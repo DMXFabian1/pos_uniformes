@@ -62,15 +62,15 @@ class _Base(unittest.TestCase):
 class RecetaTests(_Base):
     def test_propone_por_tipo_de_pieza_dentro_de_la_escuela(self) -> None:
         prop = cs.proponer_receta(self.s, self.p3)
-        self.assertEqual(prop["componentes"], [(self.p2.id, 1), (self.play.id, 1)])
+        self.assertEqual(prop["componentes"], [(self.p2.id, 1, 0), (self.play.id, 1, 1)])
         prop = cs.proponer_receta(self.s, self.cham)
-        self.assertEqual(prop["componentes"], [(self.p2.id, 1), (self.suelto.id, -1)])
+        self.assertEqual(prop["componentes"], [(self.p2.id, 1, 0), (self.suelto.id, -1, 1)])
 
     def test_ambiguo_o_faltante_no_propone(self) -> None:
         # Polo vs Deportiva: la del 3pz es la deportiva (se desempata solo)
         self._prod("Playera Polo JS", "Playera", tallas={"10": 1})
         prop = cs.proponer_receta(self.s, self.p3)
-        self.assertEqual(prop["componentes"], [(self.p2.id, 1), (self.play.id, 1)])
+        self.assertEqual(prop["componentes"], [(self.p2.id, 1, 0), (self.play.id, 1, 1)])
         # dos deportivas (H y M): eso sí lo decide Daniel
         self._prod("Playera Deportiva M JS", "Playera", tallas={"10": 1})
         prop = cs.proponer_receta(self.s, self.p3)
@@ -84,7 +84,7 @@ class RecetaTests(_Base):
         self.s.delete(self._var(self.play, "10")); self.s.delete(self._var(self.play, "12")); self.s.delete(self.play); self.s.flush()
         uni = us.armar(self.s, self.esc.id); us.agregar_pieza(self.s, uni.id, polo.id); self.s.commit()
         prop = cs.proponer_receta(self.s, self.p3)
-        self.assertEqual(prop["componentes"], [(self.p2.id, 1), (polo.id, 1)])
+        self.assertEqual(prop["componentes"], [(self.p2.id, 1, 0), (polo.id, 1, 1)])
 
     def test_definir_valida_y_recalcula_stock(self) -> None:
         with self.assertRaises(ValueError):
@@ -109,7 +109,7 @@ class GeneralesTests(_Base):
         self._prod("Pants 2pz Punto Azul Marino", "Pants 2pz", escuela=False, prenda="Básico", tallas={"10": 3})
         self.s.commit()
         prop = cs.proponer_receta(self.s, ch)
-        self.assertEqual(prop["componentes"], [(p2.id, 1), (su.id, -1)])
+        self.assertEqual(prop["componentes"], [(p2.id, 1, 0), (su.id, -1, 1)])
 
 
 class VentaTests(_Base):
@@ -210,7 +210,7 @@ class SueltoFaltanteTests(_Base):
 
     def test_crea_solo_las_que_faltan_con_las_tallas_del_2pz_y_su_precio(self) -> None:
         from pos_uniformes.database.models import Usuario
-        from pos_uniformes.scripts import crear_sueltos_faltantes as csf
+        from pos_uniformes.scripts import crear_piezas_faltantes as csf
         filas = csf.planear(self.s)
         self.assertEqual([f["nombre"] for f in filas], ["Pants Suelto Justo Sierra"])
         self.assertEqual(sorted(t for t, _c in filas[0]["tallas"]), ["10", "12", "14"])
@@ -224,13 +224,70 @@ class SueltoFaltanteTests(_Base):
         self.assertTrue(all(v.sku for v in vs.values()))
         # y ahora la chamarra ya sabe de dónde sale y dónde deja el suelto
         prop = cs.proponer_receta(self.s, self.cham)
-        self.assertEqual(prop["componentes"], [(self.p2.id, 1), (nuevo.id, -1)])
+        self.assertEqual(prop["componentes"], [(self.p2.id, 1, 0), (nuevo.id, -1, 1)])
         # correrlo otra vez no duplica
         self.assertEqual(csf.planear(self.s), [])
 
     def test_no_toca_a_la_que_usa_un_suelto_general(self) -> None:
-        from pos_uniformes.scripts import crear_sueltos_faltantes as csf
+        from pos_uniformes.scripts import crear_piezas_faltantes as csf
         general = self._prod("Pants Suelto Punto Rojo", "Pants Suelto", escuela=False, prenda="Básico", tallas={"10": 2})
         uni = us.armar(self.s, self.esc.id); us.agregar_pieza(self.s, uni.id, general.id); self.s.commit()
         self.assertEqual(csf.planear(self.s), [])
-        self.assertEqual(cs.proponer_receta(self.s, self.cham)["componentes"], [(self.p2.id, 1), (general.id, -1)])
+        self.assertEqual(cs.proponer_receta(self.s, self.cham)["componentes"], [(self.p2.id, 1, 0), (general.id, -1, 1)])
+
+
+class AlternativasTests(_Base):
+    """Daniel (2026-09-22): "el SABES puede llevar de hombre o de mujer playera
+    deportiva" → las dos playeras son una sola pieza del 3pz."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.s.delete(self._var(self.play, "10")); self.s.delete(self._var(self.play, "12")); self.s.delete(self.play)
+        self.play_h = self._prod("Playera Deportiva H JS", "Playera", tallas={"10": 3, "12": 1})
+        self.play_m = self._prod("Playera Deportiva M JS", "Playera", tallas={"10": 2, "12": 0})
+        self.play_h.genero, self.play_m.genero = "Hombre", "Mujer"
+        self.s.commit()
+
+    def test_las_dos_playeras_son_la_misma_pieza_y_el_stock_las_suma(self) -> None:
+        prop = cs.proponer_receta(self.s, self.p3)
+        self.assertEqual(prop["componentes"], [(self.p2.id, 1, 0), (self.play_h.id, 1, 1), (self.play_m.id, 1, 1)])
+        cs.definir_receta(self.s, self.p3.id, prop["componentes"]); self.s.commit()
+        self.assertEqual(cs.receta_texto(self.s, self.p3.id), "se arma de Pants 2pz Deportivo JS + Playera Deportiva H JS o Playera Deportiva M JS")
+        self.assertEqual(self._stock(self.p3, "10"), 5)   # min(2pz 5, playeras 3+2)
+        self.assertEqual(self._stock(self.p3, "12"), 1)   # min(2pz 2, playeras 1+0)
+
+    def test_al_vender_se_toma_la_que_mas_hay(self) -> None:
+        cs.definir_receta(self.s, self.p3.id, cs.proponer_receta(self.s, self.p3)["componentes"]); self.s.commit()
+        InventarioService.registrar_movimiento(self.s, self._var(self.p3, "10"), TipoMovimientoInventario.SALIDA_VENTA, -1, referencia="libreta:9", creado_por="VEND-4")
+        self.s.commit()
+        self.assertEqual((self._stock(self.play_h, "10"), self._stock(self.play_m, "10")), (2, 2))  # bajó la H (había 3)
+        self.assertEqual(self._stock(self.p2, "10"), 4)
+        self.assertEqual(self._stock(self.p3, "10"), 4)   # min(4, 2+2)
+
+    def test_dos_del_mismo_genero_no_son_alternativas(self) -> None:
+        self.play_m.genero = "Hombre"; self.s.commit()
+        prop = cs.proponer_receta(self.s, self.p3)
+        self.assertEqual(prop["componentes"], []); self.assertIn("Playera", prop["ambiguas"])
+
+
+class PlayeraFaltanteTests(_Base):
+    """Vicente Guerrero vende 3pz pero no tiene playera propia (Daniel,
+    2026-09-22: "crea su propia deportiva")."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        from pos_uniformes.database.models import RolUsuario, Usuario
+        self.s.delete(self._var(self.play, "10")); self.s.delete(self._var(self.play, "12")); self.s.delete(self.play)
+        self.s.add(Usuario(username="daniel", nombre_completo="Daniel", password_hash="x", rol=RolUsuario.ADMIN, activo=True))
+        self.s.commit()
+
+    def test_le_crea_su_playera_deportiva_con_los_precios_de_las_demas(self) -> None:
+        from pos_uniformes.database.models import Usuario
+        from pos_uniformes.scripts import crear_piezas_faltantes as csf
+        filas = [f for f in csf.planear(self.s) if f["tipo_pieza"] == "Playera"]
+        self.assertEqual([f["nombre"] for f in filas], ["Playera Deportiva Justo Sierra"])
+        csf.aplicar(self.s, filas, self.s.scalars(select(Usuario)).first()); self.s.commit()
+        nueva = self.s.scalars(select(Producto).where(Producto.nombre.like("Playera Deportiva%"))).first()
+        vs = {v.talla: float(v.precio_venta) for v in self.s.scalars(select(Variante).where(Variante.producto_id == nueva.id))}
+        self.assertEqual(vs, {"10": 199.0, "12": 209.0, "14": 209.0})
+        self.assertEqual(cs.proponer_receta(self.s, self.p3)["componentes"], [(self.p2.id, 1, 0), (nueva.id, 1, 1)])

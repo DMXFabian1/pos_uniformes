@@ -61,13 +61,24 @@ def receta_de(session: Session, conjunto_id: int) -> list[ConjuntoComponente]:
     )
 
 
+def por_grupos(receta: list[ConjuntoComponente]) -> list[list[ConjuntoComponente]]:
+    """Las piezas agrupadas: las que comparten `grupo` son alternativas (vale
+    cualquiera). Cada grupo se lleva (o deja) una vez."""
+    grupos: dict[tuple[int, bool], list[ConjuntoComponente]] = {}
+    for c in receta:
+        grupos.setdefault((int(c.grupo), c.cantidad > 0), []).append(c)
+    return list(grupos.values())
+
+
 def receta_texto(session: Session, conjunto_id: int) -> str:
-    """'se arma de Pants 2pz X + Playera Y' / 'sale de Pants 2pz X, deja Pants Suelto Z'."""
+    """'se arma de Pants 2pz X + Playera Y' / 'sale de Pants 2pz X, deja Pants
+    Suelto Z'; las alternativas van con 'o' ('Playera H o Playera M')."""
     receta = receta_de(session, conjunto_id)
     if not receta:
         return ""
-    consume = [c.componente.nombre for c in receta if c.cantidad > 0]
-    deja = [c.componente.nombre for c in receta if c.cantidad < 0]
+    grupos = por_grupos(receta)
+    consume = [" o ".join(c.componente.nombre for c in g) for g in grupos if g[0].cantidad > 0]
+    deja = [" o ".join(c.componente.nombre for c in g) for g in grupos if g[0].cantidad < 0]
     partes = []
     if consume:
         partes.append(("sale de " if deja else "se arma de ") + " + ".join(consume))
@@ -76,14 +87,17 @@ def receta_texto(session: Session, conjunto_id: int) -> str:
     return ", ".join(partes)
 
 
-def definir_receta(session: Session, conjunto_id: int, componentes: list[tuple[int, int]], *, creado_por: str = "SYSTEM") -> list[ConjuntoComponente]:
-    """Reemplaza la receta del conjunto. `componentes` = [(producto_id, cantidad)]."""
+def definir_receta(session: Session, conjunto_id: int, componentes: list, *, creado_por: str = "SYSTEM") -> list[ConjuntoComponente]:
+    """Reemplaza la receta del conjunto. `componentes` = [(producto_id, cantidad)]
+    o [(producto_id, cantidad, grupo)]; dos piezas con el mismo grupo son
+    alternativas (vale cualquiera de las dos)."""
+    componentes = [(c if len(c) == 3 else (c[0], c[1], i)) for i, c in enumerate(componentes)]
     conjunto = session.get(Producto, int(conjunto_id))
     if conjunto is None:
         raise ValueError("No existe el conjunto.")
     if not es_conjunto(conjunto):
         raise ValueError(f"{conjunto.nombre} no es un conjunto (Pants 3pz o Chamarra).")
-    for pid, cant in componentes:
+    for pid, cant, _g in componentes:
         if int(pid) == conjunto.id:
             raise ValueError("Un conjunto no puede ser pieza de sí mismo.")
         if int(cant) == 0:
@@ -96,7 +110,10 @@ def definir_receta(session: Session, conjunto_id: int, componentes: list[tuple[i
     for viejo in receta_de(session, conjunto.id):
         session.delete(viejo)
     session.flush()
-    nuevos = [ConjuntoComponente(conjunto_id=conjunto.id, componente_id=int(pid), cantidad=int(cant)) for pid, cant in componentes]
+    nuevos = [
+        ConjuntoComponente(conjunto_id=conjunto.id, componente_id=int(pid), cantidad=int(cant), grupo=int(g))
+        for pid, cant, g in componentes
+    ]
     session.add_all(nuevos)
     session.flush()
     sincronizar_conjunto(session, conjunto.id, creado_por=creado_por)
@@ -175,6 +192,28 @@ def _raiz(nombre: str) -> str:
 _COLORES_MASCULINO = {"blanco", "rojo", "negro", "amarillo", "morado", "gris"}
 
 
+_SUFIJOS_GENERO = (" h", " m", " hombre", " mujer", " niño", " niña")
+
+
+def _alternativas(tipo: str, del_tipo: list[Producto]) -> list[Producto]:
+    """Dos prendas iguales que solo se distinguen por el género (Playera
+    Deportiva **H** / **M** de SABES): valen las dos. Daniel, 2026-09-22:
+    "el SABES puede llevar de hombre o de mujer playera deportiva"."""
+    if tipo != "Playera" or len(del_tipo) < 2:
+        return []
+    def raiz(p: Producto) -> str:
+        n = " ".join(str(p.nombre or "").lower().split())
+        for suf in _SUFIJOS_GENERO:
+            n = n.replace(suf + " ", " ")
+        return " ".join(n.split())
+    deportivas = [p for p in del_tipo if "deportiv" in p.nombre.lower()]
+    if len(deportivas) < 2 or len({raiz(p) for p in deportivas}) != 1:
+        return []
+    if len({str(p.genero or "").strip().lower() for p in deportivas}) != len(deportivas):
+        return []  # mismo género: no son la misma prenda en dos versiones
+    return sorted(deportivas, key=lambda p: p.nombre)
+
+
 def _precio_medio(session: Session, producto_id: int) -> float | None:
     from sqlalchemy import func as sqlfunc
 
@@ -197,7 +236,7 @@ def _desempatar(session: Session, conjunto: Producto, tipo: str, del_tipo: list[
         deportivas = [p for p in del_tipo if "deportiv" in p.nombre.lower()]
         if len(deportivas) == 1:
             return deportivas[0]
-        return None
+        return None  # varias deportivas (H y M): son alternativas, se resuelve arriba
     if tipo == "Pants Suelto":
         p2 = next((p for p in elegidas if _tipo_pieza(p) == "Pants 2pz"), None)
         precio_2pz = _precio_medio(session, p2.id) if p2 is not None else None
@@ -220,17 +259,24 @@ def proponer_receta(session: Session, conjunto: Producto) -> dict:
         return {"componentes": [], "faltan": [], "ambiguas": {}}
     candidatas = [p for p in _candidatas(session, conjunto) if p.id != conjunto.id]
     componentes, faltan, ambiguas, elegidas = [], [], {}, []
+    grupo = 0
     for tipo, cantidad in plantilla:
         del_tipo = [p for p in candidatas if _tipo_pieza(p) == tipo]
+        alternativas = _alternativas(tipo, del_tipo)
         elegida = del_tipo[0] if len(del_tipo) == 1 else _desempatar(session, conjunto, tipo, del_tipo, elegidas)
         if elegida is not None:
             elegidas.append(elegida)
         if not del_tipo:
             faltan.append(tipo)
-        elif elegida is None:
-            ambiguas[tipo] = [p.nombre for p in del_tipo]
+        elif elegida is not None:
+            componentes.append((int(elegida.id), int(cantidad), grupo))
+        elif alternativas:
+            # Hombre y mujer de la misma prenda: vale cualquiera (mismo grupo)
+            elegidas.extend(alternativas)
+            componentes.extend((int(p.id), int(cantidad), grupo) for p in alternativas)
         else:
-            componentes.append((int(elegida.id), int(cantidad)))
+            ambiguas[tipo] = [p.nombre for p in del_tipo]
+        grupo += 1
     if faltan or ambiguas:
         componentes = []
     return {"componentes": componentes, "faltan": faltan, "ambiguas": ambiguas}
@@ -284,20 +330,39 @@ def _variantes_por_talla(session: Session, producto_id: int) -> dict[str, Varian
 
 
 def stock_derivado(session: Session, variante_conjunto: Variante, receta: list[ConjuntoComponente] | None = None) -> int | None:
-    """min(stock de cada pieza que se consume // cantidad) en la misma talla;
-    None si el conjunto no tiene receta o alguna pieza no tiene esa talla."""
+    """Lo que alcanza: min por grupo de piezas que se llevan (sumando las
+    alternativas del grupo), en la misma talla. None si el conjunto no tiene
+    receta o ninguna pieza de un grupo tiene esa talla."""
     receta = receta if receta is not None else receta_de(session, variante_conjunto.producto_id)
-    consumidos = [c for c in receta if c.cantidad > 0]
-    if not consumidos:
+    grupos = [g for g in por_grupos(receta) if g[0].cantidad > 0]
+    if not grupos:
         return None
     talla = _norm_talla(variante_conjunto.talla)
     posibles = []
-    for c in consumidos:
-        v = _variantes_por_talla(session, c.componente_id).get(talla)
-        if v is None:
+    for grupo in grupos:
+        hay = [
+            (int(v.stock_actual), int(c.cantidad))
+            for c in grupo
+            for v in [_variantes_por_talla(session, c.componente_id).get(talla)]
+            if v is not None
+        ]
+        if not hay:
             return None
-        posibles.append(int(v.stock_actual) // int(c.cantidad))
+        posibles.append(sum(stock for stock, _c in hay) // hay[0][1])
     return min(posibles)
+
+
+def _pieza_del_grupo(session: Session, grupo: list[ConjuntoComponente], talla: str):
+    """De un grupo de alternativas, la que se mueve: la que más existencia tiene
+    en esa talla (lo que la empleada toma del estante). Sin alternativas, la única."""
+    candidatas = [
+        (c, v) for c in grupo
+        for v in [_variantes_por_talla(session, c.componente_id).get(talla)]
+        if v is not None
+    ]
+    if not candidatas:
+        return grupo[0], None
+    return max(candidatas, key=lambda cv: int(cv[1].stock_actual))
 
 
 def variantes_pieza_de(session: Session, variante_conjunto: Variante) -> list[Variante]:
@@ -390,10 +455,10 @@ def descomponer(
     talla = _norm_talla(variante_conjunto.talla)
     nombre = variante_conjunto.producto.nombre if variante_conjunto.producto is not None else variante_conjunto.sku
     movimientos = []
-    for c in receta:
-        v = _variantes_por_talla(session, c.componente_id).get(talla)
+    for grupo in por_grupos(receta):
+        c, v = _pieza_del_grupo(session, grupo, talla)
         if v is None:
-            logger.warning("Conjunto %s talla %s: la pieza %s no tiene esa talla; no se movió", nombre, variante_conjunto.talla, c.componente_id)
+            logger.warning("Conjunto %s talla %s: ninguna pieza del grupo tiene esa talla; no se movió", nombre, variante_conjunto.talla)
             continue
         delta = int(cantidad) * int(c.cantidad)
         if c.cantidad > 0:

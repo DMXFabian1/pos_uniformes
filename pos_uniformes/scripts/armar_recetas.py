@@ -54,10 +54,15 @@ def _con_texto(session, filas: list[dict]) -> list[dict]:
     for f in filas:
         prop = f.get("propuesta")
         if prop and prop.get("componentes"):
-            partes = []
-            for pid, cant in prop["componentes"]:
+            # Las piezas del mismo grupo son alternativas: van con "o"
+            grupos: dict[tuple[int, bool], list[str]] = {}
+            for pid, cant, grupo in prop["componentes"]:
                 p = session.get(Producto, pid)
-                partes.append(("+ " if cant > 0 else "deja ") + (p.nombre if p else str(pid)))
+                grupos.setdefault((grupo, cant > 0), []).append(p.nombre if p else str(pid))
+            partes = [
+                ("+ " if positivo else "deja ") + " o ".join(nombres)
+                for (_g, positivo), nombres in grupos.items()
+            ]
             prop["texto"] = " ".join(partes).lstrip("+ ")
     return filas
 

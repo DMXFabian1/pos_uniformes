@@ -1719,6 +1719,10 @@ class ConjuntoComponente(Base):
         ForeignKey("producto.id", ondelete="RESTRICT"), nullable=False, index=True
     )
     cantidad: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    # Piezas con el mismo `grupo` son **alternativas**: vale cualquiera de ellas
+    # (SABES, 2026-09-22: "puede llevar de hombre o de mujer playera deportiva").
+    # Cada pieza en su propio grupo = todas se llevan, como siempre.
+    grupo: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

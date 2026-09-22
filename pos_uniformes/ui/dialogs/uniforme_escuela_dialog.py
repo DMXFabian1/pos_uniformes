@@ -515,8 +515,8 @@ class RecetaDialog(QDialog):
         botones.addWidget(guardar)
         lay.addLayout(botones)
 
-    def componentes(self) -> list[tuple[int, int]]:
-        return [(int(c.currentData()), cant) for _t, cant, c in self._combos if c.currentData() is not None]
+    def componentes(self) -> list[tuple[int, int, int]]:
+        return [(int(c.currentData()), cant, i) for i, (_t, cant, c) in enumerate(self._combos) if c.currentData() is not None]
 
     def _guardar(self) -> None:
         comps = self.componentes()
