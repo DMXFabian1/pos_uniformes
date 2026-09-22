@@ -147,7 +147,29 @@ def compute_default_na(school_levels, pieces_raw):
 # Data fetching
 # ---------------------------------------------------------------------------
 
+_SESSION = None
+
+
+def _session():
+    """La sesión con la que se le pregunta a los servicios (una por corrida)."""
+    global _SESSION
+    if _SESSION is None:
+        from pos_uniformes.database.connection import get_session  # noqa: PLC0415
+
+        _SESSION = get_session()
+    return _SESSION
+
+
+def _cerrar_session():
+    global _SESSION
+    if _SESSION is not None:
+        _SESSION.close()
+        _SESSION = None
+
+
 def fetch_all_data(conn):
+    from pos_uniformes.services import inventario_totales_service  # noqa: PLC0415
+
     cur = conn.cursor()
 
     # Stats
@@ -162,56 +184,19 @@ def fetch_all_data(conn):
     """)
     stats = dict(zip(["escuelas", "productos", "variantes_activas", "variantes_inactivas"], cur.fetchone()))
 
-    # Stock breakdown (derived from bodega_contenido)
-    cur.execute("""
-        WITH bodega_stock AS (
-            SELECT bc.variante_id,
-                COALESCE(SUM(bc.cantidad) FILTER (WHERE UPPER(bu.rack) = 'PISO'), 0) AS stock_piso,
-                COALESCE(SUM(bc.cantidad) FILTER (WHERE UPPER(bu.rack) != 'PISO'), 0) AS stock_bodega
-            FROM bodega_contenido bc
-            JOIN bodega_caja bx ON bx.id = bc.caja_id
-            JOIN bodega_ubicacion bu ON bu.id = bx.ubicacion_id
-            GROUP BY bc.variante_id
-        ),
-        school_products AS (
-            SELECT DISTINCT producto_id FROM (
-                SELECT id AS producto_id FROM producto WHERE escuela_id IS NOT NULL AND activo = true
-                UNION
-                SELECT l.producto_id FROM catalog_school_product_link l
-                JOIN producto p2 ON p2.id = l.producto_id AND p2.activo = true
-                WHERE l.activo = true
-            ) sub
-        )
-        SELECT
-            COALESCE(SUM(v.stock_actual), 0),
-            COALESCE(SUM(COALESCE(bs.stock_bodega, 0)), 0),
-            COALESCE(SUM(COALESCE(bs.stock_piso, 0)), 0),
-            COALESCE(SUM(v.stock_actual - COALESCE(bs.stock_bodega, 0) - COALESCE(bs.stock_piso, 0)), 0),
-            COUNT(*) FILTER (WHERE sp.producto_id IS NOT NULL
-                AND (v.stock_actual - COALESCE(bs.stock_bodega, 0) - COALESCE(bs.stock_piso, 0)) <= 0),
-            COUNT(*) FILTER (WHERE sp.producto_id IS NOT NULL
-                AND (v.stock_actual - COALESCE(bs.stock_bodega, 0) - COALESCE(bs.stock_piso, 0)) > 0
-                AND (v.stock_actual - COALESCE(bs.stock_bodega, 0) - COALESCE(bs.stock_piso, 0)) < COALESCE(v.stock_minimo, 2)),
-            COALESCE(SUM(v.stock_actual * v.precio_venta), 0),
-            COUNT(*) FILTER (WHERE sp.producto_id IS NOT NULL)
-        FROM variante v
-        JOIN producto p ON p.id = v.producto_id
-        LEFT JOIN bodega_stock bs ON bs.variante_id = v.id
-        LEFT JOIN school_products sp ON sp.producto_id = p.id
-        WHERE v.activo = true AND p.activo = true
-          -- Los conjuntos (Pants 3pz, Chamarra) no se suman: su existencia es
-          -- la del pants 2pz y la playera que ya vienen contados.
-          AND p.id NOT IN (SELECT conjunto_id FROM conjunto_componente)
-    """)
-    row = cur.fetchone()
-    stats["stock_total"] = int(row[0])
-    stats["stock_bodega"] = int(row[1])
-    stats["stock_piso"] = int(row[2])
-    stats["stock_tienda"] = int(row[3])
-    stats["variantes_sin_stock"] = int(row[4])
-    stats["variantes_bajo_min"] = int(row[5])
-    stats["valor_inventario"] = float(row[6])
-    stats["variantes_con_escuela"] = int(row[7])
+    # Los totales del inventario los define `inventario_totales_service`, no este
+    # guión: qué es tienda, qué es de escuela, qué es bajo mínimo y qué no se
+    # suma por venir contado en otra pieza se dicen en un solo lugar.
+    totales = inventario_totales_service.totales_inventario(_session())
+    stats["stock_total"] = totales.stock_total
+    stats["stock_bodega"] = totales.stock_bodega
+    stats["stock_piso"] = totales.stock_piso
+    stats["stock_tienda"] = totales.stock_tienda
+    stats["variantes_sin_stock"] = totales.variantes_sin_stock
+    stats["variantes_bajo_min"] = totales.variantes_bajo_minimo
+    stats["valor_inventario"] = totales.valor_inventario
+    stats["variantes_con_escuela"] = totales.variantes_con_escuela
+
 
     # Schools per nivel
     cur.execute("""
@@ -311,21 +296,10 @@ def fetch_all_data(conn):
     catalog_rows = cur.fetchall()
     catalog_cols = [d[0] for d in cur.description]
 
-    # Valor de inventario por nivel educativo
-    cur.execute("""
-        SELECT ne.nombre,
-            COALESCE(SUM(v.stock_actual * v.precio_venta), 0) AS valor
-        FROM variante v
-        JOIN producto p ON p.id = v.producto_id AND p.activo = true
-        JOIN nivel_educativo ne ON ne.id = p.nivel_educativo_id
-        WHERE v.activo = true AND p.escuela_id IS NOT NULL
-          AND p.id NOT IN (SELECT conjunto_id FROM conjunto_componente)
-        GROUP BY ne.nombre
-        ORDER BY ne.nombre
-    """)
-    valor_por_nivel = {r[0]: float(r[1]) for r in cur.fetchall()}
+    valor_por_nivel = inventario_totales_service.valor_por_nivel(_session())
 
     cur.close()
+    _cerrar_session()
     return stats, multi_level_ids, school_levels, pieces_raw, catalog_rows, catalog_cols, valor_por_nivel
 
 

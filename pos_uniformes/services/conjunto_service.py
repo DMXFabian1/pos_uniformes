@@ -466,11 +466,6 @@ def filtro_sin_conjuntos():
     return ~_P.id.in_(select(ConjuntoComponente.conjunto_id))
 
 
-SQL_SIN_CONJUNTOS = (
-    "p.id NOT IN (SELECT conjunto_id FROM conjunto_componente)"
-)
-
-
 # ------------------------------------------------------------------- la venta
 
 def descomponer(
