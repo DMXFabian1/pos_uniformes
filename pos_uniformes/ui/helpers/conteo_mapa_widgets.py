@@ -184,7 +184,14 @@ class CapaMapa(QWidget):
 
 
 class Prenda(QFrame):
-    """Capa 2/3: una prenda con su barra; al tocarla se despliegan sus tallas."""
+    """Capa 2/3: una prenda con su barra; al tocarla se despliegan sus tallas.
+
+    Si le faltan tallas por contar trae su propio botón de imprimir: estás
+    viendo justo que le falta, así que el atajo es sacar **esa** hoja sin pasar
+    por el selector de escuela (Daniel, 2026-09-22).
+    """
+
+    imprimir = pyqtSignal(str)   # el nombre de la prenda
 
     def __init__(self, p: dict, *, abierta: bool = False, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -204,6 +211,21 @@ class Prenda(QFrame):
         sub = QLabel(f"{tipo}{p['tallas']} tallas · {texto_cifras(p)}")
         sub.setStyleSheet(f"font-size: 12px; color: #8a8177; {_TXT}")
         fila.addWidget(sub, 1)
+        self.nombre = str(p["nombre"])
+        self.faltan = int(p.get("viejas", 0)) + int(p.get("nunca", 0))
+        if self.faltan:
+            from PyQt6.QtWidgets import QPushButton
+
+            # Sin objectName, igual que los de «TE TOCA CONTAR»: es el mismo
+            # gesto y tiene que verse igual.
+            boton = QPushButton("🖨 Imprimir")
+            boton.setAutoDefault(False)
+            boton.setCursor(Qt.CursorShape.PointingHandCursor)
+            cuantas = "una talla" if self.faltan == 1 else f"{self.faltan} tallas"
+            boton.setToolTip(f"Saca la hoja de esta prenda ({cuantas} por contar)")
+            # El clic se queda en el botón y no despliega las tallas.
+            boton.clicked.connect(lambda: self.imprimir.emit(self.nombre))
+            fila.addWidget(boton)
         ly.addLayout(fila)
         ly.addWidget(Semaforo(p))
         self._tallas = QWidget()
@@ -247,6 +269,7 @@ class CapaDetalle(QWidget):
     """Una escuela o un tipo de básicos: encabezado + sus prendas."""
 
     volver = pyqtSignal()
+    imprimir_prenda = pyqtSignal(str)
 
     def __init__(self, d: dict, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -282,6 +305,7 @@ class CapaDetalle(QWidget):
         self.prendas: list[Prenda] = []
         for p in d.get("prendas", []):
             w = Prenda(p)
+            w.imprimir.connect(self.imprimir_prenda)
             self.prendas.append(w)
             ly.addWidget(w)
         if not d.get("prendas"):

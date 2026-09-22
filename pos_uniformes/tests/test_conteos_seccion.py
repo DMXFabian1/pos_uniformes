@@ -46,6 +46,35 @@ class SeccionesTests(unittest.TestCase):
         # Y avisa que nada se aplica solo.
         self.assertIn("no cambia el inventario solo", cuerpo)
 
+    def test_el_mapa_puede_pedir_la_hoja_de_una_prenda(self) -> None:
+        import inspect
+
+        cuerpo = inspect.getsource(QuoteSatelliteWindow._build_conteos_page)
+        self.assertIn("imprimir_prenda.connect", cuerpo)
+
+    def test_una_sola_prenda_va_en_tira_y_solo_lo_que_falta(self) -> None:
+        import inspect
+
+        cuerpo = inspect.getsource(QuoteSatelliteWindow._conteos_imprimir_prenda_del_mapa)
+        self.assertIn("preguntar_destino=False", cuerpo)   # no estorba con el selector
+        self.assertIn("solo_lo_que_falta=True", cuerpo)    # la hoja trae lo que falta
+
+    def test_cuando_son_varias_prendas_se_sigue_preguntando(self) -> None:
+        import inspect
+
+        cuerpo = inspect.getsource(QuoteSatelliteWindow._conteos_imprimir_hoja)
+        self.assertIn("if preguntar_destino:", cuerpo)
+        self.assertIn("ConteoDestinoDialog(self", cuerpo)
+
+    def test_el_atajo_no_se_salta_el_gafete(self) -> None:
+        # Imprimir cuenta como empezar a contar: queda a nombre de quien
+        # imprime. El atajo del mapa pasa por el mismo camino.
+        import inspect
+
+        cuerpo = inspect.getsource(QuoteSatelliteWindow._conteos_imprimir_prenda_del_mapa)
+        self.assertIn("_conteos_imprimir_hoja", cuerpo)
+        self.assertIn("_conteos_contado_por", inspect.getsource(QuoteSatelliteWindow._conteos_imprimir_hoja))
+
 
 class CamarasTests(unittest.TestCase):
     def test_el_boton_de_camaras_queda_oculto(self) -> None:

@@ -3548,6 +3548,9 @@ class QuoteSatelliteWindow(QMainWindow):
         # `auto=False`: se arma cuando la página se abre (_refresh_conteos_vista),
         # no al construir la ventana (WebEngine + consulta por Wi-Fi).
         self.conteos_mapa = ConteoMapaWidget(auto=False, scroll_propio=False)
+        # El botón de una prenda del mapa saca su hoja en tira, sin preguntar
+        # destino: es una sola y elegir estorba (2026-09-22).
+        self.conteos_mapa.imprimir_prenda.connect(self._conteos_imprimir_prenda_del_mapa)
         layout.addWidget(self.conteos_mapa, 1)
         self.conteos_historial_table = QTableWidget(0, 6)
         self.conteos_historial_table.setObjectName("libretaTabla")
@@ -3987,13 +3990,18 @@ class QuoteSatelliteWindow(QMainWindow):
 
     def _conteos_imprimir_hoja(
         self, *, escuela_id=None, tipo_pieza: str = "", titulo: str = "", prenda: str = "",
-        solo_lo_que_falta: bool = False,
+        solo_lo_que_falta: bool = False, preguntar_destino: bool = True,
     ) -> None:
         """La hoja de conteo en papel carta (HP), para una escuela o prenda.
 
         Mismo orden y numeración que la pantalla de captura. La tira térmica
         de antes sigue en el admin (Ctrl+Shift+A → Conteos) como respaldo.
         Con `titulo` ya decidido (otra hoja de una jornada en proceso) no pregunta qué.
+
+        `preguntar_destino=False` la manda derecho a la tira, sin el selector:
+        es lo que pide el botón de **una** prenda en el mapa, donde elegir entre
+        carta y tira para una sola hoja estorba más de lo que ayuda (Daniel,
+        2026-09-22). Cuando son varias prendas se sigue preguntando.
         """
         from types import SimpleNamespace
 
@@ -4022,10 +4030,14 @@ class QuoteSatelliteWindow(QMainWindow):
         # tira es el respaldo cuando la HP anda fallando (2026-09-11).
         from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import ConteoDestinoDialog
 
-        destino_dlg = ConteoDestinoDialog(self, titulo=dlg.titulo)
-        if destino_dlg.exec() != int(QDialog.DialogCode.Accepted) or not destino_dlg.destino:
-            return
-        if destino_dlg.destino == ConteoDestinoDialog.TIRA:
+        if preguntar_destino:
+            destino_dlg = ConteoDestinoDialog(self, titulo=dlg.titulo)
+            if destino_dlg.exec() != int(QDialog.DialogCode.Accepted) or not destino_dlg.destino:
+                return
+            destino = destino_dlg.destino
+        else:
+            destino = ConteoDestinoDialog.TIRA
+        if destino == ConteoDestinoDialog.TIRA:
             self._conteos_imprimir_tira(dlg.escuela_id, dlg.tipo_pieza, getattr(dlg, "prenda", ""))
             self._conteos_anotar_impresion(dlg.escuela_id, dlg.tipo_pieza, getattr(dlg, "prenda", ""))
             return
@@ -4093,6 +4105,21 @@ class QuoteSatelliteWindow(QMainWindow):
             return
         self._set_status(f"{titulo}: hoja impresa, queda en proceso a nombre de {quien}." if not ya_habia else f"{titulo}: otra hoja para la jornada de {quien}.")
         self._refresh_conteos_vista()
+
+    def _conteos_imprimir_prenda_del_mapa(self, escuela_id, tipo_pieza: str, prenda: str) -> None:
+        """El botón 🖨 de una prenda en «Cómo va la tienda».
+
+        Sale su hoja y nada más, en tira. Pasa por el mismo camino que las
+        demás, así que sigue pidiendo gafete y queda anotado a nombre de quien
+        imprime; lo único que se salta es el selector de destino."""
+        from pos_uniformes.services.conteo_jornada_service import nombre_corto_prenda
+
+        corto = nombre_corto_prenda(prenda) if prenda else ""
+        titulo = corto or (f"Básicos · {tipo_pieza}" if tipo_pieza else "Conteo")
+        self._conteos_imprimir_hoja(
+            escuela_id=escuela_id, tipo_pieza=tipo_pieza, titulo=titulo, prenda=prenda,
+            solo_lo_que_falta=True, preguntar_destino=False,
+        )
 
     def _conteos_imprimir_tira(self, escuela_id: int | None, tipo_pieza: str, prenda: str = "") -> None:
         """La hoja de siempre en la impresora de tickets: una tira por prenda.

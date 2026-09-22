@@ -33,6 +33,8 @@ class ConteoMapaWidget(QWidget):
     """Barra (buscador, estado, ↻) + la capa actual (mapa o detalle)."""
 
     _listo = pyqtSignal(object)   # dict de datos, o None si falló
+    #: (escuela_id | None, tipo_pieza, prenda) — el botón de una prenda del mapa.
+    imprimir_prenda = pyqtSignal(object, str, str)
 
     def __init__(self, parent: QWidget | None = None, *, generar=generar_datos, auto: bool = True, columnas: int = 4, scroll_propio: bool = True) -> None:
         """`scroll_propio=False`: dentro de una página que ya hace scroll (la
@@ -160,8 +162,19 @@ class ConteoMapaWidget(QWidget):
                 return self._pintar()
             capa = CapaDetalle(d)
             capa.volver.connect(lambda: self._navegar("mapa"))
+            capa.imprimir_prenda.connect(self._pedir_hoja)
             self.busca.setVisible(False)
         self._poner(capa)
+
+    def _pedir_hoja(self, prenda: str) -> None:
+        """Traduce la capa que se está viendo al alcance que espera quien imprime.
+
+        Las claves del mapa son `e<escuela_id>` y `b<tipo de básicos>`."""
+        capa = str(self._capa or "")
+        if capa.startswith("e") and capa[1:].isdigit():
+            self.imprimir_prenda.emit(int(capa[1:]), "", prenda)
+        elif capa.startswith("b"):
+            self.imprimir_prenda.emit(None, capa[1:], prenda)
 
 
 class ConteoMapaDialog(QDialog):
