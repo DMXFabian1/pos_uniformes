@@ -447,6 +447,39 @@ def obtener_variantes_agrupadas_por_producto(
     return agrupar_variantes_por_producto(obtener_variantes_para_conteo(session, escuela_id, nivel_id=nivel_id))
 
 
+def _color_visible(variante) -> str:
+    """El color de una talla, o vacío cuando la prenda no se distingue por color."""
+    color = str(getattr(variante, "color", "") or "").strip()
+    return "" if color.lower() in ("", "sin color", "unico", "único") else color
+
+
+def partir_grupos_por_color(grupos: list[dict]) -> list[dict]:
+    """Una hoja por color cuando la prenda viene en varios.
+
+    La Licra sale en azul marino, blanca y negra, y la hoja las juntaba todas:
+    salían `CH CH CH · MD MD MD` sin decir cuál era cuál, y así no se puede
+    contar (Daniel, 2026-09-22, con la hoja impresa en la mano). Los montones
+    en el estante están separados por color, así que la hoja también.
+
+    Un grupo de un solo color (o sin color) se queda igual."""
+    partidos: list[dict] = []
+    for g in grupos:
+        variantes = g.get("variantes") or []
+        colores = sorted({_color_visible(v) for v in variantes} - {""})
+        if len(colores) < 2:
+            partidos.append(g)
+            continue
+        for color in colores:
+            suyas = [v for v in variantes if _color_visible(v) == color]
+            if suyas:
+                partidos.append({**g, "color": color, "variantes": suyas})
+        # Las que no dicen color no se pierden: van en su propia hoja al final.
+        sin_color = [v for v in variantes if not _color_visible(v)]
+        if sin_color:
+            partidos.append({**g, "color": "", "variantes": sin_color})
+    return partidos
+
+
 def agrupar_variantes_por_producto(variantes: list[VarianteParaConteo]) -> list[dict]:
     """Puro: la misma agrupación y orden que ven la pantalla y la hoja."""
     grupos: dict[str, dict] = {}

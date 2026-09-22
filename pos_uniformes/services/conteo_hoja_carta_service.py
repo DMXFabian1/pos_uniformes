@@ -3,7 +3,7 @@
 Hasta el 2026-09-10 la hoja salía en la impresora de tickets: tiras de 80 mm,
 una por producto. El formato de esa tira es el bueno (Daniel lo diseñó y lo
 usa): por prenda, una tabla **Talla | Exist. | Pedido**, con el nombre limpio,
-la pieza y los colores. Esta hoja lo conserva tal cual y lo acomoda de a
+la pieza y su color. Esta hoja lo conserva tal cual y lo acomoda de a
 **tres tarjetas por fila** en carta, para la HP. Cada prenda va **numerada
 igual que en la pantalla de captura** (las dos leen
 `conteo_jornada_service.alcance`).
@@ -257,9 +257,14 @@ def grupos_para_hoja(
     from pos_uniformes.database.models import Escuela
     from pos_uniformes.services.conteo_jornada_service import alcance, nombre_corto_prenda
 
+    from pos_uniformes.services.conteo_service import partir_grupos_por_color
+
     grupos = alcance(session, escuela_id, tipo_pieza, prenda)
     if solo_lo_que_falta:
         grupos = _solo_lo_que_falta(grupos) or grupos
+    # Una tarjeta por color: si no, salen `CH CH CH` sin decir cuál es cuál.
+    # Va después del filtro para no sacar la tarjeta de un color sin nada que contar.
+    grupos = partir_grupos_por_color(grupos)
     if escuela_id is None:
         titulo = f"Básicos · {nombre_corto_prenda(prenda)}" if prenda else (f"Básicos · {tipo_pieza}" if tipo_pieza else "Básicos")
     else:

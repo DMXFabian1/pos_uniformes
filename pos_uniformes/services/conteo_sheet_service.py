@@ -71,9 +71,13 @@ def build_conteo_sheets(
 
     Cada string es una hoja lista para imprimir en la térmica.
     """
+    from pos_uniformes.services.conteo_service import partir_grupos_por_color
+
     grupos = obtener_variantes_agrupadas_por_producto(session, escuela_id, nivel_id=nivel_id)
     if not grupos:
         return []
+    # Una hoja por color: los montones están separados en el estante.
+    grupos = partir_grupos_por_color(grupos)
 
     fecha_str = fecha or datetime.now().strftime("%d/%m/%Y")
 
@@ -99,11 +103,14 @@ def build_conteo_sheets(
             continue
 
         # Extraer colores únicos (ignorar "Sin color" y vacíos)
-        colores = sorted({
-            v.color for v in variantes
-            if v.color and v.color.lower() not in ("sin color", "")
-        })
-        color_str = ", ".join(colores) if colores else ""
+        # El grupo viene partido por color, así que aquí es uno solo.
+        color_str = str(grupo.get("color") or "")
+        if not color_str:
+            colores = sorted({
+                v.color for v in variantes
+                if v.color and v.color.lower() not in ("sin color", "")
+            })
+            color_str = ", ".join(colores) if colores else ""
 
         lines: list[str] = []
         lines.append(_top())
@@ -181,9 +188,13 @@ def build_conteo_sheets_basicos(
 ) -> list[str]:
     """Hojas de conteo para productos básicos (ligados por catálogo, sin escuela directa).
     `prenda`: solo ese producto (nombre completo)."""
+    from pos_uniformes.services.conteo_service import partir_grupos_por_color
+
     grupos = obtener_variantes_basicos_agrupadas(session, tipo_pieza=tipo_pieza)
     if prenda:
         grupos = [g for g in grupos if str(g.get("producto_nombre") or "") == prenda]
+    # Una hoja por color: los montones están separados en el estante.
+    grupos = partir_grupos_por_color(grupos)
     if not grupos:
         return []
 
@@ -200,11 +211,14 @@ def build_conteo_sheets_basicos(
         if not variantes:
             continue
 
-        colores = sorted({
-            v.color for v in variantes
-            if v.color and v.color.lower() not in ("sin color", "")
-        })
-        color_str = ", ".join(colores) if colores else ""
+        # El grupo viene partido por color, así que aquí es uno solo.
+        color_str = str(grupo.get("color") or "")
+        if not color_str:
+            colores = sorted({
+                v.color for v in variantes
+                if v.color and v.color.lower() not in ("sin color", "")
+            })
+            color_str = ", ".join(colores) if colores else ""
 
         lines: list[str] = []
         lines.append(_top())
