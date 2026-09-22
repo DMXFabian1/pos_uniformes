@@ -17,13 +17,17 @@ from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 
+# Para poder importar `pos_uniformes.*` corriendo el guión de frente.
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
 # ---------------------------------------------------------------------------
 # Conexión  (usa el engine de SQLAlchemy — no requiere psycopg2 directo)
 # ---------------------------------------------------------------------------
 
-def _get_connection():
+def _preparar_base():
+    """Elige a qué base preguntarle: la de la Mac si responde, si no la de la
+    tienda. Tiene que correr **antes** de crear el engine."""
     import os, socket as _sock
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from pos_uniformes.utils.config import server_db_host, server_db_port  # noqa: PLC0415
 
     _win = server_db_host()
@@ -55,8 +59,6 @@ def _get_connection():
     import pos_uniformes.utils.config as _config  # noqa: PLC0415
 
     _config.settings = _config.Settings.from_env()
-    from pos_uniformes.database.connection import engine  # noqa: PLC0415
-    return engine.raw_connection()
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -154,6 +156,7 @@ def _session():
     """La sesión con la que se le pregunta a los servicios (una por corrida)."""
     global _SESSION
     if _SESSION is None:
+        _preparar_base()
         from pos_uniformes.database.connection import get_session  # noqa: PLC0415
 
         _SESSION = get_session()
@@ -167,23 +170,12 @@ def _cerrar_session():
         _SESSION = None
 
 
-def fetch_all_data(conn):
+def fetch_all_data():
     from pos_uniformes.services import escuela_piezas_service  # noqa: PLC0415
     from pos_uniformes.services import inventario_totales_service  # noqa: PLC0415
 
-    cur = conn.cursor()
 
-    # Stats
-    cur.execute("""
-        SELECT
-            (SELECT COUNT(*) FROM escuela WHERE activo=true),
-            (SELECT COUNT(*) FROM producto WHERE activo=true),
-            (SELECT COUNT(*) FROM variante v JOIN producto p ON p.id=v.producto_id
-             WHERE v.activo=true AND p.activo=true),
-            (SELECT COUNT(*) FROM variante v JOIN producto p ON p.id=v.producto_id
-             WHERE v.activo=false AND p.activo=true)
-    """)
-    stats = dict(zip(["escuelas", "productos", "variantes_activas", "variantes_inactivas"], cur.fetchone()))
+    stats = inventario_totales_service.conteos_de_catalogo(_session())
 
     # Los totales del inventario los define `inventario_totales_service`, no este
     # guión: qué es tienda, qué es de escuela, qué es bajo mínimo y qué no se
@@ -199,16 +191,7 @@ def fetch_all_data(conn):
     stats["variantes_con_escuela"] = totales.variantes_con_escuela
 
 
-    # Schools per nivel
-    cur.execute("""
-        SELECT ne.nombre, COUNT(DISTINCT p.escuela_id)
-        FROM producto p
-        JOIN escuela e ON e.id=p.escuela_id AND e.activo=true
-        JOIN nivel_educativo ne ON ne.id=p.nivel_educativo_id
-        WHERE p.activo=true
-        GROUP BY ne.nombre
-    """)
-    stats["por_nivel"] = dict(cur.fetchall())
+    stats["por_nivel"] = escuela_piezas_service.escuelas_por_nivel(_session())
 
     multi_level_ids = escuela_piezas_service.escuelas_multinivel(_session())
 
@@ -221,46 +204,13 @@ def fetch_all_data(conn):
     pieces_raw = escuela_piezas_service.matriz_de_piezas(_session())
 
 
-    # Full catalog (direct + linked basic products)
-    cur.execute("""
-        WITH all_school_products AS (
-            SELECT p.escuela_id, p.id AS producto_id, p.nivel_educativo_id
-            FROM producto p WHERE p.activo=true AND p.escuela_id IS NOT NULL
-            UNION
-            SELECT l.escuela_id, p.id, ne_esc.nivel_educativo_id
-            FROM catalog_school_product_link l
-            JOIN producto p ON p.id=l.producto_id AND p.activo=true
-            JOIN (SELECT DISTINCT p2.escuela_id, p2.nivel_educativo_id
-                  FROM producto p2 WHERE p2.activo=true AND p2.escuela_id IS NOT NULL) ne_esc
-                ON ne_esc.escuela_id=l.escuela_id
-            WHERE l.activo=true
-        )
-        SELECT
-            e.id AS escuela_id, e.nombre AS escuela,
-            ne.nombre AS nivel, tp.nombre AS tipo_pieza,
-            p.id AS producto_id, p.nombre_base,
-            v.id AS variante_id, v.sku, v.talla, v.color,
-            v.precio_venta, v.stock_actual, v.activo AS v_activo,
-            COALESCE((SELECT SUM(bc.cantidad) FROM bodega_contenido bc JOIN bodega_caja bx ON bx.id=bc.caja_id JOIN bodega_ubicacion bu ON bu.id=bx.ubicacion_id WHERE bc.variante_id=v.id AND UPPER(bu.rack)!='PISO'), 0) AS stock_bodega,
-            COALESCE((SELECT SUM(bc.cantidad) FROM bodega_contenido bc JOIN bodega_caja bx ON bx.id=bc.caja_id JOIN bodega_ubicacion bu ON bu.id=bx.ubicacion_id WHERE bc.variante_id=v.id AND UPPER(bu.rack)='PISO'), 0) AS stock_piso,
-            v.stock_minimo,
-            p.escuela_id AS producto_escuela_id,
-            COALESCE(v.disponibilidad_oculta, false) AS disp_oculta
-        FROM all_school_products asp
-        JOIN escuela e ON e.id=asp.escuela_id AND e.activo=true
-        JOIN producto p ON p.id=asp.producto_id
-        JOIN nivel_educativo ne ON ne.id=asp.nivel_educativo_id
-        JOIN tipo_pieza tp ON tp.id=p.tipo_pieza_id
-        LEFT JOIN variante v ON v.producto_id=p.id
-        WHERE p.activo=true
-        ORDER BY e.nombre, ne.nombre, tp.nombre, p.nombre_base, v.talla, v.color
-    """)
-    catalog_rows = cur.fetchall()
-    catalog_cols = [d[0] for d in cur.description]
+    # Cada talla de cada prenda que le toca a cada escuela: el mismo reparto de
+    # Piezas y la misma cuenta de piso y bodega de los totales.
+    catalog_rows = escuela_piezas_service.catalogo_por_escuela(_session())
+    catalog_cols = list(escuela_piezas_service.CATALOGO_COLUMNAS)
 
     valor_por_nivel = inventario_totales_service.valor_por_nivel(_session())
 
-    cur.close()
     _cerrar_session()
     return stats, multi_level_ids, school_levels, pieces_raw, catalog_rows, catalog_cols, valor_por_nivel
 
@@ -2886,11 +2836,8 @@ if (typeof QWebChannel !== 'undefined' && typeof qt !== 'undefined') {{
 # ---------------------------------------------------------------------------
 
 def main():
-    print("Conectando a la base de datos...")
-    conn = _get_connection()
     print("Consultando datos...")
-    stats, multi_level_ids, school_levels, pieces_raw, catalog_rows, catalog_cols, valor_por_nivel = fetch_all_data(conn)
-    conn.close()
+    stats, multi_level_ids, school_levels, pieces_raw, catalog_rows, catalog_cols, valor_por_nivel = fetch_all_data()
     print(f"  {stats['escuelas']} escuelas, {stats['productos']} productos, {stats['variantes_activas']} variantes")
 
     print("Calculando insights...")

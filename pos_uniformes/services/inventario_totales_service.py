@@ -21,6 +21,7 @@ from pos_uniformes.database.models import (
     BodegaContenido,
     BodegaUbicacion,
     CatalogSchoolProductLink,
+    Escuela,
     NivelEducativo,
     Producto,
     Variante,
@@ -186,3 +187,36 @@ def valor_por_nivel(session: Session) -> dict[str, float]:
         .order_by(NivelEducativo.nombre)
     ).all()
     return {nombre: float(valor) for nombre, valor in filas}
+
+
+def conteos_de_catalogo(session: Session) -> dict[str, int]:
+    """De cuánto estamos hablando: escuelas, prendas y tallas vivas.
+
+    Las tallas inactivas se cuentan aparte, pero solo las de prendas que siguen
+    vivas: las de una prenda dada de baja ya no son noticia."""
+    fila = session.execute(
+        select(
+            select(func.count(Escuela.id))
+            .where(Escuela.activo.is_(True))
+            .scalar_subquery(),
+            select(func.count(Producto.id))
+            .where(Producto.activo.is_(True))
+            .scalar_subquery(),
+            select(func.count(Variante.id))
+            .select_from(Variante)
+            .join(Producto, Producto.id == Variante.producto_id)
+            .where(Variante.activo.is_(True), Producto.activo.is_(True))
+            .scalar_subquery(),
+            select(func.count(Variante.id))
+            .select_from(Variante)
+            .join(Producto, Producto.id == Variante.producto_id)
+            .where(Variante.activo.is_(False), Producto.activo.is_(True))
+            .scalar_subquery(),
+        )
+    ).one()
+    return {
+        "escuelas": int(fila[0]),
+        "productos": int(fila[1]),
+        "variantes_activas": int(fila[2]),
+        "variantes_inactivas": int(fila[3]),
+    }

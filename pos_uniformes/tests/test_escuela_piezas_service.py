@@ -143,6 +143,106 @@ class EscuelasConNivelesTest(_Base):
         self.assertEqual(orden, ["Álvaro Obregón", "Benito Juárez", "Zaragoza"])
 
 
+class CatalogoPorEscuelaTest(_Base):
+    def _variante(self, producto, talla, *, color="Rojo", stock=0, precio=100, activo=True):
+        from pos_uniformes.database.models import Variante
+
+        v = Variante(
+            producto_id=producto.id,
+            sku=f"{producto.id}-{talla}-{color}",
+            talla=talla,
+            color=color,
+            precio_venta=precio,
+            stock_actual=stock,
+            activo=activo,
+        )
+        self.s.add(v)
+        self.s.flush()
+        return v
+
+    def _fila(self, filas, sku):
+        i = eps.CATALOGO_COLUMNAS.index("sku")
+        return next(f for f in filas if f[i] == sku)
+
+    def _campo(self, fila, nombre):
+        return fila[eps.CATALOGO_COLUMNAS.index(nombre)]
+
+    def test_una_fila_por_talla_con_su_escuela(self):
+        esc = self._escuela("Justo Sierra")
+        p = self._prod("Playera JS", "Playera", escuela=esc)
+        self._variante(p, "10")
+        self._variante(p, "12")
+        filas = eps.catalogo_por_escuela(self.s)
+        self.assertEqual(len(filas), 2)
+        self.assertEqual(self._campo(filas[0], "escuela"), "Justo Sierra")
+        self.assertEqual(self._campo(filas[0], "tipo_pieza"), "Playera")
+
+    def test_la_prenda_sin_tallas_igual_aparece(self):
+        esc = self._escuela("Justo Sierra")
+        self._prod("Playera JS", "Playera", escuela=esc)
+        fila = eps.catalogo_por_escuela(self.s)[0]
+        self.assertIsNone(self._campo(fila, "variante_id"))
+        self.assertIsNone(self._campo(fila, "talla"))
+        self.assertEqual(self._campo(fila, "stock_bodega"), 0)
+
+    def test_la_general_sale_bajo_cada_escuela_que_la_lleva(self):
+        una = self._escuela("Justo Sierra")
+        otra = self._escuela("Frida Kahlo")
+        self._prod("Playera JS", "Playera", escuela=una)
+        self._prod("Playera FK", "Playera", escuela=otra)
+        general = self._prod("Suéter Vino", "Suéter")
+        self._variante(general, "10")
+        for e in (una, otra):
+            self.s.add(CatalogSchoolProductLink(escuela_id=e.id, producto_id=general.id))
+        self.s.flush()
+
+        filas = eps.catalogo_por_escuela(self.s)
+        suyas = [f for f in filas if self._campo(f, "producto_id") == general.id]
+        self.assertEqual({self._campo(f, "escuela") for f in suyas}, {"Justo Sierra", "Frida Kahlo"})
+        for f in suyas:
+            self.assertIsNone(self._campo(f, "producto_escuela_id"), "sigue siendo general")
+
+    def test_lo_guardado_viene_partido_en_piso_y_bodega(self):
+        from pos_uniformes.database.models import BodegaCaja, BodegaContenido, BodegaUbicacion
+
+        esc = self._escuela("Justo Sierra")
+        p = self._prod("Playera JS", "Playera", escuela=esc)
+        v = self._variante(p, "10", stock=10)
+        for rack, cantidad in (("A", 3), ("PISO", 2)):
+            ubi = BodegaUbicacion(codigo=f"{rack}-1", rack=rack, nivel=1)
+            self.s.add(ubi)
+            self.s.flush()
+            caja = BodegaCaja(codigo=f"C-{rack}", ubicacion_id=ubi.id)
+            self.s.add(caja)
+            self.s.flush()
+            self.s.add(BodegaContenido(caja_id=caja.id, variante_id=v.id, cantidad=cantidad))
+        self.s.flush()
+
+        fila = self._fila(eps.catalogo_por_escuela(self.s), v.sku)
+        self.assertEqual(self._campo(fila, "stock_actual"), 10)
+        self.assertEqual(self._campo(fila, "stock_bodega"), 3)
+        self.assertEqual(self._campo(fila, "stock_piso"), 2)
+
+    def test_el_orden_es_el_de_la_base(self):
+        z = self._escuela("Zaragoza")
+        a = self._escuela("Álvaro Obregón")
+        for esc in (z, a):
+            p = self._prod(f"Playera {esc.nombre}", "Playera", escuela=esc)
+            self._variante(p, "10")
+        orden = [self._campo(f, "escuela") for f in eps.catalogo_por_escuela(self.s)]
+        self.assertEqual(orden, ["Álvaro Obregón", "Zaragoza"])
+
+
+class ConteosTest(_Base):
+    def test_escuelas_por_nivel_cuenta_escuelas_no_prendas(self):
+        una = self._escuela("Justo Sierra")
+        otra = self._escuela("Frida Kahlo")
+        self._prod("Playera JS", "Playera", escuela=una)
+        self._prod("Pants JS", "Pants 2pz", escuela=una)
+        self._prod("Playera FK", "Playera", escuela=otra, nivel=self.secundaria)
+        self.assertEqual(eps.escuelas_por_nivel(self.s), {"Primaria": 1, "Secundaria": 1})
+
+
 class GeneradorNoEscribeSQLDePiezasTest(unittest.TestCase):
     def setUp(self) -> None:
         from pathlib import Path
@@ -150,15 +250,18 @@ class GeneradorNoEscribeSQLDePiezasTest(unittest.TestCase):
         ruta = Path(__file__).resolve().parent.parent / "scripts" / "generar_panel_uniformes.py"
         self.fuente = ruta.read_text(encoding="utf-8")
 
-    def test_no_arma_por_su_cuenta_la_matriz_de_piezas(self):
-        # Queda una copia de las ligas en la consulta del catálogo completo,
-        # la que alimenta Tarifarios y Disponibilidad: les toca en su paso.
-        # Aquí se cuida la matriz de Piezas, que ya tiene dueño.
-        self.assertNotIn(
-            "WITH school_products AS",
-            self.fuente,
-            "la matriz la arma escuela_piezas_service, que sigue al uniforme armado",
-        )
+    def test_el_generador_ya_no_escribe_SQL(self):
+        """Fase 2 cerrada para el panel: pregunta, no calcula."""
+        for rastro in ("cur.execute", "SELECT ", "catalog_school_product_link",
+                       "bodega_contenido", "conjunto_componente"):
+            self.assertNotIn(
+                rastro,
+                self.fuente,
+                f"'{rastro}' volvió al generador: la regla tiene que vivir en un servicio",
+            )
+
+    def test_pide_el_catalogo_al_servicio(self):
+        self.assertIn("escuela_piezas_service.catalogo_por_escuela", self.fuente)
 
     def test_pide_la_matriz_al_servicio(self):
         self.assertIn("escuela_piezas_service.matriz_de_piezas", self.fuente)
