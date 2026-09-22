@@ -3879,12 +3879,18 @@ class QuoteSatelliteWindow(QMainWindow):
         nombre = QLabel(fila.titulo)
         nombre.setStyleSheet("font-size: 15px; font-weight: 800; color: #2c2a27; background: transparent; border: none;")
         col.addWidget(nombre)
-        detalle = "nunca se ha contado" if fila.ultimo.fecha is None else f"último: {fila.ultimo.texto()}"
+        if fila.ultimo.fecha is None:
+            detalle, color = "nunca se ha contado", "#b91c1c"
+        elif fila.quedo_a_medias:
+            # Se contó, pero se cerró sin terminar: faltan prendas enteras
+            # (la Calceta se contó de un color y faltaron los otros seis).
+            detalle = f"faltan {fila.prendas_faltantes} de {fila.prendas_total} prendas · se contó {fila.ultimo.texto()}"
+            color = "#b45309"
+        else:
+            detalle, color = f"último: {fila.ultimo.texto()}", "#8a8177"
         sub = QLabel(detalle)
-        sub.setStyleSheet(
-            "font-size: 12px; color: %s; background: transparent; border: none;"
-            % ("#b91c1c" if fila.ultimo.fecha is None else "#8a8177")
-        )
+        sub.setWordWrap(True)
+        sub.setStyleSheet(f"font-size: 12px; color: {color}; background: transparent; border: none;")
         col.addWidget(sub)
         ly.addLayout(col, 1)
         boton = QPushButton("🖨 Imprimir hoja")

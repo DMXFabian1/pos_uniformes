@@ -735,3 +735,46 @@ class AlcanceCompartidoTests(unittest.TestCase):
             jn.alcances_en_lote(None, jornadas)
             jn.alcances_en_lote(None, jornadas)
         self.assertEqual(traer.call_count, 2)
+
+
+class LoQueQuedoAMediasTests(unittest.TestCase):
+    """Un conteo cerrado sin terminar (la Calceta: un color de siete) tiene que
+    volver a aparecer, aunque se haya contado ayer (Daniel, 2026-09-22)."""
+
+    def _fila(self, titulo, *, dias, hechas, total):
+        from datetime import datetime, timedelta, timezone
+        from pos_uniformes.services import conteo_jornada_service as jn
+
+        return jn.FilaTablero(
+            titulo=titulo, escuela_id=None, tipo_pieza=titulo, tallas=f"{hechas} de {total}",
+            ultimo=jn.UltimoConteo(fecha=datetime.now(timezone.utc) - timedelta(days=dias), quien="Cristal"),
+            estado="Por revisar", quien_en_proceso="", prendas_hechas=hechas, prendas_total=total,
+        )
+
+    def test_la_contada_a_medias_vuelve_a_la_lista_y_va_primero(self) -> None:
+        from unittest.mock import patch
+        from pos_uniformes.services import conteo_jornada_service as jn
+
+        completa = self._fila("Bata", dias=3, hechas=7, total=7)
+        a_medias = self._fila("Calceta", dias=3, hechas=1, total=7)
+        nunca = jn.FilaTablero(
+            titulo="Licra", escuela_id=None, tipo_pieza="Licra", ultimo=jn.UltimoConteo(fecha=None, quien=""),
+            tallas="", estado="Nunca", quien_en_proceso="",
+        )
+        with patch.object(jn, "tablero_conteos", return_value=[completa, a_medias, nunca]), \
+             patch("pos_uniformes.services.conteo_calendario_service.escuelas_con_conteo_vencido", return_value=[]), \
+             patch("pos_uniformes.services.conteo_service.obtener_estado_conteo_basicos", side_effect=Exception("x")):
+            filas = jn.lo_que_toca(None)
+        self.assertEqual([f.titulo for f in filas], ["Calceta", "Licra"])   # la completa no
+        self.assertEqual((filas[0].prendas_faltantes, filas[0].quedo_a_medias), (6, True))
+
+    def test_la_que_alguien_esta_contando_no_entra_aunque_este_a_medias(self) -> None:
+        from unittest.mock import patch
+        from pos_uniformes.services import conteo_jornada_service as jn
+
+        fila = self._fila("Calceta", dias=1, hechas=1, total=7)
+        fila = jn.FilaTablero(**{**fila.__dict__, "quien_en_proceso": "Fanny"})
+        with patch.object(jn, "tablero_conteos", return_value=[fila]), \
+             patch("pos_uniformes.services.conteo_calendario_service.escuelas_con_conteo_vencido", return_value=[]), \
+             patch("pos_uniformes.services.conteo_service.obtener_estado_conteo_basicos", side_effect=Exception("x")):
+            self.assertEqual(jn.lo_que_toca(None), [])

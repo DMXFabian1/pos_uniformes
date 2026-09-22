@@ -933,10 +933,22 @@ class FilaTablero:
     estado: str            # "Aplicada" / "Por revisar" / "Descartada" / "Conteo viejo" / "Nunca" / "En proceso"
     quien_en_proceso: str  # nombre si hay jornada abierta
     jornada_id: int | None = None   # la última jornada terminada, para abrir su comparativo
+    prendas_hechas: int = 0
+    prendas_total: int = 0
 
     @property
     def dias(self) -> int | None:
         return self.ultimo.dias()
+
+    @property
+    def prendas_faltantes(self) -> int:
+        """Prendas que el último conteo dejó sin contar (la Calceta se contó de
+        un color y faltaron los demás — Daniel, 2026-09-22)."""
+        return max(0, self.prendas_total - self.prendas_hechas)
+
+    @property
+    def quedo_a_medias(self) -> bool:
+        return self.prendas_total > 0 and self.prendas_hechas < self.prendas_total
 
 
 def tablero_conteos(session: Session, *, cache: dict | None = None) -> list[FilaTablero]:
@@ -964,10 +976,12 @@ def tablero_conteos(session: Session, *, cache: dict | None = None) -> list[Fila
         u = ultimos.get(clave, UltimoConteo(None))
         j = ultimas.get(clave)
         abierta = abiertas.get(clave)
+        hechas = total = 0
         if j is not None:
             a = avance(session, j, capturado.get(j.id), alcances.get(j.id))
             tallas = f"{a.tallas_hechas} de {a.tallas_total}"
             estado = estado_de(j)
+            hechas, total = a.prendas_hechas, a.prendas_total
         elif u.fecha is not None:
             tallas, estado = "", "Conteo viejo"
         else:
@@ -976,7 +990,10 @@ def tablero_conteos(session: Session, *, cache: dict | None = None) -> list[Fila
         if abierta is not None:
             quien = abierta.empleada_nombre or abierta.empleada_code
             estado = "En proceso"
-        return FilaTablero(titulo, escuela_id, tipo_pieza, u, tallas, estado, quien, j.id if j is not None else None)
+        return FilaTablero(
+            titulo, escuela_id, tipo_pieza, u, tallas, estado, quien,
+            j.id if j is not None else None, prendas_hechas=hechas, prendas_total=total,
+        )
 
     filas: list[FilaTablero] = []
     for e in list_all_schools(session):
@@ -1035,12 +1052,16 @@ def lo_que_toca(session: Session, *, limite: int | None = None, filas: list[Fila
             continue
         nunca = f.ultimo.fecha is None
         if f.escuela_id is not None:
-            toca = nunca or int(f.escuela_id) in vencidas
+            vencio = int(f.escuela_id) in vencidas
         else:
-            toca = nunca or basicos_vencidos
-        if toca:
+            vencio = basicos_vencidos
+        # Lo que quedó a medias también toca, aunque se haya contado ayer: la
+        # Calceta se contó de un color y faltaron los otros seis.
+        if nunca or vencio or f.quedo_a_medias:
             filas.append(f)
-    filas.sort(key=lambda f: (f.ultimo.fecha is None, -(f.dias or 0), f.titulo))
+    # Primero lo que quedó a medias (es lo más rápido de terminar), luego lo
+    # vencido de lo más viejo a lo más nuevo, y al final lo que nunca se contó.
+    filas.sort(key=lambda f: (not f.quedo_a_medias, f.ultimo.fecha is None, -(f.dias or 0), f.titulo))
     return filas[:limite] if limite is not None else filas
 
 
