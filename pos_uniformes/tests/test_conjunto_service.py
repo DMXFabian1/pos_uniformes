@@ -350,3 +350,33 @@ class TotalesTests(_Base):
         # y las prendas normales siguen contando
         self.assertIn(self.p2.id, [v.producto_id for v in self.s.scalars(
             select(Variante).join(Variante.producto).where(cs.filtro_sin_conjuntos())).all()])
+
+
+class CandadoDeTallasTests(_Base):
+    """Una pieza que no comparte ninguna talla con el conjunto no lo arma en
+    ninguna: la receta nace muerta. Pasó con los Pants 3pz de Álvaro Obregón,
+    a los que se les puso una playera unitalla (2026-09-22, nota 40)."""
+
+    def test_no_propone_una_pieza_unitalla_para_un_conjunto_por_numero(self):
+        unitalla = self._prod("Playera Deportiva", "Playera", escuela=False, tallas={"Uni": 5})
+        # Se va la playera de la escuela: solo queda la genérica unitalla.
+        for v in self.s.scalars(select(Variante).where(Variante.producto_id == self.play.id)).all():
+            v.activo = False
+        self.play.activo = False
+        self.s.flush()
+
+        propuesta = cs.proponer_receta(self.s, self.p3)
+        self.assertEqual(propuesta["componentes"], [], "no se arma con lo que no empata")
+        self.assertIn("Playera", propuesta["faltan"], "se dice que falta, no se inventa")
+        self.assertTrue(unitalla.activo)
+
+    def test_la_pieza_que_si_empata_se_sigue_proponiendo(self):
+        propuesta = cs.proponer_receta(self.s, self.p3)
+        ids = {pid for pid, _c, _g in propuesta["componentes"]}
+        self.assertIn(self.play.id, ids)
+
+    def test_empata_en_tallas_lo_dice_directo(self):
+        unitalla = self._prod("Playera Uni", "Playera", escuela=False, tallas={"Uni": 1})
+        self.assertFalse(cs.empata_en_tallas(self.s, self.p3, unitalla))
+        self.assertTrue(cs.empata_en_tallas(self.s, self.p3, self.play))
+

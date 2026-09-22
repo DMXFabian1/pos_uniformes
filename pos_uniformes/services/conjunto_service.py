@@ -273,13 +273,48 @@ def _desempatar(session: Session, conjunto: Producto, tipo: str, del_tipo: list[
     return None
 
 
+def _tallas_de(session: Session, producto_id: int) -> set[str]:
+    return {
+        _norm_talla(t)
+        for t in session.scalars(
+            select(Variante.talla).where(
+                Variante.producto_id == int(producto_id), Variante.activo == True  # noqa: E712
+            )
+        ).all()
+    }
+
+
+def empata_en_tallas(session: Session, conjunto: Producto, pieza: Producto) -> bool:
+    """¿Esta pieza sirve para armar este conjunto, aunque sea en una talla?
+
+    Una pieza que no comparte **ninguna** talla con el conjunto no lo arma en
+    ninguna: la receta nace muerta y `stock_derivado` devuelve None para todo.
+    Pasó el 2026-09-22 con los dos Pants 3pz de Álvaro Obregón, a los que se
+    les asignó una "Playera Deportiva" **unitalla** siendo pants por número:
+    las nueve tallas quedaron imposibles de armar y nadie se enteró hasta que
+    una se fue a negativo. Ver la nota 40 del vault."""
+    del_conjunto = _tallas_de(session, conjunto.id)
+    if not del_conjunto:
+        return True   # sin tallas propias no hay con qué comparar
+    return bool(del_conjunto & _tallas_de(session, pieza.id))
+
+
 def proponer_receta(session: Session, conjunto: Producto) -> dict:
     """{"componentes": [(producto_id, cantidad)], "faltan": [...tipos], "ambiguas": {tipo: [nombres]}}.
-    Solo propone cuando hay exactamente UNA prenda de cada tipo que pide la receta."""
+    Solo propone cuando hay exactamente UNA prenda de cada tipo que pide la receta.
+
+    Una pieza que no comparte ninguna talla con el conjunto **no cuenta como
+    candidata**: armar con ella deja una receta que no se puede usar en ninguna
+    talla. Si por eso no queda ninguna de un tipo, sale en `faltan` — que es lo
+    que se quiere ver, en vez de una receta muerta."""
     plantilla = RECETAS_POR_TIPO.get(_tipo_pieza(conjunto))
     if plantilla is None:
         return {"componentes": [], "faltan": [], "ambiguas": {}}
-    candidatas = [p for p in _candidatas(session, conjunto) if p.id != conjunto.id]
+    candidatas = [
+        p
+        for p in _candidatas(session, conjunto)
+        if p.id != conjunto.id and empata_en_tallas(session, conjunto, p)
+    ]
     componentes, faltan, ambiguas, elegidas = [], [], {}, []
     grupo = 0
     for tipo, cantidad in plantilla:
