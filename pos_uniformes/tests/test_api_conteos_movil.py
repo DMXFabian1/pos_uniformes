@@ -60,6 +60,37 @@ class ApiConteosMovilTests(unittest.TestCase):
         self.assertEqual([e["nombre"] for e in data["escuelas"]], ["Uno"])
         self.assertIn("toca", data["escuelas"][0])
 
+    # ── Cómo va cada escuela, desde el celular ─────────────────────────────
+
+    def test_escuelas_trae_el_estado_y_lo_urgente_primero(self) -> None:
+        self._como("VEND-1")
+        data = self.client.get("/api/v1/movil/conteos/escuelas").json()
+        filas = data["escuelas"]
+        self.assertEqual([f["nombre"] for f in filas], ["Uno"])
+        fila = filas[0]
+        # No se recalcula nada aquí: es lo que dice el servicio.
+        for campo in ("salud", "titular", "pct_al_dia", "agotadas", "vendido", "ultimo"):
+            self.assertIn(campo, fila)
+
+    def test_lo_rojo_va_antes_que_lo_verde(self) -> None:
+        from pos_uniformes.database.models import Escuela
+
+        otra = _seed(self.session, "Dos")
+        # A la de abajo le dejamos una talla diciendo que hay menos que nada.
+        talla = self.session.scalars(
+            select(Variante).join(Variante.producto).where(
+                Variante.producto.has(escuela_id=otra.id)
+            )
+        ).first()
+        talla.stock_actual = -2
+        self.session.commit()
+
+        self._como("VEND-1")
+        filas = self.client.get("/api/v1/movil/conteos/escuelas").json()["escuelas"]
+        self.assertEqual(filas[0]["nombre"], "Dos")
+        self.assertEqual(filas[0]["salud"], "rojo")
+        self.assertEqual(self.session.get(Escuela, otra.id).nombre, "Dos")
+
     def test_abrir_devuelve_la_hoja_numerada_sin_stock_del_sistema(self) -> None:
         hoja = self._abrir()
         self.assertEqual(hoja["jornada"]["titulo"], "Uno")

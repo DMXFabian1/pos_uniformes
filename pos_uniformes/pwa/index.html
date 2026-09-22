@@ -126,6 +126,15 @@ body.con-topbar .app{padding-top:calc(58px + env(safe-area-inset-top))}
   padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
 .hoja-menu .panel button{margin-top:8px; text-align:left; padding:0 16px; font-size:16px; min-height:50px}
 .hoja-menu .info{font-size:12px; color:var(--tenue); margin:0 0 6px}
+/* Escuelas: cómo va cada una (el semáforo lo decide escuela_estado_service) */
+.esc-fila{display:flex;gap:9px;align-items:flex-start;padding:10px 2px;border-bottom:1px solid var(--borde)}
+.esc-fila:last-child{border-bottom:0}
+.esc-punto{width:10px;height:10px;border-radius:50%;margin-top:5px;flex:0 0 auto}
+.esc-nombre{font-weight:700}
+.esc-titular{font-size:13px;margin-top:1px}
+.esc-cifras{font-size:11.5px;color:var(--tenue);margin-top:2px}
+.esc-grupo{font-weight:700;margin:14px 0 2px;font-size:13px}
+
 /* Mapa de conteos: semáforo por tallas (al día / viejas / nunca) */
 .sem{display:flex; height:8px; border-radius:4px; overflow:hidden; background:#e6ddd0; margin-top:6px}
 .sem i{display:block; height:100%}
@@ -265,6 +274,7 @@ body.con-topbar .app{padding-top:calc(58px + env(safe-area-inset-top))}
     <button class="btn-grande oculto" id="d-btn-bodega" onclick="duenoBodega()">📦  Bodega: llegó mercancía / pasar al piso</button>
     <button class="btn-grande oculto" id="d-btn-asistencia" onclick="duenoAsistencia()">👥  Asistencia: faltó / descanso / quitar marca</button>
     <button class="btn-grande" id="d-btn-mapa" onclick="mapaConteos()">🗺  Mapa de conteos: qué está contado y qué no</button>
+    <button class="btn-grande" id="d-btn-escuelas" onclick="escuelasEstado()">🏫  Escuelas: cómo va cada una</button>
     <div class="card">
       <strong>Hoy por empleada</strong>
       <div id="d-ranking"></div>
@@ -1345,6 +1355,56 @@ async function bodLlegoGuardar() {
       <button class="btn-grande btn-acento" onclick="bodLlegoInicio()">📥  Llegó otra prenda</button>
       <button class="btn-suave salir" onclick="duenoBodega()">← Bodega</button>`);
   } catch (e) { alert(e.message); }
+}
+
+// ── Escuelas: cómo va cada una ────────────────────────────────────────────
+// Todo viene de /movil/conteos/escuelas, que le pregunta a
+// escuela_estado_service. Aquí no se decide nada: solo se pinta, con los
+// mismos colores del mapa del panel.
+const ESC_COLOR = {rojo: "#c0392b", ambar: "#e08b1e", verde: "#3d6b2f"};
+const ESC_GRUPO = {
+  rojo: "Se vendió sin contar",
+  ambar: "Les falta contarse",
+  verde: "Al día",
+};
+
+function escFila(e) {
+  const cifras = [
+    `${e.pct_al_dia}% contada`,
+    e.agotadas ? `${e.agotadas} agotadas` : "",
+    e.vendido ? `${e.vendido} vendidas (30 d)` : "",
+    e.pedido ? `${e.pedido} por pedir` : "",
+    e.faltas ? (e.faltas === 1 ? "una vez sin surtir" : `${e.faltas} veces sin surtir`) : "",
+    // Si nunca se contó ya lo dice el titular; "se contó nunca" no se dice.
+    e.ultimo && e.ultimo !== "nunca" ? `se contó ${e.ultimo}` : "",
+  ].filter(Boolean).join(" · ");
+  const proceso = e.en_proceso ? ` <span class="sub">· contando: ${e.en_proceso}</span>` : "";
+  return `<div class="esc-fila">
+    <span class="esc-punto" style="background:${ESC_COLOR[e.salud] || "#999"}"></span>
+    <div style="flex:1;min-width:0">
+      <div class="esc-nombre">${e.nombre}${proceso}</div>
+      <div class="esc-titular" style="color:${ESC_COLOR[e.salud] || "#999"}">${e.titular}</div>
+      <div class="esc-cifras">${cifras}</div>
+    </div>
+  </div>`;
+}
+
+async function escuelasEstado() {
+  duenoSub(`<h1>🏫 Escuelas</h1><p class="sub">Primero lo que más urge</p><div id="escs"><div class="card">Cargando...</div></div>
+            <button class="btn-grande" onclick="duenoMenu()">← Volver</button>`);
+  let d;
+  try { d = await api("/api/v1/movil/conteos/escuelas"); }
+  catch (err) { $("escs").innerHTML = '<div class="card">No se pudo cargar.</div>'; return; }
+  const filas = d.escuelas || [];
+  if (!filas.length) { $("escs").innerHTML = '<div class="card">Todavía no hay escuelas.</div>'; return; }
+  let html = "";
+  for (const salud of ["rojo", "ambar", "verde"]) {
+    const del = filas.filter(e => e.salud === salud);
+    if (!del.length) continue;
+    html += `<div class="esc-grupo" style="color:${ESC_COLOR[salud]}">${ESC_GRUPO[salud]} (${del.length})</div>`;
+    html += '<div class="card">' + del.map(escFila).join("") + "</div>";
+  }
+  $("escs").innerHTML = html;
 }
 
 // ── Mapa de conteos: tres capas (nivel → escuela/prenda → tallas), semáforo por tallas ──

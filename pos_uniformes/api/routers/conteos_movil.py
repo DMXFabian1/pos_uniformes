@@ -187,6 +187,42 @@ def mapa_basicos(tipo_pieza: str, current: tuple = Depends(get_current_employee)
     return mapa_svc.basicos(db, tipo_pieza)
 
 
+# ── Cómo va cada escuela (conteo, stock, pedido, venta y demanda) ───────────
+@router.get("/escuelas")
+def escuelas(current: tuple = Depends(get_current_employee), db: Session = Depends(get_db)) -> dict:
+    """Las escuelas ordenadas por lo que más urge, con todo lo suyo junto.
+
+    Es lo mismo que enseña el mapa del panel, pero para el celular: no se
+    calcula aquí nada, lo arma `escuela_estado_service`."""
+    from pos_uniformes.services import escuela_estado_service as ee
+
+    orden = {"rojo": 0, "ambar": 1, "verde": 2}
+    filas = [
+        {
+            "escuela_id": est.escuela_id,
+            "nombre": est.nombre,
+            "niveles": est.niveles,
+            "salud": est.salud,
+            "titular": est.titular,
+            "tallas": est.tallas,
+            "al_dia": est.al_dia,
+            "pct_al_dia": est.pct_al_dia,
+            "en_rojo": est.en_rojo,
+            "faltan": est.faltan_de_contar,
+            "agotadas": est.agotadas,
+            "piezas": est.piezas_en_tienda,
+            "vendido": est.vendido_piezas,
+            "pedido": len(est.pedido),
+            "faltas": len(est.faltas_sentidas),
+            "ultimo": est.ultimo_conteo.texto(),
+            "en_proceso": est.quien_en_proceso,
+        }
+        for est in ee.estados_de_todas(db).values()
+    ]
+    filas.sort(key=lambda f: (orden.get(f["salud"], 3), -f["en_rojo"], -f["faltan"], f["nombre"]))
+    return {"escuelas": filas}
+
+
 @router.post("")
 def abrir(body: AbrirRequest, current: tuple = Depends(get_current_employee), db: Session = Depends(get_db)) -> dict:
     _solo_tienda()

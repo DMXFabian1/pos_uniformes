@@ -190,7 +190,8 @@ function estadoHtml(e) {
          `<b style="color:${SALUD[s.salud]}">${s.titular}</b>` +
          compartido +
          `<div class="salud-cifras">${cifras}</div>` +
-         `<div class="salud-cifras">se contó ${s.ultimo}</div></div>`;
+         (s.ultimo && s.ultimo !== "nunca" ? `<div class="salud-cifras">se contó ${s.ultimo}</div>` : "") +
+         `</div>`;
 }
 
 function icono(e) {

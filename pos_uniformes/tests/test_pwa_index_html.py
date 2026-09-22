@@ -55,3 +55,13 @@ class NavegacionTests(unittest.TestCase):
         # todo lo que llama a contPost/fetch POST y pinta después es acción, no pantalla
         for n in ("encConfirmarPago", "bodLlegoGuardar", "duenoGuardarCorte", "encMarcar"):
             self.assertIn(n, acciones)
+
+    def test_la_pantalla_de_escuelas_existe_y_cuelga_del_inicio_del_dueno(self) -> None:
+        self.assertIn('onclick="escuelasEstado()"', HTML.read_text(encoding="utf-8"))
+        self.assertIn("async function escuelasEstado()", HTML.read_text(encoding="utf-8"))
+        self.assertIn("/api/v1/movil/conteos/escuelas", HTML.read_text(encoding="utf-8"))
+
+    def test_escuelas_no_decide_el_semaforo_solo_lo_pinta(self) -> None:
+        # El umbral vive en EstadoDeEscuela.salud; aquí solo hay colores.
+        self.assertNotIn("en_rojo > 0 ?", HTML.read_text(encoding="utf-8"))
+        self.assertIn("ESC_COLOR", HTML.read_text(encoding="utf-8"))
