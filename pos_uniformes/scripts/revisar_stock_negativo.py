@@ -92,11 +92,14 @@ def reconciliar(session) -> tuple[int, int]:
     conjuntos = ids_de_conjuntos(session)
     ajustadas = 0
     recalculadas = 0
+
+    # Primero las piezas, después los conjuntos. Si se hace en un solo
+    # recorrido, un conjunto que esté menos en rojo que sus piezas se recalcula
+    # **antes** de que ellas suban a cero y se queda con el número viejo — le
+    # pasó al Pants 3pz de Álvaro Obregón en la tienda el 22/09: quedó en -1
+    # después de reconciliar, y hacía falta correr el guion dos veces.
     for v in listar_negativas(session):
         if v.producto_id in conjuntos:
-            recalculadas += conjunto_service.sincronizar_conjunto(
-                session, v.producto_id, creado_por=FIRMA
-            )
             continue
         InventarioService.registrar_movimiento(
             session=session,
@@ -111,6 +114,13 @@ def reconciliar(session) -> tuple[int, int]:
             creado_por=FIRMA,
         )
         ajustadas += 1
+
+    # Ya con sus piezas en orden, los conjuntos vuelven a calcularse bien.
+    for v in listar_negativas(session):
+        if v.producto_id in conjuntos:
+            recalculadas += conjunto_service.sincronizar_conjunto(
+                session, v.producto_id, creado_por=FIRMA
+            )
     return ajustadas, recalculadas
 
 

@@ -130,6 +130,28 @@ class ReconciliarTest(_Base):
         self.assertEqual(ajustadas, 0, "el conjunto no cuenta como talla ajustada")
         self.assertEqual(conjunto.stock_actual, 4, "lo que alcanzan sus piezas")
 
+    def test_el_conjunto_se_recalcula_despues_de_sus_piezas(self):
+        """En la tienda (22/09) un Pants 3pz quedó en -1 después de
+        reconciliar: estaba menos en rojo que sus piezas, así que se recalculó
+        antes de que ellas subieran a cero y se quedó con el número viejo."""
+        pants = self._prod("Pants 2pz Liso", "Pants 2pz")
+        playera = self._prod("Playera Lisa", "Playera")
+        tres = self._prod("Pants 3pz Liso", "Chamarra")
+        # Las piezas están MÁS en rojo que el conjunto: se atienden primero.
+        self._var(pants, "10", -3)
+        self._var(playera, "10", -2)
+        conjunto = self._var(tres, "10", -1)
+        self.s.add_all([
+            ConjuntoComponente(conjunto_id=tres.id, componente_id=pants.id, cantidad=1, grupo=0),
+            ConjuntoComponente(conjunto_id=tres.id, componente_id=playera.id, cantidad=1, grupo=1),
+        ])
+        self.s.flush()
+
+        ajustadas, _ = rsn.reconciliar(self.s)
+        self.assertEqual(ajustadas, 2, "las dos piezas")
+        self.assertEqual(conjunto.stock_actual, 0, "una sola pasada tiene que bastar")
+        self.assertEqual(rsn.listar_negativas(self.s), [], "no queda nada en rojo")
+
     def test_correrlo_dos_veces_no_hace_dano(self):
         p = self._prod("Calceta Escolar Blanca")
         v = self._var(p, "13-18", -2)
