@@ -194,3 +194,43 @@ class RevisarTests(_Base):
         self.assertEqual(piezas[f"{self.p2.id}-10"], 2)      # salieron dentro del 3pz
         self.assertEqual(piezas[f"{self.play.id}-10"], 3)    # 1 sola + 2 dentro del 3pz
         self.assertNotIn(f"{self.suelto.id}-10", piezas)     # la chamarra no se vendió
+
+
+class SueltoFaltanteTests(_Base):
+    """Cuando la escuela vende chamarra pero no tiene su Pants Suelto, se le
+    da de alta (Daniel, 2026-09-22) y la chamarra ya sabe dónde dejarlo."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        from pos_uniformes.database.models import RolUsuario, Usuario
+        self.s.delete(self._var(self.suelto, "10")); self.s.delete(self._var(self.suelto, "12"))
+        self.s.delete(self.suelto)
+        self.s.add(Usuario(username="daniel", nombre_completo="Daniel", password_hash="x", rol=RolUsuario.ADMIN, activo=True))
+        self.s.commit()
+
+    def test_crea_solo_las_que_faltan_con_las_tallas_del_2pz_y_su_precio(self) -> None:
+        from pos_uniformes.database.models import Usuario
+        from pos_uniformes.scripts import crear_sueltos_faltantes as csf
+        filas = csf.planear(self.s)
+        self.assertEqual([f["nombre"] for f in filas], ["Pants Suelto Justo Sierra"])
+        self.assertEqual(sorted(t for t, _c in filas[0]["tallas"]), ["10", "12", "14"])
+        productos, tallas = csf.aplicar(self.s, filas, self.s.scalars(select(Usuario)).first())
+        self.s.commit()
+        self.assertEqual((productos, tallas), (1, 3))
+        nuevo = self.s.scalars(select(Producto).where(Producto.nombre.like("Pants Suelto%"))).first()
+        vs = {v.talla: v for v in self.s.scalars(select(Variante).where(Variante.producto_id == nuevo.id))}
+        self.assertEqual({t: int(v.stock_actual) for t, v in vs.items()}, {"10": 0, "12": 0, "14": 0})
+        self.assertEqual(float(vs["10"].precio_venta), 259.0)
+        self.assertTrue(all(v.sku for v in vs.values()))
+        # y ahora la chamarra ya sabe de dónde sale y dónde deja el suelto
+        prop = cs.proponer_receta(self.s, self.cham)
+        self.assertEqual(prop["componentes"], [(self.p2.id, 1), (nuevo.id, -1)])
+        # correrlo otra vez no duplica
+        self.assertEqual(csf.planear(self.s), [])
+
+    def test_no_toca_a_la_que_usa_un_suelto_general(self) -> None:
+        from pos_uniformes.scripts import crear_sueltos_faltantes as csf
+        general = self._prod("Pants Suelto Punto Rojo", "Pants Suelto", escuela=False, prenda="Básico", tallas={"10": 2})
+        uni = us.armar(self.s, self.esc.id); us.agregar_pieza(self.s, uni.id, general.id); self.s.commit()
+        self.assertEqual(csf.planear(self.s), [])
+        self.assertEqual(cs.proponer_receta(self.s, self.cham)["componentes"], [(self.p2.id, 1), (general.id, -1)])

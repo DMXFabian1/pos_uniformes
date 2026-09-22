@@ -132,17 +132,7 @@ def _candidatas(session: Session, conjunto: Producto) -> list[Producto]:
         select(Uniforme).where(Uniforme.escuela_id == conjunto.escuela_id, Uniforme.activo == True)  # noqa: E712
         .order_by(Uniforme.id)
     )
-    if uni is not None:
-        return list(
-            session.scalars(
-                select(Producto)
-                .join(UniformePieza, UniformePieza.producto_id == Producto.id)
-                .options(joinedload(Producto.tipo_pieza))
-                .where(UniformePieza.uniforme_id == uni.id, UniformePieza.activo == True, Producto.activo == True)  # noqa: E712
-                .order_by(UniformePieza.orden)
-            ).unique().all()
-        )
-    return list(
+    propias = list(
         session.scalars(
             select(Producto)
             .options(joinedload(Producto.tipo_pieza))
@@ -150,26 +140,75 @@ def _candidatas(session: Session, conjunto: Producto) -> list[Producto]:
             .order_by(Producto.nombre)
         ).unique().all()
     )
+    if uni is None:
+        return propias
+    # Las piezas del uniforme (ahí están las generales que usa la escuela) más
+    # sus propias prendas: una recién dada de alta todavía no es pieza.
+    del_uniforme = list(
+        session.scalars(
+            select(Producto)
+            .join(UniformePieza, UniformePieza.producto_id == Producto.id)
+            .options(joinedload(Producto.tipo_pieza))
+            .where(UniformePieza.uniforme_id == uni.id, UniformePieza.activo == True, Producto.activo == True)  # noqa: E712
+            .order_by(UniformePieza.orden)
+        ).unique().all()
+    )
+    vistos = {p.id for p in del_uniforme}
+    return del_uniforme + [p for p in propias if p.id not in vistos]
 
 
 _PALABRAS_PIEZA = ("pants 3pz", "pants 2pz", "pants suelto", "chamarra", "playera")
 
 
 def _raiz(nombre: str) -> str:
-    """'Chamarra Liso Azul Marino' → 'liso azul marino' (sin la palabra de la pieza)."""
+    """'Chamarra Liso Azul Marino' → 'liso azul marino' (sin la palabra de la
+    pieza). El color va en masculino para que "Chamarra Liso Blanca" y
+    "Pants 2pz Liso Blanco" se reconozcan como la misma familia."""
     n = " ".join(str(nombre or "").lower().split())
     for palabra in _PALABRAS_PIEZA:
         n = n.replace(palabra, "")
-    return " ".join(n.split())
+    palabras = [w[:-1] + "o" if len(w) > 3 and w.endswith("a") and w[:-1] + "o" in _COLORES_MASCULINO else w for w in n.split()]
+    return " ".join(palabras)
 
 
-def _desempatar(tipo: str, del_tipo: list[Producto]) -> Producto | None:
-    """Entre dos playeras de la escuela (Polo y Deportiva), la del 3pz es la
-    deportiva. Cualquier otro empate lo decide Daniel."""
+# Colores que cambian de género según la prenda (chamarra blanca / pants blanco).
+_COLORES_MASCULINO = {"blanco", "rojo", "negro", "amarillo", "morado", "gris"}
+
+
+def _precio_medio(session: Session, producto_id: int) -> float | None:
+    from sqlalchemy import func as sqlfunc
+
+    p = session.scalar(
+        select(sqlfunc.avg(Variante.precio_venta)).where(Variante.producto_id == int(producto_id), Variante.activo == True)  # noqa: E712
+    )
+    return float(p) if p is not None else None
+
+
+def _desempatar(session: Session, conjunto: Producto, tipo: str, del_tipo: list[Producto], elegidas: list[Producto]) -> Producto | None:
+    """Empates que la regla de precios de Daniel resuelve sola:
+
+    - **Playera** del 3pz: entre Polo y Deportiva, la deportiva.
+    - **Pants Suelto** que deja la chamarra: "todo vale más por separado", así
+      que chamarra + suelto tiene que costar **más** que el 2pz del que salen
+      (por eso el suelto de punto, no el liso, cuando el 2pz de la escuela es
+      de punto). De los que cumplen, el más barato.
+    """
     if tipo == "Playera":
         deportivas = [p for p in del_tipo if "deportiv" in p.nombre.lower()]
         if len(deportivas) == 1:
             return deportivas[0]
+        return None
+    if tipo == "Pants Suelto":
+        p2 = next((p for p in elegidas if _tipo_pieza(p) == "Pants 2pz"), None)
+        precio_2pz = _precio_medio(session, p2.id) if p2 is not None else None
+        precio_conjunto = _precio_medio(session, conjunto.id)
+        if precio_2pz is None or precio_conjunto is None:
+            return None
+        cumplen = [
+            (precio, p) for p, precio in ((p, _precio_medio(session, p.id)) for p in del_tipo)
+            if precio is not None and precio_conjunto + precio >= precio_2pz
+        ]
+        return min(cumplen)[1] if cumplen else None
     return None
 
 
@@ -180,10 +219,12 @@ def proponer_receta(session: Session, conjunto: Producto) -> dict:
     if plantilla is None:
         return {"componentes": [], "faltan": [], "ambiguas": {}}
     candidatas = [p for p in _candidatas(session, conjunto) if p.id != conjunto.id]
-    componentes, faltan, ambiguas = [], [], {}
+    componentes, faltan, ambiguas, elegidas = [], [], {}, []
     for tipo, cantidad in plantilla:
         del_tipo = [p for p in candidatas if _tipo_pieza(p) == tipo]
-        elegida = del_tipo[0] if len(del_tipo) == 1 else _desempatar(tipo, del_tipo)
+        elegida = del_tipo[0] if len(del_tipo) == 1 else _desempatar(session, conjunto, tipo, del_tipo, elegidas)
+        if elegida is not None:
+            elegidas.append(elegida)
         if not del_tipo:
             faltan.append(tipo)
         elif elegida is None:
