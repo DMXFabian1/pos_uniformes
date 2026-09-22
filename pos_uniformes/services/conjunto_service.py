@@ -120,6 +120,28 @@ def definir_receta(session: Session, conjunto_id: int, componentes: list, *, cre
     return nuevos
 
 
+def reagrupar_por_tipo_de_pieza(session: Session) -> int:
+    """Recalcula el `grupo` de todas las recetas: piezas de distinto tipo van
+    en grupos distintos (se llevan todas) y las del mismo tipo quedan juntas
+    (alternativas). Lo mismo que hace la migración 4f5a6b7c8d9e, para las
+    recetas que se guardaron antes de que existiera la columna."""
+    filas = session.scalars(
+        select(ConjuntoComponente).options(joinedload(ConjuntoComponente.componente))
+        .order_by(ConjuntoComponente.conjunto_id, ConjuntoComponente.id)
+    ).unique().all()
+    por_conjunto: dict[int, dict[tuple, int]] = {}
+    cambios = 0
+    for c in filas:
+        clave = (int(c.cantidad) > 0, c.componente.tipo_pieza_id)
+        vistos = por_conjunto.setdefault(int(c.conjunto_id), {})
+        grupo = vistos.setdefault(clave, len(vistos))
+        if int(c.grupo) != grupo:
+            c.grupo = grupo
+            cambios += 1
+    session.flush()
+    return cambios
+
+
 def quitar_receta(session: Session, conjunto_id: int) -> None:
     for viejo in receta_de(session, conjunto_id):
         session.delete(viejo)

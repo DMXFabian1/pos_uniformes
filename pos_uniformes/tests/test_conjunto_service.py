@@ -291,3 +291,35 @@ class PlayeraFaltanteTests(_Base):
         vs = {v.talla: float(v.precio_venta) for v in self.s.scalars(select(Variante).where(Variante.producto_id == nueva.id))}
         self.assertEqual(vs, {"10": 199.0, "12": 209.0, "14": 209.0})
         self.assertEqual(cs.proponer_receta(self.s, self.p3)["componentes"], [(self.p2.id, 1, 0), (nueva.id, 1, 1)])
+
+
+class GrupoLegadoTests(_Base):
+    """La columna `grupo` se agregó con 0 para todas, así que las recetas que
+    ya existían se leían como "2pz **o** playera". La migración
+    4f5a6b7c8d9e las reagrupa por tipo de pieza."""
+
+    def test_reagrupar_por_tipo_de_pieza(self) -> None:
+        from pos_uniformes.database.models import ConjuntoComponente
+        self.s.add_all([
+            ConjuntoComponente(conjunto_id=self.p3.id, componente_id=self.p2.id, cantidad=1, grupo=0),
+            ConjuntoComponente(conjunto_id=self.p3.id, componente_id=self.play.id, cantidad=1, grupo=0),
+            ConjuntoComponente(conjunto_id=self.cham.id, componente_id=self.p2.id, cantidad=1, grupo=0),
+            ConjuntoComponente(conjunto_id=self.cham.id, componente_id=self.suelto.id, cantidad=-1, grupo=0),
+        ])
+        self.s.commit()
+        self.assertIn(" o ", cs.receta_texto(self.s, self.p3.id))  # así se leía: mal
+        cs.reagrupar_por_tipo_de_pieza(self.s); self.s.commit()
+        self.assertEqual(cs.receta_texto(self.s, self.p3.id), "se arma de Pants 2pz Deportivo JS + Playera Deportiva JS")
+        self.assertEqual(cs.receta_texto(self.s, self.cham.id), "sale de Pants 2pz Deportivo JS, deja Pants Suelto JS")
+
+    def test_dos_piezas_del_mismo_tipo_siguen_siendo_alternativas(self) -> None:
+        from pos_uniformes.database.models import ConjuntoComponente
+        otra = self._prod("Playera Deportiva M JS", "Playera", tallas={"10": 1})
+        self.s.add_all([
+            ConjuntoComponente(conjunto_id=self.p3.id, componente_id=self.p2.id, cantidad=1, grupo=7),
+            ConjuntoComponente(conjunto_id=self.p3.id, componente_id=self.play.id, cantidad=1, grupo=7),
+            ConjuntoComponente(conjunto_id=self.p3.id, componente_id=otra.id, cantidad=1, grupo=7),
+        ])
+        self.s.commit()
+        cs.reagrupar_por_tipo_de_pieza(self.s); self.s.commit()
+        self.assertEqual(cs.receta_texto(self.s, self.p3.id), "se arma de Pants 2pz Deportivo JS + Playera Deportiva JS o Playera Deportiva M JS")
