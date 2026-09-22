@@ -389,6 +389,7 @@ _PIEZA_ORDER = {
     "Short": 12,
     "Pantalón": 13,
     "Malla": 14,
+    "Licra": 14,   # va con la malla
     "Calceta": 15,
     "Corbata": 16,
     "Corbatín": 17,

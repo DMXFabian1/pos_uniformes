@@ -394,7 +394,7 @@ _PIEZA_ORDER = {
     "Pants 3pz": 1, "Pants 2pz": 2, "Pants Suelto": 3, "Chamarra": 4,
     "Playera": 5, "Suéter": 6, "Camisa": 7, "Chaleco": 8, "Falda": 9,
     "Jumper": 10, "Blusa": 11, "Short": 12, "Pantalón": 13, "Malla": 14,
-    "Calceta": 15, "Corbata": 16, "Corbatín": 17, "Moño": 18,
+    "Licra": 14, "Calceta": 15, "Corbata": 16, "Corbatín": 17, "Moño": 18,
     "Mascada": 19, "Boina": 20, "Guante": 21, "Bata": 22, "Jeans": 23,
 }
 
