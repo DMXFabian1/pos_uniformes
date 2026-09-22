@@ -35,3 +35,9 @@ class RevisarStockNegativoBatTests(unittest.TestCase):
     def test_si_truena_igual_enseña_lo_que_dijo_la_consola(self) -> None:
         self.assertIn("errorlevel 1", self.texto)
         self.assertIn('type "%REPORTE%"', self.texto)
+
+    def test_guarda_el_reporte_en_utf8(self) -> None:
+        # La consola de Windows abre en la pagina 850: sin esto, "Suéter" se
+        # guarda como "SuÚter" y el reporte llega roto a la Mac (22/09).
+        self.assertIn("chcp 65001", self.texto)
+        self.assertIn("PYTHONIOENCODING=utf-8", self.texto)

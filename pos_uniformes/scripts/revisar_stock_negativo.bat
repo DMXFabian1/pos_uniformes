@@ -15,6 +15,12 @@ rem =====================================================
 setlocal
 cd /d "%~dp0..\.."
 
+rem La consola de Windows abre en la pagina vieja (850) y ahi los acentos se
+rem guardan rotos: "Sueter" salia como "SuUter" en el reporte. Con 65001 y
+rem PYTHONIOENCODING el archivo queda en UTF-8, que es como lo lee la Mac.
+chcp 65001 >nul
+set PYTHONIOENCODING=utf-8
+
 if not exist "pos_uniformes\reportes" mkdir "pos_uniformes\reportes"
 set REPORTE=pos_uniformes\reportes\stock_negativo.txt
 
