@@ -168,6 +168,7 @@ def _cerrar_session():
 
 
 def fetch_all_data(conn):
+    from pos_uniformes.services import escuela_piezas_service  # noqa: PLC0415
     from pos_uniformes.services import inventario_totales_service  # noqa: PLC0415
 
     cur = conn.cursor()
@@ -209,55 +210,16 @@ def fetch_all_data(conn):
     """)
     stats["por_nivel"] = dict(cur.fetchall())
 
-    # Multi-level detection
-    cur.execute("""
-        SELECT p.escuela_id
-        FROM producto p JOIN escuela e ON e.id=p.escuela_id AND e.activo=true
-        WHERE p.activo=true
-        GROUP BY p.escuela_id HAVING COUNT(DISTINCT p.nivel_educativo_id) > 1
-    """)
-    multi_level_ids = {r[0] for r in cur.fetchall()}
+    multi_level_ids = escuela_piezas_service.escuelas_multinivel(_session())
 
-    # Schools with levels
-    cur.execute("""
-        SELECT DISTINCT e.id, e.nombre, ne.id, ne.nombre
-        FROM escuela e
-        JOIN producto p ON p.escuela_id=e.id AND p.activo=true
-        JOIN nivel_educativo ne ON ne.id=p.nivel_educativo_id
-        WHERE e.activo=true
-        ORDER BY ne.nombre, e.nombre
-    """)
-    school_levels = []
-    for eid, ename, nid, nname in cur.fetchall():
-        display = f"{ename} {nname}" if eid in multi_level_ids else ename
-        school_levels.append({
-            "escuela_id": eid, "escuela_nombre": ename,
-            "nivel_id": nid, "nivel_nombre": nname,
-            "display_name": display,
-        })
 
-    # Pieces matrix (direct + linked basic products)
-    cur.execute("""
-        WITH school_products AS (
-            SELECT p.escuela_id, p.id AS producto_id, p.nivel_educativo_id, p.tipo_pieza_id
-            FROM producto p WHERE p.activo=true AND p.escuela_id IS NOT NULL
-            UNION
-            SELECT l.escuela_id, p.id, ne_esc.nivel_educativo_id, p.tipo_pieza_id
-            FROM catalog_school_product_link l
-            JOIN producto p ON p.id=l.producto_id AND p.activo=true
-            JOIN (SELECT DISTINCT p2.escuela_id, p2.nivel_educativo_id
-                  FROM producto p2 WHERE p2.activo=true AND p2.escuela_id IS NOT NULL) ne_esc
-                ON ne_esc.escuela_id=l.escuela_id
-            WHERE l.activo=true
-        )
-        SELECT e.id, ne.nombre, tp.nombre, COUNT(DISTINCT sp.producto_id)
-        FROM school_products sp
-        JOIN escuela e ON e.id=sp.escuela_id AND e.activo=true
-        JOIN nivel_educativo ne ON ne.id=sp.nivel_educativo_id
-        JOIN tipo_pieza tp ON tp.id=sp.tipo_pieza_id
-        GROUP BY e.id, ne.nombre, tp.nombre
-    """)
-    pieces_raw = cur.fetchall()
+    school_levels = escuela_piezas_service.escuelas_con_niveles(_session())
+
+
+    # Qué prendas tiene cada escuela lo dice el POS (uniforme armado, o ligas
+    # si todavía no lo está), no una copia del SQL que se quedaría en las ligas.
+    pieces_raw = escuela_piezas_service.matriz_de_piezas(_session())
+
 
     # Full catalog (direct + linked basic products)
     cur.execute("""
