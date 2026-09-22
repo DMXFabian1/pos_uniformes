@@ -1002,6 +1002,40 @@ def build_variants(catalog_rows, catalog_cols, multi_level_ids):
     return "\n".join(h)
 
 
+#: El mapa vive fuera del POS (es su propio generador); el panel lo enseña.
+RUTA_MAPA = "../mapas_escuelas/mapa_escuelas_san_felipe.html"
+
+
+def build_mapa():
+    """La portada: las escuelas de San Felipe pintadas por cómo van.
+
+    El mapa se genera aparte (`mapas_escuelas/generar_datos_escuelas.py`) y ya
+    le pregunta a `escuela_estado_service`, así que aquí solo se enseña. Se
+    carga al entrar a la pestaña y no antes: trae Leaflet de internet y no hay
+    por qué pagarlo cada vez que se abre el panel."""
+    archivo = Path(__file__).resolve().parent.parent.parent / "mapas_escuelas" / "mapa_escuelas_san_felipe.html"
+    if not archivo.exists():
+        return (
+            '<div class="section-card" style="text-align:center;padding:40px">'
+            '<h2 style="margin:0 0 8px">Todavía no hay mapa</h2>'
+            '<p style="color:var(--text-muted);margin:0">Genéralo con '
+            '<code>python3 mapas_escuelas/generar_datos_escuelas.py</code> y vuelve a abrir el panel.</p>'
+            "</div>"
+        )
+    return (
+        '<div class="section-card" style="padding:0;overflow:hidden">'
+        f'<iframe id="mapa-frame" data-src="{RUTA_MAPA}" title="Mapa de escuelas"'
+        ' style="width:100%;height:78vh;border:0;display:block"></iframe>'
+        "</div>"
+        '<p style="color:var(--text-muted);font-size:12px;margin:8px 2px 0">'
+        "El relleno dice el nivel y el anillo cómo va la escuela: "
+        '<b style="color:#c0392b">rojo</b> se vendió sin contar · '
+        '<b style="color:#e08b1e">ámbar</b> le falta contarse · '
+        '<b style="color:#3d6b2f">verde</b> al día. '
+        "Necesita internet para pintar las calles.</p>"
+    )
+
+
 def build_conteo(school_levels):
     """Genera la pestaña de conteo de inventario (interactiva via QWebChannel)."""
     # Cada escuela-nivel es una entrada separada en el selector
@@ -1139,7 +1173,7 @@ def build_conteo(school_levels):
 # Full HTML
 # ---------------------------------------------------------------------------
 
-def generate_html(resumen, pieces, tariffs, variants, conteo):
+def generate_html(resumen, pieces, tariffs, variants, conteo, mapa):
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     return f"""<!DOCTYPE html>
 <html lang="es">
@@ -1653,7 +1687,8 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sys
 </div>
 
 <div class="nav">
-    <div class="nav-tab active" onclick="showTab('resumen')">Resumen</div>
+    <div class="nav-tab active" onclick="showTab('mapa')">🗺 Mapa</div>
+    <div class="nav-tab" onclick="showTab('resumen')">Resumen</div>
     <div class="nav-tab" onclick="showTab('piezas')">Piezas</div>
     <div class="nav-tab" onclick="showTab('tarifarios')">Tarifarios</div>
     <div class="nav-tab" onclick="showTab('variantes')">Disponibilidad</div>
@@ -1661,7 +1696,8 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sys
 </div>
 
 <div class="page">
-    <div id="resumen" class="tab-panel active">{resumen}</div>
+    <div id="mapa" class="tab-panel active">{mapa}</div>
+    <div id="resumen" class="tab-panel">{resumen}</div>
     <div id="piezas" class="tab-panel">{pieces}</div>
     <div id="tarifarios" class="tab-panel">{tariffs}</div>
 
@@ -1690,11 +1726,20 @@ function toggleTheme() {{
     }}
 }})();
 
+function cargarMapaSiHace(id) {{
+    if (id !== 'mapa') return;
+    const f = document.getElementById('mapa-frame');
+    if (f && !f.src && f.dataset.src) f.src = f.dataset.src;
+}}
+
+document.addEventListener('DOMContentLoaded', () => cargarMapaSiHace('mapa'));
+
 function showTab(id) {{
+    cargarMapaSiHace(id);
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
     document.getElementById(id).classList.add('active');
-    const names = ['resumen','piezas','tarifarios','variantes','conteo'];
+    const names = ['mapa','resumen','piezas','tarifarios','variantes','conteo'];
     const idx = names.indexOf(id);
     if (idx >= 0) document.querySelectorAll('.nav-tab')[idx].classList.add('active');
 }}
@@ -2851,8 +2896,9 @@ def main():
     tariffs = build_tariffs(catalog_rows, catalog_cols, multi_level_ids)
     variants = build_variants(catalog_rows, catalog_cols, multi_level_ids)
     conteo = build_conteo(school_levels)
+    mapa = build_mapa()
 
-    html = generate_html(resumen, pieces, tariffs, variants, conteo)
+    html = generate_html(resumen, pieces, tariffs, variants, conteo, mapa)
 
     out_path = Path(__file__).resolve().parent.parent / "panel_uniformes.html"
     out_path.write_text(html, encoding="utf-8")
