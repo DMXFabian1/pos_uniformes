@@ -43,6 +43,7 @@ class TarjetasTests(unittest.TestCase):
         self.w = SimpleNamespace(
             conteos_jornadas_box=QVBoxLayout(), conteos_revisar_box=QVBoxLayout(),
             conteos_revisar_titulo=QLabel(self.padre), conteos_quien_label=QLabel(self.padre),
+            conteos_jornadas_titulo=QLabel(self.padre), conteos_jornadas_panel=QLabel(self.padre),
             _conteos_capturar=lambda f: self.capturadas.append(f),
             _conteos_revisar=lambda f: self.revisadas.append(f),
         )
@@ -55,11 +56,19 @@ class TarjetasTests(unittest.TestCase):
     def test_el_avance_se_lee_como_persona(self) -> None:
         self.assertEqual(tarjetas.texto_avance(_avance()), "4 de 14 prendas  ·  31 de 128 tallas")
 
-    def test_sin_jornadas_lo_dice(self) -> None:
+    def test_sin_jornadas_la_seccion_desaparece(self) -> None:
+        # Antes decía "no hay conteos a medias" en una caja de media pantalla;
+        # desde el 2026-09-22 simplemente no se muestra.
         tarjetas.pintar_jornadas(self.w, abiertas=[], por_revisar=[], code="VEND-4")
-        self.assertEqual(self.w.conteos_jornadas_box.count(), 1)
-        self.assertIn("No hay conteos a medias", self.w.conteos_jornadas_box.itemAt(0).widget().text())
+        self.assertEqual(self.w.conteos_jornadas_box.count(), 0)
+        self.assertFalse(self.w.conteos_jornadas_titulo.isVisibleTo(self.padre))
+        self.assertFalse(self.w.conteos_jornadas_panel.isVisibleTo(self.padre))
         self.assertFalse(self.w.conteos_revisar_titulo.isVisibleTo(self.padre))
+
+    def test_con_jornadas_la_seccion_vuelve(self) -> None:
+        tarjetas.pintar_jornadas(self.w, abiertas=[(_foto(), _avance(), True)], por_revisar=[], code="VEND-4")
+        self.assertTrue(self.w.conteos_jornadas_titulo.isVisibleTo(self.padre))
+        self.assertEqual(self.w.conteos_jornadas_box.count(), 1)
 
     def test_la_propia_se_puede_seguir_y_la_ajena_no(self) -> None:
         tarjetas.pintar_jornadas(

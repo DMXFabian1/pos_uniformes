@@ -634,3 +634,50 @@ class UltimoConteoTests(unittest.TestCase):
         u = jn.ultimos_conteos(self.s)
         self.assertEqual(jn.ultimo_conteo_de(u, None, "Camisa").texto(), "hoy (Stayce)")
         self.assertEqual(jn.ultimo_conteo_de(u, None, "Pantalón").texto(), "nunca")
+
+
+class LoQueTocaTests(unittest.TestCase):
+    """`lo_que_toca`: lo vencido y lo que nunca se ha contado, sin lo que
+    alguien ya está contando. Es la lista que ve quien entra a Conteos."""
+
+    def test_ordena_vencidas_viejas_primero_y_nunca_al_final(self) -> None:
+        from datetime import datetime, timedelta, timezone
+        from unittest.mock import patch
+        from pos_uniformes.services import conteo_jornada_service as jn
+
+        def fila(titulo, *, escuela_id, dias=None, en_proceso=""):
+            fecha = None if dias is None else datetime.now(timezone.utc) - timedelta(days=dias)
+            return jn.FilaTablero(
+                titulo=titulo, escuela_id=escuela_id, tipo_pieza="",
+                ultimo=jn.UltimoConteo(fecha=fecha, quien=""),
+                tallas="", estado="Aplicada" if fecha else "Nunca", quien_en_proceso=en_proceso,
+            )
+
+        filas = [
+            fila("Vieja", escuela_id=1, dias=200),
+            fila("Reciente", escuela_id=2, dias=3),
+            fila("Nunca A", escuela_id=3),
+            fila("La está contando Fanny", escuela_id=4, en_proceso="Fanny"),
+            fila("Media", escuela_id=5, dias=100),
+        ]
+        vencidas = [type("E", (), {"escuela_id": i})() for i in (1, 4, 5)]
+        with patch.object(jn, "tablero_conteos", return_value=filas), \
+             patch("pos_uniformes.services.conteo_calendario_service.escuelas_con_conteo_vencido", return_value=vencidas), \
+             patch("pos_uniformes.services.conteo_service.obtener_estado_conteo_basicos", side_effect=Exception("sin básicos")):
+            resultado = jn.lo_que_toca(None)
+        # la que Fanny está contando no entra; "Reciente" no está vencida
+        self.assertEqual([f.titulo for f in resultado], ["Vieja", "Media", "Nunca A"])
+
+    def test_limite(self) -> None:
+        from unittest.mock import patch
+        from pos_uniformes.services import conteo_jornada_service as jn
+
+        filas = [
+            jn.FilaTablero(titulo=f"E{i}", escuela_id=i, tipo_pieza="", ultimo=jn.UltimoConteo(fecha=None, quien=""),
+                           tallas="", estado="Nunca", quien_en_proceso="")
+            for i in range(5)
+        ]
+        with patch.object(jn, "tablero_conteos", return_value=filas), \
+             patch("pos_uniformes.services.conteo_calendario_service.escuelas_con_conteo_vencido", return_value=[]), \
+             patch("pos_uniformes.services.conteo_service.obtener_estado_conteo_basicos", side_effect=Exception("x")):
+            self.assertEqual(len(jn.lo_que_toca(None, limite=2)), 2)

@@ -139,10 +139,12 @@ def pintar_jornadas(window, *, abiertas, por_revisar, code: str, recientes=()) -
         sub.setText("  ·  ".join(partes) if partes else "Nada a medias")
 
     _vaciar(window.conteos_jornadas_box)
-    if not abiertas:
-        vacio = QLabel("No hay conteos a medias. Empieza uno desde la barra de arriba.")
-        vacio.setObjectName("libretaPanelVacio")
-        window.conteos_jornadas_box.addWidget(vacio)
+    # Sin jornadas a medias la sección desaparece: el "no hay nada" ocupaba
+    # media pantalla para no decir nada (Daniel, 2026-09-22).
+    for nombre in ("conteos_jornadas_titulo", "conteos_jornadas_panel"):
+        w = getattr(window, nombre, None)
+        if w is not None:
+            w.setVisible(bool(abiertas))
     from pos_uniformes.services.conteo_jornada_service import puede_eliminarla
 
     reasignar = getattr(window, "_conteos_reasignar", None)

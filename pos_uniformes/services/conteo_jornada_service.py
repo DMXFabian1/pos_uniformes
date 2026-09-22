@@ -902,5 +902,41 @@ def tablero_conteos(session: Session) -> list[FilaTablero]:
     return filas
 
 
+def lo_que_toca(session: Session, *, limite: int | None = None) -> list[FilaTablero]:
+    """Lo que hay que contar hoy: lo vencido (se le pasó la vigencia de su
+    escuela) y lo que nunca se ha contado. Lo que alguien ya está contando no
+    entra — para eso está "a medias".
+
+    Orden: primero lo vencido, de lo más viejo a lo más nuevo; al final lo que
+    nunca se ha contado (Daniel, 2026-09-18: si todo trae ⚠, nada destaca).
+    """
+    from pos_uniformes.services.conteo_calendario_service import escuelas_con_conteo_vencido
+    from pos_uniformes.services.conteo_service import obtener_estado_conteo_basicos
+
+    try:
+        vencidas = {int(e.escuela_id) for e in escuelas_con_conteo_vencido(session)}
+    except Exception:  # noqa: BLE001 — sin calendario, se decide solo por "nunca"
+        logger.exception("Conteos: no se pudo leer el calendario de vigencias")
+        vencidas = set()
+    try:
+        basicos_vencidos = bool(obtener_estado_conteo_basicos(session).requiere_conteo)
+    except Exception:  # noqa: BLE001
+        basicos_vencidos = False
+
+    filas = []
+    for f in tablero_conteos(session):
+        if f.quien_en_proceso:
+            continue
+        nunca = f.ultimo.fecha is None
+        if f.escuela_id is not None:
+            toca = nunca or int(f.escuela_id) in vencidas
+        else:
+            toca = nunca or basicos_vencidos
+        if toca:
+            filas.append(f)
+    filas.sort(key=lambda f: (f.ultimo.fecha is None, -(f.dias or 0), f.titulo))
+    return filas[:limite] if limite is not None else filas
+
+
 def ultimo_conteo_de(ultimos: dict, escuela_id: int | None, tipo_pieza: str = "", prenda: str = "") -> UltimoConteo:
     return ultimos.get(clave_alcance(escuela_id, tipo_pieza, prenda), UltimoConteo(None))

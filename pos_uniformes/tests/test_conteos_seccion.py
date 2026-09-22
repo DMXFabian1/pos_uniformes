@@ -244,3 +244,94 @@ class ConteoBannerTests(unittest.TestCase):
         w.conteo_banner.setVisible.assert_called_with(True)
         QuoteSatelliteWindow._on_conteo_banner_ready(w, [SimpleNamespace(escuela_nombre="A"), SimpleNamespace(escuela_nombre="B")])
         w.conteo_banner_label.setText.assert_called_with("⚠  Conteo pendiente en 2 escuelas")
+
+
+class RediseñoPorRolTests(unittest.TestCase):
+    """La sección Conteos se acomoda a quién entró (Daniel, 2026-09-22:
+    "el diseño abruma"). Se prueba con una ventana de mentiras: solo los
+    widgets que toca la lógica."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        from PyQt6.QtWidgets import QApplication
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _ventana(self, code: str):
+        from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        w = QWidget()
+        self._vivo = w   # que no lo recoja el recolector a media prueba
+        raiz = QVBoxLayout(w)
+        fila = QHBoxLayout()
+        cards = {}
+        for key in ("por_contar", "por_revisar", "a_medias", "mias"):
+            card = QFrame(); card.setObjectName("libretaCard")
+            t, v, s = QLabel(key), QLabel("0"), QLabel("")
+            fila.addWidget(card, 1)
+            cards[key] = (card, t, v, s)
+        cards_widget = QWidget(); cards_widget.setLayout(fila)
+        raiz.addWidget(cards_widget)
+        piezas = {}
+        for nombre in ("conteos_revisar_titulo", "conteos_revisar_panel", "conteos_toca_titulo", "conteos_toca_panel"):
+            widget = QLabel(nombre) if nombre.endswith("titulo") else QFrame()
+            raiz.addWidget(widget)
+            piezas[nombre] = widget
+        fake = type("V", (), {})()
+        fake._raiz = w
+        fake._conteos_code = code
+        fake._conteos_cards = cards
+        fake.conteos_cards_row = fila
+        fake.conteos_cards_widget = cards_widget
+        fake.conteos_layout = raiz
+        fake.conteos_calendario_btn = QPushButton()
+        fake.conteos_mapa_abrir_btn = QPushButton(); fake.conteos_mapa_abrir_btn.setCheckable(True)
+        fake.conteos_ver_tabla_btn = QPushButton(); fake.conteos_ver_tabla_btn.setCheckable(True)
+        fake.conteos_mapa = QFrame()
+        fake.conteos_mapa_titulo = QLabel()
+        for nombre, widget in piezas.items():
+            setattr(fake, nombre, widget)
+        for metodo in ("_conteos_es_dueno", "_conteos_aplicar_rol", "_conteos_destacar_card", "_conteos_ordenar_secciones"):
+            setattr(type(fake), metodo, getattr(QuoteSatelliteWindow, metodo))
+        return fake, piezas
+
+    def test_la_empleada_ve_lo_suyo_y_el_mapa_cerrado(self) -> None:
+        v, piezas = self._ventana("VEND-4")
+        v._raiz.show()
+        v._conteos_aplicar_rol()
+        self.assertFalse(v.conteos_cards_widget.isVisible())      # sin tarjetas de números
+        self.assertFalse(v.conteos_calendario_btn.isVisible())    # el calendario es del dueño
+        self.assertFalse(v.conteos_mapa.isVisible())              # el mapa, cerrado
+        self.assertTrue(v.conteos_mapa_abrir_btn.isVisible())     # con su botón para abrirlo
+        self.assertFalse(v.conteos_ver_tabla_btn.isVisible())
+        self.assertEqual(v.conteos_mapa_titulo.text(), "CÓMO VA LA TIENDA")
+        # y lo que le toca va antes que lo que espera revisión
+        orden = [v.conteos_layout.indexOf(piezas[n]) for n in ("conteos_toca_titulo", "conteos_revisar_titulo")]
+        self.assertLess(orden[0], orden[1])
+
+    def test_el_dueno_ve_primero_lo_que_espera_su_revision(self) -> None:
+        from pos_uniformes.services.conteo_jornada_service import DUENO_CODE
+        v, piezas = self._ventana(DUENO_CODE)
+        v._raiz.show()
+        v._conteos_aplicar_rol()
+        self.assertTrue(v.conteos_cards_widget.isVisible())
+        self.assertTrue(v.conteos_mapa.isVisible())
+        self.assertFalse(v._conteos_cards["mias"][0].isVisible())   # "mías" no le dice nada
+        self.assertEqual(v.conteos_cards_row.indexOf(v._conteos_cards["por_revisar"][0]), 0)
+        self.assertEqual(v._conteos_cards["por_revisar"][0].objectName(), "libretaCardDestacada")
+        self.assertEqual(v._conteos_cards["por_contar"][0].objectName(), "libretaCard")
+        orden = [v.conteos_layout.indexOf(piezas[n]) for n in ("conteos_revisar_titulo", "conteos_toca_titulo")]
+        self.assertLess(orden[0], orden[1])
+
+    def test_alternar_el_mapa_lo_muestra_y_lo_esconde(self) -> None:
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+        v, _p = self._ventana("VEND-4")
+        v._raiz.show()
+        v.conteos_mapa.recargar = lambda: None
+        type(v)._conteos_alternar_mapa = QuoteSatelliteWindow._conteos_alternar_mapa
+        v._conteos_aplicar_rol()
+        v._conteos_alternar_mapa(True)
+        self.assertTrue(v.conteos_mapa.isVisible())
+        self.assertEqual(v.conteos_mapa_abrir_btn.text(), "Ocultar")
+        v._conteos_alternar_mapa(False)
+        self.assertFalse(v.conteos_mapa.isVisible())

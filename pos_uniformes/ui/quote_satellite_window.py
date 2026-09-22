@@ -3400,10 +3400,11 @@ class QuoteSatelliteWindow(QMainWindow):
         actualizar_btn.setAutoDefault(False)
         actualizar_btn.clicked.connect(self._refresh_conteos_vista)
         header.addWidget(actualizar_btn)
-        calendario_btn = QPushButton("📅 Calendario")
-        calendario_btn.setAutoDefault(False)
-        calendario_btn.clicked.connect(lambda: self._set_page("calendario"))
-        header.addWidget(calendario_btn)
+        # El calendario de vigencias es cosa del dueño; a las chicas no les dice nada.
+        self.conteos_calendario_btn = QPushButton("📅 Calendario")
+        self.conteos_calendario_btn.setAutoDefault(False)
+        self.conteos_calendario_btn.clicked.connect(lambda: self._set_page("calendario"))
+        header.addWidget(self.conteos_calendario_btn)
         salir_btn = QPushButton("Salir")
         salir_btn.setAutoDefault(False)
         salir_btn.clicked.connect(self._conteos_logout)
@@ -3415,8 +3416,8 @@ class QuoteSatelliteWindow(QMainWindow):
         cards_row.setSpacing(10)
         self._conteos_cards: dict[str, tuple[QFrame, QLabel, QLabel, QLabel]] = {}
         for index, (key, titulo) in enumerate(
-            (("por_contar", "POR CONTAR"), ("a_medias", "A MEDIAS"),
-             ("mias", "MÍAS"), ("por_revisar", "POR REVISAR"))
+            (("por_contar", "POR CONTAR"), ("por_revisar", "POR REVISAR"),
+             ("a_medias", "A MEDIAS"), ("mias", "MÍAS"))
         ):
             card = QFrame()
             card.setObjectName("libretaCardDestacada" if index == 0 else "libretaCard")
@@ -3438,7 +3439,10 @@ class QuoteSatelliteWindow(QMainWindow):
             cards_row.addWidget(card, 1)
             self._conteos_cards[key] = (card, t, v, sub)
         self._conteos_cards["por_revisar"][0].setVisible(False)
-        layout.addLayout(cards_row)
+        self.conteos_cards_row = cards_row
+        self.conteos_cards_widget = QWidget()
+        self.conteos_cards_widget.setLayout(cards_row)
+        layout.addWidget(self.conteos_cards_widget)
 
         # Barra de acciones con marco (como la de la Libreta): los tres
         # pasos, y los dos que se hacen aquí son botones.
@@ -3447,33 +3451,18 @@ class QuoteSatelliteWindow(QMainWindow):
         acciones_ly = QHBoxLayout(self.conteos_acciones_bar)
         acciones_ly.setContentsMargins(12, 8, 12, 8)
         acciones_ly.setSpacing(8)
-        orden_btn = QPushButton("1 ·  🖨 Imprimir la hoja")
+        orden_btn = QPushButton("🖨 Imprimir otra hoja")
         orden_btn.setAutoDefault(False)
+        orden_btn.setToolTip("Para contar algo que no está en la lista de arriba")
         orden_btn.clicked.connect(lambda: self._conteos_imprimir_hoja())
         acciones_ly.addWidget(orden_btn)
-        paso2 = QLabel("2 ·  Cuenta en el piso y anota")
-        paso2.setStyleSheet("font-size: 13px; font-weight: 600; color: #8a7358; background: transparent; padding: 0 8px;")
-        acciones_ly.addWidget(paso2)
-        empezar_btn = QPushButton("3 ·  ＋ Capturar lo que anotaste")
+        acciones_ly.addStretch()
+        empezar_btn = QPushButton("＋ Ya conté — capturar lo que anoté")
         empezar_btn.setObjectName("primaryButton")
         empezar_btn.setAutoDefault(False)
         empezar_btn.clicked.connect(self._conteos_empezar)
         acciones_ly.addWidget(empezar_btn)
-        acciones_ly.addStretch()
-        # El mapa (qué está contado y qué no) lo ve cualquiera: es solo lectura.
-        mapa_btn = QPushButton("🗺 Mapa")
-        mapa_btn.setAutoDefault(False)
-        mapa_btn.setToolTip("Qué está contado y qué no, escuela por escuela y talla por talla")
-        mapa_btn.clicked.connect(self._open_conteo_mapa)
-        acciones_ly.addWidget(mapa_btn)
         layout.addWidget(self.conteos_acciones_bar)
-
-        # Aviso en ámbar cuando no hay servidor (mismo tono que la Libreta).
-        self.conteos_pendiente_label = QLabel("")
-        self.conteos_pendiente_label.setStyleSheet("font-size: 12px; color: #b9770e;")
-        self.conteos_pendiente_label.setWordWrap(True)
-        self.conteos_pendiente_label.setVisible(False)
-        layout.addWidget(self.conteos_pendiente_label)
 
         def _panel() -> tuple[QFrame, QVBoxLayout]:
             marco = QFrame()
@@ -3482,6 +3471,21 @@ class QuoteSatelliteWindow(QMainWindow):
             interior.setContentsMargins(10, 10, 10, 10)
             interior.setSpacing(8)
             return marco, interior
+
+        # Aviso en ámbar cuando no hay servidor (mismo tono que la Libreta).
+        self.conteos_pendiente_label = QLabel("")
+        self.conteos_pendiente_label.setStyleSheet("font-size: 12px; color: #b9770e;")
+        self.conteos_pendiente_label.setWordWrap(True)
+        self.conteos_pendiente_label.setVisible(False)
+        layout.addWidget(self.conteos_pendiente_label)
+
+        # Lo que toca contar, con su botón de imprimir en el renglón: es lo
+        # primero que necesita ver quien entra a contar (2026-09-22).
+        self.conteos_toca_titulo = QLabel("TE TOCA CONTAR")
+        self.conteos_toca_titulo.setObjectName("libretaSeccion")
+        layout.addWidget(self.conteos_toca_titulo)
+        self.conteos_toca_panel, self.conteos_toca_box = _panel()
+        layout.addWidget(self.conteos_toca_panel)
 
         self.conteos_jornadas_titulo = QLabel("JORNADAS SIN TERMINAR  ·  toca Seguir para retomar la tuya")
         self.conteos_jornadas_titulo.setObjectName("libretaSeccion")
@@ -3504,9 +3508,17 @@ class QuoteSatelliteWindow(QMainWindow):
         # qué está contado y qué no… la sección Conteos"); la tabla de siempre
         # queda a un clic (ahí vive el doble clic al comparativo).
         titulo_fila = QHBoxLayout()
-        historial_titulo = QLabel("ESCUELAS Y BÁSICOS  ·  qué está contado y qué no")
-        historial_titulo.setObjectName("libretaSeccion")
-        titulo_fila.addWidget(historial_titulo, 1)
+        self.conteos_mapa_titulo = QLabel("ESCUELAS Y BÁSICOS  ·  qué está contado y qué no")
+        self.conteos_mapa_titulo.setObjectName("libretaSeccion")
+        titulo_fila.addWidget(self.conteos_mapa_titulo, 1)
+        # Para quien viene a contar, el panorama de la tienda va cerrado: lo abre
+        # si tiene curiosidad, no le estorba mientras trabaja.
+        self.conteos_mapa_abrir_btn = QPushButton("Ver cómo va la tienda")
+        self.conteos_mapa_abrir_btn.setAutoDefault(False)
+        self.conteos_mapa_abrir_btn.setCheckable(True)
+        self.conteos_mapa_abrir_btn.toggled.connect(self._conteos_alternar_mapa)
+        self.conteos_mapa_abrir_btn.setVisible(False)
+        titulo_fila.addWidget(self.conteos_mapa_abrir_btn)
         self.conteos_ver_tabla_btn = QPushButton("Ver tabla")
         self.conteos_ver_tabla_btn.setAutoDefault(False)
         self.conteos_ver_tabla_btn.setCheckable(True)
@@ -3545,6 +3557,7 @@ class QuoteSatelliteWindow(QMainWindow):
         aviso.setObjectName("libretaSubtitulo")
         layout.addWidget(aviso)
 
+        self.conteos_layout = layout
         self.conteos_work.setLayout(layout)
         self.conteos_work.setVisible(False)
         page_layout.addWidget(self.conteos_work, 1)
@@ -3688,6 +3701,179 @@ class QuoteSatelliteWindow(QMainWindow):
         s_.setText(sub)
         s_.setVisible(bool(sub))
 
+    def _conteos_es_dueno(self) -> bool:
+        from pos_uniformes.services.conteo_jornada_service import DUENO_CODE
+
+        return str(self._conteos_code or "") == DUENO_CODE
+
+    def _conteos_destacar_card(self, key: str) -> None:
+        """Cuál de las tarjetas va en color: la que dice qué hacer ahora.
+        Para el dueño, lo que espera su revisión; para contar, lo que toca."""
+        for nombre, (card, titulo, valor, sub) in getattr(self, "_conteos_cards", {}).items():
+            on = nombre == key
+            card.setObjectName("libretaCardDestacada" if on else "libretaCard")
+            titulo.setObjectName("libretaCardTituloClaro" if on else "libretaCardTitulo")
+            valor.setObjectName("libretaCardValorClaro" if on else "libretaCardValor")
+            sub.setObjectName("libretaCardSubClaro" if on else "libretaCardSub")
+            for w in (card, titulo, valor, sub):
+                w.style().unpolish(w)
+                w.style().polish(w)
+
+    def _conteos_aplicar_rol(self) -> None:
+        """La pantalla se acomoda a quién entró (2026-09-22, Daniel: "el diseño
+        abruma"): quien viene a contar ve lo suyo; el dueño, el panorama.
+
+        - Empleada: lo que le toca, con su botón de imprimir, y capturar. El
+          mapa de toda la tienda queda cerrado detrás de un botón.
+        - Dueño: las tarjetas de números (lo que espera su revisión primero),
+          el calendario y el mapa abierto, como hasta ahora.
+        """
+        dueno = self._conteos_es_dueno()
+        for nombre in ("conteos_cards_widget", "conteos_calendario_btn"):
+            w = getattr(self, nombre, None)
+            if w is not None:
+                w.setVisible(dueno)
+        if dueno:
+            # Lo que está frenado esperándolo va primero y en color; "mías" no
+            # le dice nada al dueño.
+            cards = getattr(self, "_conteos_cards", {})
+            fila = getattr(self, "conteos_cards_row", None)
+            if "mias" in cards:
+                cards["mias"][0].setVisible(False)
+            revisar = cards.get("por_revisar")
+            if revisar is not None and fila is not None and fila.indexOf(revisar[0]) > 0:
+                fila.removeWidget(revisar[0])
+                fila.insertWidget(0, revisar[0], 1)
+            self._conteos_destacar_card("por_revisar")
+        else:
+            self._conteos_destacar_card("por_contar")
+        self._conteos_ordenar_secciones(dueno)
+        # El mapa: abierto para el dueño; para la empleada, un botón que lo abre.
+        boton = getattr(self, "conteos_mapa_abrir_btn", None)
+        mapa = getattr(self, "conteos_mapa", None)
+        tabla_btn = getattr(self, "conteos_ver_tabla_btn", None)
+        titulo = getattr(self, "conteos_mapa_titulo", None)
+        if boton is not None:
+            boton.setVisible(not dueno)
+            if not dueno and boton.isChecked():
+                boton.setChecked(False)
+        if titulo is not None:
+            titulo.setText(
+                "ESCUELAS Y BÁSICOS  ·  qué está contado y qué no" if dueno
+                else "CÓMO VA LA TIENDA"
+            )
+        if tabla_btn is not None:
+            tabla_btn.setVisible(dueno)
+            if not dueno and tabla_btn.isChecked():
+                tabla_btn.setChecked(False)
+        if mapa is not None:
+            mapa.setVisible(dueno)
+
+    def _conteos_ordenar_secciones(self, dueno: bool) -> None:
+        """Para el dueño, lo que espera su revisión va antes que la lista de lo
+        que falta contar; para quien viene a contar, al revés."""
+        layout = getattr(self, "conteos_layout", None)
+        piezas = [
+            getattr(self, n, None)
+            for n in ("conteos_revisar_titulo", "conteos_revisar_panel",
+                      "conteos_toca_titulo", "conteos_toca_panel")
+        ]
+        if layout is None or any(w is None for w in piezas):
+            return
+        revisar_t, revisar_p, toca_t, toca_p = piezas
+        orden = [revisar_t, revisar_p, toca_t, toca_p] if dueno else [toca_t, toca_p, revisar_t, revisar_p]
+        if [layout.indexOf(w) for w in orden] == sorted(layout.indexOf(w) for w in orden):
+            return   # ya están en ese orden
+        base = min(layout.indexOf(w) for w in orden)
+        for w in orden:
+            layout.removeWidget(w)
+        for i, w in enumerate(orden):
+            layout.insertWidget(base + i, w)
+
+    def _conteos_alternar_mapa(self, abierto: bool) -> None:
+        mapa = getattr(self, "conteos_mapa", None)
+        boton = getattr(self, "conteos_mapa_abrir_btn", None)
+        if mapa is None:
+            return
+        mapa.setVisible(abierto)
+        if boton is not None:
+            boton.setText("Ocultar" if abierto else "Ver cómo va la tienda")
+        if abierto:
+            mapa.recargar()
+
+    def _conteos_pintar_toca(self, filas) -> None:
+        """La lista de lo que toca contar: un renglón por escuela o tipo de
+        básicos, con el botón que imprime SU hoja sin preguntar."""
+        box = getattr(self, "conteos_toca_box", None)
+        titulo = getattr(self, "conteos_toca_titulo", None)
+        if box is None:
+            return
+        while box.count():
+            item = box.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+        dueno = self._conteos_es_dueno()
+        if titulo is not None:
+            titulo.setText(("LO QUE TOCA CONTAR" if dueno else "TE TOCA CONTAR") + (f"  ·  {len(filas)}" if filas else ""))
+        if not filas:
+            vacio = QLabel("Todo al día: nada vencido ni sin contar. 🎉")
+            vacio.setObjectName("libretaPanelVacio")
+            box.addWidget(vacio)
+            return
+        mostrar = filas[:5]
+        for fila in mostrar:
+            box.addWidget(self._conteos_fila_toca(fila))
+        if len(filas) > len(mostrar):
+            mas = QPushButton(f"▾ ver las otras {len(filas) - len(mostrar)}")
+            mas.setObjectName("toolbarGhostButton")
+            mas.setAutoDefault(False)
+            mas.setStyleSheet("border: none; color: #a8481f; font-size: 13px; background: transparent;")
+            mas.clicked.connect(lambda _c=False, f=filas: self._conteos_pintar_toca_todas(f))
+            box.addWidget(mas)
+
+    def _conteos_pintar_toca_todas(self, filas) -> None:
+        box = getattr(self, "conteos_toca_box", None)
+        if box is None:
+            return
+        while box.count():
+            item = box.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+        for fila in filas:
+            box.addWidget(self._conteos_fila_toca(fila))
+
+    def _conteos_fila_toca(self, fila) -> QWidget:
+        card = QFrame()
+        card.setObjectName("libretaCard")
+        card.setMinimumHeight(54)
+        ly = QHBoxLayout(card)
+        ly.setContentsMargins(16, 10, 12, 10)
+        ly.setSpacing(12)
+        col = QVBoxLayout()
+        col.setSpacing(2)
+        nombre = QLabel(fila.titulo)
+        nombre.setStyleSheet("font-size: 15px; font-weight: 800; color: #2c2a27; background: transparent; border: none;")
+        col.addWidget(nombre)
+        detalle = "nunca se ha contado" if fila.ultimo.fecha is None else f"último: {fila.ultimo.texto()}"
+        sub = QLabel(detalle)
+        sub.setStyleSheet(
+            "font-size: 12px; color: %s; background: transparent; border: none;"
+            % ("#b91c1c" if fila.ultimo.fecha is None else "#8a8177")
+        )
+        col.addWidget(sub)
+        ly.addLayout(col, 1)
+        boton = QPushButton("🖨 Imprimir hoja")
+        boton.setAutoDefault(False)
+        boton.clicked.connect(
+            lambda _c=False, f=fila: self._conteos_imprimir_hoja(
+                escuela_id=f.escuela_id, tipo_pieza=f.tipo_pieza, titulo=f.titulo,
+            )
+        )
+        ly.addWidget(boton)
+        return card
+
     def _refresh_conteos_vista(self) -> None:
         """Lo pendiente, las jornadas abiertas y (dueño) lo que falta revisar."""
         self._refresh_conteos_pendiente()
@@ -3698,6 +3884,8 @@ class QuoteSatelliteWindow(QMainWindow):
         code = str(self._conteos_code or "")
         if self.offline_mode or not probe_database_host(0.5):
             pintar_jornadas(self, abiertas=[], por_revisar=[], recientes=[], code=code)
+            self._conteos_aplicar_rol()
+            self._conteos_pintar_toca([])
             return
         try:
             from pos_uniformes.services import conteo_jornada_service as jn
@@ -3712,12 +3900,15 @@ class QuoteSatelliteWindow(QMainWindow):
                     if code == jn.DUENO_CODE else []
                 )
                 recientes = jn.tablero_conteos(session)
+                toca = jn.lo_que_toca(session)
         except Exception:  # noqa: BLE001 — sin conexión: la página sigue
             logger.exception("Conteos: no se pudieron leer las jornadas")
-            abiertas, por_revisar, recientes = [], [], []
+            abiertas, por_revisar, recientes, toca = [], [], [], []
         pintar_jornadas(self, abiertas=abiertas, por_revisar=por_revisar, recientes=recientes, code=code)
+        self._conteos_aplicar_rol()
+        self._conteos_pintar_toca(toca)
         mapa = getattr(self, "conteos_mapa", None)
-        if mapa is not None:
+        if mapa is not None and mapa.isVisible():
             mapa.recargar()   # en hilo; no más de una vez por minuto
 
     def _conteos_imprimir_hoja(self, *, escuela_id=None, tipo_pieza: str = "", titulo: str = "", prenda: str = "") -> None:
