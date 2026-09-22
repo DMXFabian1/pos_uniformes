@@ -19,7 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
 from pos_uniformes.database.models import ConteoInventario, ConteoJornada, Escuela
@@ -776,6 +776,81 @@ class UltimoConteo:
         else:
             base = f"hace más de {dias // 365} año" + ("s" if dias // 365 > 1 else "")
         return f"{base} ({self.quien.split()[0]})" if self.quien else base
+
+
+@dataclass(frozen=True)
+class ConteoDelHistorial:
+    """Un conteo terminado de una escuela (o tipo de básicos), para auditarlo:
+    cuándo, quién, cuántas tallas, qué tanto se movió y si dejó pedido."""
+
+    jornada_id: int
+    titulo: str
+    quien: str
+    terminada_at: datetime | None
+    revisada_at: datetime | None
+    tallas: int
+    faltaron: int      # piezas que había de menos contra el sistema
+    sobraron: int      # piezas que había de más
+    pedido_piezas: int  # lo que Daniel decidió pedir a partir de este conteo
+    estado: str
+
+    @property
+    def diferencia(self) -> int:
+        return self.sobraron - self.faltaron
+
+
+def historial_de_alcance(
+    session: Session, escuela_id: int | None, tipo_pieza: str = "", *, prenda: str = "", limite: int = 30
+) -> list[ConteoDelHistorial]:
+    """Los conteos terminados de una escuela (o tipo de básicos), del más nuevo
+    al más viejo, con sus cifras. Para la ventana de historial (2026-09-22:
+    "¿cómo puedo compararlo con conteos anteriores?")."""
+    wheres = [ConteoJornada.terminada_at.is_not(None)]
+    if escuela_id is not None:
+        wheres.append(ConteoJornada.escuela_id == int(escuela_id))
+    else:
+        wheres.append(ConteoJornada.escuela_id.is_(None))
+        if tipo_pieza:
+            wheres.append(ConteoJornada.tipo_pieza == tipo_pieza)
+    if prenda:
+        wheres.append(ConteoJornada.prenda == prenda)
+    jornadas = session.scalars(
+        select(ConteoJornada).where(*wheres).order_by(ConteoJornada.terminada_at.desc()).limit(int(limite))
+    ).all()
+    if not jornadas:
+        return []
+    cifras = {
+        int(jid): (int(tallas or 0), int(faltaron or 0), int(sobraron or 0), int(pedido or 0))
+        for jid, tallas, faltaron, sobraron, pedido in session.execute(
+            select(
+                ConteoInventario.jornada_id,
+                func.count(ConteoInventario.id),
+                func.sum(case((ConteoInventario.diferencia < 0, -ConteoInventario.diferencia), else_=0)),
+                func.sum(case((ConteoInventario.diferencia > 0, ConteoInventario.diferencia), else_=0)),
+                func.sum(func.coalesce(ConteoInventario.pedido, 0)),
+            )
+            .where(ConteoInventario.jornada_id.in_([j.id for j in jornadas]))
+            .group_by(ConteoInventario.jornada_id)
+        ).all()
+    }
+    salida = []
+    for j in jornadas:
+        tallas, faltaron, sobraron, pedido = cifras.get(int(j.id), (0, 0, 0, 0))
+        salida.append(
+            ConteoDelHistorial(
+                jornada_id=int(j.id),
+                titulo=ref(j).titulo,
+                quien=j.empleada_nombre or j.empleada_code or "",
+                terminada_at=j.terminada_at,
+                revisada_at=j.revisada_at,
+                tallas=tallas,
+                faltaron=faltaron,
+                sobraron=sobraron,
+                pedido_piezas=pedido,
+                estado=estado_de(j),
+            )
+        )
+    return salida
 
 
 def ultimos_conteos(session: Session) -> dict:

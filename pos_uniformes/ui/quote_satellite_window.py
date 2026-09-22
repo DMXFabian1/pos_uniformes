@@ -3404,6 +3404,15 @@ class QuoteSatelliteWindow(QMainWindow):
         actualizar_btn.clicked.connect(self._refresh_conteos_vista)
         header.addWidget(actualizar_btn)
         # El calendario de vigencias es cosa del dueño; a las chicas no les dice nada.
+        # La ventana de auditoría: comparar con conteos anteriores, ver cómo
+        # evoluciona y sacar pedidos sin tener que entrar a revisar (2026-09-22).
+        self.conteos_historial_btn = QPushButton("📊 Historial")
+        self.conteos_historial_btn.setAutoDefault(False)
+        self.conteos_historial_btn.setToolTip(
+            "Todos los conteos de cada escuela: compararlos, ver cómo evoluciona y decidir pedidos"
+        )
+        self.conteos_historial_btn.clicked.connect(self._open_conteo_historial)
+        header.addWidget(self.conteos_historial_btn)
         self.conteos_calendario_btn = QPushButton("📅 Calendario")
         self.conteos_calendario_btn.setAutoDefault(False)
         self.conteos_calendario_btn.clicked.connect(lambda: self._set_page("calendario"))
@@ -3732,7 +3741,7 @@ class QuoteSatelliteWindow(QMainWindow):
           el calendario y el mapa abierto, como hasta ahora.
         """
         dueno = self._conteos_es_dueno()
-        for nombre in ("conteos_cards_widget", "conteos_calendario_btn"):
+        for nombre in ("conteos_cards_widget", "conteos_calendario_btn", "conteos_historial_btn"):
             w = getattr(self, nombre, None)
             if w is not None:
                 w.setVisible(dueno)
@@ -3792,6 +3801,17 @@ class QuoteSatelliteWindow(QMainWindow):
             layout.removeWidget(w)
         for i, w in enumerate(orden):
             layout.insertWidget(base + i, w)
+
+    def _open_conteo_historial(self) -> None:
+        from pos_uniformes.ui.dialogs.conteo_historial_dialog import abrir_historial_conteos
+
+        if self.offline_mode:
+            QMessageBox.information(
+                self, "Sin conexión",
+                "El historial se lee de la PC principal. Enciéndela e intenta de nuevo.",
+            )
+            return
+        abrir_historial_conteos(self)
 
     def _conteos_alternar_mapa(self, abierto: bool) -> None:
         mapa = getattr(self, "conteos_mapa", None)

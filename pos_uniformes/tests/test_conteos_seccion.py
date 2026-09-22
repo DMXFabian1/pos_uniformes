@@ -383,3 +383,21 @@ class CargaEnHiloTests(unittest.TestCase):
             v._on_conteos_datos_listos({"code": "VEND-4", "toca": ["A"], "recientes": [], "abiertas": [], "por_revisar": []})
         pintar.assert_not_called()
         self.assertEqual(v.pintadas, [])
+
+
+class BotonHistorialTests(unittest.TestCase):
+    """El acceso a la ventana de auditoría vive en el encabezado de Conteos y
+    es solo del dueño (2026-09-22)."""
+
+    def test_esta_en_el_encabezado_y_solo_lo_ve_el_dueno(self) -> None:
+        import inspect
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        construir = inspect.getsource(QuoteSatelliteWindow._build_conteos_page)
+        self.assertIn("conteos_historial_btn", construir)
+        self.assertIn("_open_conteo_historial", construir)
+        rol = inspect.getsource(QuoteSatelliteWindow._conteos_aplicar_rol)
+        self.assertIn("conteos_historial_btn", rol)
+        abrir = inspect.getsource(QuoteSatelliteWindow._open_conteo_historial)
+        self.assertIn("abrir_historial_conteos", abrir)
+        self.assertIn("offline_mode", abrir)   # sin la principal, avisa en vez de tronar
