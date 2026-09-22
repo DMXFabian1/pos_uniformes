@@ -97,13 +97,10 @@ class EstadoDeEscuela:
         `rojo` = el sistema cree que hay menos que nada (se vendió sin contar);
         `ambar` = le falta contarse; `verde` = contada y al día.
 
-        Vive aquí y no en quien lo pinta: el mapa, el panel y el kiosko tienen
-        que estar de acuerdo en cuándo una escuela está en rojo."""
-        if self.en_rojo:
-            return "rojo"
-        if self.faltan_de_contar:
-            return "ambar"
-        return "verde"
+        La regla vive en `conteo_mapa_service.semaforo`, no aquí y menos en
+        quien lo pinta: el mapa, el panel, el celular y el kiosko tienen que
+        estar de acuerdo en cuándo una escuela está en rojo."""
+        return conteo_mapa_service.semaforo(self.en_rojo, self.faltan_de_contar)
 
     @property
     def titular(self) -> str:

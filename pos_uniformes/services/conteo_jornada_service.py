@@ -1054,6 +1054,17 @@ class PorContar:
         return self.al_dia > 0 and self.faltan > 0
 
     @property
+    def salud(self) -> str:
+        """El mismo semáforo que usan el mapa y el panel.
+
+        Un alcance no es una escuela (puede ser un tipo de básicos), pero la
+        pregunta es la misma: ¿se vendió sin contar, le falta contarse, o está
+        al día? La regla vive en `conteo_mapa_service.semaforo`."""
+        from pos_uniformes.services import conteo_mapa_service  # noqa: PLC0415
+
+        return conteo_mapa_service.semaforo(self.en_rojo, self.faltan)
+
+    @property
     def motivo(self) -> str:
         if self.en_rojo:
             cuantas = "una talla" if self.en_rojo == 1 else f"{self.en_rojo} tallas"

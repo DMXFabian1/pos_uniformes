@@ -139,6 +139,11 @@ from pos_uniformes.services.inventory_label_service import (
 
 logger = logging.getLogger(__name__)
 
+#: Los colores del kiosko para el semáforo compartido. La **regla** de cuándo
+#: algo está en rojo vive en `conteo_mapa_service.semaforo`; aquí solo se
+#: traduce a la paleta de la Libreta, que es la que usa esta pantalla.
+_COLOR_SEMAFORO = {"rojo": "#b91c1c", "ambar": "#b45309", "verde": "#8a8177"}
+
 SATELLITE_SEARCH_DEBOUNCE_MS = 300
 _LABEL_PRINT_PINS = {"634700", "12345"}
 SATELLITE_CATALOG_PAGE_SIZE = 25
@@ -3879,14 +3884,18 @@ class QuoteSatelliteWindow(QMainWindow):
         nombre = QLabel(fila.titulo)
         nombre.setStyleSheet("font-size: 15px; font-weight: 800; color: #2c2a27; background: transparent; border: none;")
         col.addWidget(nombre)
+        # El color lo dice el semáforo compartido (conteo_mapa_service.semaforo),
+        # no este widget: hasta el 22/09 el kiosko tenía su propia regla y una
+        # escuela con tallas en rojo — lo más urgente — salía en gris, mientras
+        # que en el mapa salía en rojo. Dos semáforos que se contradecían.
+        color = _COLOR_SEMAFORO.get(fila.salud, "#8a8177")
         if fila.ultimo.fecha is None:
-            detalle, color = "nunca se ha contado", "#b91c1c"
+            detalle = fila.motivo
         elif fila.empezado:
             # Se contó una parte: la hoja saldrá solo con lo que falta.
             detalle = f"{fila.motivo} · se contó {fila.ultimo.texto()}"
-            color = "#b45309"
         else:
-            detalle, color = f"{fila.motivo} · último: {fila.ultimo.texto()}", "#8a8177"
+            detalle = f"{fila.motivo} · último: {fila.ultimo.texto()}"
         sub = QLabel(detalle)
         sub.setWordWrap(True)
         sub.setStyleSheet(f"font-size: 12px; color: {color}; background: transparent; border: none;")

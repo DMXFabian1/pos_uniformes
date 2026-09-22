@@ -714,6 +714,19 @@ class LoQueTocaTests(unittest.TestCase):
         with patch.object(jn, "ultimos_conteos", return_value=ultimos or {}):
             return jn.lo_que_toca(None, mapa=mapa)
 
+
+    def test_el_semaforo_es_el_mismo_del_mapa(self) -> None:
+        """Antes el kiosko pintaba de gris lo que el mapa pintaba de rojo."""
+        mapa = self._mapa(
+            basicos=[
+                self._basico("Calceta", tallas=42, al_dia=42, en_rojo=5),
+                self._basico("Jumper", tallas=20, al_dia=2, nunca=18),
+            ],
+        )
+        por_titulo = {f.titulo: f.salud for f in self._correr(mapa)}
+        self.assertEqual(por_titulo["Básicos · Calceta"], "rojo", "se vendió sin contar")
+        self.assertEqual(por_titulo["Básicos · Jumper"], "ambar", "solo le falta contarse")
+
     def test_lo_que_esta_en_rojo_va_primero_aunque_se_haya_contado_ayer(self) -> None:
         """El sistema cree que hay menos que nada: alguien vendió sin contar."""
         mapa = self._mapa(

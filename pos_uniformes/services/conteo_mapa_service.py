@@ -38,6 +38,27 @@ def estado_talla(v) -> str:
     return VIEJA if v.requiere_conteo else AL_DIA
 
 
+#: El semáforo, en un solo lugar. Lo usan el mapa, el panel, el celular y el
+#: kiosko; si cada uno lo decidiera, una escuela saldría roja en una pantalla y
+#: gris en otra — que es lo que pasaba en el kiosko hasta el 2026-09-22.
+ROJO, AMBAR, VERDE = "rojo", "ambar", "verde"
+
+
+def semaforo(en_rojo: int, faltan: int) -> str:
+    """Cómo va algo que se cuenta: una escuela, un tipo de básicos, lo que sea.
+
+    `rojo` = el sistema cree que hay menos que nada, o sea que se vendió sin
+    contar; es lo más urgente y le gana a cualquier vigencia.
+    `ambar` = le falta contarse (nunca se contó, o ya venció).
+    `verde` = contado y al día.
+    """
+    if en_rojo:
+        return ROJO
+    if faltan:
+        return AMBAR
+    return VERDE
+
+
 def _cifras(variantes) -> dict:
     c = Counter(estado_talla(v) for v in variantes)
     total = sum(c.values())
