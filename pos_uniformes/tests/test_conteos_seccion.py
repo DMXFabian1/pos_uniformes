@@ -335,3 +335,51 @@ class RediseñoPorRolTests(unittest.TestCase):
         self.assertEqual(v.conteos_mapa_abrir_btn.text(), "Ocultar")
         v._conteos_alternar_mapa(False)
         self.assertFalse(v.conteos_mapa.isVisible())
+
+
+class CargaEnHiloTests(unittest.TestCase):
+    """La sección lee la base en un hilo: por Wi-Fi son ~2 s y antes
+    congelaba la pantalla (2026-09-22)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        from PyQt6.QtWidgets import QApplication
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _ventana(self):
+        from PyQt6.QtWidgets import QLabel
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        v = type("V", (), {})()
+        v._conteos_code = "VEND-4"
+        v._conteos_cargando = False
+        v.conteos_quien_label = QLabel()
+        v.pintadas = []
+        v._conteos_aplicar_rol = lambda: None
+        v._conteos_pintar_toca = lambda filas: v.pintadas.append(("toca", list(filas)))
+        v.conteos_mapa = None
+        for metodo in ("_conteos_avisar_cargando", "_on_conteos_datos_listos"):
+            setattr(type(v), metodo, getattr(QuoteSatelliteWindow, metodo))
+        return v
+
+    def test_mientras_carga_lo_dice_y_al_llegar_pinta(self) -> None:
+        from unittest.mock import patch
+
+        v = self._ventana()
+        v._conteos_avisar_cargando(True)
+        self.assertEqual(v.conteos_quien_label.text(), "actualizando…")
+        with patch("pos_uniformes.ui.helpers.conteos_jornadas_helper.pintar_jornadas") as pintar:
+            v._on_conteos_datos_listos({"code": "VEND-4", "toca": ["A", "B"], "recientes": [], "abiertas": [], "por_revisar": []})
+        self.assertFalse(v._conteos_cargando)
+        self.assertEqual(v.pintadas, [("toca", ["A", "B"])])
+        self.assertEqual(pintar.call_count, 1)
+
+    def test_si_cambio_de_persona_lo_que_llega_tarde_se_ignora(self) -> None:
+        from unittest.mock import patch
+
+        v = self._ventana()
+        v._conteos_code = "VEND-9"      # ya entró otra
+        with patch("pos_uniformes.ui.helpers.conteos_jornadas_helper.pintar_jornadas") as pintar:
+            v._on_conteos_datos_listos({"code": "VEND-4", "toca": ["A"], "recientes": [], "abiertas": [], "por_revisar": []})
+        pintar.assert_not_called()
+        self.assertEqual(v.pintadas, [])

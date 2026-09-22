@@ -138,25 +138,35 @@ def alcance(session: Session, escuela_id: int | None, tipo_pieza: str = "", pren
     return [g for g in grupos if not g.get("virtual")]
 
 
-def alcances_en_lote(session: Session, jornadas: list[ConteoJornada]) -> dict[int, list[dict]]:
+def alcances_en_lote(
+    session: Session, jornadas: list[ConteoJornada], *, cache: dict | None = None
+) -> dict[int, list[dict]]:
     """`alcance()` de varias jornadas con pocas consultas: dos para todas las
-    escuelas y una para todos los básicos (el tablero pedía una por una)."""
+    escuelas y una para todos los básicos (el tablero pedía una por una).
+
+    `cache`: un dict que se reusa entre llamadas del mismo refresco para no
+    traer dos veces las tallas de las mismas escuelas (2026-09-22)."""
     from pos_uniformes.services.conteo_service import (
         agrupar_variantes_por_producto,
         obtener_variantes_basicos_agrupadas,
         obtener_variantes_para_conteo_varias,
     )
 
+    cache = cache if cache is not None else {}
+    por_escuela = cache.setdefault("por_escuela", {})
     out: dict[int, list[dict]] = {}
     escuela_ids = sorted({int(j.escuela_id) for j in jornadas if j.escuela_id is not None})
-    por_escuela = obtener_variantes_para_conteo_varias(session, escuela_ids) if escuela_ids else {}
-    basicos = None
+    faltan = [e for e in escuela_ids if e not in por_escuela]
+    if faltan:
+        por_escuela.update(obtener_variantes_para_conteo_varias(session, faltan))
+    basicos = cache.get("basicos")
     for j in jornadas:
         if j.escuela_id is not None:
             grupos = agrupar_variantes_por_producto(por_escuela.get(int(j.escuela_id), []))
         else:
             if basicos is None:
                 basicos = obtener_variantes_basicos_agrupadas(session)
+                cache["basicos"] = basicos
             grupos = [g for g in basicos if not j.tipo_pieza or g["tipo_pieza"] == j.tipo_pieza]
             prenda = (getattr(j, "prenda", "") or "").strip()
             if prenda:
@@ -561,6 +571,20 @@ def avance(session: Session, jornada: ConteoJornada, hechas: dict[int, int] | No
     )
 
 
+def avances_en_lote(session: Session, jornadas: list[ConteoJornada], *, cache: dict | None = None) -> dict[int, Avance]:
+    """El avance de varias jornadas con tres consultas en vez de tres por cada
+    una (35 jornadas por revisar eran 99 idas a la base — 2026-09-22)."""
+    jornadas = list(jornadas)
+    if not jornadas:
+        return {}
+    grupos = alcances_en_lote(session, jornadas, cache=cache)
+    hechas = capturado_por_jornada(session, [int(j.id) for j in jornadas])
+    return {
+        int(j.id): avance(session, j, hechas=hechas.get(int(j.id), {}), grupos=grupos.get(int(j.id), []))
+        for j in jornadas
+    }
+
+
 def terminar_jornada(session: Session, jornada: ConteoJornada, *, empleada_code: str) -> ConteoJornada:
     """La cierra. No aplica nada al inventario: eso lo hace la revisión."""
     if not puede_seguirla(jornada, empleada_code):
@@ -840,7 +864,7 @@ class FilaTablero:
         return self.ultimo.dias()
 
 
-def tablero_conteos(session: Session) -> list[FilaTablero]:
+def tablero_conteos(session: Session, *, cache: dict | None = None) -> list[FilaTablero]:
     """TODAS las escuelas y prendas básicas con su último conteo (Daniel,
     2026-09-14: "sé que esas no son todas las escuelas que se han contado").
     Orden: en proceso primero, luego de la contada más reciente a la más
@@ -859,7 +883,7 @@ def tablero_conteos(session: Session) -> list[FilaTablero]:
         if clave not in ultimas:
             ultimas[clave] = j
     capturado = capturado_por_jornada(session, [j.id for j in ultimas.values()])
-    alcances = alcances_en_lote(session, list(ultimas.values()))
+    alcances = alcances_en_lote(session, list(ultimas.values()), cache=cache)
 
     def fila(titulo: str, escuela_id: int | None, tipo_pieza: str, clave) -> FilaTablero:
         u = ultimos.get(clave, UltimoConteo(None))
@@ -884,7 +908,11 @@ def tablero_conteos(session: Session) -> list[FilaTablero]:
         eid = int(e["escuela_id"])
         filas.append(fila(str(e["escuela_nombre"]), eid, "", eid))
     try:
-        grupos = obtener_variantes_basicos_agrupadas(session)
+        grupos = (cache or {}).get("basicos")
+        if grupos is None:
+            grupos = obtener_variantes_basicos_agrupadas(session)
+            if cache is not None:
+                cache["basicos"] = grupos
         tipos = sorted({g["tipo_pieza"] for g in grupos if not g.get("virtual") and g["tipo_pieza"]})
     except Exception:  # noqa: BLE001
         tipos = []
@@ -902,13 +930,15 @@ def tablero_conteos(session: Session) -> list[FilaTablero]:
     return filas
 
 
-def lo_que_toca(session: Session, *, limite: int | None = None) -> list[FilaTablero]:
+def lo_que_toca(session: Session, *, limite: int | None = None, filas: list[FilaTablero] | None = None) -> list[FilaTablero]:
     """Lo que hay que contar hoy: lo vencido (se le pasó la vigencia de su
     escuela) y lo que nunca se ha contado. Lo que alguien ya está contando no
     entra — para eso está "a medias".
 
     Orden: primero lo vencido, de lo más viejo a lo más nuevo; al final lo que
     nunca se ha contado (Daniel, 2026-09-18: si todo trae ⚠, nada destaca).
+
+    `filas`: el tablero ya calculado, para no pedirlo dos veces.
     """
     from pos_uniformes.services.conteo_calendario_service import escuelas_con_conteo_vencido
     from pos_uniformes.services.conteo_service import obtener_estado_conteo_basicos
@@ -923,8 +953,9 @@ def lo_que_toca(session: Session, *, limite: int | None = None) -> list[FilaTabl
     except Exception:  # noqa: BLE001
         basicos_vencidos = False
 
+    del_tablero = tablero_conteos(session) if filas is None else filas
     filas = []
-    for f in tablero_conteos(session):
+    for f in del_tablero:
         if f.quien_en_proceso:
             continue
         nunca = f.ultimo.fecha is None

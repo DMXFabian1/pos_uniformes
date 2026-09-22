@@ -93,6 +93,7 @@ class Mosaico(QFrame):
         ly.setSpacing(5)
         nombre = QLabel(cifras.get("nombre", ""))
         nombre.setWordWrap(True)
+        nombre.setMinimumWidth(0)
         nombre.setStyleSheet(f"font-size: 14px; font-weight: 800; color: #2c2a27; {_TXT}")
         ly.addWidget(nombre)
         ly.addWidget(Semaforo(cifras))
@@ -100,6 +101,11 @@ class Mosaico(QFrame):
         if cifras.get("quien") and not cifras.get("en_proceso"):
             linea += f" · {cifras['quien']}"
         sub = QLabel(linea)
+        # Sin esto, el renglón largo ("100% al día · hace 8 d · Stayce Chavarria")
+        # fijaba el ancho mínimo del mosaico y el mapa sacaba scroll horizontal
+        # en el kiosko (2026-09-22).
+        sub.setWordWrap(True)
+        sub.setMinimumWidth(0)
         sub.setStyleSheet(f"font-size: 11px; color: #8a8177; {_TXT}")
         ly.addWidget(sub)
         if cifras.get("en_proceso"):

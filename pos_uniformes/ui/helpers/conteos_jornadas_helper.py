@@ -68,6 +68,8 @@ def _tarjeta(foto, avance, *, boton: str, activo: bool, al_click, resaltada: boo
     izq.setSpacing(2)
     titulo = QLabel(foto.titulo)
     titulo.setStyleSheet(f"font-size: 15px; font-weight: 800; color: #2c2a27; {_TXT}")
+    titulo.setMinimumWidth(0)
+    titulo.setWordWrap(True)
     izq.addWidget(titulo)
     momento = foto.terminada_at or foto.iniciada_at
     detalle = QLabel(f"{foto.quien}  ·  {cuando(momento)}")
@@ -80,12 +82,16 @@ def _tarjeta(foto, avance, *, boton: str, activo: bool, al_click, resaltada: boo
     etiqueta = QLabel(texto_avance(avance))
     etiqueta.setStyleSheet(f"font-size: 12px; font-weight: 800; color: #73341c; {_TXT}")
     etiqueta.setAlignment(Qt.AlignmentFlag.AlignRight)
+    etiqueta.setMinimumWidth(0)
     der.addWidget(etiqueta)
     barra = QProgressBar()
     barra.setMaximum(max(1, avance.tallas_total))
     barra.setValue(min(avance.tallas_hechas, max(1, avance.tallas_total)))
     barra.setTextVisible(False)
-    barra.setFixedWidth(200)
+    # Ancho máximo, no fijo: con 35 tarjetas el ancho fijo sacaba scroll
+    # horizontal en el kiosko (2026-09-22).
+    barra.setMaximumWidth(200)
+    barra.setMinimumWidth(80)
     barra.setStyleSheet(_ESTILO_BARRA)
     der.addWidget(barra)
     ly.addLayout(der)
@@ -165,23 +171,38 @@ def pintar_jornadas(window, *, abiertas, por_revisar, code: str, recientes=()) -
             )
         )
 
-    _vaciar(window.conteos_revisar_box)
     window.conteos_revisar_titulo.setVisible(bool(por_revisar))
     panel = getattr(window, "conteos_revisar_panel", None)
     if panel is not None:
         panel.setVisible(bool(por_revisar))
-    for foto, avance in por_revisar:
+    # De a poquitas: 35 tarjetas de golpe eran una pared (2026-09-22).
+    _pintar_por_revisar(window, por_revisar, tope=8)
+
+
+    tabla = getattr(window, "conteos_historial_table", None)
+    if tabla is not None:
+        pintar_historial(tabla, recientes)
+
+
+def _pintar_por_revisar(window, por_revisar, *, tope: int | None) -> None:
+    from PyQt6.QtWidgets import QPushButton
+
+    _vaciar(window.conteos_revisar_box)
+    filas = list(por_revisar)
+    mostrar = filas if tope is None else filas[:tope]
+    for foto, avance in mostrar:
         window.conteos_revisar_box.addWidget(
             _tarjeta(
                 foto, avance, boton="Revisar", activo=True,
                 al_click=window._conteos_revisar, resaltada=True,
             )
         )
-
-
-    tabla = getattr(window, "conteos_historial_table", None)
-    if tabla is not None:
-        pintar_historial(tabla, recientes)
+    if len(filas) > len(mostrar):
+        mas = QPushButton(f"▾ ver las otras {len(filas) - len(mostrar)}")
+        mas.setAutoDefault(False)
+        mas.setStyleSheet("border: none; color: #a8481f; font-size: 13px; background: transparent;")
+        mas.clicked.connect(lambda _c=False: _pintar_por_revisar(window, filas, tope=None))
+        window.conteos_revisar_box.addWidget(mas)
 
 
 def pintar_historial(tabla, filas) -> None:

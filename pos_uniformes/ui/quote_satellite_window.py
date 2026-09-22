@@ -334,6 +334,8 @@ class QuoteSatelliteWindow(QMainWindow):
     # Avisa (en hilo de UI) que el cache de anuncios se refrescó desde la DB.
     _anuncios_ready = pyqtSignal()
     _conteo_banner_ready = pyqtSignal(object)   # lista de escuelas vencidas, o None si no se pudo
+    # Lo de la sección Conteos, ya leído en un hilo (dict) — ver _refresh_conteos_vista.
+    _conteos_datos_listos = pyqtSignal(object)
     # Hay versión nueva publicada en la PC principal (payload: la versión).
     _update_disponible = pyqtSignal(str)
     # False hasta el primer _refresh_catalog_snapshot: el reindex de arranque
@@ -397,6 +399,7 @@ class QuoteSatelliteWindow(QMainWindow):
         # atorado en True — watchdog muerto hasta reiniciar.
         self._db_refresh_ready.connect(self._on_db_refresh_ready)
         self._conteo_banner_ready.connect(self._on_conteo_banner_ready)
+        self._conteos_datos_listos.connect(self._on_conteos_datos_listos)
         self._update_disponible.connect(self._ofrecer_actualizacion)
         # Buscar actualizaciones en background poco después de arrancar
         # (también hay botón manual en el admin Ctrl+Shift+A).
@@ -3875,38 +3878,74 @@ class QuoteSatelliteWindow(QMainWindow):
         return card
 
     def _refresh_conteos_vista(self) -> None:
-        """Lo pendiente, las jornadas abiertas y (dueño) lo que falta revisar."""
+        """Lo pendiente, las jornadas abiertas y (dueño) lo que falta revisar.
+
+        La lectura va en un hilo: por Wi-Fi son ~2 s y antes congelaba la
+        pantalla completa (2026-09-22). Mientras llega, lo que ya estaba
+        pintado se queda y el encabezado dice que está actualizando.
+        """
         self._refresh_conteos_pendiente()
+        if getattr(self, "_conteos_cargando", False):
+            return
+        code = str(self._conteos_code or "")
+        self._conteos_cargando = True
+        self._conteos_avisar_cargando(True)
+        import threading
+
+        def _worker() -> None:
+            datos = {"code": code, "abiertas": [], "por_revisar": [], "recientes": [], "toca": [], "sin_conexion": False}
+            try:
+                from pos_uniformes.services.satellite_startup_service import probe_database_host
+
+                if self.offline_mode or not probe_database_host(0.5):
+                    datos["sin_conexion"] = True
+                else:
+                    from pos_uniformes.services import conteo_jornada_service as jn
+
+                    with get_session() as session:
+                        cache: dict = {}   # las tallas de cada escuela, una sola vez
+                        jornadas_abiertas = jn.jornadas_abiertas(session)
+                        pendientes = jn.jornadas_por_revisar(session) if code == jn.DUENO_CODE else []
+                        # Todo en lote: antes eran ~150 idas a la base (99 solo
+                        # para el avance de las 35 por revisar).
+                        avances = jn.avances_en_lote(session, list(jornadas_abiertas) + list(pendientes), cache=cache)
+                        datos["abiertas"] = [
+                            (jn.ref(j), avances[int(j.id)], jn.puede_seguirla(j, code))
+                            for j in jornadas_abiertas
+                        ]
+                        datos["por_revisar"] = [(jn.ref(j), avances[int(j.id)]) for j in pendientes]
+                        datos["recientes"] = jn.tablero_conteos(session, cache=cache)
+                        datos["toca"] = jn.lo_que_toca(session, filas=datos["recientes"])
+            except Exception:  # noqa: BLE001 — sin conexión: la página sigue
+                logger.exception("Conteos: no se pudieron leer las jornadas")
+                datos["sin_conexion"] = True
+            finally:
+                self._conteos_datos_listos.emit(datos)
+
+        threading.Thread(target=_worker, daemon=True, name="conteos-vista").start()
+
+    def _conteos_avisar_cargando(self, cargando: bool) -> None:
+        etiqueta = getattr(self, "conteos_quien_label", None)
+        if etiqueta is not None and cargando:
+            etiqueta.setText("actualizando…")
+
+    def _on_conteos_datos_listos(self, datos) -> None:
+        """Ya llegó lo de la base (o no hubo conexión): se pinta."""
+        self._conteos_cargando = False
         from pos_uniformes.ui.helpers.conteos_jornadas_helper import pintar_jornadas
 
-        from pos_uniformes.services.satellite_startup_service import probe_database_host
-
-        code = str(self._conteos_code or "")
-        if self.offline_mode or not probe_database_host(0.5):
-            pintar_jornadas(self, abiertas=[], por_revisar=[], recientes=[], code=code)
-            self._conteos_aplicar_rol()
-            self._conteos_pintar_toca([])
-            return
-        try:
-            from pos_uniformes.services import conteo_jornada_service as jn
-
-            with get_session() as session:
-                abiertas = [
-                    (jn.ref(j), jn.avance(session, j), jn.puede_seguirla(j, code))
-                    for j in jn.jornadas_abiertas(session)
-                ]
-                por_revisar = (
-                    [(jn.ref(j), jn.avance(session, j)) for j in jn.jornadas_por_revisar(session)]
-                    if code == jn.DUENO_CODE else []
-                )
-                recientes = jn.tablero_conteos(session)
-                toca = jn.lo_que_toca(session)
-        except Exception:  # noqa: BLE001 — sin conexión: la página sigue
-            logger.exception("Conteos: no se pudieron leer las jornadas")
-            abiertas, por_revisar, recientes, toca = [], [], [], []
-        pintar_jornadas(self, abiertas=abiertas, por_revisar=por_revisar, recientes=recientes, code=code)
+        code = str(datos.get("code") or "")
+        if code != str(self._conteos_code or ""):
+            return   # cambió de persona mientras cargaba
+        pintar_jornadas(
+            self,
+            abiertas=datos.get("abiertas") or [],
+            por_revisar=datos.get("por_revisar") or [],
+            recientes=datos.get("recientes") or [],
+            code=code,
+        )
         self._conteos_aplicar_rol()
-        self._conteos_pintar_toca(toca)
+        self._conteos_pintar_toca(datos.get("toca") or [])
         mapa = getattr(self, "conteos_mapa", None)
         if mapa is not None and mapa.isVisible():
             mapa.recargar()   # en hilo; no más de una vez por minuto

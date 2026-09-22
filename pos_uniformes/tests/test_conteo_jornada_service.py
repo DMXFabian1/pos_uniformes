@@ -681,3 +681,57 @@ class LoQueTocaTests(unittest.TestCase):
              patch("pos_uniformes.services.conteo_calendario_service.escuelas_con_conteo_vencido", return_value=[]), \
              patch("pos_uniformes.services.conteo_service.obtener_estado_conteo_basicos", side_effect=Exception("x")):
             self.assertEqual(len(jn.lo_que_toca(None, limite=2)), 2)
+
+
+class AvancesEnLoteTests(unittest.TestCase):
+    """El avance de varias jornadas en tres consultas, no tres por cada una
+    (35 jornadas por revisar eran 99 idas a la base — 2026-09-22)."""
+
+    def test_da_lo_mismo_que_una_por_una_y_comparte_el_alcance(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from pos_uniformes.services import conteo_jornada_service as jn
+
+        jornadas = [SimpleNamespace(id=i, escuela_id=1 if i % 2 else 2, tipo_pieza="", prenda="", total_tallas=0) for i in (1, 2, 3)]
+        grupos = {j.id: [{"producto_nombre": "P", "variantes": [SimpleNamespace(variante_id=10 + j.id)]}] for j in jornadas}
+        hechas = {1: {11: 3}, 2: {}, 3: {13: 1}}
+        with patch.object(jn, "alcances_en_lote", return_value=grupos) as alcances, \
+             patch.object(jn, "capturado_por_jornada", return_value=hechas) as capturado:
+            resultado = jn.avances_en_lote(None, jornadas)
+        self.assertEqual(alcances.call_count, 1)      # un solo alcance para las tres
+        self.assertEqual(capturado.call_count, 1)     # y una sola lectura de lo capturado
+        self.assertEqual({i: (a.tallas_hechas, a.prendas_hechas) for i, a in resultado.items()},
+                         {1: (1, 1), 2: (0, 0), 3: (1, 1)})
+
+    def test_sin_jornadas_no_consulta_nada(self) -> None:
+        from unittest.mock import patch
+        from pos_uniformes.services import conteo_jornada_service as jn
+
+        with patch.object(jn, "alcances_en_lote") as alcances:
+            self.assertEqual(jn.avances_en_lote(None, []), {})
+        alcances.assert_not_called()
+
+
+class AlcanceCompartidoTests(unittest.TestCase):
+    """El mismo refresco pide el alcance dos veces (avances y tablero); con el
+    cache las tallas de cada escuela se traen una sola vez."""
+
+    def test_la_segunda_llamada_no_vuelve_a_la_base(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import patch
+        from pos_uniformes.services import conteo_jornada_service as jn
+
+        jornadas = [SimpleNamespace(id=1, escuela_id=7, tipo_pieza="", prenda="")]
+        cache: dict = {}
+        with patch("pos_uniformes.services.conteo_service.obtener_variantes_para_conteo_varias", return_value={7: []}) as traer, \
+             patch("pos_uniformes.services.conteo_service.agrupar_variantes_por_producto", return_value=[]):
+            jn.alcances_en_lote(None, jornadas, cache=cache)
+            jn.alcances_en_lote(None, jornadas, cache=cache)
+        self.assertEqual(traer.call_count, 1)
+        self.assertEqual(traer.call_args[0][1], [7])
+        # sin cache, cada llamada vuelve a pedirlas
+        with patch("pos_uniformes.services.conteo_service.obtener_variantes_para_conteo_varias", return_value={7: []}) as traer, \
+             patch("pos_uniformes.services.conteo_service.agrupar_variantes_por_producto", return_value=[]):
+            jn.alcances_en_lote(None, jornadas)
+            jn.alcances_en_lote(None, jornadas)
+        self.assertEqual(traer.call_count, 2)

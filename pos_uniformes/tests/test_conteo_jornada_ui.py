@@ -774,3 +774,38 @@ class ImprimirDejaHuellaTests(unittest.TestCase):
         self.assertIn("_conteos_contado_por() is None", fuente)
         self.assertIn("_conteos_confirmar_otra_hoja(abierta)", fuente)
         self.assertEqual(fuente.count("_conteos_anotar_impresion("), 2)   # carta y tira
+
+
+class PorRevisarDeAPocasTests(unittest.TestCase):
+    """35 tarjetas de golpe eran una pared: se pintan 8 y las demás detrás de
+    "ver las otras N" (2026-09-22)."""
+
+    def setUp(self) -> None:
+        self.padre = QWidget()
+        self.w = SimpleNamespace(
+            conteos_jornadas_box=QVBoxLayout(), conteos_revisar_box=QVBoxLayout(),
+            conteos_revisar_titulo=QLabel(self.padre), conteos_quien_label=QLabel(self.padre),
+            conteos_jornadas_titulo=QLabel(self.padre), conteos_jornadas_panel=QLabel(self.padre),
+            conteos_revisar_panel=QLabel(self.padre),
+            _conteos_capturar=lambda f: None, _conteos_revisar=lambda f: None,
+        )
+
+    def tearDown(self) -> None:
+        self.padre.deleteLater()
+        _APP.processEvents()
+
+    def test_muestra_ocho_y_el_resto_tras_un_boton(self) -> None:
+        from PyQt6.QtWidgets import QPushButton
+
+        pendientes = [(_foto(id=i), _avance()) for i in range(12)]
+        tarjetas.pintar_jornadas(self.w, abiertas=[], por_revisar=pendientes, code="VEND-1")
+        self.assertEqual(self.w.conteos_revisar_box.count(), 9)   # 8 tarjetas + el botón
+        boton = self.w.conteos_revisar_box.itemAt(8).widget()
+        self.assertIsInstance(boton, QPushButton)
+        self.assertIn("ver las otras 4", boton.text())
+        boton.click()
+        self.assertEqual(self.w.conteos_revisar_box.count(), 12)  # ya sin botón
+
+    def test_con_pocas_no_hay_boton(self) -> None:
+        tarjetas.pintar_jornadas(self.w, abiertas=[], por_revisar=[(_foto(), _avance())], code="VEND-1")
+        self.assertEqual(self.w.conteos_revisar_box.count(), 1)
