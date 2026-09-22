@@ -16,6 +16,7 @@ corrida tarda ~2 min; después es instantáneo salvo escuelas nuevas.
 from __future__ import annotations
 
 import json
+from collections import Counter
 import math
 import re
 import sys
@@ -417,8 +418,15 @@ def main() -> int:
 
     print("Preguntándole al POS cómo va cada escuela…")
     estados = carga_estado_pos({e["pos"] for e in mercado if e.get("pos")})
+    # Un registro del POS puede cubrir varios planteles (SABES son 13, Motolinea
+    # 3). Todos comparten el mismo estado, así que hay que decirlo: si no, una
+    # sola talla en rojo pinta trece anillos rojos y parece un incendio.
+    planteles = Counter(e["pos"] for e in mercado if e.get("pos") and e["pos"] in estados)
     for e in mercado:
-        e["estado"] = estados.get(e.get("pos", ""), {})
+        estado = estados.get(e.get("pos", ""), {})
+        if estado:
+            estado = {**estado, "comparten": planteles.get(e["pos"], 1)}
+        e["estado"] = estado
     if estados:
         rojas = sum(1 for v in estados.values() if v["salud"] == "rojo")
         ambar = sum(1 for v in estados.values() if v["salud"] == "ambar")

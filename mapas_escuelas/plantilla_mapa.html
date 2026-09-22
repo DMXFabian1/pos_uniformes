@@ -14,6 +14,7 @@
   h1 { font-size: 17px; margin: 0 0 2px; color: #4a3524; }
   .sub { font-size: 11.5px; color: #8a7a66; margin-bottom: 8px; }
   #buscador { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #d8cbb8; border-radius: 8px; font-size: 13px; background: #fff; margin-bottom: 8px; }
+  #compartidos { font-size: 11.5px; color: #6b543c; background: #f3ead9; border-radius: 8px; padding: 6px 9px; margin-bottom: 8px; line-height: 1.6; }
   #cobertura { font-size: 11.5px; color: #6b543c; background: #f3ead9; border-radius: 8px; padding: 6px 9px; margin-bottom: 8px; line-height: 1.5; }
   .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
   .chip { font-size: 12px; padding: 4px 9px; border-radius: 20px; cursor: pointer; user-select: none; background: #fff; border: 1.5px solid transparent; color: #3d2f20; }
@@ -60,6 +61,7 @@
   .salud{margin-top:8px;padding:6px 8px;border-left:3px solid #999;background:rgba(0,0,0,.04);border-radius:4px}
   .salud-cifras{font-size:11px;color:#5f594f;margin-top:2px}
   .salud-punto{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:middle}
+  .leyenda-salud{font-size:11px;color:#5f594f;margin-top:4px}
 </style>
 </head>
 <body>
@@ -70,6 +72,7 @@
     <div class="sub">Cabecera + comunidades cliente · directorio SEP · relleno = cliente, anillo = sin registrar</div>
     <input id="buscador" type="search" placeholder="Buscar escuela, comunidad o CCT…">
     <div id="cobertura"></div>
+    <div id="compartidos"></div>
     <div class="chips" id="chipsNivel"></div>
     <div class="chips chips-tipo" id="chipsTipo"></div>
     <div class="seg" id="segModo">
@@ -163,6 +166,13 @@ function saludDe(e) {
   return (e.estado && e.estado.salud) || "";
 }
 
+// Un registro del POS puede cubrir varios planteles (SABES son 13). Todos
+// enseñan el mismo estado, así que el de los demás es prestado: se pinta más
+// tenue para que una sola talla en rojo no parezca trece problemas.
+function comparteEstado(e) {
+  return !!(e.estado && e.estado.comparten > 1);
+}
+
 function estadoHtml(e) {
   const s = e.estado;
   if (!s || !s.salud) return "";
@@ -173,8 +183,12 @@ function estadoHtml(e) {
     s.pedido ? `${s.pedido} ${plural(s.pedido, "talla", "tallas")} por pedir` : "",
     s.faltas ? `${plural(s.faltas, "una vez", s.faltas + " veces")} que la pidieron y no había` : "",
   ].filter(Boolean).join(" · ");
+  const compartido = s.comparten > 1
+    ? `<div class="salud-cifras"><i>Es el estado de <b>${e.pos}</b>, que cubre ${s.comparten} planteles.</i></div>`
+    : "";
   return `<div class="salud" style="border-color:${SALUD[s.salud]}">` +
          `<b style="color:${SALUD[s.salud]}">${s.titular}</b>` +
+         compartido +
          `<div class="salud-cifras">${cifras}</div>` +
          `<div class="salud-cifras">se contó ${s.ultimo}</div></div>`;
 }
@@ -189,7 +203,12 @@ function icono(e) {
     const s = Math.round(14 + extra);
     // El relleno sigue diciendo el nivel; el anillo dice cómo va en el POS.
     const salud = saludDe(e);
-    const anillo = salud ? `box-shadow:0 0 0 3px ${SALUD[salud]}` : "";
+    // El anillo solo cuando el estado es **de esta escuela**. Si el registro del
+    // POS cubre varios planteles (SABES son 13), una sola talla en rojo pintaría
+    // trece anillos rojos y parecería un incendio: el estado no está en ningún
+    // plantel en particular, así que en el mapa no se pinta. Sigue en la ficha
+    // y en la lista, dicho con todas sus letras.
+    const anillo = salud && !comparteEstado(e) ? `box-shadow:0 0 0 3px ${SALUD[salud]}` : "";
     return L.divIcon({ className: "", iconSize: [s, s], iconAnchor: [s / 2, s / 2],
       html: `<div class="marker-cliente" style="position:relative;width:${s}px;height:${s}px;background:${color};${anillo}">${badge}</div>` });
   }
@@ -377,7 +396,12 @@ grupos.forEach((g, gi) => {
     const extraNv = TIPO_TXT[e.tipo] ? ` · ${TIPO_TXT[e.tipo]}` : "";
     const al = e.alumnos ? `${e.alumnos} al. · ` : "";
     const salud = saludDe(e);
-    const pinta = salud ? `<span class="salud-punto" style="background:${SALUD[salud]}" title="${SALUD_TXT[salud]}"></span>` : "";
+    const prestado = comparteEstado(e);
+    const estilo = prestado
+      ? `background:transparent;box-shadow:inset 0 0 0 2px ${SALUD[salud]}`
+      : `background:${SALUD[salud]}`;
+    const titulo = SALUD_TXT[salud] + (prestado ? ` (de ${e.pos}, ${e.estado.comparten} planteles)` : "");
+    const pinta = salud ? `<span class="salud-punto" style="${estilo}" title="${titulo}"></span>` : "";
     d.innerHTML = `<span class="${dotCls}" style="${style}"></span>` + pinta +
       `<b>${e.probable ? '<span class="prob">~</span> ' : ""}${e.nombre}</b>` +
       `<span class="seg-tag">${SEG[e.cct] ? " " + ESTADOS[SEG[e.cct]] : ""}</span>` +
@@ -414,6 +438,22 @@ document.getElementById("selSeg").onchange = ev => { F.seg = ev.target.value; ap
     return `<span style="color:${C[nv]};font-weight:700">●</span> ${NIVEL[nv]} ${del.filter(e => e.cliente).length}/${del.length}`;
   });
   document.getElementById("cobertura").innerHTML = "<b>Cobertura en el pueblo:</b><br>" + partes.join(" · ");
+})();
+
+// ---- Clientes que cubren varios planteles ----
+// Su estado no está en ningún punto del mapa (pintarlo repetiría el mismo aviso
+// en cada plantel), así que se dice aquí para que no se pierda de vista.
+(() => {
+  const vistos = new Map();
+  ESCUELAS.forEach(e => {
+    if (comparteEstado(e) && e.estado.salud !== "verde") vistos.set(e.pos, e.estado);
+  });
+  const caja = document.getElementById("compartidos");
+  if (!vistos.size) { caja.style.display = "none"; return; }
+  caja.innerHTML = "<b>Clientes de varios planteles:</b><br>" + [...vistos.entries()].map(
+    ([nombre, s]) => `<span class="salud-punto" style="background:${SALUD[s.salud]}"></span>` +
+      `<b>${nombre}</b> (${s.comparten} planteles) — ${s.titular}`
+  ).join("<br>");
 })();
 
 // ---- Pendientes ----
