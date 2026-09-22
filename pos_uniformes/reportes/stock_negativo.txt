@@ -6,5 +6,5 @@ Tallas en negativo: 1   piezas en rojo: -1
 
 1 de ellas son conjuntos: su existencia es la de sus piezas, así que se recalculan, no se ajustan.
 
-Listo: 0 tallas subidas a cero, 0 conjuntos recalculados.
-Cada una dejó su movimiento de ajuste, así que se puede auditar después.
+Solo reporte. Para subirlas a cero: --aplicar
+Y para arreglarlas de verdad: contarlas. Empieza por las de arriba.
