@@ -112,7 +112,12 @@ def productos_por_escuela(session: Session) -> list[tuple[int, int, int, str]]:
 
     Es el reparto del que cuelgan la matriz de Piezas, los tarifarios y la
     disponibilidad: si cada uno lo armara por su cuenta, mostrarían catálogos
-    distintos de la misma escuela."""
+    distintos de la misma escuela.
+
+    Límite heredado: los niveles de una escuela salen de sus **propias**
+    prendas, así que una escuela que solo llevara generales no tendría de dónde
+    colgarlas. En la tienda no pasa (toda escuela tiene lo suyo), pero si algún
+    día pasa, hay que darle nivel a la escuela en vez de deducirlo."""
     niveles = _niveles_por_escuela(session)
     filas: list[tuple[int, int, int, str]] = []
 
