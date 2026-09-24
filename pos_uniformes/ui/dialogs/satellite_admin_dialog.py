@@ -28,6 +28,8 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QRadioButton,
     QSpinBox,
+    QTableWidget,
+    QTableWidgetItem,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -433,6 +435,162 @@ def _build_anuncios_boxes(dialog: QWidget) -> list[QGroupBox]:
     _refrescar_satelites()
     _refrescar_lista()
     return [este_box, satelites_box, crear_box, lista_box]
+
+
+def _build_precios_box(dialog: QWidget) -> QGroupBox:
+    """Pestaña Precios: cambiar el precio de una prenda sin salir del kiosko.
+
+    Es la puerta que ya existe (Ctrl+Shift+A pide PIN de administrador), no una
+    trasera: las empleadas no la ven. Daniel, 2026-09-24: "un comando en venta
+    rápida para hacer ajustes".
+
+    Usa las mismas funciones que `scripts/cambiar_precio.py` — buscar la prenda
+    y listar sus tallas — para que la consola y esta ventana no puedan decir
+    cosas distintas.
+    """
+    from decimal import Decimal, InvalidOperation
+
+    box = QGroupBox("Cambiar el precio de una prenda")
+    layout = QVBoxLayout()
+    hint = QLabel(
+        "Escribe un pedazo del nombre y toca Buscar. Cambia **solo el precio**: "
+        "no renombra, no toca SKUs ni existencia. El POS y el kiosko se "
+        "re-indexan al abrir, o con el botón Sincronizar de la pestaña Búsqueda."
+    )
+    hint.setWordWrap(True)
+    layout.addWidget(hint)
+
+    fila = QHBoxLayout()
+    busca_in = QLineEdit()
+    busca_in.setPlaceholderText("Prenda — p. ej. «3pz Deportivo UVEG»")
+    fila.addWidget(busca_in, 1)
+    buscar_btn = QPushButton("Buscar")
+    buscar_btn.setObjectName("secondaryButton")
+    fila.addWidget(buscar_btn)
+    layout.addLayout(fila)
+
+    encontrada = QLabel("")
+    encontrada.setWordWrap(True)
+    layout.addWidget(encontrada)
+
+    tabla = QTableWidget(0, 3)
+    tabla.setHorizontalHeaderLabels(["SKU", "Talla", "Precio"])
+    tabla.horizontalHeader().setStretchLastSection(True)
+    tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+    tabla.setMaximumHeight(220)
+    layout.addWidget(tabla)
+
+    cambio = QHBoxLayout()
+    cambio.addWidget(QLabel("Precio nuevo:"))
+    precio_in = QLineEdit()
+    precio_in.setPlaceholderText("750")
+    precio_in.setMaximumWidth(140)
+    cambio.addWidget(precio_in)
+    aplicar_btn = QPushButton("Aplicar a todas sus tallas")
+    aplicar_btn.setObjectName("primaryButton")
+    aplicar_btn.setEnabled(False)
+    cambio.addWidget(aplicar_btn)
+    cambio.addStretch()
+    layout.addLayout(cambio)
+
+    estado = {"prenda": None}
+
+    def _sin_conexion() -> bool:
+        if probe_database_host(0.5):
+            return False
+        QMessageBox.warning(
+            dialog, "Sin conexión",
+            "Los precios viven en la PC principal. Enciéndela e intenta de nuevo.",
+        )
+        return True
+
+    def _pintar(variantes) -> None:
+        tabla.setRowCount(len(variantes))
+        for i, v in enumerate(variantes):
+            tabla.setItem(i, 0, QTableWidgetItem(str(v.sku)))
+            tabla.setItem(i, 1, QTableWidgetItem(str(v.talla)))
+            tabla.setItem(i, 2, QTableWidgetItem(f"${float(v.precio_venta):,.2f}"))
+
+    def _buscar() -> None:
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.database.models import Escuela
+        from pos_uniformes.scripts.cambiar_precio import buscar_prendas, tallas_de
+
+        texto = busca_in.text().strip()
+        estado["prenda"] = None
+        aplicar_btn.setEnabled(False)
+        tabla.setRowCount(0)
+        if not texto or _sin_conexion():
+            return
+        with get_session() as session:
+            prendas = buscar_prendas(session, texto)
+            if not prendas:
+                encontrada.setText(f"No hay ninguna prenda activa que diga «{texto}».")
+                return
+            if len(prendas) > 1:
+                nombres = " · ".join(p.nombre_base or p.nombre for p in prendas[:6])
+                encontrada.setText(
+                    f"«{texto}» empata con {len(prendas)} prendas: {nombres}. Sé más específico."
+                )
+                return
+            prenda = prendas[0]
+            escuela = session.get(Escuela, prenda.escuela_id).nombre if prenda.escuela_id else "general"
+            variantes = tallas_de(session, prenda, None)
+            encontrada.setText(f"#{prenda.id}  {prenda.nombre_base}   [{escuela}]")
+            _pintar(variantes)
+            estado["prenda"] = (int(prenda.id), str(prenda.nombre_base or prenda.nombre))
+            aplicar_btn.setEnabled(bool(variantes))
+
+    def _aplicar() -> None:
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.database.models import Producto
+        from pos_uniformes.scripts.cambiar_precio import tallas_de
+
+        if estado["prenda"] is None or _sin_conexion():
+            return
+        try:
+            nuevo = Decimal(precio_in.text().strip().replace(",", "").replace("$", ""))
+        except InvalidOperation:
+            QMessageBox.warning(dialog, "Precio", "Eso no es un precio.")
+            return
+        if nuevo < 0:
+            QMessageBox.warning(dialog, "Precio", "El precio no puede ser negativo.")
+            return
+
+        producto_id, nombre = estado["prenda"]
+        with get_session() as session:
+            producto = session.get(Producto, producto_id)
+            variantes = tallas_de(session, producto, None) if producto else []
+            cambian = [v for v in variantes if Decimal(str(v.precio_venta)) != nuevo]
+            if not cambian:
+                QMessageBox.information(dialog, "Precios", "Ya estaban todas en ese precio.")
+                return
+            antes = sorted({f"${float(v.precio_venta):,.2f}" for v in cambian})
+            ok = QMessageBox.question(
+                dialog, "Confirmar",
+                f"{nombre}\n\n"
+                f"{len(cambian)} talla(s): {', '.join(antes)}  →  ${nuevo:,.2f}\n\n"
+                "¿Lo cambio?",
+            )
+            if ok != QMessageBox.StandardButton.Yes:
+                return
+            for v in cambian:
+                v.precio_venta = nuevo
+                session.add(v)
+            session.commit()
+            _pintar(tallas_de(session, producto, None))
+        QMessageBox.information(
+            dialog, "Listo",
+            f"{len(cambian)} talla(s) con precio nuevo.\n\n"
+            "El POS y el kiosko lo toman al abrir; si están abiertos, usa "
+            "Sincronizar en la pestaña Búsqueda.",
+        )
+
+    buscar_btn.clicked.connect(_buscar)
+    busca_in.returnPressed.connect(_buscar)
+    aplicar_btn.clicked.connect(_aplicar)
+    box.setLayout(layout)
+    return box
 
 
 def _build_camaras_box(dialog: QWidget) -> QGroupBox:
@@ -1275,6 +1433,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     tabs.addTab(_make_tab(conteo_box), "📋  Conteos")
     if anuncios_boxes:
         tabs.addTab(_make_tab(*anuncios_boxes), "📣  Anuncios")
+    tabs.addTab(_make_tab(_build_precios_box(dialog)), "💲  Precios")
     tabs.addTab(_make_tab(_build_camaras_box(dialog)), "📹  Cámaras")
 
     outer = QVBoxLayout()
