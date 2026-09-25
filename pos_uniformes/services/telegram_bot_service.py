@@ -13,6 +13,9 @@ Comandos:
     /escuela      cómo va una escuela (contada, surtida, vendida)
     /contar       qué falta contar, lo rojo primero
     /faltas       lo que pidieron y no había
+    /pagos        a quién le toca cobrar y cuánto
+    /pagar X si   registra el pago (sin el "si" solo enseña el desglose)
+    /retiro N X   saca del cajón dejando dicho para qué
     /ayuda        esta lista
 
 Solo responde al chat configurado (POS_UNIFORMES_TELEGRAM_CHAT_ID); a
@@ -42,6 +45,11 @@ AYUDA = (
     "/estado — qué hay en caja ahora\n"
     "/resumen — resumen del día\n"
     "/pendientes — lo que falta por registrar\n"
+    "/retiro 500 gasolina — saca del cajón, con su motivo\n"
+    "\nPAGOS\n"
+    "/pagos — a quién le toca cobrar y cuánto\n"
+    "/pagar Fanny — el desglose; con «si» al final se registra\n"
+    "/deshacerpago — deshace el último pago\n"
     "\nLA TIENDA\n"
     "/prenda playera justo sierra — precio y cuántas hay por talla\n"
     "/escuela conalep — cómo va esa escuela\n"
@@ -154,6 +162,26 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
     if cmd.nombre == "asistencia":
         with session_factory() as session:
             return mensaje_asistencia(session, hoy)[0]
+    if cmd.nombre == "pagos":
+        from pos_uniformes.services import telegram_pagos_service as pg
+
+        with session_factory() as session:
+            return pg.pagos(session, hoy=hoy)
+    if cmd.nombre == "pagar":
+        from pos_uniformes.services import telegram_pagos_service as pg
+
+        with session_factory() as session:
+            return pg.pagar(session, cmd.argumento, quien=CODIGO_REMOTO, hoy=hoy)
+    if cmd.nombre == "retiro":
+        from pos_uniformes.services import telegram_pagos_service as pg
+
+        with session_factory() as session:
+            return pg.retiro(session, cmd.argumento, quien=CODIGO_REMOTO)
+    if cmd.nombre in ("deshacerpago", "deshacer_pago"):
+        from pos_uniformes.services import telegram_pagos_service as pg
+
+        with session_factory() as session:
+            return pg.deshacer_pago(session, quien=CODIGO_REMOTO)
     if cmd.nombre in ("prenda", "precio"):
         from pos_uniformes.services import telegram_inventario_service as inv
 
