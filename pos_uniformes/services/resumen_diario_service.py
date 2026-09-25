@@ -159,6 +159,47 @@ def formatear(d: DatosResumen) -> str:
 
 # ─── Acceso a datos ──────────────────────────────────────────────────────
 
+def texto_hoy(d: DatosResumen, *, quien_esta: list[str] | None = None, ahora=None) -> str:
+    """Cómo va el día **ahora**, en un vistazo (Daniel, 2026-09-25).
+
+    El resumen de la noche es para cerrar; esto es para consultarlo tres veces
+    al día sin leer un muro. Solo **dinero real** —efectivo, tarjeta, abonos—;
+    los apartados van aparte y marcados, porque son dinero comprometido, no
+    cobrado.
+    """
+    from datetime import datetime
+
+    momento = ahora or datetime.now()
+    lineas = [f"📅 Hoy · {_DIAS[d.fecha.weekday()]} {d.fecha:%d/%m}, {momento:%H:%M}", ""]
+
+    if not d.operaciones:
+        lineas.append("Todavía no se registra ninguna venta.")
+    else:
+        entro = d.efectivo + d.tarjeta + d.abonos
+        lineas.append(f"💵 Entró: {_pesos(entro)}")
+        lineas.append(f"   efectivo {_pesos(d.efectivo)} · tarjeta {_pesos(d.tarjeta)}")
+        if d.abonos:
+            lineas.append(f"   abonos {_pesos(d.abonos)}")
+        lineas.append(f"🛍 {d.operaciones} operaciones · {d.piezas} piezas")
+        if d.apartados:
+            lineas.append(f"📦 Apartados nuevos: {_pesos(d.apartados)} (comprometido, no cobrado)")
+
+    if quien_esta:
+        lineas.append("")
+        lineas.append("👥 " + ", ".join(quien_esta))
+
+    if d.horas_sin_corte is not None and d.horas_sin_corte >= 1:
+        lineas.append("")
+        horas = int(d.horas_sin_corte)
+        cuanto = "una hora" if horas == 1 else f"{horas} horas"
+        lineas.append(f"🧾 Sin corte desde hace {cuanto}.")
+    elif not d.cortes:
+        lineas.append("")
+        lineas.append("🧾 Todavía no hay corte hoy.")
+
+    return "\n".join(lineas)
+
+
 def recolectar(session, hoy: date | None = None) -> DatosResumen:
     """Lee todo lo del día. Cada bloque es defensivo: si una tabla no existe
     (base sin migrar) ese bloque se omite y el resto sale igual."""

@@ -6,6 +6,7 @@ Comandos:
     /corte sintarjeta   igual, pero los cobros con tarjeta quedan ocultos
     /nocorte      deja pasar el corte que se propuso hoy
     /estado       qué hay en caja ahora mismo
+    /hoy          cómo va el día ahora mismo, en un vistazo
     /resumen      el resumen del día (el mismo de la noche)
     /pendientes   lo que falta por registrar
     /asistencia   quién vino hoy (deducido de su primer movimiento)
@@ -43,7 +44,8 @@ AYUDA = (
     "   (se pueden juntar: /corte 5000 sintarjeta)\n"
     "/nocorte — dejar pasar el corte propuesto hoy\n"
     "/estado — qué hay en caja ahora\n"
-    "/resumen — resumen del día\n"
+    "/hoy — cómo va el día ahora mismo\n"
+    "/resumen — resumen del día (el de la noche, completo)\n"
     "/pendientes — lo que falta por registrar\n"
     "/retiro 500 gasolina — saca del cajón, con su motivo\n"
     "\nPAGOS\n"
@@ -155,6 +157,17 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
 
         with session_factory() as session:
             return formatear(recolectar(session, hoy))
+    if cmd.nombre == "hoy":
+        from pos_uniformes.services import asistencia_service as asis
+        from pos_uniformes.services.resumen_diario_service import recolectar, texto_hoy
+
+        with session_factory() as session:
+            datos = recolectar(session, hoy)
+            estan = [
+                a.nombre for a in asis.asistencia_del_dia(session, hoy)
+                if a.estado == asis.PRESENTE
+            ]
+            return texto_hoy(datos, quien_esta=estan)
     if cmd.nombre == "pendientes":
         from pos_uniformes.services.resumen_diario_service import texto_solo_pendientes
 

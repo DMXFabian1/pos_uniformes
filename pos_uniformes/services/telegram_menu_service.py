@@ -17,10 +17,11 @@ from datetime import date
 PREFIJO = "m:"
 
 _RAIZ = [
-    [("💵 Caja", "m:estado"), ("📋 Resumen", "m:resumen")],
+    [("📅 Hoy", "m:hoy"), ("💵 Caja", "m:estado")],
+    [("📋 Resumen", "m:resumen"), ("⏳ Pendientes", "m:pendientes")],
     [("💰 Pagos", "m:pagos"), ("👥 Quién vino", "m:asistencia")],
     [("🏪 Qué contar", "m:contar"), ("🔎 Sin surtir", "m:faltas")],
-    [("⏳ Pendientes", "m:pendientes"), ("❔ Ayuda", "m:ayuda")],
+    [("❔ Ayuda", "m:ayuda")],
 ]
 
 
@@ -83,6 +84,7 @@ def atender(dato: str, *, session_factory, hoy: date | None = None) -> tuple[str
 
     # Lo demás es de solo mirar: se contesta con el mismo comando de siempre.
     comando = {
+        "hoy": "/hoy",
         "estado": "/estado",
         "resumen": "/resumen",
         "pendientes": "/pendientes",
