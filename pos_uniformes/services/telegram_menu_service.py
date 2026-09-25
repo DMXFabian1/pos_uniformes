@@ -19,7 +19,8 @@ PREFIJO = "m:"
 _RAIZ = [
     [("📅 Hoy", "m:hoy"), ("💵 Caja", "m:estado")],
     [("📋 Resumen", "m:resumen"), ("⏳ Pendientes", "m:pendientes")],
-    [("💰 Pagos", "m:pagos"), ("👥 Quién vino", "m:asistencia")],
+    [("🧾 Cortes", "m:cortes"), ("💰 Pagos", "m:pagos")],
+    [("👥 Quién vino", "m:asistencia")],
     [("🏪 Qué contar", "m:contar"), ("🔎 Sin surtir", "m:faltas")],
     [("❔ Ayuda", "m:ayuda")],
 ]
@@ -31,9 +32,34 @@ def _teclado(filas):
     return telegram_service.teclado(filas)
 
 
-def menu_raiz() -> tuple[str, str]:
-    """(texto, botones) del menú principal."""
-    return "¿Qué quieres ver?", _teclado(_RAIZ)
+def menu_raiz(session=None, *, hoy: date | None = None) -> tuple[str, str]:
+    """(texto, botones) del tablero.
+
+    No pregunta «¿qué quieres ver?»: llega con el día ya puesto. Abrir el menú
+    y saber cómo va la tienda tiene que ser el mismo gesto (Daniel, 2026-09-25:
+    "que sea increíblemente completo y fácil de usar")."""
+    if session is None:
+        return "¿Qué quieres ver?", _teclado(_RAIZ)
+    return cabecera(session, hoy=hoy), _teclado(_RAIZ)
+
+
+def cabecera(session, *, hoy: date | None = None) -> str:
+    """El día de un vistazo, para encabezar el tablero.
+
+    Si algo falla al leerlo, el menú sigue sirviendo: los botones son lo que
+    no puede faltar."""
+    try:
+        from pos_uniformes.services import asistencia_service as asis
+        from pos_uniformes.services.resumen_diario_service import recolectar, texto_hoy
+
+        datos = recolectar(session, hoy)
+        estan = [
+            a.nombre for a in asis.asistencia_del_dia(session, hoy)
+            if a.estado == asis.PRESENTE
+        ]
+        return texto_hoy(datos, quien_esta=estan) + "\n\n¿Qué quieres ver?"
+    except Exception:  # noqa: BLE001 — el tablero no puede quedarse sin botones
+        return "¿Qué quieres ver?"
 
 
 def _con_volver(filas=None) -> str:
@@ -55,7 +81,8 @@ def atender(dato: str, *, session_factory, hoy: date | None = None) -> tuple[str
     accion = str(dato or "")[len(PREFIJO):]
 
     if accion in ("", "raiz"):
-        texto, botones = menu_raiz()
+        with session_factory() as session:
+            texto, botones = menu_raiz(session, hoy=hoy)
         return "", texto, botones
 
     # Pagar a alguien: el desglose primero, el dinero después.
@@ -86,6 +113,7 @@ def atender(dato: str, *, session_factory, hoy: date | None = None) -> tuple[str
     comando = {
         "hoy": "/hoy",
         "estado": "/estado",
+        "cortes": "/cortes",
         "resumen": "/resumen",
         "pendientes": "/pendientes",
         "asistencia": "/asistencia",

@@ -37,11 +37,13 @@ class RaizTest(unittest.TestCase):
         for esperado in ("Caja", "Pagos", "Quién vino", "Qué contar", "Resumen"):
             self.assertIn(esperado, juntos)
 
-    def test_el_dinero_no_queda_a_un_toque(self):
-        """Corte y retiro llevan cantidad y motivo: eso se escribe."""
-        juntos = " ".join(_textos(menu.menu_raiz()[1])).lower()
-        self.assertNotIn("corte", juntos)
-        self.assertNotIn("retiro", juntos)
+    def test_el_dinero_no_se_mueve_desde_el_tablero(self):
+        """Ver los cortes sí; hacer uno no. Hacer corte y retirar llevan
+        cantidad y motivo, y eso se escribe."""
+        acciones = {d[len(menu.PREFIJO):] for d in _datos(menu.menu_raiz()[1])}
+        self.assertIn("cortes", acciones, "verlos sí está")
+        for mueve in ("corte", "retiro", "pagarok"):
+            self.assertNotIn(mueve, acciones, f"{mueve} no puede estar a un toque")
 
     def test_los_botones_caben_en_lo_que_telegram_deja(self):
         for dato in _datos(menu.menu_raiz()[1]):
@@ -139,6 +141,32 @@ class ElBotLoConoceTest(unittest.TestCase):
         from pos_uniformes.services.telegram_bot_service import AYUDA
 
         self.assertIn("/menu", AYUDA)
+
+
+class TableroTest(unittest.TestCase):
+    """El menú llega con el día puesto: abrirlo y saber cómo va es el mismo gesto."""
+
+    def test_sin_sesion_sigue_siendo_la_pregunta_de_siempre(self):
+        texto, botones = menu.menu_raiz()
+        self.assertEqual(texto, "¿Qué quieres ver?")
+        self.assertTrue(_textos(botones))
+
+    def test_con_sesion_encabeza_con_el_dia(self):
+        with patch.object(menu, "cabecera", return_value="📅 Hoy · …\n\n¿Qué quieres ver?"):
+            texto, _b = menu.menu_raiz(object())
+        self.assertIn("📅 Hoy", texto)
+
+    def test_si_el_dia_no_se_puede_leer_el_menu_no_se_queda_sin_botones(self):
+        # Los botones son lo que no puede faltar: sin cifras se navega igual.
+        from pos_uniformes.services import resumen_diario_service as rd
+
+        with patch.object(rd, "recolectar", side_effect=RuntimeError("sin base")):
+            texto = menu.cabecera(object())
+        self.assertEqual(texto, "¿Qué quieres ver?")
+
+    def test_cortes_esta_en_el_tablero(self):
+        self.assertIn("🧾 Cortes", _textos(menu.menu_raiz()[1]))
+
 
 
 if __name__ == "__main__":

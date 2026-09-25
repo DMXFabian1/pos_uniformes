@@ -7,6 +7,7 @@ Comandos:
     /nocorte      deja pasar el corte que se propuso hoy
     /estado       qué hay en caja ahora mismo
     /hoy          cómo va el día ahora mismo, en un vistazo
+    /cortes       los últimos cortes, con lo que faltó o sobró
     /resumen      el resumen del día (el mismo de la noche)
     /pendientes   lo que falta por registrar
     /asistencia   quién vino hoy (deducido de su primer movimiento)
@@ -47,6 +48,7 @@ AYUDA = (
     "/hoy — cómo va el día ahora mismo\n"
     "/resumen — resumen del día (el de la noche, completo)\n"
     "/pendientes — lo que falta por registrar\n"
+    "/cortes — los últimos cortes y cuánto faltó o sobró\n"
     "/retiro 500 gasolina — saca del cajón, con su motivo\n"
     "\nPAGOS\n"
     "/pagos — a quién le toca cobrar y cuánto\n"
@@ -179,7 +181,13 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
     if cmd.nombre in ("menu", "menú"):
         from pos_uniformes.services import telegram_menu_service as menu
 
-        return menu.menu_raiz()[0]
+        with session_factory() as session:
+            return menu.menu_raiz(session, hoy=hoy)[0]
+    if cmd.nombre == "cortes":
+        from pos_uniformes.services import telegram_cortes_service as ct
+
+        with session_factory() as session:
+            return ct.resumen(session)
     if cmd.nombre == "pagos":
         from pos_uniformes.services import telegram_pagos_service as pg
 
