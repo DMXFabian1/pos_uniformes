@@ -58,7 +58,8 @@ AYUDA = (
     "\nGENTE\n"
     "/asistencia — quién vino hoy, con un comando por empleada para marcar\n"
     "/falta_Fanny · /descanso_Fanny · /vino_Fanny — o con espacio: /falta Fanny\n"
-    "\n/ayuda — esta lista"
+    "\n/menu — los botones, para no acordarse de nada\n"
+    "/ayuda — esta lista"
 )
 
 
@@ -162,6 +163,10 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
     if cmd.nombre == "asistencia":
         with session_factory() as session:
             return mensaje_asistencia(session, hoy)[0]
+    if cmd.nombre in ("menu", "menú"):
+        from pos_uniformes.services import telegram_menu_service as menu
+
+        return menu.menu_raiz()[0]
     if cmd.nombre == "pagos":
         from pos_uniformes.services import telegram_pagos_service as pg
 
@@ -229,9 +234,15 @@ def mensaje_asistencia(session, hoy: date | None = None) -> tuple[str, str]:
 
 
 def atender_toque(dato: str, *, session_factory, hoy: date | None = None) -> tuple[str, str, str] | None:
-    """Un botón de asistencia tocado: marca y devuelve (aviso corto, texto nuevo, botones nuevos).
-    None si el dato no es de asistencia."""
+    """Un botón tocado: (aviso corto, texto nuevo, botones nuevos).
+
+    Puede ser del menú (`m:…`) o de la lista de asistencia. None si no es de
+    ninguno de los dos."""
     from pos_uniformes.services import asistencia_service as asis
+    from pos_uniformes.services import telegram_menu_service as menu
+
+    if menu.es_del_menu(dato):
+        return menu.atender(dato, session_factory=session_factory, hoy=hoy)
 
     toque = asis.interpretar_toque(dato)
     if toque is None:

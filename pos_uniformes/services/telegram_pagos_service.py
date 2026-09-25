@@ -70,6 +70,51 @@ def pagos(session: Session, *, hoy: date | None = None) -> str:
     return "\n".join(lineas)
 
 
+def quienes_cobran(session: Session, *, hoy: date | None = None) -> list[tuple[str, str]]:
+    """(código, nombre) de quienes tienen algo pendiente. Para los botones."""
+    from pos_uniformes.services import nomina_service as nom
+
+    salida = []
+    for a in nom.avisos_de_pago(session, hoy):
+        det = nom.pago_pendiente(session, a.employee_code, hoy)
+        if det.total > 0:
+            salida.append((str(a.employee_code), _nombre(session, a.employee_code)))
+    return salida
+
+
+def tiene_pendiente(session: Session, code: str, *, hoy: date | None = None) -> bool:
+    from pos_uniformes.services import nomina_service as nom
+
+    return nom.pago_pendiente(session, code, hoy).total > 0
+
+
+def desglose_por_code(session: Session, code: str, *, hoy: date | None = None) -> str:
+    """De dónde sale cada peso. Lo mismo que enseña `/pagar Fulana`."""
+    from pos_uniformes.services import nomina_service as nom
+
+    nombre = _nombre(session, code)
+    det = nom.pago_pendiente(session, code, hoy)
+    if det.total <= 0:
+        return f"{nombre} no tiene nada pendiente ahora mismo."
+    return "\n".join(_detalle_texto(det, nombre))
+
+
+def pagar_por_code(session: Session, code: str, *, quien: str, hoy: date | None = None) -> str:
+    """Registra el pago. Ya viene confirmado por el segundo toque."""
+    from pos_uniformes.services import nomina_service as nom
+
+    nombre = _nombre(session, code)
+    det = nom.pago_pendiente(session, code, hoy)
+    if det.total <= 0:
+        return f"{nombre} no tiene nada pendiente ahora mismo."
+    try:
+        nom.registrar_pago_con_monto(session, code, creado_por=quien, fecha=hoy)
+    except PermissionError as exc:
+        return f"No se pudo: {exc}"
+    session.commit()
+    return f"✅ Pagado a {nombre}: ${det.total:,.2f}\n\nSi fue un error, /deshacerpago"
+
+
 # ------------------------------------------------------------------- /pagar
 
 def pagar(session: Session, argumento: str, *, quien: str, hoy: date | None = None) -> str:
@@ -99,17 +144,9 @@ def pagar(session: Session, argumento: str, *, quien: str, hoy: date | None = No
 
     if not confirmado:
         # El dinero no se mueve con una sola palabra.
-        return "\n".join(
-            _detalle_texto(det, nombre)
-            + ["", f"Si está bien: /pagar {nombre_buscado} si"]
-        )
+        return desglose_por_code(session, code, hoy=hoy) + f"\n\nSi está bien: /pagar {nombre_buscado} si"
 
-    try:
-        nom.registrar_pago_con_monto(session, code, creado_por=quien, fecha=hoy)
-    except PermissionError as exc:
-        return f"No se pudo: {exc}"
-    session.commit()
-    return "\n".join([f"✅ Pagado a {nombre}: ${det.total:,.2f}"] + ["", "Si fue un error, /deshacerpago"])
+    return pagar_por_code(session, code, quien=quien, hoy=hoy)
 
 
 # ------------------------------------------------------------------ /retiro
