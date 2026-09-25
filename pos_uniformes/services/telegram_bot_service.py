@@ -9,6 +9,10 @@ Comandos:
     /resumen      el resumen del día (el mismo de la noche)
     /pendientes   lo que falta por registrar
     /asistencia   quién vino hoy (deducido de su primer movimiento)
+    /prenda       precio y existencia por talla
+    /escuela      cómo va una escuela (contada, surtida, vendida)
+    /contar       qué falta contar, lo rojo primero
+    /faltas       lo que pidieron y no había
     /ayuda        esta lista
 
 Solo responde al chat configurado (POS_UNIFORMES_TELEGRAM_CHAT_ID); a
@@ -29,7 +33,7 @@ logger = logging.getLogger("telegram_bot")
 CODIGO_REMOTO = "VEND-1"  # Daniel: el que manda /corte
 
 AYUDA = (
-    "Comandos:\n"
+    "CAJA\n"
     "/corte — hacer el corte ahora e imprimir el ticket en la tienda\n"
     "/corte 5000 — el mismo corte, pero se retiran $5,000\n"
     "/corte sintarjeta — sin que se vean los cobros con tarjeta\n"
@@ -38,9 +42,15 @@ AYUDA = (
     "/estado — qué hay en caja ahora\n"
     "/resumen — resumen del día\n"
     "/pendientes — lo que falta por registrar\n"
+    "\nLA TIENDA\n"
+    "/prenda playera justo sierra — precio y cuántas hay por talla\n"
+    "/escuela conalep — cómo va esa escuela\n"
+    "/contar — qué falta contar, lo más urgente primero\n"
+    "/faltas — lo que pidieron y no había\n"
+    "\nGENTE\n"
     "/asistencia — quién vino hoy, con un comando por empleada para marcar\n"
     "/falta_Fanny · /descanso_Fanny · /vino_Fanny — o con espacio: /falta Fanny\n"
-    "/ayuda — esta lista"
+    "\n/ayuda — esta lista"
 )
 
 
@@ -144,6 +154,26 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
     if cmd.nombre == "asistencia":
         with session_factory() as session:
             return mensaje_asistencia(session, hoy)[0]
+    if cmd.nombre in ("prenda", "precio"):
+        from pos_uniformes.services import telegram_inventario_service as inv
+
+        with session_factory() as session:
+            return inv.prenda(session, cmd.argumento)
+    if cmd.nombre == "contar":
+        from pos_uniformes.services import telegram_inventario_service as inv
+
+        with session_factory() as session:
+            return inv.contar(session)
+    if cmd.nombre == "escuela":
+        from pos_uniformes.services import telegram_inventario_service as inv
+
+        with session_factory() as session:
+            return inv.escuela(session, cmd.argumento)
+    if cmd.nombre == "faltas":
+        from pos_uniformes.services import telegram_inventario_service as inv
+
+        with session_factory() as session:
+            return inv.faltas(session, hoy=hoy)
     if cmd.nombre in ("vino", "falta", "descanso"):
         from pos_uniformes.services import asistencia_service as asis
 
