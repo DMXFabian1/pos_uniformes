@@ -790,6 +790,8 @@ Cada módulo tiene su propia obra ancla, que se retoma en módulos posteriores.
 
 ## Ruta intensiva (si viajas en octubre y noviembre de 2026)
 
+> **Actualización:** el viaje es del 27 de octubre al 3 de noviembre de 2026, a Pomuch, a pueblos cercanos a Valladolid y a Mérida. El plan concreto, adaptado a la península, está en `08_yucatan_campeche_2026.md` y **sustituye a la tabla siguiente**, que se conserva como modelo general.
+
 Faltan unas cinco semanas para el 1 y 2 de noviembre de 2026. Propuesta:
 
 | Semana | Trabajo |

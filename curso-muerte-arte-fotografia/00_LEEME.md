@@ -15,6 +15,7 @@
 | `05_proyecto_dia_de_muertos.md` | Metodología del proyecto, trabajo de campo, regla contra el cliché, ética, ejercicios fotográficos, crítica de las propias fotos, serie final, ensayo y última fotografía | 11, 12, 13, 14 |
 | `06_bibliografia.md` | Bibliografía comprobada y comentada, con el grado de verificación de cada entrada | 4 |
 | `07_fuentes_primarias.md` | Fuentes primarias por época, con ediciones accesibles | 5 |
+| `08_yucatan_campeche_2026.md` | **Temporada exploratoria 2026**: Pomuch, pueblos cercanos a Valladolid y Mérida. Contexto, ética específica, plan semanal, itinerario, preguntas de campo y bibliografía peninsular verificada | 11, 12 (aplicados) |
 
 ## Convenciones epistémicas
 
