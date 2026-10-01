@@ -275,6 +275,9 @@ class HistorialCortesDialog(QDialog):
             with get_session() as session:
                 nombres_por_codigo(session)
                 cortes = listar_cortes_mes(session, desde, hasta)
+                from pos_uniformes.services.historial_cortes_service import tarjeta_del_mes
+
+                self._tarjeta_mes = tarjeta_del_mes(session, desde, hasta)
                 for c in cortes:
                     session.expunge(c)
         except Exception:  # noqa: BLE001
@@ -296,11 +299,18 @@ class HistorialCortesDialog(QDialog):
             for j, texto in enumerate(fila):
                 self.tabla.setItem(i, j, _item(texto, centrado=j not in (2, 10), negrita=(j == 5)))
         if self._cortes:
-            t = totales_cortes(self._cortes)
-            self.totales_label.setText(
-                f"{t.cortes} corte(s) en el mes · Vendido: ${t.venta:,.2f}"
-                f" · Pagos a empleadas: ${t.pagos:,.2f} · Gastos: ${t.otros_retiros:,.2f}"
+            t = totales_cortes(self._cortes, tarjeta=getattr(self, "_tarjeta_mes", 0))
+            # «Vendido» = lo que de verdad se vendió: efectivo + tarjeta, sin el
+            # reactivo y sin los ajustes. Lo entregado va aparte, porque es otra
+            # pregunta (Daniel, 2026-10-01).
+            texto = (
+                f"{t.cortes} corte(s) en el mes · Vendido: ${t.vendido:,.2f}"
+                f"  (efectivo ${t.venta_real:,.2f} + tarjeta ${t.tarjeta:,.2f})"
             )
+            if t.ajustes:
+                texto += f" · Entregado: ${t.venta:,.2f} (ajustado ${t.ajustes:,.2f})"
+            texto += f" · Pagos a empleadas: ${t.pagos:,.2f} · Gastos: ${t.otros_retiros:,.2f}"
+            self.totales_label.setText(texto)
         elif not self.totales_label.text().startswith("Sin conexión"):
             self.totales_label.setText("No hay cortes en este mes.")
 

@@ -34,6 +34,8 @@ class CorteFila:
     contado: Decimal
     esperado: Decimal
     operaciones: int
+    #: El dueño bajó (o subió) la cifra a mano con «Ajustar la venta».
+    ajustado: bool = False
 
     @property
     def diferencia(self) -> Decimal:
@@ -41,7 +43,12 @@ class CorteFila:
 
     @property
     def llama_la_atencion(self) -> bool:
-        return abs(self.diferencia) >= OJO
+        """Un ajuste del dueño no es un descuadre: él mismo lo puso.
+
+        Lo que merece mirarse es cuando la caja no cuadra sin que nadie lo
+        haya decidido (Daniel, 2026-10-01: esos 'faltó $2,000' eran sus
+        ajustes, no dinero perdido)."""
+        return not self.ajustado and abs(self.diferencia) >= OJO
 
 
 def _quien(code: str) -> str:
@@ -53,6 +60,7 @@ def _quien(code: str) -> str:
 def ultimos(session: Session, *, dias: int = 14, tope: int = TOPE) -> list[CorteFila]:
     """Los cortes más recientes, del más nuevo al más viejo."""
     from pos_uniformes.database.models import LibretaCorte
+    from pos_uniformes.services.historial_cortes_service import venta_oficial, venta_real
 
     desde = date.today() - timedelta(days=int(dias))
     filas = session.scalars(
@@ -74,6 +82,7 @@ def ultimos(session: Session, *, dias: int = 14, tope: int = TOPE) -> list[Corte
                 contado=Decimal(str(c.monto_final or 0)),
                 esperado=Decimal(str(c.monto_esperado or 0)),
                 operaciones=int(c.operaciones or 0),
+                ajustado=bool(venta_real(c) is not None and venta_real(c) != venta_oficial(c)),
             )
         )
     return salida
@@ -92,6 +101,9 @@ def texto(filas: list[CorteFila], *, dias: int = 14) -> str:
         if c.diferencia == 0:
             cuadrados += 1
             marca = "✅ cuadró"
+        elif c.ajustado:
+            signo = "+" if c.diferencia > 0 else "−"
+            marca = f"✏️ ajustado {signo}${abs(c.diferencia):,.2f}"
         else:
             señal = "⚠️" if c.llama_la_atencion else "·"
             verbo = "sobró" if c.diferencia > 0 else "faltó"
@@ -107,19 +119,13 @@ def texto(filas: list[CorteFila], *, dias: int = 14) -> str:
             f"{len(ojo)} de {len(filas)} se pasan de ${OJO:,.0f}. "
             f"El más: {peor.fecha:%d/%m} con ${abs(peor.diferencia):,.2f}."
         )
-        # Cuando falta casi siempre y en cifras redondas, lo más probable no es
-        # un descuadre: es dinero que salió sin quedar apuntado.
-        faltaron = [c for c in ojo if c.diferencia < 0]
-        redondas = [c for c in faltaron if abs(c.diferencia) % 100 == 0]
-        if len(redondas) >= 3 and len(redondas) * 2 >= len(faltaron):
-            lineas.append("")
-            lineas.append(
-                "Casi todas son cifras redondas: suena a dinero que saliste "
-                "y no quedó apuntado. Con /retiro 2000 banco queda anotado y "
-                "el corte cuadra solo."
-            )
+        # Lo que se ajusta a mano no entra aquí: eso lo decidió el dueño.
     else:
         lineas.append(f"{cuadrados} cuadraron exacto y ninguno se pasa de ${OJO:,.0f}. 👍")
+    ajustados = [c for c in filas if c.ajustado]
+    if ajustados:
+        suma = sum((c.diferencia for c in ajustados), Decimal("0"))
+        lineas.append(f"{len(ajustados)} con ajuste tuyo, {'−' if suma < 0 else '+'}${abs(suma):,.2f} en total.")
     return "\n".join(lineas)
 
 

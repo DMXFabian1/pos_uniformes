@@ -151,10 +151,38 @@ class TotalesCortes:
     retirado: Decimal
     pagos: Decimal
     otros_retiros: Decimal
-    venta: Decimal = Decimal("0.00")
+    venta: Decimal = Decimal("0.00")        # lo entregado (efectivo, con ajustes)
+    venta_real: Decimal = Decimal("0.00")   # lo mismo sin los ajustes del dueño
+    tarjeta: Decimal = Decimal("0.00")      # cobrado con tarjeta en el mes
+
+    @property
+    def ajustes(self) -> Decimal:
+        """Cuánto bajó (o subió) el dueño la cifra de los cortes del mes."""
+        return (self.venta - self.venta_real).quantize(_CENT)
+
+    @property
+    def vendido(self) -> Decimal:
+        """Lo que de verdad se vendió: efectivo real + tarjeta.
+
+        El corte solo mide el cajón, y ahí la tarjeta no entra ("tarjeta no
+        está en caja"). Sumarla es lo que convierte la cifra del corte en
+        **venta** (Daniel, 2026-10-01: "quiero saber solo ventas")."""
+        return (self.venta_real + self.tarjeta).quantize(_CENT)
 
 
-def totales_cortes(cortes: list) -> TotalesCortes:
+def tarjeta_del_mes(session, desde: date, hasta: date) -> Decimal:
+    """Lo cobrado con tarjeta en el mes. No pasa por el cajón, así que ningún
+    corte lo sabe: hay que ir a las ventas."""
+    from datetime import datetime, time as _time
+
+    from pos_uniformes.services.corte_caja_service import operaciones_del_periodo, resumir_periodo
+
+    inicio = datetime.combine(desde, _time.min).astimezone()
+    fin = datetime.combine(hasta, _time.max).astimezone()
+    return resumir_periodo(operaciones_del_periodo(session, inicio, fin)).tarjeta
+
+
+def totales_cortes(cortes: list, *, tarjeta: Decimal | int = 0) -> TotalesCortes:
     return TotalesCortes(
         cortes=len(cortes),
         en_caja=sum((_d(c.monto_final) for c in cortes), Decimal("0.00")),
@@ -162,6 +190,8 @@ def totales_cortes(cortes: list) -> TotalesCortes:
         pagos=sum((_d(c.retiros_pagos) for c in cortes), Decimal("0.00")),
         otros_retiros=sum((_d(c.otros_retiros) for c in cortes), Decimal("0.00")),
         venta=sum((venta_oficial(c) for c in cortes), Decimal("0.00")),
+        venta_real=sum(((venta_real(c) or venta_oficial(c)) for c in cortes), Decimal("0.00")),
+        tarjeta=_d(tarjeta),
     )
 
 

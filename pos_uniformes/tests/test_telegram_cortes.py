@@ -1,9 +1,10 @@
 """Los últimos cortes, con lo que faltó o sobró.
 
 Un corte con $300 de diferencia no enteraba a nadie hasta que alguien lo
-buscaba en la PC (Daniel, 2026-09-25). Al estrenarlo con datos reales salió
-que 9 de 10 cortes quedaban cortos en cifras redondas que no coinciden con
-los retiros anotados — por eso el texto sugiere /retiro cuando ve ese patrón.
+buscaba en la PC (Daniel, 2026-09-25). Al estrenarlo salió que 9 de 10 cortes
+quedaban cortos... y resultó que eran los ajustes del propio Daniel con
+«Ajustar la venta», no dinero perdido (2026-10-01). Por eso el ajuste se
+nombra ajuste y no enciende la alarma.
 """
 
 from __future__ import annotations
@@ -15,10 +16,11 @@ from decimal import Decimal
 from pos_uniformes.services import telegram_cortes_service as ct
 
 
-def _fila(dia=18, contado="16082", esperado="17082", quien="Daniel", ops=11):
+def _fila(dia=18, contado="16082", esperado="17082", quien="Daniel", ops=11, ajustado=False):
     return ct.CorteFila(
         fecha=date(2026, 9, dia), hora="17:49", quien=quien,
         contado=Decimal(contado), esperado=Decimal(esperado), operaciones=ops,
+        ajustado=ajustado,
     )
 
 
@@ -57,36 +59,33 @@ class ComoSeLeeTest(unittest.TestCase):
         self.assertIn("$2,149.00", ct.texto(filas))
 
 
-class LaPistaDelRetiroTest(unittest.TestCase):
-    """Cuando falta casi siempre y en cifras redondas, lo más probable no es un
-    descuadre: es dinero que salió sin quedar apuntado."""
+class ElAjusteNoEsUnDescuadreTest(unittest.TestCase):
+    """Daniel bajaba la cifra del corte a mano con «Ajustar la venta», y el
+    bot lo contaba como «faltó $2,000» — dinero perdido donde no lo había
+    (2026-10-01). Un ajuste lo decidió él; un descuadre, nadie."""
 
-    def _muchas_redondas(self):
-        return [
-            _fila(dia=18, contado="16082", esperado="17082"),   # 1,000
-            _fila(dia=19, contado="16627", esperado="17627"),   # 1,000
-            _fila(dia=20, contado="20548", esperado="22548"),   # 2,000
-        ]
+    def test_el_ajuste_se_dice_ajuste(self):
+        r = ct.texto([_fila(contado="16082", esperado="17082", ajustado=True)])
+        self.assertIn("✏️ ajustado −$1,000.00", r)
+        self.assertNotIn("faltó", r)
 
-    def test_con_varias_redondas_sugiere_anotar_el_retiro(self):
-        r = ct.texto(self._muchas_redondas())
-        self.assertIn("no quedó apuntado", r)
-        self.assertIn("/retiro", r)
+    def test_el_ajuste_no_enciende_la_alarma(self):
+        self.assertFalse(_fila(contado="900", esperado="1000", ajustado=True).llama_la_atencion)
+        self.assertTrue(_fila(contado="900", esperado="1000").llama_la_atencion)
 
-    def test_una_sola_no_dispara_la_sospecha(self):
-        r = ct.texto([_fila(contado="16082", esperado="17082")])
-        self.assertNotIn("no quedó apuntado", r)
+    def test_sin_ajuste_sigue_diciendo_falto(self):
+        self.assertIn("faltó", ct.texto([_fila(contado="900", esperado="1000")]))
 
-    def test_si_lo_que_falta_no_es_redondo_no_la_sugiere(self):
+    def test_dice_cuanto_sumaron_los_ajustes(self):
         filas = [
-            _fila(dia=d, contado=str(1000 - n), esperado="1000")
-            for d, n in ((18, 137), (19, 241), (20, 89))
+            _fila(dia=18, contado="16082", esperado="17082", ajustado=True),
+            _fila(dia=19, contado="20548", esperado="22548", ajustado=True),
         ]
-        self.assertNotIn("no quedó apuntado", ct.texto(filas))
+        r = ct.texto(filas)
+        self.assertIn("2 con ajuste tuyo, −$3,000.00", r)
 
-    def test_lo_que_SOBRA_no_cuenta_como_retiro(self):
-        filas = [_fila(dia=d, contado="2000", esperado="1000") for d in (18, 19, 20)]
-        self.assertNotIn("no quedó apuntado", ct.texto(filas))
+    def test_sin_ajustes_no_menciona_el_tema(self):
+        self.assertNotIn("ajuste tuyo", ct.texto([_fila(contado="1000", esperado="1000")]))
 
 
 class ElBotLoConoceTest(unittest.TestCase):
