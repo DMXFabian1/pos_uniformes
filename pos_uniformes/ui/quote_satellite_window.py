@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 import sys
 import textwrap
 import unicodedata
@@ -1411,6 +1411,19 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_ciclo_banner.setVisible(False)
         view_ly.addWidget(self.libreta_ciclo_banner)
 
+        # Pedir un préstamo: va debajo de «Mi ciclo» porque es ahí donde ella
+        # ve su pago, y de ahí se le va a descontar (Daniel, 2026-10-01).
+        self.libreta_prestamo_button = QPushButton("💵  Pedir un préstamo")
+        self.libreta_prestamo_button.setAutoDefault(False)
+        self.libreta_prestamo_button.setVisible(False)
+        self.libreta_prestamo_button.clicked.connect(self._libreta_pedir_prestamo)
+        view_ly.addWidget(self.libreta_prestamo_button)
+        self.libreta_prestamo_aviso = QLabel("")
+        self.libreta_prestamo_aviso.setWordWrap(True)
+        self.libreta_prestamo_aviso.setStyleSheet("font-size: 12px; color: #b9770e;")
+        self.libreta_prestamo_aviso.setVisible(False)
+        view_ly.addWidget(self.libreta_prestamo_aviso)
+
         # Barra del dueño: lo de todos los días (imprimir corte) a la vista;
         # lo ocasional (rango de fechas, meta semanal) plegado bajo "Más
         # opciones". Las correcciones de un movimiento (reimprimir, cambiar
@@ -2115,6 +2128,9 @@ class QuoteSatelliteWindow(QMainWindow):
     def _refresh_libreta_view(self) -> None:
         if not self._libreta_code:
             return
+        # El botón de préstamo es parte de lo que ella ve: se refresca al
+        # pintar la Libreta, no al validar el gafete.
+        self._libreta_prestamo_refrescar()
         from pos_uniformes.services import libreta_local_queue_service as libreta_cola
         from pos_uniformes.services.libreta_service import (
             filtrar_de_hoy,
@@ -2350,6 +2366,185 @@ class QuoteSatelliteWindow(QMainWindow):
             header.setChecked(abierta)  # dispara _aplicar_seccion_libreta
         else:
             self._aplicar_seccion_libreta(key)
+
+    # ── Préstamos (lo pide la empleada, lo aprueba Daniel) ───────────────
+
+    def _libreta_prestamo_refrescar(self) -> None:
+        """El botón solo para quien entró con su gafete, y con su estado.
+
+        Si ya pidió uno, no se le ofrece otra vez: se le dice en qué va."""
+        boton = getattr(self, "libreta_prestamo_button", None)
+        aviso = getattr(self, "libreta_prestamo_aviso", None)
+        if boton is None or aviso is None:
+            return
+        code = self._libreta_code
+        es_dueno = str(code or "").upper() == "VEND-1"
+        if not code or es_dueno:
+            boton.setVisible(False)
+            aviso.setVisible(False)
+            return
+        try:
+            from pos_uniformes.services import prestamos_service as pr
+
+            with get_session() as session:
+                pendiente = pr.pendiente_de(session, code)
+                por_cobrar = pr.total_por_cobrar(session, code)
+        except Exception:  # noqa: BLE001 — sin servidor, mejor no ofrecerlo
+            logger.exception("Libreta: no se pudo leer el préstamo")
+            boton.setVisible(False)
+            aviso.setVisible(False)
+            return
+
+        if pendiente is not None:
+            boton.setVisible(False)
+            aviso.setText(
+                f"💵 Pediste ${float(pendiente.monto):,.2f} para «{pendiente.motivo}». "
+                "Daniel todavía no responde."
+            )
+            aviso.setVisible(True)
+            return
+        if por_cobrar:
+            boton.setVisible(False)
+            aviso.setText(
+                f"💵 Se te descontarán ${float(por_cobrar):,.2f} de tu siguiente pago."
+            )
+            aviso.setVisible(True)
+            return
+        boton.setVisible(True)
+        aviso.setVisible(False)
+
+    def _libreta_pedir_prestamo(self) -> None:
+        datos = self._ask_prestamo()
+        if datos is None:
+            return
+        from pos_uniformes.services import prestamos_service as pr
+
+        try:
+            with get_session() as session:
+                prestamo = pr.pedir(
+                    session,
+                    employee_code=self._libreta_code,
+                    nombre=_nombre_de(self._libreta_code),
+                    monto=datos["monto"],
+                    motivo=datos["motivo"],
+                )
+                session.commit()
+                self._avisar_prestamo(session, prestamo)
+        except pr.NoSePuede as exc:
+            QMessageBox.information(self, "Préstamo", str(exc))
+            return
+        except Exception:  # noqa: BLE001
+            logger.exception("Libreta: no se pudo pedir el préstamo")
+            QMessageBox.warning(
+                self, "Sin conexión",
+                "No se pudo mandar la solicitud. Enciende la PC principal e intenta de nuevo.",
+            )
+            return
+        QMessageBox.information(
+            self, "Listo",
+            "Tu solicitud ya le llegó a Daniel.\n\nÉl la aprueba o la rechaza desde su celular.",
+        )
+        self._libreta_prestamo_refrescar()
+
+    @staticmethod
+    def _avisar_prestamo(session, prestamo) -> None:
+        """Le llega a Daniel al instante; si no se puede, no se pierde: queda
+        en la cola de alertas."""
+        from pos_uniformes.services import telegram_prestamos_service as prs
+
+        texto = prs.aviso_de_solicitud(prestamo)
+        try:
+            from pos_uniformes.services.telegram_service import enviar_mensaje
+
+            enviar_mensaje(texto)
+        except Exception:  # noqa: BLE001
+            try:
+                from pos_uniformes.services.alertas_service import encolar
+
+                encolar(session, texto)
+                session.commit()
+            except Exception:  # noqa: BLE001
+                logger.exception("Préstamo: no se pudo avisar")
+
+    def _ask_prestamo(self) -> dict | None:
+        """Formulario táctil: cuánto y para qué, con teclado en pantalla."""
+        from pos_uniformes.services import prestamos_service as pr
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Pedir un préstamo")
+        dlg.setMinimumWidth(480)
+        dlg.setStyleSheet(
+            "QDialog { background: #f4ede2; }"
+            "QLabel { color: #2c2a27; background: transparent; }"
+            "QLineEdit { background: #ffffff; color: #2c2a27;"
+            "  border: 2px solid #ddd0c0; border-radius: 12px;"
+            "  min-height: 50px; padding: 0 14px; font-size: 18px; }"
+        )
+        ly = QVBoxLayout(dlg)
+        ly.setContentsMargins(22, 20, 22, 18)
+        ly.setSpacing(10)
+
+        titulo = QLabel("Pedir un préstamo")
+        titulo.setStyleSheet("font-size: 19px; font-weight: 800; color: #73341c;")
+        ly.addWidget(titulo)
+        pista = QLabel(
+            "Daniel lo aprueba desde su celular. Se te descuenta completo de tu siguiente pago."
+        )
+        pista.setWordWrap(True)
+        pista.setStyleSheet("font-size: 12px; color: #8a8177;")
+        ly.addWidget(pista)
+
+        ly.addWidget(QLabel("¿Cuánto?"))
+        monto_input = QLineEdit()
+        monto_input.setPlaceholderText("0")
+        ly.addWidget(monto_input)
+
+        # Cantidades de siempre, para no teclear.
+        chips = QHBoxLayout()
+        for cantidad in (200, 500, 1000, 1500, 2000):
+            chip = QPushButton(f"${cantidad:,}")
+            chip.setAutoDefault(False)
+            chip.clicked.connect(lambda _c=False, n=cantidad: monto_input.setText(str(n)))
+            chips.addWidget(chip)
+        ly.addLayout(chips)
+
+        ly.addWidget(QLabel("¿Para qué?"))
+        motivo_input = QLineEdit()
+        motivo_input.setPlaceholderText("Ej. la renta, una emergencia, útiles...")
+        ly.addWidget(motivo_input)
+
+        botones = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        botones.button(QDialogButtonBox.StandardButton.Ok).setText("Pedirlo")
+        botones.button(QDialogButtonBox.StandardButton.Cancel).setText("Mejor no")
+        botones.accepted.connect(dlg.accept)
+        botones.rejected.connect(dlg.reject)
+        ly.addWidget(botones)
+
+        while True:
+            if dlg.exec() != int(QDialog.DialogCode.Accepted):
+                return None
+            crudo = monto_input.text().strip().replace("$", "").replace(",", "")
+            try:
+                monto = Decimal(crudo)
+            except (InvalidOperation, ValueError):
+                QMessageBox.information(dlg, "Préstamo", "Escribe cuánto necesitas.")
+                continue
+            motivo = motivo_input.text().strip()
+            if monto <= 0:
+                QMessageBox.information(dlg, "Préstamo", "El préstamo tiene que ser mayor a cero.")
+                continue
+            if monto > pr.TOPE:
+                QMessageBox.information(
+                    dlg, "Préstamo",
+                    f"Más de ${pr.TOPE:,.0f} hay que hablarlo con Daniel en persona.",
+                )
+                continue
+            if not motivo:
+                QMessageBox.information(dlg, "Préstamo", "Escribe para qué es.")
+                continue
+            return {"monto": monto, "motivo": motivo}
 
     def _on_libreta_seleccion(self) -> None:
         """La barra de correcciones solo aparece con un movimiento elegido."""

@@ -20,7 +20,7 @@ _RAIZ = [
     [("📅 Hoy", "m:hoy"), ("💵 Caja", "m:estado")],
     [("📋 Resumen", "m:resumen"), ("⏳ Pendientes", "m:pendientes")],
     [("🧾 Cortes", "m:cortes"), ("💰 Pagos", "m:pagos")],
-    [("👥 Quién vino", "m:asistencia")],
+    [("👥 Quién vino", "m:asistencia"), ("💵 Préstamos", "m:prestamos")],
     [("🏪 Qué contar", "m:contar"), ("🔎 Sin surtir", "m:faltas")],
     [("❔ Ayuda", "m:ayuda")],
 ]
@@ -99,6 +99,13 @@ def atender(dato: str, *, session_factory, hoy: date | None = None) -> tuple[str
         with session_factory() as session:
             texto = pg.pagar_por_code(session, code, quien=bot.CODIGO_REMOTO, hoy=hoy)
         return "Pagado", texto, _con_volver()
+
+    if accion == "prestamos":
+        from pos_uniformes.services import telegram_prestamos_service as prs
+
+        with session_factory() as session:
+            texto, botones = prs.texto_y_botones(session)
+        return "", texto, botones
 
     if accion == "pagos":
         with session_factory() as session:

@@ -18,6 +18,7 @@ Comandos:
     /pagos        a quién le toca cobrar y cuánto
     /pagar X si   registra el pago (sin el "si" solo enseña el desglose)
     /retiro N X   saca del cajón dejando dicho para qué
+    /prestamos    aprobar o rechazar lo que pidieron
     /ayuda        esta lista
 
 Solo responde al chat configurado (POS_UNIFORMES_TELEGRAM_CHAT_ID); a
@@ -54,6 +55,7 @@ AYUDA = (
     "/pagos — a quién le toca cobrar y cuánto\n"
     "/pagar Fanny — el desglose; con «si» al final se registra\n"
     "/deshacerpago — deshace el último pago\n"
+    "/prestamos — los préstamos que te pidieron, para aprobar o rechazar\n"
     "\nLA TIENDA\n"
     "/prenda playera justo sierra — precio y cuántas hay por talla\n"
     "/escuela conalep — cómo va esa escuela\n"
@@ -183,6 +185,11 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
 
         with session_factory() as session:
             return menu.menu_raiz(session, hoy=hoy)[0]
+    if cmd.nombre in ("prestamos", "préstamos"):
+        from pos_uniformes.services import telegram_prestamos_service as prs
+
+        with session_factory() as session:
+            return prs.texto_y_botones(session)[0]
     if cmd.nombre == "cortes":
         from pos_uniformes.services import telegram_cortes_service as ct
 
@@ -264,6 +271,11 @@ def atender_toque(dato: str, *, session_factory, hoy: date | None = None) -> tup
 
     if menu.es_del_menu(dato):
         return menu.atender(dato, session_factory=session_factory, hoy=hoy)
+
+    from pos_uniformes.services import telegram_prestamos_service as prs
+
+    if prs.es_de_prestamos(dato):
+        return prs.atender(dato, session_factory=session_factory, quien=CODIGO_REMOTO)
 
     toque = asis.interpretar_toque(dato)
     if toque is None:
