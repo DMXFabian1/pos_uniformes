@@ -7247,7 +7247,9 @@ class QuoteSatelliteWindow(QMainWindow):
             from pos_uniformes.ui.helpers.anuncio_cartelera import AnuncioCartelera
             from pos_uniformes.services.anuncio_local_cache_service import load_anuncios_cache
 
-            self._anuncio_cartelera = AnuncioCartelera(self)
+            self._anuncio_cartelera = AnuncioCartelera(
+                self, al_acusar=self._registrar_acuse_de_aviso
+            )
             # Arranca con lo último cacheado (funciona aun sin conexión).
             self._anuncio_cartelera.set_anuncios(load_anuncios_cache())
             self._anuncio_cartelera.start()
@@ -7269,6 +7271,80 @@ class QuoteSatelliteWindow(QMainWindow):
             self._anuncio_listener.start()
         except Exception:  # noqa: BLE001
             self._anuncio_listener = None
+
+    def _quien_esta_atendiendo(self) -> str | None:
+        """Nombre de la empleada con sesión en venta rápida, si hay alguna.
+
+        Es quien firma el acuse del aviso. Si nadie está logueado el acuse se
+        guarda igual (alguien tocó la pantalla) pero sin nombre: vale más un
+        «alguien en Entrada lo vio» que nada.
+        """
+        try:
+            vista = getattr(self, "quick_sale_widget", None)
+            nombre = getattr(vista, "_employee_name", None) or getattr(
+                vista, "_employee_code", None
+            )
+            return str(nombre).strip() or None if nombre else None
+        except Exception:  # noqa: BLE001
+            return None
+
+    def _registrar_acuse_de_aviso(self, anuncio: dict) -> None:
+        """Alguien tocó «Enterada»: lo escribe en la DB y le avisa a Daniel.
+
+        Todo off-thread y best-effort: el aviso ya se cerró en la pantalla y la
+        caja no puede quedarse esperando a la PC principal ni a Telegram.
+        """
+        import threading
+
+        anuncio_id = anuncio.get("id")
+        if not anuncio_id:
+            return
+        etiqueta = (anuncio.get("titulo") or anuncio.get("mensaje") or "(aviso)").strip()
+        empleada = self._quien_esta_atendiendo()
+
+        def _worker() -> None:
+            try:
+                from pos_uniformes.services.satellite_identity_service import (
+                    get_satellite_id,
+                    get_satellite_name,
+                )
+
+                mi_id = get_satellite_id()
+                mi_nombre = get_satellite_name()
+            except Exception:  # noqa: BLE001
+                mi_id, mi_nombre = "", ""
+            nuevo = False
+            try:
+                from pos_uniformes.services import anuncio_service as asvc
+
+                with get_session() as session:
+                    nuevo = not asvc.ya_visto_en(session, int(anuncio_id), mi_id)
+                    asvc.marcar_visto(
+                        session,
+                        int(anuncio_id),
+                        satelite=mi_id,
+                        satelite_nombre=mi_nombre,
+                        empleada=empleada,
+                    )
+                    session.commit()
+            except Exception:  # noqa: BLE001 — sin DB el acuse se pierde, no la venta
+                logger.exception("No se pudo guardar el acuse del aviso %s", anuncio_id)
+                return
+            if not nuevo:
+                return  # ya se había avisado desde esta pantalla
+            try:
+                from pos_uniformes.services import telegram_avisos_service as av
+                from pos_uniformes.services.telegram_service import enviar_mensaje
+
+                enviar_mensaje(
+                    av.aviso_de_acuse(
+                        etiqueta=etiqueta, empleada=empleada, pantalla=mi_nombre
+                    )
+                )
+            except Exception:  # noqa: BLE001 — sin internet el acuse igual quedó escrito
+                pass
+
+        threading.Thread(target=_worker, daemon=True, name="anuncio-acuse").start()
 
     def _enviar_heartbeat(self) -> None:
         """Registra/actualiza este satélite en la DB (off-thread, best-effort)."""

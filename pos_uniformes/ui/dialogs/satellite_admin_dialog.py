@@ -170,6 +170,18 @@ def _build_anuncios_boxes(dialog: QWidget) -> list[QGroupBox]:
     quitar_img_btn = QPushButton("Quitar imagen")
     quitar_img_btn.setVisible(False)
     inmediato_chk = QCheckBox("Mostrar ahora (aviso inmediato)")
+    acuse_chk = QCheckBox("Pedir que confirmen que lo vieron («Enterada»)")
+    # Cuánto vive el anuncio. Lo de siempre era «para siempre», que es lo que
+    # deja un «hoy cerramos temprano» puesto la semana que entra.
+    plazo_cb = QComboBox()
+    for etiqueta, horas in (
+        ("Se quita en 12 h", 12.0),
+        ("Se quita en 3 h", 3.0),
+        ("Se quita en 1 h", 1.0),
+        ("Se quita mañana (24 h)", 24.0),
+        ("Hasta que yo lo quite", 0.0),
+    ):
+        plazo_cb.addItem(etiqueta, horas)
     # Destinos: por defecto TODOS; se puede destildar y elegir satélites.
     todos_chk = QCheckBox("Mostrar en todos los satélites")
     todos_chk.setChecked(True)
@@ -270,6 +282,7 @@ def _build_anuncios_boxes(dialog: QWidget) -> list[QGroupBox]:
         try:
             from pos_uniformes.database.connection import get_session
             from pos_uniformes.services import anuncio_service as asvc
+            from pos_uniformes.services import telegram_avisos_service as avsvc
 
             with get_session() as session:
                 activos = asvc.listar_activos(session)
@@ -282,6 +295,17 @@ def _build_anuncios_boxes(dialog: QWidget) -> list[QGroupBox]:
                     else:
                         destino = "Todos"
                     etiqueta += f"   → {destino}"
+                    if a.expira_en is not None:
+                        etiqueta += f"   ⏱ {avsvc.falta_para(a.expira_en)}"
+                    if a.pide_acuse:
+                        vistos = asvc.quien_vio(session, a.id)
+                        if vistos:
+                            quienes = ", ".join(
+                                (v.empleada or v.satelite_nombre or "alguien") for v in vistos
+                            )
+                            etiqueta += f"   ✅ {quienes}"
+                        else:
+                            etiqueta += "   ⏳ nadie lo ha visto"
                     item = QListWidgetItem(etiqueta)
                     item.setData(Qt.ItemDataRole.UserRole, a.id)
                     lista.addItem(item)
@@ -311,6 +335,12 @@ def _build_anuncios_boxes(dialog: QWidget) -> list[QGroupBox]:
                     imagen_mime=estado_img["mime"],
                     destinos=_destinos_elegidos(),
                     duracion_seg=duracion_in.value(),
+                    pide_acuse=acuse_chk.isChecked(),
+                    expira_en=(
+                        asvc.vence_en(plazo_cb.currentData())
+                        if plazo_cb.currentData()
+                        else None
+                    ),
                     creado_por="satelite",
                 )
                 if inmediato_chk.isChecked():
@@ -327,6 +357,7 @@ def _build_anuncios_boxes(dialog: QWidget) -> list[QGroupBox]:
         mensaje_in.clear()
         _quitar_imagen()
         inmediato_chk.setChecked(False)
+        acuse_chk.setChecked(False)
         resultado_lbl.setText("✅ Anuncio enviado.")
         _refrescar_lista()
 
@@ -415,7 +446,9 @@ def _build_anuncios_boxes(dialog: QWidget) -> list[QGroupBox]:
     img_row.addWidget(imagen_lbl, 1)
     crear_layout.addLayout(img_row)
     crear_layout.addWidget(duracion_in)
+    crear_layout.addWidget(plazo_cb)
     crear_layout.addWidget(inmediato_chk)
+    crear_layout.addWidget(acuse_chk)
     crear_layout.addWidget(todos_chk)
     crear_layout.addWidget(QLabel("O elige en cuáles mostrarlo:"))
     crear_layout.addWidget(destinos_list)

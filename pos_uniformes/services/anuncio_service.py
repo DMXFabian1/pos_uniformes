@@ -13,11 +13,12 @@ llamador controla la transacción. Solo se hace flush donde se necesita el id.
 from __future__ import annotations
 
 from collections.abc import Sequence
+from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
 
-from pos_uniformes.database.models import Anuncio
+from pos_uniformes.database.models import Anuncio, AnuncioVisto
 
 # Tope defensivo del tamaño de imagen embebida (ya reducida antes de llegar aquí).
 MAX_IMAGEN_BYTES = 4 * 1024 * 1024  # 4 MB
@@ -47,6 +48,33 @@ def _normalizar_destinos(destinos) -> list[str] | None:
     return vistos or None
 
 
+def _aware(momento: datetime | None) -> datetime | None:
+    """Normaliza a UTC: SQLite devuelve naive y comparar mezclado reventaría."""
+    if momento is None:
+        return None
+    if momento.tzinfo is None:
+        return momento.replace(tzinfo=timezone.utc)
+    return momento
+
+
+def vence_en(horas: float) -> datetime:
+    """Momento de vencimiento a N horas de ahora, para quien crea el anuncio."""
+    return datetime.now(timezone.utc) + timedelta(hours=horas)
+
+
+def vigente(anuncio: Anuncio, ahora: datetime | None = None) -> bool:
+    """¿Todavía toca mostrarlo? Sin `expira_en` vive hasta que se quite.
+
+    La vigencia se resuelve en Python, no en SQL, para que valga igual con el
+    SQLite de los tests y con Postgres, y porque los anuncios activos son
+    siempre un puño.
+    """
+    expira = _aware(anuncio.expira_en)
+    if expira is None:
+        return True
+    return expira > (_aware(ahora) or datetime.now(timezone.utc))
+
+
 def visible_para(anuncio: Anuncio, identificador: str | None) -> bool:
     """¿Este satélite debe mostrar el anuncio? Sin destinos = todos."""
     destinos = anuncio.destinos
@@ -67,6 +95,8 @@ def crear_anuncio(
     destinos=None,
     duracion_seg: int = 8,
     prioridad: int = 0,
+    expira_en: datetime | None = None,
+    pide_acuse: bool = False,
     creado_por: str = "satelite",
 ) -> Anuncio:
     """Crea un anuncio activo. Requiere al menos texto o imagen.
@@ -94,6 +124,8 @@ def crear_anuncio(
         activo=True,
         duracion_seg=max(1, int(duracion_seg)),
         prioridad=int(prioridad),
+        expira_en=expira_en,
+        pide_acuse=bool(pide_acuse),
         creado_por=(creado_por or "satelite")[:60],
     )
     session.add(anuncio)
@@ -115,7 +147,8 @@ def listar_activos(session: Session, *, para: str | None = None) -> list[Anuncio
         .where(Anuncio.activo.is_(True))
         .order_by(Anuncio.prioridad.desc(), Anuncio.creado_en.asc(), Anuncio.id.asc())
     )
-    activos = list(session.scalars(stmt).all())
+    ahora = datetime.now(timezone.utc)
+    activos = [a for a in session.scalars(stmt).all() if vigente(a, ahora)]
     if para is None:
         return activos
     return [a for a in activos if visible_para(a, para)]
@@ -178,6 +211,8 @@ def to_cache_dict(anuncio: Anuncio) -> dict:
         "tiene_imagen": anuncio.imagen is not None,
         "duracion_seg": anuncio.duracion_seg,
         "prioridad": anuncio.prioridad,
+        "pide_acuse": bool(anuncio.pide_acuse),
+        "creado_en": (_aware(anuncio.creado_en) or datetime.now(timezone.utc)).isoformat(),
     }
 
 
@@ -204,6 +239,72 @@ def filas_para_cache(session: Session, *, para: str | None = None) -> list[dict]
                 "imagen_bytes": a.imagen,
                 "duracion_seg": a.duracion_seg,
                 "prioridad": a.prioridad,
+                "pide_acuse": bool(a.pide_acuse),
+                "creado_en": (_aware(a.creado_en) or datetime.now(timezone.utc)).isoformat(),
             }
         )
     return filas
+
+
+# ── Acuse de recibo ──────────────────────────────────────────────────────────
+
+
+def marcar_visto(
+    session: Session,
+    anuncio_id: int,
+    *,
+    satelite: str = "",
+    satelite_nombre: str | None = None,
+    empleada: str | None = None,
+) -> AnuncioVisto | None:
+    """Registra que en esta pantalla alguien tocó «Enterada». No hace commit.
+
+    Idempotente por pantalla: el segundo toque devuelve la fila de la primera
+    vez sin agregar renglones ni mover la hora. Lo que vale es cuándo se vio
+    por primera vez, y así tocar dos veces no manda dos avisos a Daniel.
+
+    Devuelve None si el anuncio no existe.
+    """
+    anuncio = session.get(Anuncio, int(anuncio_id))
+    if anuncio is None:
+        return None
+    satelite = (str(satelite or "").strip())[:80]
+    previo = session.scalar(
+        select(AnuncioVisto).where(
+            AnuncioVisto.anuncio_id == anuncio.id, AnuncioVisto.satelite == satelite
+        )
+    )
+    if previo is not None:
+        return previo
+    visto = AnuncioVisto(
+        anuncio_id=anuncio.id,
+        satelite=satelite,
+        satelite_nombre=(_limpiar(satelite_nombre) or None),
+        empleada=(_limpiar(empleada) or None),
+    )
+    session.add(visto)
+    session.flush()
+    return visto
+
+
+def ya_visto_en(session: Session, anuncio_id: int, satelite: str = "") -> bool:
+    """¿Esta pantalla ya acusó este anuncio?"""
+    return (
+        session.scalar(
+            select(AnuncioVisto).where(
+                AnuncioVisto.anuncio_id == int(anuncio_id),
+                AnuncioVisto.satelite == (str(satelite or "").strip())[:80],
+            )
+        )
+        is not None
+    )
+
+
+def quien_vio(session: Session, anuncio_id: int) -> list[AnuncioVisto]:
+    """Los acuses de un anuncio, el primero que contestó primero."""
+    stmt = (
+        select(AnuncioVisto)
+        .where(AnuncioVisto.anuncio_id == int(anuncio_id))
+        .order_by(AnuncioVisto.visto_en.asc(), AnuncioVisto.id.asc())
+    )
+    return list(session.scalars(stmt).all())

@@ -19,6 +19,8 @@ Comandos:
     /pagar X si   registra el pago (sin el "si" solo enseña el desglose)
     /retiro N X   saca del cajón dejando dicho para qué
     /prestamos    aprobar o rechazar lo que pidieron
+    /aviso X      pone X a pantalla completa en las pantallas de la tienda
+    /avisos       los avisos puestos, quién los vio, y quitarlos
     /ayuda        esta lista
 
 Solo responde al chat configurado (POS_UNIFORMES_TELEGRAM_CHAT_ID); a
@@ -61,6 +63,10 @@ AYUDA = (
     "/escuela conalep — cómo va esa escuela\n"
     "/contar — qué falta contar, lo más urgente primero\n"
     "/faltas — lo que pidieron y no había\n"
+    "\nLAS PANTALLAS\n"
+    "/aviso Junta a las 6 — sale a pantalla completa en la tienda\n"
+    "/aviso 3h Hoy cerramos temprano — y se quita solo en 3 horas\n"
+    "/avisos — los que están puestos, quién los vio, y quitarlos\n"
     "\nGENTE\n"
     "/asistencia — quién vino hoy, con un comando por empleada para marcar\n"
     "/falta_Fanny · /descanso_Fanny · /vino_Fanny — o con espacio: /falta Fanny\n"
@@ -190,6 +196,16 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
 
         with session_factory() as session:
             return prs.texto_y_botones(session)[0]
+    if cmd.nombre == "aviso":
+        from pos_uniformes.services import telegram_avisos_service as av
+
+        with session_factory() as session:
+            return av.mandar(session, cmd.argumento, quien=CODIGO_REMOTO)
+    if cmd.nombre == "avisos":
+        from pos_uniformes.services import telegram_avisos_service as av
+
+        with session_factory() as session:
+            return av.resumen(session)
     if cmd.nombre == "cortes":
         from pos_uniformes.services import telegram_cortes_service as ct
 
@@ -271,6 +287,11 @@ def atender_toque(dato: str, *, session_factory, hoy: date | None = None) -> tup
 
     if menu.es_del_menu(dato):
         return menu.atender(dato, session_factory=session_factory, hoy=hoy)
+
+    from pos_uniformes.services import telegram_avisos_service as av
+
+    if av.es_de_avisos(dato):
+        return av.atender(dato, session_factory=session_factory)
 
     from pos_uniformes.services import telegram_prestamos_service as prs
 

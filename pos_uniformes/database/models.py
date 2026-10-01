@@ -2033,6 +2033,16 @@ class Anuncio(Base):
     prioridad: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     # Segundos que se muestra en la rotación de cartelera antes de pasar al siguiente.
     duracion_seg: Mapped[int] = mapped_column(Integer, nullable=False, default=8, server_default="8")
+    # Cuándo deja de verse por sí solo. NULL = hasta que alguien lo quite.
+    # Un aviso de «hoy cerramos temprano» no debe seguir en la cartelera en
+    # diciembre: quien lo manda de lejos no vuelve a pasar a apagarlo.
+    expira_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # True = pide que alguien toque «Enterada»; se registra quién y desde cuál
+    # pantalla en `AnuncioVisto`. Es la diferencia entre mandar un mensaje y
+    # saber que llegó.
+    pide_acuse: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
     creado_por: Mapped[str] = mapped_column(String(60), nullable=False, default="satelite")
     creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -2045,6 +2055,35 @@ class Anuncio(Base):
         server_default=func.now(),
         onupdate=func.now(),
         nullable=False,
+    )
+
+
+class AnuncioVisto(Base):
+    """Acuse de recibo de un anuncio: quién lo vio y desde cuál pantalla.
+
+    Un aviso mandado desde el celular es un mensaje al vacío si nadie contesta.
+    Esta tabla es la contestación: una fila por (anuncio, satélite) cuando
+    alguien toca «Enterada». Se guarda el nombre de la empleada tal como estaba
+    en la sesión del kiosko — no un FK — porque lo que importa es el testimonio
+    del momento, y un cambio de nombre o una baja no debe borrarlo.
+    """
+
+    __tablename__ = "anuncio_visto"
+    __table_args__ = (
+        UniqueConstraint("anuncio_id", "satelite", name="uq_anuncio_visto_pantalla"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    anuncio_id: Mapped[int] = mapped_column(
+        ForeignKey("anuncio.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    # `identificador` del satélite; vacío si no se pudo averiguar.
+    satelite: Mapped[str] = mapped_column(String(80), nullable=False, default="")
+    # Nombre de la pantalla y de quien tocó, como se veían en ese momento.
+    satelite_nombre: Mapped[str | None] = mapped_column(String(80))
+    empleada: Mapped[str | None] = mapped_column(String(80))
+    visto_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
     )
 
 
