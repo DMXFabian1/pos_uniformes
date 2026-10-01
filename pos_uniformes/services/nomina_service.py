@@ -11,7 +11,7 @@ Solo el dueño (VEND-1) y el encargado (ENC-1) registran pagos.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
@@ -52,6 +52,8 @@ class DetallePago:
     descuento_falta: Decimal
     dias_trabajados: int | None = None   # solo modo por_dia
     tarifa_dia: Decimal | None = None    # solo modo por_dia
+    #: Préstamos aprobados que se le descuentan COMPLETOS en este pago.
+    prestamos: Decimal = Decimal("0.00")
 
     @property
     def por_dia(self) -> bool:
@@ -67,8 +69,23 @@ class DetallePago:
 
     @property
     def total(self) -> Decimal:
-        total = self.sueldo_base + self.monto_comisiones - self.descuento_faltas
+        total = (
+            self.sueldo_base + self.monto_comisiones
+            - self.descuento_faltas - self.prestamos
+        )
+        # Nunca negativo: si el préstamo se come el pago, se le entrega cero,
+        # no se le cobra la diferencia.
         return max(total, Decimal("0.00")).quantize(_CENT)
+
+    @property
+    def prestamo_sin_cubrir(self) -> Decimal:
+        """Lo que el pago no alcanzó a cubrir del préstamo.
+
+        Como el total no baja de cero, un préstamo más grande que el sueldo
+        dejaría un pedazo sin cobrar; esto lo hace visible en vez de que se
+        pierda callado."""
+        bruto = self.sueldo_base + self.monto_comisiones - self.descuento_faltas
+        return max(self.prestamos - bruto, Decimal("0.00")).quantize(_CENT)
 
 
 @dataclass(frozen=True)
@@ -146,9 +163,13 @@ def pago_pendiente(session, employee_code: str, hoy: date | None = None) -> Deta
     oculta para el encargado: esconder dinero de Daniel no puede acabar en
     que la empleada cobre de menos."""
     hoy = hoy or date.today()
+    from pos_uniformes.services import prestamos_service
+
     horario = cargar_horario(session, employee_code)
     comisiones = comisiones_desde_ultimo_pago(session, employee_code, horario)
-    return calcular_pago(horario, comisiones=comisiones, params=cargar_parametros(session), hasta=hoy)
+    detalle = calcular_pago(horario, comisiones=comisiones, params=cargar_parametros(session), hasta=hoy)
+    prestamos = prestamos_service.total_por_cobrar(session, employee_code)
+    return replace(detalle, prestamos=prestamos) if prestamos else detalle
 
 
 def registrar_pago_con_monto(session, employee_code: str, *, creado_por: str, fecha: date | None = None, momento: datetime | None = None):
@@ -176,6 +197,7 @@ def registrar_pago_con_monto(session, employee_code: str, *, creado_por: str, fe
         monto_comisiones=detalle.monto_comisiones,
         faltas=detalle.faltas,
         descuento_faltas=detalle.descuento_faltas,
+        descuento_prestamos=detalle.prestamos,
         total=detalle.total,
         creado_por=str(creado_por).strip().upper(),
         dias_trabajados=detalle.dias_trabajados,
@@ -187,6 +209,11 @@ def registrar_pago_con_monto(session, employee_code: str, *, creado_por: str, fe
         created_at=momento or datetime.now().astimezone(),
     )
     session.add(pago)
+    if detalle.prestamos:
+        from pos_uniformes.services import prestamos_service
+
+        session.flush()   # el pago necesita id para dejar el rastro
+        prestamos_service.marcar_cobrados(session, code, pago_id=int(pago.id))
     registrar_pago(session, code, fecha)  # commit incluido
     return pago
 

@@ -2254,6 +2254,11 @@ class EmpleadaPago(Base):
     faltas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     descuento_faltas: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    #: Lo que se le descontó por préstamos en este pago (queda guardado para
+    #: que el desglose de un pago viejo se siga entendiendo).
+    descuento_prestamos: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), nullable=False, default=Decimal("0.00"), server_default="0.00"
+    )
     creado_por: Mapped[str] = mapped_column(String(40), nullable=False, default="")
     # False = este pago no salió del cajón en el periodo del corte (se pagó
     # con otro dinero, o ya se había contado antes); no se resta del esperado.
@@ -2303,6 +2308,41 @@ class AlertaTelegram(Base):
     )
     enviado_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     intentos: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+
+
+class PrestamoEmpleada(Base):
+    """Un préstamo que pidió una empleada y se le descuenta del sueldo.
+
+    Lo pide ella desde la Libreta; Daniel lo aprueba o lo rechaza desde el
+    celular. Al aprobarlo se anota solo como retiro del cajón (así el corte de
+    esa noche cuadra) y se descuenta COMPLETO en su siguiente pago
+    (Daniel, 2026-10-01).
+    """
+
+    __tablename__ = "prestamo_empleada"
+    __table_args__ = (
+        CheckConstraint("monto > 0", name="prestamo_monto_positivo"),
+        CheckConstraint(
+            "estado IN ('pedido', 'aprobado', 'rechazado', 'cobrado')",
+            name="prestamo_estado_valido",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_code: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    employee_name: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    monto: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    motivo: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="pedido", index=True)
+    #: Quién lo aprobó o rechazó, y cuándo.
+    resuelto_por: Mapped[str | None] = mapped_column(String(40))
+    resuelto_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: El pago en el que se descontó (queda el rastro de dónde se cobró).
+    pago_id: Mapped[int | None] = mapped_column(ForeignKey("empleada_pago.id", ondelete="SET NULL"))
+    cobrado_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
 
 class CajaRetiro(Base):

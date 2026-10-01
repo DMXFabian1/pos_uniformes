@@ -40,8 +40,13 @@ def _detalle_texto(det, nombre: str) -> list[str]:
         lineas.append(f"Comisiones: {det.comisiones} × ${det.tarifa_comision:,.2f} = ${det.monto_comisiones:,.2f}")
     if det.faltas:
         lineas.append(f"Faltas: {det.faltas} × ${det.descuento_falta:,.2f} = −${det.descuento_faltas:,.2f}")
+    if getattr(det, "prestamos", 0):
+        lineas.append(f"Préstamo: −${det.prestamos:,.2f}")
     lineas.append("")
     lineas.append(f"TOTAL: ${det.total:,.2f}")
+    sin_cubrir = getattr(det, "prestamo_sin_cubrir", 0)
+    if sin_cubrir:
+        lineas.append(f"(quedan ${sin_cubrir:,.2f} del préstamo sin cubrir)")
     return lineas
 
 

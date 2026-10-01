@@ -1,0 +1,128 @@
+"""Préstamos a empleadas: lo pide ella, lo apruebas tú, se descuenta del sueldo.
+
+Lo delicado es que toca nómina y caja a la vez: aprobar un préstamo saca
+dinero del cajón, y pagarlo cambia lo que ella cobra. Casi todos los tests son
+sobre lo que NO debe pasar.
+"""
+
+from __future__ import annotations
+
+import unittest
+from decimal import Decimal
+
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session
+
+from pos_uniformes.database.connection import Base
+from pos_uniformes.database.models import CajaRetiro, Empleada, PrestamoEmpleada
+from pos_uniformes.services import prestamos_service as pr
+
+
+class _Base(unittest.TestCase):
+    def setUp(self) -> None:
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        self.s = Session(engine)
+        self.s.add(Empleada(codigo="VEND-5", nombre_completo="Fanny Ortiz", activo=True))
+        self.s.flush()
+
+    def _pedir(self, monto="1000", motivo="para la renta", code="VEND-5"):
+        return pr.pedir(self.s, employee_code=code, nombre="Fanny Ortiz", monto=monto, motivo=motivo)
+
+
+class PedirTest(_Base):
+    def test_queda_esperando_respuesta(self):
+        p = self._pedir()
+        self.assertEqual(p.estado, pr.PEDIDO)
+        self.assertEqual(pr.pendientes(self.s), [p])
+
+    def test_sin_motivo_no_se_puede_autorizar(self):
+        with self.assertRaises(pr.NoSePuede):
+            self._pedir(motivo="  ")
+
+    def test_ni_cero_ni_negativo(self):
+        for malo in ("0", "-100"):
+            with self.assertRaises(pr.NoSePuede):
+                self._pedir(monto=malo)
+
+    def test_lo_muy_grande_se_habla_en_persona(self):
+        with self.assertRaises(pr.NoSePuede):
+            self._pedir(monto="9000")
+
+    def test_no_se_amontonan_las_solicitudes(self):
+        self._pedir()
+        with self.assertRaises(pr.NoSePuede):
+            self._pedir()
+
+    def test_no_pide_otro_si_todavia_le_deben_descontar_uno(self):
+        p = self._pedir()
+        pr.aprobar(self.s, p.id, quien="VEND-1")
+        with self.assertRaises(pr.NoSePuede):
+            self._pedir()
+
+
+class AprobarTest(_Base):
+    def test_al_aprobar_el_dinero_sale_del_cajon(self):
+        """Sin el retiro, el corte de esa noche saldría corto justo por el
+        préstamo y parecería un descuadre."""
+        p = self._pedir(monto="1500")
+        pr.aprobar(self.s, p.id, quien="VEND-1")
+        retiros = self.s.scalars(select(CajaRetiro)).all()
+        self.assertEqual(len(retiros), 1)
+        self.assertEqual(Decimal(str(retiros[0].monto)), Decimal("1500"))
+        self.assertIn("Fanny", retiros[0].motivo)
+
+    def test_queda_el_rastro_de_quien_y_cuando(self):
+        p = self._pedir()
+        pr.aprobar(self.s, p.id, quien="VEND-1")
+        self.assertEqual(p.estado, pr.APROBADO)
+        self.assertEqual(p.resuelto_por, "VEND-1")
+        self.assertIsNotNone(p.resuelto_at)
+
+    def test_rechazar_no_saca_dinero(self):
+        p = self._pedir()
+        pr.rechazar(self.s, p.id, quien="VEND-1")
+        self.assertEqual(p.estado, pr.RECHAZADO)
+        self.assertEqual(self.s.scalars(select(CajaRetiro)).all(), [])
+
+    def test_no_se_aprueba_dos_veces(self):
+        p = self._pedir()
+        pr.aprobar(self.s, p.id, quien="VEND-1")
+        with self.assertRaises(pr.NoSePuede):
+            pr.aprobar(self.s, p.id, quien="VEND-1")
+        self.assertEqual(len(self.s.scalars(select(CajaRetiro)).all()), 1, "ni sale el dinero dos veces")
+
+    def test_el_que_no_existe_lo_dice(self):
+        with self.assertRaises(pr.NoSePuede):
+            pr.aprobar(self.s, 999, quien="VEND-1")
+
+
+class CobrarTest(_Base):
+    def test_lo_aprobado_cuenta_para_el_siguiente_pago(self):
+        p = self._pedir(monto="800")
+        pr.aprobar(self.s, p.id, quien="VEND-1")
+        self.assertEqual(pr.total_por_cobrar(self.s, "VEND-5"), Decimal("800"))
+
+    def test_lo_pedido_pero_no_aprobado_no_cuenta(self):
+        self._pedir(monto="800")
+        self.assertEqual(pr.total_por_cobrar(self.s, "VEND-5"), Decimal("0.00"))
+
+    def test_al_cobrarlo_queda_saldado_y_con_su_rastro(self):
+        p = self._pedir(monto="800")
+        pr.aprobar(self.s, p.id, quien="VEND-1")
+        cobrado = pr.marcar_cobrados(self.s, "VEND-5", pago_id=77)
+        self.assertEqual(cobrado, Decimal("800"))
+        self.assertEqual(p.estado, pr.COBRADO)
+        self.assertEqual(p.pago_id, 77)
+        self.assertEqual(pr.total_por_cobrar(self.s, "VEND-5"), Decimal("0.00"))
+
+    def test_el_prestamo_de_otra_no_se_le_descuenta_a_ella(self):
+        self.s.add(Empleada(codigo="VEND-4", nombre_completo="Stayce", activo=True))
+        self.s.flush()
+        p = pr.pedir(self.s, employee_code="VEND-4", nombre="Stayce", monto="500", motivo="x")
+        pr.aprobar(self.s, p.id, quien="VEND-1")
+        self.assertEqual(pr.total_por_cobrar(self.s, "VEND-5"), Decimal("0.00"))
+
+
+if __name__ == "__main__":
+    unittest.main()
