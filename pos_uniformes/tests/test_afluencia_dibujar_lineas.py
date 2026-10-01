@@ -91,7 +91,11 @@ class VentanaTests(unittest.TestCase):
         self.v._guardar()
         cfg = json.loads(self.config.read_text(encoding="utf-8"))
         cam = next(c for c in cfg["camaras"] if c["nombre"] == "ENTRADA2.2")
-        self.assertEqual(cam["linea"], [0.62, 0.48, 0.88, 0.58])
+        # Un clic cae en un píxel entero, así que al volver a fracción puede
+        # quedar a milésimas de donde se pidió (0.58 → 0.579). Lo que importa
+        # es que la línea sea la que se dibujó, no la precisión del ratón.
+        for guardado, pedido in zip(cam["linea"], [0.62, 0.48, 0.88, 0.58]):
+            self.assertAlmostEqual(guardado, pedido, places=2)
         self.assertEqual(cam["lado_dentro"], "izquierda")
         # Lo demás del archivo se conserva tal cual.
         self.assertEqual(cfg["camaras"][2], CFG["camaras"][2])
