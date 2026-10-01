@@ -44,6 +44,52 @@ def registrar_retiro(session, *, monto, motivo: str, creado_por: str):
     return retiro
 
 
+def registrar_gasto(session, *, monto, motivo: str, employee_code: str):
+    """Un gasto de la tienda apuntado por una empleada (no por el dueño).
+
+    Es el mismo retiro del cajón de siempre —el corte lo cuenta en «Gastos»—,
+    pero quien lo apunta no tiene que ser dueño ni encargado: es dinero que ya
+    salió, y lo que importa es que quede escrito en el momento, no que alguien
+    lo autorice después (Daniel, 2026-10-01: "un gasto relacionado a la
+    tienda, no de ellas").
+
+    A Daniel le llega el aviso al instante con el nombre de quien lo apuntó;
+    si estuvo mal, se borra con `eliminar_retiro`.
+    """
+    from pos_uniformes.database.models import CajaRetiro
+
+    code = str(employee_code or "").strip().upper()
+    if not code:
+        raise PermissionError("Hay que entrar con el gafete para apuntar un gasto.")
+    monto = Decimal(str(monto)).quantize(_CENT)
+    if monto <= 0:
+        raise ValueError("El monto debe ser mayor a cero.")
+    motivo = (motivo or "").strip()[:120]
+    if not motivo:
+        raise ValueError("Escribe en qué se gastó.")
+
+    retiro = CajaRetiro(
+        monto=monto,
+        motivo=motivo,
+        creado_por=code,
+        created_at=datetime.now().astimezone(),
+    )
+    session.add(retiro)
+    session.commit()
+    try:
+        from pos_uniformes.services.alertas_service import encolar
+        from pos_uniformes.services.nombres_empleadas_service import mostrar
+
+        encolar(
+            session,
+            f"🧾 Gasto de la tienda: ${monto:,.2f} — {motivo}\n"
+            f"Lo apuntó {mostrar(code)}. Si estuvo mal, bórralo desde el corte.",
+        )
+    except Exception:  # noqa: BLE001 — el gasto ya quedó guardado
+        pass
+    return retiro
+
+
 def retiros_del_periodo(session, desde: datetime | None, hasta: datetime, *, solo_en_cajon: bool = True) -> list:
     from pos_uniformes.database.models import CajaRetiro
 

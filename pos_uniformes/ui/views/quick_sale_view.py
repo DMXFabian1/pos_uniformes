@@ -14,6 +14,7 @@ from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
+    QDialogButtonBox,
     QFrame,
     QHBoxLayout,
     QHeaderView,
@@ -441,6 +442,15 @@ class QuickSaleWidget(QWidget):
         )
         self._btn_sin_codigo.clicked.connect(self._on_producto_sin_codigo)
         sb_layout.addWidget(self._btn_sin_codigo)
+        # Gasto de la tienda (bolsas, un mandado, el agua): sale del cajón y
+        # el corte lo cuenta en «Gastos». Lo apunta quien esté atendiendo
+        # (Daniel, 2026-10-01); a él le llega el aviso al instante.
+        self._btn_gasto = QPushButton("🧾  Gasto")
+        self._btn_gasto.setToolTip("Apuntar un gasto de la tienda que salió del cajón")
+        self._btn_gasto.setAutoDefault(False)
+        self._btn_gasto.setStyleSheet(self._btn_sin_codigo.styleSheet())
+        self._btn_gasto.clicked.connect(self._on_gasto_tienda)
+        sb_layout.addWidget(self._btn_gasto)
 
         scan_bar.setLayout(sb_layout)
         layout.addWidget(scan_bar)
@@ -1380,6 +1390,129 @@ class QuickSaleWidget(QWidget):
             (
                 self._items, self._discount_active, self._employee_name, self._employee_code
             ) = respaldo
+
+    # ─── Gasto de la tienda ──────────────────────────────────────────────
+
+    #: Lo que más se compra de un día para otro.
+    GASTOS_RAPIDOS = ("Bolsas", "Agua", "Papelería", "Limpieza", "Mandado", "Otro")
+
+    def _on_gasto_tienda(self) -> None:
+        """Apunta un gasto que salió del cajón. No es dinero de ella."""
+        if not self._employee_code:
+            QMessageBox.information(
+                self, "Gasto", "Entra con tu gafete para apuntar un gasto."
+            )
+            return
+        datos = self._ask_gasto()
+        if datos is None:
+            return
+        from pos_uniformes.services.retiros_service import registrar_gasto
+
+        try:
+            with get_session() as session:
+                registrar_gasto(
+                    session,
+                    monto=datos["monto"],
+                    motivo=datos["motivo"],
+                    employee_code=str(self._employee_code),
+                )
+        except Exception:  # noqa: BLE001
+            _logger.exception("Venta rápida: no se pudo apuntar el gasto")
+            QMessageBox.warning(
+                self, "Sin conexión",
+                "No se pudo apuntar el gasto. Enciende la PC principal e intenta de nuevo.",
+            )
+            return
+        QMessageBox.information(
+            self, "Apuntado",
+            f"Gasto de ${datos['monto']:,.2f} apuntado.\n\n"
+            "Ya le llegó a Daniel y el corte de hoy lo toma en cuenta.",
+        )
+
+    def _ask_gasto(self) -> dict | None:
+        """Formulario táctil: cuánto y en qué. Devuelve {monto, motivo} o None."""
+        from decimal import Decimal, InvalidOperation
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Gasto de la tienda")
+        dlg.setMinimumWidth(480)
+        dlg.setStyleSheet(
+            "QDialog { background: #f4ede2; }"
+            "QLabel { color: #2c2a27; background: transparent; }"
+            "QLineEdit { background: #ffffff; color: #2c2a27;"
+            "  border: 2px solid #ddd0c0; border-radius: 12px;"
+            "  min-height: 50px; padding: 0 14px; font-size: 18px; }"
+        )
+        ly = QVBoxLayout(dlg)
+        ly.setContentsMargins(22, 20, 22, 18)
+        ly.setSpacing(10)
+
+        titulo = QLabel("Gasto de la tienda")
+        titulo.setStyleSheet("font-size: 19px; font-weight: 800; color: #73341c;")
+        ly.addWidget(titulo)
+        pista = QLabel(
+            "Dinero del cajón que se usó para la tienda. A Daniel le llega el aviso "
+            "y el corte de hoy ya lo descuenta."
+        )
+        pista.setWordWrap(True)
+        pista.setStyleSheet("font-size: 12px; color: #8a8177;")
+        ly.addWidget(pista)
+
+        ly.addWidget(QLabel("¿Cuánto?"))
+        monto_input = QLineEdit()
+        monto_input.setPlaceholderText("0")
+        ly.addWidget(monto_input)
+
+        ly.addWidget(QLabel("¿En qué?"))
+        motivo_input = QLineEdit()
+        motivo_input.setPlaceholderText("Ej. bolsas, garrafón, taxi del mandado...")
+        ly.addWidget(motivo_input)
+
+        chips = QHBoxLayout()
+        for que in self.GASTOS_RAPIDOS:
+            chip = QPushButton(que)
+            chip.setAutoDefault(False)
+            if que == "Otro":
+                chip.clicked.connect(lambda _c=False: (motivo_input.clear(), motivo_input.setFocus()))
+            else:
+                chip.clicked.connect(lambda _c=False, t=que: motivo_input.setText(t))
+            chips.addWidget(chip)
+        ly.addLayout(chips)
+
+        botones = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        botones.button(QDialogButtonBox.StandardButton.Ok).setText("Apuntarlo")
+        botones.button(QDialogButtonBox.StandardButton.Cancel).setText("Cancelar")
+        botones.accepted.connect(dlg.accept)
+        botones.rejected.connect(dlg.reject)
+        ly.addWidget(botones)
+
+        while True:
+            if dlg.exec() != int(QDialog.DialogCode.Accepted):
+                return None
+            crudo = monto_input.text().strip().replace("$", "").replace(",", "")
+            try:
+                monto = Decimal(crudo)
+            except (InvalidOperation, ValueError):
+                QMessageBox.information(dlg, "Gasto", "Escribe cuánto se gastó.")
+                continue
+            motivo = motivo_input.text().strip()
+            if monto <= 0:
+                QMessageBox.information(dlg, "Gasto", "El gasto tiene que ser mayor a cero.")
+                continue
+            if not motivo:
+                QMessageBox.information(dlg, "Gasto", "Escribe en qué se gastó.")
+                continue
+            # Una cifra grande casi siempre es un dedazo: que lo confirme.
+            if monto >= Decimal("1000"):
+                ok = QMessageBox.question(
+                    dlg, "Confirmar",
+                    f"¿Seguro que fueron ${monto:,.2f} en {motivo}?",
+                )
+                if ok != QMessageBox.StandardButton.Yes:
+                    continue
+            return {"monto": monto, "motivo": motivo}
 
     # ─── Producto sin código ─────────────────────────────────────────────
 
