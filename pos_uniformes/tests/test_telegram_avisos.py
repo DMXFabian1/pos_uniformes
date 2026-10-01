@@ -311,7 +311,8 @@ class BotTests(unittest.TestCase):
         bot.atender_texto("/aviso Junta", session_factory=self.factory)
         _, texto, botones = bot.atender_toque("m:avisos", session_factory=self.factory)
         self.assertIn("Junta", texto)
-        self.assertIn("av:quitar:", botones)
+        # La lista lleva al aviso; quitarlo es un segundo toque, ya en su pantalla.
+        self.assertIn("av:ver:", botones)
 
     def test_el_toque_de_quitar_llega_por_el_bot(self) -> None:
         from pos_uniformes.services import telegram_bot_service as bot
@@ -321,5 +322,335 @@ class BotTests(unittest.TestCase):
             aviso_id = asvc.listar_activos(session)[0].id
         aviso, _, _ = bot.atender_toque(f"av:quitar:{aviso_id}", session_factory=self.factory)
         self.assertEqual(aviso, "Quitado")
+        with self.factory() as session:
+            self.assertEqual(asvc.listar_activos(session), [])
+
+
+class PantallaTests(_BaseDB):
+    """`/aviso @caja2 …` manda a una sola pantalla."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self._pantallas = [
+            {"identificador": "s1", "nombre": "Entrada", "online": True, "arroba": "@entrada"},
+            {"identificador": "s2", "nombre": "Caja 2", "online": False, "arroba": "@caja2"},
+        ]
+
+    def _con_pantallas(self):
+        from unittest.mock import patch
+
+        return patch.object(av, "pantallas", return_value=self._pantallas)
+
+    def test_el_arroba_ignora_espacios_y_acentos(self) -> None:
+        with self._con_pantallas():
+            self.assertEqual(av.buscar_pantalla(self.session, "caja2")["identificador"], "s2")
+            self.assertEqual(av.buscar_pantalla(self.session, "ENTRADA")["identificador"], "s1")
+
+    def test_no_adivina_si_dos_empiezan_igual(self) -> None:
+        self._pantallas = [
+            {"identificador": "a", "nombre": "Caja 1", "online": True, "arroba": "@caja1"},
+            {"identificador": "b", "nombre": "Caja 2", "online": True, "arroba": "@caja2"},
+        ]
+        with self._con_pantallas():
+            # Mandar el aviso a la pantalla equivocada es peor que pedirlo completo.
+            self.assertIsNone(av.buscar_pantalla(self.session, "caja"))
+
+    def test_manda_solo_a_esa_pantalla(self) -> None:
+        with self._con_pantallas():
+            texto = av.mandar(self.session, "@caja2 Ven un momento")
+        aviso = asvc.listar_activos(self.session)[0]
+        self.assertEqual(aviso.destinos, ["s2"])
+        self.assertEqual(aviso.titulo, "Ven un momento")
+        self.assertIn("Caja 2", texto)
+
+    def test_avisa_si_la_pantalla_esta_apagada(self) -> None:
+        with self._con_pantallas():
+            texto = av.mandar(self.session, "@caja2 Ven")
+        self.assertIn("apagada", texto)
+
+    def test_una_pantalla_que_no_existe_no_pierde_el_aviso(self) -> None:
+        with self._con_pantallas():
+            texto = av.mandar(self.session, "@bodega Junta a las 6")
+        aviso = asvc.listar_activos(self.session)[0]
+        self.assertIsNone(aviso.destinos)  # fue a todas
+        self.assertEqual(aviso.titulo, "Junta a las 6")
+        self.assertIn("no encontré", texto.lower())
+
+    def test_plazo_y_pantalla_juntos_en_cualquier_orden(self) -> None:
+        with self._con_pantallas():
+            av.mandar(self.session, "3h @caja2 Ven")
+            av.mandar(self.session, "@entrada 3h Ven")
+        avisos = asvc.listar_activos(self.session)
+        self.assertEqual({tuple(a.destinos) for a in avisos}, {("s2",), ("s1",)})
+        for a in avisos:
+            self.assertEqual(a.titulo, "Ven")
+
+    def test_un_correo_en_el_texto_no_es_una_pantalla(self) -> None:
+        with self._con_pantallas():
+            av.mandar(self.session, "Manda todo a juan@correo.com")
+        aviso = asvc.listar_activos(self.session)[0]
+        self.assertIsNone(aviso.destinos)
+        self.assertIn("juan@correo.com", aviso.titulo or aviso.mensaje or "")
+
+
+class CartelTests(_BaseDB):
+    """`/cartel` no interrumpe: ni acuse ni prioridad por encima de nadie."""
+
+    def test_no_pide_acuse_ni_se_pone_por_delante(self) -> None:
+        texto = av.mandar(self.session, "Promoción de mochilas", interrumpe=False)
+        cartel = asvc.listar_activos(self.session)[0]
+        self.assertFalse(cartel.pide_acuse)
+        self.assertEqual(cartel.prioridad, 0)
+        self.assertIn("No interrumpe", texto)
+
+    def test_el_aviso_si_va_por_delante(self) -> None:
+        av.mandar(self.session, "Promoción", interrumpe=False)
+        av.mandar(self.session, "Junta a las 6")
+        # El aviso urgente sale primero en la rotación.
+        self.assertEqual(asvc.listar_activos(self.session)[0].titulo, "Junta a las 6")
+
+    def test_el_comando_cartel(self) -> None:
+        from sqlalchemy.orm import sessionmaker
+
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        factory = sessionmaker(self.engine)
+        bot.atender_texto("/cartel Promoción de mochilas", session_factory=factory)
+        with factory() as session:
+            self.assertFalse(asvc.listar_activos(session)[0].pide_acuse)
+
+
+class AlargarYReponerTests(_BaseDB):
+    def setUp(self) -> None:
+        super().setUp()
+        self.factory = sessionmaker(self.engine)
+        av.mandar(self.session, "1h Junta a las 6")
+        self.aviso = asvc.listar_activos(self.session)[0]
+
+    def test_mas_horas_desde_ahora(self) -> None:
+        asvc.alargar(self.session, self.aviso.id, 3)
+        self.session.commit()
+        falta = asvc._aware(self.aviso.expira_en) - datetime.now(timezone.utc)
+        self.assertLess(abs(falta.total_seconds() - 4 * 3600), 60)
+
+    def test_alargar_uno_ya_vencido_cuenta_desde_ahora(self) -> None:
+        # Si contara desde el vencimiento viejo, «+3 h» dejaría el aviso vencido.
+        self.aviso.expira_en = datetime.now(timezone.utc) - timedelta(hours=5)
+        self.session.commit()
+        asvc.alargar(self.session, self.aviso.id, 3)
+        self.session.commit()
+        self.assertTrue(asvc.vigente(self.aviso))
+        falta = asvc._aware(self.aviso.expira_en) - datetime.now(timezone.utc)
+        self.assertLess(abs(falta.total_seconds() - 3 * 3600), 60)
+
+    def test_reponer_hace_uno_nuevo_y_apaga_el_viejo(self) -> None:
+        # Tiene que ser id NUEVO: cada kiosko recuerda los ids que ya acusó.
+        nuevo = asvc.reponer(self.session, self.aviso.id)
+        self.session.commit()
+        self.assertNotEqual(nuevo.id, self.aviso.id)
+        self.assertFalse(self.aviso.activo)
+        self.assertEqual(nuevo.titulo, "Junta a las 6")
+        self.assertTrue(nuevo.pide_acuse)
+        self.assertEqual([a.id for a in asvc.listar_activos(self.session)], [nuevo.id])
+
+    def test_reponer_conserva_la_foto_y_la_pantalla(self) -> None:
+        a = asvc.crear_anuncio(
+            self.session, titulo="Con foto", imagen=b"xx", imagen_mime="image/jpeg",
+            destinos=["s2"], pide_acuse=True,
+        )
+        self.session.commit()
+        nuevo = asvc.reponer(self.session, a.id)
+        self.assertEqual(nuevo.imagen, b"xx")
+        self.assertEqual(nuevo.destinos, ["s2"])
+
+    def test_los_acuses_de_la_vuelta_anterior_se_quedan(self) -> None:
+        asvc.marcar_visto(self.session, self.aviso.id, satelite="s1", empleada="Evelyn")
+        self.session.commit()
+        asvc.reponer(self.session, self.aviso.id)
+        self.session.commit()
+        self.assertEqual(len(asvc.quien_vio(self.session, self.aviso.id)), 1)
+
+    def test_los_botones(self) -> None:
+        aviso, texto, botones = av.atender(
+            f"{av.PREFIJO}ver:{self.aviso.id}", session_factory=self.factory
+        )
+        self.assertIn("Junta a las 6", texto)
+        self.assertIn("av:mas:", botones)
+        self.assertIn("av:otra:", botones)
+        self.assertIn("av:quitar:", botones)
+
+    def test_boton_de_mas_tiempo(self) -> None:
+        aviso, _, _ = av.atender(
+            f"{av.PREFIJO}mas:{self.aviso.id}:12", session_factory=self.factory
+        )
+        self.assertIn("se quita en", aviso.lower())
+
+    def test_boton_de_otra_vez(self) -> None:
+        aviso, _, _ = av.atender(
+            f"{av.PREFIJO}otra:{self.aviso.id}", session_factory=self.factory
+        )
+        self.assertEqual(aviso, "Puesto otra vez")
+        with self.factory() as session:
+            self.assertEqual(len(asvc.listar_activos(session)), 1)
+
+    def test_botones_de_un_aviso_que_ya_no_existe(self) -> None:
+        for dato in ("ver:99999", "mas:99999:3", "otra:99999", "quitar:99999"):
+            aviso, texto, _ = av.atender(f"{av.PREFIJO}{dato}", session_factory=self.factory)
+            self.assertTrue(aviso or texto)  # contesta algo, no revienta
+
+    def test_un_boton_mal_formado_no_revienta(self) -> None:
+        aviso, _, _ = av.atender(f"{av.PREFIJO}ver:abc", session_factory=self.factory)
+        self.assertEqual(aviso, "No conozco ese botón")
+
+
+def _png(color=(200, 30, 30)) -> bytes:
+    """Un PNG de verdad, para que `preparar_imagen` tenga qué masticar."""
+    import io
+
+    from PIL import Image
+
+    buf = io.BytesIO()
+    Image.new("RGB", (80, 60), color).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+class FotoTests(unittest.TestCase):
+    """Mandarle una foto al bot la pone a pantalla completa, sin comando."""
+
+    def setUp(self) -> None:
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.factory = sessionmaker(self.engine)
+
+    def _msg(self, **extra) -> dict:
+        msg = {"photo": [
+            {"file_id": "chico", "file_size": 100},
+            {"file_id": "grande", "file_size": 9000},
+        ]}
+        msg.update(extra)
+        return msg
+
+    def test_toma_la_version_mas_grande(self) -> None:
+        from pos_uniformes.services import telegram_service
+
+        self.assertEqual(telegram_service.foto_mas_grande(self._msg()), "grande")
+
+    def test_una_foto_mandada_como_archivo_tambien_cuenta(self) -> None:
+        from pos_uniformes.services import telegram_service
+
+        msg = {"document": {"file_id": "doc1", "mime_type": "image/png"}}
+        self.assertEqual(telegram_service.foto_mas_grande(msg), "doc1")
+
+    def test_un_pdf_no_es_una_foto(self) -> None:
+        from pos_uniformes.services import telegram_service
+
+        msg = {"document": {"file_id": "doc1", "mime_type": "application/pdf"}}
+        self.assertIsNone(telegram_service.foto_mas_grande(msg))
+
+    def test_un_mensaje_sin_foto_devuelve_none(self) -> None:
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        self.assertIsNone(
+            bot.atender_foto({"text": "hola"}, session_factory=self.factory)
+        )
+
+    def test_la_foto_queda_como_aviso_con_su_pie(self) -> None:
+        from unittest.mock import patch
+
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        with patch(
+            "pos_uniformes.services.telegram_service.bajar_archivo", return_value=_png()
+        ):
+            respuesta = bot.atender_foto(
+                self._msg(caption="Así va el aparador"), session_factory=self.factory
+            )
+        with self.factory() as session:
+            aviso = asvc.listar_activos(session)[0]
+        self.assertIsNotNone(aviso.imagen)
+        self.assertEqual(aviso.imagen_mime, "image/jpeg")
+        self.assertEqual(aviso.titulo, "Así va el aparador")
+        self.assertTrue(aviso.pide_acuse)
+        self.assertIn("Así va el aparador", respuesta)
+
+    def test_una_foto_sin_pie_se_pone_igual(self) -> None:
+        from unittest.mock import patch
+
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        with patch(
+            "pos_uniformes.services.telegram_service.bajar_archivo", return_value=_png()
+        ):
+            respuesta = bot.atender_foto(self._msg(), session_factory=self.factory)
+        with self.factory() as session:
+            self.assertEqual(len(asvc.listar_activos(session)), 1)
+        self.assertIn("solo la imagen", respuesta)
+
+    def test_el_pie_puede_llevar_plazo_y_pantalla(self) -> None:
+        from unittest.mock import patch
+
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        with patch(
+            "pos_uniformes.services.telegram_service.bajar_archivo", return_value=_png()
+        ):
+            bot.atender_foto(self._msg(caption="3h Mira esto"), session_factory=self.factory)
+        with self.factory() as session:
+            aviso = asvc.listar_activos(session)[0]
+            falta = asvc._aware(aviso.expira_en) - datetime.now(timezone.utc)
+        self.assertEqual(aviso.titulo, "Mira esto")
+        self.assertLess(abs(falta.total_seconds() - 3 * 3600), 60)
+
+    def test_un_pie_con_cartel_no_interrumpe(self) -> None:
+        from unittest.mock import patch
+
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        with patch(
+            "pos_uniformes.services.telegram_service.bajar_archivo", return_value=_png()
+        ):
+            bot.atender_foto(
+                self._msg(caption="/cartel Promoción"), session_factory=self.factory
+            )
+        with self.factory() as session:
+            aviso = asvc.listar_activos(session)[0]
+        self.assertFalse(aviso.pide_acuse)
+        self.assertEqual(aviso.titulo, "Promoción")
+
+    def test_un_pie_con_otro_comando_se_atiende_como_comando(self) -> None:
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        respuesta = bot.atender_foto(
+            self._msg(caption="/ayuda"), session_factory=self.factory
+        )
+        self.assertIn("/aviso", respuesta)
+        with self.factory() as session:
+            self.assertEqual(asvc.listar_activos(session), [])
+
+    def test_si_no_se_puede_bajar_no_se_pone_nada(self) -> None:
+        from unittest.mock import patch
+
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        with patch(
+            "pos_uniformes.services.telegram_service.bajar_archivo",
+            side_effect=RuntimeError("sin internet"),
+        ):
+            respuesta = bot.atender_foto(self._msg(), session_factory=self.factory)
+        self.assertIn("No pude bajar", respuesta)
+        with self.factory() as session:
+            # Más vale no poner nada que poner un cuadro negro en la tienda.
+            self.assertEqual(asvc.listar_activos(session), [])
+
+    def test_una_imagen_ilegible_no_se_pone(self) -> None:
+        from unittest.mock import patch
+
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        with patch(
+            "pos_uniformes.services.telegram_service.bajar_archivo", return_value=b"no soy png"
+        ):
+            respuesta = bot.atender_foto(self._msg(), session_factory=self.factory)
+        self.assertIn("No pude usar esa imagen", respuesta)
         with self.factory() as session:
             self.assertEqual(asvc.listar_activos(session), [])

@@ -308,3 +308,56 @@ def quien_vio(session: Session, anuncio_id: int) -> list[AnuncioVisto]:
         .order_by(AnuncioVisto.visto_en.asc(), AnuncioVisto.id.asc())
     )
     return list(session.scalars(stmt).all())
+
+
+# ── Darle más vida a uno que ya está puesto ──────────────────────────────────
+
+
+def alargar(session: Session, anuncio_id: int, horas: float) -> Anuncio | None:
+    """Le suma horas al vencimiento. No hace commit.
+
+    Cuenta desde *ahora*, no desde el vencimiento viejo: si ya venció o le
+    faltan minutos, «+3 h» tiene que querer decir tres horas más de hoy, no
+    tres horas desde un momento que ya pasó.
+    """
+    anuncio = session.get(Anuncio, int(anuncio_id))
+    if anuncio is None:
+        return None
+    ahora = datetime.now(timezone.utc)
+    base = _aware(anuncio.expira_en)
+    if base is None or base < ahora:
+        base = ahora
+    anuncio.expira_en = base + timedelta(hours=float(horas))
+    session.flush()
+    return anuncio
+
+
+def reponer(session: Session, anuncio_id: int, *, horas: float = 12.0) -> Anuncio | None:
+    """Vuelve a poner el mismo aviso como nuevo, para que lo acusen otra vez.
+
+    Crea una copia con id nuevo y apaga el original en vez de revivirlo. Es a
+    propósito: cada kiosko recuerda qué ids ya acusó para no estorbar dos veces
+    con lo mismo, así que revivir el original no haría que nadie lo volviera a
+    ver. Con id nuevo, todas las pantallas lo preguntan de cero — y los acuses
+    de la vuelta anterior quedan guardados como lo que fueron.
+    """
+    viejo = session.get(Anuncio, int(anuncio_id))
+    if viejo is None:
+        return None
+    nuevo = Anuncio(
+        titulo=viejo.titulo,
+        mensaje=viejo.mensaje,
+        imagen=viejo.imagen,
+        imagen_mime=viejo.imagen_mime,
+        destinos=list(viejo.destinos) if viejo.destinos else None,
+        activo=True,
+        duracion_seg=viejo.duracion_seg,
+        prioridad=viejo.prioridad,
+        pide_acuse=viejo.pide_acuse,
+        expira_en=vence_en(horas),
+        creado_por=viejo.creado_por,
+    )
+    session.add(nuevo)
+    viejo.activo = False
+    session.flush()
+    return nuevo

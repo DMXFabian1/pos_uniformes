@@ -21,6 +21,8 @@ Comandos:
     /prestamos    aprobar o rechazar lo que pidieron
     /aviso X      pone X a pantalla completa en las pantallas de la tienda
     /avisos       los avisos puestos, quién los vio, y quitarlos
+    /cartel X     igual, pero sin interrumpir: rota cuando nadie toca
+    (una foto)    mandarle una foto al bot la pone a pantalla completa
     /ayuda        esta lista
 
 Solo responde al chat configurado (POS_UNIFORMES_TELEGRAM_CHAT_ID); a
@@ -66,6 +68,9 @@ AYUDA = (
     "\nLAS PANTALLAS\n"
     "/aviso Junta a las 6 — sale a pantalla completa en la tienda\n"
     "/aviso 3h Hoy cerramos temprano — y se quita solo en 3 horas\n"
+    "/aviso @caja2 Ven un momento — solo en esa pantalla\n"
+    "/cartel Promoción de mochilas — rota sin interrumpir a nadie\n"
+    "Mándame una foto y sale a pantalla completa (el pie de foto es el aviso)\n"
     "/avisos — los que están puestos, quién los vio, y quitarlos\n"
     "\nGENTE\n"
     "/asistencia — quién vino hoy, con un comando por empleada para marcar\n"
@@ -201,6 +206,13 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
 
         with session_factory() as session:
             return av.mandar(session, cmd.argumento, quien=CODIGO_REMOTO)
+    if cmd.nombre in ("cartel", "cartelera"):
+        from pos_uniformes.services import telegram_avisos_service as av
+
+        with session_factory() as session:
+            return av.mandar(
+                session, cmd.argumento, quien=CODIGO_REMOTO, interrumpe=False
+            )
     if cmd.nombre == "avisos":
         from pos_uniformes.services import telegram_avisos_service as av
 
@@ -262,6 +274,38 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
             hecho = asis.marcar(session, code, accion, hoy)
             return hecho + "\n\n" + mensaje_asistencia(session, hoy)[0]
     return f"No conozco /{cmd.nombre}. " + AYUDA
+
+
+def atender_foto(msg: dict, *, session_factory, token: str | None = None) -> str | None:
+    """Una foto mandada al bot → aviso a pantalla completa. None si no hay foto.
+
+    El pie de foto es el aviso, y ahí valen el plazo y la `@pantalla` igual que
+    en `/aviso`. Mandar una foto es el gesto más corto que hay para poner algo
+    en las pantallas, así que no lleva comando.
+    """
+    from pos_uniformes.services import telegram_service
+
+    file_id = telegram_service.foto_mas_grande(msg)
+    if not file_id:
+        return None
+    pie = (msg.get("caption") or "").strip()
+    # Un pie que empieza con otro comando no es un aviso: se atiende como texto.
+    if pie.startswith("/") and not pie.lower().startswith(("/aviso", "/cartel")):
+        return atender_texto(pie, session_factory=session_factory)
+    interrumpe = True
+    if pie.lower().startswith("/cartel"):
+        interrumpe = False
+        pie = pie.split(maxsplit=1)[1].strip() if " " in pie else ""
+    elif pie.lower().startswith("/aviso"):
+        pie = pie.split(maxsplit=1)[1].strip() if " " in pie else ""
+
+    from pos_uniformes.services import telegram_avisos_service as av
+
+    with session_factory() as session:
+        return av.mandar_foto(
+            session, file_id=file_id, pie=pie, quien=CODIGO_REMOTO,
+            token=token, interrumpe=interrumpe,
+        )
 
 
 def mensaje_asistencia(session, hoy: date | None = None) -> tuple[str, str]:
@@ -370,20 +414,34 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
             if chat != str(chat_id):
                 logger.info("Mensaje ignorado de chat %s", chat)
                 continue
+            trae_foto = bool(telegram_service.foto_mas_grande(msg))
             if _es_viejo(msg):
                 logger.info("Mensaje viejo ignorado: %r", texto)
-                respuesta = (
-                    f"Ya estoy en línea. No atendí «{texto[:40]}» porque es de antes de arrancar; "
-                    "si todavía lo quieres, mándalo otra vez."
-                ) if parsear(texto) else ""
+                if trae_foto:
+                    respuesta = (
+                        "Ya estoy en línea. No puse esa foto porque es de antes de "
+                        "arrancar; si todavía la quieres en las pantallas, mándala otra vez."
+                    )
+                else:
+                    respuesta = (
+                        f"Ya estoy en línea. No atendí «{texto[:40]}» porque es de antes de arrancar; "
+                        "si todavía lo quieres, mándalo otra vez."
+                    ) if parsear(texto) else ""
                 if not respuesta:
                     continue
             else:
                 try:
-                    respuesta = atender_texto(texto, session_factory=session_factory)
+                    if trae_foto:
+                        respuesta = atender_foto(
+                            msg, session_factory=session_factory, token=token
+                        ) or ""
+                    else:
+                        respuesta = atender_texto(texto, session_factory=session_factory)
                 except Exception as exc:  # noqa: BLE001
                     logger.exception("Error atendiendo %r", texto)
                     respuesta = f"Falló: {exc}"
+                if not respuesta:
+                    continue
             try:
                 telegram_service.enviar_mensaje(respuesta, token=token, chat_id=chat_id)
             except Exception as exc:  # noqa: BLE001

@@ -14,6 +14,20 @@ kiosko:
   «Enterada» y al tocarlo le llega a Daniel quién lo vio y en cuál pantalla.
   Sin eso, mandar un aviso es hablarle a una pared.
 
+Lo que se controla desde el chat (Daniel, 01/10: "me gustaría controlarlos de
+telegram"):
+
+- `/aviso texto` — a todas las pantallas, pide acuse, vence en 12 h.
+- `/aviso 3h texto` — con su propio plazo (`30m`, `2d` también).
+- `/aviso @caja2 texto` — a una sola pantalla.
+- **Una foto** mandada al bot, sin comando: sale a pantalla completa. Lo que
+  escribas de pie de foto es el aviso, y ahí también valen el plazo y la
+  pantalla.
+- `/cartel texto` — el que NO interrumpe: solo rota cuando nadie está tocando
+  la pantalla, sin botón «Enterada». Para promos y recordatorios.
+- `/avisos` — los puestos; tocando uno se abre con sus botones: quitarlo,
+  darle más tiempo, o reponerlo para que lo vuelvan a acusar.
+
 Este módulo es solo texto y botones; el aviso lo guarda `anuncio_service` y lo
 pinta el overlay del satélite.
 """
@@ -52,6 +66,50 @@ def leer_plazo(palabra: str) -> float | None:
     if unidad.startswith("d"):
         return cantidad * 24.0
     return float(cantidad)
+
+
+def _clave(nombre: str) -> str:
+    """«Caja 2» → «caja2»: así `@caja2` encuentra la pantalla sin pelear con
+    espacios ni acentos, que es lo que no se puede escribir en un @."""
+    from pos_uniformes.utils.text_normalization import normalize_text_unicode
+
+    return "".join(c for c in normalize_text_unicode(nombre) if c.isalnum())
+
+
+def pantallas(session) -> list[dict]:
+    """Los satélites conocidos con su nombre y su @ para escribirlo. [] si no se pudo."""
+    try:
+        from pos_uniformes.services import satelite_registry_service as rsvc
+
+        return [
+            {
+                "identificador": s["identificador"],
+                "nombre": s["nombre"],
+                "online": s["online"],
+                "arroba": "@" + _clave(s["nombre"]),
+            }
+            for s in rsvc.listar_con_estado(session)
+        ]
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def buscar_pantalla(session, nombre: str) -> dict | None:
+    """La pantalla cuyo nombre coincide con lo que se escribió tras el @.
+
+    Exacta primero; si no, la única que empieza con eso. Si hay dos que empiezan
+    igual no se adivina: mandar un aviso a la pantalla equivocada es peor que
+    pedir que lo escriba completo.
+    """
+    buscado = _clave(nombre)
+    if not buscado:
+        return None
+    todas = pantallas(session)
+    for p in todas:
+        if _clave(p["nombre"]) == buscado:
+            return p
+    empiezan = [p for p in todas if _clave(p["nombre"]).startswith(buscado)]
+    return empiezan[0] if len(empiezan) == 1 else None
 
 
 def partir_texto(texto: str) -> tuple[str | None, str | None]:
@@ -113,56 +171,157 @@ def falta_para(expira: datetime | None, ahora: datetime | None = None) -> str:
 # ── Mandar ───────────────────────────────────────────────────────────────────
 
 
-def mandar(session, argumento: str, *, quien: str = "telegram") -> str:
-    """`/aviso [plazo] texto` → lo crea y pide que aparezca ya. Hace commit.
+AYUDA_CORTA = (
+    "¿Qué aviso? Se usa así:\n"
+    "/aviso Junta a las 6\n"
+    "/aviso 3h Hoy cerramos temprano — se quita en 3 horas\n"
+    "/aviso @caja2 Ven un momento — solo en esa pantalla\n"
+    "/cartel Promoción de mochilas — rota sin interrumpir\n\n"
+    "También puedes mandarme una foto: sale a pantalla completa, y lo que "
+    "escribas de pie de foto es el aviso.\n"
+    "Sin plazo se quita solo en 12 h. Para ver los puestos: /avisos"
+)
 
-    Devuelve lo que se le contesta en el chat: qué se mandó, a cuántas
-    pantallas y cuándo se quita solo.
+
+class AvisoVacio(ValueError):
+    """No había qué mandar (ni texto ni imagen)."""
+
+
+def _leer_prefijos(session, crudo: str) -> tuple[str, float, dict | None, list[str]]:
+    """Come los `3h` y `@caja2` del principio. (resto, horas, pantalla, quejas).
+
+    Solo del principio y solo si tienen esa forma: así «5 playeras llegaron» o
+    un correo en el texto no se confunden con órdenes.
+    """
+    horas = HORAS_DEFAULT
+    pantalla: dict | None = None
+    quejas: list[str] = []
+    while crudo:
+        partes = crudo.split(maxsplit=1)
+        primera = partes[0]
+        resto = partes[1].strip() if len(partes) > 1 else ""
+        if primera.startswith("@") and len(primera) > 1:
+            encontrada = buscar_pantalla(session, primera[1:])
+            if encontrada is None:
+                quejas.append(
+                    f"No encontré la pantalla «{primera}», así que lo puse en todas."
+                )
+            else:
+                pantalla = encontrada
+            crudo = resto
+            continue
+        plazo = leer_plazo(primera)
+        # Un plazo solo es plazo si queda aviso después: «/aviso 3h» a secas es
+        # un aviso que dice «3h», no un plazo sin recado.
+        if plazo is not None and resto:
+            horas = plazo
+            crudo = resto
+            continue
+        break
+    return crudo, horas, pantalla, quejas
+
+
+def mandar(
+    session,
+    argumento: str,
+    *,
+    quien: str = "telegram",
+    imagen: bytes | None = None,
+    imagen_mime: str | None = None,
+    interrumpe: bool = True,
+) -> str:
+    """`/aviso [plazo] [@pantalla] texto` → lo crea y lo pone. Hace commit.
+
+    `imagen`: los bytes ya reducidos de una foto mandada al bot.
+    `interrumpe=False` es `/cartel`: rota en la cartelera sin tapar a nadie ni
+    pedir acuse. Devuelve lo que se contesta en el chat.
     """
     from pos_uniformes.services import anuncio_service as asvc
 
     crudo = (argumento or "").strip()
-    if not crudo:
-        return (
-            "¿Qué aviso? Se usa así:\n"
-            "/aviso Junta a las 6\n"
-            "/aviso 3h Hoy cerramos temprano — se quita en 3 horas\n"
-            "/aviso 30m Ya voy para allá\n\n"
-            "Sale a pantalla completa en las pantallas de la tienda y te digo "
-            "quién lo vio. Si no dices plazo, se quita solo en 12 h.\n"
-            "Para ver los que están puestos: /avisos"
-        )
+    if not crudo and imagen is None:
+        return AYUDA_CORTA
 
-    horas = HORAS_DEFAULT
-    partes = crudo.split(maxsplit=1)
-    plazo = leer_plazo(partes[0]) if len(partes) > 1 else None
-    if plazo is not None:
-        horas = plazo
-        crudo = partes[1].strip()
-    if not crudo:
-        return "Me dijiste el plazo pero no el aviso. Ejemplo: /aviso 3h Hoy cerramos temprano"
+    crudo, horas, pantalla, quejas = _leer_prefijos(session, crudo)
+    if not crudo and imagen is None:
+        return AYUDA_CORTA
 
     titulo, mensaje = partir_texto(crudo)
     anuncio = asvc.crear_anuncio(
         session,
         titulo=titulo,
         mensaje=mensaje,
-        pide_acuse=True,
+        imagen=imagen,
+        imagen_mime=imagen_mime,
+        destinos=[pantalla["identificador"]] if pantalla else None,
+        pide_acuse=interrumpe,
         expira_en=asvc.vence_en(horas),
-        prioridad=10,  # por encima de la cartelera de siempre
+        # Un aviso pasa por delante de la cartelera; un cartel se forma en la fila.
+        prioridad=10 if interrumpe else 0,
         creado_por=(quien or "telegram")[:60],
     )
-    asvc.notificar(session, "inmediato", anuncio.id)
+    if interrumpe:
+        asvc.notificar(session, "inmediato", anuncio.id)
     session.commit()
 
-    pantallas = _cuantas_pantallas(session)
-    donde = "las pantallas" if pantallas is None else _plural(pantallas, "pantalla", "pantallas")
-    return (
-        f"📣 Aviso puesto en {donde}:\n\n"
-        f"«{(titulo or mensaje or '').strip()}»\n\n"
-        f"{falta_para(anuncio.expira_en).capitalize()}. "
-        "Te aviso aquí mismo en cuanto alguien toque «Enterada».\n"
-        "Para quitarlo antes: /avisos"
+    que = "📣 Aviso" if interrumpe else "🖼 Cartel"
+    if pantalla:
+        donde = f"en {pantalla['nombre']}"
+        if not pantalla["online"]:
+            donde += " (está apagada: lo verá al encender)"
+    else:
+        cuantas = _cuantas_pantallas(session)
+        donde = (
+            "en las pantallas"
+            if cuantas is None
+            else f"en {_plural(cuantas, 'pantalla', 'pantallas')}"
+        )
+    lineas = [f"{que} puesto {donde}:", ""]
+    cuerpo = (titulo or mensaje or "").strip()
+    lineas.append(f"«{cuerpo}»" if cuerpo else "(solo la imagen)")
+    if imagen is not None and cuerpo:
+        lineas.append("(con tu foto)")
+    lineas.append("")
+    lineas.append(falta_para(anuncio.expira_en).capitalize() + ".")
+    if interrumpe:
+        lineas.append('Te aviso aquí mismo en cuanto alguien toque «Enterada».')
+    else:
+        lineas.append("No interrumpe a nadie: sale cuando la pantalla está sola.")
+    lineas.append("Para quitarlo o darle más tiempo: /avisos")
+    if quejas:
+        lineas.append("")
+        lineas.extend(quejas)
+    return "\n".join(lineas)
+
+
+def mandar_foto(
+    session,
+    *,
+    file_id: str,
+    pie: str = "",
+    quien: str = "telegram",
+    token: str | None = None,
+    interrumpe: bool = True,
+) -> str:
+    """Una foto mandada al bot → aviso a pantalla completa. Hace commit.
+
+    Baja el archivo, lo reduce como cualquier imagen de anuncio y lo manda. Si
+    la bajada o la imagen fallan se dice por qué y no se crea nada: más vale no
+    poner nada que poner un cuadro en negro en la tienda.
+    """
+    from pos_uniformes.services.anuncio_image_service import preparar_imagen
+    from pos_uniformes.services.telegram_service import bajar_archivo
+
+    try:
+        crudos = bajar_archivo(file_id, token=token)
+    except Exception as exc:  # noqa: BLE001
+        return f"No pude bajar la foto de Telegram: {exc}"
+    try:
+        datos, mime = preparar_imagen(crudos)
+    except Exception as exc:  # noqa: BLE001
+        return f"No pude usar esa imagen: {exc}"
+    return mandar(
+        session, pie, quien=quien, imagen=datos, imagen_mime=mime, interrumpe=interrumpe
     )
 
 
@@ -183,20 +342,36 @@ def _cuantas_pantallas(session) -> int | None:
 # ── Ver y quitar ─────────────────────────────────────────────────────────────
 
 
-def _nombres_de_pantallas(session) -> dict[str, str]:
-    try:
-        from pos_uniformes.services import satelite_registry_service as rsvc
-
-        return {s["identificador"]: s["nombre"] for s in rsvc.listar_con_estado(session)}
-    except Exception:  # noqa: BLE001
-        return {}
-
-
 def _etiqueta(anuncio) -> str:
     texto = (anuncio.titulo or anuncio.mensaje or "").strip().replace("\n", " ")
     if not texto:
         return "(imagen)"
     return texto if len(texto) <= 40 else texto[:39] + "…"
+
+
+def _renglones_de(session, anuncio, nombres: dict[str, str]) -> list[str]:
+    """Las dos o tres líneas que describen un aviso: de cuándo es, a dónde va,
+    y quién lo ha visto."""
+    from pos_uniformes.services import anuncio_service as asvc
+
+    lineas = [f"«{_etiqueta(anuncio)}»"]
+    detalle = [hace_cuanto(anuncio.creado_en), falta_para(anuncio.expira_en)]
+    if anuncio.destinos:
+        detalle.append("solo " + ", ".join(nombres.get(d, d) for d in anuncio.destinos))
+    if anuncio.imagen is not None:
+        detalle.append("🖼 con foto")
+    if not anuncio.pide_acuse:
+        detalle.append("no interrumpe")
+    lineas.append("   " + " · ".join(x for x in detalle if x))
+    if anuncio.pide_acuse:
+        vistos = asvc.quien_vio(session, anuncio.id)
+        if not vistos:
+            lineas.append("   ⏳ Nadie lo ha visto todavía")
+        for v in vistos:
+            pantalla = v.satelite_nombre or nombres.get(v.satelite) or v.satelite or "?"
+            quien = v.empleada or "alguien"
+            lineas.append(f"   ✅ {quien} en {pantalla} · {hace_cuanto(v.visto_en)}")
+    return lineas
 
 
 def resumen(session) -> str:
@@ -205,29 +380,45 @@ def resumen(session) -> str:
 
     activos = asvc.listar_activos(session)
     if not activos:
-        return (
-            "No hay ningún aviso puesto.\n\n"
-            "Para poner uno: /aviso Junta a las 6"
-        )
+        lineas = ["No hay ningún aviso puesto.", "", "Para poner uno: /aviso Junta a las 6"]
+        nombres = pantallas(session)
+        if nombres:
+            lineas.append("")
+            lineas.append("Pantallas: " + " · ".join(
+                f"{'🟢' if p['online'] else '⚪'} {p['nombre']} ({p['arroba']})" for p in nombres
+            ))
+            lineas.append("Para una sola: /aviso " + nombres[0]["arroba"] + " Ven un momento")
+        return "\n".join(lineas)
 
-    nombres = _nombres_de_pantallas(session)
+    nombres = {p["identificador"]: p["nombre"] for p in pantallas(session)}
     lineas = [f"📣 {_plural(len(activos), 'aviso puesto', 'avisos puestos')}:"]
     for a in activos:
         lineas.append("")
-        lineas.append(f"«{_etiqueta(a)}»")
-        detalle = [hace_cuanto(a.creado_en), falta_para(a.expira_en)]
-        lineas.append("   " + " · ".join(x for x in detalle if x))
-        if a.pide_acuse:
-            vistos = asvc.quien_vio(session, a.id)
-            if not vistos:
-                lineas.append("   ⏳ Nadie lo ha visto todavía")
-            for v in vistos:
-                pantalla = v.satelite_nombre or nombres.get(v.satelite) or v.satelite or "?"
-                quien = v.empleada or "alguien"
-                lineas.append(f"   ✅ {quien} en {pantalla} · {hace_cuanto(v.visto_en)}")
+        lineas.extend(_renglones_de(session, a, nombres))
     lineas.append("")
-    lineas.append("Toca uno para quitarlo de las pantallas.")
+    lineas.append("Toca uno para quitarlo o darle más tiempo.")
     return "\n".join(lineas)
+
+
+def detalle(session, anuncio_id: int) -> tuple[str, list[list[tuple[str, str]]]]:
+    """(texto, filas de botones) de UN aviso: quitarlo, alargarlo, reponerlo."""
+    from pos_uniformes.services import anuncio_service as asvc
+
+    anuncio = asvc.obtener(session, int(anuncio_id))
+    if anuncio is None:
+        return "Ese aviso ya no existe.", []
+    nombres = {p["identificador"]: p["nombre"] for p in pantallas(session)}
+    texto = "\n".join(_renglones_de(session, anuncio, nombres))
+    if not anuncio.activo:
+        texto += "\n\n(ya no está en las pantallas)"
+        return texto, [[("🔄 Ponerlo otra vez", f"{PREFIJO}otra:{anuncio.id}")]]
+    filas = [
+        [("🗑 Quitarlo", f"{PREFIJO}quitar:{anuncio.id}")],
+        [("⏱ +3 h", f"{PREFIJO}mas:{anuncio.id}:3"), ("⏱ +12 h", f"{PREFIJO}mas:{anuncio.id}:12")],
+    ]
+    if anuncio.pide_acuse:
+        filas.append([("🔄 Que lo vean otra vez", f"{PREFIJO}otra:{anuncio.id}")])
+    return texto, filas
 
 
 def texto_y_botones(session) -> tuple[str, str]:
@@ -236,7 +427,7 @@ def texto_y_botones(session) -> tuple[str, str]:
     from pos_uniformes.services import telegram_service
 
     activos = asvc.listar_activos(session)
-    filas = [[(f"🗑 {_etiqueta(a)}", f"{PREFIJO}quitar:{a.id}")] for a in activos]
+    filas = [[(_etiqueta(a), f"{PREFIJO}ver:{a.id}")] for a in activos]
     if len(activos) > 1:
         filas.append([("🗑 Quitar todos", f"{PREFIJO}todos")])
     filas.append([("‹ Menú", "m:raiz")])
@@ -247,16 +438,41 @@ def es_de_avisos(dato: str) -> bool:
     return str(dato or "").startswith(PREFIJO)
 
 
+def _con_volver(filas: list[list[tuple[str, str]]]) -> str:
+    from pos_uniformes.services import telegram_service
+
+    return telegram_service.teclado(filas + [[("‹ Avisos", f"{PREFIJO}lista")]])
+
+
+def _partes(accion: str) -> list[str]:
+    return accion.split(":")
+
+
 def atender(dato: str, *, session_factory) -> tuple[str, str, str]:
     """Un botón de avisos: (aviso corto, texto nuevo, botones nuevos)."""
     from pos_uniformes.services import anuncio_service as asvc
 
     accion = str(dato or "")[len(PREFIJO):]
+    partes = _partes(accion)
+    nombre = partes[0] if partes else ""
 
-    if accion.startswith("quitar:"):
+    def _id() -> int | None:
         try:
-            anuncio_id = int(accion.split(":", 1)[1])
-        except ValueError:
+            return int(partes[1])
+        except (IndexError, ValueError):
+            return None
+
+    if nombre == "ver":
+        anuncio_id = _id()
+        if anuncio_id is None:
+            return "No conozco ese botón", "", ""
+        with session_factory() as session:
+            texto, filas = detalle(session, anuncio_id)
+        return "", texto, _con_volver(filas)
+
+    if nombre == "quitar":
+        anuncio_id = _id()
+        if anuncio_id is None:
             return "No conozco ese botón", "", ""
         with session_factory() as session:
             quitado = asvc.desactivar(session, anuncio_id)
@@ -264,14 +480,47 @@ def atender(dato: str, *, session_factory) -> tuple[str, str, str]:
             texto, botones = texto_y_botones(session)
         return ("Quitado" if quitado else "Ya no estaba"), texto, botones
 
-    if accion == "todos":
+    if nombre == "mas":
+        anuncio_id = _id()
+        try:
+            horas = float(partes[2])
+        except (IndexError, ValueError):
+            horas = 3.0
+        if anuncio_id is None:
+            return "No conozco ese botón", "", ""
+        with session_factory() as session:
+            anuncio = asvc.alargar(session, anuncio_id, horas)
+            session.commit()
+            if anuncio is None:
+                texto, botones = texto_y_botones(session)
+                return "Ese aviso ya no existe", texto, botones
+            cuanto = falta_para(anuncio.expira_en)
+            texto, filas = detalle(session, anuncio_id)
+        return cuanto.capitalize(), texto, _con_volver(filas)
+
+    if nombre == "otra":
+        anuncio_id = _id()
+        if anuncio_id is None:
+            return "No conozco ese botón", "", ""
+        with session_factory() as session:
+            nuevo = asvc.reponer(session, anuncio_id)
+            if nuevo is not None and nuevo.pide_acuse:
+                asvc.notificar(session, "inmediato", nuevo.id)
+            session.commit()
+            if nuevo is None:
+                texto, botones = texto_y_botones(session)
+                return "Ese aviso ya no existe", texto, botones
+            texto, filas = detalle(session, nuevo.id)
+        return "Puesto otra vez", texto, _con_volver(filas)
+
+    if nombre == "todos":
         with session_factory() as session:
             cuantos = asvc.desactivar_todos(session)
             session.commit()
             texto, botones = texto_y_botones(session)
         return f"Se quitaron {cuantos}", texto, botones
 
-    # "av:" pelón o "av:ver": la lista.
+    # "av:" pelón o "av:lista": la lista.
     with session_factory() as session:
         texto, botones = texto_y_botones(session)
     return "", texto, botones

@@ -19,6 +19,7 @@ import urllib.parse
 import urllib.request
 
 _API = "https://api.telegram.org/bot{token}/{metodo}"
+_API_ARCHIVO = "https://api.telegram.org/file/bot{token}/{ruta}"
 _MAX = 4000  # Telegram corta en 4096
 _log = logging.getLogger("telegram")
 _aviso_inseguro = False
@@ -89,6 +90,62 @@ def _llamar(token: str, metodo: str, datos: dict | None = None, timeout: float =
     if not payload.get("ok"):
         raise RuntimeError(f"Telegram respondió: {payload.get('description', payload)}")
     return payload
+
+
+#: Tope de lo que se baja de Telegram. Una foto de celular no pasa de aquí, y
+#: pone un techo a lo que un mensaje puede hacer descargar al bot.
+MAX_ARCHIVO_BYTES = 10 * 1024 * 1024
+
+
+def bajar_archivo(file_id: str, *, token: str | None = None, timeout: float = 30.0) -> bytes:
+    """Baja un archivo del bot por su `file_id` (dos pasos: getFile + descarga).
+
+    Lanza RuntimeError si Telegram no lo da o si pesa más de `MAX_ARCHIVO_BYTES`.
+    """
+    token = token or token_configurado()
+    if not token:
+        raise RuntimeError("Falta el token del bot.")
+    info = _llamar(token, "getFile", {"file_id": str(file_id)}, timeout=timeout)
+    ruta = ((info.get("result") or {}).get("file_path") or "").strip()
+    if not ruta:
+        raise RuntimeError("Telegram no dio la ruta del archivo.")
+    tamano = (info.get("result") or {}).get("file_size") or 0
+    if int(tamano or 0) > MAX_ARCHIVO_BYTES:
+        raise RuntimeError(f"El archivo pesa {int(tamano) // 1024} KB; es demasiado.")
+    url = _API_ARCHIVO.format(token=token, ruta=urllib.parse.quote(ruta))
+
+    def _abrir(verificar: bool) -> bytes:
+        req = urllib.request.Request(url)
+        with urllib.request.urlopen(req, timeout=timeout, context=_contexto_ssl(verificar)) as resp:
+            # +1 para notar el caso de que venga justo en el tope y siga habiendo más.
+            datos = resp.read(MAX_ARCHIVO_BYTES + 1)
+        if len(datos) > MAX_ARCHIVO_BYTES:
+            raise RuntimeError("El archivo es demasiado grande.")
+        return datos
+
+    try:
+        return _abrir(True)
+    except (ssl.SSLCertVerificationError, urllib.error.URLError) as exc:
+        razon = getattr(exc, "reason", exc)
+        if not isinstance(razon, ssl.SSLCertVerificationError):
+            raise
+        return _abrir(False)
+
+
+def foto_mas_grande(msg: dict) -> str | None:
+    """`file_id` de la versión más grande de una foto, o None si no hay foto.
+
+    Telegram manda la misma foto en varios tamaños; la última es la mayor.
+    También atiende la foto mandada «como archivo» (document con mime de imagen).
+    """
+    fotos = msg.get("photo") or []
+    if fotos:
+        mejor = max(fotos, key=lambda f: int(f.get("file_size") or 0))
+        return mejor.get("file_id") or None
+    doc = msg.get("document") or {}
+    if str(doc.get("mime_type") or "").startswith("image/"):
+        return doc.get("file_id") or None
+    return None
 
 
 def partir_mensaje(texto: str, maximo: int = _MAX) -> list[str]:
