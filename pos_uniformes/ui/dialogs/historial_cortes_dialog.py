@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLineEdit,
     QPlainTextEdit,
     QPushButton,
     QTableWidget,
@@ -408,6 +409,22 @@ class HistorialCortesDialog(QDialog):
         detalle.setStyleSheet("font-weight: 700; color: #73341c;")
         ly.addWidget(detalle)
 
+        # El porqué del ajuste. Sin esto, el dinero que sale por aquí queda sin
+        # explicación: en septiembre fueron $16,349 sin una sola palabra
+        # (Daniel, 2026-10-01).
+        nota_label = QLabel("¿Por qué?")
+        ly.addWidget(nota_label)
+        nota_input = QLineEdit()
+        nota_input.setPlaceholderText("Ej. depósito al banco, pago a proveedor, me lo llevé…")
+        ly.addWidget(nota_input)
+        motivos = QHBoxLayout()
+        for texto in ("Depósito al banco", "Proveedor", "Me lo llevé", "Gasto personal"):
+            chip = QPushButton(texto)
+            chip.setAutoDefault(False)
+            chip.clicked.connect(lambda _c=False, t=texto: nota_input.setText(t))
+            motivos.addWidget(chip)
+        ly.addLayout(motivos)
+
         def _refrescar() -> None:
             v = Decimal(str(spin.value())).quantize(Decimal("0.01"))
             fuera = (real - v).quantize(Decimal("0.01"))
@@ -415,6 +432,13 @@ class HistorialCortesDialog(QDialog):
             detalle.setText(
                 f"Se entrega ${entrega:,.2f}." + (f"   Sin reportar: ${fuera:,.2f}." if fuera else "   Sin ajuste.")
             )
+            # Sin ajuste no hay nada que explicar.
+            for w in (nota_label, nota_input):
+                w.setVisible(bool(fuera))
+            for i in range(motivos.count()):
+                w = motivos.itemAt(i).widget()
+                if w is not None:
+                    w.setVisible(bool(fuera))
 
         spin.valueChanged.connect(lambda _v: _refrescar())
         _refrescar()
@@ -422,14 +446,26 @@ class HistorialCortesDialog(QDialog):
         botones.accepted.connect(dlg.accept)
         botones.rejected.connect(dlg.reject)
         ly.addWidget(botones)
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
+        while True:
+            if dlg.exec() != QDialog.DialogCode.Accepted:
+                return
+            fuera = (real - Decimal(str(spin.value())).quantize(Decimal("0.01"))).quantize(Decimal("0.01"))
+            if fuera and not nota_input.text().strip():
+                QMessageBox.information(
+                    self, "Falta el porqué",
+                    "Escribe por qué se ajusta: sin eso, ese dinero queda sin explicación.",
+                )
+                continue
+            break
         try:
             from pos_uniformes.database.connection import get_session
             from pos_uniformes.services.historial_cortes_service import ajustar_corte
 
             with get_session() as session:
-                r = ajustar_corte(session, corte.id, venta=Decimal(str(spin.value())), creado_por=self._creado_por)
+                r = ajustar_corte(
+                    session, corte.id, venta=Decimal(str(spin.value())),
+                    creado_por=self._creado_por, nota=nota_input.text(),
+                )
         except Exception as exc:  # noqa: BLE001
             logger.exception("Historial de cortes: no se pudo ajustar")
             QMessageBox.warning(self, "No se pudo", str(exc) or "Inténtalo otra vez.")
@@ -439,6 +475,7 @@ class HistorialCortesDialog(QDialog):
         self.totales_label.setText(
             f"Corte ajustado: se reporta ${r['venta']:,.2f}"
             + (f" · fuera ${fuera:,.2f}" if fuera else " · sin ajuste")
+            + (f" · {r['nota']}" if r.get("nota") else "")
         )
 
     def quitar_ajuste(self) -> None:

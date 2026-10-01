@@ -212,7 +212,10 @@ class QuitarAjusteTests(unittest.TestCase):
         self.corte.retiros_pagos = Decimal("1598")
         self.session.commit()
         self.assertEqual(venta_real(self.corte), Decimal("16640.00"))
-        r = ajustar_corte(self.session, self.corte.id, venta=Decimal("13640"), creado_por="VEND-1")
+        r = ajustar_corte(
+            self.session, self.corte.id, venta=Decimal("13640"),
+            creado_por="VEND-1", nota="Depósito al banco",
+        )
         self.assertEqual(r["sin_reportar"], Decimal("3000.00"))
         self.assertEqual(r["retirado"], Decimal("12042.00"))
         self.session.refresh(self.corte)

@@ -258,6 +258,7 @@ def quitar_ajuste(session, corte_id: int, *, creado_por: str) -> dict:
         raise ValueError("Ese corte ya no existe.")
     if es_legacy(corte) or _d(corte.monto_esperado) <= 0:
         raise ValueError("Ese corte no guarda la cifra real: no hay ajuste que quitar.")
+    corte.nota = None   # sin ajuste no hay nada que explicar
     antes = _d(corte.monto_final)
     real = _d(corte.monto_esperado)
     if antes == real:
@@ -267,13 +268,18 @@ def quitar_ajuste(session, corte_id: int, *, creado_por: str) -> dict:
     return {"id": corte.id, "cambio": True, "antes": antes, "monto_final": real, "ajuste": (antes - real)}
 
 
-def ajustar_corte(session, corte_id: int, *, venta, creado_por: str) -> dict:
+def ajustar_corte(session, corte_id: int, *, venta, creado_por: str, nota: str = "") -> dict:
     """Cambia la venta OFICIAL de un corte ya hecho (SOLO el dueño, VEND-1).
 
     `venta` es lo que se reporta. La cifra del corte se recalcula con la
     misma cuenta del ticket (venta + reactivo − pagos − gastos), así que
     "se retira" cuadra con lo que de verdad se entregó. Lo que de verdad se
     vendió sigue guardado aparte y solo lo ve el dueño.
+
+    `nota`: **por qué**. Es obligatoria cuando el ajuste mueve dinero, porque
+    sin ella ese dinero queda sin explicación: en septiembre salieron $16,349
+    en ajustes y no había una sola palabra de a dónde fueron (2026-10-01). Si
+    el ajuste deja la cifra igual a la real, no hace falta.
     """
     from pos_uniformes.database.models import LibretaCorte
 
@@ -296,7 +302,16 @@ def ajustar_corte(session, corte_id: int, *, venta, creado_por: str) -> dict:
             f"(${_d(corte.reactivo_final):,.2f})."
         )
     antes = _d(corte.monto_final)
+    real_antes = venta_real(corte)
+    hay_ajuste = real_antes is not None and venta != real_antes
+    nota = (nota or "").strip()[:200]
+    if hay_ajuste and not nota:
+        raise ValueError(
+            "Escribe por qué se ajusta: sin eso, ese dinero queda sin explicación."
+        )
     corte.monto_final = nuevo_final
+    # La nota acompaña al ajuste; si se deja la cifra real, se borra con él.
+    corte.nota = nota if hay_ajuste else None
     session.commit()
     real = venta_real(corte)
     return {
@@ -307,4 +322,5 @@ def ajustar_corte(session, corte_id: int, *, venta, creado_por: str) -> dict:
         "monto_final": nuevo_final,
         "antes": antes,
         "retirado": retirado(corte),
+        "nota": corte.nota or "",
     }

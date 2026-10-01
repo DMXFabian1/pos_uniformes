@@ -36,6 +36,8 @@ class CorteFila:
     operaciones: int
     #: El dueño bajó (o subió) la cifra a mano con «Ajustar la venta».
     ajustado: bool = False
+    #: Por qué se ajustó. Vacío en los de antes de que se pidiera.
+    nota: str = ""
 
     @property
     def diferencia(self) -> Decimal:
@@ -83,6 +85,7 @@ def ultimos(session: Session, *, dias: int = 14, tope: int = TOPE) -> list[Corte
                 esperado=Decimal(str(c.monto_esperado or 0)),
                 operaciones=int(c.operaciones or 0),
                 ajustado=bool(venta_real(c) is not None and venta_real(c) != venta_oficial(c)),
+                nota=str(c.nota or ""),
             )
         )
     return salida
@@ -104,6 +107,8 @@ def texto(filas: list[CorteFila], *, dias: int = 14) -> str:
         elif c.ajustado:
             signo = "+" if c.diferencia > 0 else "−"
             marca = f"✏️ ajustado {signo}${abs(c.diferencia):,.2f}"
+            if c.nota:
+                marca += f" · {c.nota}"
         else:
             señal = "⚠️" if c.llama_la_atencion else "·"
             verbo = "sobró" if c.diferencia > 0 else "faltó"
@@ -126,6 +131,9 @@ def texto(filas: list[CorteFila], *, dias: int = 14) -> str:
     if ajustados:
         suma = sum((c.diferencia for c in ajustados), Decimal("0"))
         lineas.append(f"{len(ajustados)} con ajuste tuyo, {'−' if suma < 0 else '+'}${abs(suma):,.2f} en total.")
+        sin_decir = [c for c in ajustados if not c.nota]
+        if sin_decir:
+            lineas.append(f"{len(sin_decir)} de ellos sin decir por qué (son de antes).")
     return "\n".join(lineas)
 
 
