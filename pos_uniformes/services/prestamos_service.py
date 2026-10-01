@@ -22,8 +22,11 @@ from pos_uniformes.database.models import PrestamoEmpleada
 
 PEDIDO, APROBADO, RECHAZADO, COBRADO = "pedido", "aprobado", "rechazado", "cobrado"
 
-#: Más que esto no se pide sin hablarlo en persona.
-TOPE = Decimal("5000.00")
+#: No se presta más de esta parte de lo que lleva ganado en el ciclo
+#: (Daniel, 2026-10-01). Así el préstamo siempre cabe en su siguiente pago.
+PORCENTAJE_TOPE = Decimal("0.70")
+
+_CENT = Decimal("0.01")
 
 
 class NoSePuede(ValueError):
@@ -34,13 +37,43 @@ def _ahora() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def ganado_hasta_hoy(session: Session, employee_code: str, hoy=None) -> Decimal:
+    """Lo que lleva ganado en este ciclo, antes de cualquier préstamo.
+
+    Es lo mismo que cobraría si le pagaran hoy: su sueldo acumulado más
+    comisiones, menos faltas."""
+    from pos_uniformes.services import nomina_service as nom
+
+    det = nom.pago_pendiente(session, employee_code, hoy)
+    bruto = det.sueldo_base + det.monto_comisiones - det.descuento_faltas
+    return max(bruto, Decimal("0.00")).quantize(_CENT)
+
+
+def tope_para(session: Session, employee_code: str, hoy=None) -> Decimal:
+    """Lo más que se le puede prestar hoy: el 70% de lo que lleva ganado.
+
+    Sube conforme avanza su ciclo y se reinicia cuando se le paga; recién
+    pagada casi no puede pedir, que es justo la idea: el préstamo tiene que
+    caber en lo que ya se ganó."""
+    return (ganado_hasta_hoy(session, employee_code, hoy) * PORCENTAJE_TOPE).quantize(_CENT)
+
+
 def pedir(session: Session, *, employee_code: str, nombre: str, monto, motivo: str) -> PrestamoEmpleada:
     """La empleada lo pide desde la Libreta. Queda esperando tu respuesta."""
     monto = Decimal(str(monto))
     if monto <= 0:
         raise NoSePuede("El préstamo tiene que ser mayor a cero.")
-    if monto > TOPE:
-        raise NoSePuede(f"Más de ${TOPE:,.0f} hay que hablarlo con Daniel en persona.")
+    tope = tope_para(session, employee_code)
+    if tope <= 0:
+        raise NoSePuede(
+            "Todavía no llevas nada ganado en este ciclo, así que no hay de dónde "
+            "descontarlo. Inténtalo más adelante."
+        )
+    if monto > tope:
+        raise NoSePuede(
+            f"Lo más que puedes pedir hoy son ${tope:,.2f} — el 70% de lo que llevas "
+            "ganado. Si necesitas más, háblalo con Daniel."
+        )
     motivo = (motivo or "").strip()
     if not motivo:
         raise NoSePuede("Escribe para qué es: sin motivo no se puede autorizar.")

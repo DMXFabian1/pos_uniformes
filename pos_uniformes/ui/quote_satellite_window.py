@@ -2414,10 +2414,30 @@ class QuoteSatelliteWindow(QMainWindow):
         aviso.setVisible(False)
 
     def _libreta_pedir_prestamo(self) -> None:
-        datos = self._ask_prestamo()
+        from pos_uniformes.services import prestamos_service as pr
+
+        try:
+            with get_session() as session:
+                tope = pr.tope_para(session, self._libreta_code)
+        except Exception:  # noqa: BLE001
+            logger.exception("Libreta: no se pudo calcular el tope del préstamo")
+            QMessageBox.warning(
+                self, "Sin conexión",
+                "No se pudo consultar cuánto puedes pedir. Enciende la PC principal "
+                "e intenta de nuevo.",
+            )
+            return
+        if tope <= 0:
+            QMessageBox.information(
+                self, "Préstamo",
+                "Todavía no llevas nada ganado en este ciclo, así que no hay de dónde "
+                "descontarlo. Inténtalo más adelante.",
+            )
+            return
+
+        datos = self._ask_prestamo(tope)
         if datos is None:
             return
-        from pos_uniformes.services import prestamos_service as pr
 
         try:
             with get_session() as session:
@@ -2466,8 +2486,11 @@ class QuoteSatelliteWindow(QMainWindow):
             except Exception:  # noqa: BLE001
                 logger.exception("Préstamo: no se pudo avisar")
 
-    def _ask_prestamo(self) -> dict | None:
-        """Formulario táctil: cuánto y para qué, con teclado en pantalla."""
+    def _ask_prestamo(self, tope: Decimal) -> dict | None:
+        """Formulario táctil: cuánto y para qué, con teclado en pantalla.
+
+        `tope` es lo más que puede pedir hoy (el 70% de lo que lleva ganado):
+        se le dice de frente y las cantidades que no caben no se le ofrecen."""
         from pos_uniformes.services import prestamos_service as pr
 
         dlg = QDialog(self)
@@ -2488,7 +2511,8 @@ class QuoteSatelliteWindow(QMainWindow):
         titulo.setStyleSheet("font-size: 19px; font-weight: 800; color: #73341c;")
         ly.addWidget(titulo)
         pista = QLabel(
-            "Daniel lo aprueba desde su celular. Se te descuenta completo de tu siguiente pago."
+            f"Puedes pedir hasta ${tope:,.2f} (el 70% de lo que llevas ganado).\n"
+            "Daniel lo aprueba desde su celular y se te descuenta completo de tu siguiente pago."
         )
         pista.setWordWrap(True)
         pista.setStyleSheet("font-size: 12px; color: #8a8177;")
@@ -2501,11 +2525,18 @@ class QuoteSatelliteWindow(QMainWindow):
 
         # Cantidades de siempre, para no teclear.
         chips = QHBoxLayout()
-        for cantidad in (200, 500, 1000, 1500, 2000):
+        cabe = [c for c in (200, 500, 1000, 1500, 2000) if Decimal(c) <= tope]
+        for cantidad in cabe:
             chip = QPushButton(f"${cantidad:,}")
             chip.setAutoDefault(False)
             chip.clicked.connect(lambda _c=False, n=cantidad: monto_input.setText(str(n)))
             chips.addWidget(chip)
+        # Su tope exacto, siempre: si no cabe ninguna de las de siempre, es la
+        # única que puede tocar.
+        todo = QPushButton(f"${tope:,.0f}")
+        todo.setAutoDefault(False)
+        todo.clicked.connect(lambda: monto_input.setText(f"{tope:.0f}"))
+        chips.addWidget(todo)
         ly.addLayout(chips)
 
         ly.addWidget(QLabel("¿Para qué?"))
@@ -2535,10 +2566,11 @@ class QuoteSatelliteWindow(QMainWindow):
             if monto <= 0:
                 QMessageBox.information(dlg, "Préstamo", "El préstamo tiene que ser mayor a cero.")
                 continue
-            if monto > pr.TOPE:
+            if monto > tope:
                 QMessageBox.information(
                     dlg, "Préstamo",
-                    f"Más de ${pr.TOPE:,.0f} hay que hablarlo con Daniel en persona.",
+                    f"Lo más que puedes pedir hoy son ${tope:,.2f} — el 70% de lo que "
+                    "llevas ganado. Si necesitas más, háblalo con Daniel.",
                 )
                 continue
             if not motivo:

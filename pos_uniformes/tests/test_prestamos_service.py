@@ -29,8 +29,25 @@ class _Base(unittest.TestCase):
     def _pedir(self, monto="1000", motivo="para la renta", code="VEND-5"):
         return pr.pedir(self.s, employee_code=code, nombre="Fanny Ortiz", monto=monto, motivo=motivo)
 
+    def _ganado(self, cuanto):
+        """Finge lo que lleva ganado: el cálculo real es de nómina y ya tiene
+        sus propios tests."""
+        from unittest.mock import patch
+
+        return patch.object(pr, "ganado_hasta_hoy", return_value=Decimal(cuanto))
+
+    def setUpGanado(self):  # noqa: N802 — ayuda para los tests que no lo fijan
+        return self._ganado("10000")
+
 
 class PedirTest(_Base):
+    def setUp(self) -> None:
+        super().setUp()
+        # Con margen de sobra, salvo donde el test lo fije a propósito.
+        self._margen = self._ganado("10000")
+        self._margen.start()
+        self.addCleanup(self._margen.stop)
+
     def test_queda_esperando_respuesta(self):
         p = self._pedir()
         self.assertEqual(p.estado, pr.PEDIDO)
@@ -45,9 +62,19 @@ class PedirTest(_Base):
             with self.assertRaises(pr.NoSePuede):
                 self._pedir(monto=malo)
 
-    def test_lo_muy_grande_se_habla_en_persona(self):
-        with self.assertRaises(pr.NoSePuede):
-            self._pedir(monto="9000")
+    def test_no_mas_del_70_por_ciento_de_lo_ganado(self):
+        """Daniel, 2026-10-01: el préstamo tiene que caber en lo que ya se ganó."""
+        with self._ganado("1000"):
+            self._pedir(monto="700")          # justo el tope: pasa
+        with self._ganado("1000"), self.assertRaises(pr.NoSePuede) as caso:
+            self._pedir(monto="701")
+        self.assertIn("$700.00", str(caso.exception))
+
+    def test_recien_pagada_no_puede_pedir(self):
+        # Su ciclo empieza en cero: no hay de dónde descontarlo.
+        with self._ganado("0"), self.assertRaises(pr.NoSePuede) as caso:
+            self._pedir(monto="100")
+        self.assertIn("no llevas nada ganado", str(caso.exception))
 
     def test_no_se_amontonan_las_solicitudes(self):
         self._pedir()
@@ -62,6 +89,12 @@ class PedirTest(_Base):
 
 
 class AprobarTest(_Base):
+    def setUp(self) -> None:
+        super().setUp()
+        m = self._ganado("10000")
+        m.start()
+        self.addCleanup(m.stop)
+
     def test_al_aprobar_el_dinero_sale_del_cajon(self):
         """Sin el retiro, el corte de esa noche saldría corto justo por el
         préstamo y parecería un descuadre."""
@@ -98,6 +131,12 @@ class AprobarTest(_Base):
 
 
 class CobrarTest(_Base):
+    def setUp(self) -> None:
+        super().setUp()
+        m = self._ganado("10000")
+        m.start()
+        self.addCleanup(m.stop)
+
     def test_lo_aprobado_cuenta_para_el_siguiente_pago(self):
         p = self._pedir(monto="800")
         pr.aprobar(self.s, p.id, quien="VEND-1")

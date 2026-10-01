@@ -38,6 +38,11 @@ class _Base(unittest.TestCase):
         self.s = Session(engine)
         self.s.add(Empleada(codigo="VEND-5", nombre_completo="Fanny Ortiz", activo=True))
         self.s.flush()
+        # Aquí se prueban el aviso y los botones, no el tope del 70%: ese
+        # tiene sus propios tests en test_prestamos_service.
+        margen = patch.object(pr, "ganado_hasta_hoy", return_value=Decimal("10000"))
+        margen.start()
+        self.addCleanup(margen.stop)
 
     def _pedir(self, monto="1500", motivo="para la renta"):
         p = pr.pedir(self.s, employee_code="VEND-5", nombre="Fanny Ortiz", monto=monto, motivo=motivo)
@@ -118,7 +123,19 @@ class ElBotonDeLaLibretaTest(unittest.TestCase):
         self.assertIn("Se te descontarán", self.fuente)
 
     def test_el_formulario_trae_cantidades_de_un_toque(self):
-        self.assertIn("for cantidad in (200, 500, 1000, 1500, 2000)", self.fuente)
+        self.assertIn("(200, 500, 1000, 1500, 2000)", self.fuente)
+
+    def test_no_le_ofrece_cantidades_que_no_caben_en_su_tope(self):
+        self.assertIn("if Decimal(c) <= tope", self.fuente)
+
+    def test_le_dice_de_frente_cuanto_puede_pedir(self):
+        self.assertIn("Puedes pedir hasta", self.fuente)
+        self.assertIn("el 70% de lo que llevas ganado", self.fuente)
+
+    def test_recien_pagada_ni_siquiera_abre_el_formulario(self):
+        # Sin nada ganado no hay de dónde descontarlo: se le dice y ya.
+        self.assertIn("if tope <= 0:", self.fuente)
+        self.assertIn("no llevas nada ganado", self.fuente)
 
     def test_si_el_celular_falla_la_solicitud_no_se_pierde(self):
         # Queda en la cola de alertas en vez de perderse.
