@@ -1,0 +1,239 @@
+<title>In ictu oculi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&family=Literata:ital,opsz,wght@0,7..72,400;0,7..72,600;1,7..72,400&family=IBM+Plex+Sans+Condensed:wght@400;500;600&family=IBM+Plex+Mono&display=swap">
+<style>
+/* Layout: a reading room. Sticky index on the left like the margin of a printed book, one long measured column on the right; the hero is an inscription with a candle, after Valdés Leal. */
+:root{
+  --paper:#ECEAE4;      /* bone, slightly cool */
+  --paper-2:#E3E0D8;    /* surface for tables and asides */
+  --ink:#1C1B19;
+  --ink-2:#55514A;      /* muted text */
+  --rule:#C8C3B7;
+  --grana:#8C1A2C;      /* cochineal: the red of Baroque and Mexican painting */
+  --maya:#2C7A8F;       /* Maya blue */
+  --flame:#D29426;
+  --display:"IM Fell English", "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --display-sc:"IM Fell English SC", "IM Fell English", Georgia, serif;
+  --body:"Literata", "Iowan Old Style", Georgia, "Times New Roman", serif;
+  --ui:"IBM Plex Sans Condensed", "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+  --measure:68ch;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --paper:#131312; --paper-2:#1C1B1A; --ink:#E6E2D9; --ink-2:#A39D91; --rule:#35332F;
+  --grana:#D86A7B; --maya:#6DB5C7; --flame:#E7AE4C; color-scheme:dark }}
+:root[data-theme="dark"]{
+  --paper:#131312; --paper-2:#1C1B1A; --ink:#E6E2D9; --ink-2:#A39D91; --rule:#35332F;
+  --grana:#D86A7B; --maya:#6DB5C7; --flame:#E7AE4C; color-scheme:dark }
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:calc(env(safe-area-inset-top,0px) + 1.25rem)}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+body{background:var(--paper);color:var(--ink);font-family:var(--body);font-size:1.0625rem;line-height:1.65;
+  padding-inline:clamp(16px,4vw,48px);padding-block:0 4rem;-webkit-font-smoothing:antialiased}
+a{color:var(--grana);text-decoration-thickness:1px;text-underline-offset:.18em}
+a:hover{text-decoration-thickness:2px}
+:focus-visible{outline:2px solid var(--maya);outline-offset:3px;border-radius:2px}
+
+/* ---------- hero ---------- */
+.hero{max-width:1180px;margin-inline:auto;padding-block:clamp(2.5rem,7vw,5.5rem) 2.5rem;border-bottom:1px solid var(--rule);
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2rem 3rem;align-items:end}
+.eyebrow{font-family:var(--ui);font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);margin:0 0 1.2rem}
+.inscription{font-family:var(--display-sc);font-weight:400;font-size:clamp(3.2rem,11vw,8.5rem);line-height:.88;letter-spacing:.04em;margin:0;color:var(--ink);text-wrap:balance}
+.inscription .sm{display:block;font-family:var(--display);font-style:italic;font-size:.28em;letter-spacing:.01em;color:var(--grana);margin-top:.9rem;line-height:1.2}
+.lede{max-width:52ch;margin:1.6rem 0 0;color:var(--ink-2);font-size:1.05rem}
+.question{grid-column:1/-1;font-family:var(--display);font-style:italic;font-size:clamp(1.45rem,3.4vw,2.3rem);line-height:1.25;margin:1.5rem 0 0;max-width:30ch;text-wrap:balance}
+.question::before{content:"";display:block;width:3rem;height:1px;background:var(--grana);margin-bottom:1rem}
+
+.candle{position:relative;width:64px;height:190px;border:0;background:none;padding:0;cursor:pointer;justify-self:end}
+.candle .wax{position:absolute;bottom:0;left:50%;width:22px;height:120px;transform:translateX(-50%);
+  background:linear-gradient(90deg,var(--paper-2),var(--paper) 45%,var(--rule));border:1px solid var(--rule);border-radius:3px 3px 0 0}
+.candle .wick{position:absolute;bottom:120px;left:50%;width:2px;height:10px;background:var(--ink);transform:translateX(-50%)}
+.candle .flame{position:absolute;bottom:128px;left:50%;width:16px;height:40px;margin-left:-8px;border-radius:50% 50% 45% 45%/62% 62% 38% 38%;
+  background:radial-gradient(ellipse at 50% 80%, var(--paper) 0 18%, var(--flame) 45%, transparent 72%);
+  transform-origin:50% 90%;animation:flicker 2.6s infinite ease-in-out;transition:opacity .25s, transform .25s}
+.candle .smoke{position:absolute;bottom:130px;left:50%;width:2px;height:46px;margin-left:-1px;background:linear-gradient(to top,var(--ink-2),transparent);opacity:0;border-radius:2px}
+.candle.out .flame{opacity:0;transform:scale(.2)}
+.candle.out .smoke{animation:smoke 2.2s ease-out forwards}
+.candle-box{display:flex;flex-direction:column;align-items:center;width:max-content;justify-self:end}
+.candle-cap{font-family:var(--ui);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-2);text-align:center;margin-top:.5rem}
+@keyframes flicker{0%,100%{transform:scale(1,1) rotate(-1deg)}30%{transform:scale(.96,1.05) rotate(1.5deg)}60%{transform:scale(1.03,.95) rotate(-.5deg)}}
+@keyframes smoke{0%{opacity:.8;transform:translateY(0) scaleX(1)}100%{opacity:0;transform:translateY(-40px) scaleX(3)}}
+@media (prefers-reduced-motion: reduce){.candle .flame{animation:none}.candle.out .smoke{animation:none}}
+
+.meta{max-width:1180px;margin-inline:auto;display:flex;flex-wrap:wrap;gap:1rem 2.5rem;padding-block:1.4rem;border-bottom:1px solid var(--rule);
+  font-family:var(--ui);font-size:.9rem;color:var(--ink-2)}
+.meta b{color:var(--ink);font-weight:600}
+.meta .count{font-variant-numeric:tabular-nums;color:var(--grana);font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:.45rem .9rem;align-items:center}
+
+/* ---------- layout ---------- */
+.room{max-width:1180px;margin-inline:auto;display:grid;grid-template-columns:250px minmax(0,1fr);gap:3.5rem;padding-top:2.5rem}
+.toc{position:sticky;top:calc(env(safe-area-inset-top,0px) + 1rem);align-self:start;max-height:calc(100vh - 2rem);overflow:auto;
+  font-family:var(--ui);font-size:.9rem;padding-right:.5rem}
+.toc-title{font-family:var(--ui);font-size:.75rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);margin:0 0 .8rem}
+.toc ol{list-style:none;margin:0;padding:0}
+.navdoc{border-top:1px solid var(--rule)}
+.navdoc summary{list-style:none;cursor:pointer;padding:.55rem 0;display:flex}
+.navdoc summary::-webkit-details-marker{display:none}
+.navdoc summary a{color:var(--ink);text-decoration:none;font-weight:500;flex:1}
+.navdoc summary a .n{font-family:var(--mono);font-size:.78rem;color:var(--ink-2);margin-right:.35rem}
+.navdoc summary::after{content:"+";color:var(--ink-2);padding-left:.5rem}
+.navdoc details[open] summary::after{content:"–"}
+.navdoc.current summary a{color:var(--grana)}
+.sub{padding:0 0 .7rem 1.6rem !important}
+.sub li a{display:block;color:var(--ink-2);text-decoration:none;padding:.18rem 0;line-height:1.3}
+.sub li.lv3 a{padding-left:.8rem;font-size:.84rem}
+.sub li a:hover,.sub li a.active{color:var(--grana)}
+.theme-btn{margin-top:1.2rem;font-family:var(--ui);font-size:.8rem;background:none;border:1px solid var(--rule);color:var(--ink-2);padding:.35rem .7rem;border-radius:2px;cursor:pointer}
+.theme-btn:hover{color:var(--ink);border-color:var(--ink-2)}
+
+main{min-width:0}
+.doc{padding-bottom:3rem;margin-bottom:3rem;border-bottom:1px solid var(--rule)}
+.doc-head{margin-bottom:2rem}
+.doc-num{font-family:var(--ui);font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--grana);margin:0 0 .4rem}
+.doc-title{font-family:var(--display);font-weight:400;font-size:clamp(2.2rem,5vw,3.4rem);line-height:1.05;margin:0;text-wrap:balance}
+
+/* ---------- prose ---------- */
+.doc > *:not(.table-wrap):not(.pre-wrap):not(.doc-head){max-width:var(--measure)}
+.doc h2{font-family:var(--display);font-weight:400;font-size:clamp(1.6rem,3vw,2.1rem);line-height:1.15;margin:3rem 0 1rem;text-wrap:balance}
+.doc h3{font-family:var(--display);font-weight:400;font-size:1.45rem;line-height:1.2;margin:2.4rem 0 .8rem;color:var(--ink);text-wrap:balance}
+#doc-03 h3{border-top:1px solid var(--rule);padding-top:1.6rem;font-size:1.7rem}
+.doc h4{font-family:var(--ui);font-weight:600;font-size:.95rem;letter-spacing:.06em;text-transform:uppercase;margin:2rem 0 .6rem;color:var(--ink-2)}
+.doc p{margin:0 0 1rem}
+.doc ul,.doc ol{padding-left:1.4rem;margin:0 0 1rem}
+.doc li{margin:.25rem 0}
+.doc li > ul,.doc li > ol{margin:.3rem 0 .4rem}
+.doc ol > li::marker{font-family:var(--ui);color:var(--grana);font-weight:600}
+.doc ul > li::marker{color:var(--ink-2)}
+.doc strong{font-weight:600}
+.doc em{font-style:italic}
+.doc hr{border:0;border-top:1px solid var(--rule);margin:2.5rem 0;max-width:var(--measure)}
+.doc blockquote{margin:1.6rem 0;padding:.2rem 0 .2rem 1.3rem;border-left:2px solid var(--grana);font-family:var(--display);font-size:1.22rem;line-height:1.45;color:var(--ink)}
+.doc blockquote p{margin:.4rem 0}
+.doc code{font-family:var(--mono);font-size:.84em;background:var(--paper-2);padding:.08em .32em;border-radius:2px}
+.pre-wrap{overflow-x:auto;background:var(--paper-2);border:1px solid var(--rule);border-radius:2px;margin:1.4rem 0;max-width:100%}
+.pre-wrap pre{margin:0;padding:1.2rem 1.4rem;font-family:var(--mono);font-size:.8rem;line-height:1.45;color:var(--ink)}
+.pre-wrap pre code{background:none;padding:0;font-size:inherit}
+.xref{font-family:var(--ui);font-size:.92em;font-weight:500;text-decoration:none;border-bottom:1px solid currentColor}
+
+.table-wrap{overflow-x:auto;margin:1.4rem 0 1.8rem;max-width:100%;border-top:2px solid var(--ink);border-bottom:1px solid var(--ink)}
+.table-wrap table{border-collapse:collapse;width:100%;min-width:640px;font-family:var(--ui);font-size:.88rem;line-height:1.4}
+.table-wrap th{text-align:left;font-weight:600;font-size:.76rem;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-2);padding:.65rem .7rem;border-bottom:1px solid var(--ink);vertical-align:bottom}
+.table-wrap td{padding:.6rem .7rem;border-bottom:1px solid var(--rule);vertical-align:top}
+.table-wrap tr:last-child td{border-bottom:0}
+.table-wrap td:first-child{font-weight:500}
+.table-wrap td em,.table-wrap td i{font-family:var(--body)}
+
+/* ---------- epistemic marks ---------- */
+.tag{display:inline-block;font-family:var(--ui);font-size:.68rem;font-weight:600;letter-spacing:.06em;line-height:1;
+  padding:.24em .45em .2em;border-radius:2px;vertical-align:.12em;border:1px solid currentColor;white-space:nowrap;cursor:help}
+.tag-H{color:var(--paper);background:var(--ink);border-color:var(--ink)}
+.tag-E{color:var(--maya)}
+.tag-I{color:var(--paper);background:var(--maya);border-color:var(--maya)}
+.tag-Hi{color:var(--grana)}
+.tag-Es{color:var(--grana);border-style:dashed}
+.tag-NS{color:var(--ink-2);font-style:italic}
+.tag-C{color:var(--paper);background:var(--grana);border-color:var(--grana)}
+.tag-PRENSA{color:var(--flame)}
+.tag-note{font-family:var(--ui);font-size:.78rem;color:var(--ink-2);margin-left:.3em}
+.src{font-family:var(--ui);font-size:.68rem;font-weight:500;letter-spacing:.05em;color:var(--ink-2);border:1px solid var(--rule);padding:.12em .4em;border-radius:2px;white-space:nowrap;vertical-align:.1em}
+.chip{font-family:var(--ui);font-size:.72rem;font-weight:600;letter-spacing:.03em;padding:.1em .4em;border-radius:2px;white-space:nowrap}
+.chip-ok{color:var(--maya)}
+.chip-part{color:var(--flame)}
+.chip-unv{color:var(--grana)}
+.chip-open{color:var(--maya);border:1px solid var(--maya);text-transform:uppercase;font-size:.62rem;letter-spacing:.08em;vertical-align:.15em}
+
+.colophon{max-width:1180px;margin-inline:auto;font-family:var(--ui);font-size:.82rem;color:var(--ink-2);padding-top:1rem}
+
+/* ---------- narrow ---------- */
+@media (max-width: 900px){
+  .room{grid-template-columns:minmax(0,1fr);gap:1.5rem}
+  .toc{position:static;max-height:none;overflow:visible;border:1px solid var(--rule);padding:.8rem 1rem;background:var(--paper-2)}
+  .hero{grid-template-columns:minmax(0,1fr)}
+  .candle-box{justify-self:start}.candle{height:150px}
+  .candle .wax{height:84px}.candle .wick{bottom:84px}.candle .flame{bottom:92px}.candle .smoke{bottom:94px}
+}
+</style>
+
+<header class="hero">
+  <div>
+    <p class="eyebrow">Curso autodidacta · Fase 1: investigación y diseño</p>
+    <h1 class="inscription">In ictu oculi<span class="sm">Mirar a los muertos para aprender a mirar a los vivos</span></h1>
+    <p class="lede">La muerte, la finitud y la condición humana en el arte, de Bosch y Bruegel a Goya y la fotografía, hasta una investigación fotográfica sobre la muerte en Yucatán y Campeche.</p>
+  </div>
+  <div class="candle-box">
+    <button class="candle" id="candle" type="button" aria-label="Apagar la vela">
+      <span class="smoke"></span><span class="flame"></span><span class="wick"></span><span class="wax"></span>
+    </button>
+    <p class="candle-cap">1 Cor 15:52</p>
+  </div>
+  <p class="question">¿Cómo ha utilizado el arte la muerte para pensar la vida?</p>
+</header>
+
+<div class="meta" role="note">
+  <span><b>Temporada exploratoria:</b> 27 oct – 3 nov 2026 · Pomuch, Valladolid, Mérida · <span class="count" id="countdown">Faltan pocas semanas</span></span>
+  <span class="legend" aria-label="Marcas epistémicas">
+    <span class="tag tag-H">H</span>hecho
+    <span class="tag tag-E">E</span>evidencia
+    <span class="tag tag-I">I</span>interpretación
+    <span class="tag tag-Hi">Hi</span>hipótesis
+    <span class="tag tag-Es">Es</span>especulación
+    <span class="tag tag-NS">NS</span>no sabemos
+    <span class="tag tag-C">C</span>proyección
+    <span class="tag tag-PRENSA">PRENSA</span>sólo prensa
+  </span>
+</div>
+
+<div class="room">
+  <nav class="toc" aria-label="Índice del curso">
+    <p class="toc-title">Índice</p>
+    <ol id="toc">
+{{NAV}}
+    </ol>
+    <button class="theme-btn" id="themeBtn" type="button">Cambiar tema</button>
+  </nav>
+  <main>
+{{CONTENT}}
+  </main>
+</div>
+<p class="colophon">Fuentes verificadas en septiembre de 2026 contra catálogos, editoriales, museos y revistas académicas. Las entradas sin confirmar están marcadas como tales.</p>
+
+<script>
+(function(){
+  // candle: in ictu oculi
+  var c=document.getElementById('candle'), t;
+  c.addEventListener('click',function(){
+    clearTimeout(t); c.classList.add('out'); c.setAttribute('aria-label','La vela se apagó');
+    t=setTimeout(function(){c.classList.remove('out'); c.setAttribute('aria-label','Apagar la vela');},4200);
+  });
+  // countdown to fieldwork
+  var el=document.getElementById('countdown');
+  var start=new Date(2026,9,27), end=new Date(2026,10,3,23,59), now=new Date();
+  var day=86400000, d=Math.ceil((start-now)/day);
+  if(now<start) el.textContent= d===1 ? 'Falta 1 día' : 'Faltan '+d+' días';
+  else if(now<=end) el.textContent='En campo';
+  else el.textContent='Temporada concluida';
+  // theme toggle
+  var root=document.documentElement, btn=document.getElementById('themeBtn');
+  function cur(){var a=root.getAttribute('data-theme'); if(a) return a; return matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light';}
+  try{var s=localStorage.getItem('iio-theme'); if(s) root.setAttribute('data-theme',s);}catch(e){}
+  btn.addEventListener('click',function(){var n=cur()==='dark'?'light':'dark'; root.setAttribute('data-theme',n); try{localStorage.setItem('iio-theme',n);}catch(e){}});
+  // current document and heading in the index
+  if('IntersectionObserver' in window){
+    var navdocs={}; document.querySelectorAll('.navdoc').forEach(function(li){var a=li.querySelector('summary a'); navdocs[a.getAttribute('href').slice(1)]=li;});
+    var docObs=new IntersectionObserver(function(es){es.forEach(function(e){ if(e.isIntersecting){
+      Object.values(navdocs).forEach(function(li){li.classList.remove('current');});
+      var li=navdocs[e.target.id]; if(li){li.classList.add('current'); li.querySelector('details').open=true;}
+    }});},{rootMargin:'-40% 0px -55% 0px'});
+    document.querySelectorAll('.doc').forEach(function(s){docObs.observe(s);});
+    var links={}; document.querySelectorAll('.sub a').forEach(function(a){links[a.getAttribute('href').slice(1)]=a;});
+    var hObs=new IntersectionObserver(function(es){es.forEach(function(e){ if(e.isIntersecting && links[e.target.id]){
+      document.querySelectorAll('.sub a.active').forEach(function(a){a.classList.remove('active');});
+      links[e.target.id].classList.add('active');
+    }});},{rootMargin:'0px 0px -75% 0px'});
+    Object.keys(links).forEach(function(id){var h=document.getElementById(id); if(h) hObs.observe(h);});
+  }
+})();
+</script>
