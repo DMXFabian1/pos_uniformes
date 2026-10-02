@@ -2548,6 +2548,20 @@ class QuoteSatelliteWindow(QMainWindow):
             except Exception:  # noqa: BLE001
                 logger.exception("Préstamo: no se pudo avisar")
 
+    #: Motivos de préstamo a un toque. Amplios a propósito: el motivo es para
+    #: que Daniel decida, no para que ella cuente su vida por pedir prestado de
+    #: su propio sueldo. «Otra cosa» deja el renglón libre para escribirlo.
+    MOTIVOS_PRESTAMO = (
+        "Escuela",
+        "Doctor",
+        "Renta",
+        "Despensa",
+        "Un pago",
+        "Otra cosa",
+    )
+    #: El chip que no llena nada: abre el teclado para escribirlo.
+    MOTIVO_LIBRE = "Otra cosa"
+
     def _ask_prestamo(self, tope: Decimal) -> dict | None:
         """Formulario táctil: cuánto y para qué, con teclado en pantalla.
 
@@ -2585,26 +2599,85 @@ class QuoteSatelliteWindow(QMainWindow):
         monto_input.setPlaceholderText("0")
         ly.addWidget(monto_input)
 
+        # Las cantidades y los motivos son el mismo gesto: se ven igual.
+        _CHIP = (
+            "QPushButton { background: #ffffff; color: #2c2a27;"
+            "  border: 1.5px solid #ddd0c0; border-radius: 10px;"
+            "  min-height: 42px; padding: 0 8px; font-size: 15px; font-weight: 700; }"
+            "QPushButton:checked { background: #f7e3d8; color: #73341c;"
+            "  border: 2px solid #a84f2d; }"
+            "QPushButton:pressed { background: #f1e6d6; }"
+        )
+
         # Cantidades de siempre, para no teclear.
         chips = QHBoxLayout()
+        chips.setSpacing(6)
         cabe = [c for c in (200, 500, 1000, 1500, 2000) if Decimal(c) <= tope]
         for cantidad in cabe:
             chip = QPushButton(f"${cantidad:,}")
             chip.setAutoDefault(False)
+            chip.setStyleSheet(_CHIP)
             chip.clicked.connect(lambda _c=False, n=cantidad: monto_input.setText(str(n)))
             chips.addWidget(chip)
         # Su tope exacto, siempre: si no cabe ninguna de las de siempre, es la
         # única que puede tocar.
         todo = QPushButton(f"${tope:,.0f}")
         todo.setAutoDefault(False)
+        todo.setStyleSheet(_CHIP)
         todo.clicked.connect(lambda: monto_input.setText(f"{tope:.0f}"))
         chips.addWidget(todo)
         ly.addLayout(chips)
 
         ly.addWidget(QLabel("¿Para qué?"))
         motivo_input = QLineEdit()
-        motivo_input.setPlaceholderText("Ej. la renta, una emergencia, útiles...")
+        motivo_input.setPlaceholderText("Toca una opción o escríbelo")
         ly.addWidget(motivo_input)
+
+        # Motivos de un toque (Daniel, 02/10: "me dicen que no quieren escribir
+        # para qué"). Van en dos renglones de tres, marcables, con el mismo
+        # gesto que ya conocen de los gastos y de los ajustes del corte.
+        #
+        # El motivo se sigue pidiendo porque Daniel lo necesita para decidir —
+        # no es lo mismo la escuela que un imprevisto— pero pedirlo no tenía por
+        # qué costar un teclado en pantalla. Son a propósito amplios: nadie
+        # tiene que contar su vida para pedir prestado de su propio sueldo.
+        grupo_motivo = QButtonGroup(dlg)
+        grupo_motivo.setExclusive(True)
+        rejilla = QGridLayout()
+        rejilla.setSpacing(6)
+        for i, motivo_rapido in enumerate(self.MOTIVOS_PRESTAMO):
+            chip = QPushButton(motivo_rapido)
+            chip.setCheckable(True)
+            chip.setAutoDefault(False)
+            chip.setStyleSheet(_CHIP)
+            chip.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            if motivo_rapido == self.MOTIVO_LIBRE:
+                # «Otra cosa» no es un motivo: abre el renglón para escribirlo.
+                # Si lo llenara, a Daniel le llegaría «Otra cosa» y tendría que
+                # preguntar igual — que es justo lo que se quiere evitar.
+                chip.clicked.connect(
+                    lambda _c=False: (motivo_input.clear(), motivo_input.setFocus())
+                )
+            else:
+                chip.clicked.connect(
+                    lambda _c=False, t=motivo_rapido: motivo_input.setText(t)
+                )
+            grupo_motivo.addButton(chip)
+            rejilla.addWidget(chip, i // 3, i % 3)
+        ly.addLayout(rejilla)
+
+        # Escribir a mano suelta la marca: si no, se vería un chip encendido
+        # que ya no es lo que dice el renglón.
+        def _soltar_marca(_texto: str) -> None:
+            if any(b.text() == motivo_input.text() for b in grupo_motivo.buttons()):
+                return
+            marcado = grupo_motivo.checkedButton()
+            if marcado is not None:
+                grupo_motivo.setExclusive(False)
+                marcado.setChecked(False)
+                grupo_motivo.setExclusive(True)
+
+        motivo_input.textEdited.connect(_soltar_marca)
 
         botones = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -2635,8 +2708,10 @@ class QuoteSatelliteWindow(QMainWindow):
                     "llevas ganado. Si necesitas más, háblalo con Daniel.",
                 )
                 continue
-            if not motivo:
-                QMessageBox.information(dlg, "Préstamo", "Escribe para qué es.")
+            if not motivo or motivo.lower() == self.MOTIVO_LIBRE.lower():
+                QMessageBox.information(
+                    dlg, "Préstamo", "Toca para qué es, o escríbelo."
+                )
                 continue
             return {"monto": monto, "motivo": motivo}
 

@@ -241,3 +241,58 @@ class ElBotonDeLaLibretaTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ChipsDelMotivoTests(unittest.TestCase):
+    """«Me dicen que no quieren escribir para qué» (Daniel, 02/10).
+
+    El motivo se sigue pidiendo —Daniel lo necesita para decidir, no es lo
+    mismo la escuela que un imprevisto— pero pedirlo no tenía por qué costar un
+    teclado en pantalla con un cliente esperando.
+    """
+
+    def setUp(self) -> None:
+        self.codigo = _VENTANA.read_text(encoding="utf-8")
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        self.ventana = QuoteSatelliteWindow
+
+    def test_hay_motivos_de_un_toque(self) -> None:
+        self.assertGreaterEqual(len(self.ventana.MOTIVOS_PRESTAMO), 4)
+
+    def test_caben_en_renglones_de_tres(self) -> None:
+        # La rejilla es de tres columnas: una lista que no cuadra deja huecos.
+        self.assertEqual(len(self.ventana.MOTIVOS_PRESTAMO) % 3, 0)
+
+    def test_son_amplios_y_no_indiscretos(self) -> None:
+        # Nadie tiene que contar su vida para pedir prestado de su propio sueldo.
+        for motivo in self.ventana.MOTIVOS_PRESTAMO:
+            self.assertLessEqual(len(motivo), 12, motivo)
+
+    def test_otra_cosa_esta_entre_ellos(self) -> None:
+        self.assertIn(self.ventana.MOTIVO_LIBRE, self.ventana.MOTIVOS_PRESTAMO)
+
+    def test_otra_cosa_abre_el_renglon_en_vez_de_llenarlo(self) -> None:
+        # Si lo llenara, a Daniel le llegaría «Otra cosa» y tendría que
+        # preguntar igual — justo lo que se quiere evitar.
+        self.assertIn("motivo_input.clear(), motivo_input.setFocus()", self.codigo)
+
+    def test_otra_cosa_no_se_acepta_como_motivo(self) -> None:
+        self.assertIn('motivo.lower() == self.MOTIVO_LIBRE.lower()', self.codigo)
+
+    def test_escribir_a_mano_suelta_la_marca(self) -> None:
+        # Un chip encendido que ya no dice lo que dice el renglón miente.
+        self.assertIn("motivo_input.textEdited.connect(_soltar_marca)", self.codigo)
+
+    def test_el_motivo_sigue_siendo_obligatorio(self) -> None:
+        # Los chips lo hacen barato, no opcional: sin motivo no se autoriza.
+        self.assertIn("Toca para qué es, o escríbelo.", self.codigo)
+
+    def test_el_servicio_tambien_lo_exige(self) -> None:
+        # El candado de verdad no está en la pantalla.
+        with self.assertRaises(pr.NoSePuede):
+            engine = create_engine("sqlite:///:memory:")
+            Base.metadata.create_all(engine)
+            s = Session(engine)
+            with patch.object(pr, "ganado_hasta_hoy", return_value=Decimal("5000")):
+                pr.pedir(s, employee_code="VEND-5", nombre="Fanny", monto="100", motivo="  ")
