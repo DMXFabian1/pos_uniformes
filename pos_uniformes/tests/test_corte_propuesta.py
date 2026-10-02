@@ -214,3 +214,66 @@ class BotTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CerrarSoloTests(unittest.TestCase):
+    """Si no contestó y ya cerró, el corte se hace solo.
+
+    En el kiosko el botón del corte únicamente sale con el gafete de Daniel, así
+    que sin esto un día suyo fuera es un día sin corte: el cajón se acumula sin
+    registro y al volver no se sabe de qué día es cada peso.
+    """
+
+    HOY = date(2026, 10, 1)
+
+    def _propuesta(self, **cambios):
+        base = dict(
+            fecha=self.HOY,
+            momento=datetime(2026, 10, 1, 17, 30),
+            recordado=True,
+            cancelado=False,
+        )
+        base.update(cambios)
+        return prop.Propuesta(**base)
+
+    def _toca(self, propuesta=None, **cambios):
+        args = dict(
+            hoy=self.HOY,
+            minutos_tras_cierre=60,
+            hubo_corte_despues=False,
+            hubo_movimiento=True,
+        )
+        args.update(cambios)
+        return prop.toca_cerrar_solo(propuesta or self._propuesta(), **args)
+
+    def test_pasado_el_cierre_y_sin_contestar_se_hace(self) -> None:
+        self.assertTrue(self._toca())
+
+    def test_todavia_no_pasa_el_margen(self) -> None:
+        # Da tiempo a que conteste tras el recordatorio y a la última venta.
+        self.assertFalse(self._toca(minutos_tras_cierre=10))
+
+    def test_justo_en_el_margen_si(self) -> None:
+        self.assertTrue(self._toca(minutos_tras_cierre=prop.MINUTOS_DESPUES_DE_CERRAR))
+
+    def test_antes_de_cerrar_nunca(self) -> None:
+        self.assertFalse(self._toca(minutos_tras_cierre=-30))
+
+    def test_nocorte_se_respeta(self) -> None:
+        # Si dijo que hoy no, es que hoy no.
+        self.assertFalse(self._toca(self._propuesta(cancelado=True)))
+
+    def test_sin_recordatorio_todavia_no(self) -> None:
+        # Primero se le insiste; esto es el último eslabón, no el primero.
+        self.assertFalse(self._toca(self._propuesta(recordado=False)))
+
+    def test_si_ya_hay_corte_no_se_hace_otro(self) -> None:
+        self.assertFalse(self._toca(hubo_corte_despues=True))
+
+    def test_un_dia_sin_ventas_no_se_corta(self) -> None:
+        self.assertFalse(self._toca(hubo_movimiento=False))
+
+    def test_sin_propuesta_de_hoy_no_se_toca_nada(self) -> None:
+        # Si el camino normal no corrió (PC apagada a esa hora), no se improvisa.
+        self.assertFalse(self._toca(prop.Propuesta()))
+        self.assertFalse(self._toca(self._propuesta(fecha=date(2026, 9, 30))))

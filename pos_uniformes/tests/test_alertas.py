@@ -14,6 +14,28 @@ from sqlalchemy.orm import sessionmaker
 from pos_uniformes.database.models import AlertaTelegram, CajaRetiro, LibretaCorte, LibretaVenta
 from pos_uniformes.services import alertas_service as al
 
+#: El vigilante también revisa el respaldo, que vive en el disco. Este archivo
+#: no habla de respaldos, y sin esto cada test dependería de lo que haya en la
+#: carpeta de la máquina que lo corre: pasaría en la tienda y fallaría aquí.
+#: Los tests del respaldo lo vuelven a parchar con lo que les interesa.
+_PARCHE_RESPALDO = None
+
+
+def setUpModule() -> None:  # noqa: N802 — API de unittest
+    global _PARCHE_RESPALDO
+    from pos_uniformes.services import respaldo_estado_service as est
+
+    _PARCHE_RESPALDO = patch.object(
+        est, "leer_estado",
+        return_value=est.EstadoRespaldo(ultimo=datetime.now(timezone.utc), archivo=None),
+    )
+    _PARCHE_RESPALDO.start()
+
+
+def tearDownModule() -> None:  # noqa: N802 — API de unittest
+    if _PARCHE_RESPALDO is not None:
+        _PARCHE_RESPALDO.stop()
+
 
 def _sqlite(*tablas):
     engine = create_engine("sqlite://")

@@ -29,6 +29,10 @@ _CENT = Decimal("0.01")
 TOLERANCIA_DIFERENCIA = Decimal("50.00")
 # Minutos después del cierre para avisar que no hubo corte.
 MINUTOS_SIN_CORTE = 10
+
+#: A partir de qué hora se avisa del respaldo viejo. Un aviso a las 3 de la
+#: mañana se lee a las 9 ya mezclado con lo demás, o no se lee.
+HORA_AVISO_RESPALDO = 10
 MAX_INTENTOS = 5
 
 
@@ -151,6 +155,7 @@ class Vigilante:
 
     ultimo_id: int | None = None
     dia_sin_corte_avisado: date | None = None
+    dia_respaldo_avisado: date | None = None
     _apertura: object = field(default=None, repr=False)
 
     def revisar(self, session, ahora: datetime | None = None) -> list[str]:
@@ -159,6 +164,7 @@ class Vigilante:
         textos: list[str] = []
         textos += self._movimientos_fuera_de_horario(session, ahora)
         textos += self._cierre_sin_corte(session, ahora)
+        textos += self._respaldo_viejo(ahora)
         return textos
 
     def _movimientos_fuera_de_horario(self, session, ahora: datetime) -> list[str]:
@@ -204,6 +210,33 @@ class Vigilante:
         if not hubo_movimiento:
             return []
         return [texto_sin_corte(hoy, cierre)]
+
+
+    def _respaldo_viejo(self, ahora: datetime) -> list[str]:
+        """Avisa una vez al día si el último respaldo ya tiene días.
+
+        Esta vigilancia vive aquí, en el bot, y no en la tarea del respaldo, a
+        propósito: la tarea solo puede avisar de lo que le pasa mientras corre.
+        Si se borra, si la PC pasó días apagada, o si nunca se instaló, no falla
+        nada y por lo tanto no avisa nada — el silencio se ve igual que el
+        éxito. El bot lo nota desde fuera.
+        """
+        hoy = ahora.date()
+        if self.dia_respaldo_avisado == hoy:
+            return []
+        # Después de abrir: un aviso a las 3 de la mañana no lo lee nadie.
+        if ahora.hour < HORA_AVISO_RESPALDO:
+            return []
+        self.dia_respaldo_avisado = hoy
+        try:
+            from pos_uniformes.services import respaldo_estado_service as est
+
+            estado = est.leer_estado()
+            if estado.al_dia:
+                return []
+            return [est.texto_sin_respaldo(estado)]
+        except Exception:  # noqa: BLE001 — el vigilante nunca puede tumbar al bot
+            return []
 
 
 def procesar(session_factory, enviar, vigilante: Vigilante | None = None) -> int:

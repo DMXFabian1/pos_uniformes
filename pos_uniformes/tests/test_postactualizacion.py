@@ -11,13 +11,36 @@ from pos_uniformes.scripts import postactualizacion as post
 
 
 class TareasEsperadasTests(unittest.TestCase):
-    def test_sin_telegram_solo_el_supervisor(self) -> None:
+    #: Las que van siempre, con o sin Telegram, con o sin nada más.
+    BASE = ["POS Supervisor", "POS Supervisor check", "POS Respaldo"]
+
+    def test_sin_telegram_solo_el_supervisor_y_el_respaldo(self) -> None:
         nombres = [t.nombre for t in post.tareas_esperadas(hay_telegram=False, resumen_a_hora_fija=False)]
-        self.assertEqual(nombres, ["POS Supervisor", "POS Supervisor check"])
+        self.assertEqual(nombres, self.BASE)
+
+    def test_el_respaldo_no_depende_de_telegram(self) -> None:
+        # Es lo último que debería faltar en una PC con la base: si colgara de
+        # que Telegram esté configurado, una PC sin bot se quedaría sin respaldo.
+        for con_bot in (True, False):
+            nombres = [
+                t.nombre
+                for t in post.tareas_esperadas(hay_telegram=con_bot, resumen_a_hora_fija=False)
+            ]
+            self.assertIn("POS Respaldo", nombres)
+
+    def test_el_respaldo_es_diario_y_callado(self) -> None:
+        tarea = next(
+            t for t in post.tareas_esperadas(hay_telegram=True, resumen_a_hora_fija=False)
+            if t.nombre == "POS Respaldo"
+        )
+        self.assertIn("DAILY", tarea.schedule)
+        self.assertEqual(tarea.script, "respaldo_diario.bat")
+        # --callado: la tarea no puede quedarse esperando un "pause" para siempre.
+        self.assertEqual(tarea.args, ("--callado",))
 
     def test_con_telegram_agrega_resumen_y_pendientes(self) -> None:
         nombres = [t.nombre for t in post.tareas_esperadas(hay_telegram=True, resumen_a_hora_fija=False)]
-        self.assertEqual(nombres, ["POS Supervisor", "POS Supervisor check", "POS Resumen 1645", "POS Resumen 1745", "POS Pendientes", "POS Asistencia"])
+        self.assertEqual(nombres, self.BASE + ["POS Resumen 1645", "POS Resumen 1745", "POS Pendientes", "POS Asistencia"])
 
     def test_hora_fija_elegida_por_daniel_se_respeta(self) -> None:
         nombres = [t.nombre for t in post.tareas_esperadas(hay_telegram=True, resumen_a_hora_fija=True)]

@@ -5,12 +5,16 @@ decide si hoy toca a esa hora.
 
 Desde 2026-09-09 NO cierra la caja solo: manda a Telegram lo que hay y
 espera a que Daniel conteste `/corte` (o `/nocorte`). Con `--recordar` (20
-min después) se lo recuerda UNA vez si no contestó; si sigue sin contestar,
-la caja se queda sin corte y salta la alerta de "cierre sin corte".
+min después) se lo recuerda UNA vez si no contestó.
+
+Y con `--cerrar` (un rato después de cerrar la tienda) lo hace solo si siguió
+sin contestar — porque en el kiosko el botón del corte únicamente sale con su
+gafete, así que si él no está, nadie más puede cerrar el día.
 
 Uso:
     python -m pos_uniformes.scripts.corte_automatico             # propone por Telegram
     python -m pos_uniformes.scripts.corte_automatico --recordar  # recuerda una vez
+    python -m pos_uniformes.scripts.corte_automatico --cerrar    # lo hace si no contestó
     python -m pos_uniformes.scripts.corte_automatico --hacer     # lo hace sin preguntar
     python -m pos_uniformes.scripts.corte_automatico --forzar    # aunque no sea la hora
     python -m pos_uniformes.scripts.corte_automatico --simular   # solo dice qué haría
@@ -29,10 +33,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--simular", action="store_true", help="no guardar ni imprimir; solo decir qué haría")
     parser.add_argument("--hacer", action="store_true", help="cerrar e imprimir sin preguntar (comportamiento viejo)")
     parser.add_argument("--recordar", action="store_true", help="recordar una vez la propuesta sin contestar")
+    parser.add_argument("--cerrar", action="store_true", help="hacerlo solo si ya cerró y no contestó")
     args = parser.parse_args(argv)
 
     if args.recordar:
         return _recordar()
+    if args.cerrar:
+        return _cerrar_si_nadie_contesto(simular=args.simular)
 
     from pos_uniformes.database.connection import get_session
     from pos_uniformes.services.corte_caja_service import (
@@ -117,6 +124,72 @@ def _recordar() -> int:
     anotar_recordatorio()
     _mandar(mensaje)
     print(mensaje)
+    return 0
+
+
+def _cerrar_si_nadie_contesto(*, simular: bool = False) -> int:
+    """Hace el corte que quedó sin contestar, ya pasada la hora de cerrar.
+
+    Es el último eslabón: propuesta → recordatorio → esto. Solo actúa si todo
+    el camino normal pasó y él no contestó, y lo dice claramente para que no
+    parezca que la cifra la decidió alguien.
+    """
+    from pos_uniformes.database.connection import get_session
+    from pos_uniformes.services.corte_caja_service import estado_caja, ultimo_corte
+    from pos_uniformes.services.corte_propuesta_service import (
+        MINUTOS_DESPUES_DE_CERRAR,
+        leer,
+        toca_cerrar_solo,
+    )
+    from pos_uniformes.services.horario_tienda_service import AUTO_CODE, hora_cierre
+
+    ahora = datetime.now().astimezone()
+    propuesta = leer()
+    cierre = hora_cierre(ahora.date())
+    minutos = (
+        ahora - datetime.combine(ahora.date(), cierre).astimezone()
+    ).total_seconds() / 60
+
+    with get_session() as session:
+        previo = ultimo_corte(session)
+        hecho = (previo.hasta or previo.created_at) if previo else None
+        hubo_corte_despues = bool(
+            hecho and propuesta.momento and _local(hecho) >= _local(propuesta.momento)
+        )
+        estado = estado_caja(session, ahora)
+        hubo_movimiento = estado.resumen.operaciones > 0
+        if not toca_cerrar_solo(
+            propuesta,
+            hoy=ahora.date(),
+            minutos_tras_cierre=minutos,
+            hubo_corte_despues=hubo_corte_despues,
+            hubo_movimiento=hubo_movimiento,
+        ):
+            print(
+                "No toca cerrar solo "
+                f"(propuesta de {propuesta.fecha}, recordado={propuesta.recordado}, "
+                f"cancelado={propuesta.cancelado}, corte={hubo_corte_despues}, "
+                f"movimiento={hubo_movimiento}, {minutos:.0f} min tras cerrar; "
+                f"se esperan {MINUTOS_DESPUES_DE_CERRAR})."
+            )
+            return 0
+        if simular:
+            print(f"Haría el corte solo: venta ${estado.resumen.efectivo:,.2f}.")
+            return 0
+
+        from pos_uniformes.services.corte_remoto_service import hacer_corte_y_avisar
+
+        resultado = hacer_corte_y_avisar(session, creado_por=AUTO_CODE, ahora=ahora)
+
+    mensaje = (
+        "🌙 Cerré el día por ti: no contestaste la propuesta y en el kiosko "
+        "nadie más puede hacer el corte.\n\n"
+        + resultado.mensaje
+        + "\n\nEs la cifra real, sin ajustes. Si algo no cuadra, lo arreglas "
+        "desde «Cortes anteriores» cuando puedas."
+    )
+    print(mensaje)
+    _mandar(mensaje)
     return 0
 
 

@@ -44,7 +44,9 @@ from pathlib import Path
 #   4 = "POS Asistencia": la lista de quién vino, a las 11:00 (2026-09-12)
 #   5 = "POS Afluencia" (el contador de personas) también oculta; su instalador
 #       la creaba con consola visible "que había que dejar abierta" (2026-09-13)
-INFRA_VERSION = 6
+#   7 = "POS Respaldo" diaria a las 20:30. No existía ninguna tarea de respaldo:
+#       el runner estaba escrito y nadie lo disparaba (2026-10-01)
+INFRA_VERSION = 7
 
 # Tareas que ya no van (las crearon versiones anteriores).
 TAREAS_OBSOLETAS = (
@@ -84,6 +86,11 @@ def tareas_esperadas(*, hay_telegram: bool, resumen_a_hora_fija: bool, snapshot_
     tareas = [
         Tarea("POS Supervisor", ("/SC", "ONLOGON"), "supervisor.bat"),
         Tarea("POS Supervisor check", ("/SC", "MINUTE", "/MO", "30"), "supervisor.bat"),
+        # El respaldo (2026-10-01): run_scheduled_backup.py estaba escrito desde
+        # siempre y NADA lo corría — no había tarea ni instalador. Va aquí, con
+        # el supervisor, porque no depende de que Telegram o el corte existan:
+        # es lo último que debería faltar en una PC con la base.
+        Tarea("POS Respaldo", ("/SC", "DAILY", "/ST", "20:30"), "respaldo_diario.bat", ("--callado",)),
     ]
     if snapshot_casa:
         tareas.append(Tarea("POS Snapshot Casa", ("/SC", "MINUTE", "/MO", "15"), "enviar_snapshot_casa.bat"))
@@ -99,6 +106,10 @@ def tareas_esperadas(*, hay_telegram: bool, resumen_a_hora_fija: bool, snapshot_
         tareas.append(Tarea("POS Corte 1730", ("/SC", "DAILY", "/ST", "17:30"), "corte_automatico.bat"))
         tareas.append(Tarea("POS Corte recordatorio 1650", ("/SC", "DAILY", "/ST", "16:50"), "corte_automatico.bat", ("--recordar",)))
         tareas.append(Tarea("POS Corte recordatorio 1750", ("/SC", "DAILY", "/ST", "17:50"), "corte_automatico.bat", ("--recordar",)))
+        # Último eslabón (2026-10-01): si no contestó y ya cerró, el corte se
+        # hace solo. En el kiosko el botón del corte solo sale con el gafete de
+        # Daniel, así que sin esto un día suyo fuera es un día sin corte.
+        tareas.append(Tarea("POS Corte final", ("/SC", "DAILY", "/ST", "18:50"), "corte_automatico.bat", ("--cerrar",)))
     if hay_telegram and not resumen_a_hora_fija:
         # El resumen sale 15 min antes de cerrar; el script decide cuál toca.
         tareas.append(Tarea("POS Resumen 1645", ("/SC", "DAILY", "/ST", "16:45"), "resumen_diario_telegram.bat", ("--si-toca",)))

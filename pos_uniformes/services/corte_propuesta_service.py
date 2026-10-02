@@ -2,8 +2,17 @@
 
 A la hora del corte (30 min antes de cerrar) el sistema ya no cierra la caja
 solo: manda a Telegram lo que hay y espera a que Daniel conteste `/corte`.
-Si no contesta, se lo recuerda UNA vez; si sigue sin contestar, la caja se
-queda sin corte (y la alerta de "cierre sin corte" hace su trabajo).
+Si no contesta, se lo recuerda UNA vez.
+
+Y si después de cerrar sigue sin contestar, **el corte se hace solo** con la
+cifra real y se le dice (2026-10-01, antes de un viaje de una semana). Antes la
+caja se quedaba sin corte y la alerta de "cierre sin corte" avisaba — pero
+avisar desde lejos no hace el corte: el cajón se acumulaba sin registro y al
+volver no se sabía de qué día era cada peso. Un corte automático que él puede
+ajustar después es mejor que un día sin corte, porque el ajuste deja rastro y
+el hueco no.
+
+`/nocorte` se sigue respetando: si dijo que hoy no, no se hace.
 
 El estado vive en un JSON local de la PC servidor: no hace falta tabla nueva
 porque la propuesta solo importa el día que se hace.
@@ -84,6 +93,39 @@ def cancelar(hoy: date | None = None) -> bool:
         return False
     _guardar(Propuesta(p.fecha, p.momento, p.recordado, True))
     return True
+
+
+#: Cuánto se espera después de cerrar antes de hacer el corte sin él. Da tiempo
+#: a que conteste tras el recordatorio y a que termine la última venta.
+MINUTOS_DESPUES_DE_CERRAR = 45
+
+
+def toca_cerrar_solo(
+    p: Propuesta,
+    *,
+    hoy: date,
+    minutos_tras_cierre: float,
+    hubo_corte_despues: bool,
+    hubo_movimiento: bool,
+) -> bool:
+    """¿Hacer el corte sin que haya contestado? (puro, sin reloj ni DB)
+
+    Pide que todo el camino normal haya pasado primero: que hoy se haya
+    propuesto, que ya se le recordara, que no haya dicho `/nocorte`, que no
+    exista ya un corte, que haya habido movimiento, y que el cierre haya pasado
+    hace rato. Si falta cualquiera, no se toca nada.
+    """
+    if not p.hay or p.fecha != hoy:
+        return False          # hoy no se propuso: no es el camino normal
+    if p.cancelado:
+        return False          # dijo /nocorte
+    if not p.recordado:
+        return False          # todavía no se le ha insistido
+    if hubo_corte_despues:
+        return False          # ya hay corte
+    if not hubo_movimiento:
+        return False          # día sin ventas: nada que cortar
+    return minutos_tras_cierre >= MINUTOS_DESPUES_DE_CERRAR
 
 
 def toca_recordar(p: Propuesta, *, hoy: date, hubo_corte_despues: bool) -> bool:

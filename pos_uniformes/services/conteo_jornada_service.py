@@ -17,7 +17,7 @@ Reglas:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
 from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
@@ -722,11 +722,27 @@ def reasignar_jornada(session: Session, jornada: ConteoJornada, *, a_code: str, 
     return jornada
 
 
+def _a_local(momento: datetime) -> datetime:
+    """Pasa a hora local un momento que vino de la BASE. Sin zona = UTC.
+
+    Las columnas son `DateTime(timezone=True)`: Postgres devuelve con zona y
+    esto no cambia nada, pero el SQLite de las pruebas devuelve el UTC pelón.
+    Tomarlo por local daba fechas del futuro después de las 6 de la tarde —
+    «hoy» se volvía «02/10 05:35», y las pruebas se ponían rojas cada noche.
+
+    Solo para fechas de la base: una escrita a mano sin zona sí quiere decir
+    hora local, y por eso la normalización va aquí y no dentro de `UltimoConteo`.
+    """
+    if momento.tzinfo is None:
+        momento = momento.replace(tzinfo=timezone.utc)
+    return momento.astimezone()
+
+
 def cuando(momento: datetime | None) -> str:
     """'hoy 10:20' / 'ayer 16:05' / '08/09 12:40' para las tarjetas."""
     if momento is None:
         return ""
-    local = momento.astimezone() if momento.tzinfo else momento
+    local = _a_local(momento)
     hoy = datetime.now().date()
     dias = (hoy - local.date()).days
     hora = local.strftime("%H:%M")
@@ -876,10 +892,10 @@ def ultimos_conteos(session: Session) -> dict:
         quien = mostrar(nombre or code or "", nombres)
         if escuela_id is None and prenda:
             # Una prenda sola: cuenta para esa prenda Y como último toque al tipo.
-            salida.setdefault(("basicos", str(tipo_pieza or ""), str(prenda)), UltimoConteo(terminada, quien))
+            salida.setdefault(("basicos", str(tipo_pieza or ""), str(prenda)), UltimoConteo(_a_local(terminada), quien))
         clave = int(escuela_id) if escuela_id is not None else ("basicos", str(tipo_pieza or ""))
         if clave not in salida:
-            salida[clave] = UltimoConteo(terminada, quien)
+            salida[clave] = UltimoConteo(_a_local(terminada), quien)
     # 2. Conteos viejos (sin jornada): la talla contada más recientemente.
     viejos = session.execute(
         select(Producto.escuela_id, func.max(Variante.ultimo_conteo_at))
@@ -890,7 +906,7 @@ def ultimos_conteos(session: Session) -> dict:
     for escuela_id, fecha in viejos:
         clave = int(escuela_id)
         if clave not in salida and fecha is not None:
-            salida[clave] = UltimoConteo(fecha, "")
+            salida[clave] = UltimoConteo(_a_local(fecha), "")
     # 3. Básicos sin jornada: por prenda (nombre del producto) y por tipo.
     from pos_uniformes.database.models import TipoPieza
 
@@ -904,11 +920,11 @@ def ultimos_conteos(session: Session) -> dict:
     for tipo, prenda, fecha in viejos_basicos:
         if fecha is None:
             continue
-        salida.setdefault(("basicos", str(tipo), str(prenda)), UltimoConteo(fecha, ""))
+        salida.setdefault(("basicos", str(tipo), str(prenda)), UltimoConteo(_a_local(fecha), ""))
         clave_tipo = ("basicos", str(tipo))
         actual = salida.get(clave_tipo)
         if actual is None or (actual.fecha is not None and actual.quien == "" and _mas_nuevo(fecha, actual.fecha)):
-            salida[clave_tipo] = UltimoConteo(fecha, "")
+            salida[clave_tipo] = UltimoConteo(_a_local(fecha), "")
     return salida
 
 
