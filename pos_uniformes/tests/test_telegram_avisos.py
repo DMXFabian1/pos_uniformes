@@ -743,8 +743,12 @@ class SeCierraCuandoYaLoVieronTests(_BaseDB):
         self.assertFalse(cerrado)
 
     def test_el_mensaje_cierra_el_tema_cuando_ya_no_falta_nadie(self) -> None:
+        # `cerrado` lo dice el servicio, no se deduce de `faltan`: cuando no se
+        # puede saber cuántas pantallas hay, faltan llega en cero igual y el
+        # aviso NO se quitó.
         texto = av.aviso_de_acuse(
-            etiqueta="Junta", empleada="Evelyn", pantalla="Entrada", faltan=0
+            etiqueta="Junta", empleada="Evelyn", pantalla="Entrada",
+            faltan=0, cerrado=True,
         )
         self.assertIn("Ya lo vieron", texto)
         self.assertIn("se quitó", texto)
@@ -754,3 +758,180 @@ class SeCierraCuandoYaLoVieronTests(_BaseDB):
             etiqueta="Junta", empleada="Evelyn", pantalla="Entrada", faltan=2
         )
         self.assertIn("Faltan 2 pantallas", texto)
+
+
+class RevisionDeBugsTests(_BaseDB):
+    """Lo que salió al revisar anuncios a conciencia (02/10)."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        from datetime import datetime as _dt
+
+        ahora = _dt.now(timezone.utc)
+        self._pantallas = [
+            {"identificador": "s1", "nombre": "Entrada", "online": True,
+             "arroba": "@entrada", "ultimo_visto": ahora},
+            {"identificador": "s2", "nombre": "Caja 2", "online": True,
+             "arroba": "@caja2", "ultimo_visto": ahora},
+        ]
+
+    def _con_registro(self, pantallas=None):
+        from unittest.mock import patch
+
+        return patch(
+            "pos_uniformes.services.satelite_registry_service.listar_con_estado",
+            return_value=pantallas if pantallas is not None else self._pantallas,
+        )
+
+    # ── El acuse tiene que sobrevivir a que se apague el kiosko ──
+
+    def test_lo_ya_acusado_no_vuelve_en_el_cache(self) -> None:
+        # La cartelera recordaba los acusados SOLO en memoria, así que bastaba
+        # reiniciar el kiosko —cosa que pasa en cada publicación— para que el
+        # mismo recado le volviera a salir a quien ya lo había leído.
+        with self._con_registro():
+            av.mandar(self.session, "Junta a las 6")
+        aviso = asvc.listar_activos(self.session)[0]
+        asvc.marcar_visto(self.session, aviso.id, satelite="s1")
+        self.session.commit()
+        self.assertEqual(asvc.filas_para_cache(self.session, para="s1"), [])
+
+    def test_a_la_otra_pantalla_si_le_sigue_llegando(self) -> None:
+        with self._con_registro():
+            av.mandar(self.session, "Junta a las 6")
+        aviso = asvc.listar_activos(self.session)[0]
+        asvc.marcar_visto(self.session, aviso.id, satelite="s1")
+        self.session.commit()
+        filas = asvc.filas_para_cache(self.session, para="s2")
+        self.assertEqual([f["titulo"] for f in filas], ["Junta a las 6"])
+
+    def test_un_cartel_no_se_filtra_porque_nunca_se_acusa(self) -> None:
+        av.mandar(self.session, "Promoción", interrumpe=False)
+        self.assertEqual(len(asvc.filas_para_cache(self.session, para="s1")), 1)
+
+    # ── Una pantalla retirada no puede dejar el aviso colgado ──
+
+    def test_una_pantalla_que_lleva_meses_sin_aparecer_no_cuenta(self) -> None:
+        from datetime import datetime as _dt
+
+        muerta = dict(
+            identificador="s9", nombre="Kiosko viejo", online=False, arroba="@k",
+            ultimo_visto=_dt.now(timezone.utc) - timedelta(days=90),
+        )
+        with self._con_registro():
+            av.mandar(self.session, "Junta")
+        aviso = asvc.listar_activos(self.session)[0]
+        asvc.marcar_visto(self.session, aviso.id, satelite="s1")
+        asvc.marcar_visto(self.session, aviso.id, satelite="s2")
+        with self._con_registro(self._pantallas + [muerta]):
+            cerrado, faltan = asvc.cerrar_si_ya_lo_vieron(self.session, aviso.id)
+        self.assertTrue(cerrado, "un kiosko retirado dejó el aviso esperando para siempre")
+
+    def test_una_apagada_desde_ayer_si_cuenta(self) -> None:
+        # Apagada no es retirada: mañana la prenden y tiene que verlo.
+        from datetime import datetime as _dt
+
+        dormida = dict(
+            identificador="s3", nombre="Caja 3", online=False, arroba="@c3",
+            ultimo_visto=_dt.now(timezone.utc) - timedelta(days=1),
+        )
+        with self._con_registro():
+            av.mandar(self.session, "Junta")
+        aviso = asvc.listar_activos(self.session)[0]
+        asvc.marcar_visto(self.session, aviso.id, satelite="s1")
+        asvc.marcar_visto(self.session, aviso.id, satelite="s2")
+        with self._con_registro(self._pantallas + [dormida]):
+            cerrado, faltan = asvc.cerrar_si_ya_lo_vieron(self.session, aviso.id)
+        self.assertFalse(cerrado)
+        self.assertEqual(faltan, 1)
+
+    # ── El mensaje no puede decir que se quitó algo que sigue puesto ──
+
+    def test_no_dice_que_se_quito_si_no_se_quito(self) -> None:
+        texto = av.aviso_de_acuse(
+            etiqueta="Junta", empleada="Evelyn", pantalla="Entrada",
+            faltan=0, cerrado=False,
+        )
+        self.assertNotIn("se quitó", texto)
+        self.assertIn("Sigue puesto", texto)
+
+    def test_lo_dice_cuando_de_verdad_se_quito(self) -> None:
+        texto = av.aviso_de_acuse(
+            etiqueta="Junta", empleada="Evelyn", pantalla="Entrada",
+            faltan=0, cerrado=True,
+        )
+        self.assertIn("se quitó", texto)
+
+    def test_la_ventana_pasa_lo_que_de_verdad_paso(self) -> None:
+        from pathlib import Path
+
+        codigo = (
+            Path(__file__).resolve().parents[1] / "ui" / "quote_satellite_window.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("cerrado, faltan = asvc.cerrar_si_ya_lo_vieron", codigo)
+        self.assertIn("faltan=faltan, cerrado=cerrado,", codigo)
+
+
+class ComandosConBotonesTests(unittest.TestCase):
+    """`/avisos` decía «toca uno» y mandaba el texto pelón.
+
+    Los comandos siempre se contestaban sin botones, así que había que
+    acordarse de entrar por el menú — justo lo que el menú vino a evitar.
+    """
+
+    def setUp(self) -> None:
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.factory = sessionmaker(self.engine)
+
+    def test_avisos_contesta_con_botones(self) -> None:
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        bot.atender_texto("/aviso Junta", session_factory=self.factory)
+        texto, botones = bot.responder("/avisos", session_factory=self.factory)
+        self.assertIn("Junta", texto)
+        self.assertIn("av:ver:", botones)
+
+    def test_lo_que_promete_el_texto_existe(self) -> None:
+        # El texto invita a tocar: tiene que haber algo que tocar.
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        bot.atender_texto("/aviso Junta", session_factory=self.factory)
+        texto, botones = bot.responder("/avisos", session_factory=self.factory)
+        self.assertIn("Toca uno", texto)
+        self.assertTrue(botones)
+
+    def test_menu_tambien(self) -> None:
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        _texto, botones = bot.responder("/menu", session_factory=self.factory)
+        self.assertIn("m:avisos", botones)
+
+    def test_un_comando_normal_no_lleva_botones(self) -> None:
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        texto, botones = bot.responder("/ayuda", session_factory=self.factory)
+        self.assertIn("/aviso", texto)
+        self.assertEqual(botones, "")
+
+    def test_si_los_botones_truenan_se_contesta_igual(self) -> None:
+        # El adorno no puede dejar sin respuesta.
+        from unittest.mock import patch
+
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        with patch(
+            "pos_uniformes.services.telegram_avisos_service.texto_y_botones",
+            side_effect=RuntimeError("sin DB"),
+        ):
+            texto, botones = bot.responder("/avisos", session_factory=self.factory)
+        self.assertTrue(texto)
+        self.assertEqual(botones, "")
+
+    def test_el_bucle_del_bot_los_manda(self) -> None:
+        from pathlib import Path
+
+        codigo = (
+            Path(__file__).resolve().parents[1] / "services" / "telegram_bot_service.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn("botones=botones or None", codigo)

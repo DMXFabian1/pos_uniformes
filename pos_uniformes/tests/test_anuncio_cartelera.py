@@ -481,3 +481,41 @@ class SinBandasBlancasTests(unittest.TestCase):
         # «Enterada» quedaba invisible: letra vino sobre vino.
         hoja = self.overlay._botones.styleSheet()
         self.assertIn("#avisoBotones", hoja)
+
+
+class BugsEncontradosRevisandoTests(unittest.TestCase):
+    """Lo que salió al revisar anuncios a conciencia (02/10).
+
+    Los tres eran del mismo tipo: código que funcionaba en el orden en que lo
+    probé y no en el orden en que ocurre de verdad.
+    """
+
+    def setUp(self) -> None:
+        from pos_uniformes.ui.anuncio_overlay import AnuncioOverlay
+
+        self.parent = QWidget()
+        self.parent.resize(1280, 800)
+        self.overlay = AnuncioOverlay(self.parent)
+        self.overlay.setGeometry(self.parent.rect())
+
+    def tearDown(self) -> None:
+        self.parent.close()
+
+    def test_el_pie_se_descuenta_aunque_la_ventana_no_este_mostrada(self) -> None:
+        # La cartelera pinta y DESPUÉS muestra, así que al medir la foto la
+        # ventana está oculta e isVisible() siempre decía False.
+        self.overlay._message_label.setText("Así va el aparador")
+        self.overlay._message_label.setVisible(True)
+        self.overlay._pide_acuse = True
+        con_pie = self.overlay.area_para_imagen().height()
+        self.overlay._message_label.setVisible(False)
+        sin_pie = self.overlay.area_para_imagen().height()
+        self.assertLess(con_pie, sin_pie, "el pie de foto no se está descontando")
+
+    def test_la_ventana_oculta_no_cambia_la_cuenta(self) -> None:
+        self.overlay._message_label.setVisible(True)
+        oculta = self.overlay.area_para_imagen().height()
+        self.parent.show()
+        self.overlay.show()
+        mostrada = self.overlay.area_para_imagen().height()
+        self.assertEqual(oculta, mostrada)

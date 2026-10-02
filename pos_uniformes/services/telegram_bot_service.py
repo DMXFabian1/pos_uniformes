@@ -276,6 +276,40 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
     return f"No conozco /{cmd.nombre}. " + AYUDA
 
 
+#: Comandos cuya respuesta lleva botones. Sin esto, `/avisos` decía «toca uno
+#: para quitarlo» y mandaba el texto pelón: no había nada que tocar, y había
+#: que acordarse de entrar por el menú — justo lo que el menú vino a evitar.
+_CON_BOTONES = {
+    "avisos": ("pos_uniformes.services.telegram_avisos_service", "texto_y_botones"),
+    "prestamos": ("pos_uniformes.services.telegram_prestamos_service", "texto_y_botones"),
+    "préstamos": ("pos_uniformes.services.telegram_prestamos_service", "texto_y_botones"),
+    "menu": ("pos_uniformes.services.telegram_menu_service", "menu_raiz"),
+    "menú": ("pos_uniformes.services.telegram_menu_service", "menu_raiz"),
+}
+
+
+def responder(texto: str, *, session_factory, hoy: date | None = None) -> tuple[str, str]:
+    """(respuesta, botones) para un mensaje. Es lo que usa el bucle del bot.
+
+    `atender_texto` sigue devolviendo solo texto porque así se usa en mil
+    lados; aquí se le agregan los botones a los pocos comandos que los tienen.
+    """
+    cmd = parsear(texto)
+    destino = _CON_BOTONES.get(cmd.nombre) if cmd is not None else None
+    if destino is None:
+        return atender_texto(texto, session_factory=session_factory, hoy=hoy), ""
+    modulo, funcion = destino
+    try:
+        import importlib
+
+        hacer = getattr(importlib.import_module(modulo), funcion)
+        with session_factory() as session:
+            return hacer(session)
+    except Exception:  # noqa: BLE001 — sin botones se contesta igual
+        logger.exception("No se pudieron armar los botones de /%s", cmd.nombre)
+        return atender_texto(texto, session_factory=session_factory, hoy=hoy), ""
+
+
 def atender_foto(msg: dict, *, session_factory, token: str | None = None) -> str | None:
     """Una foto mandada al bot → aviso a pantalla completa. None si no hay foto.
 
@@ -415,6 +449,7 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
                 logger.info("Mensaje ignorado de chat %s", chat)
                 continue
             trae_foto = bool(telegram_service.foto_mas_grande(msg))
+            botones = ""
             if _es_viejo(msg):
                 logger.info("Mensaje viejo ignorado: %r", texto)
                 if trae_foto:
@@ -436,14 +471,18 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
                             msg, session_factory=session_factory, token=token
                         ) or ""
                     else:
-                        respuesta = atender_texto(texto, session_factory=session_factory)
+                        respuesta, botones = responder(
+                            texto, session_factory=session_factory
+                        )
                 except Exception as exc:  # noqa: BLE001
                     logger.exception("Error atendiendo %r", texto)
                     respuesta = f"Falló: {exc}"
                 if not respuesta:
                     continue
             try:
-                telegram_service.enviar_mensaje(respuesta, token=token, chat_id=chat_id)
+                telegram_service.enviar_mensaje(
+                    respuesta, token=token, chat_id=chat_id, botones=botones or None
+                )
             except Exception as exc:  # noqa: BLE001
                 logger.warning("No se pudo responder: %s", exc)
         if una_vez:

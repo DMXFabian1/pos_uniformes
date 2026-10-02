@@ -226,10 +226,26 @@ def filas_para_cache(session: Session, *, para: str | None = None) -> list[dict]
 
     Se usa desde el hilo de fondo del watchdog: baja los anuncios de la DB y los
     escribe al cache local para que la cartelera funcione aun sin conexión.
-    `para` (identificador de este satélite) filtra a los que le corresponden.
+    `para` (identificador de este satélite) filtra a los que le corresponden, y
+    **deja fuera los que esta pantalla ya acusó**.
+
+    Eso último no es un adorno: la cartelera recordaba los acusados en memoria,
+    así que bastaba reiniciar el kiosko —cosa que pasa cada vez que se publica
+    una versión— para que el mismo recado volviera a salirle a quien ya lo
+    había leído. Lo que se acusó tiene que quedar acusado al apagar la máquina.
     """
+    ya_vistos: set[int] = set()
+    if para:
+        ya_vistos = {
+            int(i)
+            for (i,) in session.execute(
+                select(AnuncioVisto.anuncio_id).where(AnuncioVisto.satelite == str(para))
+            ).all()
+        }
     filas: list[dict] = []
     for a in listar_activos(session, para=para):
+        if a.id in ya_vistos:
+            continue
         filas.append(
             {
                 "id": a.id,
@@ -366,10 +382,19 @@ def reponer(session: Session, anuncio_id: int, *, horas: float = 12.0) -> Anunci
 # ── Cuando ya lo vieron, el aviso terminó ────────────────────────────────────
 
 
+#: Una pantalla que lleva más de esto sin aparecer ya no cuenta para dar un
+#: aviso por visto. Un kiosko que se retiró o se descompuso seguía en la lista
+#: y dejaba el aviso esperando un acuse que no iba a llegar nunca.
+DIAS_PANTALLA_VIVA = 7
+
+
 def pantallas_esperadas(session: Session, anuncio: Anuncio) -> list[str]:
     """Identificadores de los satélites que deberían acusar este anuncio.
 
-    Con `destinos`, son esos. Sin destinos, son todos los satélites conocidos.
+    Con `destinos`, son esos. Sin destinos, los satélites que han dado señales
+    de vida en los últimos `DIAS_PANTALLA_VIVA` días — uno retirado hace meses
+    no puede dejar el aviso colgado.
+
     Lista vacía = no se pudo averiguar, y entonces no se cierra nada: más vale
     un aviso de más que uno que se apagó sin que nadie lo viera.
     """
@@ -378,7 +403,13 @@ def pantallas_esperadas(session: Session, anuncio: Anuncio) -> list[str]:
     try:
         from pos_uniformes.services import satelite_registry_service as rsvc
 
-        return [str(s["identificador"]) for s in rsvc.listar_con_estado(session)]
+        corte = datetime.now(timezone.utc) - timedelta(days=DIAS_PANTALLA_VIVA)
+        vivas = []
+        for sat in rsvc.listar_con_estado(session):
+            visto = _aware(sat.get("ultimo_visto"))
+            if visto is None or visto >= corte:
+                vivas.append(str(sat["identificador"]))
+        return vivas
     except Exception:  # noqa: BLE001
         return []
 

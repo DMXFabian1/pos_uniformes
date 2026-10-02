@@ -530,12 +530,19 @@ def atender(dato: str, *, session_factory) -> tuple[str, str, str]:
 
 
 def aviso_de_acuse(
-    *, etiqueta: str, empleada: str | None, pantalla: str | None, faltan: int | None = None
+    *,
+    etiqueta: str,
+    empleada: str | None,
+    pantalla: str | None,
+    faltan: int | None = None,
+    cerrado: bool = False,
 ) -> str:
     """El mensaje que recibe Daniel cuando tocan «Enterada» en una pantalla.
 
-    Cierra el tema cuando ya no falta nadie: así no se queda esperando otro
-    mensaje que no va a llegar.
+    `cerrado` es lo que de verdad pasó, no una deducción de `faltan`: cuando no
+    se puede saber cuántas pantallas hay, el aviso NO se quita y `faltan` llega
+    en cero igual. Decir «ya lo vieron, se quitó» en ese caso sería mentirle
+    sobre algo que sigue puesto en la tienda.
     """
     quien = (empleada or "Alguien").strip()
     donde = (pantalla or "").strip()
@@ -543,9 +550,11 @@ def aviso_de_acuse(
     if donde:
         linea += f" en {donde}"
     partes = [linea, "", f"«{etiqueta}»", ""]
-    if faltan:
+    if cerrado:
+        partes.append("Ya lo vieron todas. El aviso se quitó de las pantallas.")
+    elif faltan:
         verbo = "Falta" if faltan == 1 else "Faltan"
         partes.append(f"{verbo} {_plural(faltan, 'pantalla', 'pantallas')} por verlo.")
     else:
-        partes.append("Ya lo vieron. El aviso se quitó de las pantallas.")
+        partes.append("Sigue puesto. Para quitarlo: /avisos")
     return "\n".join(partes)

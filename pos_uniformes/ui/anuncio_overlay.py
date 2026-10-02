@@ -341,7 +341,11 @@ class AnuncioOverlay(QWidget):
         # abajo. Se descuenta por partes para que la foto llegue lo más grande
         # que quepa sin tapar nada.
         fraccion = 0.72 if self._pide_acuse else 0.86
-        if self._message_label.isVisible():
+        # isVisibleTo y no isVisible: `render_anuncio` corre ANTES de `show()`
+        # (la cartelera pinta y luego muestra), así que isVisible() siempre
+        # sería False aquí y el pie de foto nunca se descontaría — la imagen
+        # salía calculada más alta de lo que cabe.
+        if self._message_label.isVisibleTo(self):
             fraccion -= 0.08
         alto = max(1, int(self.height() * fraccion))
         return QSize(ancho, alto)

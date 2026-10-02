@@ -7452,6 +7452,7 @@ class QuoteSatelliteWindow(QMainWindow):
                 mi_id, mi_nombre = "", ""
             nuevo = False
             faltan = 0
+            cerrado = False
             try:
                 from pos_uniformes.services import anuncio_service as asvc
 
@@ -7465,7 +7466,7 @@ class QuoteSatelliteWindow(QMainWindow):
                         empleada=empleada,
                     )
                     # Si ya lo vieron en todas, el aviso terminó su trabajo.
-                    _cerrado, faltan = asvc.cerrar_si_ya_lo_vieron(session, int(anuncio_id))
+                    cerrado, faltan = asvc.cerrar_si_ya_lo_vieron(session, int(anuncio_id))
                     session.commit()
             except Exception:  # noqa: BLE001 — sin DB el acuse se pierde, no la venta
                 logger.exception("No se pudo guardar el acuse del aviso %s", anuncio_id)
@@ -7479,7 +7480,7 @@ class QuoteSatelliteWindow(QMainWindow):
                 enviar_mensaje(
                     av.aviso_de_acuse(
                         etiqueta=etiqueta, empleada=empleada, pantalla=mi_nombre,
-                        faltan=faltan,
+                        faltan=faltan, cerrado=cerrado,
                     )
                 )
             except Exception:  # noqa: BLE001 — sin internet el acuse igual quedó escrito
