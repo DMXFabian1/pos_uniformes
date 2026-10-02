@@ -7,6 +7,7 @@ Comandos:
     /nocorte      deja pasar el corte que se propuso hoy
     /estado       qué hay en caja ahora mismo
     /hoy          cómo va el día ahora mismo, en un vistazo
+    /pulso        ¿está todo en pie? la tienda entera en una pantalla
     /cortes       los últimos cortes, con lo que faltó o sobró
     /resumen      el resumen del día (el mismo de la noche)
     /pendientes   lo que falta por registrar
@@ -50,6 +51,7 @@ AYUDA = (
     "   (se pueden juntar: /corte 5000 sintarjeta)\n"
     "/nocorte — dejar pasar el corte propuesto hoy\n"
     "/estado — qué hay en caja ahora\n"
+    "/pulso — ¿está todo en pie? la tienda entera en una pantalla\n"
     "/hoy — cómo va el día ahora mismo\n"
     "/resumen — resumen del día (el de la noche, completo)\n"
     "/pendientes — lo que falta por registrar\n"
@@ -182,7 +184,19 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
                 a.nombre for a in asis.asistencia_del_dia(session, hoy)
                 if a.estado == asis.PRESENTE
             ]
-            return texto_hoy(datos, quien_esta=estan)
+            texto = texto_hoy(datos, quien_esta=estan)
+            try:
+                from pos_uniformes.services import comparativa_service as comp
+
+                linea = comp.texto(comp.comparar(session, hoy))
+            except Exception:  # noqa: BLE001 — el día sale igual sin comparación
+                linea = ""
+            return texto + (f"\n\n{linea}" if linea else "")
+    if cmd.nombre in ("pulso", "pulse", "todo"):
+        from pos_uniformes.services.telegram_pulso_service import pulso
+
+        with session_factory() as session:
+            return pulso(session, hoy=hoy)
     if cmd.nombre == "pendientes":
         from pos_uniformes.services.resumen_diario_service import texto_solo_pendientes
 

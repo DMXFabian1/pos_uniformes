@@ -118,6 +118,7 @@ POS_UNIFORMES_DB_HOST=localhost ./pos_uniformes/.venv/bin/python mapas_escuelas/
 | `/corte 5000` | El mismo corte, retirando $5,000 |
 | `/corte sintarjeta` | Sin que se vean los cobros con tarjeta *(se juntan: `/corte 5000 sintarjeta`)* |
 | `/nocorte` | Dejar pasar el corte propuesto de hoy |
+| **`/pulso`** | **¿Está todo en pie? La tienda entera en una pantalla** (2026-10-02) |
 | `/estado` | Qué hay en caja ahora |
 | `/resumen` | Resumen del día |
 | `/pendientes` | Lo que falta por registrar |

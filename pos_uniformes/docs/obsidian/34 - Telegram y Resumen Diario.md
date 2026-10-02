@@ -333,6 +333,65 @@ sueldo (hay un test que los limita a doce letras).
 «Otra cosa» **no llena el renglón: lo abre**. Si lo llenara, a Daniel le
 llegaría «Para: Otra cosa» y tendría que preguntar igual.
 
+## `/pulso` y la comparación (2026-10-02)
+
+Daniel: *"perfeccionemos el bot, ¿tú qué crees que le haga falta?"*. La
+respuesta no eran más comandos: al bot le faltaba **juicio**. Daba cifras y
+ninguna manera de juzgarlas.
+
+### `/pulso` — ¿está todo en pie?
+
+Para contestar esa pregunta había que mandar `/hoy`, `/cortes`, `/asistencia`,
+acordarse del respaldo y adivinar si los kioskos estaban prendidos: cinco
+comandos y una corazonada. Ahora es una pantalla:
+
+```
+🫀 La tienda ahora — 02/10 12:24
+
+⚠️ Abierta · nadie ha movido nada todavía
+· Vendido: $0.00
+   ↓ 100% abajo de un viernes normal a esta hora ($3,958)
+⚠️ Último corte: hace 12 días
+
+⚠️ Pantallas: 0 de 3 · apagada: Entrada, Caja 2
+✅ Respaldo: hoy
+
+✅ Nada esperando tu respuesta
+```
+
+Junta lo que se construyó en la semana: respaldo, pantallas, préstamos, avisos.
+
+| Regla | Por qué |
+|---|---|
+| Cada renglón se gana su marca (✅ / ⚠️ / ·) | Se lee de un vistazo sin entender ninguna cifra |
+| Lo que no se pudo averiguar **se dice** | Un `/pulso` que calla lo que no sabe enseña a confiar de más |
+| Cada bloque es independiente **con rollback** | En Postgres una consulta fallida deja la transacción abortada y **todo lo que sigue falla también**. Sin el rollback, un bloque malo se llevaba la vista entera |
+
+Lo del rollback salió corriéndolo contra la base real, no leyendo.
+
+### Comparar: `$4,200` ¿es bueno?
+
+`services/comparativa_service.py`. Dos decisiones que hacen que valga:
+
+1. **Contra el mismo día de la semana** (4 semanas atrás). Una tienda de
+   uniformes no vende igual lunes que sábado; comparar contra "ayer" habla del
+   calendario, no del negocio.
+2. **Hasta la misma hora.** A las 11 llevas dos horas de venta; compararlas
+   contra un día completo diría que vas hundido **siempre**, y un bot que solo
+   da malas noticias se ignora.
+
+Los días sin venta (cerrado, festivo) se saltan: promediar un cero convierte un
+día bueno en uno malo. Debajo del 8% se dice «como un viernes normal» — fingir
+precisión en el ±3% es inventar una señal donde solo hay ruido.
+
+> [!warning] Un test atrapó un defecto de diseño
+> «El mejor viernes del mes» se anunciaba por ganar un 3%. Eso es ruido, y
+> anunciarlo así enseña a no creerle al bot — y entonces tampoco se le cree el
+> día que sí pasa algo. Ahora la banda de «normal» se evalúa primero, y cuando
+> sí destaca se dicen **las dos cosas**: que es el mejor y por cuánto.
+
+`/hoy` también la trae. Tests: `test_comparativa` (11) · `test_pulso` (13).
+
 ## Infraestructura
 
 | Pieza | Archivo |
