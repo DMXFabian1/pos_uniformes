@@ -532,18 +532,20 @@ def atender(dato: str, *, session_factory) -> tuple[str, str, str]:
 def aviso_de_acuse(
     *, etiqueta: str, empleada: str | None, pantalla: str | None, faltan: int | None = None
 ) -> str:
-    """El mensaje que recibe Daniel cuando tocan «Enterada» en una pantalla."""
+    """El mensaje que recibe Daniel cuando tocan «Enterada» en una pantalla.
+
+    Cierra el tema cuando ya no falta nadie: así no se queda esperando otro
+    mensaje que no va a llegar.
+    """
     quien = (empleada or "Alguien").strip()
     donde = (pantalla or "").strip()
     linea = f"✅ {quien} vio el aviso"
     if donde:
         linea += f" en {donde}"
-    partes = [linea, "", f"«{etiqueta}»"]
+    partes = [linea, "", f"«{etiqueta}»", ""]
     if faltan:
-        partes.append("")
-        partes.append(
-            f"Falta {_plural(faltan, 'pantalla', 'pantallas')} por verlo."
-            if faltan > 0
-            else ""
-        )
-    return "\n".join(x for x in partes if x is not None)
+        verbo = "Falta" if faltan == 1 else "Faltan"
+        partes.append(f"{verbo} {_plural(faltan, 'pantalla', 'pantallas')} por verlo.")
+    else:
+        partes.append("Ya lo vieron. El aviso se quitó de las pantallas.")
+    return "\n".join(partes)

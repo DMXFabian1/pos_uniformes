@@ -654,3 +654,103 @@ class FotoTests(unittest.TestCase):
         self.assertIn("No pude usar esa imagen", respuesta)
         with self.factory() as session:
             self.assertEqual(asvc.listar_activos(session), [])
+
+
+class SeCierraCuandoYaLoVieronTests(_BaseDB):
+    """Un aviso es un recado, no un cartel: cuando llegó, terminó.
+
+    Daniel (02/10): "una vez que ponen enterada, debería de ya no salir de
+    nuevo, solo que me avise que ya se enteraron y ya".
+    """
+
+    def setUp(self) -> None:
+        super().setUp()
+        self._pantallas = [
+            {"identificador": "s1", "nombre": "Entrada", "online": True, "arroba": "@entrada"},
+            {"identificador": "s2", "nombre": "Caja 2", "online": True, "arroba": "@caja2"},
+        ]
+
+    def _con_registro(self):
+        from unittest.mock import patch
+
+        return patch(
+            "pos_uniformes.services.satelite_registry_service.listar_con_estado",
+            return_value=self._pantallas,
+        )
+
+    def _aviso(self, **extra):
+        a = asvc.crear_anuncio(self.session, titulo="Junta a las 6", pide_acuse=True, **extra)
+        self.session.commit()
+        return a
+
+    def test_con_una_pantalla_que_falta_no_se_cierra(self) -> None:
+        a = self._aviso()
+        asvc.marcar_visto(self.session, a.id, satelite="s1")
+        with self._con_registro():
+            cerrado, faltan = asvc.cerrar_si_ya_lo_vieron(self.session, a.id)
+        self.assertFalse(cerrado)
+        self.assertEqual(faltan, 1)
+        self.assertTrue(a.activo)
+
+    def test_cuando_todas_vieron_se_apaga(self) -> None:
+        a = self._aviso()
+        asvc.marcar_visto(self.session, a.id, satelite="s1")
+        asvc.marcar_visto(self.session, a.id, satelite="s2")
+        with self._con_registro():
+            cerrado, faltan = asvc.cerrar_si_ya_lo_vieron(self.session, a.id)
+        self.session.commit()
+        self.assertTrue(cerrado)
+        self.assertEqual(faltan, 0)
+        self.assertEqual(asvc.listar_activos(self.session), [])
+
+    def test_uno_dirigido_se_cierra_con_esa_sola(self) -> None:
+        # Si va solo a Caja 2, no tiene que esperar a Entrada.
+        a = self._aviso(destinos=["s2"])
+        asvc.marcar_visto(self.session, a.id, satelite="s2")
+        with self._con_registro():
+            cerrado, _ = asvc.cerrar_si_ya_lo_vieron(self.session, a.id)
+        self.assertTrue(cerrado)
+
+    def test_sin_saber_cuantas_pantallas_hay_no_se_apaga_nada(self) -> None:
+        # Más vale un aviso de más que uno apagado sin que nadie lo viera.
+        from unittest.mock import patch
+
+        a = self._aviso()
+        asvc.marcar_visto(self.session, a.id, satelite="s1")
+        with patch(
+            "pos_uniformes.services.satelite_registry_service.listar_con_estado",
+            side_effect=OSError("sin DB"),
+        ):
+            cerrado, faltan = asvc.cerrar_si_ya_lo_vieron(self.session, a.id)
+        self.assertFalse(cerrado)
+        self.assertTrue(a.activo)
+
+    def test_cerrar_uno_ya_apagado_no_hace_nada(self) -> None:
+        a = self._aviso()
+        asvc.desactivar(self.session, a.id)
+        self.session.commit()
+        with self._con_registro():
+            self.assertEqual(asvc.cerrar_si_ya_lo_vieron(self.session, a.id), (False, 0))
+
+    def test_el_cartel_no_entra_en_esto(self) -> None:
+        # El que no pide acuse no se acusa, así que nunca se cierra solo:
+        # se queda hasta que vence o lo quitas. Para eso existe.
+        av.mandar(self.session, "Promoción", interrumpe=False)
+        cartel = asvc.listar_activos(self.session)[0]
+        self.assertFalse(cartel.pide_acuse)
+        with self._con_registro():
+            cerrado, _ = asvc.cerrar_si_ya_lo_vieron(self.session, cartel.id)
+        self.assertFalse(cerrado)
+
+    def test_el_mensaje_cierra_el_tema_cuando_ya_no_falta_nadie(self) -> None:
+        texto = av.aviso_de_acuse(
+            etiqueta="Junta", empleada="Evelyn", pantalla="Entrada", faltan=0
+        )
+        self.assertIn("Ya lo vieron", texto)
+        self.assertIn("se quitó", texto)
+
+    def test_el_mensaje_dice_cuantas_faltan(self) -> None:
+        texto = av.aviso_de_acuse(
+            etiqueta="Junta", empleada="Evelyn", pantalla="Entrada", faltan=2
+        )
+        self.assertIn("Faltan 2 pantallas", texto)

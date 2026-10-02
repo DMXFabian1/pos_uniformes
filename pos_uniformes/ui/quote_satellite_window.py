@@ -2530,16 +2530,20 @@ class QuoteSatelliteWindow(QMainWindow):
         en la cola de alertas."""
         from pos_uniformes.services import telegram_prestamos_service as prs
 
-        texto = prs.aviso_de_solicitud(prestamo)
+        texto = prs.aviso_de_solicitud(prestamo, session=session)
         try:
             from pos_uniformes.services.telegram_service import enviar_mensaje
 
-            enviar_mensaje(texto)
+            # Con sus botones: se decide desde el aviso mismo, sin tener que
+            # acordarse de /prestamos ni volver a buscar de quién era.
+            enviar_mensaje(texto, botones=prs.botones_de(prestamo))
         except Exception:  # noqa: BLE001
             try:
                 from pos_uniformes.services.alertas_service import encolar
 
-                encolar(session, texto)
+                # La cola manda texto pelón (no lleva botones), así que ahí sí
+                # se dice cómo contestar: es el camino de cuando no hubo señal.
+                encolar(session, texto + "\n\nPara responder: /prestamos")
                 session.commit()
             except Exception:  # noqa: BLE001
                 logger.exception("Préstamo: no se pudo avisar")
@@ -7372,6 +7376,7 @@ class QuoteSatelliteWindow(QMainWindow):
             except Exception:  # noqa: BLE001
                 mi_id, mi_nombre = "", ""
             nuevo = False
+            faltan = 0
             try:
                 from pos_uniformes.services import anuncio_service as asvc
 
@@ -7384,6 +7389,8 @@ class QuoteSatelliteWindow(QMainWindow):
                         satelite_nombre=mi_nombre,
                         empleada=empleada,
                     )
+                    # Si ya lo vieron en todas, el aviso terminó su trabajo.
+                    _cerrado, faltan = asvc.cerrar_si_ya_lo_vieron(session, int(anuncio_id))
                     session.commit()
             except Exception:  # noqa: BLE001 — sin DB el acuse se pierde, no la venta
                 logger.exception("No se pudo guardar el acuse del aviso %s", anuncio_id)
@@ -7396,7 +7403,8 @@ class QuoteSatelliteWindow(QMainWindow):
 
                 enviar_mensaje(
                     av.aviso_de_acuse(
-                        etiqueta=etiqueta, empleada=empleada, pantalla=mi_nombre
+                        etiqueta=etiqueta, empleada=empleada, pantalla=mi_nombre,
+                        faltan=faltan,
                     )
                 )
             except Exception:  # noqa: BLE001 — sin internet el acuse igual quedó escrito

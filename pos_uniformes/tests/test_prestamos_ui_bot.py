@@ -56,7 +56,94 @@ class ElAvisoTest(_Base):
         self.assertIn("Fanny Ortiz", texto)
         self.assertIn("$1,500.00", texto)
         self.assertIn("para la renta", texto)
-        self.assertIn("/prestamos", texto)
+
+    def test_trae_con_que_decidir(self):
+        # Daniel (02/10): "no es muy claro el mensaje". Decidir un préstamo es
+        # comparar el monto con lo que lleva ganado y lo que ya debe; sin esas
+        # cifras hay que ir a buscarlas a otro lado, con el teléfono en la mano.
+        texto = prs.aviso_de_solicitud(self._pedir(), session=self.s)
+        self.assertIn("Lleva ganado", texto)
+        self.assertIn("Puede pedir hasta", texto)
+        self.assertIn("Le quedarían", texto)
+
+    def test_dice_lo_que_pasa_si_lo_aprueba(self):
+        texto = prs.aviso_de_solicitud(self._pedir(), session=self.s)
+        self.assertIn("sale del cajón", texto)
+        self.assertIn("siguiente pago", texto)
+
+    def test_no_habla_de_deudas_porque_no_puede_haberlas(self):
+        # `pedir` no la deja pedir si ya tiene algo por cobrar, así que al
+        # llegar este aviso siempre debe cero. Decir "Ya debe: $0.00" sería
+        # ruido que invita a dudar de una cifra que no puede ser otra.
+        texto = prs.aviso_de_solicitud(self._pedir(), session=self.s)
+        self.assertNotIn("Ya debe", texto)
+
+    def test_sin_sesion_el_aviso_sale_igual(self):
+        # El adorno no puede impedir que el recado llegue.
+        texto = prs.aviso_de_solicitud(self._pedir())
+        self.assertIn("Fanny Ortiz", texto)
+        self.assertNotIn("Lleva ganado", texto)
+
+    def test_si_las_cifras_truenan_el_aviso_sigue_saliendo(self):
+        p = self._pedir()
+        with patch.object(pr, "ganado_hasta_hoy", side_effect=RuntimeError("sin DB")):
+            texto = prs.aviso_de_solicitud(p, session=self.s)
+        self.assertIn("Fanny Ortiz", texto)
+        self.assertNotIn("Lleva ganado", texto)
+
+
+class LosBotonesDelAvisoTest(_Base):
+    """Se decide desde el aviso mismo, sin acordarse de ningún comando."""
+
+    def test_el_aviso_trae_aprobar_y_rechazar(self):
+        p = self._pedir()
+        botones = json.loads(prs.botones_de(p))
+        datos = [b["callback_data"] for fila in botones["inline_keyboard"] for b in fila]
+        self.assertIn(f"pr:ok:{p.id}", datos)
+        self.assertIn(f"pr:no:{p.id}", datos)
+
+    def test_el_boton_dice_a_quien_se_le_presta(self):
+        # Con varios avisos en el chat, "Aprobar" a secas no dice de cuál.
+        botones = json.loads(prs.botones_de(self._pedir()))
+        etiquetas = [b["text"] for fila in botones["inline_keyboard"] for b in fila]
+        self.assertTrue(any("Fanny" in e for e in etiquetas))
+
+    def test_los_botones_son_de_ESA_solicitud(self):
+        # Con dos avisos en el chat, el de una no puede aprobar el de la otra.
+        self.s.add(Empleada(codigo="VEND-3", nombre_completo="Evelyn Ortiz", activo=True))
+        self.s.flush()
+        uno = self._pedir(monto="100")
+        otro = pr.pedir(
+            self.s, employee_code="VEND-3", nombre="Evelyn Ortiz",
+            monto="200", motivo="otra",
+        )
+        self.s.flush()
+        datos = [
+            b["callback_data"]
+            for fila in json.loads(prs.botones_de(uno))["inline_keyboard"]
+            for b in fila
+        ]
+        self.assertIn(f"pr:ok:{uno.id}", datos)
+        self.assertNotIn(f"pr:ok:{otro.id}", datos)
+
+    def test_tocar_el_boton_del_aviso_aprueba(self):
+        p = self._pedir()
+        aviso, texto, _ = prs.atender(
+            f"pr:ok:{p.id}", session_factory=_Sesion(self.s), quien="VEND-1"
+        )
+        self.assertEqual(aviso, "Aprobado")
+        self.assertEqual(self.s.get(PrestamoEmpleada, p.id).estado, pr.APROBADO)
+
+    def test_la_ventana_manda_el_aviso_con_sus_botones(self):
+        # El enganche: sin esto el mensaje llega pelón y hay que ir a /prestamos.
+        codigo = _VENTANA.read_text(encoding="utf-8")
+        self.assertIn("botones=prs.botones_de(prestamo)", codigo)
+        self.assertIn("aviso_de_solicitud(prestamo, session=session)", codigo)
+
+    def test_por_la_cola_si_se_dice_como_responder(self):
+        # La cola de alertas manda texto pelón: ahí los botones no viajan.
+        codigo = _VENTANA.read_text(encoding="utf-8")
+        self.assertIn("Para responder: /prestamos", codigo)
 
 
 class LaPantallaDelCelularTest(_Base):

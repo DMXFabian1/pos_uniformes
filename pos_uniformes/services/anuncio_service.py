@@ -361,3 +361,48 @@ def reponer(session: Session, anuncio_id: int, *, horas: float = 12.0) -> Anunci
     viejo.activo = False
     session.flush()
     return nuevo
+
+
+# ── Cuando ya lo vieron, el aviso terminó ────────────────────────────────────
+
+
+def pantallas_esperadas(session: Session, anuncio: Anuncio) -> list[str]:
+    """Identificadores de los satélites que deberían acusar este anuncio.
+
+    Con `destinos`, son esos. Sin destinos, son todos los satélites conocidos.
+    Lista vacía = no se pudo averiguar, y entonces no se cierra nada: más vale
+    un aviso de más que uno que se apagó sin que nadie lo viera.
+    """
+    if anuncio.destinos:
+        return [str(d) for d in anuncio.destinos]
+    try:
+        from pos_uniformes.services import satelite_registry_service as rsvc
+
+        return [str(s["identificador"]) for s in rsvc.listar_con_estado(session)]
+    except Exception:  # noqa: BLE001
+        return []
+
+
+def cerrar_si_ya_lo_vieron(session: Session, anuncio_id: int) -> tuple[bool, int]:
+    """Apaga el aviso si ya lo acusaron todas las pantallas. (cerrado, faltan).
+
+    Daniel (02/10): "una vez que ponen enterada, debería de ya no salir de
+    nuevo, solo que me avise que ya se enteraron y ya". Un aviso es un recado,
+    no un cartel: cuando llegó a quien tenía que llegar, su trabajo terminó.
+    Lo que sí se queda puesto es el cartel (`/cartel`), que para eso existe.
+
+    No hace commit.
+    """
+    anuncio = session.get(Anuncio, int(anuncio_id))
+    if anuncio is None or not anuncio.activo:
+        return False, 0
+    esperadas = pantallas_esperadas(session, anuncio)
+    if not esperadas:
+        return False, 0
+    vistas = {str(v.satelite) for v in quien_vio(session, anuncio.id) if v.satelite}
+    faltan = [p for p in esperadas if p not in vistas]
+    if faltan:
+        return False, len(faltan)
+    anuncio.activo = False
+    session.flush()
+    return True, 0

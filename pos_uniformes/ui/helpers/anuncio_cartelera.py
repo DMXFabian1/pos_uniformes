@@ -95,7 +95,10 @@ class AnuncioCartelera(QObject):
         sigue habiendo, reinicia la rotación desde el principio para no quedar
         en un índice inválido.
         """
-        self._anuncios = list(anuncios or [])
+        # Lo ya acusado aquí no vuelve, aunque siga activo para otras pantallas.
+        self._anuncios = [
+            a for a in (anuncios or []) if a.get("id") not in self._acusados
+        ]
         if self._en_cartelera:
             if not self._anuncios:
                 self._cerrar_overlay()
@@ -190,6 +193,11 @@ class AnuncioCartelera(QObject):
         anuncio_id = anuncio.get("id")
         if anuncio_id is not None:
             self._acusados.add(anuncio_id)
+            # Y se va de la cartelera de esta pantalla. Antes solo dejaba de
+            # pedir acuse y seguía rotando como anuncio común, así que el mismo
+            # recado volvía a salir toda la tarde (Daniel, 02/10: "ya no salir
+            # de nuevo, solo que me avise que ya se enteraron y ya").
+            self._anuncios = [a for a in self._anuncios if a.get("id") != anuncio_id]
         self._ultima_actividad = self._now()
         self._cerrar_overlay()
         if self._al_acusar_cb is not None:
