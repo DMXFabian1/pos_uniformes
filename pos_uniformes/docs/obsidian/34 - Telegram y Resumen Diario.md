@@ -392,6 +392,50 @@ precisión en el ±3% es inventar una señal donde solo hay ruido.
 
 `/hoy` también la trae. Tests: `test_comparativa` (11) · `test_pulso` (13).
 
+## El bot iba lento: era el saludo TLS (2026-10-02)
+
+Daniel: *"el bot funciona algo lento en telegram"*. Primero se midieron los
+comandos contra una base real, y **ninguno era el problema**:
+
+```
+/ayuda 0 ms · /cortes 3 ms · /avisos 3 ms · /pagos 11 ms · /pulso 14 ms
+/menu 24 ms · /hoy 38 ms · /estado 153 ms · /contar 173 ms
+```
+
+El costo estaba en la red. `_llamar` abría una **conexión nueva en cada
+llamada**, o sea un saludo TLS completo cada vez. Medido desde la Mac:
+
+| | por llamada |
+|---|---|
+| Conexión nueva cada vez | **571 ms** |
+| Conexión reutilizada | **182 ms** |
+
+Un 68% menos **en una red buena**. En la de la tienda —WiFi, con pérdida— un
+saludo TLS son varias idas y vueltas más, así que la diferencia es mayor. Y el
+bot hace una llamada por cada cosa que contesta.
+
+Ahora usa un `PoolManager` de urllib3 **con nuestro mismo contexto TLS**, el que
+confía en el certificado del antivirus. Eso era lo delicado: `requests` con su
+propio paquete de certificados habría roto la tienda.
+
+> [!tip] Red de seguridad
+> Este es el único camino por el que habla el bot, y romperlo sería dejarlo mudo
+> con Daniel de viaje. Si el camino rápido falla por cualquier motivo que no sea
+> el certificado, la llamada se hace por urllib como siempre y nadie se entera.
+
+### Dos bugs que atraparon los tests, uno de ellos viejo
+
+1. **`urlopen` guarda la causa en `.reason`**, no en la cadena de excepciones.
+   Sin mirar ahí, el error del certificado se perdía y no se reintentaba sin
+   verificar — el bot mudo en la tienda. Lo atrapó un test que ya existía.
+2. **No hay que seguir `__context__`.** Es «qué se estaba atendiendo cuando
+   esto se lanzó», no «qué lo causó». Siguiéndolo, un error cualquiera lanzado
+   dentro del `except` del certificado heredaba su causa y se daba por
+   certificado también, y el reintento se quedaba dando vueltas.
+
+`telegram_service._pedir` / `_obtener_pool` / `_es_de_certificado` ·
+`ConexionReutilizadaTests` en `test_resumen_diario`.
+
 ## Infraestructura
 
 | Pieza | Archivo |

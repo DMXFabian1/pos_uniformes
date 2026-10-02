@@ -79,6 +79,21 @@ if __name__ == "__main__":
 
 
 class TlsFallbackTests(unittest.TestCase):
+    """El reintento sin verificar TLS, en el camino de urllib.
+
+    Desde 2026-10-02 las llamadas van primero por una conexión reutilizada
+    (urllib3); urllib quedó de respaldo. Estos dos prueban el respaldo, así que
+    apagan el camino rápido a propósito — si no, harían red de verdad.
+    """
+
+    @staticmethod
+    def _sin_pool():
+        from unittest.mock import patch
+
+        from pos_uniformes.services import telegram_service as tg
+
+        return patch.object(tg, "_obtener_pool", side_effect=RuntimeError("sin pool"))
+
     def test_certificado_no_reconocido_reintenta_sin_verificar(self) -> None:
         import io
         import json
@@ -102,7 +117,8 @@ class TlsFallbackTests(unittest.TestCase):
             return resp
 
         tg._aviso_inseguro = False
-        with patch("urllib.request.urlopen", side_effect=fake_urlopen), redirect_stdout(io.StringIO()) as out:
+        with self._sin_pool(), patch("urllib.request.urlopen", side_effect=fake_urlopen), \
+                redirect_stdout(io.StringIO()) as out:
             payload = tg._llamar("t", "getUpdates")
         self.assertTrue(payload["ok"])
         self.assertEqual(llamadas[-1], ssl.CERT_NONE)
@@ -114,6 +130,127 @@ class TlsFallbackTests(unittest.TestCase):
 
         from pos_uniformes.services import telegram_service as tg
 
-        with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("sin red")):
+        with self._sin_pool(), patch(
+            "urllib.request.urlopen", side_effect=urllib.error.URLError("sin red")
+        ):
             with self.assertRaises(urllib.error.URLError):
                 tg._llamar("t", "getUpdates")
+
+
+class ConexionReutilizadaTests(unittest.TestCase):
+    """Abrir una conexión nueva en cada llamada cuesta un saludo TLS entero.
+
+    Medido desde la Mac: 571 ms por llamada contra 182 ms reutilizando (−68%).
+    El bot hace una llamada por cada cosa que contesta, y en la red de la
+    tienda —WiFi, con pérdida— la diferencia es mayor. De ahí que se guarde la
+    conexión; y de ahí también la red de seguridad, porque este es el único
+    camino por el que el bot habla.
+    """
+
+    def setUp(self) -> None:
+        from pos_uniformes.services import telegram_service as tg
+
+        self.tg = tg
+        tg.soltar_pool()
+        self.addCleanup(tg.soltar_pool)
+
+    def _pool_falso(self, cuerpo='{"ok": true, "result": []}'):
+        from unittest.mock import MagicMock
+
+        pool = MagicMock()
+        pool.request.return_value = MagicMock(data=cuerpo.encode())
+        return pool
+
+    def test_la_conexion_se_reutiliza_entre_llamadas(self) -> None:
+        from unittest.mock import patch
+
+        pool = self._pool_falso()
+        with patch.object(self.tg, "_obtener_pool", return_value=pool) as obtener:
+            self.tg._llamar("t", "getMe")
+            self.tg._llamar("t", "getMe")
+        self.assertEqual(pool.request.call_count, 2)
+        self.assertEqual(obtener.call_count, 2)   # mismo pool, no uno nuevo
+
+    def test_guarda_el_mismo_pool(self) -> None:
+        from unittest.mock import patch
+
+        with patch("urllib3.PoolManager", side_effect=lambda **k: object()) as crear:
+            primero = self.tg._obtener_pool(True)
+            segundo = self.tg._obtener_pool(True)
+        self.assertIs(primero, segundo)
+        self.assertEqual(crear.call_count, 1)
+
+    def test_cambiar_de_modo_TLS_abre_otro(self) -> None:
+        from unittest.mock import patch
+
+        with patch("urllib3.PoolManager", side_effect=lambda **k: object()):
+            verificando = self.tg._obtener_pool(True)
+            sin_verificar = self.tg._obtener_pool(False)
+        self.assertIsNot(verificando, sin_verificar)
+
+    def test_si_el_pool_truena_se_contesta_por_el_camino_viejo(self) -> None:
+        # La red de seguridad: romper esto sería dejar a Daniel sin bot.
+        import json
+        from unittest.mock import MagicMock, patch
+
+        resp = MagicMock()
+        resp.__enter__ = lambda s: s
+        resp.__exit__ = lambda s, *a: False
+        resp.read.return_value = json.dumps({"ok": True, "result": "por urllib"}).encode()
+        with patch.object(self.tg, "_obtener_pool", side_effect=RuntimeError("pool roto")), \
+                patch("urllib.request.urlopen", return_value=resp):
+            payload = self.tg._llamar("t", "getMe")
+        self.assertEqual(payload["result"], "por urllib")
+
+    def test_un_error_de_certificado_NO_se_tapa_con_el_respaldo(self) -> None:
+        # Tiene que llegar a `_llamar` para que reintente sin verificar; si el
+        # respaldo se lo tragara, el antivirus de la tienda dejaría al bot mudo.
+        import ssl
+        from unittest.mock import patch
+
+        with patch.object(
+            self.tg, "_obtener_pool",
+            side_effect=ssl.SSLCertVerificationError("self-signed certificate"),
+        ):
+            with self.assertRaises(ssl.SSLCertVerificationError):
+                self.tg._pedir("https://x", None, 5, True)
+
+    def test_reconoce_el_error_del_certificado_aunque_venga_envuelto(self) -> None:
+        import ssl
+
+        hondo = ssl.SSLCertVerificationError("self-signed certificate in certificate chain")
+        envuelto = RuntimeError("falló la conexión")
+        envuelto.__cause__ = hondo
+        self.assertTrue(self.tg._es_de_certificado(envuelto))
+        self.assertFalse(self.tg._es_de_certificado(RuntimeError("sin red")))
+
+    def test_por_el_texto_tambien(self) -> None:
+        # urllib3 a veces lo entrega como texto, sin la excepción adentro.
+        self.assertTrue(
+            self.tg._es_de_certificado(OSError("CERTIFICATE_VERIFY_FAILED] self signed"))
+        )
+
+    def test_reconoce_el_del_urlopen_que_lo_guarda_en_reason(self) -> None:
+        # urlopen NO lo encadena: lo mete en `.reason`. Perderlo significa no
+        # reintentar sin verificar, y eso es el bot mudo en la tienda.
+        import ssl
+        import urllib.error
+
+        envuelto = urllib.error.URLError(ssl.SSLCertVerificationError("self-signed certificate"))
+        self.assertTrue(self.tg._es_de_certificado(envuelto))
+
+    def test_un_error_dentro_del_except_NO_hereda_la_causa(self) -> None:
+        # `__context__` es «qué se estaba atendiendo», no «qué lo causó».
+        # Siguiéndolo, un RuntimeError lanzado mientras se atendía el error de
+        # certificado se daba por certificado también, y el reintento sin
+        # verificar se quedaba dando vueltas.
+        import ssl
+
+        try:
+            try:
+                raise ssl.SSLCertVerificationError("self-signed certificate")
+            except ssl.SSLCertVerificationError:
+                raise RuntimeError("otra cosa")
+        except RuntimeError as otro:
+            self.assertIsNotNone(otro.__context__)
+            self.assertFalse(self.tg._es_de_certificado(otro))

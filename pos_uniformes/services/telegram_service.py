@@ -62,22 +62,110 @@ def chat_id_configurado() -> str:
     return _config("POS_UNIFORMES_TELEGRAM_CHAT_ID")
 
 
+#: Conexión reutilizada contra api.telegram.org. Abrir una nueva en cada
+#: llamada cuesta un saludo TLS completo: medido desde la Mac son 571 ms por
+#: llamada contra 182 ms reutilizando —un 68% — y en la red de la tienda, que
+#: va por WiFi y pierde paquetes, la diferencia es mayor todavía. Como el bot
+#: hace una llamada por cada cosa que contesta, eso se siente en el chat.
+_pool = None
+_pool_verifica: bool | None = None
+
+
+def _obtener_pool(verificar: bool):
+    """PoolManager con NUESTRO contexto TLS (el que confía en el antivirus)."""
+    global _pool, _pool_verifica
+    if _pool is None or _pool_verifica != verificar:
+        import urllib3
+
+        _pool = urllib3.PoolManager(
+            ssl_context=_contexto_ssl(verificar), maxsize=4, retries=False
+        )
+        _pool_verifica = verificar
+    return _pool
+
+
+def soltar_pool() -> None:
+    """Olvida la conexión guardada. Para pruebas y para forzar un saludo nuevo."""
+    global _pool, _pool_verifica
+    _pool, _pool_verifica = None, None
+
+
+def _pedir(url: str, cuerpo: bytes | None, timeout: float, verificar: bool) -> str:
+    """Una llamada HTTP reutilizando la conexión. Cae a urllib si algo raro pasa.
+
+    La red de seguridad importa: este es el único camino por el que habla el
+    bot, y romperlo sería dejar a Daniel sin bot estando de viaje. Si el camino
+    rápido falla por cualquier motivo que no sea el certificado, se hace la
+    llamada como siempre y nadie se entera.
+    """
+    try:
+        import urllib3
+
+        pool = _obtener_pool(verificar)
+        if cuerpo is None:
+            resp = pool.request("GET", url, timeout=urllib3.Timeout(total=timeout))
+        else:
+            resp = pool.request(
+                "POST", url, body=cuerpo, timeout=urllib3.Timeout(total=timeout),
+                headers={"Content-Type": "application/x-www-form-urlencoded"},
+            )
+        return resp.data.decode("utf-8")
+    except Exception as exc:  # noqa: BLE001
+        if _es_de_certificado(exc):
+            raise  # lo atiende quien llama, para caer al modo sin verificar
+        _log.debug("Conexión reutilizada falló (%s); se va por el camino de siempre", exc)
+        soltar_pool()
+        req = urllib.request.Request(url, data=cuerpo)
+        with urllib.request.urlopen(req, timeout=timeout, context=_contexto_ssl(verificar)) as resp:
+            return resp.read().decode("utf-8")
+
+
+def _es_de_certificado(exc: BaseException) -> bool:
+    """¿El error es el del certificado que no reconoce (antivirus/proxy)?
+
+    Hay que mirar por tres lados porque cada capa lo envuelve a su manera:
+    `urlopen` lo guarda en `.reason` (no en la cadena de excepciones), urllib3
+    lo encadena con `__cause__`, y a veces solo queda el texto. Perderlo
+    significa no reintentar sin verificar, y eso es el bot mudo en la tienda.
+
+    **No se sigue `__context__`**, y es a propósito: `__context__` es «qué se
+    estaba atendiendo cuando esto se lanzó», no «qué lo causó». Siguiéndolo,
+    un error cualquiera levantado dentro del `except` del error de certificado
+    heredaba su causa y se daba por certificado también — con eso el reintento
+    sin verificar se quedaba dando vueltas. Lo encontró un test que ya existía.
+    """
+    visto: set[int] = set()
+    pendientes = [exc]
+    while pendientes:
+        actual = pendientes.pop()
+        if actual is None or id(actual) in visto:
+            continue
+        visto.add(id(actual))
+        if isinstance(actual, ssl.SSLCertVerificationError):
+            return True
+        if "CERTIFICATE_VERIFY_FAILED" in str(actual):
+            return True
+        pendientes.extend(
+            x for x in (actual.__cause__, getattr(actual, "reason", None))
+            if isinstance(x, BaseException)
+        )
+    return False
+
+
 def _llamar(token: str, metodo: str, datos: dict | None = None, timeout: float = 15.0) -> dict:
     global _aviso_inseguro
     url = _API.format(token=token, metodo=metodo)
     cuerpo = urllib.parse.urlencode(datos or {}).encode("utf-8")
 
     def _abrir(verificar: bool):
-        req = urllib.request.Request(url, data=cuerpo if datos else None)
-        with urllib.request.urlopen(req, timeout=timeout, context=_contexto_ssl(verificar)) as resp:
-            return json.loads(resp.read().decode("utf-8"))
+        return json.loads(_pedir(url, cuerpo if datos else None, timeout, verificar))
 
     try:
         payload = _abrir(True)
-    except (ssl.SSLCertVerificationError, urllib.error.URLError) as exc:
-        # urlopen envuelve el error TLS en URLError(reason=SSLCertVerificationError).
-        razon = getattr(exc, "reason", exc)
-        if not isinstance(razon, ssl.SSLCertVerificationError):
+    except Exception as exc:  # noqa: BLE001
+        # urlopen envuelve el error TLS en URLError(reason=…); urllib3 lo
+        # envuelve distinto. `_es_de_certificado` mira toda la cadena.
+        if not _es_de_certificado(exc):
             raise
         # Último recurso: el antivirus intercepta y su certificado no está
         # en el almacén que ve Python. Se avisa una vez y se sigue.
@@ -86,6 +174,7 @@ def _llamar(token: str, metodo: str, datos: dict | None = None, timeout: float =
             msg = "Telegram: certificado no reconocido (antivirus/proxy); continuando sin verificar TLS."
             _log.warning(msg)
             print(msg)
+        soltar_pool()
         payload = _abrir(False)
     if not payload.get("ok"):
         raise RuntimeError(f"Telegram respondió: {payload.get('description', payload)}")
