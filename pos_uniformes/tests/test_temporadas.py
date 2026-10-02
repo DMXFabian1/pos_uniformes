@@ -202,3 +202,63 @@ class ElTicketSeLeeTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         for malo in ("Atendio:", "ARTICULOS", "Terminos y Condiciones", "REIMPRESION"):
             self.assertNotIn(malo, codigo, malo)
+
+
+class ForzarUnaTemporadaTests(unittest.TestCase):
+    """Verla antes de su fecha, sin dejarla puesta para siempre."""
+
+    def setUp(self) -> None:
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        parche = patch.object(
+            t, "ruta_forzada", return_value=Path(self._tmp.name) / "temporada_forzada.json"
+        )
+        parche.start()
+        self.addCleanup(parche.stop)
+
+    def test_sin_forzar_manda_el_calendario(self) -> None:
+        self.assertIsNone(t.forzada())
+        self.assertIsNone(t.actual(date(2026, 3, 18)))
+
+    def test_forzada_manda_sobre_la_fecha(self) -> None:
+        t.forzar("halloween")
+        self.assertEqual(t.actual(date(2026, 3, 18)).nombre, "Halloween")
+
+    def test_vence_sola(self) -> None:
+        # Una tienda con el arbolito en marzo porque alguien probó y se le
+        # olvidó quitarlo es peor que no haber tenido la herramienta.
+        t.forzar("navidad", horas=-1)        # ya vencida
+        self.assertIsNone(t.forzada())
+        self.assertIsNone(t.actual(date(2026, 3, 18)))
+
+    def test_se_puede_quitar_a_mano(self) -> None:
+        t.forzar("halloween")
+        self.assertTrue(t.quitar_forzada())
+        self.assertIsNone(t.forzada())
+        self.assertFalse(t.quitar_forzada())   # ya no había nada
+
+    def test_una_que_no_existe_no_fuerza_nada(self) -> None:
+        self.assertIsNone(t.forzar("vete_a_saber"))
+        self.assertIsNone(t.forzada())
+
+    def test_un_archivo_corrupto_no_fuerza_nada(self) -> None:
+        ruta = t.ruta_forzada()
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        ruta.write_text("{roto", encoding="utf-8")
+        self.assertIsNone(t.forzada())
+
+    def test_tambien_afecta_al_ticket(self) -> None:
+        # Se quiere ver el adorno completo, no la mitad.
+        t.forzar("navidad")
+        self.assertIn("/_\\", "\n".join(t.renglones_de_ticket(date(2026, 3, 18))))
+        self.assertTrue(t.marcador_de_ticket(date(2026, 3, 18)))
+
+    def test_sin_archivo_no_se_abre_nada(self) -> None:
+        # `actual()` se llama en cada ticket: el caso de siempre no puede
+        # pagar una lectura de disco.
+        self.assertFalse(t.ruta_forzada().exists())
+        self.assertIsNone(t.forzada())

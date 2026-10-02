@@ -154,4 +154,6 @@ No hay comandos: todo es tocar. Lo que a veces se olvida:
 
 ---
 
-> Creado: 2026-09-25 · Al día 2026-10-01 · Ver [[22 - Referencia Rápida]] (PINs, rutas, red) · [[39 - Brújula]]
+**Temporadas:** `scripts\probar_temporada.bat halloween` finge una temporada 2 h (se quita sola; `--quitar` la adelanta) · `scripts\probar_dibujo_ticket.bat halloween` imprime un ticket de prueba con el dibujo.
+
+> Creado: 2026-09-25 · Al día 2026-10-02 · Ver [[22 - Referencia Rápida]] (PINs, rutas, red) · [[39 - Brújula]]

@@ -162,12 +162,89 @@ def actual(hoy: date | None = None) -> Temporada | None:
 
     La mayor parte del año no hay nada, y eso está bien: un adorno que sale
     siempre deja de notarse, y entonces no adorna.
+
+    Si hay una temporada **forzada** y no ha vencido, manda esa: es para poder
+    ver el adorno antes de su fecha (`scripts/probar_temporada.bat`).
     """
+    forzada_ = forzada()
+    if forzada_ is not None:
+        return forzada_
     hoy = hoy or date.today()
     for t in TEMPORADAS:
         if t.incluye(hoy):
             return t
     return None
+
+
+# ── Forzar una temporada para verla antes ────────────────────────────────────
+#
+# Halloween entra el 20 de octubre, y querer verlo el 2 es razonable. Lo que no
+# es razonable es que se quede forzado: por eso **vence solo**. Una tienda con
+# el arbolito de Navidad en marzo porque alguien probó y se le olvidó quitarlo
+# es peor que no haber tenido la herramienta.
+
+HORAS_FORZADA = 2.0
+
+
+def ruta_forzada():
+    from pos_uniformes.utils.config import runtime_base_dir
+
+    return runtime_base_dir() / "data" / "temporada_forzada.json"
+
+
+def forzada() -> "Temporada | None":
+    """La temporada forzada que siga vigente, o None."""
+    ruta = ruta_forzada()
+    if not ruta.exists():          # el caso de siempre: ni se abre el archivo
+        return None
+    try:
+        import json
+        from datetime import datetime, timezone
+
+        datos = json.loads(ruta.read_text(encoding="utf-8"))
+        hasta = datetime.fromisoformat(str(datos["hasta"]))
+        if hasta.tzinfo is None:
+            hasta = hasta.replace(tzinfo=timezone.utc)
+        if hasta <= datetime.now(timezone.utc):
+            return None
+        return next((t for t in TEMPORADAS if t.nombre == datos["nombre"]), None)
+    except Exception:  # noqa: BLE001 — un archivo raro no fuerza nada
+        return None
+
+
+def forzar(nombre_archivo: str, *, horas: float = HORAS_FORZADA) -> "Temporada | None":
+    """Fuerza una temporada por unas horas. Devuelve cuál, o None si no existe."""
+    import json
+    from datetime import datetime, timedelta, timezone
+
+    t = temporada_de_archivo(nombre_archivo)
+    if t is None:
+        return None
+    ruta = ruta_forzada()
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    ruta.write_text(
+        json.dumps(
+            {
+                "nombre": t.nombre,
+                "hasta": (datetime.now(timezone.utc) + timedelta(hours=horas)).isoformat(),
+            },
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+    return t
+
+
+def quitar_forzada() -> bool:
+    """Vuelve al calendario de verdad. True si había algo que quitar."""
+    ruta = ruta_forzada()
+    if not ruta.exists():
+        return False
+    try:
+        ruta.unlink()
+        return True
+    except OSError:
+        return False
 
 
 def renglones_de_ticket(hoy: date | None = None) -> list[str]:

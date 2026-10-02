@@ -714,6 +714,27 @@ devuelve None: un adorno no puede impedir que el kiosko abra.
 
 `QuoteSatelliteWindow._marca_de_temporada` · `test_temporada_pantalla` (9).
 
+### Verlo antes de su fecha
+
+```
+scripts\probar_temporada.bat halloween    → la finge DOS HORAS
+scripts\probar_temporada.bat --quitar     → vuelve el calendario
+scripts\probar_temporada.bat              → cómo va
+scripts\probar_dibujo_ticket.bat halloween → un ticket de prueba con el dibujo
+```
+
+Afecta a la pantalla **y** al ticket: se quiere ver el adorno completo, no la
+mitad. Hay que cerrar y volver a abrir el kiosko, porque la barra se arma al
+arrancar.
+
+> [!tip] Vence sola, y es a propósito
+> Una tienda con el arbolito de Navidad en marzo porque alguien probó y se le
+> olvidó quitarlo es **peor** que no haber tenido la herramienta. Por eso el
+> override dura dos horas y se apaga solo; `--quitar` lo adelanta.
+
+El archivo solo se abre si existe: `actual()` se llama en cada ticket, y el caso
+de todos los días no puede pagar una lectura de disco.
+
 ### El dibujo, ahora en PNG (2026-10-02)
 
 Daniel preguntó si se podía con PNG. Sí: la térmica imprime mapas de bits con
