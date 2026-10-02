@@ -344,7 +344,33 @@ def aplicar(*, forzar: bool = False) -> list[str]:
         hechos.append(f"infraestructura en la version {INFRA_VERSION}")
     else:
         hechos.append(f"infraestructura ya en la version {INFRA_VERSION}")
+    hechos.extend(limpiar_registro_satelites())
     return hechos
+
+
+def limpiar_registro_satelites() -> list[str]:
+    """Quita del registro las pantallas que llevan un mes sin aparecer.
+
+    Va en CADA actualización, no solo al subir de versión: el registro se
+    ensucia con el uso (una Mac donde se probó el kiosko una tarde, un equipo
+    retirado), no con las versiones.
+
+    Es seguro porque el registro **se cura solo**: una pantalla viva se vuelve a
+    registrar en su siguiente latido, al minuto. Si la base no contesta, no pasa
+    nada — se intenta la próxima vez.
+    """
+    try:
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.services import satelite_registry_service as rsvc
+
+        with get_session() as session:
+            quitadas = rsvc.retirar_viejos(session)
+            session.commit()
+    except Exception as exc:  # noqa: BLE001 — la limpieza nunca detiene la actualización
+        return [f"Aviso: no se pudo limpiar el registro de pantallas ({exc})."]
+    if not quitadas:
+        return []
+    return [f"pantallas retiradas del registro (un mes sin aparecer): {', '.join(quitadas)}"]
 
 
 def _log() -> logging.Logger:

@@ -568,3 +568,30 @@ el mostrador.
 | Gafete sin conexión | `ui/views/quick_sale_view.py` → `_empleada_de_cache`, `_avisar_sin_conexion` |
 | Espera al arrancar | `services/satellite_startup_service.esperar_base` |
 | Tests | `test_satellite_db_resilience` (27) |
+
+## Limpiar el registro de pantallas (2026-10-02)
+
+El registro se ensucia con el uso: una Mac donde se probó el kiosko una tarde,
+un equipo retirado. En la base de Daniel había tres, y una era su MacBook.
+
+Importa porque **un aviso espera a que todas las pantallas lo acusen**: una
+fantasma en la lista es una que nunca va a contestar. (Eso ya está cubierto
+aparte —`anuncio_service` solo cuenta las vistas en 7 días— pero una lista con
+equipos que no existen tampoco se puede leer de un vistazo, y leerla de un
+vistazo es para lo que está.)
+
+> [!tip] Borrar es seguro porque el registro se cura solo
+> Cualquier pantalla viva **se vuelve a registrar sola** en su siguiente latido,
+> al minuto. Lo único que se pierde es el nombre puesto a mano, y solo de una
+> que lleva un mes sin aparecer.
+
+| Dónde | Cómo |
+|---|---|
+| Automático | `postactualizacion.limpiar_registro_satelites()` en **cada** actualización — el registro se ensucia con el uso, no con las versiones, así que no va detrás del `if` de `INFRA_VERSION` |
+| A mano | Menú admin del satélite → **Satélites** → «Quitar las que ya no están». Enseña cuáles antes de preguntar: mirar no puede ser destruir |
+
+`DIAS_PARA_RETIRAR = 30`, amplio a propósito: un kiosko que vuelve de reparación
+en tres semanas no debe desaparecer mientras tanto. *Apagada no es retirada.*
+
+`satelite_registry_service.listar_viejos` / `retirar_viejos` ·
+`test_satelite_registro_limpieza` (11).

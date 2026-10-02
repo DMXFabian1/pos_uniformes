@@ -93,3 +93,55 @@ def listar_con_estado(
             }
         )
     return salida
+
+
+# ── Limpieza del registro ────────────────────────────────────────────────────
+
+#: Una pantalla que lleva más de un mes sin latir ya no es una pantalla de la
+#: tienda: es una Mac donde se probó el kiosko una tarde, o un equipo retirado.
+#: Un mes es amplio a propósito — un kiosko descompuesto que vuelve de
+#: reparación en tres semanas no debería desaparecer de la lista mientras tanto.
+DIAS_PARA_RETIRAR = 30
+
+
+def listar_viejos(
+    session: Session, *, dias: int = DIAS_PARA_RETIRAR, ahora: datetime | None = None
+) -> list[Satelite]:
+    """Los satélites que no laten desde hace `dias`. Los que nunca latieron van también."""
+    corte = (ahora or _ahora()) - timedelta(days=dias)
+    viejos = []
+    for sat in listar(session):
+        visto = sat.ultimo_visto
+        if visto is None:
+            viejos.append(sat)
+            continue
+        if visto.tzinfo is None:  # por si el motor devolvió naive (SQLite)
+            visto = visto.replace(tzinfo=timezone.utc)
+        if visto < corte:
+            viejos.append(sat)
+    return viejos
+
+
+def retirar_viejos(
+    session: Session, *, dias: int = DIAS_PARA_RETIRAR, ahora: datetime | None = None
+) -> list[str]:
+    """Borra los registros viejos. Devuelve los nombres que quitó. No hace commit.
+
+    **Borrar aquí es seguro porque el registro se cura solo**: cualquier pantalla
+    que siga viva se vuelve a registrar sola en su siguiente latido, que es al
+    minuto. Lo único que se pierde es el nombre que se le haya puesto a mano, y
+    solo de una pantalla que lleva un mes sin aparecer.
+
+    Importa tenerlo limpio porque un aviso espera a que **todas** las pantallas
+    lo acusen: una fantasma en la lista es una que nunca va a contestar. (Eso ya
+    está cubierto aparte — `anuncio_service` solo cuenta las vistas en 7 días —
+    pero una lista con equipos que no existen tampoco se puede leer de un
+    vistazo, y leerla de un vistazo es para lo que está.)
+    """
+    viejos = listar_viejos(session, dias=dias, ahora=ahora)
+    nombres = [s.nombre or s.identificador for s in viejos]
+    for sat in viejos:
+        session.delete(sat)
+    if viejos:
+        session.flush()
+    return nombres

@@ -152,6 +152,7 @@ def _build_anuncios_boxes(dialog: QWidget) -> list[QGroupBox]:
     satelites_box = QGroupBox("Satélites")
     satelites_list = QListWidget()
     refrescar_sat_btn = QPushButton("Actualizar")
+    limpiar_sat_btn = QPushButton("Quitar las que ya no están")
 
     # — Crear —
     crear_box = QGroupBox("Nuevo anuncio")
@@ -404,6 +405,45 @@ def _build_anuncios_boxes(dialog: QWidget) -> list[QGroupBox]:
     quitar_btn.clicked.connect(_quitar_seleccionado)
     quitar_todos_btn.clicked.connect(_quitar_todos)
     guardar_nombre_btn.clicked.connect(_guardar_nombre)
+    def _limpiar_satelites() -> None:
+        """Quita del registro las pantallas que llevan un mes sin aparecer.
+
+        Se puede borrar sin miedo: una pantalla viva se vuelve a registrar sola
+        en su siguiente latido, al minuto. Lo único que se pierde es el nombre
+        que se le haya puesto a mano, y solo de una que lleva un mes ausente.
+        """
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.services import satelite_registry_service as rsvc
+
+        try:
+            with get_session() as session:
+                viejas = rsvc.listar_viejos(session)
+                if not viejas:
+                    QMessageBox.information(
+                        dialog, "Pantallas",
+                        "Todas las pantallas de la lista han aparecido este mes. "
+                        "No hay nada que quitar.",
+                    )
+                    return
+                nombres = ", ".join(s.nombre or s.identificador for s in viejas)
+                if QMessageBox.question(
+                    dialog, "Quitar del registro",
+                    f"Llevan un mes sin aparecer:\n\n{nombres}\n\n"
+                    "Si alguna sigue viva, se vuelve a registrar sola al prenderla. "
+                    "¿Las quito?",
+                ) != QMessageBox.StandardButton.Yes:
+                    return
+                quitadas = rsvc.retirar_viejos(session)
+                session.commit()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(dialog, "No se pudo", f"¿La PC principal está encendida?\n\n{exc}")
+            return
+        _refrescar_satelites()
+        QMessageBox.information(
+            dialog, "Listo", f"Se quitaron {len(quitadas)}: {', '.join(quitadas)}"
+        )
+
+    limpiar_sat_btn.clicked.connect(_limpiar_satelites)
     refrescar_sat_btn.clicked.connect(_refrescar_satelites)
     todos_chk.toggled.connect(lambda marcado: destinos_list.setEnabled(not marcado))
 
@@ -428,6 +468,7 @@ def _build_anuncios_boxes(dialog: QWidget) -> list[QGroupBox]:
     sat_layout.addWidget(sat_hint)
     sat_layout.addWidget(satelites_list)
     sat_layout.addWidget(refrescar_sat_btn)
+    sat_layout.addWidget(limpiar_sat_btn)
     satelites_box.setLayout(sat_layout)
 
     # — Layout: Crear —
