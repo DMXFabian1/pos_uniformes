@@ -21,14 +21,19 @@ from __future__ import annotations
 import time
 from collections.abc import Callable
 
+import logging
+
 from PyQt6.QtCore import QObject, QTimer
 
 from pos_uniformes.ui.anuncio_overlay import AnuncioOverlay
+
+_logger = logging.getLogger(__name__)
 
 _INACTIVIDAD_DEFAULT_SEG = 120     # 2 min sin tocar → entra la cartelera
 _CHEQUEO_INACTIVIDAD_MS = 10_000   # cada cuánto se revisa la inactividad
 _INMEDIATO_AUTO_CERRAR_SEG = 20    # el aviso inmediato se cierra solo tras esto
 _ANTIREBOTE_SEG = 0.8              # ignora descartes en el primer instante
+_REINTENTO_OCUPADO_MS = 4_000      # cada cuánto se vuelve a intentar si está ocupada
 
 
 class AnuncioCartelera(QObject):
@@ -86,6 +91,12 @@ class AnuncioCartelera(QObject):
         self._inmediato_timer = QTimer(self)
         self._inmediato_timer.setSingleShot(True)
         self._inmediato_timer.timeout.connect(self._cerrar_overlay)
+        #: Aviso que llegó mientras la pantalla estaba ocupada (imprimiendo, un
+        #: diálogo abierto). Se guarda y se enseña en cuanto se desocupe.
+        self._pendiente: dict | None = None
+        self._espera_timer = QTimer(self)
+        self._espera_timer.setInterval(_REINTENTO_OCUPADO_MS)
+        self._espera_timer.timeout.connect(self._intentar_pendiente)
 
     # ── API pública ────────────────────────────────────────────────────────────
 
@@ -96,6 +107,7 @@ class AnuncioCartelera(QObject):
         self._idle_timer.stop()
         self._rotacion_timer.stop()
         self._inmediato_timer.stop()
+        self._espera_timer.stop()
 
     def set_anuncios(self, anuncios: list[dict]) -> None:
         """Actualiza la lista de anuncios activos (cartelera).
@@ -125,9 +137,43 @@ class AnuncioCartelera(QObject):
             if self._now() - self._mostrado_en >= _ANTIREBOTE_SEG:
                 self._cerrar_overlay()
 
+    def ocupada(self) -> bool:
+        """¿La pantalla está en medio de algo que no se puede interrumpir?
+
+        Daniel (02/10): "estaba imprimiendo un ticket y salió el anuncio, se
+        bugueó y se cerró". Un aviso que aparece encima de un diálogo abierto
+        —el de imprimir, el de cobro, el de una pregunta— le roba el foco y deja
+        a la empleada peleando con dos ventanas a la vez, con un cliente
+        enfrente. Lo que se está haciendo manda; el recado puede esperar cuatro
+        segundos.
+        """
+        try:
+            from PyQt6.QtWidgets import QApplication
+
+            return QApplication.activeModalWidget() is not None
+        except Exception:  # noqa: BLE001 — si no se puede saber, no se estorba
+            return True
+
+    def _intentar_pendiente(self) -> None:
+        """Vuelve a intentar el aviso que quedó esperando a que se desocupe."""
+        anuncio = self._pendiente
+        if anuncio is None:
+            self._espera_timer.stop()
+            return
+        if self.ocupada():
+            return
+        self._pendiente = None
+        self._espera_timer.stop()
+        self.mostrar_inmediato(anuncio)
+
     def mostrar_inmediato(self, anuncio: dict) -> None:
         """Muestra un anuncio ya mismo, encima de todo (aviso inmediato)."""
         if not anuncio:
+            return
+        if self.ocupada():
+            # Se guarda y se enseña en cuanto cierre lo que tenga abierto.
+            self._pendiente = anuncio
+            self._espera_timer.start()
             return
         self._en_cartelera = False
         self._rotacion_timer.stop()
@@ -146,6 +192,8 @@ class AnuncioCartelera(QObject):
     def _chequear_inactividad(self) -> None:
         if self._en_cartelera or self._inmediato or not self._anuncios:
             return
+        if self.ocupada():
+            return  # hay un diálogo abierto: la cartelera no se mete
         if self._now() - self._ultima_actividad >= self._inactividad_seg:
             self._entrar_cartelera()
 
@@ -183,6 +231,22 @@ class AnuncioCartelera(QObject):
         return anuncio.get("id") not in self._acusados
 
     def _pintar(self, anuncio: dict) -> None:
+        """Pinta el anuncio. Si algo falla, se cierra y la venta sigue.
+
+        En este programa una excepción dentro de un slot de Qt puede llevarse
+        el proceso entero. Un recado en la pantalla no vale una venta a medias:
+        si no se puede pintar, se recoge y ya.
+        """
+        try:
+            self._pintar_de_verdad(anuncio)
+        except Exception:  # noqa: BLE001
+            _logger.exception("No se pudo pintar el anuncio %s", anuncio.get("id"))
+            try:
+                self._cerrar_overlay()
+            except Exception:  # noqa: BLE001
+                pass
+
+    def _pintar_de_verdad(self, anuncio: dict) -> None:
         self._actual = anuncio
         # Si ya se acusó aquí, se pinta como anuncio común (sin botones).
         if anuncio.get("pide_acuse") and anuncio.get("id") in self._acusados:

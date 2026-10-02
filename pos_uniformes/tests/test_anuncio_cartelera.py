@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import unittest
+from unittest.mock import Mock
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -582,3 +583,83 @@ class SinPcPrincipalAlAcusarTests(unittest.TestCase):
         self.addCleanup(ctrl.stop)
         ctrl.set_anuncios([_aviso(7)])
         self.assertEqual([a["id"] for a in ctrl._anuncios], [7])
+
+
+class NoEstorbaMientrasImprimeTests(unittest.TestCase):
+    """«Estaba imprimiendo un ticket y salió el anuncio, se bugueó y se cerró».
+
+    Daniel, 02/10. Un aviso encima de un diálogo abierto le roba el foco y deja
+    a la empleada peleando con dos ventanas, con un cliente enfrente. Lo que se
+    está haciendo manda; el recado puede esperar.
+    """
+
+    def setUp(self) -> None:
+        self.parent = QWidget()
+        self.parent.resize(800, 600)
+        self.parent.show()
+        self.reloj = _Reloj()
+        self.ctrl = AnuncioCartelera(self.parent, inactividad_seg=120, now_fn=self.reloj)
+        self.overlay = self.ctrl._overlay
+        self.ocupado = {"si": False}
+        self.ctrl.ocupada = lambda: self.ocupado["si"]
+
+    def tearDown(self) -> None:
+        self.ctrl.stop()
+        self.parent.close()
+
+    def test_no_sale_encima_de_un_dialogo(self) -> None:
+        self.ocupado["si"] = True
+        self.ctrl.mostrar_inmediato(_anuncios()[0])
+        self.assertFalse(self.overlay.isVisible())
+
+    def test_pero_no_se_pierde(self) -> None:
+        self.ocupado["si"] = True
+        self.ctrl.mostrar_inmediato(_anuncios()[0])
+        self.ocupado["si"] = False
+        self.ctrl._intentar_pendiente()
+        self.assertTrue(self.overlay.isVisible())
+
+    def test_sigue_esperando_mientras_siga_ocupada(self) -> None:
+        self.ocupado["si"] = True
+        self.ctrl.mostrar_inmediato(_anuncios()[0])
+        self.ctrl._intentar_pendiente()
+        self.ctrl._intentar_pendiente()
+        self.assertFalse(self.overlay.isVisible())
+        self.assertIsNotNone(self.ctrl._pendiente)
+
+    def test_la_cartelera_tampoco_se_mete(self) -> None:
+        self.ocupado["si"] = True
+        self.ctrl.set_anuncios(_anuncios())
+        self.reloj.avanzar(200)
+        self.ctrl._chequear_inactividad()
+        self.assertFalse(self.overlay.isVisible())
+
+    def test_desocupada_si_sale_normal(self) -> None:
+        self.ctrl.mostrar_inmediato(_anuncios()[0])
+        self.assertTrue(self.overlay.isVisible())
+
+    def test_si_no_se_puede_saber_no_estorba(self) -> None:
+        # Ante la duda, la venta gana.
+        ctrl = AnuncioCartelera(self.parent, now_fn=self.reloj)
+        self.addCleanup(ctrl.stop)
+        from unittest.mock import patch
+
+        with patch(
+            "PyQt6.QtWidgets.QApplication.activeModalWidget",
+            side_effect=RuntimeError("vete a saber"),
+        ):
+            self.assertTrue(ctrl.ocupada())
+
+    def test_un_anuncio_que_truena_al_pintar_no_tumba_la_caja(self) -> None:
+        # En este programa una excepción dentro de un slot puede llevarse el
+        # proceso entero. Un recado no vale una venta a medias.
+        self.overlay.render_anuncio = Mock(side_effect=RuntimeError("pixmap roto"))
+        self.ctrl.mostrar_inmediato(_anuncios()[0])   # no debe propagar
+        self.assertFalse(self.overlay.isVisible())
+
+    def test_y_la_cartelera_sigue_viva_despues(self) -> None:
+        self.overlay.render_anuncio = Mock(side_effect=RuntimeError("pixmap roto"))
+        self.ctrl.mostrar_inmediato(_anuncios()[0])
+        del self.overlay.render_anuncio          # vuelve el de verdad
+        self.ctrl.mostrar_inmediato(_anuncios()[1])
+        self.assertTrue(self.overlay.isVisible())
