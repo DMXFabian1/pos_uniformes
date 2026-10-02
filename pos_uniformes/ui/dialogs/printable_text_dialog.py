@@ -176,8 +176,18 @@ def _sin_marcadores(content: str) -> str:
 
 
 def _render_drawtext(printer: QPrinter, content: str) -> bool:
-    """Dibuja el texto en la página con la fuente/flags de siempre."""
-    content = _sin_marcadores(content)
+    """Dibuja el texto en la página con la fuente/flags de siempre.
+
+    Si el contenido trae el marcador del dibujo de temporada, se parte en
+    bloques y la imagen se dibuja entre ellos. Esto es lo que hace que el dibujo
+    salga en PNG **en los tickets**: los tickets NO pasan por ESC/POS —ese
+    camino es solo de las hojas de conteo— así que el raster del otro lado no
+    les servía de nada.
+
+    Si algo del dibujo falla, se cae a pintar todo el texto de una, con el
+    marcador cambiado por el dibujo de caracteres: exactamente lo de siempre.
+    """
+    bloques = _bloques_con_imagen(content)
     painter = QPainter()
     if not painter.begin(printer):
         return False
@@ -186,16 +196,80 @@ def _render_drawtext(printer: QPrinter, content: str) -> bool:
         font.setPointSize(TICKET_FONT_POINT_SIZE)
         font.setBold(True)
         painter.setFont(font)
-
         rect = painter.viewport()
-        painter.drawText(
-            rect,
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap,
-            content,
+        banderas = (
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap
         )
+        if bloques is None:
+            painter.drawText(rect, banderas, _sin_marcadores(content))
+            return True
+
+        y = rect.top()
+        for clase, valor in bloques:
+            if clase == "texto":
+                alto = painter.boundingRect(
+                    rect.adjusted(0, y - rect.top(), 0, 0), banderas, valor
+                ).height()
+                painter.drawText(
+                    rect.adjusted(0, y - rect.top(), 0, 0), banderas, valor
+                )
+                y += alto
+            else:
+                y += _dibujar_imagen(painter, rect, y, valor)
     finally:
         painter.end()
     return True
+
+
+def _bloques_con_imagen(content: str):
+    """[(clase, valor)] partiendo el contenido en el marcador. None si no hay.
+
+    `None` quiere decir «no hay nada que dibujar»: así el camino de siempre se
+    queda tal cual, sin pagar ni un cálculo de más.
+    """
+    try:
+        from pos_uniformes.services.temporada_service import (
+            MARCADOR_FIN,
+            MARCADOR_INICIO,
+            imagen_para_marcador,
+        )
+    except Exception:  # noqa: BLE001
+        return None
+    if not content or MARCADOR_INICIO not in content:
+        return None
+
+    bloques = []
+    for i, parte in enumerate(content.split(MARCADOR_INICIO)):
+        if i == 0:
+            bloques.append(("texto", parte))
+            continue
+        nombre, _, resto = parte.partition(MARCADOR_FIN)
+        ruta = imagen_para_marcador(nombre)
+        if ruta is None:
+            # Sin PNG, el renglón se va: el llamador ya puso el de ASCII.
+            return None
+        bloques.append(("imagen", str(ruta)))
+        bloques.append(("texto", resto))
+    return bloques
+
+
+def _dibujar_imagen(painter: QPainter, rect, y: int, ruta: str) -> int:
+    """Dibuja el PNG centrado y devuelve cuánto alto ocupó.
+
+    El ancho se limita a la mitad del papel para que el dibujo no compita con el
+    total, y se escala con `KeepAspectRatio` para no deformarlo.
+    """
+    from PyQt6.QtCore import Qt as _Qt
+    from PyQt6.QtGui import QImage
+
+    imagen = QImage(ruta)
+    if imagen.isNull():
+        return 0
+    ancho = max(1, rect.width() // 2)
+    escalada = imagen.scaledToWidth(ancho, _Qt.TransformationMode.SmoothTransformation)
+    x = rect.left() + (rect.width() - escalada.width()) // 2
+    painter.drawImage(x, y, escalada)
+    return escalada.height()
 
 
 def _print_ticket_job(content: str) -> bool:

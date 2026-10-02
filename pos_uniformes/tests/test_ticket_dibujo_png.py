@@ -137,13 +137,18 @@ class EnElTicketTests(unittest.TestCase):
     def test_sin_marcador_no_toca_nada(self) -> None:
         self.assertEqual(temp.sin_marcadores("Hola\nAdios"), "Hola\nAdios")
 
-    def test_el_camino_de_qprinter_tambien_lo_quita(self) -> None:
+    def test_qprinter_dibuja_el_PNG_y_no_lo_cambia_por_texto(self) -> None:
+        # Este era el hueco: los tickets NO pasan por ESC/POS —ese camino es
+        # solo de las hojas de conteo— así que el raster del otro lado no les
+        # servía de nada y el dibujo habría salido en caracteres.
         from pathlib import Path
 
         codigo = (
             Path(__file__).resolve().parents[1] / "ui" / "dialogs" / "printable_text_dialog.py"
         ).read_text(encoding="utf-8")
-        self.assertIn("content = _sin_marcadores(content)", codigo)
+        self.assertIn("painter.drawImage(", codigo)
+        self.assertIn("_bloques_con_imagen(content)", codigo)
+        # Y la vista previa sí lo cambia por el de caracteres: ahí no hay papel.
         self.assertIn("editor.setPlainText(_sin_marcadores(content))", codigo)
 
 
@@ -178,3 +183,33 @@ class ElDibujoSaleDelMarcadorTests(unittest.TestCase):
     def test_la_vuelta_de_archivo_a_temporada(self) -> None:
         self.assertEqual(temp.temporada_de_archivo("halloween").nombre, "Halloween")
         self.assertIsNone(temp.temporada_de_archivo("no_existe"))
+
+
+class ElTicketDibujaLaImagenTests(unittest.TestCase):
+    """Partir el ticket en bloques para meter el PNG entre el texto."""
+
+    def setUp(self) -> None:
+        from pos_uniformes.ui.dialogs import printable_text_dialog as ptd
+
+        self.ptd = ptd
+
+    def test_sin_marcador_no_se_parte_nada(self) -> None:
+        # None = «el camino de siempre, sin pagar ni un cálculo de más».
+        self.assertIsNone(self.ptd._bloques_con_imagen("Hola\nAdios"))
+
+    def test_con_marcador_quedan_texto_imagen_texto(self) -> None:
+        texto = f"arriba\n{temp.MARCADOR_INICIO}halloween{temp.MARCADOR_FIN}\nabajo"
+        bloques = self.ptd._bloques_con_imagen(texto)
+        self.assertEqual([c for c, _ in bloques], ["texto", "imagen", "texto"])
+        self.assertIn("arriba", bloques[0][1])
+        self.assertTrue(bloques[1][1].endswith("halloween.png"))
+        self.assertIn("abajo", bloques[2][1])
+
+    def test_si_falta_el_PNG_se_deja_el_camino_viejo(self) -> None:
+        texto = f"a{temp.MARCADOR_INICIO}no_existe{temp.MARCADOR_FIN}b"
+        self.assertIsNone(self.ptd._bloques_con_imagen(texto))
+
+    def test_dos_dibujos_en_el_mismo_papel(self) -> None:
+        m = f"{temp.MARCADOR_INICIO}navidad{temp.MARCADOR_FIN}"
+        bloques = self.ptd._bloques_con_imagen(f"a{m}b{m}c")
+        self.assertEqual([c for c, _ in bloques], ["texto", "imagen", "texto", "imagen", "texto"])

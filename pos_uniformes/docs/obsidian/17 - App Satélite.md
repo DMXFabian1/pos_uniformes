@@ -689,6 +689,13 @@ primero fue **imprimirlo y leerlo**, no imaginarlo.
   leen como contradicción aunque cambio ≠ devolución. Es política suya, no
   estética: queda pendiente de que él decida.
 
+> [!warning] Los tickets NO pasan por ESC/POS (2026-10-02)
+> Se descubrió al intentar mandar un ticket de prueba a la tienda. `print_ticket_text` → `_print_ticket_job` usa **QPrinter + drawText**, y lo dice en su propio comentario: *"camino HISTÓRICO, intacto… no se le aplica ESC/POS a propósito"*. **ESC/POS es solo para las hojas de conteo.**
+>
+> Dos consecuencias, las dos corregidas:
+> 1. El `?═══════?` del CP850 **no afecta a los tickets** — ahí los `╞ ╡` se dibujan como glifos y salen bien. El guard de codepage sigue valiendo para las hojas de conteo, y por si algún día los tickets cambian de camino.
+> 2. El raster que se había puesto en `build_escpos_bytes` **no llegaba a los tickets**: el dibujo habría salido en caracteres igual. Ahora `_render_drawtext` parte el contenido en bloques y dibuja el PNG con `painter.drawImage`, centrado y a media hoja de ancho. Sin marcador, el camino de siempre no paga ni un cálculo de más.
+
 ### El dibujo, ahora en PNG (2026-10-02)
 
 Daniel preguntó si se podía con PNG. Sí: la térmica imprime mapas de bits con
