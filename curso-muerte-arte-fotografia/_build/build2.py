@@ -25,9 +25,23 @@ TAGS = {'H': 'Hecho documentado', 'E': 'Evidencia', 'I': 'Interpretación', 'Hi'
         'Es': 'Especulación', 'NS': 'No sabemos', 'C': 'Proyección contemporánea', 'PRENSA': 'Sólo en prensa'}
 CODE = r'(?:PRENSA|NS|Hi|Es|H|E|I|C)'
 tag_re = re.compile(r'\[(' + CODE + r')((?:\s*/\s*' + CODE + r')*)((?:[:,][^\]\[<]{0,70})?)\]')
+PRESS = json.loads((HERE / 'press.json').read_text(encoding='utf-8')) if (HERE / 'press.json').exists() else []
+def press_for(m):
+    ctx = re.sub(r'<[^>]+>', '', m.string[max(0, m.start() - 400):m.start()])
+    ctx = ctx[ctx.rfind('\n', 0, len(ctx) - 1) + 1:] if '\n' in ctx[:-1] else ctx
+    for k, p in enumerate(PRESS):
+        if p['match'] in ctx:
+            return k
+    return None
+
 def tag_sub(m):
     first, rest, extra = m.group(1), m.group(2) or '', (m.group(3) or '').strip(' ,:')
     codes = [first] + [c.strip() for c in rest.split('/') if c.strip()]
+    if first == 'PRENSA':
+        k = press_for(m)
+        if k is not None:
+            return ('<button type="button" class="tag tag-PRENSA press" data-press="%d" aria-haspopup="dialog" title="Ver la nota de prensa">PRENSA'
+                    '<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2h6v6M10 2L3 9"/></svg></button>' % k) + ('<span class="tag-note">%s</span>' % extra if extra else '')
     out = '<span class="tag tag-%s" title="%s">%s</span>' % (first, ' / '.join(TAGS[c] for c in codes), ' / '.join(codes))
     return out + ('<span class="tag-note">%s</span>' % extra if extra else '')
 
@@ -242,7 +256,7 @@ meta = [{'id': u['id'], 'title': BeautifulSoup(md(u['title']), 'html.parser').ge
 
 shell = (HERE / 'shell2.html').read_text(encoding='utf-8')
 out = (shell.replace('{{MAP}}', map_html).replace('{{DRAWER}}', drawer_html)
-       .replace('{{UNITS}}', '\n'.join(sections_html)).replace('{{META}}', json.dumps(meta, ensure_ascii=False))
+       .replace('{{UNITS}}', '\n'.join(sections_html)).replace('{{META}}', json.dumps(meta, ensure_ascii=False)).replace('{{PRESS}}', json.dumps(PRESS, ensure_ascii=False))
        .replace('{{HOMEIMG_TAG}}', '<img src="img/triunfo.jpg" alt="">' if (IMG / 'triunfo.jpg').exists() else '')
        .replace('{{HOMECREDIT}}', html.escape(CREDITS.get('triunfo', ''))))
 OUT.write_text(out, encoding='utf-8')

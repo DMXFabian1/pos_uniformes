@@ -254,6 +254,26 @@ body.reading .side-arrow{opacity:.75}.side-arrow:hover{opacity:1;transform:scale
 @media (max-width:1100px){.side-arrow{display:none}}
 footer.colophon{max-width:1280px;margin:4rem auto 0;padding:1.5rem clamp(16px,4vw,56px) 3rem;border-top:1px solid var(--rule);font-family:var(--ui);font-size:.82rem;color:var(--ink-2)}
 
+
+/* press notes */
+button.tag.press{font:inherit;font-family:var(--ui);font-size:.68rem;font-weight:600;letter-spacing:.06em;line-height:1;padding:.24em .45em .2em;background:color-mix(in srgb,var(--flame) 12%,transparent);cursor:pointer;display:inline-flex;align-items:center;gap:.25em;transition:background .2s,transform .2s}
+button.tag.press svg{width:.8em;height:.8em;stroke:currentColor;fill:none;stroke-width:1.6}
+button.tag.press:hover,button.tag.press[aria-expanded="true"]{background:var(--flame);color:var(--paper)}
+.pop{position:fixed;z-index:70;width:min(400px,calc(100vw - 32px));background:var(--paper);color:var(--ink);border:1px solid var(--rule);border-top:3px solid var(--flame);border-radius:4px;
+  box-shadow:0 24px 50px -20px rgba(0,0,0,.55);padding:1.1rem 1.2rem 1.2rem;opacity:0;transform:translateY(8px) scale(.98);pointer-events:none;transition:opacity .22s,transform .22s}
+.pop.open{opacity:1;transform:none;pointer-events:auto}
+.pop-close{position:absolute;top:.5rem;right:.5rem;width:30px;height:30px;border:0;background:none;cursor:pointer;color:var(--ink-2);border-radius:50%}
+.pop-close:hover{background:var(--paper-2);color:var(--ink)}
+.pop-close svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8}
+.pop-meta{font-family:var(--ui);font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:var(--flame);margin:0 2rem .5rem 0;font-weight:600}
+.pop-title{font-family:var(--display);font-size:1.3rem;line-height:1.2;margin:0 0 .6rem}
+.pop-sum{font-family:var(--ui);font-size:.92rem;line-height:1.45;color:var(--ink);margin:0 0 .7rem}
+.pop-quote{margin:0 0 .9rem;padding-left:.8rem;border-left:2px solid var(--flame);font-family:var(--body);font-style:italic;font-size:.95rem;line-height:1.45;color:var(--ink-2)}
+.pop-link{display:inline-flex;align-items:center;gap:.4rem;font-family:var(--ui);font-weight:500;font-size:.92rem}
+.pop-warn{font-family:var(--ui);font-size:.76rem;color:var(--ink-2);margin:.9rem 0 0;padding-top:.7rem;border-top:1px solid var(--rule)}
+.pop-more{font-family:var(--ui);font-size:.82rem;margin:.5rem 0 0;color:var(--ink-2)}
+@media (max-width:640px){.pop{left:0!important;right:0;bottom:0;top:auto!important;width:100%;border-radius:12px 12px 0 0;padding-bottom:calc(1.4rem + env(safe-area-inset-bottom,0px));transform:translateY(30px)}}
+
 @keyframes breathe{from{transform:scale(1.0)}to{transform:scale(1.09) translate(-1%,-1%)}}
 @keyframes rise{from{transform:translateY(.35em);opacity:.2;filter:blur(4px)}to{transform:none;opacity:1;filter:none}}
 @keyframes enter{from{transform:translateY(18px);opacity:.82}to{transform:none;opacity:1}}
@@ -330,6 +350,7 @@ footer.colophon{max-width:1280px;margin:4rem auto 0;padding:1.5rem clamp(16px,4v
 {{UNITS}}
 </main>
 
+<div class="pop" id="pop" role="dialog" aria-modal="false" aria-labelledby="popTitle"><button class="pop-close" id="popClose" type="button" aria-label="Cerrar nota"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button><div id="popBody"></div></div>
 <button class="side-arrow l" id="sidePrev" type="button" aria-label="Lección anterior"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
 <button class="side-arrow r" id="sideNext" type="button" aria-label="Lección siguiente"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
 
@@ -432,6 +453,31 @@ footer.colophon{max-width:1280px;margin:4rem auto 0;padding:1.5rem clamp(16px,4v
   var c=$('#candle'), t; c.addEventListener('click',function(){ clearTimeout(t); c.classList.add('out'); c.setAttribute('aria-label','La vela se apagó');
     var hh=$('#homeHero'); hh.classList.remove('dark'); void hh.offsetWidth; hh.classList.add('dark');
     t=setTimeout(function(){c.classList.remove('out'); c.setAttribute('aria-label','Apagar la vela');},4200); });
+
+
+  // ---------- press notes
+  var PRESS={{PRESS}}, pop=$('#pop'), popBtn=null;
+  function esc(t){var d=document.createElement('div');d.textContent=t||'';return d.innerHTML}
+  function closePop(){ pop.classList.remove('open'); if(popBtn){popBtn.setAttribute('aria-expanded','false'); popBtn=null;} }
+  function openPop(btn){
+    var p=PRESS[+btn.getAttribute('data-press')]; if(!p) return;
+    if(popBtn===btn){closePop();return} closePop(); popBtn=btn; btn.setAttribute('aria-expanded','true');
+    var links=(p.sources||[]).map(function(s,i){return '<a class="pop-link" target="_blank" rel="noopener" href="'+esc(s.url)+'">'+(i===0?'Leer la nota en ':'También en ')+esc(s.outlet)+' ↗</a>'}).join('<br>');
+    var s0=(p.sources||[])[0]||{};
+    $('#popBody').innerHTML='<p class="pop-meta">'+esc(s0.outlet)+(s0.date?' · '+esc(s0.date):'')+'</p>'+
+      '<h3 class="pop-title" id="popTitle">'+esc(s0.headline||p.claim)+'</h3>'+
+      '<p class="pop-sum">'+esc(p.summary)+'</p>'+(p.quote?'<blockquote class="pop-quote">«'+esc(p.quote)+'»</blockquote>':'')+links+
+      (p.note?'<p class="pop-more">'+esc(p.note)+'</p>':'')+
+      '<p class="pop-warn">Dato respaldado sólo por prensa, no por una fuente académica. Tómalo como pista, no como hecho establecido.</p>';
+    if(innerWidth>640){ var r=btn.getBoundingClientRect(), w=pop.offsetWidth||400, left=Math.min(Math.max(16,r.left-20),innerWidth-w-16);
+      pop.style.left=left+'px'; pop.style.top='0px'; var h=pop.offsetHeight; var top=r.bottom+10; if(top+h>innerHeight-12) top=Math.max(12,r.top-h-10); pop.style.top=top+'px'; }
+    pop.classList.add('open'); $('#popClose').focus({preventScroll:true});
+  }
+  document.addEventListener('click',function(e){ var b=e.target.closest('button.press'); if(b){e.preventDefault(); openPop(b); return;} if(pop.classList.contains('open')&&!e.target.closest('#pop')) closePop(); });
+  $('#popClose').addEventListener('click',function(){var b=popBtn; closePop(); if(b) b.focus();});
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&pop.classList.contains('open')){var b=popBtn; closePop(); if(b) b.focus();} });
+  addEventListener('scroll',function(){ if(innerWidth>640) closePop(); },{passive:true});
+  window.addEventListener('hashchange',closePop);
 
   // ---------- countdown
   var start=new Date(2026,9,27), end=new Date(2026,10,3,23,59), now=new Date(), d=Math.ceil((start-now)/86400000);
