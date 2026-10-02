@@ -519,3 +519,66 @@ class BugsEncontradosRevisandoTests(unittest.TestCase):
         self.overlay.show()
         mostrada = self.overlay.area_para_imagen().height()
         self.assertEqual(oculta, mostrada)
+
+
+class SinPcPrincipalAlAcusarTests(unittest.TestCase):
+    """El escenario completo: se cae la PC, tocan Enterada, reinician el kiosko.
+
+    Es el hueco que quedaba: el acuse vivía en memoria y el reinicio lo borraba.
+    """
+
+    def setUp(self) -> None:
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        parche = patch(
+            "pos_uniformes.services.acuse_local_queue_service.satellite_data_dir",
+            return_value=Path(self._tmp.name),
+        )
+        parche.start()
+        self.addCleanup(parche.stop)
+        from pos_uniformes.services import acuse_local_queue_service as cola
+
+        self.cola = cola
+        self.parent = QWidget()
+        self.parent.resize(800, 600)
+        self.parent.show()
+        self.reloj = _Reloj()
+
+    def tearDown(self) -> None:
+        self.parent.close()
+
+    def _cartelera(self, **extra):
+        return AnuncioCartelera(
+            self.parent, inactividad_seg=120, now_fn=self.reloj, **extra
+        )
+
+    def test_el_kiosko_reiniciado_no_le_saca_otra_vez_lo_acusado(self) -> None:
+        # Toca Enterada con la PC caída: el acuse se encola.
+        self.cola.encolar(7, satelite="s1", empleada="Evelyn", etiqueta="Junta")
+        # El kiosko se reinicia: cartelera nueva, memoria en blanco.
+        ctrl = self._cartelera()
+        self.addCleanup(ctrl.stop)
+        ctrl.set_anuncios([_aviso(7), _anuncios()[0]])
+        self.assertNotIn(7, [a["id"] for a in ctrl._anuncios])
+        self.assertIn(7, ctrl.acusados)
+
+    def test_lo_que_no_se_acuso_si_sigue_saliendo(self) -> None:
+        ctrl = self._cartelera()
+        self.addCleanup(ctrl.stop)
+        ctrl.set_anuncios([_aviso(7)])
+        self.assertEqual([a["id"] for a in ctrl._anuncios], [7])
+
+    def test_una_cola_ilegible_no_impide_arrancar(self) -> None:
+        from pathlib import Path
+
+        ruta = Path(self._tmp.name) / "data" / "acuses_pendientes.json"
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        ruta.write_text("no soy json", encoding="utf-8")
+        ctrl = self._cartelera()
+        self.addCleanup(ctrl.stop)
+        ctrl.set_anuncios([_aviso(7)])
+        self.assertEqual([a["id"] for a in ctrl._anuncios], [7])

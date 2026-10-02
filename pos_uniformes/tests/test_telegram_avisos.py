@@ -935,3 +935,112 @@ class ComandosConBotonesTests(unittest.TestCase):
             Path(__file__).resolve().parents[1] / "services" / "telegram_bot_service.py"
         ).read_text(encoding="utf-8")
         self.assertIn("botones=botones or None", codigo)
+
+
+class ColaDeAcusesTests(unittest.TestCase):
+    """«Enterada» no se pierde porque se cayó la PC principal.
+
+    Antes, si la base no contestaba, el acuse se quedaba en la memoria del
+    kiosko y se iba con el primer reinicio: el aviso le volvía a salir a quien
+    ya lo había leído y a Daniel no le llegaba nada.
+    """
+
+    def setUp(self) -> None:
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        parche = patch(
+            "pos_uniformes.services.acuse_local_queue_service.satellite_data_dir",
+            return_value=Path(self._tmp.name),
+        )
+        parche.start()
+        self.addCleanup(parche.stop)
+
+        from pos_uniformes.services import acuse_local_queue_service as cola
+
+        self.cola = cola
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.session = Session(self.engine)
+        self.addCleanup(self.session.close)
+
+    def _aviso(self, titulo="Junta a las 6"):
+        a = asvc.crear_anuncio(self.session, titulo=titulo, pide_acuse=True)
+        self.session.commit()
+        return a
+
+    def test_sin_cola_no_hay_pendientes(self) -> None:
+        self.assertEqual(self.cola.pendientes(), [])
+        self.assertEqual(self.cola.ids_pendientes(), set())
+
+    def test_encolar_y_leer(self) -> None:
+        self.cola.encolar(7, satelite="s1", empleada="Evelyn", etiqueta="Junta")
+        self.assertEqual(self.cola.ids_pendientes(), {7})
+        self.assertEqual(self.cola.pendientes()[0]["empleada"], "Evelyn")
+
+    def test_tocar_dos_veces_encola_una(self) -> None:
+        self.cola.encolar(7, satelite="s1")
+        self.cola.encolar(7, satelite="s1")
+        self.assertEqual(len(self.cola.pendientes()), 1)
+
+    def test_guarda_la_hora_del_toque(self) -> None:
+        # Lo que vale es cuándo lo leyó, no cuándo se pudo subir.
+        self.cola.encolar(7, satelite="s1")
+        self.assertTrue(self.cola.pendientes()[0]["visto_en"])
+
+    def test_al_volver_la_conexion_se_sube(self) -> None:
+        a = self._aviso()
+        self.cola.encolar(a.id, satelite="s1", satelite_nombre="Entrada", empleada="Evelyn")
+        subidos = self.cola.drenar(self.session)
+        self.assertEqual(len(subidos), 1)
+        vistos = asvc.quien_vio(self.session, a.id)
+        self.assertEqual([v.empleada for v in vistos], ["Evelyn"])
+        self.assertEqual(self.cola.pendientes(), [])
+
+    def test_el_drenado_dice_si_quedo_cerrado(self) -> None:
+        from datetime import datetime as _dt
+        from unittest.mock import patch
+
+        a = self._aviso()
+        self.cola.encolar(a.id, satelite="s1")
+        pantallas = [{"identificador": "s1", "nombre": "Entrada", "online": True,
+                      "ultimo_visto": _dt.now(timezone.utc)}]
+        with patch(
+            "pos_uniformes.services.satelite_registry_service.listar_con_estado",
+            return_value=pantallas,
+        ):
+            subidos = self.cola.drenar(self.session)
+        self.assertTrue(subidos[0]["cerrado"])
+
+    def test_un_aviso_borrado_no_atora_la_cola(self) -> None:
+        # No hay a qué pegar el acuse y no hay nada que reintentar.
+        self.cola.encolar(99999, satelite="s1")
+        self.assertEqual(self.cola.drenar(self.session), [])
+        self.assertEqual(self.cola.pendientes(), [])
+
+    def test_si_la_subida_truena_la_cola_queda_intacta(self) -> None:
+        from unittest.mock import patch
+
+        a = self._aviso()
+        self.cola.encolar(a.id, satelite="s1")
+        with patch.object(asvc, "marcar_visto", side_effect=RuntimeError("se cayó")):
+            self.assertEqual(self.cola.drenar(self.session), [])
+        self.assertEqual(self.cola.ids_pendientes(), {a.id})
+
+    def test_un_archivo_corrupto_no_tumba_nada(self) -> None:
+        from pathlib import Path
+
+        ruta = Path(self._tmp.name) / "data" / "acuses_pendientes.json"
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        ruta.write_text("{esto no es json", encoding="utf-8")
+        self.assertEqual(self.cola.pendientes(), [])
+        self.cola.encolar(3, satelite="s1")
+        self.assertEqual(self.cola.ids_pendientes(), {3})
+
+    def test_no_crece_sin_limite(self) -> None:
+        for i in range(self.cola.MAX_PENDIENTES + 50):
+            self.cola.encolar(i, satelite="s1")
+        self.assertLessEqual(len(self.cola.pendientes()), self.cola.MAX_PENDIENTES)

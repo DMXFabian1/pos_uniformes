@@ -139,6 +139,14 @@ from pos_uniformes.services.inventory_label_service import (
 
 logger = logging.getLogger(__name__)
 
+
+def _fecha_iso(valor) -> datetime | None:
+    """Lee un ISO guardado en disco. None si no se puede."""
+    try:
+        return datetime.fromisoformat(str(valor))
+    except (TypeError, ValueError):
+        return None
+
 #: Los colores del kiosko para el semáforo compartido. La **regla** de cuándo
 #: algo está en rojo vive en `conteo_mapa_service.semaforo`; aquí solo se
 #: traduce a la paleta de la Libreta, que es la que usa esta pantalla.
@@ -662,6 +670,7 @@ class QuoteSatelliteWindow(QMainWindow):
             rows = None
             links = None
             anuncios_ok = False
+            acuses_subidos: list = []
             try:
                 from pos_uniformes.services.satellite_startup_service import probe_database_host
                 if probe_database_host():
@@ -692,6 +701,17 @@ class QuoteSatelliteWindow(QMainWindow):
                             mi_id = get_satellite_id()
                             registrar(session, mi_id, get_satellite_name())
                             session.commit()
+                            # Primero los acuses que quedaron esperando: si se
+                            # suben después del cache, el aviso ya acusado
+                            # volvería a bajar y a salir en pantalla.
+                            try:
+                                from pos_uniformes.services import (
+                                    acuse_local_queue_service as cola_acuses,
+                                )
+
+                                acuses_subidos = cola_acuses.drenar(session)
+                            except Exception:  # noqa: BLE001
+                                acuses_subidos = []
                             save_anuncios_cache(filas_para_cache(session, para=mi_id))
                             anuncios_ok = True
                         except Exception:  # noqa: BLE001
@@ -706,6 +726,8 @@ class QuoteSatelliteWindow(QMainWindow):
                 self._db_refresh_ready.emit(rows, links)
                 if anuncios_ok:
                     self._anuncios_ready.emit()
+                for subido in acuses_subidos:
+                    self._avisar_acuse_atrasado(subido)
 
         threading.Thread(target=_worker, daemon=True, name="satellite-db-watchdog").start()
 
@@ -7425,6 +7447,31 @@ class QuoteSatelliteWindow(QMainWindow):
         except Exception:  # noqa: BLE001
             return None
 
+    def _avisar_acuse_atrasado(self, subido: dict) -> None:
+        """Le avisa a Daniel de un acuse que estuvo esperando a que volviera la PC.
+
+        Se dice de cuándo fue: «lo vieron hace dos horas» y «acaban de verlo»
+        no son la misma noticia, y la hora que vale es la del toque.
+        """
+        from pos_uniformes.services import telegram_avisos_service as av
+
+        cuando = av.hace_cuanto(_fecha_iso(subido.get("visto_en")))
+        texto = av.aviso_de_acuse(
+            etiqueta=str(subido.get("etiqueta") or "(aviso)"),
+            empleada=subido.get("empleada"),
+            pantalla=subido.get("satelite_nombre"),
+            faltan=int(subido.get("faltan") or 0),
+            cerrado=bool(subido.get("cerrado")),
+        )
+        if cuando and cuando != "ahora":
+            texto += f"\n\n(Lo tocaron {cuando}; la PC principal estaba apagada.)"
+        try:
+            from pos_uniformes.services.telegram_service import enviar_mensaje
+
+            enviar_mensaje(texto)
+        except Exception:  # noqa: BLE001 — el acuse ya quedó escrito
+            logger.exception("No se pudo avisar el acuse atrasado")
+
     def _registrar_acuse_de_aviso(self, anuncio: dict) -> None:
         """Alguien tocó «Enterada»: lo escribe en la DB y le avisa a Daniel.
 
@@ -7468,8 +7515,18 @@ class QuoteSatelliteWindow(QMainWindow):
                     # Si ya lo vieron en todas, el aviso terminó su trabajo.
                     cerrado, faltan = asvc.cerrar_si_ya_lo_vieron(session, int(anuncio_id))
                     session.commit()
-            except Exception:  # noqa: BLE001 — sin DB el acuse se pierde, no la venta
+            except Exception:  # noqa: BLE001 — sin DB se encola, no se pierde
                 logger.exception("No se pudo guardar el acuse del aviso %s", anuncio_id)
+                try:
+                    from pos_uniformes.services import acuse_local_queue_service as cola
+
+                    cola.encolar(
+                        int(anuncio_id), satelite=mi_id, satelite_nombre=mi_nombre,
+                        empleada=empleada, etiqueta=etiqueta,
+                    )
+                except Exception:  # noqa: BLE001
+                    logger.exception("Tampoco se pudo encolar el acuse")
+                self.marcar_sin_conexion()
                 return
             if not nuevo:
                 return  # ya se había avisado desde esta pantalla

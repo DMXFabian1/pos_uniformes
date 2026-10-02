@@ -52,7 +52,16 @@ class AnuncioCartelera(QObject):
         #: inyecta la ventana; aquí no se toca ni DB ni red.
         self._al_acusar_cb = al_acusar
         #: Ids ya acusados EN ESTA pantalla: dejan de pedir acuse localmente.
+        #: Arranca con los que quedaron esperando a que vuelva la PC principal:
+        #: si no, reiniciar el kiosko con la base caída le volvería a sacar el
+        #: recado a quien ya lo leyó, que es justo lo que se está evitando.
         self._acusados: set[int] = set()
+        try:
+            from pos_uniformes.services import acuse_local_queue_service as cola
+
+            self._acusados |= cola.ids_pendientes()
+        except Exception:  # noqa: BLE001 — sin cola se sigue igual
+            pass
         #: El anuncio que se está pintando, para saber qué se acusó.
         self._actual: dict | None = None
         self._now = now_fn or time.monotonic
