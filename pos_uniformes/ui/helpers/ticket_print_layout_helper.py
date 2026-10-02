@@ -30,13 +30,31 @@ def tk_bot() -> str:
 
 
 def tk_dbl() -> str:
-    return "╞" + "═" * (TICKET_CHAR_WIDTH - 2) + "╡"
+    """Regla gruesa dentro del recuadro sencillo.
+
+    Las esquinas van sencillas (├ ┤) y no ╞ ╡ a propósito: **CP850 no tiene las
+    uniones simple↔doble**, y la térmica imprime en CP850. Con ╞ ╡ la impresora
+    sacaba `?═══════?` — y lo venía haciendo desde antes de 2026-10-02, sin que
+    nadie lo notara porque en pantalla se ve bien. Hay un test que ahora revisa
+    carácter por carácter que todo el ticket sobreviva a esa codificación.
+    """
+    return "├" + "═" * (TICKET_CHAR_WIDTH - 2) + "┤"
 
 
-def tk_bot_dbl() -> str:
-    """Cierre doble. Deja el total dentro de una banda, que es lo que se busca
-    primero al mirar el papel."""
-    return "╘" + "═" * (TICKET_CHAR_WIDTH - 2) + "╛"
+def tk_dbl_top() -> str:
+    """Arranque del recuadro del total. Doble entero: CP850 sí lo tiene."""
+    return "╔" + "═" * (TICKET_CHAR_WIDTH - 2) + "╗"
+
+
+def tk_dbl_bot() -> str:
+    return "╚" + "═" * (TICKET_CHAR_WIDTH - 2) + "╝"
+
+
+def tk_dbl_row(label: str, value: str) -> str:
+    """Renglón del recuadro del total, con paredes dobles."""
+    gap = _IW - len(label) - len(value)
+    relleno = " " * max(1, gap)
+    return f"║ {label}{relleno}{value} ║"
 
 
 def tk_line(text: str) -> str:

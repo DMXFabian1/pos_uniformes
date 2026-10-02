@@ -63,7 +63,9 @@ from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
     TICKET_CHAR_WIDTH as _TW,
     tk_bot,
     tk_center,
-    tk_bot_dbl,
+    tk_dbl_bot,
+    tk_dbl_row,
+    tk_dbl_top,
     tk_dbl,
     tk_field,
     tk_fmt,
@@ -2485,9 +2487,14 @@ class QuickSaleWidget(QWidget):
             lines.append(tk_row("Descuento:", f"-${tk_fmt(discount)}"))
         # El total entre dos reglas dobles: es lo primero que se busca al
         # mirar el papel, y antes pesaba lo mismo que «Subtotal».
-        lines.append(tk_dbl())
-        lines.append(tk_row("TOTAL A PAGAR:", f"${tk_fmt(total)}"))
-        lines.append(tk_bot_dbl())
+        # El total en su propio recuadro doble: es lo primero que se busca al
+        # mirar el papel. No se puede unir al recuadro de arriba porque CP850 no
+        # tiene las uniones simple↔doble, así que se cierra el de los artículos
+        # y el total va aparte — que además lo hace resaltar más.
+        lines.append(tk_bot())
+        lines.append(tk_dbl_top())
+        lines.append(tk_dbl_row("TOTAL A PAGAR:", f"${tk_fmt(total)}"))
+        lines.append(tk_dbl_bot())
 
         if not store_copy:
             self._append_terms(lines, self._TERMS_VENTA)

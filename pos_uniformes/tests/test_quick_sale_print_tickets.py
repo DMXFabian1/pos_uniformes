@@ -18,7 +18,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtWidgets import QApplication, QDialog, QLineEdit
 
-from pos_uniformes.ui.helpers.ticket_print_layout_helper import tk_row
+from pos_uniformes.ui.helpers.ticket_print_layout_helper import tk_dbl_row, tk_row
 from pos_uniformes.ui.views.quick_sale_view import QuickSaleWidget
 
 _MOD = "pos_uniformes.ui.views.quick_sale_view"
@@ -151,7 +151,7 @@ class QuickSaleTicketDialogTests(unittest.TestCase):
             copy = widget._build_venta_text(store_copy=True, terminal_commission=True)
         # 515.00 - 4.5% = 491.82 -> regla de redondeo (.82 > .69) -> 492.00
         self.assertIn("$492.00", copy)
-        self.assertIn(tk_row("TOTAL A PAGAR:", "$492.00"), copy)
+        self.assertIn(tk_dbl_row("TOTAL A PAGAR:", "$492.00"), copy)
         self.assertNotIn("515.00", copy)
 
     def test_terminal_commission_on_employee_copy(self) -> None:
@@ -718,17 +718,20 @@ class ElTicketSeLeeTests(unittest.TestCase):
         self.assertIn("1 x $15.00", texto)
         self.assertNotIn("T.  ", texto)
 
-    def test_el_total_va_en_una_banda(self) -> None:
+    def test_el_total_va_en_su_propio_recuadro(self) -> None:
         # Es lo primero que se busca al mirar el papel, y pesaba lo mismo que
-        # «Subtotal». Ahora queda entre dos reglas dobles.
+        # «Subtotal». Va aparte y en doble porque CP850 no tiene las uniones
+        # simple↔doble que harían falta para pegarlo al recuadro de arriba.
         w = self._widget([self._item("Playera", "185", 1)])
         renglones = w._build_venta_text(fecha_str="31/10/2026 13:40").splitlines()
         i = next(n for n, l in enumerate(renglones) if "TOTAL A PAGAR" in l)
-        self.assertTrue(renglones[i - 1].startswith("╞"))
-        self.assertTrue(renglones[i + 1].startswith("╘"))
+        self.assertTrue(renglones[i].startswith("║"), renglones[i])
+        self.assertTrue(renglones[i - 1].startswith("╔"), renglones[i - 1])
+        self.assertTrue(renglones[i + 1].startswith("╚"), renglones[i + 1])
+        # Y el de los artículos quedó cerrado antes de abrir el del total.
+        self.assertTrue(renglones[i - 2].startswith("└"), renglones[i - 2])
 
     def test_el_recuadro_queda_cerrado(self) -> None:
-        # Terminar en una regla de en medio deja la caja abierta.
         w = self._widget([self._item("Playera", "185", 1)])
         copia = w._build_venta_text(store_copy=True, fecha_str="31/10/2026 13:40")
-        self.assertTrue(copia.rstrip().endswith("╛"))
+        self.assertTrue(copia.rstrip().endswith("╝"))
