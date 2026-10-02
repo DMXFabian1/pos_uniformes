@@ -696,6 +696,24 @@ primero fue **imprimirlo y leerlo**, no imaginarlo.
 > 1. El `?═══════?` del CP850 **no afecta a los tickets** — ahí los `╞ ╡` se dibujan como glifos y salen bien. El guard de codepage sigue valiendo para las hojas de conteo, y por si algún día los tickets cambian de camino.
 > 2. El raster que se había puesto en `build_escpos_bytes` **no llegaba a los tickets**: el dibujo habría salido en caracteres igual. Ahora `_render_drawtext` parte el contenido en bloques y dibuja el PNG con `painter.drawImage`, centrado y a media hoja de ancho. Sin marcador, el camino de siempre no paga ni un cálculo de más.
 
+### El motivo en la pantalla (2026-10-02)
+
+Vive en **dos lugares y nada más**, y hay un test que lo cuida:
+
+| Dónde | Qué se ve |
+|---|---|
+| Pie de la barra del kiosko | Una raya de 3 px del color de la temporada y el saludo con su emoji |
+| Tarjeta del gate de venta rápida | El emoji en lugar del 📋, y el saludo debajo |
+
+El gate es la cara del kiosko **cuando nadie está atendiendo**; la barra se ve
+siempre pero está fuera del área de trabajo. **Mientras se vende, la pantalla es
+para vender** — no se pinta la ventana de naranja en octubre.
+
+Casi todo el año no hay nada, igual que en el ticket. Y si el servicio truena,
+devuelve None: un adorno no puede impedir que el kiosko abra.
+
+`QuoteSatelliteWindow._marca_de_temporada` · `test_temporada_pantalla` (9).
+
 ### El dibujo, ahora en PNG (2026-10-02)
 
 Daniel preguntó si se podía con PNG. Sí: la térmica imprime mapas de bits con

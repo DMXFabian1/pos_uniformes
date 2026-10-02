@@ -1247,8 +1247,52 @@ class QuoteSatelliteWindow(QMainWindow):
 
         layout.addWidget(budget_card)
         layout.addWidget(items_card, 1)
+        # El detalle de temporada vive AQUÍ y en ningún otro lado de la ventana:
+        # al pie de la barra, debajo de todo, donde se ve siempre y no estorba
+        # nunca. Daniel (02/10): "nada exagerado, pero sí algo sutil".
+        marca = self._marca_de_temporada()
+        if marca is not None:
+            layout.addWidget(marca)
         card.setLayout(layout)
         return card
+
+    @staticmethod
+    def _marca_de_temporada() -> QWidget | None:
+        """Una rayita de color y el saludo al pie de la barra. None casi todo el año.
+
+        No se pinta la ventana entera de naranja en octubre: se pone una marca
+        chica y se deja en paz lo que la empleada usa para trabajar. La mayor
+        parte del año no hay nada —y eso es parte del diseño, porque un adorno
+        permanente deja de notarse.
+        """
+        try:
+            from pos_uniformes.services.temporada_service import actual
+
+            t = actual()
+        except Exception:  # noqa: BLE001 — un adorno no puede impedir que abra
+            return None
+        if t is None:
+            return None
+
+        caja = QWidget()
+        ly = QVBoxLayout(caja)
+        ly.setContentsMargins(0, 10, 0, 0)
+        ly.setSpacing(6)
+
+        raya = QFrame()
+        raya.setFrameShape(QFrame.Shape.HLine)
+        raya.setFixedHeight(3)
+        raya.setStyleSheet(f"background: {t.color}; border: none;")
+        ly.addWidget(raya)
+
+        saludo = QLabel(f"{t.emoji}  {t.saludo}")
+        saludo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        saludo.setWordWrap(True)
+        saludo.setStyleSheet(
+            f"color: {t.color}; font-size: 12px; font-weight: 700; background: transparent;"
+        )
+        ly.addWidget(saludo)
+        return caja
 
     @staticmethod
     def _scrollable(widget: QWidget) -> QScrollArea:
