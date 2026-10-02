@@ -432,10 +432,26 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
             payload = telegram_service._llamar(token, "getUpdates", datos, timeout=ESPERA_GETUPDATES_SEG + 15)
         except Exception as exc:  # noqa: BLE001
             logger.warning("getUpdates falló: %s", exc)
+            # Se anota el hueco: el bot no puede avisar mientras está
+            # incomunicado —esa es la falla— pero sí contarlo al volver.
+            try:
+                from pos_uniformes.services import bot_conexion_service as conexion
+
+                conexion.anotar_fallo()
+            except Exception:  # noqa: BLE001 — llevar la cuenta no tumba el bot
+                pass
             time.sleep(10)
             if una_vez:
                 return
             continue
+        try:
+            from pos_uniformes.services import bot_conexion_service as conexion
+
+            de_regreso = conexion.anotar_ok()
+            if de_regreso:
+                _mandar(de_regreso)
+        except Exception:  # noqa: BLE001
+            logger.exception("No se pudo contar el hueco de conexión")
         for upd in payload.get("result", []):
             offset = int(upd["update_id"]) + 1
             toque = upd.get("callback_query")
