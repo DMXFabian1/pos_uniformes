@@ -75,6 +75,16 @@ from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
 
 _TIW = _TW - 4
 
+
+def _temporada_de_hoy():
+    """La temporada del calendario, o None. Nunca estorba si algo falla."""
+    try:
+        from pos_uniformes.services.temporada_service import actual
+
+        return actual()
+    except Exception:  # noqa: BLE001 — un adorno no puede impedir que se venda
+        return None
+
 if TYPE_CHECKING:
     from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
 
@@ -229,7 +239,13 @@ class QuickSaleWidget(QWidget):
         cl.setSpacing(12)
         cl.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        emoji = QLabel("📋")
+        # El motivo de temporada vive AQUÍ y en ningún otro lado de la venta:
+        # es la cara del kiosko cuando nadie está atendiendo. Mientras se vende,
+        # la pantalla es para vender (Daniel, 02/10: "nada exagerado, pero sí
+        # algo sutil").
+        temporada = _temporada_de_hoy()
+
+        emoji = QLabel(temporada.emoji if temporada else "📋")
         emoji.setObjectName("gateEmoji")
         emoji.setAlignment(Qt.AlignmentFlag.AlignCenter)
         cl.addWidget(emoji)
@@ -243,6 +259,16 @@ class QuickSaleWidget(QWidget):
         hint.setObjectName("gateHint")
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         cl.addWidget(hint)
+
+        if temporada is not None:
+            saludo = QLabel(temporada.saludo)
+            saludo.setObjectName("gateTemporada")
+            saludo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            saludo.setStyleSheet(
+                f"color: {temporada.color}; font-size: 13px; font-weight: 700;"
+                " background: transparent;"
+            )
+            cl.addWidget(saludo)
 
         cl.addSpacing(8)
 
@@ -2454,8 +2480,30 @@ class QuickSaleWidget(QWidget):
             self._append_terms(lines, self._TERMS_VENTA)
             lines.append("")
             lines.append("Gracias por su compra.".center(_TW))
+            self._append_temporada(lines)
 
         return "\n".join(lines)
+
+    @staticmethod
+    def _append_temporada(lines: list[str]) -> None:
+        """El detalle del calendario al pie del ticket, si hoy hay temporada.
+
+        Va **después** del «Gracias por su compra» y solo en la copia del
+        cliente: la de la tienda se archiva y no necesita adornos. La mayor
+        parte del año no agrega nada — y eso está bien, porque un adorno que
+        sale siempre deja de notarse.
+        """
+        try:
+            from pos_uniformes.services.temporada_service import renglones_de_ticket
+
+            renglones = renglones_de_ticket()
+        except Exception:  # noqa: BLE001 — un adorno jamás detiene un ticket
+            return
+        if not renglones:
+            return
+        lines.append("")
+        for renglon in renglones:
+            lines.append(renglon.center(_TW))
 
     def _build_apartado_text(
         self,

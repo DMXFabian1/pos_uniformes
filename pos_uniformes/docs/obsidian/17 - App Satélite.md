@@ -595,3 +595,60 @@ en tres semanas no debe desaparecer mientras tanto. *Apagada no es retirada.*
 
 `satelite_registry_service.listar_viejos` / `retirar_viejos` ·
 `test_satelite_registro_limpieza` (11).
+
+## Temporadas: un detalle del calendario (2026-10-02)
+
+Idea de Daniel: *"poner temáticas… que se viera un dibujito en el ticket, tal
+vez también que la app tuviera motivos, nada exagerado, pero sí algo sutil"*.
+
+`services/temporada_service.py` es el **único** lugar que decide en qué fecha
+estamos; de ahí beben el ticket y la pantalla. Repartido, un año alguien mueve
+Halloween en un lado y no en el otro.
+
+| Temporada | Fechas |
+|---|---|
+| **Regreso a clases** | 15 jul – 10 sep |
+| Independencia | 11–17 sep |
+| Halloween | 20–31 oct |
+| Día de Muertos | 1–2 nov |
+| Navidad | 1–25 dic |
+| Año nuevo y Reyes | 26 dic – 6 ene |
+| San Valentín | 10–14 feb |
+| Día de las Madres | 5–10 may |
+
+El **regreso a clases** va primero en la lista a propósito: para una tienda de
+uniformes es LA temporada, no una fiesta más, y si algún año se empalma con
+otra, el uniforme es lo que trae a la gente.
+
+### Tres reglas, porque esto es una tienda y no una tarjeta
+
+- **El dibujo es ASCII puro, sin emoji.** La térmica dibuja texto con una fuente
+  monoespaciada: las líneas salen, los emoji salen como cuadritos. Los emoji se
+  quedan para la pantalla. Hay un test que lo cuida.
+- **Máximo cuatro renglones.** El ticket es papel que cuesta y que se guarda.
+- **El saludo pesa más que el dibujo.** «Feliz Día de Muertos» de la tienda de
+  uniformes de su hijo es lo que la señora lee; el dibujo es el adorno del
+  adorno.
+
+Y la mayor parte del año **no sale nada** — un adorno que sale siempre deja de
+notarse, y entonces no adorna. Un test verifica que haya más de 200 días
+limpios.
+
+> [!warning] El bug que casi se imprime
+> Quien imprime centra renglón por renglón, y centrar cada uno por su cuenta le
+> da a cada uno un margen distinto: **el dibujo se desarma**. Se vio al
+> renderizarlo enmarcado, antes de tocar el ticket. `renglones_de_ticket`
+> devuelve el arte **rellenado al mismo ancho**, para que el centrado les toque
+> igual y el bloque conserve su forma.
+
+### Dónde se ve
+
+- **Ticket:** al pie, **después** del «Gracias por su compra» y **solo en la
+  copia del cliente** — la de la tienda se archiva y no necesita adornos.
+- **Pantalla:** el emoji y el saludo en la tarjeta del gate de venta rápida, y
+  nada más. Es la cara del kiosko cuando nadie está atendiendo; mientras se
+  vende, la pantalla es para vender.
+
+Un adorno **jamás** detiene un ticket: si algo falla, se omite y nadie se entera.
+
+`test_temporadas` (18).
