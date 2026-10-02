@@ -97,10 +97,10 @@ sections = split_h2(d03)
 arch = next(b for t, b in sections if t == 'Arquitectura')
 ruta = next(b for t, b in sections if t.startswith('Ruta intensiva'))
 doc_unit('programa', 'Lecciones', 'El programa', '## Arquitectura\n' + arch + '\n## Ruta intensiva\n' + ruta,
-         img('programa', 'center 40%'), 'Dieciséis módulos',
+         img('programa', 'center 30%'), 'Dieciséis módulos',
          'La arquitectura del curso, las obras que regresan y la ruta intensiva para este otoño.')
 
-MOD_IMG = {1: ('triunfo', 'center 55%'), 2: ('m02', 'center 30%'), 3: ('m03', 'center'), 4: ('m04', 'center'),
+MOD_IMG = {1: ('triunfo', 'center 55%'), 2: ('m02', 'center 30%'), 3: ('m03', 'center'), 4: ('m04', 'left center'),
            5: ('m05', 'center 35%'), 6: ('m06', 'center'), 7: ('m07', 'center'), 8: ('m08', 'center 35%'),
            9: ('m09', 'center 40%'), 10: ('m10', 'center 40%'), 11: ('m11', 'center 30%'), 12: ('m12', 'center'),
            13: ('m13', 'center 25%'), 14: ('m14', 'center'), 15: ('m15', 'center 20%'), 16: ('triunfo', 'right 20%')}
@@ -165,9 +165,14 @@ def module_html(u):
     u['question'] = question
     u['summary'] = question
     nav = ''.join('<button class="stepdot" type="button" data-target="%s-s%02d" title="%s"><span>%02d</span>%s</button>' % (u['id'], n, html.escape(l), n, html.escape(l)) for n, l, c, _ in steps)
-    body = ''.join('<article class="step %s" id="%s-s%02d"><header><span class="step-n">%02d</span><h3>%s</h3></header><div class="step-body">%s</div></article>'
-                   % (c, u['id'], n, n, html.escape(l), inner) for n, l, c, inner in steps)
-    return '<nav class="steps" aria-label="Apartados de la lección">%s</nav><div class="steps-body">%s</div>' % (nav, body)
+    im = u['image']
+    def extra(c):
+        if c == 'anchor' and im:
+            return '<figure class="anchor-fig"><img src="%s" alt="" loading="lazy"><figcaption>%s</figcaption></figure>' % (im['src'], html.escape(im['credit']))
+        return ''
+    body = ''.join('<article class="step %s" id="%s-s%02d"><header><span class="step-n">%02d</span><h3>%s</h3></header><div class="step-body">%s</div>%s</article>'
+                   % (c, u['id'], n, n, html.escape(l), inner, extra(c)) for n, l, c, inner in steps)
+    return '<div class="steps-body">%s</div><nav class="steps" aria-label="Apartados de la lección"><p class="steps-title">En esta lección</p>%s</nav>' % (body, nav)
 
 for u in units:
     if u['kind'] == 'module':

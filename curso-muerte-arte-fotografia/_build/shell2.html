@@ -151,27 +151,35 @@ a.read .dcheck::after{background:var(--maya);border-color:var(--maya)}
 .chipnav:hover,.stepdot:hover{border-color:var(--grana);color:var(--grana)}
 .stepdot span{font-family:var(--mono);font-size:.72rem;margin-right:.35rem;color:var(--grana)}
 
-/* module steps */
-.steps-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1.2rem 2.5rem;align-items:start}
-.step{grid-column:span 2;max-width:var(--measure);scroll-margin-top:calc(var(--bar) + 20px)}
-.step header{display:flex;align-items:baseline;gap:.8rem;border-top:1px solid var(--rule);padding-top:1rem;margin-bottom:.5rem}
-.step-n{font-family:var(--display-sc);font-size:1.6rem;color:var(--grana);line-height:1;min-width:2ch}
-.step h3{font-family:var(--ui);font-weight:600;font-size:.82rem;letter-spacing:.14em;text-transform:uppercase;margin:0;color:var(--ink-2)}
+/* module steps: reading column + sticky rail of the 14 parts */
+.ubody.module{display:grid;grid-template-columns:minmax(0,1fr) 240px;gap:0 3.5rem;align-items:start}
+.steps{position:sticky;top:calc(var(--bar) + 1.2rem);flex-direction:column;flex-wrap:nowrap;gap:.1rem;border-bottom:0;margin:0;padding:0 0 0 1rem;border-left:1px solid var(--rule)}
+.steps-title{font-family:var(--ui);font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-2);margin:0 0 .6rem}
+.stepdot{border:0;border-radius:0;background:none;padding:.28rem 0;font-size:.86rem}
+.stepdot.on{color:var(--grana)}
+.stepdot.on span{font-weight:600}
+.steps-body{min-width:0}
+.step{max-width:var(--measure);scroll-margin-top:calc(var(--bar) + 20px);margin-bottom:1.6rem}
+.step header{display:flex;align-items:baseline;gap:.8rem;border-top:1px solid var(--rule);padding-top:1rem;margin-bottom:.6rem}
+.step-n{font-family:var(--display-sc);font-size:1.7rem;color:var(--grana);line-height:1;min-width:2ch}
+.step header h3{font-family:var(--ui);font-weight:600;font-size:.8rem;letter-spacing:.16em;text-transform:uppercase;margin:0;color:var(--ink-2)}
 .step-body > :first-child{margin-top:0}
-.step.anchor,.step.exercise,.step.socratic,.step.final{grid-column:1/-1;max-width:none}
-.step.anchor .step-body,.step.exercise .step-body,.step.socratic .step-body{max-width:var(--measure)}
-.step.anchor{background:var(--paper-2);padding:0 1.4rem 1.2rem;border-radius:3px}
-.step.anchor header{border-top:0}
+.step.anchor{max-width:none;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,240px);gap:0 2rem;background:var(--paper-2);padding:0 1.4rem 1.4rem;border-radius:3px}
+.step.anchor header{grid-column:1/-1;border-top:0}
+.step.anchor .step-body{font-family:var(--display);font-size:1.2rem;line-height:1.45}
+.anchor-fig{margin:0;align-self:start}
+.anchor-fig img{width:100%;max-height:340px;object-fit:cover;border-radius:2px;box-shadow:0 10px 24px -14px rgba(0,0,0,.6)}
+.anchor-fig figcaption{font-family:var(--ui);font-size:.72rem;color:var(--ink-2);margin-top:.4rem;line-height:1.35}
 .step.socratic .step-body li{font-family:var(--display);font-size:1.18rem;line-height:1.4;list-style:none;position:relative;margin:.55rem 0}
 .step.socratic .step-body ul{padding-left:1.6rem}
 .step.socratic .step-body li::before{content:"?";position:absolute;left:-1.5rem;top:-.1rem;font-family:var(--display-sc);color:var(--grana);font-size:1.4rem}
 .step.exercise{border:1px solid var(--maya);border-radius:3px;padding:0 1.4rem 1.2rem;background:color-mix(in srgb,var(--maya) 7%,var(--paper))}
-.step.exercise header{border-top:0}.step.exercise h3{color:var(--maya)}
-.step.final{text-align:center;padding:2.5rem 1rem 1rem}
+.step.exercise header{border-top:0}.step.exercise header h3{color:var(--maya)}
+.step.final{text-align:center;padding:2.5rem 1rem 1rem;margin-inline:auto}
 .step.final header{justify-content:center;border-top:0}
 .step.final .step-body{font-family:var(--display);font-style:italic;font-size:clamp(1.3rem,2.6vw,1.8rem);line-height:1.35;max-width:36ch;margin-inline:auto}
 .step.final .step-body::before{content:"";display:block;width:2.5rem;height:2px;background:var(--grana);margin:0 auto 1.2rem}
-@media (max-width:820px){.steps-body{grid-template-columns:minmax(0,1fr)}.step{grid-column:1/-1}}
+@media (max-width:980px){.ubody.module{grid-template-columns:minmax(0,1fr)}.steps{display:none}.step.anchor{grid-template-columns:minmax(0,1fr)}.anchor-fig{margin-top:1rem}}
 
 /* prose */
 .ubody h2{font-family:var(--display);font-weight:400;font-size:clamp(1.65rem,3vw,2.2rem);line-height:1.15;margin:3rem 0 1rem;text-wrap:balance;scroll-margin-top:calc(var(--bar) + 20px)}
@@ -248,7 +256,7 @@ footer.colophon{max-width:1280px;margin:4rem auto 0;padding:1.5rem clamp(16px,4v
 
 @keyframes breathe{from{transform:scale(1.0)}to{transform:scale(1.09) translate(-1%,-1%)}}
 @keyframes rise{from{transform:translateY(.35em);opacity:.2;filter:blur(4px)}to{transform:none;opacity:1;filter:none}}
-@keyframes enter{from{transform:translateY(14px);opacity:.35}to{transform:none;opacity:1}}
+@keyframes enter{from{transform:translateY(18px);opacity:.82}to{transform:none;opacity:1}}
 @keyframes flicker{0%,100%{transform:scale(1,1) rotate(-1deg)}30%{transform:scale(.96,1.05) rotate(1.5deg)}60%{transform:scale(1.03,.95) rotate(-.5deg)}}
 @keyframes smoke{0%{opacity:.8;transform:translateY(0) scaleX(1)}100%{opacity:0;transform:translateY(-40px) scaleX(3)}}
 @keyframes dusk{0%{opacity:0}25%{opacity:.82}100%{opacity:0}}
@@ -409,6 +417,11 @@ footer.colophon{max-width:1280px;margin:4rem auto 0;padding:1.5rem clamp(16px,4v
 
   // in-page jumps (chips and step dots)
   document.addEventListener('click',function(e){ var b=e.target.closest('[data-target]'); if(!b) return; var t=document.getElementById(b.getAttribute('data-target')); if(t) t.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'}); });
+
+  // current step in the lesson rail
+  var stepObs=('IntersectionObserver' in window)?new IntersectionObserver(function(es){es.forEach(function(e){ if(!e.isIntersecting) return;
+      var id=e.target.id; $$('.stepdot').forEach(function(b){b.classList.toggle('on',b.getAttribute('data-target')===id)}); })},{rootMargin:'-20% 0px -70% 0px'}):null;
+  if(stepObs) $$('.step').forEach(function(s){stepObs.observe(s)});
 
   // ---------- fuse (reading progress)
   function fuse(){ var h=document.documentElement.scrollHeight-innerHeight; var f=h>0?Math.min(1,scrollY/h):0;
