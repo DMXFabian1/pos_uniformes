@@ -363,3 +363,121 @@ class FondoDeVerdadTests(unittest.TestCase):
         self.overlay.render_anuncio({**_aviso(), "imagen_path": "/no/existe.jpg"})
         # Sin archivo cae a texto; lo que importa es que nunca quede en blanco.
         self.assertNotEqual(self._color_de_esquina().name(), "#ffffff")
+
+
+class FotoGrandeTests(unittest.TestCase):
+    """La foto salía del tamaño de una estampilla (foto de la tienda, 02/10).
+
+    El escalado se medía contra el QLabel, y ahí estaba el huevo y la gallina:
+    el label medía lo que su pixmap, y el pixmap se escalaba al label. Ahora se
+    mide contra la ventana, que sí tiene tamaño propio desde el principio.
+    """
+
+    def setUp(self) -> None:
+        import tempfile
+
+        from PyQt6.QtGui import QColor, QImage
+
+        from pos_uniformes.ui.anuncio_overlay import AnuncioOverlay
+
+        self._tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self._tmp.cleanup)
+        self.foto = f"{self._tmp.name}/foto.png"
+        imagen = QImage(900, 1200, QImage.Format.Format_RGB32)   # vertical, de celular
+        imagen.fill(QColor("#3a6ea5"))
+        imagen.save(self.foto)
+
+        self.parent = QWidget()
+        self.parent.resize(1280, 800)
+        self.overlay = AnuncioOverlay(self.parent)
+        self.overlay.setGeometry(self.parent.rect())
+
+    def tearDown(self) -> None:
+        self.parent.close()
+
+    def _con_foto(self, **extra):
+        anuncio = {
+            "id": 5, "titulo": "Así va el aparador", "mensaje": None,
+            "imagen_path": self.foto, "duracion_seg": 8, "pide_acuse": True,
+        }
+        anuncio.update(extra)
+        return anuncio
+
+    def test_el_area_se_mide_contra_la_ventana(self) -> None:
+        area = self.overlay.area_para_imagen()
+        self.assertGreater(area.width(), 1000)   # casi todo el ancho de 1280
+        self.assertGreater(area.height(), 400)
+
+    def test_la_foto_ocupa_buena_parte_de_la_pantalla(self) -> None:
+        self.overlay.render_anuncio(self._con_foto())
+        pixmap = self.overlay._image_label.pixmap()
+        self.assertIsNotNone(pixmap)
+        # Una vertical en pantalla ancha la limita el alto; aun así tiene que
+        # llenar más de la mitad, no ser una estampilla de veinte píxeles.
+        self.assertGreater(pixmap.height(), self.overlay.height() * 0.5)
+
+    def test_conserva_la_proporcion(self) -> None:
+        self.overlay.render_anuncio(self._con_foto())
+        pixmap = self.overlay._image_label.pixmap()
+        self.assertAlmostEqual(pixmap.width() / pixmap.height(), 900 / 1200, places=1)
+
+    def test_el_pie_de_foto_se_lee(self) -> None:
+        # Quien manda una foto con pie lo escribió para que se leyera.
+        self.overlay.render_anuncio(self._con_foto())
+        self.assertTrue(self.overlay._message_label.isVisibleTo(self.overlay))
+        self.assertIn("aparador", self.overlay._message_label.text())
+
+    def test_sin_pie_no_deja_un_renglon_vacio(self) -> None:
+        self.overlay.render_anuncio(self._con_foto(titulo=None, mensaje=None))
+        self.assertFalse(self.overlay._message_label.isVisibleTo(self.overlay))
+
+    def test_al_crecer_la_ventana_la_foto_crece(self) -> None:
+        self.overlay.render_anuncio(self._con_foto())
+        chica = self.overlay._image_label.pixmap().height()
+        self.parent.resize(1920, 1200)
+        self.overlay.setGeometry(self.parent.rect())
+        self.overlay._reescalar_pixmap()
+        self.assertGreater(self.overlay._image_label.pixmap().height(), chica)
+
+
+class SinBandasBlancasTests(unittest.TestCase):
+    """Las etiquetas se pintaban su propio fondo blanco.
+
+    Con una hoja de estilo en el padre, Qt dibuja también a los hijos con el
+    estilo de hojas y cada etiqueta se pinta de blanco. El texto va en crema:
+    sobre esas bandas desaparecía igual que sobre el kiosko.
+    """
+
+    def setUp(self) -> None:
+        from pos_uniformes.ui.anuncio_overlay import AnuncioOverlay
+
+        self.parent = QWidget()
+        self.parent.resize(900, 600)
+        self.overlay = AnuncioOverlay(self.parent)
+        self.overlay.setGeometry(self.parent.rect())
+        self.overlay.render_anuncio(_aviso())
+
+    def tearDown(self) -> None:
+        self.parent.close()
+
+    def _imagen(self):
+        return self.overlay.grab().toImage()
+
+    def test_detras_del_titulo_esta_el_fondo_del_aviso(self) -> None:
+        imagen = self._imagen()
+        geo = self.overlay._title_label.geometry()
+        # Junto al borde izquierdo de la etiqueta, fuera de las letras.
+        color = imagen.pixelColor(geo.left() + 2, geo.center().y())
+        self.assertEqual(color.name(), "#8f2f12")
+
+    def test_detras_del_pie_tambien(self) -> None:
+        imagen = self._imagen()
+        geo = self.overlay._hint_label.geometry()
+        color = imagen.pixelColor(geo.left() + 2, geo.center().y())
+        self.assertEqual(color.name(), "#8f2f12")
+
+    def test_el_boton_enterada_conserva_su_fondo(self) -> None:
+        # La regla de «sin fondo» del contenedor se la heredaban los botones y
+        # «Enterada» quedaba invisible: letra vino sobre vino.
+        hoja = self.overlay._botones.styleSheet()
+        self.assertIn("#avisoBotones", hoja)

@@ -22,9 +22,16 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import QSize, Qt, pyqtSignal
 from PyQt6.QtGui import QColor, QPainter, QPixmap
-from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QSizePolicy,
+    QVBoxLayout,
+    QWidget,
+)
 
 # Paleta cálida MAXIMODA (misma que el resto del satélite).
 _BG = "#7b2d14"       # marrón/rojo de marca — fondo de anuncios de texto
@@ -33,6 +40,10 @@ _BG_IMG = "#1a1a1a"   # casi negro — fondo para imágenes (letterbox)
 _TITULO = "#fdfaf6"   # crema
 _MENSAJE = "#f3e9dd"
 _HINT = "#e8c9a0"
+#: Los hijos NO pintan fondo: con una hoja de estilo en el padre, Qt dibuja
+#: cada etiqueta con su propio fondo (blanco), y el texto crema se pierde
+#: sobre esas bandas — justo el mismo sintoma que el overlay transparente.
+_SIN_FONDO = "background: transparent;"
 
 # Escalones de letra según el largo del texto (px). El primero que alcanza gana.
 _TITULO_ESCALONES = ((20, 72), (40, 56), (90, 40))
@@ -40,16 +51,26 @@ _TITULO_MINIMO = 32
 _MENSAJE_ESCALONES = ((80, 40), (200, 32), (500, 26))
 _MENSAJE_MINIMO = 20
 
+#: Pastilla de arriba: dice de qué se trata antes de que se lea el texto.
+_PILDORA_STYLE = (
+    "background-color: rgba(253, 250, 246, 38);"
+    "color: {color}; font-size: 20px; font-weight: 800;"
+    "letter-spacing: 3px; border-radius: 18px; padding: 8px 22px;"
+)
+
 _BOTON_STYLE = """
 QPushButton {
     background-color: #fdfaf6; color: #7b2d14;
-    font-size: 30px; font-weight: 800;
-    border: none; border-radius: 14px; padding: 18px 44px;
+    font-size: 32px; font-weight: 800;
+    border: none; border-radius: 16px; padding: 22px 56px;
 }
+QPushButton:pressed { background-color: #e8c9a0; }
 QPushButton#luego {
-    background-color: rgba(253, 250, 246, 40); color: #fdfaf6;
-    font-size: 24px; font-weight: 600; padding: 16px 32px;
+    background-color: transparent; color: #f3e9dd;
+    font-size: 24px; font-weight: 600; padding: 20px 34px;
+    border: 2px solid rgba(253, 250, 246, 90); border-radius: 16px;
 }
+QPushButton#luego:pressed { background-color: rgba(253, 250, 246, 30); }
 """
 
 
@@ -122,13 +143,29 @@ class AnuncioOverlay(QWidget):
         self._image_label = QLabel(self)
         self._image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._image_label.setScaledContents(False)
+        # Que pueda ocupar lo que le den: sin esto el layout le daba su tamaño
+        # natural (el del pixmap ya escalado, o cero) y la foto salía diminuta
+        # junto al texto — así se vio en la tienda el 02/10.
+        self._image_label.setSizePolicy(
+            QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding
+        )
+        self._image_label.setMinimumSize(1, 1)
+        self._image_label.setStyleSheet(_SIN_FONDO)
 
+        # La pastilla va en su propia fila para que no se estire de lado a lado.
         self._kicker_label = QLabel(self)
         self._kicker_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._kicker_label.setStyleSheet(
-            f"color: {_HINT}; font-size: 22px; font-weight: 700; letter-spacing: 2px;"
-        )
+        self._kicker_label.setStyleSheet(_PILDORA_STYLE.format(color=_TITULO))
         self._kicker_label.setVisible(False)
+        self._kicker_fila = QWidget(self)
+        _kf = QHBoxLayout(self._kicker_fila)
+        _kf.setContentsMargins(0, 0, 0, 0)
+        _kf.addStretch(1)
+        _kf.addWidget(self._kicker_label)
+        _kf.addStretch(1)
+        self._kicker_fila.setObjectName("avisoKicker")
+        self._kicker_fila.setStyleSheet("#avisoKicker { background: transparent; }")
+        self._kicker_fila.setVisible(False)
 
         self._title_label = QLabel(self)
         self._title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -140,7 +177,7 @@ class AnuncioOverlay(QWidget):
 
         self._hint_label = QLabel("Toca la pantalla para volver", self)
         self._hint_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._hint_label.setStyleSheet(f"color: {_HINT}; font-size: 20px;")
+        self._hint_label.setStyleSheet(f"color: {_HINT}; font-size: 20px; {_SIN_FONDO}")
 
         self._enterada_btn = QPushButton("✅ Enterada", self)
         self._enterada_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -151,25 +188,36 @@ class AnuncioOverlay(QWidget):
         self._luego_btn.clicked.connect(self.descartado.emit)
 
         self._botones = QWidget(self)
+        self._botones.setObjectName("avisoBotones")
         botones_row = QHBoxLayout(self._botones)
         botones_row.setContentsMargins(0, 0, 0, 0)
-        botones_row.setSpacing(16)
+        botones_row.setSpacing(20)
         botones_row.addStretch(1)
         botones_row.addWidget(self._enterada_btn)
         botones_row.addWidget(self._luego_btn)
         botones_row.addStretch(1)
+        # Con nombre: si la regla fuera a secas, se la heredarian los botones y
+        # «Enterada» perderia su fondo crema (se vio al renderizar, 02/10).
+        self._botones.setStyleSheet("#avisoBotones { background: transparent; }")
         self._botones.setVisible(False)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(48, 48, 48, 32)
+        layout.setContentsMargins(64, 48, 64, 40)
+        layout.setSpacing(18)
         layout.addStretch(1)
-        layout.addWidget(self._kicker_label)
-        layout.addWidget(self._image_label)
+        layout.addWidget(self._kicker_fila)
+        # Factor 1 solo para la imagen: cuando hay foto se queda con el hueco,
+        # y cuando no hay, un QLabel oculto no pide nada y el texto se centra.
+        layout.addWidget(self._image_label, 1)
         layout.addWidget(self._title_label)
         layout.addWidget(self._message_label)
         layout.addStretch(1)
         layout.addWidget(self._botones)
         layout.addWidget(self._hint_label)
+        self._layout = layout
+        #: Índices de los dos addStretch, para poder apagarlos con la foto.
+        self._i_stretch = (0, 5)
+        self._i_imagen = 2
 
     def _pintar_fondo(self, color: str) -> None:
         """Deja el fondo de ese color. Lo pinta `paintEvent`, no la hoja de estilo.
@@ -204,7 +252,7 @@ class AnuncioOverlay(QWidget):
         imagen_path = anuncio.get("imagen_path")
         pixmap = QPixmap(imagen_path) if imagen_path else QPixmap()
         if imagen_path and not pixmap.isNull():
-            self._render_imagen(pixmap)
+            self._render_imagen(pixmap, anuncio.get("titulo"), anuncio.get("mensaje"))
         else:
             self._render_texto(anuncio.get("titulo"), anuncio.get("mensaje"))
         self._render_cabecera_y_pie(anuncio)
@@ -213,50 +261,95 @@ class AnuncioOverlay(QWidget):
         """La tirita de arriba, los botones y la línea de abajo según el modo."""
         cuando = hace_cuanto(anuncio.get("creado_en"))
         if self._pide_acuse:
-            self._kicker_label.setText(
-                f"AVISO · {cuando}" if cuando else "AVISO"
-            )
+            self._kicker_label.setText(f"AVISO · {cuando}" if cuando else "AVISO")
             self._kicker_label.setVisible(True)
+            self._kicker_fila.setVisible(True)
             self._botones.setVisible(True)
             self._hint_label.setText("Toca «Enterada» para que se sepa que lo leíste")
             if not self._modo_imagen:
                 self._pintar_fondo(_BG_AVISO)
         else:
             self._kicker_label.setVisible(False)
+            self._kicker_fila.setVisible(False)
             self._botones.setVisible(False)
             self._hint_label.setText("Toca la pantalla para volver")
 
-    def _render_imagen(self, pixmap: QPixmap) -> None:
+    def _render_imagen(self, pixmap: QPixmap, titulo=None, mensaje=None) -> None:
+        """La foto manda, y el pie de foto va debajo en chico.
+
+        Antes el modo imagen escondía el texto: quien manda una foto con pie
+        («así va el aparador») escribió ese pie para que se leyera.
+        """
         self._modo_imagen = True
         self._pixmap_original = pixmap
-        self._title_label.setVisible(False)
-        self._message_label.setVisible(False)
         self._image_label.setVisible(True)
+        pie = " · ".join(x.strip() for x in (titulo, mensaje) if x and x.strip())
+        self._title_label.setVisible(False)
+        self._message_label.setText(pie)
+        self._message_label.setStyleSheet(f"color: {_MENSAJE}; font-size: 30px; {_SIN_FONDO}")
+        self._message_label.setVisible(bool(pie))
         self._pintar_fondo(_BG_IMG)
+        self._ajustar_espaciadores(hay_imagen=True)
         self._reescalar_pixmap()
 
     def _render_texto(self, titulo: str | None, mensaje: str | None) -> None:
         self._modo_imagen = False
         self._pixmap_original = None
         self._image_label.setVisible(False)
+        self._ajustar_espaciadores(hay_imagen=False)
         self._pintar_fondo(_BG)
         titulo = titulo or ""
         mensaje = mensaje or ""
         px_titulo = _tamano(titulo, _TITULO_ESCALONES, _TITULO_MINIMO)
         px_mensaje = _tamano(mensaje, _MENSAJE_ESCALONES, _MENSAJE_MINIMO)
         self._title_label.setStyleSheet(
-            f"color: {_TITULO}; font-size: {px_titulo}px; font-weight: 800;"
+            f"color: {_TITULO}; font-size: {px_titulo}px; font-weight: 800; {_SIN_FONDO}"
         )
-        self._message_label.setStyleSheet(f"color: {_MENSAJE}; font-size: {px_mensaje}px;")
+        self._message_label.setStyleSheet(f"color: {_MENSAJE}; font-size: {px_mensaje}px; {_SIN_FONDO}")
         self._title_label.setText(titulo)
         self._title_label.setVisible(bool(titulo))
         self._message_label.setText(mensaje)
         self._message_label.setVisible(bool(mensaje))
 
+    def _ajustar_espaciadores(self, *, hay_imagen: bool) -> None:
+        """Con foto, los espaciadores no estiran: el hueco es para la imagen.
+
+        Con `addStretch(1)` arriba y abajo más el factor 1 de la imagen, el
+        sobrante se repartía en tres y a la foto le tocaba un tercio. Por eso
+        salía pequeña aunque el cálculo del área fuera correcto.
+        """
+        for i in self._i_stretch:
+            self._layout.setStretch(i, 0 if hay_imagen else 1)
+        # Y al revés: sin foto, el hueco de la imagen no debe reclamar nada, o
+        # el texto queda pegado arriba con un vacío debajo.
+        self._layout.setStretch(self._i_imagen, 1 if hay_imagen else 0)
+
+    def area_para_imagen(self) -> QSize:
+        """Cuánto espacio le toca a la foto, medido sobre la VENTANA.
+
+        Antes se medía sobre el QLabel, y ahí estaba el huevo y la gallina: el
+        label era del tamaño de su pixmap, el pixmap se escalaba al tamaño del
+        label, y el resultado era una estampilla de veinte píxeles al lado del
+        texto (foto de la tienda, 02/10).
+
+        La ventana sí tiene tamaño propio desde el principio. Se le descuenta
+        lo que ocupan los botones y el pie cuando los hay, para que la foto
+        llegue grande pero nunca los tape.
+        """
+        ancho = max(1, int(self.width() * 0.92))
+        # Lo que NO es la foto: márgenes, pastilla, pie, botones y el renglón de
+        # abajo. Se descuenta por partes para que la foto llegue lo más grande
+        # que quepa sin tapar nada.
+        fraccion = 0.72 if self._pide_acuse else 0.86
+        if self._message_label.isVisible():
+            fraccion -= 0.08
+        alto = max(1, int(self.height() * fraccion))
+        return QSize(ancho, alto)
+
     def _reescalar_pixmap(self) -> None:
         if not self._modo_imagen or self._pixmap_original is None:
             return
-        area = self._image_label.size()
+        area = self.area_para_imagen()
         if area.width() <= 0 or area.height() <= 0:
             return
         self._image_label.setPixmap(
