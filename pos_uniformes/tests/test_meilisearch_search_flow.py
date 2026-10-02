@@ -271,7 +271,7 @@ class AutostartRunsOfflineTests(unittest.TestCase):
 
         source = Path(entry.__file__).read_text(encoding="utf-8")
         autostart_pos = source.index("autostart_and_reindex()")
-        probe_pos = source.index("connection_available = probe_database_host()")
+        probe_pos = source.index("connection_available = esperar_base(")
         self.assertLess(
             autostart_pos,
             probe_pos,

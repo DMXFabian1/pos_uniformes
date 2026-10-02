@@ -298,6 +298,7 @@ class QuickSaleWidget(QWidget):
                 self._gate_input.setFocus()
                 return
         else:
+            sin_conexion = False
             try:
                 with get_session() as session:
                     emp = session.scalar(
@@ -310,15 +311,34 @@ class QuickSaleWidget(QWidget):
                 # Sin log, un error real de DB se veia como "codigo no encontrado".
                 _logger.exception("Error de DB al validar empleada '%s' en el gate", code)
                 emp = None
+                sin_conexion = True
 
-            if not emp:
+            if sin_conexion:
+                # No es lo mismo "tu gafete no existe" que "no alcanzo la PC".
+                # Decirle lo primero cuando pasa lo segundo la deja parada en la
+                # puerta creyendo que su gafete está mal, y de ahí a apagar y
+                # volver a abrir hay un paso.
+                resuelto = self._empleada_de_cache(code)
+                self._avisar_sin_conexion()
+                if resuelto is None:
+                    self._gate_error.setText(
+                        "Sin conexión con la PC principal y tu gafete no está guardado aquí. "
+                        "Pide que te abran con otro gafete."
+                    )
+                    self._gate_error.setVisible(True)
+                    self._gate_input.clear()
+                    self._gate_input.setFocus()
+                    return
+                emp_code, emp_name = resuelto
+            elif not emp:
                 self._gate_error.setText(f"Codigo '{code}' no encontrado o inactivo.")
                 self._gate_error.setVisible(True)
                 self._gate_input.clear()
                 self._gate_input.setFocus()
                 return
-            emp_code = emp.codigo
-            emp_name = emp.nombre_completo
+            else:
+                emp_code = emp.codigo
+                emp_name = emp.nombre_completo
 
         self._employee_code = emp_code
         self._employee_name = emp_name
@@ -329,6 +349,42 @@ class QuickSaleWidget(QWidget):
         self._refresh_items_table()
         self._refresh_totals()
         QTimer.singleShot(0, self._scan_input.setFocus)
+
+    def _empleada_de_cache(self, code: str) -> tuple[str, str] | None:
+        """(código, nombre) desde la copia local de empleadas, o None.
+
+        La copia la deja el watchdog cada vez que hay conexión, así que con la
+        PC principal apagada se sigue sabiendo de quién es cada gafete — y la
+        venta queda a nombre de quien de verdad atendió, no de un código suelto.
+        """
+        try:
+            from pos_uniformes.services.nombres_empleadas_service import nombres_por_codigo
+
+            nombres = nombres_por_codigo()
+        except Exception:  # noqa: BLE001
+            nombres = {}
+        limpio = str(code or "").strip().upper()
+        nombre = nombres.get(limpio)
+        if nombre:
+            return limpio, nombre
+        # Sin copia local: se acepta el formato de siempre, igual que cuando
+        # el programa arranca sin conexión. Vale más vender que validar.
+        if limpio.startswith(("VEND-", "ENC-")):
+            return limpio, limpio
+        return None
+
+    def _avisar_sin_conexion(self) -> None:
+        """Le dice a la ventana que la base no contestó, para no reintentarla.
+
+        Sin esto cada operación vuelve a chocar con el timeout de cinco
+        segundos hasta que pase el watchdog, que tarda cinco minutos.
+        """
+        marcar = getattr(self.satellite, "marcar_sin_conexion", None)
+        if callable(marcar):
+            try:
+                marcar()
+            except Exception:  # noqa: BLE001
+                pass
 
     # ─── Vista de venta ──────────────────────────────────────────────────
 
@@ -1418,9 +1474,12 @@ class QuickSaleWidget(QWidget):
                 )
         except Exception:  # noqa: BLE001
             _logger.exception("Venta rápida: no se pudo apuntar el gasto")
+            self._avisar_sin_conexion()
             QMessageBox.warning(
                 self, "Sin conexión",
-                "No se pudo apuntar el gasto. Enciende la PC principal e intenta de nuevo.",
+                "No se pudo apuntar el gasto porque la PC principal no contesta.\n\n"
+                "Apúntalo en un papel y vuelve a intentarlo cuando se quite el letrero "
+                "rojo de arriba. No cierres el programa: las ventas siguen guardándose.",
             )
             return
         QMessageBox.information(
@@ -2308,6 +2367,10 @@ class QuickSaleWidget(QWidget):
                 pass
             return info
         except Exception:
+            # Marcarlo aquí ahorra el timeout de 5 s a todo lo que venga
+            # después: este suele ser el primero que choca con la pared,
+            # porque se arma un ticket en cuanto se cobra algo.
+            self._avisar_sin_conexion()
             cached = load_business_info_cache()
             return cached if cached and cached[0] else default
 

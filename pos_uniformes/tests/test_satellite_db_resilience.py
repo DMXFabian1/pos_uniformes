@@ -139,3 +139,201 @@ class KioskLookupFallbackTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SeCaeAMediaTardeTests(unittest.TestCase):
+    """Si la PC principal se apaga con el satélite ya abierto.
+
+    Daniel (01/10): "si la pc principal se apaga, el satélite empieza a fallar
+    y sugiere cerrar". El arranque sin conexión siempre funcionó; lo que no
+    estaba cubierto es caerse A MEDIA TARDE, porque `offline_mode` se decidía
+    una vez al abrir y ya no cambiaba: las treinta decisiones que cuelgan de
+    él seguían tomando el camino de la base.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _ventana(self) -> QuoteSatelliteWindow:
+        return QuoteSatelliteWindow(user_id=1)
+
+    def test_arranca_en_linea(self) -> None:
+        w = self._ventana()
+        self.assertFalse(w.offline_mode)
+        self.assertTrue(w.db_en_linea)
+
+    def test_al_caerse_la_ventana_se_vuelve_local(self) -> None:
+        w = self._ventana()
+        w.marcar_sin_conexion()
+        self.assertTrue(w.offline_mode)
+        self.assertFalse(w.db_en_linea)
+
+    def test_al_volver_la_pc_vuelve_a_estar_en_linea(self) -> None:
+        w = self._ventana()
+        w.marcar_sin_conexion()
+        w._on_db_refresh_ready([{"sku": "SKU1"}], None)
+        self.assertFalse(w.offline_mode)
+
+    def test_el_watchdog_sin_filas_la_marca_local(self) -> None:
+        w = self._ventana()
+        w._on_db_refresh_ready(None, None)
+        self.assertTrue(w.offline_mode)
+
+    def test_marcar_dos_veces_no_hace_nada_la_segunda(self) -> None:
+        w = self._ventana()
+        w.marcar_sin_conexion()
+        w._set_db_connectivity_banner = Mock()
+        w.marcar_sin_conexion()
+        w._set_db_connectivity_banner.assert_not_called()
+
+    def test_el_que_arranco_offline_sigue_offline_aunque_vuelva(self) -> None:
+        # Booteó sin user_id ni catálogo en vivo: volver a "en línea" a media
+        # tarde la dejaría a medias. Se reinicia y ya.
+        w = QuoteSatelliteWindow(user_id=None, offline_mode=True, offline_catalog_cache=[])
+        w._db_online = True
+        self.assertTrue(w.offline_mode)
+
+    def test_el_banner_dice_que_se_puede_seguir_vendiendo(self) -> None:
+        # Un banner que solo informa de la falla invita a apagar y volver a
+        # abrir, que es lo peor que puede hacerse con ventas a medias.
+        w = self._ventana()
+        w.marcar_sin_conexion()
+        texto = w.offline_banner.text()
+        self.assertIn("seguir vendiendo", texto)
+        self.assertIn("se sube solo", texto)
+
+    def test_avisar_del_banner_no_puede_tumbar_la_venta(self) -> None:
+        w = self._ventana()
+        w._set_db_connectivity_banner = Mock(side_effect=RuntimeError("widget muerto"))
+        w.marcar_sin_conexion()          # no debe propagar
+        self.assertTrue(w.offline_mode)
+
+
+class GafeteSinConexionTests(unittest.TestCase):
+    """El gate decía «código no encontrado» cuando lo que faltaba era la PC."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _vista(self, *, offline=False):
+        from pos_uniformes.ui.views.quick_sale_view import QuickSaleWidget
+
+        satellite = SimpleNamespace(
+            offline_mode=offline,
+            _kiosk_lookup_from_cache=None,
+            marcar_sin_conexion=Mock(),
+        )
+        vista = QuickSaleWidget.__new__(QuickSaleWidget)
+        vista.satellite = satellite
+        return vista, satellite
+
+    def test_resuelve_el_gafete_con_la_copia_local(self) -> None:
+        vista, _ = self._vista()
+        with patch(
+            "pos_uniformes.services.nombres_empleadas_service.nombres_por_codigo",
+            return_value={"VEND-3": "Evelyn Ortiz"},
+        ):
+            self.assertEqual(vista._empleada_de_cache("vend-3"), ("VEND-3", "Evelyn Ortiz"))
+
+    def test_sin_copia_local_acepta_el_formato_de_siempre(self) -> None:
+        # Vale más vender que validar: es el mismo criterio que cuando el
+        # programa arranca sin conexión.
+        vista, _ = self._vista()
+        with patch(
+            "pos_uniformes.services.nombres_empleadas_service.nombres_por_codigo",
+            return_value={},
+        ):
+            self.assertEqual(vista._empleada_de_cache("VEND-9"), ("VEND-9", "VEND-9"))
+            self.assertEqual(vista._empleada_de_cache("ENC-1"), ("ENC-1", "ENC-1"))
+
+    def test_un_codigo_que_no_es_gafete_no_abre(self) -> None:
+        vista, _ = self._vista()
+        with patch(
+            "pos_uniformes.services.nombres_empleadas_service.nombres_por_codigo",
+            return_value={},
+        ):
+            self.assertIsNone(vista._empleada_de_cache("SKU000123"))
+
+    def test_si_la_copia_truena_no_revienta(self) -> None:
+        vista, _ = self._vista()
+        with patch(
+            "pos_uniformes.services.nombres_empleadas_service.nombres_por_codigo",
+            side_effect=OSError("disco"),
+        ):
+            self.assertEqual(vista._empleada_de_cache("VEND-3"), ("VEND-3", "VEND-3"))
+
+    def test_avisa_a_la_ventana_para_no_reintentar(self) -> None:
+        # Sin esto cada operación vuelve a esperar el timeout de 5 s hasta que
+        # pase el watchdog, que tarda 5 minutos.
+        vista, satellite = self._vista()
+        vista._avisar_sin_conexion()
+        satellite.marcar_sin_conexion.assert_called_once()
+
+    def test_una_ventana_sin_ese_metodo_no_revienta(self) -> None:
+        from pos_uniformes.ui.views.quick_sale_view import QuickSaleWidget
+
+        vista = QuickSaleWidget.__new__(QuickSaleWidget)
+        vista.satellite = SimpleNamespace(offline_mode=False)
+        vista._avisar_sin_conexion()  # no debe lanzar
+
+
+class EsperarALaPrincipalTests(unittest.TestCase):
+    """Se va la luz, vuelve, y todo se prende junto.
+
+    El servidor tarda en levantar Postgres; el kiosko bootea en segundos. Antes
+    probaba UNA vez, no encontraba nada, y se quedaba en modo local toda la
+    mañana — o se negaba a abrir si tampoco tenía catálogo guardado.
+    """
+
+    def setUp(self) -> None:
+        from pos_uniformes.services import satellite_startup_service as sss
+
+        self.sss = sss
+        self.dormido = []
+
+    def _esperar(self, respuestas, **extra):
+        pasos = iter(respuestas)
+        reloj = {"t": 0.0}
+
+        def _probe():
+            return next(pasos, False)
+
+        def _dormir(seg):
+            self.dormido.append(seg)
+            reloj["t"] += seg
+
+        args = dict(probe=_probe, dormir=_dormir, reloj=lambda: reloj["t"])
+        args.update(extra)
+        return self.sss.esperar_base(**args)
+
+    def test_si_ya_esta_encendida_no_espera_nada(self) -> None:
+        # El caso de todos los días: esperar solo cuesta cuando no hay nadie.
+        self.assertTrue(self._esperar([True]))
+        self.assertEqual(self.dormido, [])
+
+    def test_aguanta_mientras_el_servidor_levanta(self) -> None:
+        self.assertTrue(self._esperar([False, False, True]))
+        self.assertEqual(len(self.dormido), 2)
+
+    def test_se_rinde_y_sigue_en_modo_local(self) -> None:
+        # Rendirse está bien: abre con el catálogo guardado. Lo que no está
+        # bien es quedarse esperando para siempre con la tienda abriendo.
+        self.assertFalse(self._esperar([False] * 100, limite_seg=10, cada_seg=3))
+
+    def test_no_espera_mas_del_limite(self) -> None:
+        self._esperar([False] * 100, limite_seg=9, cada_seg=3)
+        self.assertLessEqual(sum(self.dormido), 9)
+
+    def test_le_cuenta_al_de_la_pantalla_cuanto_falta(self) -> None:
+        avisos = []
+        self._esperar([False, False, True], avisar=lambda i, r: avisos.append((i, r)))
+        self.assertEqual([i for i, _ in avisos], [1, 2])
+        self.assertTrue(all(r >= 0 for _, r in avisos))
+
+    def test_un_aviso_que_truena_no_detiene_la_espera(self) -> None:
+        def _truena(*_a):
+            raise RuntimeError("splash cerrado")
+
+        self.assertTrue(self._esperar([False, True], avisar=_truena))

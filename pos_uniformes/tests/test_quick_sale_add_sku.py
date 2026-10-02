@@ -263,7 +263,12 @@ class GateScanDbErrorLoggingTests(unittest.TestCase):
         warn.assert_called_once()
 
     def test_gate_scan_db_error_is_logged(self) -> None:
-        satellite = SimpleNamespace(offline_mode=False, _kiosk_lookup_from_cache=None)
+        from unittest.mock import Mock
+
+        satellite = SimpleNamespace(
+            offline_mode=False, _kiosk_lookup_from_cache=None,
+            marcar_sin_conexion=Mock(),
+        )
         widget = QuickSaleWidget(satellite)
         widget._gate_input.setText("EMP:VEND-2")
         with patch(
@@ -272,8 +277,13 @@ class GateScanDbErrorLoggingTests(unittest.TestCase):
         ), self.assertLogs("pos_uniformes.ui.views.quick_sale_view", level="ERROR") as logs:
             widget._on_gate_scan()
         self.assertTrue(any("VEND-2" in line for line in logs.output))
-        # El gate sigue mostrando el error amigable y no inicia sesion.
-        self.assertTrue(widget._gate_error.isVisible() or not widget._employee_code)
+        # Hasta el 01/10 el gate la dejaba fuera con «código no encontrado»,
+        # que además era mentira: lo que faltaba era la PC, no su gafete.
+        # Ahora entra con la copia local — sin la PC principal se puede vender,
+        # y dejarla parada en la puerta es lo que lleva a apagar y volver a abrir.
+        self.assertEqual(widget._employee_code, "VEND-2")
+        self.assertFalse(widget._gate_error.isVisible())
+        satellite.marcar_sin_conexion.assert_called_once()
 
 
 if __name__ == "__main__":

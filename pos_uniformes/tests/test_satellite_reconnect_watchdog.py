@@ -67,7 +67,10 @@ class ReconnectWatchdogTests(unittest.TestCase):
         # No se pierde el catálogo, no se cierra nada, banner de sin conexión.
         self.assertEqual(window.catalog_snapshot_rows, [{"sku": "SKU-OLD"}])
         self.assertFalse(window.offline_banner.isHidden())
-        self.assertIn("Sin conexion", window.offline_banner.text())
+        self.assertIn("Sin conexión", window.offline_banner.text())
+        # Y, sobre todo, que no invite a cerrar: eso es lo peor que puede
+        # hacerse con ventas a medias.
+        self.assertIn("seguir vendiendo", window.offline_banner.text())
 
     def test_offline_boot_picks_up_db_when_pc_turns_on(self) -> None:
         # Arrancó offline; el watchdog encuentra la DB y trae datos frescos.

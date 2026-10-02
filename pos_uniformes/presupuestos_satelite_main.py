@@ -149,7 +149,19 @@ def main() -> int:
         print(f"Meilisearch no disponible: {exc}", file=sys.stderr)
 
     _show_splash_message(splash, "Verificando conexión...", app)
-    connection_available = probe_database_host()
+    # Se espera un poco a que la PC principal aparezca. El caso que duele es la
+    # luz: vuelve, todo se prende junto, el servidor tarda en levantar Postgres
+    # y el kiosko —que bootea en segundos— probaba UNA vez y se quedaba en modo
+    # local toda la mañana. Si ya está encendida, esto no cuesta nada: vuelve
+    # en el primer intento.
+    from pos_uniformes.services.satellite_startup_service import esperar_base
+
+    def _esperando(intento: int, restan: int) -> None:
+        _show_splash_message(
+            splash, f"Esperando a la PC principal… ({restan}s)", app
+        )
+
+    connection_available = esperar_base(avisar=_esperando)
 
     if connection_available:
         _show_splash_message(splash, "Preparando base de datos...", app)
@@ -173,12 +185,18 @@ def main() -> int:
         _show_splash_message(splash, "Sin conexión — cargando catálogo local...", app)
         local_cache = load_catalog_cache()
         if local_cache is None:
+            # Es el único caso en que de verdad no se puede abrir: sin catálogo
+            # no hay precios ni SKUs que buscar. Se dice qué pasa y qué hacer,
+            # sin pedirle que "revise la red" — eso no lo va a hacer nadie en
+            # el mostrador.
             splash.close()
             QMessageBox.warning(
                 None,
-                "Sin conexion y sin catalogo guardado",
-                "No se pudo conectar con la PC principal y no hay un catalogo guardado localmente.\n\n"
-                "Enciende la PC principal, conéctate a la red y vuelve a abrir el programa.",
+                "Falta encender la PC principal",
+                "Esta pantalla todavía no tiene su copia del catálogo, y la PC "
+                "principal (la de atrás) no contesta.\n\n"
+                "Enciéndela, espera dos minutos y vuelve a abrir este programa.\n\n"
+                "Si ya está encendida, avisa: puede ser la red.",
             )
             return 1
         window = QuoteSatelliteWindow(

@@ -355,7 +355,10 @@ class QuoteSatelliteWindow(QMainWindow):
     ) -> None:
         super().__init__()
         self.user_id = user_id
-        self.offline_mode = offline_mode
+        # Cómo booteó la ventana. Si booteó sin DB se queda así toda la sesión:
+        # no hay `user_id` ni catálogo en vivo, y volver a "en línea" a media
+        # tarde dejaría la ventana a medias. Se reinicia y ya.
+        self._arranco_offline = bool(offline_mode)
         # Estado de conectividad cacheado (lo mantiene el watchdog off-thread).
         # Arranca según cómo booteó la ventana: si booteó offline, la DB no está.
         # El despachador lo consulta para NO abrir conexiones que congelan la UI.
@@ -598,6 +601,56 @@ class QuoteSatelliteWindow(QMainWindow):
                     pass
         super().closeEvent(event)
 
+    @property
+    def offline_mode(self) -> bool:
+        """¿Estamos sin la PC principal AHORA MISMO?
+
+        Antes era un valor fijo del arranque, y ahí estaba el problema que vio
+        Daniel (01/10): si la PC principal se apagaba a media tarde, la ventana
+        seguía creyéndose en línea. Las treinta decisiones que cuelgan de esto
+        —el gafete, los tickets, los conteos, la libreta— tomaban el camino de
+        la base y se quedaban esperando el timeout de cinco segundos *cada vez*.
+        Eso es lo que se sentía como "empezó a fallar".
+
+        Ahora sigue a la realidad: lo que ya sabía hacer sin conexión lo hace
+        apenas se cae, sin reiniciar nada.
+        """
+        # Con getattr porque algunas pruebas arman la ventana sin __init__:
+        # sin estado conocido se asume en línea, que es como arranca en la tienda.
+        return getattr(self, "_arranco_offline", False) or not getattr(self, "_db_online", True)
+
+    @offline_mode.setter
+    def offline_mode(self, valor: bool) -> None:
+        """Forzar el modo local a mano (lo usan las pruebas y el menú admin).
+
+        Simétrico, igual que en el arranque: ponerlo en False quiere decir
+        «estamos en línea», no solo «no booteó offline». Si no se repusiera
+        `_db_online`, apagarlo nunca volvería a encenderlo.
+        """
+        self._arranco_offline = bool(valor)
+        self._db_online = not bool(valor)
+
+    @property
+    def db_en_linea(self) -> bool:
+        """Lo que el watchdog vio la última vez. Sin estado: se asume que sí."""
+        return bool(getattr(self, "_db_online", True))
+
+    def marcar_sin_conexion(self) -> None:
+        """La PC principal no contestó: anotarlo YA, sin esperar al watchdog.
+
+        El watchdog pasa cada cinco minutos. Sin esto, entre que se cae y que
+        él se entera, cada operación vuelve a intentar la base y vuelve a
+        esperar su timeout — una venta tras otra, con el cliente enfrente. El
+        primero que choca con la pared le avisa a los demás.
+        """
+        if not self._db_online:
+            return
+        self._db_online = False
+        try:
+            self._set_db_connectivity_banner(online=False)
+        except Exception:  # noqa: BLE001 — avisar nunca puede tumbar la venta
+            pass
+
     def _start_background_db_refresh(self) -> None:
         """Lanza un hilo que revisa la DB y trae catálogo fresco si se puede."""
         if getattr(self, "_db_refresh_running", False):
@@ -704,8 +757,13 @@ class QuoteSatelliteWindow(QMainWindow):
         else:
             saved_at = catalog_cache_saved_at()
             age_text = format_cache_age_label(saved_at) if saved_at else "cache local"
+            # Lo primero es decirle que NO cierre nada. Un banner que solo
+            # informa de la falla invita a apagar y volver a abrir, que es lo
+            # peor que puede hacerse con ventas a medias.
             self.offline_banner.setText(
-                f"Sin conexion con la PC principal — Catalogo {age_text}."
+                "Sin conexión con la PC principal — "
+                "puedes seguir vendiendo, todo se guarda y se sube solo cuando vuelva. "
+                f"(Catálogo {age_text}.)"
             )
             self.offline_banner.setVisible(True)
 
