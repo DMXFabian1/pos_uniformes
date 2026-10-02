@@ -19,10 +19,36 @@ if errorlevel 1 (
     goto :launch
 )
 
-set BEHIND=0
+rem En que rama esta esta copia y a cual remota mira. Importa porque lo que
+rem sigue cuenta lo que falta CONTRA SU RAMA: si la copia esta parada en otra,
+rem no le falta nada de esa, y antes salia "Ya estas al dia" — una respuesta
+rem correcta a la pregunta equivocada. (02/10: por eso el acceso no bajaba nada.)
+set RAMA=
+for /f %%b in ('git rev-parse --abbrev-ref HEAD 2^>nul') do set RAMA=%%b
+set ARRIBA=
+for /f %%u in ('git rev-parse --abbrev-ref --symbolic-full-name @{u} 2^>nul') do set ARRIBA=%%u
+if "%ARRIBA%"=="" (
+    echo.
+    echo *** La rama "%RAMA%" no esta conectada a ninguna rama remota. ***
+    echo     Por eso no baja nada. Corre: scripts\revisar_actualizacion.bat
+    echo.
+    timeout /t 12 >nul
+    goto :launch
+)
+
+rem El centinela: si el conteo falla, NO se asume que estamos al dia.
+set BEHIND=?
 for /f %%c in ('git rev-list HEAD..@{u} --count 2^>nul') do set BEHIND=%%c
+if "%BEHIND%"=="?" (
+    echo.
+    echo *** No se pudo saber si hay actualizaciones ^(sin internet?^). ***
+    echo     Se abre la version actual. Corre: scripts\revisar_actualizacion.bat
+    echo.
+    timeout /t 10 >nul
+    goto :launch
+)
 if "%BEHIND%"=="0" (
-    echo Ya estas al dia.
+    echo Ya estas al dia ^(rama %RAMA%^).
     goto :revisar_publicado
 )
 
