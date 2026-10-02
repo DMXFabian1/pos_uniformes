@@ -67,10 +67,17 @@ def tk_product_price(meta: str, value: str, lines: list[str]) -> None:
 
 
 def tk_fmt(value: object) -> str:
+    """Cantidad para el ticket, con coma de millares: 1395 → «1,395.00».
+
+    Sin la coma, un ticket de uniformes —donde se va arriba de mil sin querer—
+    enseñaba «$1395.00», y eso se lee de dos veces. La coma no es adorno: es la
+    diferencia entre ver la cifra y tener que contar los dígitos.
+    """
     try:
         from decimal import Decimal
-        return str(Decimal(str(value)).quantize(Decimal("0.01")))
-    except Exception:
+
+        return f"{Decimal(str(value)).quantize(Decimal('0.01')):,}"
+    except Exception:  # noqa: BLE001 — un ticket se imprime igual
         return str(value)
 
 

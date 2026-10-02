@@ -1045,10 +1045,10 @@ class QuickSaleWidget(QWidget):
     # ─── Tickets ─────────────────────────────────────────────────────────
 
     _TERMS_VENTA = (
-        "1. Revise su mercancia antes de retirarse del establecimiento.\n"
-        "2. Tiene 15 dias naturales para realizar cambios presentando este ticket. La prenda debe estar en buen estado y con sus etiquetas.\n"
+        "1. Revise su mercancía antes de retirarse del establecimiento.\n"
+        "2. Tiene 15 días naturales para realizar cambios presentando este ticket. La prenda debe estar en buen estado y con sus etiquetas.\n"
         "3. Conserve este ticket como comprobante de pago.\n"
-        "4. Para cualquier aclaracion, presente este ticket.\n"
+        "4. Para cualquier aclaración, presente este ticket.\n"
         "5. No se aceptan devoluciones.\n"
         "6. Para solicitar factura, presente este ticket y sus datos fiscales."
     )
@@ -2420,7 +2420,7 @@ class QuickSaleWidget(QWidget):
     @staticmethod
     def _append_terms(lines: list[str], terms: str) -> None:
         lines.append("")
-        lines.append("Terminos y Condiciones".center(_TW))
+        lines.append("Términos y Condiciones".center(_TW))
         for term_line in terms.split("\n"):
             lines.extend(
                 textwrap.wrap(term_line, width=_TW, subsequent_indent="   ") or [term_line]
@@ -2457,17 +2457,28 @@ class QuickSaleWidget(QWidget):
                 lines.append(f"Tel: {biz_phone}".center(_TW))
         lines.append("Ticket de venta".center(_TW))
         if reimpresion:
-            lines.append("*** REIMPRESION ***".center(_TW))
+            lines.append("*** REIMPRESIÓN ***".center(_TW))
 
         lines.append(tk_top())
         tk_field("Fecha:", now, lines)
-        tk_field("Atendio:", self._employee_name or self._employee_code or "", lines)
+        tk_field("Atendió:", self._employee_name or self._employee_code or "", lines)
 
         lines.append(tk_mid())
-        lines.append(tk_center("ARTICULOS"))
+        lines.append(tk_center("ARTÍCULOS"))
         lines.append(tk_mid())
         self._build_items_block(lines, items)
 
+        lines.append(tk_mid())
+        # Cuántas piezas lleva, para que la señora verifique sin recontar el
+        # ticket renglón por renglón.
+        piezas = sum(int(it["cantidad"]) for it in items)
+        articulos = len(items)
+        lines.append(
+            tk_line(
+                f"{articulos} artículo{'s' if articulos != 1 else ''}"
+                f" · {piezas} pieza{'s' if piezas != 1 else ''}"
+            )
+        )
         lines.append(tk_mid())
         lines.append(tk_row("Subtotal:", f"${tk_fmt(subtotal)}"))
         if self._discount_active:
@@ -2532,14 +2543,14 @@ class QuickSaleWidget(QWidget):
             lines.append(f"Tel: {biz_phone}".center(_TW))
         lines.append("Ticket de apartado".center(_TW))
         if reimpresion:
-            lines.append("*** REIMPRESION ***".center(_TW))
+            lines.append("*** REIMPRESIÓN ***".center(_TW))
         if copy_label:
             lines.append(f"- {copy_label} -".center(_TW))
 
         lines.append(tk_top())
         tk_field("Fecha:", now, lines)
         tk_field("Cliente:", cliente, lines)
-        tk_field("Atendio:", self._employee_name or self._employee_code or "", lines)
+        tk_field("Atendió:", self._employee_name or self._employee_code or "", lines)
 
         lines.append(tk_mid())
         lines.append(tk_center("PRODUCTOS"))
@@ -2615,7 +2626,7 @@ class QuickSaleWidget(QWidget):
 
         lines.append(tk_top())
         tk_field("Fecha:", now, lines)
-        tk_field("Atendio:", self._employee_name or self._employee_code or "", lines)
+        tk_field("Atendió:", self._employee_name or self._employee_code or "", lines)
 
         lines.append(tk_mid())
         first = True

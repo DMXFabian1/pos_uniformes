@@ -199,14 +199,14 @@ class ApartadoTicketTests(unittest.TestCase):
         widget = self._make_widget()
         with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")):
             text = widget._build_apartado_text("Ana", copy_label="CLIENTE", include_terms=True)
-        self.assertIn("Terminos y Condiciones", text)
+        self.assertIn("Términos y Condiciones", text)
         self.assertIn("- CLIENTE -", text)
 
     def test_store_copy_excludes_terms(self) -> None:
         widget = self._make_widget()
         with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")):
             text = widget._build_apartado_text("Ana", copy_label="COPIA TIENDA", include_terms=False)
-        self.assertNotIn("Terminos y Condiciones", text)
+        self.assertNotIn("Términos y Condiciones", text)
         self.assertIn("- COPIA TIENDA -", text)
 
     def test_both_copies_show_minimum_25pct_rounded(self) -> None:

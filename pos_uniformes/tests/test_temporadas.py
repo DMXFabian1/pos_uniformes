@@ -158,3 +158,33 @@ class NuncaDetieneUnTicketTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ElTicketSeLeeTests(unittest.TestCase):
+    """Lo que el cliente se lleva a su casa (Daniel, 02/10: hay que mejorarlo)."""
+
+    def test_las_cantidades_llevan_coma_de_millares(self) -> None:
+        # En una tienda de uniformes se pasa de mil sin querer, y «$1395.00» se
+        # lee de dos veces.
+        from pos_uniformes.ui.helpers.ticket_print_layout_helper import tk_fmt
+
+        self.assertEqual(tk_fmt("1395"), "1,395.00")
+        self.assertEqual(tk_fmt("12850.5"), "12,850.50")
+        self.assertEqual(tk_fmt("750"), "750.00")
+
+    def test_una_cantidad_rara_no_detiene_el_ticket(self) -> None:
+        from pos_uniformes.ui.helpers.ticket_print_layout_helper import tk_fmt
+
+        self.assertEqual(tk_fmt("no soy un numero"), "no soy un numero")
+
+    def test_el_ticket_lleva_acentos(self) -> None:
+        # El pipeline imprime ┌─┐╞═╡, que es más exótico que una tilde: que
+        # fuera sin acentos era costumbre, no limitación. Y un ticket sin
+        # acentos se lee como hecho a las carreras.
+        from pathlib import Path
+
+        codigo = (
+            Path(__file__).resolve().parents[1] / "ui" / "views" / "quick_sale_view.py"
+        ).read_text(encoding="utf-8")
+        for malo in ("Atendio:", "ARTICULOS", "Terminos y Condiciones", "REIMPRESION"):
+            self.assertNotIn(malo, codigo, malo)

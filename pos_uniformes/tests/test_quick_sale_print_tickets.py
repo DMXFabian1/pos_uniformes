@@ -136,11 +136,11 @@ class QuickSaleTicketDialogTests(unittest.TestCase):
         self.assertIn("COPIA TIENDA", copy)
         # Y oculta lo que ve el cliente.
         self.assertNotIn("MAXIMODA", copy)
-        self.assertNotIn("Terminos y Condiciones", copy)
+        self.assertNotIn("Términos y Condiciones", copy)
         self.assertNotIn("Gracias por su compra", copy)
         # El ticket del cliente no cambia.
         self.assertIn("MAXIMODA", customer)
-        self.assertIn("Terminos y Condiciones", customer)
+        self.assertIn("Términos y Condiciones", customer)
         self.assertIn("Gracias por su compra", customer)
         self.assertNotIn("COPIA TIENDA", customer)
 
@@ -439,7 +439,7 @@ class ReimpresionTicketTests(unittest.TestCase):
                 tipo="venta", detalle=detalle, cliente=None, employee_name="Fanny Ortiz",
                 descuento_empleada=False, created_at=datetime(2026, 9, 5, 12, 24),
             )
-        self.assertIn("REIMPRESION", texto)
+        self.assertIn("REIMPRESIÓN", texto)
         self.assertIn("05/09/2026 12:24", texto)   # fecha ORIGINAL, no la de hoy
         self.assertIn("Fanny Ortiz", texto)
         self.assertIn("Sueter Claudia", texto)
@@ -465,7 +465,7 @@ class ReimpresionTicketTests(unittest.TestCase):
             )
         self.assertIn("apartado", apartado.lower())
         self.assertIn("Ana Lopez", apartado)
-        self.assertIn("REIMPRESION", apartado)
+        self.assertIn("REIMPRESIÓN", apartado)
         self.assertIsNone(abono)
 
 
@@ -640,3 +640,60 @@ class AnticipoApartadoTests(unittest.TestCase):
         with patch.object(w, "_registrar_en_libreta") as reg:
             w._registrar_y_vaciar("venta", pago_tarjeta=True)
         reg.assert_called_once_with("venta", cliente=None, pago_tarjeta=True)
+
+
+class ElTicketSeLeeTests(unittest.TestCase):
+    """Lo que el cliente se lleva a su casa (Daniel, 02/10: hay que mejorarlo)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _widget(self, items) -> QuickSaleWidget:
+        satellite = SimpleNamespace(offline_mode=True, _kiosk_lookup_from_cache=None)
+        w = QuickSaleWidget(satellite)
+        w._employee_code, w._employee_name = "VEND-3", "Evelyn Ortiz"
+        w._biz_info = ("MAXIMODA", "", "")
+        w._items = items
+        return w
+
+    @staticmethod
+    def _item(nombre, precio, cantidad, talla="12"):
+        return {
+            "sku": nombre[:3], "nombre": nombre, "talla": talla, "color": "",
+            "precio": Decimal(precio), "cantidad": cantidad,
+        }
+
+    def test_dice_cuantas_piezas_lleva(self) -> None:
+        # Para verificar de un vistazo, sin recontar el ticket renglón por renglón.
+        w = self._widget([self._item("Playera", "185", 3), self._item("Calceta", "45", 2)])
+        texto = w._build_venta_text(fecha_str="31/10/2026 13:40")
+        self.assertIn("2 artículos · 5 piezas", texto)
+
+    def test_una_sola_pieza_va_en_singular(self) -> None:
+        w = self._widget([self._item("Playera", "185", 1)])
+        self.assertIn("1 artículo · 1 pieza", w._build_venta_text(fecha_str="31/10/2026 13:40"))
+
+    def test_las_cantidades_llevan_coma_de_millares(self) -> None:
+        # En uniformes se pasa de mil sin querer, y «$1395.00» se lee de dos veces.
+        w = self._widget([self._item("Pants 3pz", "750", 2)])
+        texto = w._build_venta_text(fecha_str="31/10/2026 13:40")
+        self.assertIn("$1,500.00", texto)
+        self.assertNotIn("$1500.00", texto)
+
+    def test_el_ticket_lleva_acentos(self) -> None:
+        # El pipeline imprime ┌─┐╞═╡, más exótico que una tilde: que fuera sin
+        # acentos era costumbre, no limitación — y se leía como hecho a las
+        # carreras, en el papel que el cliente se lleva.
+        w = self._widget([self._item("Playera", "185", 1)])
+        texto = w._build_venta_text(fecha_str="31/10/2026 13:40")
+        self.assertIn("Atendió:", texto)
+        self.assertIn("ARTÍCULOS", texto)
+        self.assertIn("Términos y Condiciones", texto)
+
+    def test_la_copia_de_la_tienda_no_lleva_el_conteo_de_mas(self) -> None:
+        # La copia interna sigue siendo la misma de siempre en lo que importa.
+        w = self._widget([self._item("Playera", "185", 3)])
+        copia = w._build_venta_text(store_copy=True, fecha_str="31/10/2026 13:40")
+        self.assertIn("COPIA TIENDA", copia)
+        self.assertNotIn("Términos", copia)
