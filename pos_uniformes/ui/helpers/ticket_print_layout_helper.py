@@ -33,6 +33,12 @@ def tk_dbl() -> str:
     return "╞" + "═" * (TICKET_CHAR_WIDTH - 2) + "╡"
 
 
+def tk_bot_dbl() -> str:
+    """Cierre doble. Deja el total dentro de una banda, que es lo que se busca
+    primero al mirar el papel."""
+    return "╘" + "═" * (TICKET_CHAR_WIDTH - 2) + "╛"
+
+
 def tk_line(text: str) -> str:
     return f"│ {text:<{_IW}} │"
 

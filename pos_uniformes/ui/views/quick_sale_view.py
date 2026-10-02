@@ -63,6 +63,7 @@ from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
     TICKET_CHAR_WIDTH as _TW,
     tk_bot,
     tk_center,
+    tk_bot_dbl,
     tk_dbl,
     tk_field,
     tk_fmt,
@@ -2408,14 +2409,14 @@ class QuickSaleWidget(QWidget):
             first = False
             for dl in textwrap.wrap(it["nombre"], width=_TIW) or [it["nombre"]]:
                 lines.append(tk_line(dl))
-            if it["talla"]:
-                lines.append(tk_line(f"Talla: {it['talla']}"))
+            # La talla viaja con el precio en el mismo renglón. Antes ocupaba
+            # uno para ella sola: tres renglones por prenda, y un ticket de diez
+            # prendas era una escalera de treinta. Dice lo mismo en dos.
             sub = it["precio"] * it["cantidad"]
-            tk_product_price(
-                f"{it['cantidad']} x ${tk_fmt(it['precio'])}",
-                f"${tk_fmt(sub)}",
-                lines,
-            )
+            meta = f"{it['cantidad']} x ${tk_fmt(it['precio'])}"
+            if it["talla"]:
+                meta = f"T.{it['talla']}  {meta}"
+            tk_product_price(meta, f"${tk_fmt(sub)}", lines)
 
     @staticmethod
     def _append_terms(lines: list[str], terms: str) -> None:
@@ -2469,8 +2470,8 @@ class QuickSaleWidget(QWidget):
         self._build_items_block(lines, items)
 
         lines.append(tk_mid())
-        # Cuántas piezas lleva, para que la señora verifique sin recontar el
-        # ticket renglón por renglón.
+        # El resumen va junto, sin regla de por medio: cuántas piezas y cuánto
+        # suman son la misma pregunta.
         piezas = sum(int(it["cantidad"]) for it in items)
         articulos = len(items)
         lines.append(
@@ -2479,13 +2480,14 @@ class QuickSaleWidget(QWidget):
                 f" · {piezas} pieza{'s' if piezas != 1 else ''}"
             )
         )
-        lines.append(tk_mid())
         lines.append(tk_row("Subtotal:", f"${tk_fmt(subtotal)}"))
         if self._discount_active:
             lines.append(tk_row("Descuento:", f"-${tk_fmt(discount)}"))
+        # El total entre dos reglas dobles: es lo primero que se busca al
+        # mirar el papel, y antes pesaba lo mismo que «Subtotal».
         lines.append(tk_dbl())
         lines.append(tk_row("TOTAL A PAGAR:", f"${tk_fmt(total)}"))
-        lines.append(tk_bot())
+        lines.append(tk_bot_dbl())
 
         if not store_copy:
             self._append_terms(lines, self._TERMS_VENTA)

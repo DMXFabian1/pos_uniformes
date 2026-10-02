@@ -652,3 +652,39 @@ limpios.
 Un adorno **jamás** detiene un ticket: si algo falla, se omite y nadie se entera.
 
 `test_temporadas` (18).
+
+## El ticket, revisado de verdad (2026-10-02)
+
+Daniel: *"tenemos que mejorar en definitiva lo que se ve en el ticket"*. Lo
+primero fue **imprimirlo y leerlo**, no imaginarlo.
+
+| Lo que se vio | Por qué importaba |
+|---|---|
+| `$1395.00` | Sin coma de millares. En uniformes se pasa de mil sin querer y esa cifra se lee de dos veces. Ninguna prueba se rompió al ponerla — ninguna miraba cuatro dígitos |
+| «Atendio», «ARTICULOS», «Terminos» | **Todo el ticket sin acentos.** Parecía limitación de la térmica y no lo es: el mismo papel imprime `┌─┐╞═╡`, mucho más exótico que una tilde, y el texto va por QTextDocument, no por una página de códigos. Era costumbre — y se lee como algo hecho a las carreras |
+| Tres renglones por prenda | Nombre, talla y precio por separado: un ticket de diez prendas era una escalera de treinta renglones. La talla ahora viaja con el precio (`T.12  3 x $185.00`) |
+| El total pesaba igual que «Subtotal» | Es lo primero que se busca al mirar el papel. Ahora va **entre dos reglas dobles**, y el recuadro cierra con `╘══╛` |
+| No decía cuántas piezas | «3 artículos · 6 piezas», para verificar de un vistazo sin recontar renglón por renglón |
+
+```
+├────────────────────────────────────┤
+│ Playera Blanca Cuello Redondo      │
+│ T.12  3 x $185.00          $555.00 │
+├────────────────────────────────────┤
+│ 3 artículos · 6 piezas             │
+│ Subtotal:                $1,395.00 │
+╞════════════════════════════════════╡
+│ TOTAL A PAGAR:           $1,395.00 │
+╘════════════════════════════════════╛
+```
+
+### Lo que NO se tocó, y por qué
+
+- **Folio.** Los términos dicen tres veces «presente este ticket» —para cambios,
+  aclaraciones y factura— y el papel no trae ningún número: si una clienta
+  vuelve en noviembre, no hay por dónde buscarla. Se le planteó a Daniel y
+  **dijo que no le interesa**; es su operación y la conoce.
+- **Los términos** siguen siendo trece renglones, más largos que la compra, y el
+  punto 2 («15 días para cambios») junto al 5 («no se aceptan devoluciones») se
+  leen como contradicción aunque cambio ≠ devolución. Es política suya, no
+  estética: queda pendiente de que él decida.

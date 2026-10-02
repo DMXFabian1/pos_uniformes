@@ -697,3 +697,38 @@ class ElTicketSeLeeTests(unittest.TestCase):
         copia = w._build_venta_text(store_copy=True, fecha_str="31/10/2026 13:40")
         self.assertIn("COPIA TIENDA", copia)
         self.assertNotIn("Términos", copia)
+
+    def test_cada_prenda_cabe_en_dos_renglones(self) -> None:
+        # Antes eran tres por prenda (nombre, talla, precio): un ticket de diez
+        # era una escalera de treinta renglones. La talla viaja con el precio.
+        w = self._widget([self._item("Playera", "185", 3, talla="12")])
+        texto = w._build_venta_text(fecha_str="31/10/2026 13:40")
+        self.assertIn("T.12", texto)
+        self.assertNotIn("Talla: 12", texto)
+        renglones = texto.splitlines()
+        i = next(n for n, l in enumerate(renglones) if "Playera" in l)
+        self.assertIn("T.12", renglones[i + 1])
+        self.assertIn("$555.00", renglones[i + 1])
+        # Y ya viene la regla: no hubo un tercer renglón para la talla.
+        self.assertTrue(renglones[i + 2].startswith("├"), renglones[i + 2])
+
+    def test_una_prenda_sin_talla_no_deja_el_hueco(self) -> None:
+        w = self._widget([self._item("Bolsa", "15", 1, talla="")])
+        texto = w._build_venta_text(fecha_str="31/10/2026 13:40")
+        self.assertIn("1 x $15.00", texto)
+        self.assertNotIn("T.  ", texto)
+
+    def test_el_total_va_en_una_banda(self) -> None:
+        # Es lo primero que se busca al mirar el papel, y pesaba lo mismo que
+        # «Subtotal». Ahora queda entre dos reglas dobles.
+        w = self._widget([self._item("Playera", "185", 1)])
+        renglones = w._build_venta_text(fecha_str="31/10/2026 13:40").splitlines()
+        i = next(n for n, l in enumerate(renglones) if "TOTAL A PAGAR" in l)
+        self.assertTrue(renglones[i - 1].startswith("╞"))
+        self.assertTrue(renglones[i + 1].startswith("╘"))
+
+    def test_el_recuadro_queda_cerrado(self) -> None:
+        # Terminar en una regla de en medio deja la caja abierta.
+        w = self._widget([self._item("Playera", "185", 1)])
+        copia = w._build_venta_text(store_copy=True, fecha_str="31/10/2026 13:40")
+        self.assertTrue(copia.rstrip().endswith("╛"))
