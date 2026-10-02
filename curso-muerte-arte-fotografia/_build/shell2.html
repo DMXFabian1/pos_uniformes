@@ -259,7 +259,7 @@ footer.colophon{max-width:1280px;margin:4rem auto 0;padding:1.5rem clamp(16px,4v
 button.tag.press{font:inherit;font-family:var(--ui);font-size:.68rem;font-weight:600;letter-spacing:.06em;line-height:1;padding:.24em .45em .2em;background:color-mix(in srgb,var(--flame) 12%,transparent);cursor:pointer;display:inline-flex;align-items:center;gap:.25em;transition:background .2s,transform .2s}
 button.tag.press svg{width:.8em;height:.8em;stroke:currentColor;fill:none;stroke-width:1.6}
 button.tag.press:hover,button.tag.press[aria-expanded="true"]{background:var(--flame);color:var(--paper)}
-.pop{position:fixed;z-index:70;width:min(400px,calc(100vw - 32px));background:var(--paper);color:var(--ink);border:1px solid var(--rule);border-top:3px solid var(--flame);border-radius:4px;
+.pop{position:absolute;z-index:70;width:min(400px,calc(100vw - 32px));background:var(--paper);color:var(--ink);border:1px solid var(--rule);border-top:3px solid var(--flame);border-radius:4px;
   box-shadow:0 24px 50px -20px rgba(0,0,0,.55);padding:1.1rem 1.2rem 1.2rem;opacity:0;transform:translateY(8px) scale(.98);pointer-events:none;transition:opacity .22s,transform .22s}
 .pop.open{opacity:1;transform:none;pointer-events:auto}
 .pop-close{position:absolute;top:.5rem;right:.5rem;width:30px;height:30px;border:0;background:none;cursor:pointer;color:var(--ink-2);border-radius:50%}
@@ -272,7 +272,7 @@ button.tag.press:hover,button.tag.press[aria-expanded="true"]{background:var(--f
 .pop-link{display:inline-flex;align-items:center;gap:.4rem;font-family:var(--ui);font-weight:500;font-size:.92rem}
 .pop-warn{font-family:var(--ui);font-size:.76rem;color:var(--ink-2);margin:.9rem 0 0;padding-top:.7rem;border-top:1px solid var(--rule)}
 .pop-more{font-family:var(--ui);font-size:.82rem;margin:.5rem 0 0;color:var(--ink-2)}
-@media (max-width:640px){.pop{left:0!important;right:0;bottom:0;top:auto!important;width:100%;border-radius:12px 12px 0 0;padding-bottom:calc(1.4rem + env(safe-area-inset-bottom,0px));transform:translateY(30px)}}
+@media (max-width:640px){.pop{position:fixed;left:0!important;right:0;bottom:0;top:auto!important;width:100%;border-radius:12px 12px 0 0;padding-bottom:calc(1.4rem + env(safe-area-inset-bottom,0px));transform:translateY(30px)}}
 
 @keyframes breathe{from{transform:scale(1.0)}to{transform:scale(1.09) translate(-1%,-1%)}}
 @keyframes rise{from{transform:translateY(.35em);opacity:.2;filter:blur(4px)}to{transform:none;opacity:1;filter:none}}
@@ -469,14 +469,15 @@ button.tag.press:hover,button.tag.press[aria-expanded="true"]{background:var(--f
       '<p class="pop-sum">'+esc(p.summary)+'</p>'+(p.quote?'<blockquote class="pop-quote">«'+esc(p.quote)+'»</blockquote>':'')+links+
       (p.note?'<p class="pop-more">'+esc(p.note)+'</p>':'')+
       '<p class="pop-warn">Dato respaldado sólo por prensa, no por una fuente académica. Tómalo como pista, no como hecho establecido.</p>';
-    if(innerWidth>640){ var r=btn.getBoundingClientRect(), w=pop.offsetWidth||400, left=Math.min(Math.max(16,r.left-20),innerWidth-w-16);
-      pop.style.left=left+'px'; pop.style.top='0px'; var h=pop.offsetHeight; var top=r.bottom+10; if(top+h>innerHeight-12) top=Math.max(12,r.top-h-10); pop.style.top=top+'px'; }
+    if(innerWidth>640){ var r=btn.getBoundingClientRect(), w=pop.offsetWidth||400, left=Math.min(Math.max(16,r.left-20),document.documentElement.clientWidth-w-16);
+      var h=pop.offsetHeight, top=r.bottom+10; if(top+h>innerHeight-12 && r.top-h-10>12) top=r.top-h-10;
+      pop.style.left=left+'px'; pop.style.top=(top+scrollY)+'px'; } else { pop.style.top=''; }
     pop.classList.add('open'); $('#popClose').focus({preventScroll:true});
   }
   document.addEventListener('click',function(e){ var b=e.target.closest('button.press'); if(b){e.preventDefault(); openPop(b); return;} if(pop.classList.contains('open')&&!e.target.closest('#pop')) closePop(); });
   $('#popClose').addEventListener('click',function(){var b=popBtn; closePop(); if(b) b.focus();});
   document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&pop.classList.contains('open')){var b=popBtn; closePop(); if(b) b.focus();} });
-  addEventListener('scroll',function(){ if(innerWidth>640) closePop(); },{passive:true});
+  addEventListener('resize',closePop);
   window.addEventListener('hashchange',closePop);
 
   // ---------- countdown

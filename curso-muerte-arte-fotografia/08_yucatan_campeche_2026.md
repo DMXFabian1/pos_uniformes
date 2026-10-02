@@ -64,7 +64,7 @@ Las marcas epistémicas son las de siempre: [H] hecho, [E] evidencia, [I] interp
 
 - **"Tradición milenaria"**: la prensa y la promoción turística la llaman así, pero la continuidad directa con prácticas prehispánicas **no está demostrada** [NS / Hi].
   - Landa describe otros tratamientos: entierro en la casa, cremación, estatuas con cenizas.
-  - La exhumación a los tres años está hoy vinculada a la **Ley de Salud** estatal y al uso de nichos [PRENSA, La Jornada Maya].
+  - La exhumación a los tres años está hoy vinculada a la **Ley de Salud Pública del Estado de Campeche**, que permite exhumar los restos a los tres años del entierro [PRENSA, La Jornada Maya].
   - La práctica puede tener raíces prehispánicas, coloniales y modernas a la vez. **Esta es exactamente la pregunta de Malvido frente a la continuidad, trasladada a la península.**
 - **Turismo y cobro.**
   - Hay guías jóvenes que llevan a turistas con las familias, y vecinos que se quejan de la pérdida de privacidad y de la fotografía constante (Apipilhuasco 2025).

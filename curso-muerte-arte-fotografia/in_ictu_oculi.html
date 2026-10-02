@@ -254,6 +254,26 @@ body.reading .side-arrow{opacity:.75}.side-arrow:hover{opacity:1;transform:scale
 @media (max-width:1100px){.side-arrow{display:none}}
 footer.colophon{max-width:1280px;margin:4rem auto 0;padding:1.5rem clamp(16px,4vw,56px) 3rem;border-top:1px solid var(--rule);font-family:var(--ui);font-size:.82rem;color:var(--ink-2)}
 
+
+/* press notes */
+button.tag.press{font:inherit;font-family:var(--ui);font-size:.68rem;font-weight:600;letter-spacing:.06em;line-height:1;padding:.24em .45em .2em;background:color-mix(in srgb,var(--flame) 12%,transparent);cursor:pointer;display:inline-flex;align-items:center;gap:.25em;transition:background .2s,transform .2s}
+button.tag.press svg{width:.8em;height:.8em;stroke:currentColor;fill:none;stroke-width:1.6}
+button.tag.press:hover,button.tag.press[aria-expanded="true"]{background:var(--flame);color:var(--paper)}
+.pop{position:absolute;z-index:70;width:min(400px,calc(100vw - 32px));background:var(--paper);color:var(--ink);border:1px solid var(--rule);border-top:3px solid var(--flame);border-radius:4px;
+  box-shadow:0 24px 50px -20px rgba(0,0,0,.55);padding:1.1rem 1.2rem 1.2rem;opacity:0;transform:translateY(8px) scale(.98);pointer-events:none;transition:opacity .22s,transform .22s}
+.pop.open{opacity:1;transform:none;pointer-events:auto}
+.pop-close{position:absolute;top:.5rem;right:.5rem;width:30px;height:30px;border:0;background:none;cursor:pointer;color:var(--ink-2);border-radius:50%}
+.pop-close:hover{background:var(--paper-2);color:var(--ink)}
+.pop-close svg{width:16px;height:16px;stroke:currentColor;fill:none;stroke-width:1.8}
+.pop-meta{font-family:var(--ui);font-size:.74rem;letter-spacing:.1em;text-transform:uppercase;color:var(--flame);margin:0 2rem .5rem 0;font-weight:600}
+.pop-title{font-family:var(--display);font-size:1.3rem;line-height:1.2;margin:0 0 .6rem}
+.pop-sum{font-family:var(--ui);font-size:.92rem;line-height:1.45;color:var(--ink);margin:0 0 .7rem}
+.pop-quote{margin:0 0 .9rem;padding-left:.8rem;border-left:2px solid var(--flame);font-family:var(--body);font-style:italic;font-size:.95rem;line-height:1.45;color:var(--ink-2)}
+.pop-link{display:inline-flex;align-items:center;gap:.4rem;font-family:var(--ui);font-weight:500;font-size:.92rem}
+.pop-warn{font-family:var(--ui);font-size:.76rem;color:var(--ink-2);margin:.9rem 0 0;padding-top:.7rem;border-top:1px solid var(--rule)}
+.pop-more{font-family:var(--ui);font-size:.82rem;margin:.5rem 0 0;color:var(--ink-2)}
+@media (max-width:640px){.pop{position:fixed;left:0!important;right:0;bottom:0;top:auto!important;width:100%;border-radius:12px 12px 0 0;padding-bottom:calc(1.4rem + env(safe-area-inset-bottom,0px));transform:translateY(30px)}}
+
 @keyframes breathe{from{transform:scale(1.0)}to{transform:scale(1.09) translate(-1%,-1%)}}
 @keyframes rise{from{transform:translateY(.35em);opacity:.2;filter:blur(4px)}to{transform:none;opacity:1;filter:none}}
 @keyframes enter{from{transform:translateY(18px);opacity:.82}to{transform:none;opacity:1}}
@@ -3834,7 +3854,7 @@ PREGUNTA QUE HACE LA OBRA (una sola oración, en forma de pregunta):
 <li>los restos se exhuman <strong>al menos tres años</strong> después del entierro;</li>
 <li>los huesos limpios se guardan en <strong>cajas de madera</strong> en nichos u osarios del cementerio;</li>
 <li>cada año, un familiar designado <strong>limpia los huesos</strong> y <strong>cambia el paño</strong>, blanco y bordado (con el nombre o con motivos, según la familia);</li>
-<li><strong>no se hace el año en que muere alguien de la familia</strong> <span class="tag tag-PRENSA" title="Sólo en prensa">PRENSA</span><span class="tag-note">La Jornada Maya</span>.</li>
+<li><strong>no se hace el año en que muere alguien de la familia</strong> <button aria-haspopup="dialog" class="tag tag-PRENSA press" data-press="0" title="Ver la nota de prensa" type="button">PRENSA<svg aria-hidden="true" viewbox="0 0 12 12"><path d="M4 2h6v6M10 2L3 9"></path></svg></button><span class="tag-note">La Jornada Maya</span>.</li>
 </ul>
 </li>
 <li><strong>El nombre.</strong> En español se llama "Limpieza de los Santos Restos", y a veces "cambio de ropa". En maya se escribe <em>Choo Ba'ak</em> o <em>Cho'o Ba'ak</em>.<ul>
@@ -3845,7 +3865,7 @@ PREGUNTA QUE HACE LA OBRA (una sola oración, en forma de pregunta):
 </li>
 <li><strong>El calendario.</strong> No hay una fecha fija de inicio <span class="tag tag-H" title="Hecho documentado">H</span>.<ul>
 <li>El libro del Congreso habla de "la última semana de octubre" y, en otro capítulo, de "mediados de octubre".</li>
-<li>En 2025 la limpieza empezó el 24 de octubre <span class="tag tag-PRENSA" title="Sólo en prensa">PRENSA</span>.</li>
+<li>En 2025 la limpieza empezó el 24 de octubre <button aria-haspopup="dialog" class="tag tag-PRENSA press" data-press="1" title="Ver la nota de prensa" type="button">PRENSA<svg aria-hidden="true" viewbox="0 0 12 12"><path d="M4 2h6v6M10 2L3 9"></path></svg></button>.</li>
 <li>Cervantes (2012) sitúa el Janal Pixán de Pomuch entre el 26 de octubre y el 2 de noviembre.</li>
 <li><strong>Tus fechas (del 27 de octubre en adelante) caen dentro del periodo, pero algunas familias ya habrán limpiado. Confírmalo localmente.</strong></li>
 </ul>
@@ -3862,16 +3882,16 @@ PREGUNTA QUE HACE LA OBRA (una sola oración, en forma de pregunta):
 <ul>
 <li><strong>"Tradición milenaria"</strong>: la prensa y la promoción turística la llaman así, pero la continuidad directa con prácticas prehispánicas <strong>no está demostrada</strong> <span class="tag tag-NS" title="No sabemos / Hipótesis">NS / Hi</span>.<ul>
 <li>Landa describe otros tratamientos: entierro en la casa, cremación, estatuas con cenizas.</li>
-<li>La exhumación a los tres años está hoy vinculada a la <strong>Ley de Salud</strong> estatal y al uso de nichos <span class="tag tag-PRENSA" title="Sólo en prensa">PRENSA</span><span class="tag-note">La Jornada Maya</span>.</li>
+<li>La exhumación a los tres años está hoy vinculada a la <strong>Ley de Salud Pública del Estado de Campeche</strong>, que permite exhumar los restos a los tres años del entierro <button aria-haspopup="dialog" class="tag tag-PRENSA press" data-press="2" title="Ver la nota de prensa" type="button">PRENSA<svg aria-hidden="true" viewbox="0 0 12 12"><path d="M4 2h6v6M10 2L3 9"></path></svg></button><span class="tag-note">La Jornada Maya</span>.</li>
 <li>La práctica puede tener raíces prehispánicas, coloniales y modernas a la vez. <strong>Esta es exactamente la pregunta de Malvido frente a la continuidad, trasladada a la península.</strong></li>
 </ul>
 </li>
 <li><strong>Turismo y cobro.</strong><ul>
 <li>Hay guías jóvenes que llevan a turistas con las familias, y vecinos que se quejan de la pérdida de privacidad y de la fotografía constante (Apipilhuasco 2025).</li>
-<li>Hubo robos de restos, entre ellos un cráneo <span class="tag tag-PRENSA" title="Sólo en prensa">PRENSA</span>.</li>
-<li>En 2025 el Ayuntamiento cobró 30 pesos por entrar al cementerio. El comité organizador se desmarcó: "es un acto privado y familiar, no un espectáculo turístico" <span class="tag tag-PRENSA" title="Sólo en prensa">PRENSA</span>.</li>
+<li>Hubo robos de restos, entre ellos un cráneo <button aria-haspopup="dialog" class="tag tag-PRENSA press" data-press="3" title="Ver la nota de prensa" type="button">PRENSA<svg aria-hidden="true" viewbox="0 0 12 12"><path d="M4 2h6v6M10 2L3 9"></path></svg></button>.</li>
+<li>En 2025 el Ayuntamiento cobró 30 pesos por entrar al cementerio. El comité organizador se desmarcó: "es un acto privado y familiar, no un espectáculo turístico" <button aria-haspopup="dialog" class="tag tag-PRENSA press" data-press="4" title="Ver la nota de prensa" type="button">PRENSA<svg aria-hidden="true" viewbox="0 0 12 12"><path d="M4 2h6v6M10 2L3 9"></path></svg></button>.</li>
 <li>Hay festivales rivales ("Pomuch para el Mundo" y otro) con tensiones partidistas (Apipilhuasco 2025).</li>
-<li>Se han visto drones y creadores de contenido <span class="tag tag-PRENSA" title="Sólo en prensa">PRENSA</span><span class="tag-note">2025</span>.</li>
+<li>Se han visto drones y creadores de contenido <button aria-haspopup="dialog" class="tag tag-PRENSA press" data-press="5" title="Ver la nota de prensa" type="button">PRENSA<svg aria-hidden="true" viewbox="0 0 12 12"><path d="M4 2h6v6M10 2L3 9"></path></svg></button><span class="tag-note">2025</span>.</li>
 </ul>
 </li>
 <li><strong>No hay reglas escritas oficiales</strong> para visitantes, que yo haya encontrado <span class="tag tag-NS" title="No sabemos">NS</span>. Lo que sigue en la §5 es buena práctica, no normativa.</li>
@@ -3894,16 +3914,16 @@ PREGUNTA QUE HACE LA OBRA (una sola oración, en forma de pregunta):
 <ul>
 <li><strong>Festival de las Ánimas 2026</strong>: del <strong>24 de octubre al 2 de noviembre</strong> <span class="tag tag-H" title="Hecho documentado">H</span><span class="tag-note">merida.gob.mx</span>.</li>
 <li><strong>Paseo de las Ánimas 2026</strong>: <strong>viernes 30 de octubre, 18:00</strong>, del <strong>Cementerio General al Parque de San Juan</strong> <span class="tag tag-H" title="Hecho documentado">H</span>.</li>
-<li><strong>Origen</strong> <span class="tag tag-PRENSA" title="Sólo en prensa">PRENSA</span><span class="tag-note">Diario de Yucatán, 2023</span>:<ul>
+<li><strong>Origen</strong> <button aria-haspopup="dialog" class="tag tag-PRENSA press" data-press="6" title="Ver la nota de prensa" type="button">PRENSA<svg aria-hidden="true" viewbox="0 0 12 12"><path d="M4 2h6v6M10 2L3 9"></path></svg></button><span class="tag-note">Diario de Yucatán, 2023</span>:<ul>
 <li>2008: "Corredor de las Ánimas", organizado por los vecinos del barrio de la Ermita de Santa Isabel y el Ayuntamiento;</li>
 <li>2009: "Marcha";</li>
 <li>2010: pasa a llamarse "Paseo";</li>
 <li>desde 2015 se puede participar con traje regional y cara pintada.</li>
-<li>Unos 90.000 asistentes en 2025 <span class="tag tag-PRENSA" title="Sólo en prensa">PRENSA</span>.</li>
+<li>Unos 90.000 asistentes en 2025 <button aria-haspopup="dialog" class="tag tag-PRENSA press" data-press="7" title="Ver la nota de prensa" type="button">PRENSA<svg aria-hidden="true" viewbox="0 0 12 12"><path d="M4 2h6v6M10 2L3 9"></path></svg></button>.</li>
 </ul>
 </li>
 <li><strong>Es un caso de invención de la tradición paralelo al desfile de la Ciudad de México</strong>, anterior a él y de origen vecinal, no cinematográfico. <strong>Una diferencia importante</strong>, que no conviene aplanar.</li>
-<li><strong>Cementerio General</strong>: se abrió en 1821, en terrenos de la hacienda Xcoholté <span class="tag tag-PRENSA" title="Sólo en prensa">PRENSA</span>.</li>
+<li><strong>Cementerio General</strong>: se abrió en 1821, en terrenos de la hacienda Xcoholté <button aria-haspopup="dialog" class="tag tag-PRENSA press" data-press="8" title="Ver la nota de prensa" type="button">PRENSA<svg aria-hidden="true" viewbox="0 0 12 12"><path d="M4 2h6v6M10 2L3 9"></path></svg></button>.</li>
 <li><strong>Cómo usar Mérida:</strong> como <strong>contrapunto urbano</strong>. El maquillaje, la multitud y la Catrina "exportada" conviven aquí con el Janal Pixán doméstico. También para ver la tensión entre Día de Muertos, Janal Pixán y Halloween (Fernández Repetto y Medina Várguez 2015).</li>
 </ul>
 <hr/>
@@ -3948,7 +3968,7 @@ PREGUNTA QUE HACE LA OBRA (una sola oración, en forma de pregunta):
 <li><strong>Jícaras</strong> de chocolate y atole; número par de ofrendas; mantel nuevo (<em>zuhuy</em>, "virgen"); <strong>sólo gallinas, no gallos</strong>, porque "los gallos cantarían y espantarían a las almas" (Chan Kom, 1934) [H para Chan Kom; verifica si sigue vigente donde vayas].</li>
 <li><strong>Velas</strong>: filas de velas en puertas y muros durante el <em>bix</em> <span class="tag tag-H" title="Hecho documentado">H</span>. En Chan Kom, velas negras el día de los adultos <span class="tag tag-H" title="Hecho documentado">H</span>.</li>
 <li><strong>Ánimas solas</strong>: en Chan Kom se ponía en la puerta una jícara de chocolate, un pan y una vela "para las almas que no tengan parientes vivos" <span class="tag tag-H" title="Hecho documentado">H</span><span class="tag-note">1934</span>. <strong>Una de las ideas más poderosas que vas a encontrar: una ofrenda para los muertos de nadie.</strong></li>
-<li><strong>Hilo negro o rojo en la muñeca de los niños</strong> para protegerlos de los <em>pixanes</em>: sólo aparece en prensa <span class="tag tag-PRENSA" title="Sólo en prensa">PRENSA</span>. No tiene respaldo académico que yo haya encontrado.</li>
+<li><strong>Hilo negro o rojo en la muñeca de los niños</strong> para protegerlos de los <em>pixanes</em>: sólo aparece en prensa <button aria-haspopup="dialog" class="tag tag-PRENSA press" data-press="9" title="Ver la nota de prensa" type="button">PRENSA<svg aria-hidden="true" viewbox="0 0 12 12"><path d="M4 2h6v6M10 2L3 9"></path></svg></button>. No tiene respaldo académico que yo haya encontrado.</li>
 </ul>
 <p><strong>Léxico maya útil</strong> (diccionario UADY):</p>
 <ul>
@@ -5072,6 +5092,7 @@ PREGUNTA QUE HACE LA OBRA (una sola oración, en forma de pregunta):
 </div><div class="endmark" aria-hidden="true"></div></section>
 </main>
 
+<div class="pop" id="pop" role="dialog" aria-modal="false" aria-labelledby="popTitle"><button class="pop-close" id="popClose" type="button" aria-label="Cerrar nota"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button><div id="popBody"></div></div>
 <button class="side-arrow l" id="sidePrev" type="button" aria-label="Lección anterior"><svg viewBox="0 0 24 24"><path d="M15 6l-6 6 6 6"/></svg></button>
 <button class="side-arrow r" id="sideNext" type="button" aria-label="Lección siguiente"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></button>
 
@@ -5174,6 +5195,32 @@ PREGUNTA QUE HACE LA OBRA (una sola oración, en forma de pregunta):
   var c=$('#candle'), t; c.addEventListener('click',function(){ clearTimeout(t); c.classList.add('out'); c.setAttribute('aria-label','La vela se apagó');
     var hh=$('#homeHero'); hh.classList.remove('dark'); void hh.offsetWidth; hh.classList.add('dark');
     t=setTimeout(function(){c.classList.remove('out'); c.setAttribute('aria-label','Apagar la vela');},4200); });
+
+
+  // ---------- press notes
+  var PRESS=[{"match": "no se hace el año en que muere", "sources": [{"outlet": "La Jornada Maya", "date": "27 de octubre de 2025", "headline": "Ritual Cho'o Ba'ak, o limpia de huesos, persiste por los siglos de los siglos en Pomuch", "url": "https://www.lajornadamaya.mx/campeche/254384/ritual-choo-baak-o-limpia-de-huesos-persiste-por-los-siglos-de-los-siglos-en-pomuch-campeche"}], "summary": "Nota de Jairo Magaña. Explica que la limpia no se hace el año en que muere una persona, y que un familiar directo de alguien que murió ese año tampoco participa.", "quote": "El Cho'o Ba'ak no se realiza el año en el que muere una persona"}, {"match": "la limpieza empezó el 24 de octubre", "sources": [{"outlet": "Diario de Yucatán", "date": "25 de octubre de 2025", "headline": "Pomuch invita a celebrar a los finados: ya limpian a sus difuntos y habrá un festival de 13 horas", "url": "https://www.yucatan.com.mx/mexico/2025/10/25/pomuch-invita-a-celebrar-a-los-finados-ya-limpian-a-sus-difuntos-y-habra-un-festival-de-13-horas.html"}], "summary": "Nota de Flor Estrella Santana. Informa que la limpieza de los restos óseos en Pomuch empezó el viernes 24 de octubre de 2025, antes de los festejos de difuntos.", "quote": "En Pomuch la tradicional limpieza de los restos óseos de los difuntos se inició este viernes 24 de octubre de 2025."}, {"match": "Ley de Salud", "sources": [{"outlet": "La Jornada Maya", "date": "27 de octubre de 2025", "headline": "Ritual Cho'o Ba'ak, o limpia de huesos, persiste por los siglos de los siglos en Pomuch", "url": "https://www.lajornadamaya.mx/campeche/254384/ritual-choo-baak-o-limpia-de-huesos-persiste-por-los-siglos-de-los-siglos-en-pomuch-campeche"}], "summary": "La nota relaciona el plazo de tres años con la Ley de Salud Pública del Estado de Campeche, que permite exhumar los restos para darles otro lugar de sepultura o resguardo.", "quote": "a los tres años del entierro, los restos pueden exhumarse con la finalidad de darles un mejor lugar de sepultura o resguardo"}, {"match": "Hubo robos de restos", "sources": [{"outlet": "La Jornada Maya", "date": "27 de octubre de 2025", "headline": "Ritual Cho'o Ba'ak, o limpia de huesos, persiste por los siglos de los siglos en Pomuch", "url": "https://www.lajornadamaya.mx/campeche/254384/ritual-choo-baak-o-limpia-de-huesos-persiste-por-los-siglos-de-los-siglos-en-pomuch-campeche"}], "summary": "Don Wilberth Chablé encontró el osario de su hermano Hilario sin el cráneo, y la pieza nunca apareció pese a su queja ante las autoridades. Un pie de foto dice que los vecinos atribuyen los robos a turistas.", "quote": "al llegar a su Osario, notó que hacía falta el cráneo de Hilario… la pieza de la osamenta nunca apareció"}, {"match": "cobró 30 pesos", "sources": [{"outlet": "El Imparcial", "date": "26 de octubre de 2025", "headline": "Pomuch, el pueblo de Campeche donde limpiar los huesos de los difuntos para el Día de Muertos es una tradición de amor y respeto", "url": "https://www.elimparcial.com/mexico/2025/10/26/pomuch-el-pueblo-de-campeche-donde-limpiar-los-huesos-de-los-difuntos-para-el-dia-de-muertos-es-una-tradicion-de-amor-y-respeto/"}, {"outlet": "Diario de Yucatán", "date": "25 de octubre de 2025", "headline": "Pomuch invita a celebrar a los finados: ya limpian a sus difuntos y habrá un festival de 13 horas", "url": "https://www.yucatan.com.mx/mexico/2025/10/25/pomuch-invita-a-celebrar-a-los-finados-ya-limpian-a-sus-difuntos-y-habra-un-festival-de-13-horas.html"}], "summary": "Nota de Elsi V. Ventura. El Ayuntamiento de Hecelchakán cobró 30 pesos por persona para entrar al cementerio del 24 al 30 de octubre, y el Comité Organizador se deslindó del cobro. El Diario de Yucatán reproduce el cartel del Ayuntamiento.", "quote": "la limpieza de restos óseos es un acto privado y familiar, no un espectáculo turístico"}, {"match": "Se han visto drones", "sources": [{"outlet": "AFP, vía Animal Político", "date": "22 de octubre de 2025", "headline": "La limpieza de huesos en Pomuch, donde antes del Día de Muertos, los difuntos se bañan bajo el sol", "url": "https://grupoanimal.mx/estilo-de-vida/dia-de-muertos-pomuch-limpieza-huesos"}, {"outlet": "El Diario de Hoy (reproducción del cable)", "date": "29 de octubre de 2025", "headline": "En México, antes del Día de Muertos los difuntos se «bañan» bajo el sol", "url": "https://www.eldiariodehoy.com/noticias/internacionales/en-mexico-antes-del-dia-de-muertos-los-difuntos-se-banan-bajo-el-sol/44023/2025/"}], "summary": "El cable de AFP describe el ritual de Pomuch y señala que hoy el cementerio también recibe turistas y creadores de contenido con drones.", "quote": "en cuyo cementerio ahora se ven también turistas y creadores de contenido con drones"}, {"match": "Origen", "sources": [{"outlet": "Diario de Yucatán", "date": "26 de octubre de 2023", "headline": "Historia del Paseo de las Ánimas en Mérida: cómo surgió", "url": "https://www.yucatan.com.mx/merida/2023/10/26/historia-del-paseo-de-las-animas-en-merida-fotos-y-videos.html"}], "summary": "Nota de Jessica Ruiz Rubio. En 2008 los vecinos de la Ermita de Santa Isabel propusieron al Ayuntamiento el «Corredor de las Ánimas». En 2009 fue «Marcha» y desde 2010, «Paseo». Desde 2015 la gente participa con inscripción previa y traje regional.", "quote": "A partir de 2015… se comenzó a incluir a la ciudadanía como parte de la procesión"}, {"match": "Unos 90.000 asistentes", "sources": [{"outlet": "Diario de Yucatán", "date": "3 de noviembre de 2025", "headline": "El Festival de las Ánimas concluye con cifras récord", "url": "https://www.yucatan.com.mx/merida/2025/11/03/el-festival-de-las-animas-concluye-con-cifras-record.html"}], "summary": "Balance municipal del Festival de las Ánimas 2025: más de 200.000 asistentes en todo el festival, y más de 90.000 en el Paseo de las Ánimas. Son cifras oficiales del Ayuntamiento.", "quote": "el Paseo de las Ánimas, que reunió a más de 90 mil asistentes"}, {"match": "se abrió en 1821", "sources": [{"outlet": "PorEsto", "date": "22 de octubre de 2023", "headline": "Cementerio General de Mérida, un museo de arte descuidado que alberga 25 mil tumbas", "url": "https://www.poresto.com/yucatan/2023/10/22/cementerio-general-de-merida-un-museo-de-arte-descuidado-que-alberga-25-mil-tumbas.html"}], "summary": "Nota de Rubén Darío Hau. El cementerio se levantó en terrenos de la antigua hacienda ganadera de San Antonio X‑Coholté, se aprobó en 1814 y empezó a funcionar el 3 de noviembre de 1821.", "quote": "Comenzó a funcionar como tal exactamente el 3 de noviembre de 1821"}, {"match": "Hilo negro o rojo", "sources": [{"outlet": "POSTA México", "date": "19 de octubre de 2024", "headline": "Por esta razón, en Hanal Pixán amarran un hilo negro a los niños", "url": "https://www.posta.com.mx/mexico/por-esta-razon-en-hanal-pixan-amarran-un-hilo-negro-a-los-ninos/vl1624882"}], "summary": "Nota de Alexis Lara. Explica que a los niños de hasta unos 8 años se les ata un hilo negro, a veces rojo, con nueve nudos en la muñeca derecha o en el tobillo, para protegerlos durante el Hanal Pixán.", "quote": "es como una manera de protegerlos y de advertir a las ánimas que no pueden tocarlos, ni jugar con ellos", "note": "Pregunta en el campo si se hace donde estés, y cómo se explica allí."}], pop=$('#pop'), popBtn=null;
+  function esc(t){var d=document.createElement('div');d.textContent=t||'';return d.innerHTML}
+  function closePop(){ pop.classList.remove('open'); if(popBtn){popBtn.setAttribute('aria-expanded','false'); popBtn=null;} }
+  function openPop(btn){
+    var p=PRESS[+btn.getAttribute('data-press')]; if(!p) return;
+    if(popBtn===btn){closePop();return} closePop(); popBtn=btn; btn.setAttribute('aria-expanded','true');
+    var links=(p.sources||[]).map(function(s,i){return '<a class="pop-link" target="_blank" rel="noopener" href="'+esc(s.url)+'">'+(i===0?'Leer la nota en ':'También en ')+esc(s.outlet)+' ↗</a>'}).join('<br>');
+    var s0=(p.sources||[])[0]||{};
+    $('#popBody').innerHTML='<p class="pop-meta">'+esc(s0.outlet)+(s0.date?' · '+esc(s0.date):'')+'</p>'+
+      '<h3 class="pop-title" id="popTitle">'+esc(s0.headline||p.claim)+'</h3>'+
+      '<p class="pop-sum">'+esc(p.summary)+'</p>'+(p.quote?'<blockquote class="pop-quote">«'+esc(p.quote)+'»</blockquote>':'')+links+
+      (p.note?'<p class="pop-more">'+esc(p.note)+'</p>':'')+
+      '<p class="pop-warn">Dato respaldado sólo por prensa, no por una fuente académica. Tómalo como pista, no como hecho establecido.</p>';
+    if(innerWidth>640){ var r=btn.getBoundingClientRect(), w=pop.offsetWidth||400, left=Math.min(Math.max(16,r.left-20),document.documentElement.clientWidth-w-16);
+      var h=pop.offsetHeight, top=r.bottom+10; if(top+h>innerHeight-12 && r.top-h-10>12) top=r.top-h-10;
+      pop.style.left=left+'px'; pop.style.top=(top+scrollY)+'px'; } else { pop.style.top=''; }
+    pop.classList.add('open'); $('#popClose').focus({preventScroll:true});
+  }
+  document.addEventListener('click',function(e){ var b=e.target.closest('button.press'); if(b){e.preventDefault(); openPop(b); return;} if(pop.classList.contains('open')&&!e.target.closest('#pop')) closePop(); });
+  $('#popClose').addEventListener('click',function(){var b=popBtn; closePop(); if(b) b.focus();});
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape'&&pop.classList.contains('open')){var b=popBtn; closePop(); if(b) b.focus();} });
+  addEventListener('resize',closePop);
+  window.addEventListener('hashchange',closePop);
 
   // ---------- countdown
   var start=new Date(2026,9,27), end=new Date(2026,10,3,23,59), now=new Date(), d=Math.ceil((start-now)/86400000);
