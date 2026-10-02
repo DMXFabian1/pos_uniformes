@@ -122,6 +122,37 @@ def flor():
     return img
 
 
+def papel_picado():
+    """Papel picado para Independencia.
+
+    Primero llevaba las mismas estrellas que Año Nuevo, que no era un dibujo
+    sino un relleno — Daniel lo cacó de inmediato. El papel picado se lee como
+    «tienda en septiembre» sin recurrir al águila, que a 2 cm se vuelve una
+    mancha, ni al sombrero, que es la caricatura de siempre.
+    """
+    img, d = _lienzo(150)
+    d.line([(6, 18), (234, 18)], fill=NEGRO, width=TRAZO - 2)
+    x, i = 18, 0
+    while x < 215:
+        ancho, alto = 44, 74
+        d.rectangle([x, 18, x + ancho, 18 + alto], outline=NEGRO, width=TRAZO - 2)
+        # El «picado»: huecos macizos que se alternan, para que la tira no se
+        # vea repetida y cada banderola tenga su figura.
+        cx = x + ancho // 2
+        if i % 2 == 0:
+            d.ellipse([cx - 11, 38, cx + 11, 60], fill=NEGRO)
+            d.polygon([(cx, 66), (cx - 12, 84), (cx + 12, 84)], fill=NEGRO)
+        else:
+            d.polygon([(cx, 32), (cx - 14, 52), (cx + 14, 52)], fill=NEGRO)
+            d.rectangle([cx - 10, 60, cx + 10, 82], fill=NEGRO)
+        for k in range(4):   # el fleco de abajo
+            fx = x + 6 + k * 11
+            d.polygon([(fx, 18 + alto), (fx + 9, 18 + alto), (fx + 4, 18 + alto + 14)], fill=NEGRO)
+        x += ancho + 10
+        i += 1
+    return img
+
+
 def estrellas():
     img, d = _lienzo(90)
     def estrella(cx, cy, r):
@@ -148,7 +179,7 @@ DIBUJOS = {
     "san_valentin": corazon,
     "dia_de_las_madres": flor,
     "anio_nuevo": estrellas,
-    "independencia": estrellas,
+    "independencia": papel_picado,
 }
 
 
