@@ -184,9 +184,12 @@ def renglones_de_ticket(hoy: date | None = None) -> list[str]:
     t = actual(hoy)
     if t is None:
         return []
-    arte = [a for a in t.arte[:MAX_RENGLONES] if len(a) <= ANCHO_TICKET]
-    ancho = max((len(a) for a in arte), default=0)
-    return [a.ljust(ancho) for a in arte] + [t.saludo]
+    return _solo_arte_de(t) + [t.saludo]
+
+
+def _solo_arte(hoy: date | None = None) -> list[str]:
+    """El dibujo de ASCII de hoy, sin el saludo."""
+    return _solo_arte_de(actual(hoy))
 
 
 def saludo_de_pantalla(hoy: date | None = None) -> str:
@@ -246,29 +249,44 @@ def marcador_de_ticket(hoy: date | None = None) -> str:
     return f"{MARCADOR_INICIO}{archivo}{MARCADOR_FIN}"
 
 
+def temporada_de_archivo(archivo: str) -> "Temporada | None":
+    """La temporada a la que pertenece ese dibujo. Lo contrario de `ARCHIVOS`."""
+    buscado = str(archivo or "").strip()
+    for t in TEMPORADAS:
+        if ARCHIVOS.get(t.nombre) == buscado:
+            return t
+    return None
+
+
 def sin_marcadores(texto: str, hoy: date | None = None) -> str:
     """Cambia el marcador por el dibujo de ASCII, para quien no imprime puntos.
 
     Lo usan la vista previa en pantalla y el camino de QPrinter. Sin esto, en
     esos dos saldría el texto crudo «[[IMG:halloween]]», que es peor que no
     poner nada.
+
+    El dibujo sale **del marcador**, no de la fecha de hoy. Parece lo mismo y no
+    lo es: un ticket de Halloween reimpreso el 1 de noviembre llevaba el
+    marcador de la calabaza y se le ponía la calavera — o nada, si ya no había
+    temporada. Lo que manda es lo que dice el papel.
     """
     if MARCADOR_INICIO not in (texto or ""):
         return texto
-    arte = "\n".join(r.center(ANCHO_TICKET) for r in _solo_arte(hoy))
     salida = []
     for i, parte in enumerate(texto.split(MARCADOR_INICIO)):
         if i == 0:
             salida.append(parte)
             continue
-        _, _, resto = parte.partition(MARCADOR_FIN)
+        archivo, _, resto = parte.partition(MARCADOR_FIN)
+        arte = "\n".join(
+            r.center(ANCHO_TICKET) for r in _solo_arte_de(temporada_de_archivo(archivo))
+        )
         salida.append(arte + resto)
     return "".join(salida)
 
 
-def _solo_arte(hoy: date | None = None) -> list[str]:
-    """El dibujo de ASCII sin el saludo (el saludo ya va aparte en el ticket)."""
-    t = actual(hoy)
+def _solo_arte_de(t: "Temporada | None") -> list[str]:
+    """El dibujo de ASCII de ESA temporada, sin el saludo."""
     if t is None:
         return []
     arte = [a for a in t.arte[:MAX_RENGLONES] if len(a) <= ANCHO_TICKET]

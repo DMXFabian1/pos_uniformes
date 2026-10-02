@@ -149,3 +149,32 @@ class EnElTicketTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ElDibujoSaleDelMarcadorTests(unittest.TestCase):
+    """Y no de la fecha de hoy, que parece lo mismo y no lo es."""
+
+    def test_un_ticket_reimpreso_otro_dia_conserva_SU_dibujo(self) -> None:
+        # Un ticket de Halloween reimpreso el 1 de noviembre llevaba el marcador
+        # de la calabaza y se le ponía la calavera — o nada, si ya no había
+        # temporada. Lo que manda es lo que dice el papel.
+        texto = f"{temp.MARCADOR_INICIO}halloween{temp.MARCADOR_FIN}\n"
+        de_muertos = date(2026, 11, 2)
+        salida = temp.sin_marcadores(texto, de_muertos)
+        self.assertIn("'-www-'", salida)        # la boca de la calabaza
+        self.assertNotIn("'-|||-'", salida)     # NO los dientes de la calavera
+
+    def test_sirve_aunque_hoy_no_haya_temporada(self) -> None:
+        texto = f"{temp.MARCADOR_INICIO}navidad{temp.MARCADOR_FIN}\n"
+        salida = temp.sin_marcadores(texto, date(2026, 3, 18))
+        self.assertIn("/_\\", salida)
+
+    def test_un_marcador_desconocido_no_deja_basura(self) -> None:
+        salida = temp.sin_marcadores(f"a{temp.MARCADOR_INICIO}vete_a_saber{temp.MARCADOR_FIN}b")
+        self.assertNotIn("IMG", salida)
+        self.assertIn("a", salida)
+        self.assertIn("b", salida)
+
+    def test_la_vuelta_de_archivo_a_temporada(self) -> None:
+        self.assertEqual(temp.temporada_de_archivo("halloween").nombre, "Halloween")
+        self.assertIsNone(temp.temporada_de_archivo("no_existe"))
