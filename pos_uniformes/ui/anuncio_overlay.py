@@ -23,7 +23,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtGui import QColor, QPainter, QPixmap
 from PyQt6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
 # Paleta cálida MAXIMODA (misma que el resto del satélite).
@@ -101,10 +101,18 @@ class AnuncioOverlay(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self.setObjectName("anuncioOverlay")
+        #: Color que pinta `paintEvent`. Nunca None: un overlay sin fondo deja
+        #: ver el kiosko y el texto se pierde.
+        self._color_fondo = _BG
         self.setAutoFillBackground(True)
+        # Un QWidget pelado NO pinta el `background-color` de su hoja de estilo
+        # a menos que se le pida con WA_StyledBackground. Sin esto el overlay
+        # sale transparente: se ve el kiosko detrás y el texto crema desaparece
+        # sobre el blanco de la pantalla (visto en la tienda, 02/10).
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         # Recibe foco para capturar teclado; el mouse se maneja en mousePressEvent.
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
-        self.setStyleSheet(_BOTON_STYLE)
+        self._pintar_fondo(_BG)
 
         self._pixmap_original: QPixmap | None = None
         self._modo_imagen = False
@@ -163,6 +171,26 @@ class AnuncioOverlay(QWidget):
         layout.addWidget(self._botones)
         layout.addWidget(self._hint_label)
 
+    def _pintar_fondo(self, color: str) -> None:
+        """Deja el fondo de ese color. Lo pinta `paintEvent`, no la hoja de estilo.
+
+        Se intentó primero con `background-color` en la hoja, y en la tienda
+        salió transparente: se veía el kiosko detrás y el texto crema no se leía
+        sobre el blanco. Qt solo pinta el fondo de la hoja en un QWidget pelado
+        bajo condiciones que cambian entre plataformas y estilos — aquí en la
+        Mac se pintaba y en el Windows de la tienda no, así que ninguna prueba
+        de aquí lo iba a atrapar.
+
+        Pintarlo a mano no depende de nada de eso. La hoja y la paleta se dejan
+        puestas igual: cuestan nada y cubren el primer cuadro.
+        """
+        self._color_fondo = color
+        self.setStyleSheet(_BOTON_STYLE + f"#anuncioOverlay {{ background-color: {color}; }}")
+        paleta = self.palette()
+        paleta.setColor(self.backgroundRole(), QColor(color))
+        self.setPalette(paleta)
+        self.update()
+
     # ── API ──────────────────────────────────────────────────────────────────
 
     @property
@@ -192,9 +220,7 @@ class AnuncioOverlay(QWidget):
             self._botones.setVisible(True)
             self._hint_label.setText("Toca «Enterada» para que se sepa que lo leíste")
             if not self._modo_imagen:
-                self.setStyleSheet(
-                    _BOTON_STYLE + f"#anuncioOverlay {{ background-color: {_BG_AVISO}; }}"
-                )
+                self._pintar_fondo(_BG_AVISO)
         else:
             self._kicker_label.setVisible(False)
             self._botones.setVisible(False)
@@ -206,14 +232,14 @@ class AnuncioOverlay(QWidget):
         self._title_label.setVisible(False)
         self._message_label.setVisible(False)
         self._image_label.setVisible(True)
-        self.setStyleSheet(_BOTON_STYLE + f"#anuncioOverlay {{ background-color: {_BG_IMG}; }}")
+        self._pintar_fondo(_BG_IMG)
         self._reescalar_pixmap()
 
     def _render_texto(self, titulo: str | None, mensaje: str | None) -> None:
         self._modo_imagen = False
         self._pixmap_original = None
         self._image_label.setVisible(False)
-        self.setStyleSheet(_BOTON_STYLE + f"#anuncioOverlay {{ background-color: {_BG}; }}")
+        self._pintar_fondo(_BG)
         titulo = titulo or ""
         mensaje = mensaje or ""
         px_titulo = _tamano(titulo, _TITULO_ESCALONES, _TITULO_MINIMO)
@@ -248,6 +274,17 @@ class AnuncioOverlay(QWidget):
             self.setGeometry(parent.rect())
 
     # ── Eventos ────────────────────────────────────────────────────────────────
+
+    def paintEvent(self, event) -> None:  # noqa: N802 — API de Qt
+        """Pinta el fondo SIEMPRE, antes que nada.
+
+        Es lo único que separa un aviso legible de un texto crema flotando
+        sobre la pantalla blanca del kiosko.
+        """
+        painter = QPainter(self)
+        painter.fillRect(self.rect(), QColor(self._color_fondo))
+        painter.end()
+        super().paintEvent(event)
 
     def resizeEvent(self, event) -> None:  # noqa: N802 — API de Qt
         super().resizeEvent(event)

@@ -271,3 +271,95 @@ class OverlayAvisoTests(unittest.TestCase):
 
         self.assertEqual(hace_cuanto(None), "")
         self.assertEqual(hace_cuanto("no es una fecha"), "")
+
+
+class FondoDeVerdadTests(unittest.TestCase):
+    """El overlay tiene que PINTARSE, no solo decir que se pinta.
+
+    En la tienda (02/10) el aviso salió transparente: se veía el kiosko detrás y
+    el texto, que va en crema, desaparecía sobre el blanco de la pantalla. La
+    causa es vieja y silenciosa de Qt: un QWidget pelado NO pinta el
+    `background-color` de su hoja de estilo si no se le pide con
+    WA_StyledBackground. Todos los tests de antes miraban atributos y pasaban.
+
+    Estos miran los píxeles, que es lo único que mira quien está enfrente.
+    """
+
+    def setUp(self) -> None:
+        from pos_uniformes.ui.anuncio_overlay import AnuncioOverlay
+
+        # Padre blanco: si el overlay fuera transparente, se vería blanco —
+        # exactamente lo que pasó en la tienda.
+        self.parent = QWidget()
+        self.parent.setStyleSheet("background: white;")
+        self.parent.resize(600, 400)
+        self.overlay = AnuncioOverlay(self.parent)
+        self.overlay.setGeometry(self.parent.rect())
+
+    def tearDown(self) -> None:
+        self.parent.close()
+
+    def _color_de_esquina(self):
+        imagen = self.overlay.grab().toImage()
+        # Una esquina: lejos de las etiquetas, es fondo puro.
+        return imagen.pixelColor(4, 4)
+
+    def test_pinta_aunque_la_hoja_de_estilo_no_sirva(self) -> None:
+        """El de verdad: sin hoja de estilo, el fondo tiene que seguir ahí.
+
+        Aquí en la Mac Qt respeta el `background-color` de la hoja, así que un
+        test que solo mire los píxeles pasa igual aunque el código esté como
+        estaba en la tienda — por eso este le quita la hoja: deja al descubierto
+        si alguien vuelve a dejar el fondo colgando de ella.
+        """
+        self.overlay.render_anuncio(_aviso())
+        self.overlay.setStyleSheet("")          # como si Qt la ignorara
+        self.assertEqual(self._color_de_esquina().name(), "#8f2f12")
+
+    def test_el_atributo_que_hace_que_se_pinte(self) -> None:
+        from PyQt6.QtCore import Qt as _Qt
+
+        self.assertTrue(
+            self.overlay.testAttribute(_Qt.WidgetAttribute.WA_StyledBackground)
+        )
+
+    def test_un_aviso_no_es_transparente(self) -> None:
+        self.overlay.render_anuncio(_aviso())
+        color = self._color_de_esquina()
+        self.assertNotEqual(color.name(), "#ffffff", "el overlay salió transparente")
+        self.assertEqual(color.name(), "#8f2f12")
+
+    def test_un_anuncio_de_texto_tiene_su_fondo(self) -> None:
+        self.overlay.render_anuncio(_anuncios()[0])
+        self.assertEqual(self._color_de_esquina().name(), "#7b2d14")
+
+    def test_el_titulo_contrasta_con_el_fondo(self) -> None:
+        # El texto va en crema. Si el fondo quedara claro no se leería, que es
+        # justo como se veía en la foto de la tienda.
+        from pos_uniformes.ui.anuncio_overlay import _MENSAJE, _TITULO
+
+        self.overlay.render_anuncio(_aviso())
+        fondo = self._color_de_esquina()
+        for color_texto in (_TITULO, _MENSAJE):
+            from PyQt6.QtGui import QColor
+
+            texto = QColor(color_texto)
+            distancia = (
+                abs(texto.red() - fondo.red())
+                + abs(texto.green() - fondo.green())
+                + abs(texto.blue() - fondo.blue())
+            )
+            self.assertGreater(distancia, 200, f"{color_texto} no se lee sobre {fondo.name()}")
+
+    def test_cambiar_de_anuncio_repinta_el_fondo(self) -> None:
+        # La cartelera rota: un aviso y luego uno normal tienen fondos distintos
+        # y el segundo no puede quedarse con el del primero.
+        self.overlay.render_anuncio(_aviso())
+        self.assertEqual(self._color_de_esquina().name(), "#8f2f12")
+        self.overlay.render_anuncio(_anuncios()[0])
+        self.assertEqual(self._color_de_esquina().name(), "#7b2d14")
+
+    def test_con_imagen_el_fondo_es_oscuro(self) -> None:
+        self.overlay.render_anuncio({**_aviso(), "imagen_path": "/no/existe.jpg"})
+        # Sin archivo cae a texto; lo que importa es que nunca quede en blanco.
+        self.assertNotEqual(self._color_de_esquina().name(), "#ffffff")
