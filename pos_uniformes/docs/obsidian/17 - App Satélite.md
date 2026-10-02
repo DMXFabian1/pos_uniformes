@@ -688,3 +688,42 @@ primero fue **imprimirlo y leerlo**, no imaginarlo.
   punto 2 («15 días para cambios») junto al 5 («no se aceptan devoluciones») se
   leen como contradicción aunque cambio ≠ devolución. Es política suya, no
   estética: queda pendiente de que él decida.
+
+### El dibujo, ahora en PNG (2026-10-02)
+
+Daniel preguntó si se podía con PNG. Sí: la térmica imprime mapas de bits con
+`GS v 0`. Lo que complica no es el comando — es que **el ticket viaja como una
+cadena** por toda la cola de impresión, así que la imagen no cabe dentro.
+
+La solución es un **marcador** (`[[IMG:halloween]]`) en su propio renglón, y
+cada camino de impresión lo resuelve a su manera:
+
+| Camino | Qué hace con el marcador |
+|---|---|
+| ESC/POS (el de la tienda) | Lo cambia por los puntos, centrado, y repone la alineación |
+| QPrinter (respaldo) | Lo cambia por el dibujo de ASCII |
+| Vista previa en pantalla | Igual, el de ASCII |
+
+Sin esa sustitución, los dos últimos imprimirían el literal `[[IMG:halloween]]`,
+que es peor que no poner nada. **El dibujo de caracteres no se tiró**: es la red
+por si falta el PNG.
+
+Los dibujos se generan con `scripts/generar_dibujos_temporada.py` (PIL) y van
+versionados en `assets/temporadas/`. Reglas que vienen de cómo imprime una
+térmica: blanco y negro **puro** sin grises (la impresora quema o no quema; un
+gris se vuelve tramado sucio), trazo de 5 px o más (a 203 dpi una línea de 1 px
+se pierde), figuras cerradas y simples (a 2 cm se ve la silueta, no las
+facciones) y 240 puntos de ancho sobre los 576 del papel.
+
+El raster se arma a mano: un bit por punto, el más significativo a la izquierda,
+en filas de `ancho/8` bytes. El ancho se redondea hacia arriba al múltiplo de 8
+porque la unidad del comando es el byte — una imagen de 5 puntos ocupa uno, y
+los 3 de sobra tienen que ir en blanco y no con lo que hubiera en memoria.
+
+Los tests **decodifican el raster de vuelta** y comprueban los bits: que la
+cabecera diga el tamaño, que un punto negro prenda su bit, que el relleno vaya
+limpio y que un gris se decida. Más: que el nombre del marcador no pueda salirse
+de la carpeta de dibujos (viaja dentro del ticket), y que si el PNG no se puede
+leer el ticket salga igual.
+
+`test_ticket_dibujo_png` (16).

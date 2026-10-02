@@ -161,8 +161,23 @@ def _try_print_escpos(printer_name: str, content: str, copies: int) -> bool:
         return False
 
 
+def _sin_marcadores(content: str) -> str:
+    """Quita el marcador del dibujo de temporada, poniendo el de ASCII.
+
+    Este camino dibuja TEXTO: no sabe imprimir puntos. Sin esto saldría el
+    literal «[[IMG:halloween]]» en el papel, que es peor que no poner nada.
+    """
+    try:
+        from pos_uniformes.services.temporada_service import sin_marcadores
+
+        return sin_marcadores(content)
+    except Exception:  # noqa: BLE001 — el ticket se imprime igual
+        return content
+
+
 def _render_drawtext(printer: QPrinter, content: str) -> bool:
     """Dibuja el texto en la página con la fuente/flags de siempre."""
+    content = _sin_marcadores(content)
     painter = QPainter()
     if not painter.begin(printer):
         return False
@@ -276,7 +291,8 @@ def _build_ticket_editor(content: str) -> QTextEdit:
         f'QTextEdit {{ font-family: "{mono_family}"; font-size: {TICKET_FONT_POINT_SIZE}pt;'
         f" font-weight: bold; }}"
     )
-    editor.setPlainText(content)
+    # La vista previa tampoco imprime puntos: enseña el dibujo de ASCII.
+    editor.setPlainText(_sin_marcadores(content))
     return editor
 
 

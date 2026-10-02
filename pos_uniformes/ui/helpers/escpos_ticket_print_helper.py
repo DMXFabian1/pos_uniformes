@@ -31,11 +31,85 @@ def _codepage_cmd(n: int) -> bytes:
     return bytes([_ESC, ord("t"), max(0, min(255, int(n)))])
 
 
+#: Ancho del papel en puntos. 80 mm a 203 dpi = 576; es el valor de casi todas
+#: las térmicas de 80 mm, y solo se usa para centrar la imagen.
+PUNTOS_POR_LINEA = 576
+
+_ALINEAR_CENTRO = bytes([_ESC, ord("a"), 1])
+_ALINEAR_IZQ = bytes([_ESC, ord("a"), 0])
+
+
+def raster_de_imagen(ruta) -> bytes:
+    """Convierte un PNG a los bytes de `GS v 0` (imagen de puntos).
+
+    La térmica no sabe de PNG: recibe un mapa de bits, un bit por punto, 1 =
+    quema. Se manda en filas de `ancho/8` bytes, con el bit más significativo a
+    la izquierda.
+
+    El ancho se redondea hacia arriba al múltiplo de 8 porque la unidad del
+    comando es el byte: una imagen de 240 puntos ocupa 30 bytes por fila, pero
+    una de 243 ocuparía 31 y los 5 puntos de más tienen que ir en blanco, no
+    con basura.
+    """
+    from PIL import Image
+
+    img = Image.open(ruta).convert("L")
+    # Umbral duro, sin grises: la impresora decide quemar o no quemar, y un gris
+    # se convierte en un tramado sucio.
+    img = img.point(lambda v: 0 if v < 128 else 255, mode="1")
+    ancho, alto = img.size
+    bytes_por_fila = (ancho + 7) // 8
+    pixeles = img.load()
+
+    datos = bytearray()
+    for y in range(alto):
+        fila = bytearray(bytes_por_fila)
+        for x in range(ancho):
+            if not pixeles[x, y]:          # 0 = negro = quemar
+                fila[x // 8] |= 0x80 >> (x % 8)
+        datos += fila
+
+    cabecera = bytes(
+        [_GS, ord("v"), ord("0"), 0,
+         bytes_por_fila & 0xFF, (bytes_por_fila >> 8) & 0xFF,
+         alto & 0xFF, (alto >> 8) & 0xFF]
+    )
+    return cabecera + bytes(datos)
+
+
+def _trozos_con_imagenes(text: str, s: EscPosSettings) -> bytes:
+    """Codifica el texto y cambia cada marcador de imagen por sus puntos.
+
+    El ticket viaja como una cadena por toda la cola de impresión, así que la
+    imagen no puede ir dentro: va un marcador en su propio renglón y aquí se
+    sustituye. Si el dibujo no se puede cargar, se omite y el ticket sale igual
+    — un adorno nunca detiene un ticket.
+    """
+    from pos_uniformes.services.temporada_service import (
+        MARCADOR_INICIO,
+        imagen_para_marcador,
+    )
+
+    salida = bytearray()
+    for parte in text.split(MARCADOR_INICIO):
+        if salida and "]]" in parte:
+            nombre, _, resto = parte.partition("]]")
+            ruta = imagen_para_marcador(nombre)
+            if ruta is not None:
+                try:
+                    salida += _ALINEAR_CENTRO + raster_de_imagen(ruta) + _ALINEAR_IZQ
+                except Exception:  # noqa: BLE001 — sin dibujo, el ticket sigue
+                    pass
+            parte = resto
+        salida += parte.encode(s.encoding, errors="replace")
+    return bytes(salida)
+
+
 def build_escpos_bytes(text: str, settings: EscPosSettings | None = None) -> bytes:
     """Arma el stream ESC/POS: init + codepage + texto + avance + corte."""
     s = settings or EscPosSettings()
     cuerpo = text if text.endswith("\n") else text + "\n"
-    encoded = cuerpo.encode(s.encoding, errors="replace")
+    encoded = _trozos_con_imagenes(cuerpo, s)
     feed = ("\n" * s.feed_lines).encode(s.encoding, errors="replace")
     corte = _CUT_FULL if s.full_cut else _CUT_PARTIAL
     return _INIT + _codepage_cmd(s.codepage) + encoded + feed + corte

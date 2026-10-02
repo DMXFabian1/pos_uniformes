@@ -193,3 +193,84 @@ def saludo_de_pantalla(hoy: date | None = None) -> str:
     """'🎃 ¡Feliz Halloween!' para la pantalla. Vacío si no hay temporada."""
     t = actual(hoy)
     return f"{t.emoji} {t.saludo}" if t else ""
+
+
+# ── El dibujo de verdad (PNG) ────────────────────────────────────────────────
+#
+# La térmica sabe imprimir puntos, no solo letras, así que el dibujo puede ser
+# una imagen y no un montón de caracteres. Pero el ticket viaja como una CADENA
+# por toda la cola de impresión, así que la imagen no puede ir dentro: va un
+# marcador en su propio renglón, y cada camino de impresión lo resuelve como
+# puede —ESC/POS lo cambia por los puntos; los demás, por el dibujo de ASCII,
+# que para eso se queda.
+
+MARCADOR_INICIO = "[[IMG:"
+MARCADOR_FIN = "]]"
+
+#: Nombre de archivo por temporada. Si falta el PNG, se usa el ASCII de arriba.
+ARCHIVOS = {
+    "Regreso a clases": "regreso_a_clases",
+    "Independencia": "independencia",
+    "Halloween": "halloween",
+    "Día de Muertos": "dia_de_muertos",
+    "Navidad": "navidad",
+    "Año nuevo y Reyes": "anio_nuevo",
+    "San Valentín": "san_valentin",
+    "Día de las Madres": "dia_de_las_madres",
+}
+
+
+def carpeta_dibujos():
+    from pathlib import Path
+
+    return Path(__file__).resolve().parents[1] / "assets" / "temporadas"
+
+
+def imagen_para_marcador(nombre: str):
+    """La ruta del PNG de ese marcador, o None si no está."""
+    limpio = "".join(c for c in str(nombre or "") if c.isalnum() or c == "_")
+    if not limpio:
+        return None
+    ruta = carpeta_dibujos() / f"{limpio}.png"
+    return ruta if ruta.exists() else None
+
+
+def marcador_de_ticket(hoy: date | None = None) -> str:
+    """El marcador del dibujo de hoy, o '' si no hay temporada o no hay PNG."""
+    t = actual(hoy)
+    if t is None:
+        return ""
+    archivo = ARCHIVOS.get(t.nombre)
+    if not archivo or imagen_para_marcador(archivo) is None:
+        return ""
+    return f"{MARCADOR_INICIO}{archivo}{MARCADOR_FIN}"
+
+
+def sin_marcadores(texto: str, hoy: date | None = None) -> str:
+    """Cambia el marcador por el dibujo de ASCII, para quien no imprime puntos.
+
+    Lo usan la vista previa en pantalla y el camino de QPrinter. Sin esto, en
+    esos dos saldría el texto crudo «[[IMG:halloween]]», que es peor que no
+    poner nada.
+    """
+    if MARCADOR_INICIO not in (texto or ""):
+        return texto
+    arte = "\n".join(r.center(ANCHO_TICKET) for r in _solo_arte(hoy))
+    salida = []
+    for i, parte in enumerate(texto.split(MARCADOR_INICIO)):
+        if i == 0:
+            salida.append(parte)
+            continue
+        _, _, resto = parte.partition(MARCADOR_FIN)
+        salida.append(arte + resto)
+    return "".join(salida)
+
+
+def _solo_arte(hoy: date | None = None) -> list[str]:
+    """El dibujo de ASCII sin el saludo (el saludo ya va aparte en el ticket)."""
+    t = actual(hoy)
+    if t is None:
+        return []
+    arte = [a for a in t.arte[:MAX_RENGLONES] if len(a) <= ANCHO_TICKET]
+    ancho = max((len(a) for a in arte), default=0)
+    return [a.ljust(ancho) for a in arte]

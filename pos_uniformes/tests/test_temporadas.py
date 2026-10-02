@@ -135,15 +135,29 @@ class NuncaDetieneUnTicketTests(unittest.TestCase):
         self.assertEqual(lineas, ["TOTAL", "Gracias por su compra."])
 
     def test_va_despues_del_gracias(self) -> None:
+        # Ahora se emite el marcador del PNG; el saludo va debajo.
         from unittest.mock import patch
 
         from pos_uniformes.ui.views.quick_sale_view import QuickSaleWidget
 
         lineas = ["Gracias por su compra."]
-        with patch.object(t, "renglones_de_ticket", return_value=["(arte)", "¡Feliz!"]):
+        with patch.object(t, "actual", return_value=t.TEMPORADAS[2]):
             QuickSaleWidget._append_temporada(lineas)
         self.assertEqual(lineas[0], "Gracias por su compra.")
-        self.assertIn("¡Feliz!", lineas[-1])
+        self.assertTrue(any(t.MARCADOR_INICIO in l for l in lineas))
+        self.assertIn(t.TEMPORADAS[2].saludo, lineas[-1])
+
+    def test_sin_png_cae_al_dibujo_de_ascii(self) -> None:
+        from unittest.mock import patch
+
+        from pos_uniformes.ui.views.quick_sale_view import QuickSaleWidget
+
+        lineas: list[str] = []
+        with patch.object(t, "actual", return_value=t.TEMPORADAS[2]), \
+                patch.object(t, "imagen_para_marcador", return_value=None):
+            QuickSaleWidget._append_temporada(lineas)
+        self.assertFalse(any(t.MARCADOR_INICIO in l for l in lineas))
+        self.assertTrue(any('.-"""-.' in l for l in lineas))
 
     def test_solo_en_la_copia_del_cliente(self) -> None:
         # La de la tienda se archiva; no necesita adornos.

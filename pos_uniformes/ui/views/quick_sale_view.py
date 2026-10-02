@@ -2514,15 +2514,26 @@ class QuickSaleWidget(QWidget):
         sale siempre deja de notarse.
         """
         try:
-            from pos_uniformes.services.temporada_service import renglones_de_ticket
+            from pos_uniformes.services.temporada_service import (
+                actual,
+                marcador_de_ticket,
+                renglones_de_ticket,
+            )
 
-            renglones = renglones_de_ticket()
+            temporada = actual()
+            marcador = marcador_de_ticket()
         except Exception:  # noqa: BLE001 — un adorno jamás detiene un ticket
             return
-        if not renglones:
+        if temporada is None:
             return
         lines.append("")
-        for renglon in renglones:
+        if marcador:
+            # El dibujo de verdad. Quien no sepa imprimir puntos lo cambia por
+            # el de ASCII (`sin_marcadores`), que para eso sigue existiendo.
+            lines.append(marcador)
+            lines.append(temporada.saludo.center(_TW))
+            return
+        for renglon in renglones_de_ticket():
             lines.append(renglon.center(_TW))
 
     def _build_apartado_text(
