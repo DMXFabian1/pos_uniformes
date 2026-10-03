@@ -337,3 +337,49 @@ class EsperarALaPrincipalTests(unittest.TestCase):
             raise RuntimeError("splash cerrado")
 
         self.assertTrue(self._esperar([False, True], avisar=_truena))
+
+
+class ElKioskoSiempreAbreTests(unittest.TestCase):
+    """«Arranque no disponible: connection timeout expired» (foto, 02/10).
+
+    El kiosko se negó a abrir teniendo su modo local perfectamente bueno. El
+    sondeo solo dice que el puerto contesta; con la red parpadeando, la conexión
+    de verdad puede fallar un segundo después. Un kiosko que no abre es un
+    kiosko que no vende.
+    """
+
+    def setUp(self) -> None:
+        from pathlib import Path
+
+        self.codigo = (
+            Path(__file__).resolve().parents[1] / "presupuestos_satelite_main.py"
+        ).read_text(encoding="utf-8")
+        # Lo que pasa después del sondeo.
+        self.tramo = self.codigo[self.codigo.index("connection_available = esperar_base"):]
+
+    def test_un_fallo_de_conexion_cae_a_local_y_no_cierra(self) -> None:
+        self.assertIn("connection_available = False", self.tramo)
+        self.assertNotIn(
+            'QMessageBox.critical(None, "Arranque no disponible"', self.tramo,
+            "sigue rindiéndose en vez de abrir en local",
+        )
+
+    def test_el_camino_local_se_toma_si_no_hubo_ventana(self) -> None:
+        # `if window is None` y no `else`: así el fallo de la rama en línea
+        # entra al camino local en vez de saltárselo.
+        self.assertIn("if window is None:", self.tramo)
+
+    def test_un_esquema_viejo_SI_detiene_el_arranque(self) -> None:
+        # Esa no se tapa: la base está, pero con un esquema que el programa no
+        # entiende. Abrir en local escondería el problema y alguien vendería
+        # contra un catálogo que ya no cuadra.
+        self.assertIn("except DatabasePreflightError", self.tramo)
+        self.assertIn('"Base de datos no lista"', self.tramo)
+
+    def test_sin_catalogo_guardado_si_se_avisa(self) -> None:
+        # El único caso en que de verdad no se puede abrir.
+        self.assertIn('"Falta encender la PC principal"', self.tramo)
+
+    def test_queda_anotado_en_el_log(self) -> None:
+        # Si abre en local sin decir nada, nadie se entera de que la base falló.
+        self.assertIn("se abre en local", self.tramo)

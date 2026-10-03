@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import sys
 from pathlib import Path
 
@@ -163,25 +164,35 @@ def main() -> int:
 
     connection_available = esperar_base(avisar=_esperando)
 
+    window = None
     if connection_available:
+        # El sondeo solo dice que el puerto contesta. Con la red parpadeando,
+        # la conexión de verdad puede fallar un segundo después — y el 02/10 eso
+        # dejó al kiosko SIN ABRIR («Arranque no disponible: connection timeout
+        # expired») teniendo su modo local perfectamente bueno. Si cualquier
+        # paso de aquí falla, se cae a local en vez de rendirse: un kiosko que
+        # no abre es un kiosko que no vende.
         _show_splash_message(splash, "Preparando base de datos...", app)
-        bootstrap_schema()
         try:
+            bootstrap_schema()
             assert_database_ready()
+            _show_splash_message(splash, "Cargando catálogo...", app)
+            operator_id = resolve_satellite_operator_id()
+            window = QuoteSatelliteWindow(user_id=operator_id, offline_mode=False)
         except DatabasePreflightError as exc:
+            # Esta sí para todo: la base está, pero con un esquema que este
+            # programa no entiende. Abrir en local escondería el problema y
+            # alguien vendería contra un catálogo que ya no cuadra.
             splash.close()
             QMessageBox.critical(None, "Base de datos no lista", str(exc))
             return 1
-
-        _show_splash_message(splash, "Cargando catálogo...", app)
-        try:
-            operator_id = resolve_satellite_operator_id()
-            window = QuoteSatelliteWindow(user_id=operator_id, offline_mode=False)
         except Exception as exc:
-            splash.close()
-            QMessageBox.critical(None, "Arranque no disponible", str(exc))
-            return 1
-    else:
+            logging.getLogger(__name__).warning(
+                "La base contestó el sondeo pero no la conexión (%s); se abre en local.", exc
+            )
+            connection_available = False
+
+    if window is None:
         _show_splash_message(splash, "Sin conexión — cargando catálogo local...", app)
         local_cache = load_catalog_cache()
         if local_cache is None:
