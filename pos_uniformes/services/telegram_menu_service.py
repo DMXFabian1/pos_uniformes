@@ -21,6 +21,7 @@ _RAIZ = [
     [("📅 Hoy", "m:hoy"), ("💵 Caja", "m:estado")],
     [("📋 Resumen", "m:resumen"), ("⏳ Pendientes", "m:pendientes")],
     [("🧾 Cortes", "m:cortes"), ("💰 Pagos", "m:pagos")],
+    [("💵 Lo que salió del cajón", "m:cajon")],
     [("👥 Quién vino", "m:asistencia"), ("💵 Préstamos", "m:prestamos")],
     [("🏪 Qué contar", "m:contar"), ("🔎 Sin surtir", "m:faltas")],
     [("📣 Avisos", "m:avisos")],
@@ -109,6 +110,13 @@ def atender(dato: str, *, session_factory, hoy: date | None = None) -> tuple[str
             texto, botones = prs.texto_y_botones(session)
         return "", texto, botones
 
+    if accion in ("cajon", "cajón"):
+        from pos_uniformes.services import telegram_cajon_service as cj
+
+        with session_factory() as session:
+            texto, botones = cj.texto_y_botones(session)
+        return "", texto, botones
+
     if accion == "avisos":
         from pos_uniformes.services import telegram_avisos_service as av
 
@@ -126,11 +134,17 @@ def atender(dato: str, *, session_factory, hoy: date | None = None) -> tuple[str
         return "", texto, _con_volver(filas)
 
     # Lo demás es de solo mirar: se contesta con el mismo comando de siempre.
+    if accion == "cortes":
+        from pos_uniformes.services import telegram_cortes_service as ct
+
+        with session_factory() as session:
+            texto, botones = ct.texto_y_botones(session)
+        return "", texto, botones
+
     comando = {
         "pulso": "/pulso",
         "hoy": "/hoy",
         "estado": "/estado",
-        "cortes": "/cortes",
         "resumen": "/resumen",
         "pendientes": "/pendientes",
         "asistencia": "/asistencia",

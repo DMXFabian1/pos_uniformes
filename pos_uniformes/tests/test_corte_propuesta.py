@@ -147,9 +147,23 @@ class OpcionesCorteTests(unittest.TestCase):
 
         self.assertEqual(self._leer("5000.50").retirar, Decimal("5000.50"))
 
-    def test_palabras_raras_explican_como_se_usa(self) -> None:
+    def test_el_texto_suelto_es_la_nota(self) -> None:
+        # Antes cualquier palabra rara daba error. Desde 2026-10-04 el texto
+        # suelto es el motivo del corte —«/corte 5000 deposité al banco»— que
+        # es el campo que faltaba desde el celular.
+        self.assertEqual(self._leer("deposité al banco").nota, "deposité al banco")
+
+    def test_una_palabra_mal_escrita_se_vuelve_nota_y_por_eso_se_repite(self) -> None:
+        # El costo de aceptar texto libre: «sintarjets» ya no da error. Por eso
+        # la respuesta del bot repite la nota, para que el dedazo se vea.
+        opciones = self._leer("sintarjets")
+        self.assertFalse(opciones.sin_tarjeta)
+        self.assertEqual(opciones.nota, "sintarjets")
+
+    def test_falta_la_cantidad_despues_de_la_palabra_clave(self) -> None:
+        # Esto sí es error: «fondo» sin cifra no quiere decir nada.
         with self.assertRaises(ValueError) as caso:
-            self._leer("mañana")
+            self._leer("fondo")
         self.assertIn("/corte 5000", str(caso.exception))
 
     def test_negativo_se_rechaza(self) -> None:
@@ -178,7 +192,7 @@ class CorteConModificacionesTests(unittest.TestCase):
         self.assertEqual(hacer.call_args.kwargs["retirar"], Decimal("5000.00"))
         self.assertTrue(hacer.call_args.kwargs["sin_tarjeta"])
 
-    def test_argumento_invalido_no_hace_corte(self) -> None:
+    def test_lo_que_no_es_cifra_ni_palabra_clave_viaja_como_nota(self) -> None:
         from contextlib import contextmanager
         from unittest.mock import MagicMock
 
@@ -190,9 +204,49 @@ class CorteConModificacionesTests(unittest.TestCase):
             yield MagicMock()
 
         with patch.object(crs, "hacer_corte_y_avisar") as hacer:
-            r = bot.atender_texto("/corte mañana", session_factory=_sesion)
+            hacer.return_value = MagicMock(mensaje="listo")
+            bot.atender_texto("/corte deposité al banco", session_factory=_sesion)
+        self.assertEqual(hacer.call_args.kwargs["nota"], "deposité al banco")
+        self.assertIsNone(hacer.call_args.kwargs["retirar"])
+
+    def test_una_palabra_clave_sin_cifra_si_detiene_el_corte(self) -> None:
+        from contextlib import contextmanager
+        from unittest.mock import MagicMock
+
+        from pos_uniformes.services import corte_remoto_service as crs
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        @contextmanager
+        def _sesion():
+            yield MagicMock()
+
+        with patch.object(crs, "hacer_corte_y_avisar") as hacer:
+            r = bot.atender_texto("/corte fondo", session_factory=_sesion)
         hacer.assert_not_called()
-        self.assertIn("No entendí", r)
+        self.assertIn("falta la cantidad", r.lower())
+
+    def test_el_fondo_y_los_otros_viajan(self) -> None:
+        from contextlib import contextmanager
+        from decimal import Decimal
+        from unittest.mock import MagicMock
+
+        from pos_uniformes.services import corte_remoto_service as crs
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        @contextmanager
+        def _sesion():
+            yield MagicMock()
+
+        with patch.object(crs, "hacer_corte_y_avisar") as hacer:
+            hacer.return_value = MagicMock(mensaje="listo")
+            bot.atender_texto(
+                "/corte 5000 fondo 2000 otros 350 me lo llevé", session_factory=_sesion
+            )
+        k = hacer.call_args.kwargs
+        self.assertEqual(k["retirar"], Decimal("5000.00"))
+        self.assertEqual(k["fondo"], Decimal("2000.00"))
+        self.assertEqual(k["otros"], Decimal("350.00"))
+        self.assertEqual(k["nota"], "me lo llevé")
 
 
 class BotTests(unittest.TestCase):

@@ -38,6 +38,9 @@ class CorteFila:
     ajustado: bool = False
     #: Por qué se ajustó. Vacío en los de antes de que se pidiera.
     nota: str = ""
+    #: Para poder tocarlo desde Telegram. Va al final y con valor por omisión
+    #: para no obligar a nadie que ya armaba filas a mano.
+    id: int = 0
 
     @property
     def diferencia(self) -> Decimal:
@@ -78,6 +81,7 @@ def ultimos(session: Session, *, dias: int = 14, tope: int = TOPE) -> list[Corte
         momento = momento.astimezone() if momento and momento.tzinfo else momento
         salida.append(
             CorteFila(
+                id=int(c.id),
                 fecha=c.fecha,
                 hora=momento.strftime("%H:%M") if momento else "",
                 quien=_quien(str(c.creado_por or "")),
@@ -139,3 +143,151 @@ def texto(filas: list[CorteFila], *, dias: int = 14) -> str:
 
 def resumen(session: Session, *, dias: int = 14) -> str:
     return texto(ultimos(session, dias=dias), dias=dias)
+
+
+# ── Tocar un corte: quitarle el ajuste o borrarlo ────────────────────────────
+#
+# El diálogo «Cortes anteriores» del kiosko sabe ajustar la cifra, quitar el
+# ajuste y borrar un corte, y nada de eso estaba en el bot (Daniel, 2026-10-04).
+# Borrar va con DOS toques a propósito: es lo único de aquí que no se puede
+# deshacer, y se hace con el teléfono en la mano, en la calle.
+
+PREFIJO = "co:"
+
+
+def es_de_cortes(dato: str) -> bool:
+    return str(dato or "").startswith(PREFIJO)
+
+
+def _teclado(filas):
+    from pos_uniformes.services import telegram_service
+
+    return telegram_service.teclado(filas)
+
+
+def texto_y_botones(session: Session, *, dias: int = 14) -> tuple[str, str]:
+    """La lista de siempre, con un botón por corte para poder tocarlo."""
+    filas = ultimos(session, dias=dias)
+    botones = [
+        [(f"{c.fecha:%d/%m} · ${c.contado:,.0f}" + (" ✏️" if c.ajustado else ""),
+          f"{PREFIJO}ver:{c.id}")]
+        for c in filas
+    ]
+    botones.append([("‹ Menú", "m:raiz")])
+    return texto(filas, dias=dias), _teclado(botones)
+
+
+def detalle(session: Session, corte_id: int) -> tuple[str, list]:
+    """(texto, filas de botones) de UN corte."""
+    from pos_uniformes.database.models import LibretaCorte
+    from pos_uniformes.services.historial_cortes_service import venta_oficial, venta_real
+
+    corte = session.get(LibretaCorte, int(corte_id))
+    if corte is None:
+        return "Ese corte ya no existe.", []
+
+    oficial = venta_oficial(corte)
+    real = venta_real(corte)
+    lineas = [
+        f"🧾 Corte del {corte.fecha:%d/%m/%Y}",
+        f"Lo que dice el ticket: ${oficial:,.2f}",
+    ]
+    if real is not None and real != oficial:
+        lineas.append(f"Lo que de verdad se vendió: ${real:,.2f}")
+        lineas.append(f"Ajuste tuyo: {'−' if oficial < real else '+'}${abs(oficial - real):,.2f}")
+        lineas.append(f"Por qué: {corte.nota}" if corte.nota else "Sin decir por qué.")
+    lineas.append("")
+    lineas.append(f"Para cambiar la cifra:\n/ajustar {corte.id} 12500 depósito al banco")
+
+    filas = []
+    if real is not None and real != oficial:
+        filas.append([("↩️ Quitar el ajuste", f"{PREFIJO}quitar:{corte.id}")])
+    filas.append([("🗑 Borrar este corte", f"{PREFIJO}borrar:{corte.id}")])
+    return "\n".join(lineas), filas
+
+
+def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
+    """Un botón de cortes: (aviso corto, texto nuevo, botones nuevos)."""
+    from pos_uniformes.services import historial_cortes_service as hist
+
+    accion = str(dato or "")[len(PREFIJO):]
+    que, _, crudo = accion.partition(":")
+    try:
+        corte_id = int(crudo)
+    except ValueError:
+        return "No conozco ese botón", "", ""
+
+    def _con_volver(filas):
+        return _teclado(list(filas) + [[("‹ Cortes", f"{PREFIJO}lista")]])
+
+    if que == "ver":
+        with session_factory() as session:
+            texto_, filas = detalle(session, corte_id)
+        return "", texto_, _con_volver(filas)
+
+    if que == "quitar":
+        with session_factory() as session:
+            try:
+                hist.quitar_ajuste(session, corte_id, creado_por=quien)
+                session.commit()
+                aviso = "Ajuste quitado"
+            except Exception as exc:  # noqa: BLE001
+                session.rollback()
+                aviso = str(exc)[:60]
+            texto_, filas = detalle(session, corte_id)
+        return aviso, texto_, _con_volver(filas)
+
+    if que == "borrar":
+        # Primer toque: solo pregunta. Borrar un corte no se deshace.
+        with session_factory() as session:
+            texto_, _ = detalle(session, corte_id)
+        texto_ += "\n\n⚠️ Borrarlo no se puede deshacer."
+        return "", texto_, _con_volver(
+            [[("Sí, bórralo", f"{PREFIJO}borrarok:{corte_id}")],
+             [("Mejor no", f"{PREFIJO}ver:{corte_id}")]]
+        )
+
+    if que == "borrarok":
+        with session_factory() as session:
+            try:
+                hist.borrar_corte(session, corte_id, creado_por=quien)
+                session.commit()
+                aviso = "Borrado"
+            except Exception as exc:  # noqa: BLE001
+                session.rollback()
+                aviso = str(exc)[:60]
+            texto_, botones = texto_y_botones(session)
+        return aviso, texto_, botones
+
+    with session_factory() as session:
+        texto_, botones = texto_y_botones(session)
+    return "", texto_, botones
+
+
+def ajustar(session: Session, argumento: str, *, quien: str) -> str:
+    """`/ajustar <id> <cifra> <por qué>`. El motivo es obligatorio si mueve dinero."""
+    from decimal import InvalidOperation
+
+    from pos_uniformes.services import historial_cortes_service as hist
+
+    partes = (argumento or "").split(maxsplit=2)
+    if len(partes) < 2:
+        return (
+            "Se usa así:\n/ajustar 12 12500 depósito al banco\n\n"
+            "El número de corte sale en /cortes, tocando el que sea."
+        )
+    try:
+        corte_id = int(partes[0])
+        cifra = Decimal(partes[1].replace("$", "").replace(",", ""))
+    except (ValueError, InvalidOperation):
+        return "No entendí. Se usa así:\n/ajustar 12 12500 depósito al banco"
+    nota = partes[2].strip() if len(partes) > 2 else ""
+    try:
+        hist.ajustar_corte(session, corte_id, venta=cifra, creado_por=quien, nota=nota)
+        session.commit()
+    except Exception as exc:  # noqa: BLE001
+        session.rollback()
+        return str(exc)
+    return f"✅ El corte {corte_id} ahora dice ${cifra:,.2f}." + (
+        f"\nPor qué: {nota}" if nota else ""
+    )

@@ -8,7 +8,8 @@ Comandos:
     /estado       qué hay en caja ahora mismo
     /hoy          cómo va el día ahora mismo, en un vistazo
     /pulso        ¿está todo en pie? la tienda entera en una pantalla
-    /cortes       los últimos cortes, con lo que faltó o sobró
+    /cortes       los últimos cortes; tocando uno se ajusta o se borra
+    /ajustar N X  cambia la cifra de un corte, diciendo por qué
     /resumen      el resumen del día (el mismo de la noche)
     /pendientes   lo que falta por registrar
     /asistencia   quién vino hoy (deducido de su primer movimiento)
@@ -19,6 +20,7 @@ Comandos:
     /pagos        a quién le toca cobrar y cuánto
     /pagar X si   registra el pago (sin el "si" solo enseña el desglose)
     /retiro N X   saca del cajón dejando dicho para qué
+    /cajon        corrige lo que NO salió del cajón, antes del corte
     /prestamos    aprobar o rechazar lo que pidieron
     /aviso X      pone X a pantalla completa en las pantallas de la tienda
     /avisos       los avisos puestos, quién los vio, y quitarlos
@@ -55,8 +57,11 @@ AYUDA = (
     "/hoy — cómo va el día ahora mismo\n"
     "/resumen — resumen del día (el de la noche, completo)\n"
     "/pendientes — lo que falta por registrar\n"
-    "/cortes — los últimos cortes y cuánto faltó o sobró\n"
+    "/cortes — los últimos cortes; toca uno para ajustarlo o borrarlo\n"
+    "/ajustar 12 12500 depósito al banco — cambia la cifra de ese corte\n"
     "/retiro 500 gasolina — saca del cajón, con su motivo\n"
+    "/cajon — desmarca lo que NO salió del cajón (una transferencia,\n"
+    "   algo ya contado). Antes del corte\n"
     "\nPAGOS\n"
     "/pagos — a quién le toca cobrar y cuánto\n"
     "/pagar Fanny — el desglose; con «si» al final se registra\n"
@@ -104,39 +109,90 @@ def parsear(texto: str) -> Comando | None:
 
 @dataclass(frozen=True)
 class OpcionesCorte:
-    """Lo que trae `/corte`: cuánto se retira y si se esconde la tarjeta."""
+    """Lo que trae `/corte`. Son los mismos campos del diálogo del kiosko.
+
+    `nota` se queda con lo que no es ninguna otra cosa: así `/corte 5000
+    deposité al banco` guarda el motivo sin pedir una palabra clave más. Un
+    corte sin explicación es el hueco que ya se tapó al ajustar; hacerlo de
+    lejos no tenía por qué ser la excepción.
+    """
 
     retirar: Decimal | None = None
     sin_tarjeta: bool = False
+    fondo: Decimal | None = None
+    otros: Decimal | None = None
+    nota: str = ""
 
 
 _SIN_TARJETA = {"sintarjeta", "sin-tarjeta", "sin_tarjeta", "st"}
+#: Palabras que presentan una cifra. Lo demás que no sea número es nota.
+_FONDO = {"fondo", "reactivo"}
+_OTROS = {"otros", "otro", "salida", "salidas", "gasto"}
+
+_AYUDA_CORTE = (
+    "Se usa así:\n"
+    "/corte — con la cifra calculada\n"
+    "/corte 5000 — se retiran $5,000\n"
+    "/corte fondo 2000 — deja ese fondo en el cajón\n"
+    "/corte otros 350 — descuenta una salida no apuntada\n"
+    "/corte sintarjeta — sin los cobros con tarjeta\n"
+    "/corte 5000 deposité al banco — lo demás queda como nota\n"
+    "(se pueden juntar: /corte 5000 fondo 2000 deposité al banco)"
+)
+
+
+def _cifra(palabra: str) -> Decimal | None:
+    """'$5,000.50' → Decimal. None si no es un número."""
+    crudo = palabra.strip().lower().replace("$", "").replace(",", "").replace("_", "")
+    try:
+        return Decimal(crudo).quantize(Decimal("0.01"))
+    except (InvalidOperation, ValueError):
+        return None
 
 
 def leer_opciones_corte(argumento: str) -> OpcionesCorte:
-    """'5000 sintarjeta' → retira $5,000 y esconde la tarjeta. En cualquier
-    orden; '$5,000.50' también vale."""
-    retirar: Decimal | None = None
+    """'5000 fondo 2000 deposité al banco' → todo lo del diálogo, en una línea."""
+    retirar = fondo = otros = None
     sin_tarjeta = False
-    for palabra in (argumento or "").split():
+    nota: list[str] = []
+
+    palabras = (argumento or "").split()
+    i = 0
+    while i < len(palabras):
+        palabra = palabras[i]
         limpia = palabra.strip().lower()
         if limpia in _SIN_TARJETA:
             sin_tarjeta = True
+            i += 1
             continue
-        crudo = limpia.replace("$", "").replace(",", "").replace("_", "")
-        try:
-            valor = Decimal(crudo)
-        except (InvalidOperation, ValueError):
-            raise ValueError(
-                f"No entendí «{palabra}». Se usa así:\n"
-                "/corte — con la cifra calculada\n"
-                "/corte 5000 — se retiran $5,000\n"
-                "/corte 5000 sintarjeta — además, sin los cobros con tarjeta"
-            ) from None
-        if valor < 0:
-            raise ValueError("Lo que se retira no puede ser negativo.")
-        retirar = valor.quantize(Decimal("0.01"))
-    return OpcionesCorte(retirar=retirar, sin_tarjeta=sin_tarjeta)
+        if limpia in _FONDO or limpia in _OTROS:
+            siguiente = _cifra(palabras[i + 1]) if i + 1 < len(palabras) else None
+            if siguiente is None:
+                raise ValueError(f"Después de «{palabra}» falta la cantidad.\n\n" + _AYUDA_CORTE)
+            if siguiente < 0:
+                raise ValueError("Una cantidad no puede ser negativa.")
+            if limpia in _FONDO:
+                fondo = siguiente
+            else:
+                otros = siguiente
+            i += 2
+            continue
+        valor = _cifra(palabra)
+        if valor is not None and not nota:
+            # La cifra suelta es lo que se retira, y solo si todavía no empezó
+            # la nota: en «5000 deposité 2 cajas» el 2 es parte del recado.
+            if valor < 0:
+                raise ValueError("Lo que se retira no puede ser negativo.")
+            retirar = valor
+            i += 1
+            continue
+        nota.append(palabra)
+        i += 1
+
+    return OpcionesCorte(
+        retirar=retirar, sin_tarjeta=sin_tarjeta, fondo=fondo, otros=otros,
+        nota=" ".join(nota).strip(),
+    )
 
 
 def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> str:
@@ -157,6 +213,7 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
             return hacer_corte_y_avisar(
                 session, creado_por=CODIGO_REMOTO,
                 retirar=opciones.retirar, sin_tarjeta=opciones.sin_tarjeta,
+                fondo=opciones.fondo, otros=opciones.otros, nota=opciones.nota,
             ).mensaje
     if cmd.nombre == "nocorte":
         from pos_uniformes.services.corte_propuesta_service import cancelar
@@ -232,11 +289,21 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
 
         with session_factory() as session:
             return av.resumen(session)
+    if cmd.nombre in ("cajon", "cajón"):
+        from pos_uniformes.services import telegram_cajon_service as cj
+
+        with session_factory() as session:
+            return cj.texto_y_botones(session)[0]
     if cmd.nombre == "cortes":
         from pos_uniformes.services import telegram_cortes_service as ct
 
         with session_factory() as session:
             return ct.resumen(session)
+    if cmd.nombre == "ajustar":
+        from pos_uniformes.services import telegram_cortes_service as ct
+
+        with session_factory() as session:
+            return ct.ajustar(session, cmd.argumento, quien=CODIGO_REMOTO)
     if cmd.nombre == "pagos":
         from pos_uniformes.services import telegram_pagos_service as pg
 
@@ -295,6 +362,9 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
 #: que acordarse de entrar por el menú — justo lo que el menú vino a evitar.
 _CON_BOTONES = {
     "avisos": ("pos_uniformes.services.telegram_avisos_service", "texto_y_botones"),
+    "cajon": ("pos_uniformes.services.telegram_cajon_service", "texto_y_botones"),
+    "cortes": ("pos_uniformes.services.telegram_cortes_service", "texto_y_botones"),
+    "cajón": ("pos_uniformes.services.telegram_cajon_service", "texto_y_botones"),
     "prestamos": ("pos_uniformes.services.telegram_prestamos_service", "texto_y_botones"),
     "préstamos": ("pos_uniformes.services.telegram_prestamos_service", "texto_y_botones"),
     "menu": ("pos_uniformes.services.telegram_menu_service", "menu_raiz"),
@@ -384,6 +454,16 @@ def atender_toque(dato: str, *, session_factory, hoy: date | None = None) -> tup
 
     if av.es_de_avisos(dato):
         return av.atender(dato, session_factory=session_factory)
+
+    from pos_uniformes.services import telegram_cajon_service as cj
+
+    if cj.es_del_cajon(dato):
+        return cj.atender(dato, session_factory=session_factory)
+
+    from pos_uniformes.services import telegram_cortes_service as ct
+
+    if ct.es_de_cortes(dato):
+        return ct.atender(dato, session_factory=session_factory, quien=CODIGO_REMOTO)
 
     from pos_uniformes.services import telegram_prestamos_service as prs
 

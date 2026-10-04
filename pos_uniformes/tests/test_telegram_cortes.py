@@ -103,3 +103,129 @@ class ElBotLoConoceTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TocarUnCorteTests(unittest.TestCase):
+    """Ajustar, quitar el ajuste y borrar — desde el celular (2026-10-04).
+
+    El diálogo «Cortes anteriores» del kiosko sabía hacerlo y el bot no. Lo que
+    se cuida aquí sobre todo es que borrar **no** sea de un toque: es lo único
+    de esta pantalla que no se puede deshacer, y se hace en la calle.
+    """
+
+    def setUp(self) -> None:
+        from datetime import datetime
+        from decimal import Decimal
+
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import Session, sessionmaker
+
+        from pos_uniformes.database.connection import Base
+        from pos_uniformes.database.models import LibretaCorte
+
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.s = Session(self.engine)
+        self.addCleanup(self.s.close)
+        self.factory = sessionmaker(self.engine)
+        ahora = datetime.now().astimezone()
+        # `desde` no es adorno: sin él el corte cuenta como de los viejos
+        # (es_legacy) y el servicio dice que no guarda la cifra real.
+        self.corte = LibretaCorte(
+            fecha=ahora.date(), creado_por="VEND-1", desde=ahora,
+            monto_final=Decimal("10000"), monto_esperado=Decimal("12000"),
+            reactivo_inicial=Decimal("1000"), reactivo_final=Decimal("1000"),
+            operaciones=20, created_at=ahora, hasta=ahora, nota="depósito al banco",
+        )
+        self.s.add(self.corte)
+        self.s.flush()
+        self.s.commit()
+
+    def test_la_lista_trae_un_boton_por_corte(self) -> None:
+        texto, botones = ct.texto_y_botones(self.s)
+        self.assertIn(f"co:ver:{self.corte.id}", botones)
+
+    def test_el_detalle_enseña_el_ajuste_y_su_motivo(self) -> None:
+        from pos_uniformes.services.historial_cortes_service import venta_oficial, venta_real
+
+        texto, filas = ct.detalle(self.s, self.corte.id)
+        # Las cifras que se enseñan son las de VENTA, no los montos crudos del
+        # corte: el reactivo y los pagos ya están descontados.
+        self.assertIn(f"${venta_oficial(self.corte):,.2f}", texto)
+        self.assertIn(f"${venta_real(self.corte):,.2f}", texto)
+        self.assertIn("depósito al banco", texto)
+        datos = [d for fila in filas for _, d in fila]
+        self.assertIn(f"co:quitar:{self.corte.id}", datos)
+        self.assertIn(f"co:borrar:{self.corte.id}", datos)
+
+    def test_sin_ajuste_no_se_ofrece_quitarlo(self) -> None:
+        from decimal import Decimal
+
+        self.corte.monto_esperado = Decimal("10000")
+        self.s.commit()
+        _, filas = ct.detalle(self.s, self.corte.id)
+        datos = [d for fila in filas for _, d in fila]
+        self.assertNotIn(f"co:quitar:{self.corte.id}", datos)
+
+    def test_borrar_pide_confirmacion_antes(self) -> None:
+        # Un solo toque no puede borrar un corte.
+        _, texto, botones = ct.atender(
+            f"co:borrar:{self.corte.id}", session_factory=self.factory, quien="VEND-1"
+        )
+        self.assertIn("no se puede deshacer", texto)
+        self.assertIn(f"co:borrarok:{self.corte.id}", botones)
+        from pos_uniformes.database.models import LibretaCorte
+
+        self.s.expire_all()
+        self.assertIsNotNone(self.s.get(LibretaCorte, self.corte.id))
+
+    def test_el_segundo_toque_si_borra(self) -> None:
+        from pos_uniformes.database.models import LibretaCorte
+
+        cid = self.corte.id
+        aviso, _, _ = ct.atender(
+            f"co:borrarok:{cid}", session_factory=self.factory, quien="VEND-1"
+        )
+        self.assertEqual(aviso, "Borrado")
+        self.s.expire_all()
+        self.assertIsNone(self.s.get(LibretaCorte, cid))
+
+    def test_quitar_el_ajuste(self) -> None:
+        aviso, _, _ = ct.atender(
+            f"co:quitar:{self.corte.id}", session_factory=self.factory, quien="VEND-1"
+        )
+        self.assertEqual(aviso, "Ajuste quitado")
+
+    def test_un_boton_mal_formado_no_revienta(self) -> None:
+        aviso, _, _ = ct.atender("co:ver:abc", session_factory=self.factory, quien="VEND-1")
+        self.assertEqual(aviso, "No conozco ese botón")
+
+    def test_es_de_cortes(self) -> None:
+        self.assertTrue(ct.es_de_cortes("co:ver:1"))
+        self.assertFalse(ct.es_de_cortes("cj:pago:1"))
+
+
+class AjustarPorTextoTests(unittest.TestCase):
+    """La cifra se escribe, porque un botón no puede llevar una cantidad."""
+
+    def setUp(self) -> None:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import Session
+
+        from pos_uniformes.database.connection import Base
+
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.s = Session(self.engine)
+        self.addCleanup(self.s.close)
+
+    def test_sin_argumentos_explica_como_se_usa(self) -> None:
+        self.assertIn("/ajustar 12", ct.ajustar(self.s, "", quien="VEND-1"))
+
+    def test_una_cifra_que_no_es_cifra(self) -> None:
+        self.assertIn("No entendí", ct.ajustar(self.s, "12 muchos", quien="VEND-1"))
+
+    def test_un_corte_que_no_existe_lo_dice(self) -> None:
+        r = ct.ajustar(self.s, "99999 12500 depósito", quien="VEND-1")
+        self.assertTrue(r)
+        self.assertNotIn("ahora dice", r)

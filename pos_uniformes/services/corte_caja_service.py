@@ -441,7 +441,8 @@ def datos_ticket_encargado(session, desde: datetime | None, hasta: datetime) -> 
 
 def cerrar_corte_automatico(
     session, *, creado_por: str, ahora: datetime | None = None, nota: str | None = None,
-    retirar: Decimal | None = None,
+    retirar: Decimal | None = None, fondo_final: Decimal | None = None,
+    otros_retiros: Decimal = Decimal("0.00"),
 ) -> CorteAutomatico:
     """Corte de un botón (encargado): registra los pagos que tocan hoy, cierra
     con el esperado como cifra final y deja el mismo fondo. Nadie cuenta ni
@@ -450,7 +451,13 @@ def cerrar_corte_automatico(
 
     `retirar` (solo Daniel, desde el celular) fija cuánto sale del cajón: el
     corte cierra en fondo + esa cifra y el resto se queda. El real calculado
-    igual queda guardado en `monto_esperado`, que solo ve él."""
+    igual queda guardado en `monto_esperado`, que solo ve él.
+
+    `fondo_final` y `otros_retiros` son los dos campos del diálogo que faltaban
+    desde el celular (2026-10-04): cuánto se deja de fondo esa noche, y una
+    salida de último momento que no quedó apuntada. Sin ellos, un corte hecho
+    de lejos cuadraba contra un fondo que ya no era y sin contar ese gasto.
+    """
     from pos_uniformes.services.nomina_service import registrar_pago_con_monto
 
     ahora = ahora or datetime.now().astimezone()
@@ -460,19 +467,25 @@ def cerrar_corte_automatico(
         # Fechados EXACTAMENTE a la hora del corte: así caen dentro del
         # periodo que se cierra (<= hasta) aunque `ahora` venga del caller.
         pagos.append(registrar_pago_con_monto(session, aviso.employee_code, creado_por=creado_por, fecha=hoy, momento=ahora))
-    estado = estado_caja(session, ahora)
+    otros_retiros = _d(otros_retiros)
+    estado = estado_caja(session, ahora, otros_retiros=otros_retiros)
     # Si los pagos superaron la venta, el fondo baja (no hay de dónde más
     # sacar); si no, se queda igual y el resto se retira.
     fondo = min(estado.reactivo, max(estado.esperado, Decimal("0.00")))
     contado = max(estado.esperado, Decimal("0.00"))
+    if fondo_final is not None:
+        # Lo que él decide dejar manda sobre lo calculado, pero nunca más de lo
+        # que hay: un fondo mayor al contado dejaría el cajón debiendo.
+        fondo = min(_d(fondo_final), contado)
     if retirar is not None:
-        fondo = estado.reactivo
+        fondo = estado.reactivo if fondo_final is None else min(_d(fondo_final), estado.reactivo)
         contado = (fondo + _d(retirar)).quantize(_CENT)
     corte = cerrar_corte(
         session,
         contado=contado,
         creado_por=creado_por,
         reactivo_final=fondo,
+        otros_retiros=otros_retiros,
         nota=nota,
         ahora=ahora,
     )

@@ -129,6 +129,9 @@ POS_UNIFORMES_DB_HOST=localhost ./pos_uniformes/.venv/bin/python mapas_escuelas/
 | **`/faltas`** | **Lo que pidieron y no había en 7 días** |
 | `/cortes` | Los últimos cortes, con lo que faltó o sobró y el motivo del ajuste |
 | `/retiro 500 gasolina` | Saca del cajón dejando dicho para qué |
+| **`/corte 5000 fondo 2000 otros 350 deposité al banco`** | **Todo lo del diálogo en una línea; lo que sobra es la nota** (2026-10-04) |
+| **`/cajon`** | **Desmarca lo que NO salió del cajón (transferencias, ya contado). Antes del corte** |
+| **`/ajustar 12 12500 depósito al banco`** | **Cambia la cifra de un corte. El número sale tocándolo en `/cortes`** |
 | `/pagos` · `/pagar Fanny` | A quién le toca cobrar; con «si» al final se registra |
 | `/deshacerpago` | Deshace el último pago |
 | `/prestamos` | Los préstamos que pidieron, para aprobar o rechazar |

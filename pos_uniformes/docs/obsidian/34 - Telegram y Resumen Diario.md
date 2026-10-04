@@ -436,6 +436,73 @@ propio paquete de certificados habría roto la tienda.
 `telegram_service._pedir` / `_obtener_pool` / `_es_de_certificado` ·
 `ConexionReutilizadaTests` en `test_resumen_diario`.
 
+## Las opciones del corte que faltaban (2026-10-04)
+
+Daniel preguntó qué del corte no estaba en el bot. Se comparó el diálogo del
+kiosko contra `/corte` y faltaban cinco; pidió trabajar en cuatro.
+
+### `/corte`: fondo, otros retiros y la nota
+
+```
+/corte 5000 fondo 2000 otros 350 deposité al banco
+```
+
+| Palabra | Qué hace |
+|---|---|
+| una cifra suelta | lo que se retira (como siempre) |
+| `fondo N` / `reactivo N` | cuánto se deja en el cajón esa noche |
+| `otros N` / `salida N` | una salida de último momento no apuntada |
+| `sintarjeta` | sin los cobros con tarjeta en el ticket |
+| **lo demás** | la nota: por qué |
+
+> [!warning] El costo de aceptar texto libre
+> Antes, cualquier palabra rara daba error. Ahora es la nota — lo que significa
+> que **un dedazo ya no se detecta**: `/corte sintarjets` no esconde la tarjeta
+> y se guarda como motivo. Por eso la respuesta **repite la nota**
+> (`📝 Nota: «sintarjets»`): si no se enseña, el error se descubre viendo el
+> papel. Lo que sí sigue siendo error es una palabra clave sin cifra.
+
+El fondo nunca puede quedar mayor a lo contado: dejaría el cajón debiendo.
+
+### `/cajon` — lo que NO salió del cajón
+
+Era la que movía números. El diálogo lista los pagos y retiros del periodo con
+una casilla («desmarca el que NO salió del cajón»): una transferencia, algo ya
+contado. Sin eso, **el corte se cuadra contra dinero que nunca salió y la
+diferencia aparece como faltante** — de lejos, como si la caja no cuadrara.
+
+```
+💵 Lo apuntado desde el último corte:
+
+✅ Evelyn — $1,430.00 · 04/10 18:13
+✅ gasolina — $350.00 · 04/10 18:13
+⬜ proveedor (transferencia) — $1,200.00 · 04/10 18:13
+
+✅ salió del cajón · ⬜ no salió (no se le resta)
+Fuera del cajón: $1,200.00
+```
+
+Va en un comando **aparte** y antes del corte, a propósito: `/corte` sigue
+siendo de un solo toque, como está en la cabeza de Daniel y como lo usa la tarea
+automática. El mismo botón sirve de ida y de vuelta, para poder deshacer un
+dedazo desde el celular.
+
+### `/cortes`: tocar un corte
+
+Tocando uno se abre con **↩️ Quitar el ajuste** y **🗑 Borrar**. La cifra se
+cambia por texto, porque un botón no puede llevar una cantidad:
+
+```
+/ajustar 12 12500 depósito al banco
+```
+
+> [!tip] Borrar va con dos toques
+> Es lo único de esa pantalla que no se deshace, y se hace con el teléfono en la
+> mano, en la calle. El primer toque solo pregunta.
+
+`telegram_cajon_service` · `telegram_cortes_service.atender` ·
+`test_telegram_cajon` (15) · `TocarUnCorteTests`.
+
 ## Infraestructura
 
 | Pieza | Archivo |

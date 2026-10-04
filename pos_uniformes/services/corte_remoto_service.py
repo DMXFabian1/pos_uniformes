@@ -75,6 +75,7 @@ def texto_propuesta_corte(session, ahora: datetime | None = None) -> str:
 def hacer_corte_y_avisar(
     session, *, creado_por: str, ahora: datetime | None = None,
     retirar: Decimal | None = None, sin_tarjeta: bool = False,
+    fondo: Decimal | None = None, otros: Decimal | None = None, nota: str = "",
 ) -> ResultadoCorte:
     """Corte + ticket a la impresora. Devuelve el mensaje para Telegram.
 
@@ -82,7 +83,10 @@ def hacer_corte_y_avisar(
     con esa cifra —venta declarada = retiro + pagos + salidas— y el real
     calculado queda guardado en `monto_esperado`, que solo ve él.
     `sin_tarjeta`: los cobros con tarjeta del periodo quedan privados y el
-    papel no los menciona."""
+    papel no los menciona.
+    `fondo`: cuánto se deja en el cajón esa noche (si no, el de siempre).
+    `otros`: una salida de último momento que no quedó apuntada.
+    `nota`: por qué. Los tres faltaban desde el celular (2026-10-04)."""
     from pos_uniformes.services import trabajos_service
     from pos_uniformes.services.corte_caja_service import (
         cerrar_corte_automatico,
@@ -99,7 +103,11 @@ def hacer_corte_y_avisar(
     if estado.resumen.operaciones == 0 and not avisos:
         return ResultadoCorte(False, "Sin corte: no hay ventas ni pagos desde el último corte.")
 
-    auto = cerrar_corte_automatico(session, creado_por=creado_por, ahora=ahora, retirar=retirar)
+    auto = cerrar_corte_automatico(
+        session, creado_por=creado_por, ahora=ahora, retirar=retirar,
+        fondo_final=fondo, otros_retiros=otros or Decimal("0.00"),
+        nota=nota or None,
+    )
     if sin_tarjeta:
         from pos_uniformes.services.libreta_service import marcar_privadas_del_periodo
 
@@ -154,9 +162,17 @@ def hacer_corte_y_avisar(
         lineas.append(f"Ya pagado a {(p.employee_name or p.employee_code).split()[0]}: ${Decimal(p.total):,.2f}")
     for r in retiros:
         lineas.append(f"Ya salió ({r.motivo}): ${Decimal(r.monto):,.2f}")
+    if otros:
+        lineas.append(f"Otra salida (de este corte): ${Decimal(otros):,.2f}")
     lineas.append(f"Sacar de la venta: ${retiro:,.2f}")
     lineas.append(f"Reactivo que queda: ${Decimal(auto.corte.reactivo_final):,.2f}")
     if sin_tarjeta:
         lineas.append("🔒 Los cobros con tarjeta no salieron en el ticket.")
+    if nota:
+        # Se repite lo que se entendió como nota, a propósito: desde que el
+        # texto suelto vale como motivo, una palabra mal escrita («sintarjets»)
+        # ya no da error — se vuelve nota. Si no se enseña, el corte sale sin
+        # esconder la tarjeta y nadie se entera hasta ver el papel.
+        lineas.append(f"📝 Nota: «{nota}»")
     lineas.append("🖨 Ticket enviado a la impresora de la tienda." if impreso else "⚠️ El corte quedó guardado pero no se pudo encolar el ticket.")
     return ResultadoCorte(True, "\n".join(lineas), impreso)
