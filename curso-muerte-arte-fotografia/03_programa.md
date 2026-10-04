@@ -514,7 +514,7 @@ Cada módulo tiene su propia obra ancla, que se retoma en módulos posteriores.
    - Edmund Burke, *A Philosophical Enquiry into the Origin of our Ideas of the Sublime and Beautiful* (1757). El terror, a distancia segura, como fuente de lo sublime. **Este texto explica tu experiencia infantil mejor que cualquier otro**: terror más fascinación = sublime.
    - *Apocalipsis* 6.
 8. **Preguntas socráticas.**
-   - La Biblia de tu madre: **¿qué edición era?** Tarea de investigación: identifica la edición, la editorial, el año y qué láminas de Doré incluía, y si eran reproducciones fotomecánicas de los grabados. Es arqueología de tu propia mirada.
+   - La Biblia de tu madre era católica, y la que tú has leído es la Reina‑Valera 1960, protestante. Las imágenes de la muerte te llegaron por una tradición y el texto por otra. La de tu madre: **¿qué edición era?** Tarea de investigación: identifica la edición, la editorial, el año y qué láminas de Doré incluía, y si eran reproducciones fotomecánicas de los grabados. Es arqueología de tu propia mirada.
    - Si otros tallaron la línea de Doré, ¿de quién es la imagen que recuerdas?
    - ¿Lo sublime es una forma de mirar la muerte o una forma de **no** mirarla, de convertirla en espectáculo?
 9. **Conexión filosófica.** Burke, y brevemente Kant (*Crítica del juicio*, 1790, lo sublime dinámico): el terror sublime exige **seguridad** para quien mira. ¿Mirar la muerte desde una Biblia ilustrada, en casa, de niño, era la condición perfecta de lo sublime?

@@ -18,7 +18,8 @@ El proyecto es una **investigación**, no una ilustración. Tiene tres fases y u
 
 | Código | Procedencia | Pregunta de control |
 |---|---|---|
-| **CR** | Cristianismo: catequesis, liturgia, la Biblia de tu madre | ¿Recuerdo *dónde* lo aprendí? |
+| **CR‑c** | Cristianismo católico: la Biblia de tu madre, Doré, la liturgia, el arte de las iglesias | ¿Recuerdo *dónde* lo aprendí? |
+| **CR‑p** | Cristianismo protestante: tu Reina‑Valera 1960, la lectura personal de la Biblia | ¿Esta idea depende de un libro que la RVR1960 no tiene (Sabiduría, Eclesiástico, Macabeos)? |
 | **AE** | Arte europeo: Bruegel, Bosch, Doré, Valdés | ¿Esta idea existiría sin estas imágenes? |
 | **FI** | Filosofía | ¿La leí o la oí resumida? |
 | **ES** | Estética: gótico, macabro, lo "cautivador" | ¿Es una idea, o un gusto? |

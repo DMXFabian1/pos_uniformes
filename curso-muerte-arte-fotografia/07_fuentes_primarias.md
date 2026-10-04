@@ -12,24 +12,35 @@ Hay una advertencia general. Una fuente primaria no es "la verdad de la época".
 - Todas las citas latinas siguen la **Vulgata Clementina** (Roma, 1592). Fue la Biblia oficial de la Iglesia católica desde 1592 hasta el siglo XX, y la que leían Bosch, Mañara, Valdés Leal y la Nueva España. La Biblia de Doré (1866) también estaba hecha "selon la Vulgate".
 - La **Nova Vulgata** (1979), que es hoy el texto latino oficial, a veces cambia palabras. Por ejemplo, en Sabiduría 2:8.
 - La numeración de algunos versículos también cambia entre ediciones: Eclesiástico 7:40 en la Clementina es 7:36 en las biblias modernas.
-- Las traducciones al español del curso son mías, literales a propósito. Para leer pasajes completos en español con notas críticas, se recomienda la **Biblia de Jerusalén**, que incluye los libros deuterocanónicos. Las ediciones cambian; comprueba la tuya.
+- **Para el español se usa tu Biblia, la Reina‑Valera 1960 (RVR1960).** Las citas de la columna correspondiente se cotejaron con el texto de la RVR1960 en octubre de 2026. Donde el curso cita un pasaje que la RVR1960 no tiene, se indica.
+
+**Dos Biblias en tu historia, y por qué importa.**
+- La Biblia de tu madre, la de los grabados de Doré, era **católica**: incluía los libros deuterocanónicos y venía de la tradición de la Vulgata.
+- La que tú has leído, la **Reina‑Valera 1960**, es **protestante** y no los incluye. Su origen es la *Biblia del Oso* de Casiodoro de Reina (Basilea, 1569), revisada por Cipriano de Valera (1602).
+- La Biblia del Oso **sí traía los deuterocanónicos**, intercalados en el Antiguo Testamento como en las biblias católicas. Valera los agrupó en una sección aparte de "apócrifos" entre los dos Testamentos, y la RVR1960 los omite.
+- Consecuencia para el curso: **cuatro textos que sostienen la iconografía católica de la muerte no están en tu Biblia**:
+  - el *memorare novissima tua* (Eclesiástico o Sirácida; no confundir con Eclesiastés);
+  - el *carpe diem* de los impíos (Sabiduría);
+  - el *ubi sunt principes gentium* (Baruc);
+  - la oración por los difuntos (2 Macabeos), fundamento del Purgatorio, de las ánimas y quizá de la palabra "macabro".
+- Ahí tienes, en tu propia biografía, la frontera entre las dos tradiciones que el curso estudia.
 
 Lee siempre la Vulgata junto a una traducción moderna, y el griego o el hebreo cuando importe.
 
-| Texto | Referencia | Por qué | Módulo |
-|---|---|---|---|
-| Génesis 3:19 | *"quia pulvis es et in pulverem reverteris"* | Origen de la fórmula del Miércoles de Ceniza | 2, mapa |
-| Eclesiastés (Qohélet) 1:2; 2:24; 9:7‑10; 12:8 | *"vanitas vanitatum... omnia vanitas"* (sin *et*) | La *vanitas*, y su conclusión casi epicúrea que la tradición olvida | 9 |
-| Eclesiástico (Sirácida) 7:40 en la Vulgata (7:36 en las numeraciones modernas) | *"memorare novissima tua..."* | Fundamento de las postrimerías | 3, 5 |
-| Sabiduría 2:1‑9 | v. 8: *"coronemus nos rosis antequam marcescant"* (Clementina; la Nova Vulgata dice *"calycibus rosarum"*) | El *carpe diem* en boca de los impíos. **Libro deuterocanónico**: está en las biblias católicas y ortodoxas, pero no en las protestantes | Tesis, 16 |
-| Isaías 22:13; 1 Corintios 15:32 | Is: *"comedamus et bibamus, cras enim moriemur"*; 1 Cor: *"manducemus et bibamus…"*, precedido de *"si mortui non resurgunt"* | Isaías lo reprocha; Pablo lo concede **en condicional** | Tesis |
-| Deuteronomio 32:20, 28‑29 | *"...et novissima providerent"* | Citas de la *Mesa de los pecados capitales* | 5 |
-| Baruc 3:16‑19 | *"ubi sunt principes gentium"* | Raíz del *ubi sunt* | Mapa |
-| 1 Corintios 15 (todo el capítulo) | v. 52: *"in momento, in ictu oculi"* | Es sobre la **resurrección** | 2, 9 |
-| 1 Juan 2:17 | *"et mundus transit"* | Antecedente de *sic transit* | Mapa |
-| Apocalipsis 6:1‑8 | Los cuatro jinetes, el *equus pallidus* | Durero, Doré, Bruegel | 1, 8, 11 |
-| 2 Macabeos 12:43‑46 | La oración por los difuntos | Posible origen de "macabro"; fundamento del sufragio por las ánimas | 4 |
-| Secuencia *Dies irae* | Siglo XIII | El Juicio en la liturgia de difuntos | 3 |
+| Texto | Vulgata Clementina | Tu Reina‑Valera 1960 | Por qué | Módulo |
+|---|---|---|---|---|
+| Génesis 3:19 | *"quia pulvis es et in pulverem reverteris"* | «pues polvo eres, y al polvo volverás» | Origen de la fórmula del Miércoles de Ceniza | 2, mapa |
+| Eclesiastés (Qohélet) 1:2; 2:24; 9:7‑10; 12:8 | *"vanitas vanitatum… omnia vanitas"* (sin *et*) | 1:2 «Vanidad de vanidades, dijo el Predicador; vanidad de vanidades, todo es vanidad». 9:7 «Anda, y come tu pan con gozo, y bebe tu vino con alegre corazón» | La *vanitas*, y su conclusión casi epicúrea que la tradición olvida | 9 |
+| Eclesiástico (Sirácida) 7:40 en la Clementina (7:36 en las numeraciones modernas) | *"memorare novissima tua…"* | **No está** (deuterocanónico) | Fundamento de las postrimerías | 3, 5 |
+| Sabiduría 2:1‑9 | v. 8: *"coronemus nos rosis antequam marcescant"* (la Nova Vulgata dice *"calycibus rosarum"*) | **No está** (deuterocanónico) | El *carpe diem* en boca de los impíos | Tesis, 16 |
+| Isaías 22:13; 1 Corintios 15:32 | Is: *"comedamus et bibamus, cras enim moriemur"*. 1 Cor: *"si mortui non resurgunt, manducemus et bibamus…"* | Is: «Comamos y bebamos, porque mañana moriremos». 1 Cor: «Si los muertos no resucitan, comamos y bebamos, porque mañana moriremos». La RVR1960 no refleja el cambio de verbo del latín | Isaías lo reprocha; Pablo lo concede **en condicional** | Tesis |
+| Deuteronomio 32:20, 28‑29 | *"utinam saperent et intelligerent, ac novissima providerent"* | 32:29 «¡Ojalá fueran sabios, que comprendieran esto, y se dieran cuenta del fin que les espera!». La RVR1960 traduce *novissima*, «postrimerías», como «el fin que les espera» | Citas de la *Mesa de los pecados capitales* | 5 |
+| Baruc 3:16‑19 | *"ubi sunt principes gentium"* | **No está** (deuterocanónico). El *ubi sunt* que sí tienes es Isaías 33:18: «¿Qué es del escriba?, ¿qué del pesador del tributo?» | Raíz del *ubi sunt* | Mapa |
+| 1 Corintios 15 (todo el capítulo) | v. 52: *"in momento, in ictu oculi, in novissima tuba"* | 15:51‑52 «No todos dormiremos; pero todos seremos transformados, en un momento, en un abrir y cerrar de ojos, a la final trompeta» | Es sobre la **resurrección** | 2, 9 |
+| 1 Juan 2:17 | *"et mundus transit, et concupiscentia ejus"* | «Y el mundo pasa, y sus deseos» | Antecedente de *sic transit* | Mapa |
+| Apocalipsis 6:1‑8 | v. 8: *"equus pallidus"* | «un caballo amarillo, y el que lo montaba tenía por nombre Muerte». **Nota de traducción:** el griego dice *chlōrós*, «verdoso, lívido»; la Vulgata lo vierte como «pálido» y la RVR1960 como «amarillo». Doré y Durero pintan el caballo pálido de la tradición latina | Durero, Doré, Bruegel | 1, 8, 11 |
+| 2 Macabeos 12:43‑46 | La oración por los difuntos | **No está** (deuterocanónico) | Posible origen de "macabro"; fundamento del sufragio por las ánimas | 4 |
+| Secuencia *Dies irae* | Siglo XIII | No es un texto bíblico: es liturgia católica de difuntos | El Juicio en la liturgia de difuntos | 3 |
 
 **Acceso:** la Nova Vulgata está en línea en vatican.va. La Clementina, en Wikisource latina (*Vulgata Clementina*) y en otros sitios. El *Novum Testamentum Graece* (Nestle‑Aland) sirve para el griego.
 
@@ -165,5 +176,5 @@ Estas son las fuentes más importantes del proyecto:
 2. El diario de campo (tres columnas).
 3. El registro de palabras oídas.
 4. Las hojas de contacto con sus calificaciones P/I/B/C/E.
-5. La Biblia de tu madre, **si todavía existe**. Identifica la edición.
+5. Las dos Biblias de tu historia: la católica de tu madre, con los grabados de Doré (identifica la edición si todavía existe), y tu Reina‑Valera 1960.
 6. Tus propias fotografías familiares de los muertos de tu familia.
