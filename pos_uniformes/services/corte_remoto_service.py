@@ -74,7 +74,9 @@ def texto_propuesta_corte(session, ahora: datetime | None = None) -> str:
     if e.resumen.tarjeta:
         lineas.append(f"• Con tarjeta: ${e.resumen.tarjeta:,.2f} (no está en el cajón)")
     for a in avisos:
-        lineas.append(f"• Pagar a {a.employee_name.split()[0]}: ${Decimal(a.total_estimado):,.2f}")
+        prest = Decimal(getattr(a, "prestamos", 0) or 0)
+        resta = f" (ya sin ${prest:,.2f} del préstamo)" if prest else ""
+        lineas.append(f"• Pagar a {a.employee_name.split()[0]}: ${Decimal(a.total_estimado):,.2f}{resta}")
     if e.pagos:
         lineas.append(f"• Pagos ya hechos: -${e.pagos:,.2f}")
     if e.total_retiros:

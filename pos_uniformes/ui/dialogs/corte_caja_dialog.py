@@ -709,7 +709,16 @@ def confirmar_pago(parent: QWidget | None, *, employee_code: str, employee_name:
         f"{base_txt}"
         f"{d.comisiones} comisiones × ${d.tarifa_comision:,.2f}:  +${d.monto_comisiones:,.2f}\n"
         + (f"{d.faltas} falta(s):        -${d.descuento_faltas:,.2f}\n" if d.faltas else "")
+        # El préstamo SE TIENE que ver: ya venía restado del total, así que sin
+        # esta línea el pago aparecía más chico sin decir por qué, y eso se lee
+        # como un error del programa (Daniel, 2026-10-04).
+        + (f"Préstamo:           -${d.prestamos:,.2f}\n" if d.prestamos else "")
         + f"\nA PAGAR:  ${d.total:,.2f}"
+        + (
+            f"\n\nQuedan ${d.prestamo_sin_cubrir:,.2f} del préstamo sin cubrir."
+            if d.prestamo_sin_cubrir
+            else ""
+        )
     )
     box = QMessageBox(parent)
     box.setWindowTitle("Pagar")
@@ -745,7 +754,9 @@ def texto_previa_corte_encargado(estado: EstadoCaja, avisos: list) -> str:
         lineas.append("")
         lineas.append("PAGAR HOY:")
         for a in avisos:
-            lineas.append(f"  {a.employee_name.split()[0]}  ${a.total_estimado:,.2f}")
+            prest = Decimal(getattr(a, "prestamos", 0) or 0)
+            resta = f"  (ya sin ${prest:,.2f} del préstamo)" if prest else ""
+            lineas.append(f"  {a.employee_name.split()[0]}  ${a.total_estimado:,.2f}{resta}")
     if estado.pagos:
         lineas.append(f"Pagos ya hechos: -${estado.pagos:,.2f}")
     if estado.total_retiros:

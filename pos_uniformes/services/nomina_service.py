@@ -96,6 +96,10 @@ class AvisoPago:
     dias_para_pago: int | None
     comisiones: int
     total_estimado: Decimal
+    #: Préstamos aprobados que ya van restados en `total_estimado`. Se guarda
+    #: aparte para poder decir POR QUÉ el pago bajó: un total más chico sin
+    #: explicación se lee como un error del programa (Daniel, 2026-10-04).
+    prestamos: Decimal = Decimal("0.00")
 
 
 # ─── Lógica pura ─────────────────────────────────────────────────────────
@@ -282,6 +286,8 @@ def _empleadas_activas(session) -> list:
 def avisos_de_pago(session, hoy: date | None = None, dias: int = 7) -> list[AvisoPago]:
     """Empleadas a las que les toca pago en los próximos `dias` (incluye hoy y
     atrasados), con lo que llevan acumulado. Ordenado por fecha de pago."""
+    from pos_uniformes.services import prestamos_service
+
     hoy = hoy or date.today()
     params = cargar_parametros(session)
     avisos: list[AvisoPago] = []
@@ -294,6 +300,12 @@ def avisos_de_pago(session, hoy: date | None = None, dias: int = 7) -> list[Avis
             continue
         comisiones = comisiones_desde_ultimo_pago(session, emp.codigo, horario)
         detalle = calcular_pago(horario, comisiones=comisiones, params=params, hasta=max(hoy, proximo or hoy))
+        # El préstamo tiene que ir AQUÍ y no solo en el pago: con este número
+        # el corte decide cuánto se retira del cajón, y estimar de más deja
+        # dinero apartado que nunca se le entrega (bug 2026-10-04).
+        prestamos = prestamos_service.total_por_cobrar(session, emp.codigo)
+        if prestamos:
+            detalle = replace(detalle, prestamos=prestamos)
         avisos.append(
             AvisoPago(
                 employee_code=emp.codigo.upper(),
@@ -302,6 +314,7 @@ def avisos_de_pago(session, hoy: date | None = None, dias: int = 7) -> list[Avis
                 dias_para_pago=(proximo - hoy).days if proximo else None,
                 comisiones=comisiones,
                 total_estimado=detalle.total,
+                prestamos=prestamos,
             )
         )
     avisos.sort(key=lambda a: (a.fecha_pago is None, a.fecha_pago or hoy, a.employee_name))
