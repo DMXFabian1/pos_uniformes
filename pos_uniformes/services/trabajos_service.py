@@ -375,6 +375,67 @@ def registrar_fallo(
     return trabajo
 
 
+#: Un reclamo de impresión que lleva más de esto sin terminar está muerto: la
+#: máquina que lo tomó se apagó, se quedó sin red o la cerraron a media hoja.
+#: Generoso a propósito — una hoja de conteo tarda, y soltar un trabajo que
+#: todavía se está imprimiendo lo imprime DOS veces.
+MINUTOS_PARA_SOLTAR = 15
+
+#: PEDIDO queda fuera: ahí EN_PROCESO significa "alguien lo está preparando",
+#: una persona juntando prendas, y eso tarda lo que tarda. Soltarlo por tiempo
+#: le quitaría el pedido de las manos (ver el docstring de EstadoTrabajo).
+_RECLAMABLES = (TipoTrabajo.TICKET, TipoTrabajo.ETIQUETA, TipoTrabajo.CONTEO)
+
+
+def soltar_reclamos_vencidos(
+    session: Session,
+    *,
+    minutos: int = MINUTOS_PARA_SOLTAR,
+    max_intentos: int = 3,
+    ahora: datetime | None = None,
+) -> list[int]:
+    """Devuelve a PENDIENTE los trabajos atorados en EN_PROCESO. Devuelve sus ids.
+
+    Nadie suelta un reclamo cuando la máquina que lo tomó se muere: el trabajo
+    se queda EN_PROCESO para siempre y la cola nunca lo vuelve a ver. En la
+    tienda había uno así desde el 13 de julio, casi tres meses (2026-10-04).
+
+    Cuenta como un intento fallido y respeta `max_intentos`, para que un
+    trabajo que tumba al despachador cada vez termine en ERROR en vez de
+    reclamarse y morirse en ciclo.
+    """
+    from datetime import timedelta, timezone
+
+    referencia = ahora or datetime.now(timezone.utc)
+    corte = referencia - timedelta(minutes=minutos)
+    atorados = session.scalars(
+        select(Trabajo)
+        .where(Trabajo.estado == EstadoTrabajo.EN_PROCESO)
+        .where(Trabajo.tipo.in_(list(_RECLAMABLES)))
+        .where(Trabajo.updated_at < corte)
+        .order_by(Trabajo.id)
+    ).all()
+    soltados: list[int] = []
+    for trabajo in atorados:
+        trabajo.intentos = (trabajo.intentos or 0) + 1
+        trabajo.error_msg = (
+            f"Se soltó solo: llevaba más de {minutos} min sin terminar "
+            "(la máquina que lo tomó se apagó o perdió la red)."
+        )
+        if trabajo.intentos >= max_intentos:
+            trabajo.estado = EstadoTrabajo.ERROR
+            trabajo.procesado_en = func.now()
+            trabajo.disponible_en = None
+        else:
+            trabajo.estado = EstadoTrabajo.PENDIENTE
+            trabajo.procesado_en = None
+            trabajo.disponible_en = None
+        soltados.append(int(trabajo.id))
+    if soltados:
+        session.flush()
+    return soltados
+
+
 def limpiar_trabajos_viejos(
     session: Session,
     *,

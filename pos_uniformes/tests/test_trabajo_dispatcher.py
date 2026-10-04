@@ -310,3 +310,45 @@ class DispatcherOfflineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SoltarAtoradosEnElPollTests(unittest.TestCase):
+    """El despachador recoge lo que otra máquina dejó tirado antes de pedir
+    trabajo nuevo. Sin esto, un trabajo EN_PROCESO no lo vuelve a ver nadie."""
+
+    def setUp(self) -> None:
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.session_factory = lambda: Session(self.engine)
+        self.impresos: list[str] = []
+
+    def _atorar(self, texto: str, *, hace_minutos: int) -> int:
+        from datetime import datetime, timedelta, timezone
+
+        s = self.session_factory()
+        t = svc.enviar_ticket(s, texto)
+        t.estado = EstadoTrabajo.EN_PROCESO
+        t.updated_at = datetime.now(timezone.utc) - timedelta(minutes=hace_minutos)
+        s.commit()
+        tid = t.id
+        s.close()
+        return tid
+
+    def _disp(self) -> TrabajoDispatcher:
+        return TrabajoDispatcher(
+            self.session_factory,
+            {TipoTrabajo.TICKET: lambda t: self.impresos.append(svc.texto_de_ticket(t))},
+        )
+
+    def test_lo_atorado_se_imprime_en_el_siguiente_poll(self) -> None:
+        tid = self._atorar("EL DE JULIO", hace_minutos=60 * 24 * 80)
+        self.assertEqual(self._disp().poll_once(), EstadoTrabajo.HECHO)
+        self.assertEqual(self.impresos, ["EL DE JULIO"])
+        s = self.session_factory()
+        self.assertEqual(svc.obtener(s, tid).estado, EstadoTrabajo.HECHO)
+        s.close()
+
+    def test_lo_que_se_esta_imprimiendo_ahora_no_se_le_quita(self) -> None:
+        self._atorar("EN CURSO", hace_minutos=1)
+        self.assertIsNone(self._disp().poll_once())
+        self.assertEqual(self.impresos, [])

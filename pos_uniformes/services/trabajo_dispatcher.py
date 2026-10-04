@@ -122,6 +122,20 @@ class TrabajoDispatcher:
             return None
 
         try:
+            # Antes de pedir trabajo nuevo, recoger lo que quedó tirado: si una
+            # máquina se apagó a medio imprimir, su reclamo bloquea ese trabajo
+            # para siempre y nadie más lo ve (en la tienda había uno desde
+            # julio). Si falla, no se cancela el poll: es limpieza, no el
+            # trabajo de este ciclo.
+            try:
+                soltados = svc.soltar_reclamos_vencidos(session)
+                if soltados:
+                    logger.info("Despachador: reclamos vencidos soltados: %s", soltados)
+                    session.commit()
+            except Exception:  # noqa: BLE001
+                logger.exception("Despachador: no se pudieron soltar los reclamos vencidos")
+                session.rollback()
+
             trabajo = svc.reclamar_siguiente(session, tipos=self._tipos)
             if trabajo is None:
                 session.rollback()

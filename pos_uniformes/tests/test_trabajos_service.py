@@ -239,3 +239,68 @@ class ReordenarYObtenerTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SoltarReclamosVencidosTests(unittest.TestCase):
+    """Un reclamo que nadie terminó bloquea el trabajo para siempre: en la
+    tienda había uno EN_PROCESO desde el 13 de julio (2026-10-04)."""
+
+    def setUp(self) -> None:
+        self.session = _make_session()
+
+    def tearDown(self) -> None:
+        self.session.close()
+
+    def _atorado(self, tipo=TipoTrabajo.CONTEO, *, hace_minutos=120, intentos=0):
+        from datetime import datetime, timedelta, timezone
+
+        t = svc.encolar(self.session, tipo, {"hojas": ["x"]})
+        t.estado = EstadoTrabajo.EN_PROCESO
+        t.intentos = intentos
+        # `updated_at` es la hora del reclamo (onupdate); aquí se fija a mano
+        # porque SQLite no tiene al despachador reclamándolo de verdad.
+        t.updated_at = datetime.now(timezone.utc) - timedelta(minutes=hace_minutos)
+        self.session.flush()
+        return t
+
+    def test_vuelve_a_pendiente_y_dice_por_que(self) -> None:
+        t = self._atorado()
+        self.assertEqual(svc.soltar_reclamos_vencidos(self.session), [t.id])
+        self.assertEqual(t.estado, EstadoTrabajo.PENDIENTE)
+        self.assertEqual(t.intentos, 1)
+        self.assertIsNone(t.disponible_en)   # disponible ya, sin backoff
+        self.assertIn("se soltó solo", (t.error_msg or "").lower())
+
+    def test_el_reciente_no_se_toca(self) -> None:
+        """Soltar un trabajo que todavía se está imprimiendo lo imprime dos veces."""
+        t = self._atorado(hace_minutos=2)
+        self.assertEqual(svc.soltar_reclamos_vencidos(self.session), [])
+        self.assertEqual(t.estado, EstadoTrabajo.EN_PROCESO)
+
+    def test_el_pedido_no_se_suelta_aunque_tarde(self) -> None:
+        """Ahí EN_PROCESO es una persona juntando prendas, no una impresora."""
+        t = self._atorado(TipoTrabajo.PEDIDO, hace_minutos=60 * 24)
+        self.assertEqual(svc.soltar_reclamos_vencidos(self.session), [])
+        self.assertEqual(t.estado, EstadoTrabajo.EN_PROCESO)
+
+    def test_al_tope_de_intentos_queda_en_error(self) -> None:
+        """Un trabajo que tumba al despachador cada vez no puede reclamarse
+        y morirse en ciclo para siempre."""
+        t = self._atorado(intentos=2)
+        self.assertEqual(svc.soltar_reclamos_vencidos(self.session, max_intentos=3), [t.id])
+        self.assertEqual(t.estado, EstadoTrabajo.ERROR)
+        self.assertIsNotNone(t.procesado_en)
+
+    def test_el_pendiente_y_el_hecho_no_se_tocan(self) -> None:
+        pend = svc.encolar(self.session, TipoTrabajo.TICKET, {"texto": "a"})
+        hecho = svc.encolar(self.session, TipoTrabajo.TICKET, {"texto": "b"})
+        svc.marcar_hecho(self.session, hecho.id)
+        self.assertEqual(svc.soltar_reclamos_vencidos(self.session), [])
+        self.assertEqual(pend.estado, EstadoTrabajo.PENDIENTE)
+        self.assertEqual(hecho.estado, EstadoTrabajo.HECHO)
+
+    def test_el_soltado_se_puede_reclamar_otra_vez(self) -> None:
+        """Lo que importa: que la cola lo vuelva a VER."""
+        t = self._atorado(TipoTrabajo.TICKET)
+        svc.soltar_reclamos_vencidos(self.session)
+        self.assertEqual(svc.reclamar_siguiente(self.session).id, t.id)
