@@ -58,6 +58,7 @@ AYUDA = (
     "/resumen — resumen del día (el de la noche, completo)\n"
     "/pendientes — lo que falta por registrar\n"
     "/cortes — los últimos cortes; toca uno para ajustarlo o borrarlo\n"
+    "/cortes 30 — los de los últimos 30 días (para rastrear el dinero)\n"
     "/ajustar 12 12500 depósito al banco — cambia la cifra de ese corte\n"
     "/retiro 500 gasolina — saca del cajón, con su motivo\n"
     "/cajon — desmarca lo que NO salió del cajón (una transferencia,\n"
@@ -298,7 +299,7 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
         from pos_uniformes.services import telegram_cortes_service as ct
 
         with session_factory() as session:
-            return ct.resumen(session)
+            return ct.resumen(session, dias=ct.dias_de_argumento(cmd.argumento))
     if cmd.nombre == "ajustar":
         from pos_uniformes.services import telegram_cortes_service as ct
 
@@ -387,8 +388,16 @@ def responder(texto: str, *, session_factory, hoy: date | None = None) -> tuple[
         import importlib
 
         hacer = getattr(importlib.import_module(modulo), funcion)
+        # Si la función sabe recibir el argumento, se le pasa: sin esto
+        # `/cortes 30` contestaba con los botones pero con los 14 días de
+        # siempre, callado, que es la peor forma de ignorar algo.
+        import inspect
+
+        extra = {}
+        if "argumento" in inspect.signature(hacer).parameters:
+            extra["argumento"] = cmd.argumento
         with session_factory() as session:
-            return hacer(session)
+            return hacer(session, **extra)
     except Exception:  # noqa: BLE001 — sin botones se contesta igual
         logger.exception("No se pudieron armar los botones de /%s", cmd.nombre)
         return atender_texto(texto, session_factory=session_factory, hoy=hoy), ""

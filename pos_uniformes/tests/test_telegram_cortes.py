@@ -229,3 +229,94 @@ class AjustarPorTextoTests(unittest.TestCase):
         r = ct.ajustar(self.s, "99999 12500 depósito", quien="VEND-1")
         self.assertTrue(r)
         self.assertNotIn("ahora dice", r)
+
+
+class SalidasDelPeriodoTests(unittest.TestCase):
+    """Cada corte ya decía lo suyo; lo que faltaba era el acumulado, que es el
+    número con el que Daniel puede rastrear el dinero que saca del cajón
+    ("sólo necesito que sea trazable para mí", 2026-10-04)."""
+
+    def _fila(self, dia, contado, esperado, *, ajustado=False):
+        return ct.CorteFila(
+            id=dia, fecha=date(2026, 10, dia), hora="17:40", quien="Daniel",
+            contado=Decimal(contado), esperado=Decimal(esperado),
+            operaciones=20, ajustado=ajustado,
+        )
+
+    def test_dice_cuanto_salio_y_en_cuantos_cortes(self) -> None:
+        filas = [self._fila(2, "16438", "17438"), self._fila(1, "13591", "14716")]
+        salidas = ct.SalidasPeriodo(cortes=13, salio=Decimal("14825.00"), cortes_que_faltaron=11)
+        texto = ct.texto(filas, dias=14, salidas=salidas)
+        self.assertIn("11 de 13 con diferencia, −$14,825.00 en total", texto)
+        self.assertIn("no solo los 2 de arriba", texto)
+        self.assertIn("/retiro", texto)
+
+    def test_el_total_no_depende_de_cuantos_se_enseñan(self) -> None:
+        """Sumar solo lo visible daría un número más chico que el real, y un
+        número de dinero que depende del tamaño de la pantalla no sirve."""
+        filas = [self._fila(2, "16438", "17438")]   # un solo corte en la lista
+        salidas = ct.SalidasPeriodo(cortes=13, salio=Decimal("14825.00"), cortes_que_faltaron=11)
+        texto = ct.texto(filas, dias=14, salidas=salidas)
+        self.assertIn("−$14,825.00", texto)          # el total del periodo
+        self.assertNotIn("−$1,000.00 en total", texto)   # no el del único visible
+
+    def test_cuando_todo_cuadra_no_se_habla_de_diferencias(self) -> None:
+        filas = [self._fila(3, "17596", "17596")]
+        texto = ct.texto(filas, dias=14, salidas=ct.SalidasPeriodo(cortes=1))
+        self.assertNotIn("con diferencia", texto)
+        self.assertNotIn("/retiro", texto)
+
+    def test_tambien_dice_lo_que_sobro(self) -> None:
+        filas = [self._fila(2, "16438", "17438")]
+        salidas = ct.SalidasPeriodo(
+            cortes=5, salio=Decimal("1000.00"), cortes_que_faltaron=1,
+            sobro=Decimal("40.00"), cortes_que_sobraron=2,
+        )
+        texto = ct.texto(filas, dias=14, salidas=salidas)
+        self.assertIn("Salió $1,000.00 · sobró $40.00", texto)
+        self.assertIn("−$960.00 en total", texto)   # el neto, no una de las dos
+
+
+class DiasDeArgumentoTests(unittest.TestCase):
+    """`/cortes 30` para poder mirar más atrás de la quincena."""
+
+    def test_un_numero_son_dias(self) -> None:
+        self.assertEqual(ct.dias_de_argumento("30"), 30)
+
+    def test_sin_argumento_se_queda_como_estaba(self) -> None:
+        self.assertEqual(ct.dias_de_argumento(""), 14)
+        self.assertEqual(ct.dias_de_argumento("   "), 14)
+
+    def test_lo_que_no_es_numero_no_rompe_el_comando(self) -> None:
+        self.assertEqual(ct.dias_de_argumento("del mes"), 14)
+
+    def test_no_se_piden_dos_años_de_cortes(self) -> None:
+        self.assertEqual(ct.dias_de_argumento("9999"), 180)
+        self.assertEqual(ct.dias_de_argumento("0"), 1)
+
+
+class NoFelicitarConElDineroFueraTests(unittest.TestCase):
+    """El mensaje decía "ninguno se pasa de $50 👍" justo encima de "−$14,825
+    en total", porque aquí «ajustado» solo significa «tuvo diferencia» y
+    entonces nada llama la atención nunca (2026-10-04)."""
+
+    def _fila(self, dia, contado, esperado):
+        return ct.CorteFila(
+            id=dia, fecha=date(2026, 10, dia), hora="17:40", quien="Daniel",
+            contado=Decimal(contado), esperado=Decimal(esperado),
+            operaciones=20, ajustado=Decimal(contado) != Decimal(esperado),
+        )
+
+    def test_con_dinero_fuera_no_hay_pulgar_arriba(self) -> None:
+        filas = [self._fila(2, "16438", "17438"), self._fila(3, "17596", "17596")]
+        salidas = ct.SalidasPeriodo(cortes=13, salio=Decimal("14825.00"), cortes_que_faltaron=11)
+        texto = ct.texto(filas, dias=14, salidas=salidas)
+        self.assertNotIn("👍", texto)
+        self.assertNotIn("ninguno se pasa", texto)
+        self.assertIn("1 de 2 cuadraron exacto.", texto)
+        self.assertIn("−$14,825.00", texto)
+
+    def test_cuando_de_verdad_cuadro_todo_si_lo_dice(self) -> None:
+        filas = [self._fila(3, "17596", "17596")]
+        texto = ct.texto(filas, dias=14, salidas=ct.SalidasPeriodo(cortes=1))
+        self.assertIn("👍", texto)

@@ -95,7 +95,59 @@ def ultimos(session: Session, *, dias: int = 14, tope: int = TOPE) -> list[Corte
     return salida
 
 
-def texto(filas: list[CorteFila], *, dias: int = 14) -> str:
+@dataclass(frozen=True)
+class SalidasPeriodo:
+    """Lo que salió (y sobró) por diferencia en TODO el periodo.
+
+    Va aparte de `ultimos()` a propósito: la lista se corta en `TOPE` para que
+    el mensaje no sea un muro, y sumar solo lo que se alcanza a enseñar daría
+    un total más chico que el real. Un número de dinero que depende de cuántos
+    renglones caben en la pantalla no sirve para rastrear nada.
+    """
+
+    cortes: int = 0
+    salio: Decimal = Decimal("0.00")
+    cortes_que_faltaron: int = 0
+    sobro: Decimal = Decimal("0.00")
+    cortes_que_sobraron: int = 0
+
+
+def salidas_del_periodo(session: Session, *, dias: int = 14) -> SalidasPeriodo:
+    """Suma las diferencias de todos los cortes del periodo (sin tope)."""
+    from pos_uniformes.database.models import LibretaCorte
+
+    desde = date.today() - timedelta(days=int(dias))
+    filas = session.scalars(
+        select(LibretaCorte).where(LibretaCorte.fecha >= desde)
+    ).all()
+
+    salio = sobro = Decimal("0.00")
+    n_falto = n_sobro = 0
+    total = 0
+    for c in filas:
+        esperado = Decimal(str(c.monto_esperado or 0))
+        # Los cortes viejos no guardaban el esperado: ahí la cifra ERA el total
+        # del día. Restarle cero diría que sobraron $20,000 (ver es_legacy).
+        if esperado <= 0:
+            continue
+        total += 1
+        dif = (Decimal(str(c.monto_final or 0)) - esperado).quantize(_CENT)
+        if dif < 0:
+            salio += -dif
+            n_falto += 1
+        elif dif > 0:
+            sobro += dif
+            n_sobro += 1
+    return SalidasPeriodo(
+        cortes=total,
+        salio=salio.quantize(_CENT),
+        cortes_que_faltaron=n_falto,
+        sobro=sobro.quantize(_CENT),
+        cortes_que_sobraron=n_sobro,
+    )
+
+
+def texto(filas: list[CorteFila], *, dias: int = 14, salidas: SalidasPeriodo | None = None) -> str:
     """Los cortes como se leen en el celular."""
     if not filas:
         return f"No hay cortes en los últimos {dias} días."
@@ -129,20 +181,57 @@ def texto(filas: list[CorteFila], *, dias: int = 14) -> str:
             f"El más: {peor.fecha:%d/%m} con ${abs(peor.diferencia):,.2f}."
         )
         # Lo que se ajusta a mano no entra aquí: eso lo decidió el dueño.
+    elif salidas is not None and (salidas.salio or salidas.sobro):
+        # NO va el 👍. Aquí «ajustado» significa solo «tuvo diferencia», así que
+        # nada llama la atención nunca y el mensaje felicitaba («ninguno se pasa
+        # de $50 👍») justo encima del renglón que decía que habían salido
+        # $14,825. Un visto bueno que sale pase lo que pase no informa nada, y
+        # enseña a no leer el que sí importa (2026-10-04).
+        lineas.append(f"{cuadrados} de {len(filas)} cuadraron exacto.")
     else:
         lineas.append(f"{cuadrados} cuadraron exacto y ninguno se pasa de ${OJO:,.0f}. 👍")
-    ajustados = [c for c in filas if c.ajustado]
-    if ajustados:
-        suma = sum((c.diferencia for c in ajustados), Decimal("0"))
-        lineas.append(f"{len(ajustados)} con ajuste tuyo, {'−' if suma < 0 else '+'}${abs(suma):,.2f} en total.")
-        sin_decir = [c for c in ajustados if not c.nota]
-        if sin_decir:
-            lineas.append(f"{len(sin_decir)} de ellos sin decir por qué (son de antes).")
+    # El total con el que Daniel rastrea su dinero. Antes sumaba SOLO los
+    # cortes que caben en el mensaje (tope de 10), así que en un periodo largo
+    # decía menos de lo que de verdad salió: un número de dinero que depende
+    # de cuántos renglones caben en la pantalla no sirve para rastrear nada
+    # ("sólo necesito que sea trazable para mí", 2026-10-04). `salidas` lo trae
+    # calculado sobre TODOS los cortes del periodo.
+    if salidas is not None and (salidas.salio or salidas.sobro):
+        neto = salidas.sobro - salidas.salio
+        cuantos = salidas.cortes_que_faltaron + salidas.cortes_que_sobraron
+        # Solo se aclara "no solo los de arriba" cuando de verdad hay más de
+        # los que caben: si no, es ruido.
+        alcance = (
+            f"{dias} días, no solo los {len(filas)} de arriba"
+            if salidas.cortes > len(filas)
+            else f"{dias} días"
+        )
+        lineas.append(
+            f"{cuantos} de {salidas.cortes} con diferencia, "
+            f"{'−' if neto < 0 else '+'}${abs(neto):,.2f} en total ({alcance})."
+        )
+        if salidas.salio and salidas.sobro:
+            lineas.append(f"   Salió ${salidas.salio:,.2f} · sobró ${salidas.sobro:,.2f}")
+        lineas.append("   Lo que saques del cajón queda anotado con /retiro 2000 me lo llevé.")
+    else:
+        ajustados = [c for c in filas if c.ajustado]
+        if ajustados:
+            suma = sum((c.diferencia for c in ajustados), Decimal("0"))
+            lineas.append(f"{len(ajustados)} con ajuste tuyo, {'−' if suma < 0 else '+'}${abs(suma):,.2f} en total.")
+
+    # Esto se cuenta sobre los que se enseñan y no sobre el periodo, a
+    # propósito: la nota es de cada corte y solo se puede leer en los que
+    # están arriba.
+    sin_decir = [c for c in filas if c.ajustado and not c.nota]
+    if sin_decir:
+        lineas.append(f"{len(sin_decir)} de ellos sin decir por qué (son de antes).")
     return "\n".join(lineas)
 
 
 def resumen(session: Session, *, dias: int = 14) -> str:
-    return texto(ultimos(session, dias=dias), dias=dias)
+    return texto(
+        ultimos(session, dias=dias), dias=dias, salidas=salidas_del_periodo(session, dias=dias)
+    )
 
 
 # ── Tocar un corte: quitarle el ajuste o borrarlo ────────────────────────────
@@ -165,8 +254,19 @@ def _teclado(filas):
     return telegram_service.teclado(filas)
 
 
-def texto_y_botones(session: Session, *, dias: int = 14) -> tuple[str, str]:
+def dias_de_argumento(argumento: str, *, por_defecto: int = 14, tope: int = 180) -> int:
+    """`/cortes 30` = los últimos 30 días. Para rastrear el dinero hay que poder
+    mirar más atrás que la quincena que trae por defecto."""
+    texto_arg = str(argumento or "").strip()
+    if not texto_arg.isdigit():
+        return por_defecto
+    return max(1, min(int(texto_arg), tope))
+
+
+def texto_y_botones(session: Session, *, dias: int = 14, argumento: str = "") -> tuple[str, str]:
     """La lista de siempre, con un botón por corte para poder tocarlo."""
+    if argumento:
+        dias = dias_de_argumento(argumento, por_defecto=dias)
     filas = ultimos(session, dias=dias)
     botones = [
         [(f"{c.fecha:%d/%m} · ${c.contado:,.0f}" + (" ✏️" if c.ajustado else ""),
@@ -174,7 +274,10 @@ def texto_y_botones(session: Session, *, dias: int = 14) -> tuple[str, str]:
         for c in filas
     ]
     botones.append([("‹ Menú", "m:raiz")])
-    return texto(filas, dias=dias), _teclado(botones)
+    return (
+        texto(filas, dias=dias, salidas=salidas_del_periodo(session, dias=dias)),
+        _teclado(botones),
+    )
 
 
 def detalle(session: Session, corte_id: int) -> tuple[str, list]:
