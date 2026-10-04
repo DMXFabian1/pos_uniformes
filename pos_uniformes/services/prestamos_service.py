@@ -168,15 +168,61 @@ def rechazar(session: Session, prestamo_id: int, *, quien: str) -> PrestamoEmple
     return prestamo
 
 
-def marcar_cobrados(session: Session, employee_code: str, *, pago_id: int | None = None) -> Decimal:
-    """Al pagarle, los préstamos aprobados quedan saldados. Devuelve cuánto."""
+def marcar_cobrados(
+    session: Session,
+    employee_code: str,
+    *,
+    pago_id: int | None = None,
+    cubierto: Decimal | None = None,
+) -> Decimal:
+    """Al pagarle, los préstamos aprobados quedan saldados. Devuelve cuánto.
+
+    `cubierto` es lo que el pago ALCANZÓ a cubrir. El total de un pago no baja
+    de cero, así que un préstamo más grande que el sueldo no se cobra completo
+    y lo que falta tiene que seguir debiéndose: marcarlo todo como cobrado
+    perdonaba la diferencia sin que nadie lo decidiera (bug 2026-10-04).
+
+    Se saldan los más viejos primero. El que queda a medias se PARTE: la mitad
+    cobrada queda como fila saldada (con el rastro del pago) y el préstamo
+    original se queda con lo que falta, esperando el siguiente pago. Así la
+    suma de lo que debe sigue siendo la correcta y no se pierde la historia.
+
+    Sin `cubierto` se cobra todo, como antes.
+    """
+    restante = None if cubierto is None else max(Decimal(str(cubierto)), Decimal("0.00"))
     total = Decimal("0.00")
     for p in por_cobrar(session, employee_code):
-        p.estado = COBRADO
-        p.cobrado_at = _ahora()
-        p.pago_id = pago_id
+        monto = Decimal(str(p.monto))
+        if restante is not None and restante <= 0:
+            break   # el pago se acabó: lo demás sigue debiéndose
+        if restante is None or restante >= monto:
+            p.estado = COBRADO
+            p.cobrado_at = _ahora()
+            p.pago_id = pago_id
+            session.add(p)
+            total += monto
+            if restante is not None:
+                restante -= monto
+            continue
+        # Alcanzó para una parte: la parte cobrada se va a su propia fila y el
+        # préstamo se queda con el resto (mismo id, misma fecha: es la misma deuda).
+        parte = restante.quantize(_CENT)
+        session.add(PrestamoEmpleada(
+            employee_code=p.employee_code,
+            employee_name=p.employee_name,
+            monto=parte,
+            motivo=(f"{p.motivo} (parte del #{p.id})" if p.motivo else f"parte del #{p.id}")[:200],
+            estado=COBRADO,
+            resuelto_por=p.resuelto_por,
+            resuelto_at=p.resuelto_at,
+            pago_id=pago_id,
+            cobrado_at=_ahora(),
+            created_at=p.created_at,
+        ))
+        p.monto = (monto - parte).quantize(_CENT)
         session.add(p)
-        total += Decimal(str(p.monto))
+        total += parte
+        restante = Decimal("0.00")
     session.flush()
     return total
 

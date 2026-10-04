@@ -55,9 +55,14 @@ class ElDesgloseLoDiceTest(unittest.TestCase):
         from pos_uniformes.services.telegram_pagos_service import _detalle_texto
 
         texto = "\n".join(_detalle_texto(_detalle(prestamos="2000"), "Fanny Ortiz"))
-        self.assertIn("Préstamo: −$2,000.00", texto)
+        # Se enseña lo DESCONTADO (1,412), no el préstamo entero: el total no
+        # baja de cero, así que un renglón de −$2,000 nunca cuadraría con
+        # TOTAL $0. Y los $588 que faltan no se perdonan: siguen debiéndose
+        # (antes se marcaban cobrados y desaparecían — bug 2026-10-04).
+        self.assertIn("Préstamo: −$1,412.00", texto)
+        self.assertNotIn("−$2,000.00", texto)
         self.assertIn("TOTAL: $0.00", texto)
-        self.assertIn("$588.00 del préstamo sin cubrir", texto)
+        self.assertIn("$588.00 del préstamo para el próximo pago", texto)
 
     def test_sin_prestamo_no_ensucia_el_desglose(self):
         from pos_uniformes.services.telegram_pagos_service import _detalle_texto
@@ -73,11 +78,15 @@ class ElPagoLoGuardaTest(unittest.TestCase):
         from pos_uniformes.services import nomina_service as nom
 
         fuente = inspect.getsource(nom.registrar_pago_con_monto)
-        # Queda guardado en la fila del pago, para entender un pago viejo.
-        self.assertIn("descuento_prestamos=detalle.prestamos", fuente)
-        # Y los préstamos quedan saldados con el id de ESE pago.
+        # Queda guardado en la fila del pago, para entender un pago viejo: lo
+        # que SE DESCONTÓ, no el préstamo entero, o el desglose guardado no
+        # cuadraría con su propio total.
+        self.assertIn("descuento_prestamos=detalle.prestamo_cubierto", fuente)
+        # Y los préstamos quedan saldados con el id de ESE pago, solo hasta
+        # donde el pago alcanzó.
         self.assertIn("marcar_cobrados", fuente)
         self.assertIn("pago_id=int(pago.id)", fuente)
+        self.assertIn("cubierto=detalle.prestamo_cubierto", fuente)
 
     def test_el_pendiente_trae_los_prestamos(self):
         import inspect

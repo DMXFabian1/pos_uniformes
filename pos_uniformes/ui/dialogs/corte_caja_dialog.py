@@ -712,10 +712,11 @@ def confirmar_pago(parent: QWidget | None, *, employee_code: str, employee_name:
         # El préstamo SE TIENE que ver: ya venía restado del total, así que sin
         # esta línea el pago aparecía más chico sin decir por qué, y eso se lee
         # como un error del programa (Daniel, 2026-10-04).
-        + (f"Préstamo:           -${d.prestamos:,.2f}\n" if d.prestamos else "")
+        + (f"Préstamo:           -${d.prestamo_cubierto:,.2f}\n" if d.prestamo_cubierto else "")
         + f"\nA PAGAR:  ${d.total:,.2f}"
         + (
-            f"\n\nQuedan ${d.prestamo_sin_cubrir:,.2f} del préstamo sin cubrir."
+            f"\n\nLe siguen quedando ${d.prestamo_sin_cubrir:,.2f} del préstamo\n"
+            "para el próximo pago."
             if d.prestamo_sin_cubrir
             else ""
         )

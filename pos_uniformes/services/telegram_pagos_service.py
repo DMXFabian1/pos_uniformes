@@ -40,13 +40,18 @@ def _detalle_texto(det, nombre: str) -> list[str]:
         lineas.append(f"Comisiones: {det.comisiones} × ${det.tarifa_comision:,.2f} = ${det.monto_comisiones:,.2f}")
     if det.faltas:
         lineas.append(f"Faltas: {det.faltas} × ${det.descuento_falta:,.2f} = −${det.descuento_faltas:,.2f}")
-    if getattr(det, "prestamos", 0):
-        lineas.append(f"Préstamo: −${det.prestamos:,.2f}")
+    # Se enseña lo que el pago SÍ descontó, no el préstamo entero: el total no
+    # baja de cero, así que restar $2,000 de un sueldo de $1,300 nunca cuadra.
+    cubierto = getattr(det, "prestamo_cubierto", None)
+    if cubierto is None:
+        cubierto = getattr(det, "prestamos", 0)
+    if cubierto:
+        lineas.append(f"Préstamo: −${cubierto:,.2f}")
     lineas.append("")
     lineas.append(f"TOTAL: ${det.total:,.2f}")
     sin_cubrir = getattr(det, "prestamo_sin_cubrir", 0)
     if sin_cubrir:
-        lineas.append(f"(quedan ${sin_cubrir:,.2f} del préstamo sin cubrir)")
+        lineas.append(f"(le siguen quedando ${sin_cubrir:,.2f} del préstamo para el próximo pago)")
     return lineas
 
 

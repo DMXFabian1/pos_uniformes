@@ -165,3 +165,64 @@ class CobrarTest(_Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CobroParcial(_Base):
+    """Un préstamo más grande que el pago no se perdona: se parte y el resto
+    sigue debiéndose (bug 2026-10-04)."""
+
+    def _aprobado(self, monto):
+        with self.setUpGanado():
+            p = self._pedir(monto=monto)
+            return pr.aprobar(self.s, p.id, quien="VEND-1")
+
+    def test_lo_que_no_alcanzo_sigue_por_cobrar(self):
+        self._aprobado("2000")
+        cobrado = pr.marcar_cobrados(self.s, "VEND-5", pago_id=None, cubierto=Decimal("1300"))
+        self.assertEqual(cobrado, Decimal("1300.00"))
+        self.assertEqual(pr.total_por_cobrar(self.s, "VEND-5"), Decimal("700.00"))
+
+    def test_la_parte_cobrada_queda_de_rastro(self):
+        self._aprobado("2000")
+        pr.marcar_cobrados(self.s, "VEND-5", pago_id=None, cubierto=Decimal("1300"))
+        saldados = self.s.scalars(
+            select(PrestamoEmpleada).where(PrestamoEmpleada.estado == pr.COBRADO)
+        ).all()
+        self.assertEqual([Decimal(str(p.monto)) for p in saldados], [Decimal("1300.00")])
+
+    def test_la_suma_no_cambia(self):
+        self._aprobado("2000")
+        pr.marcar_cobrados(self.s, "VEND-5", pago_id=None, cubierto=Decimal("1300"))
+        total = sum(
+            (Decimal(str(p.monto)) for p in self.s.scalars(select(PrestamoEmpleada)).all()),
+            Decimal("0.00"),
+        )
+        self.assertEqual(total, Decimal("2000.00"))
+
+    def test_el_viejo_se_salda_primero(self):
+        # Por la puerta normal no se puede deber dos a la vez (`pedir` lo
+        # impide), así que se arman a mano: lo que importa es que si alguna vez
+        # hay dos, el pago se come el más viejo y no uno al azar.
+        viejo, nuevo = (
+            PrestamoEmpleada(employee_code="VEND-5", employee_name="Fanny Ortiz",
+                             monto=Decimal(m), motivo="x", estado=pr.APROBADO)
+            for m in ("500", "800")
+        )
+        self.s.add_all([viejo, nuevo])
+        self.s.flush()
+        pr.marcar_cobrados(self.s, "VEND-5", pago_id=None, cubierto=Decimal("500"))
+        self.assertEqual(self.s.get(PrestamoEmpleada, viejo.id).estado, pr.COBRADO)
+        self.assertEqual(self.s.get(PrestamoEmpleada, nuevo.id).estado, pr.APROBADO)
+
+    def test_sin_cubierto_se_cobra_todo_como_antes(self):
+        self._aprobado("2000")
+        self.assertEqual(pr.marcar_cobrados(self.s, "VEND-5"), Decimal("2000.00"))
+        self.assertEqual(pr.total_por_cobrar(self.s, "VEND-5"), Decimal("0.00"))
+
+    def test_un_pago_de_cero_no_salda_nada(self):
+        self._aprobado("2000")
+        self.assertEqual(
+            pr.marcar_cobrados(self.s, "VEND-5", pago_id=None, cubierto=Decimal("0")),
+            Decimal("0.00"),
+        )
+        self.assertEqual(pr.total_por_cobrar(self.s, "VEND-5"), Decimal("2000.00"))

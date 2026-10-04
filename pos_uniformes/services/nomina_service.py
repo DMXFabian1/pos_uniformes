@@ -87,6 +87,14 @@ class DetallePago:
         bruto = self.sueldo_base + self.monto_comisiones - self.descuento_faltas
         return max(self.prestamos - bruto, Decimal("0.00")).quantize(_CENT)
 
+    @property
+    def prestamo_cubierto(self) -> Decimal:
+        """Lo que este pago SÍ alcanzó a descontar del préstamo.
+
+        Es lo que se guarda como descuento y lo que se marca cobrado: lo que
+        no cubrió sigue debiéndose."""
+        return (self.prestamos - self.prestamo_sin_cubrir).quantize(_CENT)
+
 
 @dataclass(frozen=True)
 class AvisoPago:
@@ -201,7 +209,7 @@ def registrar_pago_con_monto(session, employee_code: str, *, creado_por: str, fe
         monto_comisiones=detalle.monto_comisiones,
         faltas=detalle.faltas,
         descuento_faltas=detalle.descuento_faltas,
-        descuento_prestamos=detalle.prestamos,
+        descuento_prestamos=detalle.prestamo_cubierto,
         total=detalle.total,
         creado_por=str(creado_por).strip().upper(),
         dias_trabajados=detalle.dias_trabajados,
@@ -217,7 +225,9 @@ def registrar_pago_con_monto(session, employee_code: str, *, creado_por: str, fe
         from pos_uniformes.services import prestamos_service
 
         session.flush()   # el pago necesita id para dejar el rastro
-        prestamos_service.marcar_cobrados(session, code, pago_id=int(pago.id))
+        prestamos_service.marcar_cobrados(
+            session, code, pago_id=int(pago.id), cubierto=detalle.prestamo_cubierto
+        )
     registrar_pago(session, code, fecha)  # commit incluido
     return pago
 

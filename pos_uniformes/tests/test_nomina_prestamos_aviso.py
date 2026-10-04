@@ -41,9 +41,39 @@ class DesgloseDelKiosko(unittest.TestCase):
         import inspect
         from pos_uniformes.ui.dialogs import corte_caja_dialog as d
         fuente = inspect.getsource(d.confirmar_pago)
-        self.assertIn("d.prestamos", fuente)
+        self.assertIn("d.prestamo_cubierto", fuente)
         self.assertIn("Préstamo", fuente)
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PrestamoMayorQueElSueldo(unittest.TestCase):
+    """Lo que el pago no alcanzó a cubrir sigue debiéndose."""
+
+    def _detalle(self, prestamo):
+        from pos_uniformes.services.nomina_service import DetallePago
+        return DetallePago(
+            employee_code="VEND-3", desde=date(2026, 9, 28), hasta=date(2026, 10, 4),
+            comisiones=0, sueldo_base=Decimal("1300.00"), tarifa_comision=Decimal("2.00"),
+            faltas=0, descuento_falta=Decimal("100.00"), prestamos=Decimal(prestamo),
+        )
+
+    def test_cubierto_es_lo_que_alcanzo(self):
+        d = self._detalle("2000.00")
+        self.assertEqual(d.total, Decimal("0.00"))
+        self.assertEqual(d.prestamo_cubierto, Decimal("1300.00"))
+        self.assertEqual(d.prestamo_sin_cubrir, Decimal("700.00"))
+
+    def test_si_alcanza_se_cubre_todo(self):
+        d = self._detalle("500.00")
+        self.assertEqual(d.prestamo_cubierto, Decimal("500.00"))
+        self.assertEqual(d.prestamo_sin_cubrir, Decimal("0.00"))
+
+    def test_el_pago_guarda_y_salda_solo_lo_cubierto(self):
+        import inspect
+        from pos_uniformes.services import nomina_service as n
+        fuente = inspect.getsource(n.registrar_pago_con_monto)
+        self.assertIn("descuento_prestamos=detalle.prestamo_cubierto", fuente)
+        self.assertIn("cubierto=detalle.prestamo_cubierto", fuente)
