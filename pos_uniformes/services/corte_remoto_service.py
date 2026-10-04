@@ -41,6 +41,22 @@ def texto_estado_actual(session, ahora: datetime | None = None) -> str:
     return "\n".join(lineas)
 
 
+def cifras_de_propuesta(session, ahora: datetime | None = None):
+    """(retiro, fondo) de la propuesta. Un solo lugar que haga esta cuenta.
+
+    La hacían tres —el texto, los botones y la pantalla de cantidades— y tres
+    copias de una resta de dinero es una que algún día va a decir otra cosa.
+    """
+    from pos_uniformes.services.corte_caja_service import estado_caja, pagos_que_tocan_hoy
+
+    ahora = ahora or datetime.now().astimezone()
+    e = estado_caja(session, ahora)
+    avisos = pagos_que_tocan_hoy(session, ahora.date())
+    total_pagos = sum((Decimal(a.total_estimado) for a in avisos), Decimal("0.00"))
+    retiro = (e.resumen.efectivo - e.pagos - total_pagos - e.total_retiros).quantize(Decimal("0.01"))
+    return max(retiro, Decimal("0.00")), Decimal(e.reactivo)
+
+
 def texto_propuesta_corte(session, ahora: datetime | None = None) -> str:
     """Lo que llega al celular a la hora del corte: qué hay y qué pasaría si
     lo haces. Nada se guarda ni se imprime hasta que Daniel conteste."""
@@ -64,12 +80,31 @@ def texto_propuesta_corte(session, ahora: datetime | None = None) -> str:
     if e.total_retiros:
         lineas.append(f"• Ya salió del cajón: -${e.total_retiros:,.2f}")
     lineas.append(f"• Se retiraría: ${retiro:,.2f} · queda de fondo ${e.reactivo:,.2f}")
-    lineas.append("")
-    lineas.append("Toca /corte para hacerlo e imprimir el ticket.")
-    lineas.append(f"O escribe /corte {int(max(retiro, Decimal('0')))} para retirar otra cifra,")
-    lineas.append("y agrega «sintarjeta» si no quieres que se vean los cobros con tarjeta.")
-    lineas.append("Toca /nocorte para dejarlo pasar.")
     return "\n".join(lineas)
+
+
+def propuesta_de_corte(session, ahora: datetime | None = None) -> tuple[str, str]:
+    """(texto, botones) de la propuesta. Lo que se manda a Telegram, de una.
+
+    Juntos y no en dos llamadas: el texto dice una cifra y los botones ofrecen
+    esa misma: pedirlos por separado deja la puerta abierta a que un día no
+    coincidan.
+    """
+    ahora = ahora or datetime.now().astimezone()
+    return texto_propuesta_corte(session, ahora), botones_propuesta_corte(session, ahora)
+
+
+def botones_propuesta_corte(session, ahora: datetime | None = None) -> str:
+    """Los botones que acompañan a la propuesta.
+
+    Antes el mensaje terminaba dictando comandos —«toca /corte», «o escribe
+    /corte 5000 y agrega sintarjeta»—: cuatro renglones de instrucciones para la
+    cosa que más se hace con el bot. Ahora la decisión se toma ahí mismo.
+    """
+    from pos_uniformes.services.telegram_corte_botones_service import botones_de_propuesta
+
+    retiro, fondo = cifras_de_propuesta(session, ahora)
+    return botones_de_propuesta(retiro, fondo)
 
 
 def hacer_corte_y_avisar(

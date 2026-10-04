@@ -465,6 +465,11 @@ def atender_toque(dato: str, *, session_factory, hoy: date | None = None) -> tup
     if ct.es_de_cortes(dato):
         return ct.atender(dato, session_factory=session_factory, quien=CODIGO_REMOTO)
 
+    from pos_uniformes.services import telegram_corte_botones_service as cb
+
+    if cb.es_de_corte(dato):
+        return cb.atender(dato, session_factory=session_factory, quien=CODIGO_REMOTO)
+
     from pos_uniformes.services import telegram_prestamos_service as prs
 
     if prs.es_de_prestamos(dato):

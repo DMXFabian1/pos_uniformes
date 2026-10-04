@@ -74,9 +74,11 @@ def main(argv: list[str] | None = None) -> int:
             from pos_uniformes.services.corte_propuesta_service import anotar_propuesta
             from pos_uniformes.services.corte_remoto_service import texto_propuesta_corte
 
-            mensaje = texto_propuesta_corte(session, ahora)
+            from pos_uniformes.services.corte_remoto_service import propuesta_de_corte
+
+            mensaje, botones = propuesta_de_corte(session, ahora)
             anotar_propuesta(ahora)
-            _mandar(mensaje)
+            _mandar(mensaje, botones)
             print(mensaje)
             return 0
 
@@ -88,12 +90,12 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def _mandar(mensaje: str) -> None:
+def _mandar(mensaje: str, botones: str | None = None) -> None:
     try:
         from pos_uniformes.services import telegram_service
 
         if telegram_service.token_configurado() and telegram_service.chat_id_configurado():
-            telegram_service.enviar_mensaje(mensaje)
+            telegram_service.enviar_mensaje(mensaje, botones=botones)
     except Exception as exc:  # noqa: BLE001
         print(f"(Telegram no disponible: {exc})")
 
@@ -120,9 +122,12 @@ def _recordar() -> int:
         if not toca_recordar(propuesta, hoy=ahora.date(), hubo_corte_despues=hubo_corte_despues):
             print("Nada que recordar.")
             return 0
-        mensaje = "⏰ Sigue pendiente el corte.\n\n" + texto_propuesta_corte(session, ahora)
+        from pos_uniformes.services.corte_remoto_service import propuesta_de_corte
+
+        texto_, botones = propuesta_de_corte(session, ahora)
+        mensaje = "⏰ Sigue pendiente el corte.\n\n" + texto_
     anotar_recordatorio()
-    _mandar(mensaje)
+    _mandar(mensaje, botones)
     print(mensaje)
     return 0
 

@@ -503,6 +503,60 @@ cambia por texto, porque un botón no puede llevar una cantidad:
 `telegram_cajon_service` · `telegram_cortes_service.atender` ·
 `test_telegram_cajon` (15) · `TocarUnCorteTests`.
 
+## La propuesta del corte, con botones (2026-10-04)
+
+Daniel preguntó cómo hacer más sencilla la interacción con el bot. La respuesta
+no era otro comando: **ya hay 31**, y ese mismo día se le había agregado uno con
+cuatro palabras que hay que recordar (`/corte 5000 fondo 2000 otros 350 nota`).
+
+El menú arregló **mirar** cosas; **hacer** cosas seguía siendo escribir. Y la
+propuesta del corte llega todas las tardes: contestarla es lo que más se hace
+con el bot. Antes terminaba con cuatro renglones de instrucciones:
+
+> *Toca /corte para hacerlo e imprimir el ticket. O escribe /corte 2820 para
+> retirar otra cifra, y agrega «sintarjeta» si… Toca /nocorte para dejarlo pasar.*
+
+Ahora trae:
+
+```
+[ ✅ Hacer el corte ]
+[ 💵 Retirar otra cantidad ] [ 💰 Cambiar el fondo ]
+[ 🔎 Algo no salió del cajón ]
+[ 🙅 Hoy no ]
+```
+
+Y al tocar «retirar»:
+
+```
+[ $2,820  (lo calculado) ]
+[ $2,000 ] [ $1,000 ] [ $500 ]
+[ ‹ Volver ]
+```
+
+La calculada va primero porque casi siempre es la que se usa, y **solo se
+ofrecen las que caben**: ofrecer $5,000 cuando hay $2,820 es ofrecer un error.
+
+> [!info] Sin estado, a propósito
+> Telegram no guarda nada entre toques, así que cada botón lleva lo que necesita
+> y **hace el corte de una**. Juntar retiro y fondo pediría recordar lo que se
+> tocó antes; para ese caso raro sigue estando `/corte 5000 fondo 2000`. Lo
+> común queda en uno o dos toques.
+
+### La regla que queda
+
+**Si una función nueva necesita que recuerdes una palabra, está mal diseñada.**
+Que la ofrezca el mensaje donde ya estás parado — el mismo patrón del aviso del
+préstamo. Los comandos no se van: dejan de ser el camino principal y pasan a ser
+el atajo de quien ya sabe.
+
+De paso salió una duplicación: la cuenta del retiro se hacía en **tres** lugares
+(el texto, los botones y la pantalla de cantidades). Tres copias de una resta de
+dinero es una que algún día dirá otra cosa — ahora es `cifras_de_propuesta`, y
+el texto y los botones se piden juntos (`propuesta_de_corte`) para que no puedan
+discrepar.
+
+`telegram_corte_botones_service` · `test_corte_botones` (16).
+
 ## Infraestructura
 
 | Pieza | Archivo |

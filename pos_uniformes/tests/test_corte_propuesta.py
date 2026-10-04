@@ -91,6 +91,9 @@ class ScriptTests(unittest.TestCase):
             horario_tienda_service, "decidir_corte_automatico",
             return_value=horario_tienda_service.DecisionCorte(True, "toca el corte"),
         ), patch.object(
+            corte_remoto_service, "propuesta_de_corte",
+            return_value=("¿Hacemos el corte?", "{}"),
+        ), patch.object(
             corte_remoto_service, "texto_propuesta_corte", return_value="¿Hacemos el corte?"
         ), patch.object(
             corte_remoto_service, "hacer_corte_y_avisar"
