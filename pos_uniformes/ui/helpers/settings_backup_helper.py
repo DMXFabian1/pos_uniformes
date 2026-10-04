@@ -41,8 +41,9 @@ def build_settings_backup_automatic_status_view(
 ) -> tuple[str, str]:
     if automatic_status is None:
         return (
-            "Automatico: sin informacion todavia.",
-            "Programa scripts/run_scheduled_backup.py desde el sistema para empezar a monitorear respaldos automaticos.",
+            "Automatico: todavia no ha corrido ninguno.",
+            "La tarea \"POS Respaldo\" corre a las 20:30; si ya paso esa hora y sigue asi, "
+            "corre scripts\\actualizar_pc_principal.bat para volver a dejarla instalada.",
         )
 
     reference_now = now or datetime.now()

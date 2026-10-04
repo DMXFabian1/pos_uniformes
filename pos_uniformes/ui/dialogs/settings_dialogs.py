@@ -1053,7 +1053,10 @@ def build_backup_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_restore_backup_button.clicked.connect(window._handle_restore_backup)
 
     backup_hint = QLabel(
-        "Los respaldos automaticos deben correr por tarea externa usando scripts/run_scheduled_backup.py. Desde aqui puedes crear uno manual, revisar la carpeta y restaurar respaldos .dump."
+        "El respaldo automatico ya esta programado: la tarea \"POS Respaldo\" corre todos los dias "
+        "a las 20:30 en esta PC. Aqui arriba dice como va; si lleva dias sin respaldo correcto, "
+        "corre scripts\\actualizar_pc_principal.bat (vuelve a dejar la tarea) o scripts\\revisar_respaldos.bat "
+        "para ver por que. Abajo puedes hacer uno a mano cuando quieras, revisar la carpeta y restaurar un .dump."
     )
     backup_hint.setWordWrap(True)
     automatic_box = QGroupBox("Estado del respaldo automatico")

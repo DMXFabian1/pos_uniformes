@@ -36,7 +36,7 @@ class SettingsBackupHelperTests(unittest.TestCase):
 
         self.assertEqual(view.location_label, "Carpeta de respaldos: /tmp/backups")
         self.assertEqual(view.status_label, "Respaldos disponibles: 2 | Ultimo: respaldo_1.dump")
-        self.assertEqual(view.automatic_status_label, "Automatico: sin informacion todavia.")
+        self.assertEqual(view.automatic_status_label, "Automatico: todavia no ha corrido ninguno.")
         self.assertEqual(len(view.rows), 2)
         self.assertEqual(view.rows[0].path_value, "/tmp/backups/respaldo_1.dump")
         self.assertEqual(view.rows[0].values, ("respaldo_1.dump", "Dump", "2026-03-18 10:30", "5 MB", "Si"))
@@ -53,7 +53,7 @@ class SettingsBackupHelperTests(unittest.TestCase):
 
         self.assertEqual(empty_view.status_label, "No hay respaldos todavia en la carpeta configurada.")
         self.assertEqual(empty_view.rows, ())
-        self.assertEqual(empty_view.automatic_status_label, "Automatico: sin informacion todavia.")
+        self.assertEqual(empty_view.automatic_status_label, "Automatico: todavia no ha corrido ninguno.")
         self.assertEqual(
             error_view.status_label,
             "No se pudo leer la carpeta de respaldos: permiso denegado",
@@ -105,3 +105,19 @@ class SettingsBackupHelperTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NoMandarAProgramarLoQueYaEstaProgramadoTests(unittest.TestCase):
+    """El texto decía "programa run_scheduled_backup.py desde el sistema" — y la
+    tarea "POS Respaldo" ya la deja instalada el actualizador desde el 1-oct.
+    Mandar a configurar lo que ya está configurado hace que el aviso se ignore
+    (Daniel preguntó por un botón que ya existía, 2026-10-04)."""
+
+    def test_sin_respaldos_dice_que_hacer_y_no_pide_programar_nada(self) -> None:
+        resumen, detalle = build_settings_backup_automatic_status_view(automatic_status=None)
+        self.assertNotIn("run_scheduled_backup", detalle)
+        self.assertNotIn("Programa", detalle)
+        self.assertIn("POS Respaldo", detalle)
+        self.assertIn("20:30", detalle)
+        self.assertIn("actualizar_pc_principal", detalle)
+        self.assertIn("no ha corrido", resumen)
