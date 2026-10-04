@@ -90,7 +90,7 @@ void motorParar() {
   digitalWrite(PIN_IN2, LOW);
 }
 
-void motorMover(Direccion dir, uint8_t pwm) {
+void motorMover(int8_t dir, uint8_t pwm) {   // dir: ARRIBA o ABAJO
   bool subir = (dir == ARRIBA) != INVERTIR_MOTOR;
   digitalWrite(PIN_IN1, subir ? HIGH : LOW);
   digitalWrite(PIN_IN2, subir ? LOW  : HIGH);
@@ -146,8 +146,8 @@ int8_t siguienteDestino() {
   return -1;
 }
 
-void cambiarEstado(Estado nuevo) {
-  estado  = nuevo;
+void cambiarEstado(uint8_t nuevo) {
+  estado  = (Estado)nuevo;
   tInicio = millis();
 }
 
