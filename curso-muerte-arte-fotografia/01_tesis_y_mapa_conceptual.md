@@ -34,7 +34,10 @@ La transformación que te interesa, «vas a morir → ¿qué significa estar viv
 
 2. **Inferencia epicúrea u horaciana.** *Vas a morir → no pospongas, no te angusties por lo que no depende de ti, recoge el día.*
    Viene de Horacio (*carpe diem*) y de Epicuro, aunque para Epicuro la muerte "no es nada para nosotros", lo cual complica la inferencia. **[H]**
-   Dato crucial: **la Biblia conoce esta inferencia y la condena.** En *Sabiduría* 2:1‑9 la ponen en boca de los impíos: *"coronemus nos rosis antequam marcescant"*, "coronémonos de rosas antes de que se marchiten". En *Isaías* 22:13 (citado por Pablo en *1 Corintios* 15:32) se lee *"comedamus et bibamus, cras enim moriemur"*, "comamos y bebamos, que mañana moriremos". **[H]**
+   Dato crucial: **la Biblia conoce esta inferencia.** Cito por la Vulgata Clementina (1592), la edición que leían Mañara y Valdés Leal. Los pasajes son tres:
+   - En *Sabiduría* 2:1‑9 la ponen en boca de los impíos (2:1: *"dixerunt enim cogitantes apud se non recte"*, "dijeron, razonando equivocadamente"). El v. 8 dice *"coronemus nos rosis antequam marcescant"*, "coronémonos de rosas antes de que se marchiten". La Nova Vulgata (1979) dice *"coronemus nos calycibus rosarum"*, "de capullos de rosa".
+   - En *Isaías* 22:13, el profeta la reprocha al pueblo que festeja en vez de hacer penitencia: *"comedamus et bibamus, cras enim moriemur"*, "comamos y bebamos, que mañana moriremos".
+   - **Pablo** la retoma en *1 Corintios* 15:32 con otro verbo (*"manducemus et bibamus, cras enim moriemur"*), pero **en condicional**: *"si mortui non resurgunt"*, "si los muertos no resucitan". Pablo no la condena sin más. Concede que **sería la conclusión correcta si no hubiera resurrección**. Es un matiz decisivo para tu tesis: para el cristianismo paulino, la inferencia 2 no es absurda, sino lo que se seguiría de una vida sin más allá. **[H]** sobre los textos.
 
 3. **Inferencia existencial moderna.** *Vas a morir → tu finitud es la condición del sentido: sólo un ser finito puede elegir, comprometerse, importarle algo.*
    Aparece en Heidegger (1927), en parte en Camus (1942) y, en su versión secular fuerte, en Martin Hägglund, *This Life* (2019). **[H]** sobre las fuentes.

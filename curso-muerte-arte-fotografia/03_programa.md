@@ -221,7 +221,7 @@ Cada módulo tiene su propia obra ancla, que se retoma en módulos posteriores.
      - **Su atribución está disputada:** el BRCP la dio a un seguidor o taller, y el Prado mantiene la autoría de Bosch [NS]. Aplica el protocolo de desacuerdo del método, §6.4.
 7. **Fuente primaria.**
    - *Ars moriendi*, versión breve con 11 xilografías (c. 1450‑1460). Hay facsímiles digitales en varias bibliotecas: busca los ejemplares de la British Library o de la Library of Congress.
-   - *Deuteronomio* 32:28‑29: *"utinam saperent et intellegerent ac novissima providerent"*, "¡ojalá fueran sabios, entendieran y previeran sus postrimerías!".
+   - *Deuteronomio* 32:28‑29: *"utinam saperent et intelligerent, ac novissima providerent"* (Clementina), "¡ojalá fueran sabios, entendieran y previeran sus postrimerías!".
 8. **Preguntas socráticas.**
    - Si el cuadro no dice qué elige el hombre, ¿para quién es la elección? ¿Para el avaro, o para quien mira?
    - ¿Tiene sentido que todo se decida en un instante después de toda una vida?

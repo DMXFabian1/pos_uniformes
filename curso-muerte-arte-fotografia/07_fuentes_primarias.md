@@ -8,6 +8,12 @@ Hay una advertencia general. Una fuente primaria no es "la verdad de la época".
 
 ## A. Bíblicas y litúrgicas
 
+**Versión que usa el curso.**
+- Todas las citas latinas siguen la **Vulgata Clementina** (Roma, 1592). Fue la Biblia oficial de la Iglesia católica desde 1592 hasta el siglo XX, y la que leían Bosch, Mañara, Valdés Leal y la Nueva España. La Biblia de Doré (1866) también estaba hecha "selon la Vulgate".
+- La **Nova Vulgata** (1979), que es hoy el texto latino oficial, a veces cambia palabras. Por ejemplo, en Sabiduría 2:8.
+- La numeración de algunos versículos también cambia entre ediciones: Eclesiástico 7:40 en la Clementina es 7:36 en las biblias modernas.
+- Las traducciones al español del curso son mías, literales a propósito. Para leer pasajes completos en español con notas críticas, se recomienda la **Biblia de Jerusalén**, que incluye los libros deuterocanónicos. Las ediciones cambian; comprueba la tuya.
+
 Lee siempre la Vulgata junto a una traducción moderna, y el griego o el hebreo cuando importe.
 
 | Texto | Referencia | Por qué | Módulo |
@@ -15,8 +21,8 @@ Lee siempre la Vulgata junto a una traducción moderna, y el griego o el hebreo 
 | Génesis 3:19 | *"quia pulvis es et in pulverem reverteris"* | Origen de la fórmula del Miércoles de Ceniza | 2, mapa |
 | Eclesiastés (Qohélet) 1:2; 2:24; 9:7‑10; 12:8 | *"vanitas vanitatum... omnia vanitas"* (sin *et*) | La *vanitas*, y su conclusión casi epicúrea que la tradición olvida | 9 |
 | Eclesiástico (Sirácida) 7:40 en la Vulgata (7:36 en las numeraciones modernas) | *"memorare novissima tua..."* | Fundamento de las postrimerías | 3, 5 |
-| Sabiduría 2:1‑9 | *"coronemus nos rosis antequam marcescant"* | La Biblia **condena** el *carpe diem* | Tesis, 16 |
-| Isaías 22:13; 1 Corintios 15:32 | *"comedamus et bibamus, cras enim moriemur"* | Ídem | Tesis |
+| Sabiduría 2:1‑9 | v. 8: *"coronemus nos rosis antequam marcescant"* (Clementina; la Nova Vulgata dice *"calycibus rosarum"*) | El *carpe diem* en boca de los impíos. **Libro deuterocanónico**: está en las biblias católicas y ortodoxas, pero no en las protestantes | Tesis, 16 |
+| Isaías 22:13; 1 Corintios 15:32 | Is: *"comedamus et bibamus, cras enim moriemur"*; 1 Cor: *"manducemus et bibamus…"*, precedido de *"si mortui non resurgunt"* | Isaías lo reprocha; Pablo lo concede **en condicional** | Tesis |
 | Deuteronomio 32:20, 28‑29 | *"...et novissima providerent"* | Citas de la *Mesa de los pecados capitales* | 5 |
 | Baruc 3:16‑19 | *"ubi sunt principes gentium"* | Raíz del *ubi sunt* | Mapa |
 | 1 Corintios 15 (todo el capítulo) | v. 52: *"in momento, in ictu oculi"* | Es sobre la **resurrección** | 2, 9 |
@@ -25,7 +31,7 @@ Lee siempre la Vulgata junto a una traducción moderna, y el griego o el hebreo 
 | 2 Macabeos 12:43‑46 | La oración por los difuntos | Posible origen de "macabro"; fundamento del sufragio por las ánimas | 4 |
 | Secuencia *Dies irae* | Siglo XIII | El Juicio en la liturgia de difuntos | 3 |
 
-**Acceso:** la Vulgata Clementina y la Nova Vulgata están en línea (vatican.va). El *Novum Testamentum Graece* (Nestle‑Aland) sirve para el griego.
+**Acceso:** la Nova Vulgata está en línea en vatican.va. La Clementina, en Wikisource latina (*Vulgata Clementina*) y en otros sitios. El *Novum Testamentum Graece* (Nestle‑Aland) sirve para el griego.
 
 ---
 
