@@ -50,7 +50,7 @@ La ruta no sigue una historia de estilos. Sigue **cambios en la función de la i
 | 11 | Kierkegaard | "Junto a una tumba" (1845) | La seriedad ante la muerte: su certeza y su indeterminación ("puede ser hoy") | *In ictu oculi*; Goya | ¿Qué cambia si la muerte puede ser *hoy*? | 12 |
 | 12 | Heidegger | *Ser y tiempo* §§46‑53 | Ser‑para‑la‑muerte. El "se muere" impersonal (*das Man*) frente al adelantarse (*Vorlaufen*) | Danza macabra (el "se muere"); la *vanitas* | ¿La *vanitas* es autenticidad o cavilación? | 9, 16 |
 | 13 | Camus | *El mito de Sísifo* (1942) | El absurdo. Rechazo del salto religioso y del suicidio | Goya, "Nada" | ¿Se puede vivir sin que la muerte signifique? | 12 |
-| 14 | Jankélévitch | *La muerte* (1966) | 1ª, 2ª y 3ª persona | Todo el curso | ¿En qué persona fotografías? | 2, 16 |
+| 14 | Jankélévitch | *La muerte* (1966) | 1.ª, 2.ª y 3.ª persona | Todo el curso | ¿En qué persona fotografías? | 2, 16 |
 | 15 | Nagel | "Death" (1970) | La muerte es un mal por privación | Post mortem de niños | ¿A quién daña una muerte? | 13 |
 | 16 | Williams | "The Makropulos Case" (1973) | La inmortalidad sería tediosa | *Et in Arcadia* | ¿Querrías no morir? | 10, 16 |
 | 17 | Levinas | *Dios, la muerte y el tiempo* (1993) | La muerte del otro precede a la propia | Barthes, el Invernadero | ¿Es la muerte del otro la muerte primera? | 13 |
@@ -131,7 +131,7 @@ Es orientativo, **no un itinerario turístico**. Sirve para ver la diversidad. L
 
 | Dimensión | *Memento mori* / *vanitas* (Europa, ss. XV‑XVII) | Día de Muertos (múltiples variantes, ss. XVI‑XXI) | ¿Conexión histórica real? |
 |---|---|---|---|
-| **Persona gramatical** | 1ª: *yo* moriré | 2ª y 1ª del plural: *nuestros* muertos | No son equivalentes |
+| **Persona gramatical** | 1.ª: *yo* moriré | 2.ª y 1.ª del plural: *nuestros* muertos | No son equivalentes |
 | **Tiempo** | Futuro (tu muerte) | Pasado y presente cíclico (vuelven cada año) | — |
 | **Afecto** | Temor, desengaño | Variable: alegría, duelo, obligación, cansancio, negocio | **Generalizar el afecto es el error más común** |
 | **Actor** | El individuo ante Dios | La familia y la comunidad ante sus muertos | — |
@@ -220,7 +220,7 @@ Nota sobre la psicología: la teoría de los **"vínculos continuos"** (*continu
 | **Manuel Álvarez Bravo** | *Obrero en huelga, asesinado* (1934); *La buena fama durmiendo* (1938‑1939) | ○ | | | | | | ● | | ● | ¿La muerte política puede ser bella sin traicionar al muerto? |
 | **Graciela Iturbide** | *Juchitán de las mujeres* (1989); fotografías de angelitos; *El baño de Frida* (2006) | ○ | ● | ● | | | | ○ | ● | ○ | *El baño de Frida*: fotografiar los objetos de una muerta como un retrato |
 | **Enrique Metinides** | Nota roja, *La Prensa* (1948‑1997) | ● | | | | | | ● | | ● | Espectáculo, testimonio, compasión: ¿dónde está la línea? |
-| **Pedro Meyer** | *Fotografío para recordar* (1991) | ● | ○ | ● | ● | | ● | ● | | ○ | El duelo en 2ª persona. El fotógrafo como hijo |
+| **Pedro Meyer** | *Fotografío para recordar* (1991) | ● | ○ | ● | ● | | ● | ● | | ○ | El duelo en 2.ª persona. El fotógrafo como hijo |
 | **Juan de Dios Machain; Romualdo García** | Retratos de angelitos (Jalisco; Guanajuato) | ● | | ● | | | ● | ● | | ● | La foto como **parte** del rito, no como mirada externa |
 | **Teresa Margolles** (artista, no sólo fotógrafa) | *¿De qué otra cosa podríamos hablar?* (Venecia, 2009) | ● | ● | ● | | ● | ● | ● | | ● | ¿Qué queda de la violencia cuando no hay imagen? |
 

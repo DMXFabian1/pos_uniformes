@@ -116,7 +116,7 @@ Cada eje tiene **una pregunta principal**, preguntas de observación, preguntas 
 
 ### 7. El lenguaje: ¿qué palabras utiliza la gente para hablar de quienes murieron?
 
-- **Observa y escucha.** ¿Se dice "mis muertos", "mis difuntos", "las ánimas", "los fieles difuntos", "los angelitos"? ¿Se habla a los muertos en 2ª persona? ¿En qué lengua? ¿Se usan eufemismos? ¿Se bromea? ¿Quién bromea y quién no?
+- **Observa y escucha.** ¿Se dice "mis muertos", "mis difuntos", "las ánimas", "los fieles difuntos", "los angelitos"? ¿Se habla a los muertos en 2.ª persona? ¿En qué lengua? ¿Se usan eufemismos? ¿Se bromea? ¿Quién bromea y quién no?
 - **Registro.** Transcripción literal en el diario (B4).
 - **Ejercicio.** "Pie de foto ajeno". Elige 3 fotos. El pie será **una frase literal oída** a alguien, con su permiso. Nunca inventada.
 

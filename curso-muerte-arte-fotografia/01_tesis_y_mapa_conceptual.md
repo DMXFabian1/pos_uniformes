@@ -18,12 +18,12 @@ Tomo la idea de las **personas gramaticales de la muerte** de Vladimir Jankélé
 
 | Persona | Qué muerte es | Tradiciones y obras donde predomina | Tiempo verbal dominante |
 |---|---|---|---|
-| **1ª persona** (*yo moriré*) | La propia muerte, que nunca experimento como un hecho vivido | *Memento mori*, *ars moriendi*, Montaigne, Heidegger (*Sein zum Tode*) | Futuro, casi siempre imperativo: *memento* |
-| **2ª persona** (*tú has muerto*) | La muerte del ser amado, la que sí se vive | Duelo, epitafio, Día de Muertos, fotografía post mortem, Barthes y la foto del Invernadero | Pretérito y presente conversacional: se le habla al muerto |
-| **3ª persona** (*se muere*, *los muertos*) | La muerte como hecho general, objeto de saber o de espectáculo | Danza macabra en parte, anatomía, *Desastres* de Goya, nota roja, estadística | Presente genérico ("el hombre es mortal") |
-| **1ª del plural** (*sumus*, *nosotros*) | La condición compartida | *Pulvis et umbra sumus*, *ubi sunt*, la comunidad en el panteón | Presente de condición |
+| **1.ª persona** (*yo moriré*) | La propia muerte, que nunca experimento como un hecho vivido | *Memento mori*, *ars moriendi*, Montaigne, Heidegger (*Sein zum Tode*) | Futuro, casi siempre imperativo: *memento* |
+| **2.ª persona** (*tú has muerto*) | La muerte del ser amado, la que sí se vive | Duelo, epitafio, Día de Muertos, fotografía post mortem, Barthes y la foto del Invernadero | Pretérito y presente conversacional: se le habla al muerto |
+| **3.ª persona** (*se muere*, *los muertos*) | La muerte como hecho general, objeto de saber o de espectáculo | Danza macabra en parte, anatomía, *Desastres* de Goya, nota roja, estadística | Presente gnómico, el de las verdades generales: "el hombre es mortal" (NGLE § 23.3.1c) |
+| **1.ª persona del plural** (*sumus*, *nosotros*) | La condición compartida | *Pulvis et umbra sumus*, *ubi sunt*, la comunidad en el panteón | Presente caracterizador, el que describe situaciones estables (NGLE § 23.3.1c) |
 
-La fotografía añade una **conjugación imposible** que Roland Barthes describe en *La Chambre claire* (1980, segunda parte; comprueba el parágrafo en tu edición). Sobre el retrato de Lewis Payne tomado por Alexander Gardner (1865), escribe: *"il est mort et il va mourir"* ("está muerto y va a morir"). Es un futuro anterior visto desde un pretérito. Esa gramática será una de las claves del Módulo 13 y de tu proyecto.
+La fotografía añade una **conjugación imposible** que Roland Barthes describe en *La Chambre claire* (1980, segunda parte; comprueba el parágrafo en tu edición). Sobre el retrato de Lewis Payne tomado por Alexander Gardner (1865), escribe: *"il est mort et il va mourir"* ("está muerto y va a morir"). Es un futuro compuesto (el *antefuturo* de Bello) visto desde un pretérito. Esa gramática será una de las claves del Módulo 13 y de tu proyecto.
 
 ### 1.3 Tres inferencias a partir de «vas a morir»
 
@@ -46,7 +46,7 @@ Hay además una **cuarta posición** que el curso tomará en serio porque desarm
 
 Tu proyecto corre un riesgo: llegar a México con la inferencia 3 en la cabeza, la existencial moderna, y encontrar en el Día de Muertos una confirmación de algo que ya pensabas. La hipótesis del curso es la contraria:
 
-> **El Día de Muertos, en la mayoría de sus variantes documentadas, no es principalmente un *memento mori*.** No es sobre *mi* muerte (1ª persona). Es sobre *mis* muertos (2ª persona y 1ª del plural), sobre la obligación, la reciprocidad y el trabajo de los vivos. Y no es *una* práctica, sino muchas, con historias distintas. **[Hi]**, a verificar en campo.
+> **El Día de Muertos, en la mayoría de sus variantes documentadas, no es principalmente un *memento mori*.** No es sobre *mi* muerte (1.ª persona). Es sobre *mis* muertos (2.ª persona y 1.ª del plural), sobre la obligación, la reciprocidad y el trabajo de los vivos. Y no es *una* práctica, sino muchas, con historias distintas. **[Hi]**, a verificar en campo.
 
 Si en el campo descubres que esto es falso en algún lugar concreto, esa será una conclusión valiosa.
 
@@ -62,23 +62,32 @@ Si en el campo descubres que esto es falso en algún lugar concreto, esa será u
 
 ### 2.0 Primero, la categoría gramatical: lo que casi nadie distingue
 
-Estos trece términos se suelen presentar como sinónimos decorativos. **No pertenecen a la misma clase de cosa.** Clasificarlos por su forma lingüística ya revela su función:
+Estos trece términos se suelen presentar como sinónimos decorativos. **No pertenecen a la misma clase de cosa.** Clasificarlos por su forma lingüística ya revela su función.
 
-| Término | Forma lingüística | Función | ¿Es un género artístico? |
+> **Terminología.** Los términos gramaticales siguen la *Nueva gramática de la lengua española. Manual* (RAE y ASALE, 2010), abreviada **NGLE**, con la referencia a su parágrafo (§). Algunos términos son propios de la gramática latina o hebrea y la NGLE no los trata (imperativo futuro, verbo deponente, acusativo con infinitivo, gerundio latino, genitivo, declinación, estado constructo). Se marcan como tales cuando aparecen.
+
+Tres equivalencias para leer este mapa:
+- La NGLE llama **grupo** (*grupo nominal*, *grupo preposicional*) a lo que otras tradiciones llaman *sintagma* (§ 1.5.1a).
+- Llama **adjunto** al *complemento circunstancial* (§ 1.6.2d).
+- Llama **realizativo** a lo que se suele llamar *performativo*, "calcando una expresión inglesa" (§ 42.1.1b).
+
+La columna «Función» corresponde a lo que la NGLE llama **modalidad del enunciado**: declarativa o aseverativa, interrogativa, exclamativa, imperativa o exhortativa (§ 1.7.2a; § 42.1.1i).
+
+| Término | Forma lingüística (NGLE) | Función | ¿Es un género artístico? |
 |---|---|---|---|
-| *memento mori* | Imperativo + infinitivo | **Mandato**: pide al oyente que haga algo | No. Es una función que pueden cumplir muchos géneros |
-| *vanitas* | Sustantivo abstracto (tesis) | **Juicio sobre el mundo**: todo es vacío | Sí, pero como etiqueta en gran parte **historiográfica** |
-| *danse macabre* | Sintagma nominal (nombre propio de una forma) | **Forma narrativa y performativa**: la procesión de los estados | Sí. Es una forma iconográfica y textual concreta |
-| *ars moriendi* | Sustantivo + gerundivo en genitivo | **Técnica práctica**: un manual | Es un género textual con ilustraciones |
-| *tempus fugit* | Oración declarativa | **Constatación** | No. Es un lema, sobre todo en relojes y relojes de sol |
-| *sic transit gloria mundi* | Oración declarativa con deíctico (*sic*) | **Demostración ritual**: "así", señalando algo que se quema ante tus ojos | No |
-| *in ictu oculi* | Sintagma preposicional (complemento circunstancial) | **Medida del tiempo**: la instantaneidad | No. Es una inscripción |
-| *ubi sunt?* | Pregunta retórica | **Lamento y catálogo de ausencias** | Es un *topos* literario |
-| *et in Arcadia ego* | Oración elíptica, sin verbo | **Enigma epigráfico** | No. Es un tema pictórico que nace del enigma |
-| *pulvis et umbra sumus* | Oración copulativa en 1ª del plural | **Confesión de la condición compartida** | No |
-| *carpe diem* | Imperativo + objeto directo | **Exhortación ética** | Es un *topos* poético |
-| *ars longa, vita brevis* | Dos sentencias nominales, sin verbo | **Aforismo profesional** | No |
-| *desengaño* | Sustantivo deverbal con prefijo privativo | **Concepto epistemológico y moral** | No. Es una categoría cultural del Barroco hispánico |
+| *memento mori* | Imperativo (futuro latino) + infinitivo. Modalidad imperativa o exhortativa (§ 42.2) | **Mandato**: pide al oyente que haga algo | No. Es una función que pueden cumplir muchos géneros |
+| *vanitas* | Nombre abstracto (tesis) | **Juicio sobre el mundo**: todo es vacío | Sí, pero como etiqueta en gran parte **historiográfica** |
+| *danse macabre* | Grupo nominal (§ 1.5.1a) que funciona como nombre propio de una forma | **Forma narrativa y escenificada**: la procesión de los estados | Sí. Es una forma iconográfica y textual concreta |
+| *ars moriendi* | Sustantivo + gerundio latino en genitivo (en español equivale a un infinitivo nominal: *el arte del morir*, § 26.2) | **Técnica práctica**: un manual | Es un género textual con ilustraciones |
+| *tempus fugit* | Oración declarativa o aseverativa (§ 42.1.1i) | **Constatación** | No. Es un lema, sobre todo en relojes y relojes de sol |
+| *sic transit gloria mundi* | Oración declarativa con el adverbio demostrativo *sic* («así», § 17.4.1b), en uso de deixis ostensiva (§ 17.1.2a) | **Demostración ritual**: "así", señalando algo que se quema ante tus ojos | No |
+| *in ictu oculi* | Grupo preposicional (§ 1.5.1a) con función de adjunto temporal, es decir, complemento circunstancial de tiempo (§ 1.6.2d). En la inscripción forma un enunciado no oracional (§ 42.1.1h) | **Medida del tiempo**: la instantaneidad | No. Es una inscripción |
+| *ubi sunt?* | Interrogativa retórica (§ 42.3.5a) | **Lamento y catálogo de ausencias** | Es un *topos* literario |
+| *et in Arcadia ego* | Oración con elipsis del verbo | **Enigma epigráfico** | No. Es un tema pictórico que nace del enigma |
+| *pulvis et umbra sumus* | Oración copulativa (§ 37) en primera persona del plural, que incluye al hablante (§ 33.4.1c) | **Confesión de la condición compartida** | No |
+| *carpe diem* | Imperativo + complemento directo | **Exhortación ética** | Es un *topos* poético |
+| *ars longa, vita brevis* | Dos construcciones bimembres sin verbo, con la pauta de los refranes (§ 37.1.2d) | **Aforismo profesional** | No |
+| *desengaño* | Nombre deverbal de acción y efecto (§ 5.1.1; § 5.2), formado sobre *desengañar*, con el prefijo negativo *des‑* (§ 10.8) | **Concepto epistemológico y moral** | No. Es una categoría cultural del Barroco hispánico |
 
 **Consecuencia práctica.** Cuando digas "esta obra es un *memento mori*", estás diciendo qué *hace* la obra, no qué *es*. Una *vanitas* holandesa puede funcionar como *memento mori*, pero no toda *vanitas* lo es, y no todo *memento mori* es una *vanitas*.
 
@@ -93,8 +102,10 @@ Estos trece términos se suelen presentar como sinónimos decorativos. **No pert
    - *memento* viene de *memini*, un verbo defectivo que sólo existe en formas de perfecto pero significa en presente "tengo en la mente, recuerdo". Raíz indoeuropea \*men‑ ("pensar"), la misma de *mens*, *mentio*, *moneo* y del griego μέμονα.
    - *mori* es el infinitivo presente de *morior* (deponente, "morir"). Raíz \*mer‑, la de *mors*, *mortalis* y del sánscrito *mṛ‑*.
 5. **Gramática.**
-   - *memento* es un **imperativo futuro**. *Memini* no tiene imperativo presente, así que la forma lleva un matiz de "tenlo presente siempre, de aquí en adelante". El español "recuerda" lo pierde.
-   - Con *memini* + infinitivo, la construcción clásica más natural para "recuerda *que* morirás" sería acusativo con infinitivo: *memento te moriturum esse*.
+   - *memento* es un **imperativo futuro**, término de la gramática latina.
+   - En la terminología de la NGLE, lo que el español puede expresar con el imperativo es la modalidad imperativa o exhortativa (§ 42.2).
+   - El latín conserva aquí una distinción temporal dentro del imperativo que el español no tiene. *Memini* no tiene imperativo presente, así que la forma lleva un matiz de "tenlo presente siempre, de aquí en adelante". El español "recuerda" lo pierde.
+   - Con *memini* + infinitivo, la construcción clásica más natural para "recuerda *que* morirás" sería el acusativo con infinitivo de la gramática latina: *memento te moriturum esse*.
    - *Memento mori* es una fórmula comprimida y ambigua: "acuérdate de morir" (como un deber) o "acuérdate del morir".
    - No he encontrado la expresión como fórmula fija en latín clásico. Parece medieval o de la Edad Moderna temprana. **[I]**, con prudencia: no es fácil demostrar una ausencia.
 6. **Contexto histórico.** Se repite mucho una historia: en el triunfo romano, un esclavo susurraba *memento mori* al general. Es una **reconstrucción moderna**. **[H]**
@@ -160,7 +171,7 @@ Estos trece términos se suelen presentar como sinónimos decorativos. **No pert
 6. **Contexto histórico.**
    - Mural del claustro-osario del **Cementerio de los Inocentes** en París. Según el *Journal d'un bourgeois de Paris*, se empezó en agosto de 1424 y se terminó en la Cuaresma de 1425. Se destruyó en 1669. **[H]**
    - Lo conocemos por la edición impresa de **Guyot Marchant** (París, 28 de septiembre de 1485; única copia conocida en Grenoble). **[H]**
-   - Contexto: peste negra desde 1348, Guerra de los Cien Años, predicación mendicante. La relación causal directa con la peste es plausible pero **simplificadora [I]**. Elina Gertsman subraya su carácter **performativo**: sermones, representaciones.
+   - Contexto: peste negra desde 1348, Guerra de los Cien Años, predicación mendicante. La relación causal directa con la peste es plausible pero **simplificadora [I]**. Elina Gertsman subraya su carácter de **representación escénica** (*performance*): sermones, representaciones. Aquí el inglés *performance* no tiene el sentido de los verbos realizativos de la NGLE (§ 42.1.1b).
 7. **Evolución semántica.**
    - Pasa de una forma devocional a una sátira social (Holbein).
    - Luego a un motivo romántico: Saint‑Saëns, *Danse macabre* (1874).
@@ -186,8 +197,10 @@ Estos trece términos se suelen presentar como sinónimos decorativos. **No pert
 3. **Traducción natural.** "Arte de bien morir" o "manual para morir bien". En castellano: *Arte de bien morir*.
 4. **Etimología.**
    - *ars, artis* equivale al griego τέχνη: **técnica, oficio, método**. **No** tiene el sentido estético moderno de "arte".
-   - *moriendi* es el **gerundio en genitivo** de *morior*.
-5. **Gramática.** Todo el significado está en el gerundio. Es el arte *del morir*, del **proceso**, no *de la muerte* (*mors*, el estado). El texto no enseña qué es la muerte. Enseña **qué hacer en la agonía**. Esta distinción entre morir y muerte es la misma que usará Epicuro al revés: la muerte no es nada para nosotros, pero el morir sí.
+   - *moriendi* es el **gerundio en genitivo** de *morior*, en la terminología latina.
+   - Ojo: el gerundio latino es un **sustantivo verbal**, «el morir». No equivale al gerundio español en *‑ndo*, que es una forma no personal sin flexión de número, persona, tiempo ni modo (NGLE § 27.1.1a).
+   - Su equivalente en español es el **infinitivo nominal**: *el morir* (§ 26.2).
+5. **Gramática.** Todo el significado está en esa forma verbal nominalizada. Es el arte *del morir*, del **proceso**, no *de la muerte* (*mors*, el estado). El texto no enseña qué es la muerte. Enseña **qué hacer en la agonía**. Esta distinción entre morir y muerte es la misma que usará Epicuro al revés: la muerte no es nada para nosotros, pero el morir sí.
 6. **Contexto histórico.**
    - Versión larga anónima hacia 1415, vinculada al entorno del Concilio de Constanza.
    - Versión breve con **11 xilografías**, en libros tabulares (*blockbooks*) hacia 1450‑1460.
@@ -211,11 +224,12 @@ Estos trece términos se suelen presentar como sinónimos decorativos. **No pert
 2. **Traducción literal.** "Pero huye entretanto, huye el tiempo irreparable".
 3. **Traducción natural.** "El tiempo se escapa sin remedio".
 4. **Etimología.**
-   - *fugit* es la 3ª persona singular del presente de indicativo de *fugio*, "huir".
+   - *fugit* es la 3.ª persona singular del presente de indicativo de *fugio*, "huir".
    - *tempus* se relaciona quizá con \*temp‑, "tensión, extensión". La etimología es discutida **[NS]**.
    - *inreparabile*: que no se puede recuperar ni reparar.
 5. **Gramática.**
-   - Presente de indicativo durativo, repetido por **anáfora**: *fugit... fugit*.
+   - Es un presente de indicativo con **valor progresivo**: la situación está en curso, como en «canto ~ estoy cantando» (NGLE § 23.3.1a).
+   - Se repite por **anáfora**, una figura retórica: *fugit... fugit*.
    - El inglés *time flies* confunde *flee* ("huir") con *fly* ("volar"), y de ahí el español "el tiempo vuela" y el reloj con alas.
    - En Virgilio el tiempo no vuela: **huye**, como un animal o un prisionero.
 6. **Contexto histórico.** El verso siguiente lo cambia todo: *"singula dum capti circumvectamur amore"*, "mientras nosotros, cautivos del amor [por el tema], rondamos cada detalle". **Es un poeta que se reprende a sí mismo por demorarse en la cría de ganado.**
@@ -239,9 +253,12 @@ Estos trece términos se suelen presentar como sinónimos decorativos. **No pert
    - *transit* viene de *trans‑eo*, "pasar al otro lado, atravesar, irse".
    - *gloria* es **renombre, fama, esplendor**. Aquí no es la "gloria" celestial.
    - *mundus*, en sentido cristiano, es el **orden secular**, el "siglo".
-5. **Gramática.** Todo depende del deíctico ***sic***, "así, *de este modo*". La frase **señala** algo presente. En el rito papal, un maestro de ceremonias quemaba ante el nuevo papa un manojo de estopa y decía: *"Pater sancte, sic transit gloria mundi"*. Es una frase **performativa y ostensiva**: sin la llama que se consume, pierde su fuerza.
+5. **Gramática.**
+   - Todo depende de ***sic***, "así, *de este modo*", equivalente al **adverbio demostrativo** *así* (NGLE § 17.4.1b).
+   - La frase **señala** algo presente: es **deixis ostensiva**, la que "se obtiene por simple mostración", a veces con un gesto (§ 17.1.2a).
+   - En el rito papal, un maestro de ceremonias quemaba ante el nuevo papa un manojo de estopa y decía: *"Pater sancte, sic transit gloria mundi"*. Es un acto verbal ritual con deixis ostensiva: sin la llama que se consume, pierde su fuerza ilocutiva (§ 42.1.1b).
 6. **Contexto histórico.** El uso más antiguo atestiguado en una coronación papal es el de **Alejandro V** (Pisa, 7 de julio de 1409), papa de la obediencia pisana y hoy considerado antipapa. **[H]**
-   Hay una variante próxima en la *Imitatio Christi* I, 3, 6: *"O quam cito transit gloria mundi"*, "¡Oh, qué pronto pasa la gloria del mundo!". Y un antecedente en la *1ª Carta de Juan* 2:17: *"et mundus transit et concupiscentia eius"*.
+   Hay una variante próxima en la *Imitatio Christi* I, 3, 6: *"O quam cito transit gloria mundi"*, "¡Oh, qué pronto pasa la gloria del mundo!". Y un antecedente en la *1.ª Carta de Juan* 2:17: *"et mundus transit et concupiscentia eius"*.
 7. **Evolución semántica.** Pasa de la humillación ritual del poder supremo a un proverbio irónico sobre cualquier caída.
 8. **Contexto religioso y filosófico.** La advertencia se dirige al **más poderoso** en su momento de máxima gloria, igual que el *hominem te memento* de Tertuliano.
 9. **Uso artístico.** Escenas de coronas, tiaras y cetros caídos.
@@ -255,11 +272,14 @@ Estos trece términos se suelen presentar como sinónimos decorativos. **No pert
 2. **Traducción literal.** "En el golpe del ojo".
 3. **Traducción natural.** "En un abrir y cerrar de ojos".
 4. **Etimología.**
-   - *ictus, ‑us* (4ª declinación) viene de *icio / ico*, "golpear, herir". Es la palabra del golpe de un arma, del latido y del **ictus métrico**.
+   - *ictus, ‑us* (4.ª declinación) viene de *icio / ico*, "golpear, herir". Es la palabra del golpe de un arma, del latido y del **ictus métrico**.
    - El griego es aún más rico:
      - ***ἄτομος*** es "lo indivisible": un instante que no se puede partir. Es la misma palabra de la que viene "átomo".
      - ***ῥιπή*** es "impulso, lanzamiento, aleteo, parpadeo".
-5. **Gramática.** Es un complemento circunstancial de tiempo **sin verbo** en la inscripción. En la pintura no hay nada que "pase" en el enunciado: la acción la pone la imagen, la Muerte que apaga la vela.
+5. **Gramática.**
+   - Es un **grupo preposicional** (NGLE § 1.5.1a) con función de **adjunto temporal**, es decir, complemento circunstancial de tiempo (§ 1.6.2d). En la Vulgata modifica al verbo de la frase anterior: *immutabimur*, «seremos transformados» (v. 51).
+   - En la inscripción aparece **sin verbo** y forma un enunciado no oracional (§ 42.1.1h).
+   - En la pintura no hay nada que "pase" en el enunciado: la acción la pone la imagen, la Muerte que apaga la vela.
 6. **Contexto histórico.** En Pablo **no se habla de la muerte, sino de la resurrección**: *"no todos dormiremos, pero todos seremos transformados, en un instante, en un abrir y cerrar de ojos, al son de la última trompeta"*.
    Valdés Leal (c. 1670‑1672) **recontextualiza** la frase y la aplica al instante de la muerte. **[H]** sobre el texto paulino y la inscripción.
    Hay una lectura posible, **plausible pero no demostrable [Hi]**: el programa de Miguel Mañara quería justamente esa doble valencia. El instante que te arrebata el mundo es el mismo tipo de instante en que serás juzgado y transformado. Es desengaño y esperanza a la vez.
@@ -279,13 +299,13 @@ Estos trece términos se suelen presentar como sinónimos decorativos. **No pert
 5. **Gramática.**
    - Pregunta **de lugar** en **presente**, sobre personas que existieron en **pasado** (*fuere*).
    - La tensión temporal es el mensaje: preguntar *dónde están* supone que "están" en algún sitio, y la respuesta implícita es *en ninguna parte*, o *en el polvo*.
-   - Es una pregunta retórica: no se espera respuesta, se espera **silencio**.
+   - Es una **interrogativa retórica**: "contiene implícitamente su propia respuesta" (NGLE § 42.3.5a). No se espera respuesta, se espera **silencio**.
 6. **Contexto histórico.**
    - Antecedentes bíblicos: *Baruc* 3:16, *"ubi sunt principes gentium"*; *Isaías* 33:18.
    - Boecio, *Consolatio* II, metro 7: *"Ubi nunc fidelis ossa Fabricii manent?"*
    - Florece en la poesía medieval latina y vernácula, y entra en el himno estudiantil *Gaudeamus igitur*.
 7. **Evolución semántica.** Pasa de la vanidad del poder a la nostalgia elegíaca. En François Villon (*"Mais où sont les neiges d'antan?"*) ya es melancolía por lo irrecuperable.
-8. **Contexto religioso y filosófico.** Es menos un *memento mori*, que habla en 1ª persona y en futuro, que un **catálogo de ausencias**, en 3ª persona y en pasado. Es el concepto del mapa más cercano a la **memoria** y al **olvido**, y por eso el más cercano al Día de Muertos. Ver la Parte IX.
+8. **Contexto religioso y filosófico.** Es menos un *memento mori*, que habla en 1.ª persona y en futuro, que un **catálogo de ausencias**, en 3.ª persona y en pasado. Es el concepto del mapa más cercano a la **memoria** y al **olvido**, y por eso el más cercano al Día de Muertos. Ver la Parte IX.
 9. **Uso artístico.** Sobre todo literario. En la imagen equivale a las tumbas vacías y a las ruinas (Piranesi).
 10. **Ejemplos.**
     - Jorge Manrique, *Coplas por la muerte de su padre* (c. 1476): *"¿Qué se hizo el rey don Juan? / Los infantes de Aragón / ¿qué se hicieron?"*
@@ -302,7 +322,7 @@ Estos trece términos se suelen presentar como sinónimos decorativos. **No pert
    - **(b)** "También yo estuve [viví] en Arcadia".
 4. **Etimología.** *Arcadia* es una región montañosa del Peloponeso, idealizada como paraíso pastoril por Virgilio (*Églogas*) y por Sannazaro (*Arcadia*, 1504).
 5. **Gramática.** Es el caso más fino del mapa para alguien formado en lingüística.
-   - La oración es **elíptica: falta el verbo**.
+   - Hay **elipsis del verbo**.
    - Erwin Panofsky ("Et in Arcadia Ego: Poussin and the Elegiac Tradition", 1955) sostuvo que el verbo implícito es *sum* (presente) y que *et* modifica a *in Arcadia* ("incluso en Arcadia"). Según él, la lectura (b) es un **error gramatical**, porque "yo también viví" exigiría algo como *et ego in Arcadia vixi*.
    - Objeción: el orden de palabras latino es flexible, y *et... ego* = "también yo" no es imposible. **Panofsky argumenta bien, pero la gramática sola no decide [I]**.
    - **Lo que decide es la imagen.** En Guercino hay una **calavera** sobre el pedestal, y el hablante es la Muerte. En el Poussin del Louvre los pastores leen una **tumba**, y el hablante se desliza hacia el difunto, con una melancolía serena.
@@ -326,7 +346,7 @@ Estos trece términos se suelen presentar como sinónimos decorativos. **No pert
 4. **Etimología.**
    - *pulvis*: polvo.
    - ***umbra***: sombra, pero también, en sentido técnico, la **sombra de un muerto en el inframundo**, el alma en el Hades.
-5. **Gramática.** Es una **1ª persona del plural** del presente de *esse*. No dice "serás" ni "seréis", como el *memento*. Dice "**somos**": el poeta se incluye. Tiene el tono de una confesión, no de una amenaza.
+5. **Gramática.** Es una **oración copulativa** en **primera persona del plural** del presente de *esse*. La NGLE lo describe así: la primera persona del plural "implica la inclusión del hablante en el grupo de individuos" que el sujeto denota (§ 33.4.1c). No dice "serás" ni "seréis", como el *memento*. Dice "**somos**": el poeta se incluye. Tiene el tono de una confesión, no de una amenaza.
 6. **Contexto histórico.** La oda *Diffugere nives*: la nieve se retira, vuelve la primavera, las lunas reparan sus pérdidas en el cielo. **Pero nosotros no volvemos.** Es el **contraste entre el tiempo cíclico de la naturaleza y el tiempo lineal humano**. Esto importa mucho para México, donde el ritual anual es cíclico.
 7. **Evolución semántica.** Lo cristianizan leyéndolo junto a *Génesis* 3:19 (*pulvis es*).
    - Matiz perdido: el español "sombra" pierde el sentido de "espectro del inframundo".
@@ -347,7 +367,7 @@ Estos trece términos se suelen presentar como sinónimos decorativos. **No pert
 2. **Traducción literal.** "Recoge el día, confiando lo menos posible en el siguiente".
 3. **Traducción natural.** "Cosecha el día de hoy y no fíes en el de mañana".
 4. **Etimología.** *carpo* significa "arrancar, recoger, cosechar", dicho de frutos y flores. También "pacer" y "desgastar poco a poco". Es un **verbo agrícola**, no bélico.
-5. **Gramática.** Imperativo presente. *quam minimum credula* es un adjetivo femenino concertado con Leucónoe, la destinataria: "tú, lo menos crédula posible".
+5. **Gramática.** Imperativo presente, en la terminología latina. *quam minimum credula* es un adjetivo femenino que concuerda con Leucónoe, la destinataria: "tú, lo menos crédula posible".
 6. **Contexto histórico.** El poema se dirige a una mujer, Leucónoe, que consulta los "números babilónicos" (la astrología) para saber cuándo morirán. Horacio le dice que **no pregunte**, que no sepa. *Carpe diem* es un consejo **contra la ansiedad por el futuro**, de raíz epicúrea (ataraxia). No es un llamado a la intensidad.
 7. **Evolución semántica.** "Aprovecha el momento", "vive intensamente", "atrévete". La difusión masiva de esta lectura activista le debe mucho a la película *Dead Poets Society* (1989). **La lectura motivacional es [C].** "Seize" traduce mal *carpe*: se aprehende con violencia lo que en Horacio se recoge con suavidad.
 8. **Contexto religioso y filosófico.** Es la inferencia 2 de la tesis. El cristianismo la condenó (*Sabiduría* 2:6‑9), pero también la absorbió en el tópico del *collige, virgo, rosas* (atribuido a Ausonio, siglo IV).
@@ -364,7 +384,11 @@ Estos trece términos se suelen presentar como sinónimos decorativos. **No pert
 2. **Traducción literal.** "La vida, breve; el arte, largo; la ocasión, aguda [fugaz]; la experiencia, engañosa; el juicio, difícil".
 3. **Traducción natural.** "La vida es corta, el oficio largo de aprender, la ocasión se escapa, el experimento es arriesgado y el diagnóstico difícil".
 4. **Etimología.** ***τέχνη*** es el oficio, la técnica, **la medicina**. No es el "Arte" de museo. ***καιρός*** es el momento oportuno.
-5. **Gramática.** Frases nominales puras, sin cópula, típicas del estilo aforístico. El orden original pone **la vida primero**. El latín lo invierte (*ars longa, vita brevis*) y así desplaza el énfasis.
+5. **Gramática.**
+   - Son **construcciones bimembres sin verbo**.
+   - La NGLE señala que el orden «sujeto – predicado» es el característico de los refranes: *Año de nieves, año de bienes*; *Victoria sin peligro, triunfo sin gloria* (§ 37.1.2d).
+   - Es justo la pauta del aforismo.
+   - El orden original pone **la vida primero**. El latín lo invierte (*ars longa, vita brevis*) y así desplaza el énfasis.
 6. **Contexto histórico.** Es la primera línea de un tratado médico. La queja es la de un **médico**: no alcanza una vida para dominar el oficio.
 7. **Evolución semántica.** Es un malentendido fértil. Desde el Renacimiento, y sobre todo desde el Romanticismo, se lee como "**el Arte perdura, la vida del artista es breve**", la obra como forma de inmortalidad. Esa lectura es **[C]** respecto del original.
 8. **Contexto religioso y filosófico.** Ya Séneca lo usa para su argumento: la vida no es breve, somos nosotros quienes la desperdiciamos.
@@ -378,8 +402,11 @@ Estos trece términos se suelen presentar como sinónimos decorativos. **No pert
 1. **Original.** *desengaño*, en castellano.
 2. **Traducción literal.** "Des‑engaño": la acción de quitar un engaño.
 3. **Traducción natural** (en el Barroco): "el reconocimiento de la verdad tras la ilusión". Traducirlo al inglés como *disillusionment* o *disappointment* pierde el matiz.
-4. **Etimología.** Prefijo privativo *des‑* + *engaño*, de *engañar*, probablemente del latín vulgar \**ingannare*, relacionado con *gannire*, "gañir, burlarse". La etimología es discutida **[I]**.
-5. **Gramática.** Es un sustantivo deverbal que nombra **a la vez un proceso y su resultado**.
+4. **Etimología.** Prefijo negativo *des‑* (NGLE § 10.8) + *engaño*, de *engañar*, probablemente del latín vulgar \**ingannare*, relacionado con *gannire*, "gañir, burlarse". La etimología es discutida **[I]**.
+5. **Gramática.**
+   - Es un **nombre deverbal** (NGLE § 5.1.1), formado sobre el verbo *desengañar*.
+   - Es un **nombre de acción y efecto** (§ 5.2): nombra **a la vez un proceso y su resultado**. La NGLE da un ejemplo de esta doble lectura: *elección* es nombre de acción en «La elección es difícil» y de efecto en «Esa fue mi elección» (§ 5.2.1i).
+   - En el verbo, *des‑* tiene el valor de "inversión de una acción o una situación previa" (*deshacer*, *desordenar*: § 10.8). *Desengañar* es **deshacer un engaño**, no simplemente carecer de él. Esa precisión gramatical sostiene la lectura barroca: el desengaño es un acto.
 6. **Contexto histórico.** Es la categoría central del Barroco hispánico:
    - Quevedo (los *Sueños*; el soneto "¡Ah de la vida!").
    - Calderón, *La vida es sueño* (1635).
@@ -464,7 +491,7 @@ Estos trece términos se suelen presentar como sinónimos decorativos. **No pert
 - ***difunto***, del lat. *defunctus*, participio de *defungor*, "cumplir enteramente, terminar una obligación". El difunto es literalmente **el que ha cumplido su función**. En México son *los fieles difuntos*.
 - ***finado***, de *finar*, a partir de *finis*: "el que ha llegado a su término". Es muy frecuente en el habla rural mexicana: "mi finado esposo".
 - ***fallecer***, del antiguo *fallir*, "faltar". Fallecer es "llegar a faltar". La palabra contiene la **ausencia**.
-- ***occiso***, del lat. *occisus*, "muerto violentamente". Es el registro de la nota roja y del parte policial: la muerte en 3ª persona.
+- ***occiso***, del lat. *occisus*, "muerto violentamente". Es el registro de la nota roja y del parte policial: la muerte en 3.ª persona.
 - En México hay además muchos nombres populares de la muerte: *la pelona, la flaca, la huesuda, la calaca, la catrina, la parca, la tiznada...* Su inventario y su distribución regional **no están bien documentados en fuentes académicas** que yo haya podido verificar. **[NS]** Es una tarea de campo tuya.
 - En náhuatl clásico:
   - *miqui*, "morir"; *micqui*, "muerto, difunto".

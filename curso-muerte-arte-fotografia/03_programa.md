@@ -12,22 +12,22 @@ Cada módulo tiene su propia obra ancla, que se retoma en módulos posteriores.
 
 | # | Módulo | Obra ancla | Bloque |
 |---|---|---|---|
-| 1 | Aprender a mirar | Bruegel, *El triunfo de la muerte* (1ª visita) | I. Mirar |
-| 2 | Nombrar la muerte | Valdés Leal, *In ictu oculi* (1ª visita) | I. Mirar |
+| 1 | Aprender a mirar | Bruegel, *El triunfo de la muerte* (1.ª visita) | I. Mirar |
+| 2 | Nombrar la muerte | Valdés Leal, *In ictu oculi* (1.ª visita) | I. Mirar |
 | 3 | Juicio, cadáver y postrimerías | *Triunfo de la Muerte*, Camposanto de Pisa | II. Edad Media |
 | 4 | La danza macabra | Bernt Notke, *Danza macabra* de Tallin | II. Edad Media |
 | 5 | *Ars moriendi*: la hora decisiva | Bosch, *La muerte y el avaro* | III. Bosch y Bruegel |
 | 6 | El *Jardín* y los límites de la interpretación | Bosch, *El jardín de las delicias* | III. Bosch y Bruegel |
-| 7 | Bruegel: el mundo como proverbio | *El triunfo de la muerte* (2ª visita) y *Grandes peces* | III. Bosch y Bruegel |
+| 7 | Bruegel: el mundo como proverbio | *El triunfo de la muerte* (2.ª visita) y *Grandes peces* | III. Bosch y Bruegel |
 | 8 | La línea que multiplica | Dürer, *El caballero, la muerte y el diablo* | IV. Grabado |
-| 9 | Vanitas y desengaño | Valdés Leal, los Jeroglíficos *in situ* (2ª visita) | V. Barroco |
+| 9 | Vanitas y desengaño | Valdés Leal, los Jeroglíficos *in situ* (2.ª visita) | V. Barroco |
 | 10 | Ruina, Arcadia y tiempo | Poussin, *Et in Arcadia ego* (Louvre) | V. Barroco |
 | 11 | Guerra, Biblia y línea | Doré, *La Muerte en el caballo pálido* | IV. Grabado |
 | 12 | Goya: la muerte sin garantía | Goya, *Desastres* 69, "Nada. Ello dirá" | VI. Ruptura |
 | 13 | La fotografía y los muertos | A. Gardner, *Lewis Payne* (1865) | VII. Fotografía |
 | 14 | Muertes mesoamericanas | *Códice Borgia*, lámina 56 | VIII. México |
 | 15 | Todos Santos, calaveras y nación | Posada, *Calavera garbancera* (1913) | VIII. México |
-| 16 | Mirar a los vivos | Pedro Meyer, *Fotografío para recordar* (1991) y el *Triunfo* (3ª visita) | IX. Síntesis |
+| 16 | Mirar a los vivos | Pedro Meyer, *Fotografío para recordar* (1991) y el *Triunfo* (3.ª visita) | IX. Síntesis |
 
 **Ritmo sugerido:** unas dos semanas por módulo, unas 32 semanas en total. Cada módulo pide unas 6‑8 horas de lectura, 2‑3 horas de lectura visual, una salida fotográfica y una página de diario.
 
@@ -46,7 +46,7 @@ Cada módulo tiene su propia obra ancla, que se retoma en módulos posteriores.
    - El módulo no busca todavía explicar el cuadro, sino **desautomatizar** tu mirada sobre una obra que conoces desde niño.
 3. **Conceptos.** Mirada lenta. Descripción frente a interpretación. La memoria infantil como **dato**, no como argumento. *Ekphrasis* (describir con palabras una imagen).
 4. **Vocabulario.** Punto de vista elevado. Línea de horizonte. Paisaje panorámico o "paisaje de mundo" (*Weltlandschaft*). Figura y fondo. Narración simultánea. Escala jerárquica.
-5. **Obra ancla.** *El triunfo de la muerte*, 1ª visita.
+5. **Obra ancla.** *El triunfo de la muerte*, 1.ª visita.
 6. **Lectura visual** (orientaciones, no respuestas):
    - Cuenta a los vivos. ¿Cuántos se resisten, cuántos huyen, cuántos no se han dado cuenta?
    - Busca a la **pareja de músicos** abajo a la derecha. ¿Saben lo que ocurre?
@@ -89,7 +89,7 @@ Cada módulo tiene su propia obra ancla, que se retoma en módulos posteriores.
    - La recontextualización de una cita.
    - Las **personas gramaticales de la muerte** (Jankélévitch).
 4. **Vocabulario.** *Jeroglífico* en sentido barroco: una imagen con significado moral cifrado, no una escritura egipcia. Postrimerías o novísimos. Emblema (*inscriptio*, *pictura*, *subscriptio*). Tenebrismo.
-5. **Obra ancla.** *In ictu oculi*, 1ª visita. Ver la lectura de ejemplo en el método, §6.8.
+5. **Obra ancla.** *In ictu oculi*, 1.ª visita. Ver la lectura de ejemplo en el método, §6.8.
 6. **Lectura visual.**
    - La **inscripción está sobre la llama**, no sobre la Muerte. ¿Qué se nombra entonces: la Muerte, la vela o el instante?
    - Mira cómo la luz del cuadro depende de esa llama que está a punto de apagarse.
@@ -103,7 +103,7 @@ Cada módulo tiene su propia obra ancla, que se retoma en módulos posteriores.
    - ¿Traicionó Valdés o Mañara a San Pablo al cambiar el contexto de la cita?
    - ¿Qué parte de tu fascinación viene del latín como sonido?
    - ¿En qué persona gramatical está este cuadro? ¿Y tu fotografía favorita?
-9. **Conexión filosófica.** Jankélévitch, *La muerte*: la muerte en 1ª, 2ª y 3ª persona. ¿Una pintura puede hablar en 1ª persona? ¿Quién dice "in ictu oculi"?
+9. **Conexión filosófica.** Jankélévitch, *La muerte*: la muerte en 1.ª, 2.ª y 3.ª persona. ¿Una pintura puede hablar en 1.ª persona? ¿Quién dice "in ictu oculi"?
 10. **Conexión con México.**
     - El vocabulario: *difunto*, *finado*, *fallecer* (ver el mapa conceptual, §2.15).
     - El náhuatl *miqui*, *micqui*, *Mictlan*.
@@ -164,7 +164,7 @@ Cada módulo tiene su propia obra ancla, que se retoma en módulos posteriores.
 2. **Contexto.**
    - Cementerio de los Inocentes de París, 1424‑1425. Edición impresa de Guyot Marchant, 1485. **[H]**
    - La forma se difunde por Francia, el Imperio, el Báltico, Istria y Castilla.
-   - Tenía un carácter **performativo**: sermones, versos recitados y quizá representaciones (Gertsman). **[I]**
+   - Tenía un carácter de **representación escénica** (*performance*): sermones, versos recitados y quizá representaciones (Gertsman). **[I]**
 3. **Conceptos.** Igualación. Sátira de los estados. "El muerto" frente a "la Muerte". Imagen y texto como unidad.
 4. **Vocabulario.** *Danse macabre*, *Totentanz*, *Danza general*. Estados (órdenes sociales). Coro (danza en cadena). Filacteria.
 5. **Obra ancla.** Bernt Notke, fragmento de la *Danza macabra* (finales del siglo XV). Iglesia de San Nicolás (Niguliste), Tallin, hoy museo.
@@ -290,7 +290,7 @@ Cada módulo tiene su propia obra ancla, que se retoma en módulos posteriores.
    - El mundo al revés.
    - El humanismo del círculo de Ortelius: el *Album amicorum* de Abraham Ortelius incluye un elogio de Bruegel **[H]**.
 4. **Vocabulario.** *Inventor / sculpsit / excudit*. Estado de la plancha. Proverbio y refrán. Carnaval y Cuaresma.
-5. **Obra ancla.** *El triunfo de la muerte*, 2ª visita, ahora junto a:
+5. **Obra ancla.** *El triunfo de la muerte*, 2.ª visita, ahora junto a:
    - *Los proverbios flamencos* (1559, Gemäldegalerie, Berlín);
    - *El combate entre Carnaval y Cuaresma* (1559, Kunsthistorisches Museum, Viena);
    - *Dulle Griet* (c. 1561‑1562, Museum Mayer van den Bergh, Amberes);
@@ -399,7 +399,7 @@ Cada módulo tiene su propia obra ancla, que se retoma en módulos posteriores.
    - Contrapunto septentrional: la ***vanitas* holandesa** protestante de Leiden y Haarlem.
 3. **Conceptos.** Vanitas. Desengaño. Caridad como vía de salvación. El mundo como teatro o sueño. Emblemática.
 4. **Vocabulario.** Bodegón. Naturaleza muerta (*still‑life / stilleven*: "vida quieta", no "naturaleza muerta"; **nota lingüística** sobre la divergencia de los nombres). Hermandad o cofradía. Programa iconográfico.
-5. **Obra ancla.** Los dos Jeroglíficos, 2ª visita, **in situ**. Si puedes viajar a Sevilla, la experiencia del recorrido es irreemplazable. Junto a:
+5. **Obra ancla.** Los dos Jeroglíficos, 2.ª visita, **in situ**. Si puedes viajar a Sevilla, la experiencia del recorrido es irreemplazable. Junto a:
    - Pereda, *El sueño del caballero*;
    - Steenwyck, *Alegoría de las vanidades*;
    - Sor Juana, soneto "Este que ves, engaño colorido".
@@ -457,7 +457,7 @@ Cada módulo tiene su propia obra ancla, que se retoma en módulos posteriores.
 2. **Contexto.**
    - La pastoral clásica (Virgilio, Sannazaro).
    - Guercino (c. 1618‑1622) y Poussin (c. 1627‑1630, Chatsworth; c. 1637‑1638, Louvre).
-   - En el siglo XVIII, la **estética de la ruina**: Piranesi, con las *Carceri* (1ª ed. c. 1749‑1750; 2ª ed. 1761) y las *Vedute di Roma*; Hubert Robert; Diderot en el *Salón de 1767* sobre la "poética de las ruinas".
+   - En el siglo XVIII, la **estética de la ruina**: Piranesi, con las *Carceri* (1.ª ed. c. 1749‑1750; 2.ª ed. 1761) y las *Vedute di Roma*; Hubert Robert; Diderot en el *Salón de 1767* sobre la "poética de las ruinas".
 3. **Conceptos.** Elegía. Pastoral. Ruina. Tiempo cíclico frente a tiempo lineal. Lo sublime.
 4. **Vocabulario.** Arcadia. *Locus amoenus*. Capricho arquitectónico. Veduta.
 5. **Obra ancla.** Poussin, *Les Bergers d'Arcadie* (Louvre).
@@ -760,10 +760,10 @@ Cada módulo tiene su propia obra ancla, que se retoma en módulos posteriores.
    - Es uno de los primeros ensayos fotográficos digitales. Un fotógrafo mexicano mira **su propio** duelo en **segunda persona**.
 3. **Conceptos.** Duelo como trabajo. Posmemoria (Marianne Hirsch). Contrato civil de la fotografía (Ariella Azoulay). Crítica del documental (Martha Rosler). Ética de la mirada.
 4. **Vocabulario.** Serie. Secuencia. Edición. Libro de fotografía. Instalación. Consentimiento informado.
-5. **Obra ancla.** *Fotografío para recordar*, y el ***Triunfo de la muerte*, 3ª visita**. Mira el cuadro de Bruegel después de todo el curso. ¿Qué ves ahora?
+5. **Obra ancla.** *Fotografío para recordar*, y el ***Triunfo de la muerte*, 3.ª visita**. Mira el cuadro de Bruegel después de todo el curso. ¿Qué ves ahora?
 6. **Lectura visual.** Lee la obra de Meyer con el método completo y compárala con el *Triunfo*:
-   - uno es la muerte de **todos**, en 3ª persona del plural;
-   - el otro es la muerte de **dos personas amadas**, en 2ª persona.
+   - uno es la muerte de **todos**, en 3.ª persona del plural;
+   - el otro es la muerte de **dos personas amadas**, en 2.ª persona.
    - ¿Cuál te conmueve más? ¿Por qué? ¿Cuál es más "verdadera"?
 7. **Fuente primaria.** Tus propios textos: las versiones 1 y 2 de "Lo que creo que significa la muerte", tus fichas y tu diario de campo.
 8. **Preguntas socráticas.**

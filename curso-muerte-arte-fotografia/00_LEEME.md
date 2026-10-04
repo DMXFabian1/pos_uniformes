@@ -29,6 +29,10 @@ En todo el curso, cada afirmación relevante lleva una de estas marcas:
 - **[NS] No sabemos.** Se dice así, sin rodeos.
 - **[C] Proyección contemporánea.** Una idea nuestra que leemos hacia atrás, en el pasado.
 
+## Terminología gramatical
+
+Los términos gramaticales siguen la *Nueva gramática de la lengua española. Manual* (RAE y ASALE, 2010), abreviada **NGLE** y citada por parágrafo (§). Los términos propios de la gramática latina o hebrea se marcan como tales.
+
 ## Regla de oro
 
 No mates el misterio de las obras por intentar explicarlo todo. Cuando una lectura parezca cerrarse demasiado bien, sospecha de ella.

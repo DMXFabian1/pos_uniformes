@@ -19,9 +19,9 @@
 **Cuando no hay ISBN** es porque no pude confirmarlo, o porque el libro es anterior a los ISBN. No se ha inventado ninguno.
 
 **Correcciones hechas durante la verificación.** Constan aquí para que no repitas errores comunes:
-- La 1ª ed. de *La filosofía náhuatl* (1956) es del **Instituto Indigenista Interamericano**, no de la UNAM.
+- La 1.ª ed. de *La filosofía náhuatl* (1956) es del **Instituto Indigenista Interamericano**, no de la UNAM.
 - El título del artículo de Malvido que suele citarse ("...y su secularización en el México moderno") **no es el publicado**; va corregido abajo.
-- La 1ª traducción española de *La cámara lúcida* es de **Gustavo Gili (1982)**, no de Paidós.
+- La 1.ª traducción española de *La cámara lúcida* es de **Gustavo Gili (1982)**, no de Paidós.
 - No existe, hasta donde pude comprobar, un libro del Prado dedicado a la restauración del *Triunfo de la muerte*. Hay notas de prensa y una conferencia en vídeo (2018).
 - La *Mesa de los pecados capitales* dice **DOMINUS**, no *Deus*.
 - La fotografía de Minamata es de **Tomoko Kamimura**, no "Uemura".
@@ -38,7 +38,7 @@ Si sólo lees esto, tendrás el esqueleto del curso.
    *Por qué:* la gran síntesis sobre las actitudes occidentales ante la muerte, de la Edad Media al siglo XX. Es imprescindible **y discutible**: léela como hipótesis. Tiene una versión breve: *Historia de la muerte en Occidente*, Barcelona: Acantilado, 2000, ISBN 978‑84‑95359‑17‑9 ✔.
 
 2. **Vladimir Jankélévitch, *La Mort*.** Paris: Flammarion, 1966. En español: *La muerte*, trad. Manuel Arranz, Valencia: Pre‑Textos, 2002, ISBN 978‑84‑8191‑441‑2. [EA / filosofía] ✔
-   *Por qué:* es la fuente de la distinción entre la muerte en 1ª, 2ª y 3ª persona, la columna del curso. Es un filósofo que escribe como un moralista francés.
+   *Por qué:* es la fuente de la distinción entre la muerte en 1.ª, 2.ª y 3.ª persona, la columna del curso. Es un filósofo que escribe como un moralista francés.
 
 3. **Hans Belting, *Bild‑Anthropologie*.** München: Fink, 2001. En español: *Antropología de la imagen*, trad. Gonzalo María Vélez Espinosa, Buenos Aires / Madrid: Katz, 2007, ISBN 978‑84‑96859‑13‑5. [EA] ✔
    *Por qué:* sostiene que la imagen nace como sustituto del cuerpo muerto. Es la teoría de fondo que une a Valdés Leal, la fotografía post mortem y la foto en la ofrenda.
@@ -53,7 +53,7 @@ Si sólo lees esto, tendrás el esqueleto del curso.
    *Por qué:* explica qué cambia cuando una imagen se vuelve repetible. Te sirve para el grabado y para la fotografía.
 
 7. **Roland Barthes, *La Chambre claire. Note sur la photographie*.** Paris: Cahiers du cinéma / Gallimard / Seuil, 1980, ISBN 978‑2‑07‑020541‑7. En español: *La cámara lúcida*, trad. Joaquim Sala‑Sanahuja, Barcelona: Gustavo Gili, 1982; y Paidós, ediciones posteriores (p. ej. 2009, ISBN 978‑84‑493‑2293‑8). [EA / ensayo; en este curso, casi fuente primaria] ✔
-   *Por qué:* el libro sobre fotografía y muerte. Está escrito tras la muerte de la madre del autor. Es la muerte en 2ª persona.
+   *Por qué:* el libro sobre fotografía y muerte. Está escrito tras la muerte de la madre del autor. Es la muerte en 2.ª persona.
 
 8. **Susan Sontag, *On Photography*.** New York: FSG, 1977. En español: *Sobre la fotografía*, Madrid: Alfaguara, 2005, ISBN 978‑84‑204‑0212‑3. Y ***Regarding the Pain of Others***, FSG, 2003. En español: *Ante el dolor de los demás*, Madrid: Alfaguara, 2003, ISBN 978‑84‑204‑6670‑5. [ensayo] ✔
    *Por qué:* contiene la frase "todas las fotografías son *memento mori*" (en "In Plato's Cave") y la historia de la imagen de guerra de Goya a la fotografía. Hay que leerla **para discutirla**.
@@ -89,13 +89,13 @@ Si sólo lees esto, tendrás el esqueleto del curso.
 - **Reindert L. Falkenburg**, *The Land of Unlikeness: Hieronymus Bosch, The Garden of Earthly Delights*, Zwolle: WBooks, 2011, ISBN 978‑90‑400‑7767‑8. [EA] ✔
 - **Hans Belting**, *Hieronymus Bosch: Garden of Earthly Delights*, München: Prestel, 2002, ISBN 978‑3‑7913‑2674‑0. [EA] ✔
 - **Manfred Sellink**, *Bruegel: The Complete Paintings, Drawings and Prints*, Ghent: Ludion, 2007, ISBN 978‑90‑5544‑686‑5. [CAT razonado] ✔ *Por qué:* es el catálogo completo, para tener toda la obra a la vista.
-- **Enrique Valdivieso González**, *Juan de Valdés Leal*, Sevilla: Editorial Universidad de Sevilla / Junta de Andalucía, 2021, ISBN 978‑84‑472‑2284‑1. [EA / catálogo razonado] ✔ *Por qué:* la monografía de referencia, actualizada. La 1ª ed. es de Sevilla: Guadalquivir, 1988, ISBN 978‑84‑86080‑08‑2.
+- **Enrique Valdivieso González**, *Juan de Valdés Leal*, Sevilla: Editorial Universidad de Sevilla / Junta de Andalucía, 2021, ISBN 978‑84‑472‑2284‑1. [EA / catálogo razonado] ✔ *Por qué:* la monografía de referencia, actualizada. La 1.ª ed. es de Sevilla: Guadalquivir, 1988, ISBN 978‑84‑86080‑08‑2.
 - **José Antonio Maravall**, *La cultura del Barroco*, Barcelona: Ariel, 1975, ISBN 978‑84‑344‑8314‑9. [EA] ✔ *Por qué:* el Barroco como cultura "dirigida". Es discutido, pero hay que conocerlo.
 - **Fernando R. de la Flor**, *Barroco. Representación e ideología en el mundo hispánico (1580‑1680)*, Madrid: Cátedra, 2002, ISBN 978‑84‑376‑1960‑6. [EA] ✔ *Por qué:* es el mejor estudioso actual del desengaño y la melancolía barroca.
 
 ### Grabado
-- **Antony Griffiths**, *Prints and Printmaking: An Introduction to the History and Techniques*, London: British Museum Press, 2ª ed. 1996, ISBN 978‑0‑7141‑2608‑1. [EA / manual] ✔ *Por qué:* es el manual técnico claro para distinguir las técnicas.
-- **Erwin Panofsky**, *The Life and Art of Albrecht Dürer*, Princeton UP, 1943 (4ª ed., 1955). En español: *Vida y arte de Alberto Durero*, Madrid: Alianza, ISBN 978‑84‑206‑7027‑0. [EA] ✔
+- **Antony Griffiths**, *Prints and Printmaking: An Introduction to the History and Techniques*, London: British Museum Press, 2.ª ed. 1996, ISBN 978‑0‑7141‑2608‑1. [EA / manual] ✔ *Por qué:* es el manual técnico claro para distinguir las técnicas.
+- **Erwin Panofsky**, *The Life and Art of Albrecht Dürer*, Princeton UP, 1943 (4.ª ed., 1955). En español: *Vida y arte de Alberto Durero*, Madrid: Alianza, ISBN 978‑84‑206‑7027‑0. [EA] ✔
 - **R. Klibansky, E. Panofsky, F. Saxl**, *Saturn and Melancholy*, London: Nelson, 1964. En español: *Saturno y la melancolía*, Madrid: Alianza, 1991, ISBN 978‑84‑206‑7100‑0. [EA] ✔ *Por qué:* *Melencolia I* y la tradición saturnina.
 - **Philippe Kaenel (dir.)**, *Gustave Doré (1832‑1883): l'imaginaire au pouvoir*, Paris: Musée d'Orsay / Flammarion, 2014, ISBN 978‑2‑08‑131641‑6. [CAT] ✔
 
@@ -105,7 +105,7 @@ Si sólo lees esto, tendrás el esqueleto del curso.
 
 ### México
 - **Alfredo López Austin**, *Cuerpo humano e ideología: las concepciones de los antiguos nahuas*, México: UNAM‑IIA, 1980, 2 vols. (reimpr. 2023, ISBN 978‑607‑30‑8333‑1). [EA] ✔ *Por qué:* las entidades anímicas. Es la base para no proyectar el "alma" cristiana.
-- **Miguel León‑Portilla**, *La filosofía náhuatl estudiada en sus fuentes*, México: Instituto Indigenista Interamericano, 1956; 11ª ed. UNAM‑IIH, 2017, ISBN 978‑607‑02‑8765‑7 (hay acceso libre en historicas.unam.mx). [EA, clásico y discutido] ✔
+- **Miguel León‑Portilla**, *La filosofía náhuatl estudiada en sus fuentes*, México: Instituto Indigenista Interamericano, 1956; 11.ª ed. UNAM‑IIH, 2017, ISBN 978‑607‑02‑8765‑7 (hay acceso libre en historicas.unam.mx). [EA, clásico y discutido] ✔
 - **Hugo G. Nutini**, *Todos Santos in Rural Tlaxcala*, Princeton UP, 1988, ISBN 978‑0‑691‑07755‑0. [EA / etnografía] ✔ *Por qué:* es una etnografía en profundidad de un lugar concreto, justo lo que exige este curso.
 - **Rafael Barajas Durán "El Fisgón"**, *Posada: mito y mitote. La caricatura política de José Guadalupe Posada y Manuel Alfonso Manilla*, México: FCE, 2009, ISBN 978‑607‑16‑0075‑2. [EA] ✔ *Por qué:* desmonta el mito de Posada, reconstruye la historia real de la "Catrina" y devuelve su lugar a Manilla.
 - **Elsa Malvido**, "La festividad de Todos Santos, Fieles Difuntos y su altar de muertos en México, patrimonio 'intangible' de la humanidad", en *Patrimonio Cultural y Turismo. Cuadernos* 16 ("Día de Muertos en México"), México: CONACULTA, 2006, pp. 41‑56. [ART] ✔ (título corregido) *Por qué:* es la tesis del origen principalmente católico y europeo. **Léelo contra Matos.**
@@ -124,7 +124,7 @@ Si sólo lees esto, tendrás el esqueleto del curso.
 ### Antropología de la muerte
 - **Robert Hertz**, "Contribution à une étude sur la représentation collective de la mort", *L'Année sociologique* 10 (1907), pp. 48‑137. [FP / EA clásico] ✔ *Por qué:* explica la doble sepultura. Es clave para Pomuch.
 - **Arnold van Gennep**, *Les rites de passage*, Paris: Nourry, 1909. En español: *Los ritos de paso*, Madrid: Alianza, 2008, ISBN 978‑84‑206‑6217‑6. [EA clásico] ✔
-- **Peter Metcalf y Richard Huntington**, *Celebrations of Death: The Anthropology of Mortuary Ritual*, 2ª ed., Cambridge UP, 1991, ISBN 978‑0‑521‑42375‑5 (en la 1ª ed., de 1979, el orden de los autores es el inverso). [EA] ✔
+- **Peter Metcalf y Richard Huntington**, *Celebrations of Death: The Anthropology of Mortuary Ritual*, 2.ª ed., Cambridge UP, 1991, ISBN 978‑0‑521‑42375‑5 (en la 1.ª ed., de 1979, el orden de los autores es el inverso). [EA] ✔
 - **Eric Hobsbawm y Terence Ranger (eds.)**, *The Invention of Tradition*, Cambridge UP, 1983. En español: *La invención de la tradición*, Barcelona: Crítica, 2002. [EA] ✔ *Por qué:* es la herramienta conceptual para entender el desfile de 2016, entre otras cosas.
 
 ---
@@ -158,7 +158,7 @@ Si sólo lees esto, tendrás el esqueleto del curso.
 
 ### Grabado
 - **Antony Griffiths**, *The Print Before Photography: An Introduction to European Printmaking 1550‑1820*, London: British Museum Press, 2016, ISBN 978‑0‑7141‑2695‑1. [EA] ✔
-- **Bamber Gascoigne**, *How to Identify Prints*, London: Thames & Hudson, 1986 (2ª ed. 2004, ISBN 978‑0‑500‑28480‑3). [manual] ✔
+- **Bamber Gascoigne**, *How to Identify Prints*, London: Thames & Hudson, 1986 (2.ª ed. 2004, ISBN 978‑0‑500‑28480‑3). [manual] ✔
 - **Giulia Bartrum**, *Albrecht Dürer and His Legacy*, London: British Museum Press, 2002, ISBN 978‑0‑7141‑2633‑3. [CAT] ✔
 - **Paulette Choné (dir.)**, *Jacques Callot 1592‑1635*, Paris: RMN, 1992, ISBN 978‑2‑7118‑2561‑5 (exposición en Nancy). [CAT] ✔
 - **John Wilton‑Ely**, *The Mind and Art of Giovanni Battista Piranesi*, London: Thames & Hudson, 1978, ISBN 978‑0‑500‑09122‑7. [EA] ✔
@@ -210,6 +210,7 @@ Si sólo lees esto, tendrás el esqueleto del curso.
 - **Dennis Klass, Phyllis R. Silverman y Steven L. Nickman (eds.)**, *Continuing Bonds: New Understandings of Grief*, 1996. ✱ (no verificado en catálogo) *Por qué:* es la teoría psicológica de los "vínculos continuos" con los muertos.
 
 ### Referencia
+- **Real Academia Española y Asociación de Academias de la Lengua Española**, *Nueva gramática de la lengua española. Manual*, Madrid: Espasa, 2010, ISBN 978‑84‑670‑3281‑9. [REF] ✔ (ISBN comprobado en el propio volumen) *Uso:* es la terminología gramatical del curso, citada por parágrafo (§).
 - **Louis Réau**, *Iconographie de l'art chrétien*, Paris: PUF, 1955‑1959. En español: *Iconografía del arte cristiano*, Barcelona: Ediciones del Serbal, desde 1996. [REF] ✔
 - **James Hall**, *Dictionary of Subjects and Symbols in Art*, London: John Murray, 1974. En español: *Diccionario de temas y símbolos artísticos*, Madrid: Alianza, 1987 (ed. 1996, ISBN 978‑84‑206‑5223‑8). [REF] ✔ *Uso:* como punto de partida, nunca como punto de llegada.
 
@@ -223,7 +224,7 @@ Todos verificados ✔ salvo indicación.
 - Diane Arbus, *Diane Arbus: An Aperture Monograph*, New York: Aperture, 1972.
 - Josef Koudelka, *Gitans, la fin du voyage* / *Gypsies*, 1975; *Exiles*, 1988; *Invasion 68: Prague*, 2008; *Ruins*, 2020 (◐ editorial).
 - Daido Moriyama, *Shashin yo sayonara*, Tokyo: Shashin Hyōron‑sha, 1972.
-- Nan Goldin, *The Ballad of Sexual Dependency*, New York: Aperture, 1986; *Sisters, Saints and Sibyls*, 2004/2005 (◐ año de la 1ª ed.; reed. Thames & Hudson, 2026).
+- Nan Goldin, *The Ballad of Sexual Dependency*, New York: Aperture, 1986; *Sisters, Saints and Sibyls*, 2004/2005 (◐ año de la 1.ª ed.; reed. Thames & Hudson, 2026).
 - Sally Mann, *What Remains*, Boston: Bulfinch, 2003, ISBN 978‑0‑8212‑2843‑2; *Deep South*, 2005; *Proud Flesh*, Aperture, 2009; *Hold Still*, Little, Brown, 2015, ISBN 978‑0‑316‑24775‑7.
 - Roger Ballen, *Platteland* (1994); *Outland* (2001); *Shadow Chamber* (2005); *Boarding House* (2009); *Asylum of the Birds*, Thames & Hudson, 2014, ISBN 978‑0‑500‑54429‑7.
 - Hiroshi Sugimoto: las series *Dioramas*, *Theaters*, *Seascapes* y *Portraits* (consulta los catálogos de la obra).

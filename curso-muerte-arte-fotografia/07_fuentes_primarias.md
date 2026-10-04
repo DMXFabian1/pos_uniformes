@@ -115,12 +115,12 @@ Casi todas las fuentes son **coloniales**. Léelas siempre con la pregunta ***qu
 
 | Texto | Datos | Qué buscar | Módulo |
 |---|---|---|---|
-| Edmund Burke, *A Philosophical Enquiry into the Origin of our Ideas of the Sublime and Beautiful* | 1757 (2ª ed. 1759) | Terror más distancia = sublime. **Tu experiencia infantil** | 11 |
+| Edmund Burke, *A Philosophical Enquiry into the Origin of our Ideas of the Sublime and Beautiful* | 1757 (2.ª ed. 1759) | Terror más distancia = sublime. **Tu experiencia infantil** | 11 |
 | Diderot, *Salon de 1767* | Sobre Hubert Robert | La poética de las ruinas | 10 |
 | Goya, títulos manuscritos de los *Desastres* y cartas a Martín Zapater | c. 1810‑1820 | "Yo lo vi" (44), "Esto es peor" (37), "Nada. Ello dirá" (69) | 12 |
 | Schopenhauer, *Die Welt als Wille und Vorstellung*, II | Cap. 41 | La muerte y la indestructibilidad del ser | 6, 10 |
 | Kierkegaard, "Ved en Grav" | En *Tres discursos para ocasiones supuestas*, 1845 | La seriedad ante la muerte | 12 |
-| Tolstói, *La muerte de Iván Ilich* | 1886 | La muerte en 1ª persona narrada desde dentro. La mentira de los otros | 16 |
+| Tolstói, *La muerte de Iván Ilich* | 1886 | La muerte en 1.ª persona narrada desde dentro. La mentira de los otros | 16 |
 | Freud, "Duelo y melancolía" | 1917 | El trabajo del duelo | 13, 15 |
 | Heidegger, *Ser y tiempo* | §§46‑53. En español: trad. Jorge Eduardo Rivera, Madrid: Trotta, 2003 | Ser‑para‑la‑muerte; *das Man*; §53 contra el "pensar en la muerte" | 9, 16 |
 | Camus, *Le Mythe de Sisyphe* | 1942 | El absurdo | 12 |
@@ -131,8 +131,8 @@ Casi todas las fuentes son **coloniales**. Léelas siempre con la pregunta ***qu
 | José Gorostiza, *Muerte sin fin* | 1939 | La muerte como forma que se vacía | 15 |
 | Juan Rulfo, *Pedro Páramo* | 1955 | Un pueblo de muertos que hablan | 11, 15 |
 | Edmundo Valadés, "La muerte tiene permiso" | 1955 | Cuento | 15 |
-| Carlos Fuentes, *La muerte de Artemio Cruz* | 1962 | La muerte en 1ª, 2ª y 3ª persona (**¡la estructura misma de la novela!**) | 2, 15 |
-| Jaime Sabines, "Algo sobre la muerte del mayor Sabines" | 1973 | El duelo por el padre. La 2ª persona en la poesía mexicana | 15, 16 |
+| Carlos Fuentes, *La muerte de Artemio Cruz* | 1962 | La muerte en 1.ª, 2.ª y 3.ª persona (**¡la estructura misma de la novela!**) | 2, 15 |
+| Jaime Sabines, "Algo sobre la muerte del mayor Sabines" | 1973 | El duelo por el padre. La 2.ª persona en la poesía mexicana | 15, 16 |
 
 ---
 

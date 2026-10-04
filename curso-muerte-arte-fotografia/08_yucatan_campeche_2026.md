@@ -163,7 +163,7 @@ Se suma a los criterios generales de `05`, §12.
 | Semana | Lectura | Escritura | Fotografía | Gestión |
 |---|---|---|---|---|
 | **28 sep‑4 oct** | Módulo 1 (Bruegel); método de lectura (`02`); mapa conceptual (sólo §2.0, 2.1, 2.2, 2.8 y 2.15) | **"Lo que creo que significa la muerte", v1. Esta semana, antes de leer lo demás** | Ejercicio "Veo" | Empieza a buscar contactos (6.3) |
-| **5‑11 oct** | Módulo 13: Barthes (2ª parte), Sontag ("En la caverna de Platón") y Linkman o Ruby (capítulos iniciales). Ética (`05`, §12, y la §5 de este documento) | Análisis de procedencias de v1 (código de colores) | Ejercicio "Ausencia" | Alojamiento en Hecelchakán o Campeche y en Valladolid |
+| **5‑11 oct** | Módulo 13: Barthes (2.ª parte), Sontag ("En la caverna de Platón") y Linkman o Ruby (capítulos iniciales). Ética (`05`, §12, y la §5 de este documento) | Análisis de procedencias de v1 (código de colores) | Ejercicio "Ausencia" | Alojamiento en Hecelchakán o Campeche y en Valladolid |
 | **12‑18 oct** | **Península**: Le Guen 2008 ("Ubèel pixan"); Landa §XXXIII; Redfield y Villa Rojas, la parte de Chan Kom sobre los muertos; Hertz 1907 (la parte sobre la doble sepultura) | Hipótesis A3 (5 frases "espero encontrar...") | Ejercicio "Lo que permanece" | Confirma las fechas de limpieza en Pomuch con alguien del lugar |
 | **19‑25 oct** | **Pomuch**: Apipilhuasco 2025 y 2024; Cervantes 2012 (tesis, PDF libre). **Contexto nacional**: Lomnitz (introducción y un capítulo), Malvido 2006 | **v2** de "Lo que creo..." | Ejercicio "Sin calavera" | Carta de presentación impresa; copias impresas de algunas fotos tuyas para regalar |
 | **26 oct** | Relee las hipótesis A3 y la §5 | — | Revisa el equipo | Prepara el diario de campo con sus 3 columnas |
