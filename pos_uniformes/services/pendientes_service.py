@@ -5,6 +5,7 @@
 - Posibles faltas: le tocaba trabajar, no tiene movimientos en la Libreta y
   nadie apuntó nada.
 - Empleadas sin horario configurado (sin descanso fijo o sin último pago).
+- Préstamos pedidos que llevan días esperando respuesta.
 
 `pendientes_del_dia(session, hoy)` lee la base; `texto_pendientes` es puro.
 """
@@ -20,6 +21,7 @@ PAGO_ATRASADO = "pago_atrasado"
 DESCANSO_HOY = "descanso_hoy"
 POSIBLE_FALTA = "posible_falta"
 SIN_HORARIO = "sin_horario"
+PRESTAMO_SIN_RESPONDER = "prestamo_sin_responder"
 
 # Antes de esta hora no se sugieren faltas (todavía puede llegar / vender).
 HORA_MINIMA_FALTA = 13
@@ -40,7 +42,10 @@ class Pendiente:
 
 
 def _orden(p: Pendiente) -> tuple:
-    prioridad = {PAGO_ATRASADO: 0, PAGO_HOY: 1, POSIBLE_FALTA: 2, SIN_HORARIO: 3, DESCANSO_HOY: 4}
+    prioridad = {
+        PAGO_ATRASADO: 0, PRESTAMO_SIN_RESPONDER: 1, PAGO_HOY: 2,
+        POSIBLE_FALTA: 3, SIN_HORARIO: 4, DESCANSO_HOY: 5,
+    }
     return (prioridad.get(p.tipo, 9), p.employee_name)
 
 
@@ -129,19 +134,52 @@ def pendientes_del_dia(session, hoy: date | None = None, ahora: datetime | None 
         ):
             salida.append(Pendiente(POSIBLE_FALTA, code, e.nombre_completo, f"{nombre} no tiene movimientos hoy. ¿Faltó?"))
 
+    # Préstamos esperando respuesta. Va aquí y no solo en /pulso porque un
+    # préstamo pedido no se descuenta ni aparece en ningún desglose —no hay
+    # nada en la pantalla que delate que alguien está esperando—, y el de
+    # Stayce llevaba dos días sin contestar (Daniel, 2026-10-04).
+    try:
+        from pos_uniformes.services.prestamos_service import pendientes as prestamos_pendientes
+
+        for p in prestamos_pendientes(session):
+            nombre = str(p.employee_name or p.employee_code).split()[0]
+            dias = (hoy - p.created_at.date()).days if p.created_at else 0
+            cuanto = (
+                "hoy" if dias <= 0
+                else "desde ayer" if dias == 1
+                else f"desde hace {dias} días"
+            )
+            salida.append(Pendiente(
+                PRESTAMO_SIN_RESPONDER, p.employee_code, p.employee_name or p.employee_code,
+                f"{nombre} espera respuesta de su préstamo de ${Decimal(str(p.monto)):,.2f} "
+                f"({cuanto}) → /prestamos",
+                monto=Decimal(str(p.monto)), dias=dias,
+            ))
+    except Exception:  # noqa: BLE001 — base sin la tabla todavía
+        try:
+            session.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+
     salida.sort(key=_orden)
     return salida
 
 
 def texto_pendientes(pendientes: list[Pendiente]) -> str:
     """Bloque para Telegram / pantalla. Vacío si no hay nada que hacer."""
-    accion = [p for p in pendientes if p.tipo in (PAGO_HOY, PAGO_ATRASADO, POSIBLE_FALTA, SIN_HORARIO)]
+    accion = [
+        p for p in pendientes
+        if p.tipo in (PAGO_HOY, PAGO_ATRASADO, PRESTAMO_SIN_RESPONDER, POSIBLE_FALTA, SIN_HORARIO)
+    ]
     descansos = [p for p in pendientes if p.tipo == DESCANSO_HOY]
     if not accion and not descansos:
         return ""
     lineas = ["📌 PENDIENTES"]
     for p in accion:
-        icono = {PAGO_ATRASADO: "❗", PAGO_HOY: "💵", POSIBLE_FALTA: "❓", SIN_HORARIO: "⚙️"}[p.tipo]
+        icono = {
+            PAGO_ATRASADO: "❗", PRESTAMO_SIN_RESPONDER: "🤲", PAGO_HOY: "💵",
+            POSIBLE_FALTA: "❓", SIN_HORARIO: "⚙️",
+        }[p.tipo]
         lineas.append(f"{icono} {p.texto}")
     if descansos:
         lineas.append("🛌 Descansa hoy: " + ", ".join(p.nombre_corto for p in descansos))

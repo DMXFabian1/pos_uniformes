@@ -107,3 +107,72 @@ class TextoPendientesTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PrestamoSinResponderTests(unittest.TestCase):
+    """Un préstamo pedido no se descuenta ni sale en ningún desglose: si nadie
+    lo recuerda, se queda esperando días (Stayce, 2026-10-04)."""
+
+    def _session(self):
+        """Tienda sin empleadas: aquí solo importa el bloque de préstamos."""
+        session = MagicMock()
+        q = MagicMock()
+        q.filter.return_value.order_by.return_value.all.return_value = []
+        q.filter.return_value.distinct.return_value.all.return_value = []
+        session.query.return_value = q
+        return session
+
+    def _pendientes(self, prestamos):
+        with patch("pos_uniformes.services.nomina_service.avisos_de_pago", return_value=[]), \
+             patch("pos_uniformes.services.libreta_service.ventana_hoy",
+                   return_value=(datetime(2026, 10, 4), datetime(2026, 10, 4, 23, 59))), \
+             patch("pos_uniformes.services.prestamos_service.pendientes", return_value=prestamos):
+            return svc.pendientes_del_dia(
+                self._session(), date(2026, 10, 4), ahora=datetime(2026, 10, 4, 18, 0)
+            )
+
+    def _prestamo(self, dias, monto="150.00"):
+        return SimpleNamespace(
+            employee_code="VEND-4", employee_name="Stayce Chavarría",
+            monto=Decimal(monto), created_at=datetime(2026, 10, 4 - dias, 9, 57),
+        )
+
+    def test_aparece_con_los_dias_que_lleva(self):
+        from pos_uniformes.services import pendientes_service as ps
+
+        p, = [x for x in self._pendientes([self._prestamo(2)]) if x.tipo == ps.PRESTAMO_SIN_RESPONDER]
+        self.assertIn("Stayce", p.texto)
+        self.assertIn("$150.00", p.texto)
+        self.assertIn("desde hace 2 días", p.texto)
+        self.assertIn("/prestamos", p.texto)
+
+    def test_el_de_hoy_no_dice_dias(self):
+        from pos_uniformes.services import pendientes_service as ps
+
+        p, = [x for x in self._pendientes([self._prestamo(0)]) if x.tipo == ps.PRESTAMO_SIN_RESPONDER]
+        self.assertIn("(hoy)", p.texto)
+
+    def test_sin_prestamos_no_ensucia(self):
+        from pos_uniformes.services import pendientes_service as ps
+
+        self.assertEqual(
+            [x for x in self._pendientes([]) if x.tipo == ps.PRESTAMO_SIN_RESPONDER], []
+        )
+
+    def test_sale_en_el_texto_del_resumen(self):
+        from pos_uniformes.services.pendientes_service import texto_pendientes
+
+        texto = texto_pendientes(self._pendientes([self._prestamo(2)]))
+        self.assertIn("🤲", texto)
+        self.assertIn("Stayce espera respuesta de su préstamo", texto)
+
+    def test_si_la_base_no_tiene_la_tabla_el_resto_sale_igual(self):
+        from pos_uniformes.services import pendientes_service as ps
+
+        with patch("pos_uniformes.services.nomina_service.avisos_de_pago", return_value=[]), \
+             patch("pos_uniformes.services.libreta_service.ventana_hoy",
+                   return_value=(datetime(2026, 10, 4), datetime(2026, 10, 4, 23, 59))), \
+             patch("pos_uniformes.services.prestamos_service.pendientes",
+                   side_effect=RuntimeError("no existe la tabla")):
+            salida = svc.pendientes_del_dia(self._session(), date(2026, 10, 4))
+        self.assertEqual([x for x in salida if x.tipo == ps.PRESTAMO_SIN_RESPONDER], [])
