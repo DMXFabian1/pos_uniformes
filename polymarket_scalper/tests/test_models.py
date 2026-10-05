@@ -74,3 +74,41 @@ def test_match_outcome_mapping():
     assert match_outcome("Yes", "FC Barcelona", "Feyenoord Rotterdam", "Will FC Barcelona vs. Feyenoord end in a draw?") == "draw"
     assert match_outcome("Draw", "H", "A") == "draw"
     assert match_outcome("Lakers", "Los Angeles Lakers", "Boston Celtics") == "home"
+
+
+def test_nba_con_codigos_del_feed_resuelve_por_posicion():
+    # El feed de NBA manda "GS"/"LAC" y los outcomes son "Warriors"/"Clippers": por nombre no casa
+    # ninguno. Gamma lista los outcomes visitante-primero en NBA (ordering="away"), y con eso se
+    # resuelve por posición. Antes el partido entero se quedaba sin lados, en silencio.
+    from scalper.models.base import resolver_lados
+
+    assert resolver_lados(["Warriors", "Clippers"], "LAC", "GS", ordering="away") == ["away", "home"]
+    assert resolver_lados(["Warriors", "Clippers"], "LAC", "GS", ordering="home") == ["home", "away"]
+    # sin ordering no se adivina
+    assert resolver_lados(["Warriors", "Clippers"], "LAC", "GS") == [None, None]
+    # y nunca se adivina con tres salidas
+    assert resolver_lados(["A", "Draw", "B"], "X", "Y", ordering="home") == [None, "draw", None]
+
+
+def test_el_nombre_sigue_mandando_sobre_la_posicion():
+    # Tenis: nombres completos y ordering="home". El nombre casa, así que la posición ni se mira:
+    # el comportamiento de antes queda intacto aunque Gamma diga otro orden.
+    from scalper.models.base import resolver_lados
+
+    assert resolver_lados(["Alexander Zverev", "Novak Djokovic"], "Novak Djokovic", "Alexander Zverev",
+                          ordering="home") == ["away", "home"]
+
+
+def test_parse_market_guarda_el_ordering_del_evento():
+    from scalper.discovery import parse_market
+
+    m = {"conditionId": "0xabc", "clobTokenIds": '["1","2"]', "outcomes": '["Warriors","Clippers"]',
+         "sportsMarketType": "moneyline"}
+    ev = {"id": "e", "slug": "nba-gsw-lac-2026-10-04", "gameId": 20025089,
+          "sport": {"ordering": "away", "sport": "nba"}}
+    mi = parse_market(m, ev, "nba", 0.03)
+    assert mi is not None and mi.event_ordering == "away" and mi.event_game_id == "20025089"
+    # y sobrevive al disco: la columna está en el esquema
+    from scalper.storage import SCHEMAS
+    assert "event_ordering" in SCHEMAS["markets"].names
+    assert parse_market(m, {"id": "e", "slug": "x"}, "nba", 0.03).event_ordering == ""

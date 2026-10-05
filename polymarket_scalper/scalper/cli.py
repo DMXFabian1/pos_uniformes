@@ -406,6 +406,7 @@ def cmd_model(args: argparse.Namespace) -> None:
     import polars as pl
     from .discovery import MarketInfo
     from .models import ModelRegistry, WinProb, match_outcome, parse_game
+    from .models.base import lado_de
     from .storage import latest_markets, scan
 
     cfg = load_config(args.config)
@@ -438,7 +439,7 @@ def cmd_model(args: argparse.Namespace) -> None:
         first: dict[str, list[float]] = {}
         for m in mls:
             for t in m.tokens:
-                side = match_outcome(t.outcome, g.home, g.away, m.question)
+                side = lado_de(m, t, g)
                 q = qmap.get(t.token_id)
                 if side and q and q["mid_first"] is not None:
                     first.setdefault(side, []).append(q["mid_first"])
@@ -452,7 +453,7 @@ def cmd_model(args: argparse.Namespace) -> None:
         if pre is not None:
             print(f"  previo(proxy)= local {pre.home:.3f} visitante {pre.away:.3f} empate {pre.draw:.3f}")
         for m in mls:
-            sides = {t.token_id: match_outcome(t.outcome, g.home, g.away, m.question) for t in m.tokens}
+            sides = {t.token_id: lado_de(m, t, g) for t in m.tokens}
             mids = {t.token_id: qmap.get(t.token_id) for t in m.tokens}
             print(f"  {m.question[:60]}  fee={m.fee_rate}")
             for t in m.tokens:

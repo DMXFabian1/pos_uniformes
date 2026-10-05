@@ -33,7 +33,7 @@ SCHEMAS: dict[str, pa.Schema] = {
         ("fee_rate", F()), ("fee_type", S()), ("volume_24h", F()), ("liquidity", F()), ("end_date", S()),
         ("accepting_orders", B()), ("sports_market_type", S()), ("game_start_time", S()), ("tags", S()),
         ("event_market_count", I()), ("event_neg_risk_augmented", B()),
-        ("event_game_id", S()), ("event_start_time", S()),
+        ("event_game_id", S()), ("event_start_time", S()), ("event_ordering", S()),
     ]),
     "games": pa.schema([
         ("ts_ms", I()), ("game_id", S()), ("league", S()), ("sport", S()), ("home", S()), ("away", S()),

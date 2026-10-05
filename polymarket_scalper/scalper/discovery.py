@@ -51,6 +51,10 @@ class MarketInfo:
     event_neg_risk_augmented: bool = False
     event_game_id: str = ""              # enlaza con el feed en vivo de deportes
     event_start_time: str = ""
+    # En qué orden lista Gamma los outcomes de un partido: "away" (NBA: visitante primero) o "home"
+    # (tenis). Sirve para resolver qué outcome es cada equipo cuando el feed manda códigos ("GS",
+    # "LAC") que no casan por nombre con "Warriors"/"Clippers".
+    event_ordering: str = ""
     updown_symbol: str = ""              # mercados "Up or Down": símbolo, ventana y límites
     updown_window_s: int = 0
     updown_start_ms: int = 0
@@ -160,6 +164,7 @@ def parse_market(m: dict[str, Any], event: dict[str, Any], category: str, defaul
         event_neg_risk_augmented=bool(event.get("negRiskAugmented")),
         event_game_id=str(event.get("gameId") or ""),
         event_start_time=str(event.get("startTime") or ""),
+        event_ordering=str((event.get("sport") or {}).get("ordering") or "") if isinstance(event.get("sport"), dict) else "",
     )
 
 

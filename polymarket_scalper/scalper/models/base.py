@@ -180,6 +180,36 @@ def match_outcome(outcome: str, home: str, away: str, question: str = "") -> str
     return _closest(o, home, away)
 
 
+def resolver_lados(outcomes: list[str], home: str, away: str, question: str = "",
+                   ordering: str = "") -> list[str | None]:
+    """Qué lado del partido es cada outcome. Primero por nombre; si no casa ninguno, por posición.
+
+    El feed de deportes manda nombres completos en tenis ("Alexander Zverev") pero códigos en NBA
+    ("GS", "LAC"), y "warriors" no se parece en nada a "gs": `match_outcome` devolvía None para los
+    dos lados y el partido quedaba sin lados, en silencio. Gamma sí dice el orden en que lista los
+    outcomes (`sport.ordering`): en NBA es "away", visitante primero, en los 32 de 32 eventos
+    comprobados. Cuando el nombre no sirve y el orden sí se conoce, se resuelve por posición.
+
+    La posición solo entra si **ningún** outcome casó por nombre y hay exactamente dos: así el tenis
+    y el fútbol siguen exactamente igual que antes, y un mercado de tres salidas nunca se adivina.
+    """
+    lados = [match_outcome(o, home, away, question) for o in outcomes]
+    if len(outcomes) == 2 and all(l is None for l in lados) and ordering in ("home", "away"):
+        primero = ordering
+        return [primero, "home" if primero == "away" else "away"]
+    return lados
+
+
+def lado_de(m, t, g) -> str | None:
+    """Lado de un token de un mercado, dado el estado del partido. Ver `resolver_lados`."""
+    outcomes = [x.outcome for x in m.tokens]
+    lados = resolver_lados(outcomes, g.home, g.away, m.question, getattr(m, "event_ordering", ""))
+    try:
+        return lados[t.index]
+    except (IndexError, TypeError):
+        return None
+
+
 def _closest(text: str, home: str, away: str, min_ratio: float = 0.6, contains: bool = False) -> str | None:
     h, a = norm_name(home), norm_name(away)
     if contains:

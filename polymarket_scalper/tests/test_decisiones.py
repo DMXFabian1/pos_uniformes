@@ -252,3 +252,39 @@ def test_con_el_feed_atrasado_no_se_abre_nada(cfg):
     eng._ultima_decision.clear()
     eng.on_game(2400, "g1", _game(score="100-89", period="Q4", elapsed="05:50", live=True))
     assert eng.reales
+
+
+def test_un_partido_nba_con_codigos_del_feed_resuelve_los_lados(cfg):
+    # Mercado NBA con outcomes "Warriors"/"Clippers" y feed con home="LAC", away="GS". Por nombre no
+    # casa nada; con ordering="away" el motor tiene que mapear Warriors→away y Clippers→home.
+    from scalper.models import parse_game
+
+    m = make_market("0xgsw", event_id="e1", outcomes=("Warriors", "Clippers"))
+    m.event_game_id = "20025089"
+    m.event_ordering = "away"
+    m.sports_market_type = "moneyline"
+    eng = _engine(cfg, [m])
+    g = parse_game({"game_id": "20025089", "league": "nba", "sport": "", "home": "LAC", "away": "GS",
+                    "status": "InProgress", "live": True, "ended": False, "score": "41-50",
+                    "period": "Q2", "elapsed": "03:10"})
+    eng._ensure_sides(m.condition_id, g)
+    lados = eng.outcome_side[m.condition_id]
+    assert lados[m.tokens[0].token_id] == "away"      # Warriors = visitante
+    assert lados[m.tokens[1].token_id] == "home"      # Clippers = local
+    assert eng.stats.get("mercados_sin_lados", 0) == 0
+
+
+def test_un_moneyline_sin_lados_se_dice_en_vez_de_callarse(cfg):
+    from scalper.models import parse_game
+
+    m = make_market("0xmudo", event_id="e2", outcomes=("Warriors", "Clippers"))
+    m.event_game_id = "1"
+    m.event_ordering = ""           # sin orden conocido: no se adivina
+    m.sports_market_type = "moneyline"
+    eng = _engine(cfg, [m])
+    g = parse_game({"game_id": "1", "league": "nba", "sport": "", "home": "LAC", "away": "GS",
+                    "status": "InProgress", "live": True, "ended": False, "score": "0-0",
+                    "period": "Q1", "elapsed": "00:00"})
+    eng._ensure_sides(m.condition_id, g)
+    assert eng.outcome_side[m.condition_id] == {}
+    assert eng.stats["mercados_sin_lados"] == 1

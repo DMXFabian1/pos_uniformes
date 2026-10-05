@@ -16,6 +16,7 @@ from ..config import Config
 from ..discovery import MarketInfo
 from ..learn import ModelStore, Scorer
 from ..models import GameState, ModelRegistry, WinProb, match_outcome, parse_game
+from ..models.base import lado_de
 from ..evaluacion import minimos_requeridos
 from ..micro import instantanea
 from ..models.crypto import UpDownModel, UpDownState
@@ -273,14 +274,21 @@ class Engine:
             return
         sides: dict[str, str] = {}
         for t in m.tokens:
-            side = match_outcome(t.outcome, g.home, g.away, m.question)
+            side = lado_de(m, t, g)
             if side is None and m.is_binary and t.outcome.lower() == "no":
-                other = match_outcome(m.tokens[0].outcome, g.home, g.away, m.question)
+                other = lado_de(m, m.tokens[0], g)
                 if other in ("home", "away") and not (m.event_neg_risk and len(self.event_index.get(m.event_id, [])) > 2):
                     side = "away" if other == "home" else "home"
             if side is not None:
                 sides[t.token_id] = side
         self.outcome_side[cid] = sides
+        # Un moneyline de un partido en vivo sin ningún lado resuelto es un mercado que el modelo no
+        # puede tocar. Antes pasaba en silencio (NBA entero, por los códigos del feed); ahora se dice.
+        if not sides and m.sports_market_type in ("", "moneyline", "child_moneyline") and len(m.tokens) == 2:
+            self.stats["mercados_sin_lados"] += 1
+            log.warning("sin lados para %s: outcomes %s contra local=%r visitante=%r (ordering=%r). "
+                        "El modelo no puede usar este mercado.", m.event_slug or cid,
+                        [x.outcome for x in m.tokens], g.home, g.away, getattr(m, "event_ordering", ""))
 
     def _market_probs(self, cids: list[str]) -> WinProb | None:
         """Prob. implícita por lado a partir de los mids de los mercados enlazados al partido."""

@@ -13,6 +13,7 @@ from ..config import Config
 from ..discovery import MarketInfo
 from ..learn.registry import ModelStore
 from ..models import ModelRegistry, WinProb, match_outcome, parse_game
+from ..models.base import lado_de
 from ..opportunities import listar as listar_oportunidades, por_grupo, resumen_grupo
 from ..storage import latest_markets, latest_profiles, scan
 
@@ -145,7 +146,7 @@ def _games(cfg: Config, data_dir: Path, limit: int = 30) -> list[dict[str, Any]]
         first: dict[str, list[float]] = {}
         for m in mls:
             for t in m.tokens:
-                side = match_outcome(t.outcome, g.home, g.away, m.question)
+                side = lado_de(m, t, g)
                 q = qmap.get(t.token_id)
                 if side and q and q["mid_first"] is not None:
                     first.setdefault(side, []).append(q["mid_first"])
@@ -165,7 +166,7 @@ def _games(cfg: Config, data_dir: Path, limit: int = 30) -> list[dict[str, Any]]
         for m in mls:
             toks = []
             for t in m.tokens:
-                side = match_outcome(t.outcome, g.home, g.away, m.question)
+                side = lado_de(m, t, g)
                 q = qmap.get(t.token_id)
                 pm = wp.for_side(side) if (wp is not None and side) else None
                 mid = q["mid"] if q else None
