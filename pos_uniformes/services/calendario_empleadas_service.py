@@ -365,14 +365,55 @@ def comisiones_desde_ultimo_pago(session, employee_code: str, horario: HorarioEm
         LibretaVenta.employee_code == str(employee_code).strip().upper()
     )
     if horario.fecha_ultimo_pago is not None:
-        # El pago cubre hasta ese día completo: cuenta desde el siguiente.
-        from datetime import datetime, time, timedelta as _td
-
-        corte = datetime.combine(
-            horario.fecha_ultimo_pago + _td(days=1), time.min
-        ).astimezone()
-        query = query.filter(LibretaVenta.created_at >= corte)
+        query = query.filter(
+            LibretaVenta.created_at >= _corte_de_comisiones(session, employee_code, horario)
+        )
     return int(query.scalar() or 0)
+
+
+def _corte_de_comisiones(session, employee_code: str, horario: HorarioEmpleada):
+    """Desde qué momento cuentan las comisiones del siguiente pago.
+
+    Lo natural seria "desde el dia siguiente al ultimo pago", y asi estaba. El
+    problema: el pago se registra a una HORA. A Cristal se le pagó el 3-oct a
+    las 09:13 y siguió vendiendo todo el día; esas 11 comisiones no entraron en
+    su pago (no existían todavía) y tampoco en el siguiente (que empieza el
+    4-oct). Se perdieron sin que nadie las borrara (Daniel, 2026-10-05).
+
+    Así que el corte es el MOMENTO del último pago, no el final de ese día.
+    Las comisiones del salario no cambian: el día del pago se paga completo y
+    el ciclo de días sigue empezando al día siguiente; lo que se arregla es que
+    las comisiones de esa tarde no caigan en el hueco.
+
+    Si el pago se registró con una fecha distinta al día en que se capturó (un
+    pago adelantado o atrasado), no se puede usar su hora: ahí manda el día
+    siguiente a la fecha del pago, como antes.
+    """
+    from datetime import datetime, time, timedelta as _td
+
+    del_dia_siguiente = datetime.combine(
+        horario.fecha_ultimo_pago + _td(days=1), time.min
+    ).astimezone()
+
+    try:
+        from pos_uniformes.database.models import EmpleadaPago
+
+        pago = (
+            session.query(EmpleadaPago)
+            .filter(EmpleadaPago.employee_code == str(employee_code).strip().upper())
+            .order_by(EmpleadaPago.created_at.desc())
+            .first()
+        )
+    except Exception:  # noqa: BLE001 — base sin la tabla todavía
+        return del_dia_siguiente
+
+    if pago is None or pago.created_at is None or pago.fecha != horario.fecha_ultimo_pago:
+        return del_dia_siguiente
+    momento = pago.created_at
+    momento = momento.astimezone() if momento.tzinfo else momento.astimezone()
+    # Nunca más tarde que el día siguiente: si el pago se capturó de noche,
+    # el corte natural ya es mejor y evita depender de la hora exacta.
+    return min(momento, del_dia_siguiente)
 
 
 def chips_calendario_mes(session, year: int, month: int, hoy: date) -> dict[date, list[tuple[str, str]]]:
