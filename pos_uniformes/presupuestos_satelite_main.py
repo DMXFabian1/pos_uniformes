@@ -105,10 +105,60 @@ def resolve_satellite_operator_id() -> int:
         return int(sorted(users, key=sort_key)[0].id)
 
 
+def _modo_servidor_de_impresion(app) -> int:
+    """`--servidor-impresion`: despacha la cola SIN abrir el kiosko.
+
+    En la tienda las impresoras de etiquetas cuelgan del kiosko, y el kiosko no
+    tiene Python —el lanzador solo le baja este .exe—, así que el servicio del
+    repo no se podía instalar ahí. Con esto el mismo ejecutable sirve de
+    servidor de impresión con la pantalla apagada (Daniel, 2026-10-05).
+
+    Va ANTES del candado de instancia única: este proceso y la ventana del
+    kiosko pueden convivir en la misma PC, cada uno con el suyo.
+    """
+    import logging
+
+    from pos_uniformes.ui.helpers.servidor_impresion_runner import (
+        correr,
+        es_servidor_de_impresion,
+        tomar_candado,
+    )
+    from pos_uniformes.utils.config import satellite_data_dir
+
+    destino = satellite_data_dir() / "logs" / "servidor_impresion.log"
+    destino.parent.mkdir(parents=True, exist_ok=True)
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+        handlers=[logging.FileHandler(destino, encoding="utf-8")],
+    )
+    log = logging.getLogger("servidor_impresion")
+
+    forzar = "--forzar" in sys.argv
+    drenar = "--drenar" in sys.argv
+    es_servidor, origen = es_servidor_de_impresion()
+    if not es_servidor and not forzar:
+        # Una Estación no tiene impresoras: despachar desde ahí reclamaría los
+        # trabajos de las demás para mandarlos a una impresora que no existe.
+        log.warning(
+            "Esta PC (%s) está marcada como «Estación», no como «Servidor de "
+            "impresión». No arranco. Cámbialo en el menú admin → «Rol de "
+            "impresión de esta PC».", origen,
+        )
+        return 2
+    if not drenar and not tomar_candado():
+        log.info("Ya hay un servidor de impresión corriendo en esta PC. No arranco otro.")
+        return 0
+    bootstrap_schema()
+    return correr(app, drenar=drenar, origen=origen)
+
+
 def main() -> int:
     # Una excepcion que escape de un slot no debe cerrar el kiosko.
     install_satellite_excepthook()
     app = QApplication(sys.argv)
+    if "--servidor-impresion" in sys.argv:
+        return _modo_servidor_de_impresion(app)
     app.setApplicationName(satellite_display_name())
     app.setOrganizationName("POSUniformes")
     from pos_uniformes.utils.qt_spanish import instalar_espanol_qt

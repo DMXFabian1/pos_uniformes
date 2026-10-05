@@ -20,34 +20,9 @@ from __future__ import annotations
 
 import argparse
 import logging
-import signal
 import sys
 
 logger = logging.getLogger("servidor_impresion")
-
-#: Candado: la tarea vigía lo lanza cada 5 min para que vuelva si se murió, y
-#: esto hace que los lanzamientos de más no hagan nada. Dos despachadores no
-#: imprimirían doble (el reclamo es atómico), pero sí serían dos procesos
-#: compitiendo por la misma impresora y dos logs mezclados.
-NOMBRE_MUTEX = "Global\\POSUniformesServidorImpresion"
-_MUTEX = None
-
-
-def tomar_candado() -> bool:
-    """True si somos el único. Fuera de Windows no hay candado (solo dev)."""
-    if not sys.platform.startswith("win"):
-        return True
-    import ctypes
-
-    kernel32 = ctypes.windll.kernel32  # type: ignore[attr-defined]
-    handle = kernel32.CreateMutexW(None, True, NOMBRE_MUTEX)
-    if not handle:
-        return True
-    if kernel32.GetLastError() == 183:  # ERROR_ALREADY_EXISTS
-        return False
-    global _MUTEX
-    _MUTEX = handle
-    return True
 
 
 def _configurar_log(verboso: bool) -> None:
@@ -63,64 +38,17 @@ def _configurar_log(verboso: bool) -> None:
     )
 
 
-def _es_servidor_de_impresion() -> tuple[bool, str]:
-    """(es_servidor, cómo se llama esta PC) según el menú admin del kiosko."""
-    from pos_uniformes.services.print_routing_cache_service import MODO_LOCAL, load_print_routing
-
-    modo, origen = load_print_routing()
-    return modo == MODO_LOCAL, origen
-
-
 def _correr(args, origen: str) -> int:
-    """La parte que necesita Qt: event loop, handlers y despachador.
-
-    Separada de `main` a propósito: la decisión de arrancar (soy servidor, soy
-    el único) es donde está el riesgo y se prueba sin levantar Qt.
-    """
-    from PyQt6.QtCore import QTimer
+    """La parte que necesita Qt. El núcleo vive en el helper porque el .exe del
+    satélite lo arranca igual con `--servidor-impresion`: en el kiosko no hay
+    Python y es justo donde están las impresoras de etiquetas."""
     from PyQt6.QtWidgets import QApplication
 
-    from pos_uniformes.database.connection import get_session
-    from pos_uniformes.services.trabajo_dispatcher import TrabajoDispatcher
-    from pos_uniformes.ui.helpers.trabajo_print_handlers import build_handlers
+    from pos_uniformes.ui.helpers.servidor_impresion_runner import correr
 
     # QApplication sin una sola ventana: QPrinter/QPainter la necesitan.
     app = QApplication(sys.argv[:1])
-    app.setQuitOnLastWindowClosed(False)   # no hay ventanas: no se debe salir solo
-
-    despachador = TrabajoDispatcher(
-        get_session,
-        build_handlers(),
-        schedule=QTimer.singleShot,
-        on_event=lambda tid, estado, err: logger.info(
-            "Trabajo %s → %s%s", tid, getattr(estado, "value", estado), f" ({err})" if err else ""
-        ),
-    )
-
-    if args.drenar:
-        cuantos = despachador.drain()
-        logger.info("Saqué %s trabajo(s) de la cola.", cuantos)
-        return 0
-
-    logger.info("Servidor de impresión en pie como «%s». Esperando trabajos.", origen)
-
-    def _parar(*_args) -> None:
-        logger.info("Me piden parar: termino lo que estoy imprimiendo y cierro.")
-        despachador.stop()
-        app.quit()
-
-    for señal in (signal.SIGINT, signal.SIGTERM):
-        try:
-            signal.signal(señal, _parar)
-        except (ValueError, OSError):   # en Windows no todas existen
-            pass
-    # Sin esto, un Ctrl+C no se atiende hasta que Qt vuelva de su event loop.
-    despertador = QTimer()
-    despertador.start(500)
-    despertador.timeout.connect(lambda: None)
-
-    despachador.start()
-    return int(app.exec())
+    return correr(app, drenar=args.drenar, origen=origen)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -134,7 +62,12 @@ def main(argv: list[str] | None = None) -> int:
 
     _configurar_log(args.verboso)
 
-    es_servidor, origen = _es_servidor_de_impresion()
+    from pos_uniformes.ui.helpers.servidor_impresion_runner import (
+        es_servidor_de_impresion,
+        tomar_candado,
+    )
+
+    es_servidor, origen = es_servidor_de_impresion()
     if not es_servidor and not args.forzar:
         # Una Estación no tiene impresoras: si despachara, reclamaría trabajos
         # de los demás para mandarlos a una impresora que no existe y los

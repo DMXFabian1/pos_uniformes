@@ -15,6 +15,7 @@ from unittest.mock import patch
 
 from pos_uniformes.scripts import servidor_impresion as srv
 from pos_uniformes.services.print_routing_cache_service import MODO_LOCAL, MODO_SATELITE
+from pos_uniformes.ui.helpers import servidor_impresion_runner as runner
 
 
 class NoArrancarEnUnaEstacionTests(unittest.TestCase):
@@ -22,7 +23,7 @@ class NoArrancarEnUnaEstacionTests(unittest.TestCase):
         with patch.object(srv, "_configurar_log"), \
              patch("pos_uniformes.services.print_routing_cache_service.load_print_routing",
                    return_value=(MODO_SATELITE, "caja 2")), \
-             patch.object(srv, "tomar_candado") as candado:
+             patch.object(runner, "tomar_candado") as candado:
             self.assertEqual(srv.main([]), 2)
         candado.assert_not_called()   # ni siquiera llega a tomar el candado
 
@@ -31,7 +32,7 @@ class NoArrancarEnUnaEstacionTests(unittest.TestCase):
         with patch.object(srv, "_configurar_log"), \
              patch("pos_uniformes.services.print_routing_cache_service.load_print_routing",
                    return_value=(MODO_SATELITE, "caja 2")), \
-             patch.object(srv, "tomar_candado", return_value=True), \
+             patch.object(runner, "tomar_candado", return_value=True), \
              patch.object(srv, "_correr", return_value=0) as correr:
             self.assertEqual(srv.main(["--forzar"]), 0)
         correr.assert_called_once()
@@ -43,7 +44,7 @@ class UnoSoloALaVezTests(unittest.TestCase):
         with patch.object(srv, "_configurar_log"), \
              patch("pos_uniformes.services.print_routing_cache_service.load_print_routing",
                    return_value=(MODO_LOCAL, "principal")), \
-             patch.object(srv, "tomar_candado", return_value=False), \
+             patch.object(runner, "tomar_candado", return_value=False), \
              patch.object(srv, "_correr") as correr:
             self.assertEqual(srv.main([]), 0)
         correr.assert_not_called()
@@ -53,7 +54,7 @@ class UnoSoloALaVezTests(unittest.TestCase):
         with patch.object(srv, "_configurar_log"), \
              patch("pos_uniformes.services.print_routing_cache_service.load_print_routing",
                    return_value=(MODO_LOCAL, "principal")), \
-             patch.object(srv, "tomar_candado") as candado, \
+             patch.object(runner, "tomar_candado") as candado, \
              patch.object(srv, "_correr", return_value=0):
             self.assertEqual(srv.main(["--drenar"]), 0)
         candado.assert_not_called()
@@ -61,3 +62,55 @@ class UnoSoloALaVezTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DesdeElExeDelSateliteTests(unittest.TestCase):
+    """En el kiosko no hay Python —el lanzador solo baja el .exe— y ahí es donde
+    están las impresoras de etiquetas. Por eso el mismo ejecutable tiene que
+    poder arrancar como servidor de impresión (Daniel, 2026-10-05)."""
+
+    def _main(self, argv, **kw):
+        import sys as _sys
+
+        from pos_uniformes import presupuestos_satelite_main as sat
+
+        viejo = _sys.argv
+        _sys.argv = argv
+        try:
+            with patch.object(sat, "install_satellite_excepthook"), \
+                 patch.object(sat, "QApplication", return_value=object()), \
+                 patch.object(sat, "bootstrap_schema"), \
+                 patch("pos_uniformes.ui.helpers.servidor_impresion_runner.correr",
+                       return_value=0) as correr, \
+                 patch("pos_uniformes.ui.helpers.servidor_impresion_runner.tomar_candado",
+                       return_value=kw.get("candado", True)), \
+                 patch("pos_uniformes.services.print_routing_cache_service.load_print_routing",
+                       return_value=(kw.get("modo", MODO_LOCAL), "kiosko")):
+                return sat.main(), correr
+        finally:
+            _sys.argv = viejo
+
+    def test_la_bandera_despacha_sin_abrir_el_kiosko(self) -> None:
+        salida, correr = self._main(["app.exe", "--servidor-impresion"])
+        self.assertEqual(salida, 0)
+        correr.assert_called_once()
+
+    def test_sin_la_bandera_no_se_mete_en_el_arranque_normal(self) -> None:
+        """El kiosko de siempre tiene que seguir abriendo igual."""
+        import sys as _sys
+
+        from pos_uniformes import presupuestos_satelite_main as sat
+
+        fuente = __import__("inspect").getsource(sat.main)
+        self.assertIn('if "--servidor-impresion" in sys.argv:', fuente)
+        del _sys
+
+    def test_una_estacion_tampoco_despacha_desde_el_exe(self) -> None:
+        salida, correr = self._main(["app.exe", "--servidor-impresion"], modo=MODO_SATELITE)
+        self.assertEqual(salida, 2)
+        correr.assert_not_called()
+
+    def test_el_segundo_proceso_se_va_en_paz(self) -> None:
+        salida, correr = self._main(["app.exe", "--servidor-impresion"], candado=False)
+        self.assertEqual(salida, 0)
+        correr.assert_not_called()

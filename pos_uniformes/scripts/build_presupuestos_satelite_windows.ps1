@@ -89,6 +89,9 @@ if (Test-Path $updatesDir) {
     Copy-Item (Join-Path $PSScriptRoot "lanzador_satelite.bat") $updatesDir -Force
     # Reparador para el kiosko (cuando el .exe se copia a medias).
     Copy-Item (Join-Path $PSScriptRoot "reparar_satelite.bat") $updatesDir -Force -ErrorAction SilentlyContinue
+    # El instalador del servidor de impresion del kiosko tambien: ahi no hay
+    # repo ni Python, asi que tiene que llegar por la carpeta compartida.
+    Copy-Item (Join-Path $PSScriptRoot "instalar_servidor_impresion_kiosko.bat") $updatesDir -Force -ErrorAction SilentlyContinue
     Write-Host "  Publicado para kioskos en: $publishDir ($publishedVersion)"
 } else {
     Write-Host "  (No existe $updatesDir - no se publico para kioskos)"
