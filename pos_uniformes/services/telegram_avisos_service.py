@@ -176,6 +176,7 @@ AYUDA_CORTA = (
     "/aviso Junta a las 6\n"
     "/aviso 3h Hoy cerramos temprano — se quita en 3 horas\n"
     "/aviso @caja2 Ven un momento — solo en esa pantalla\n"
+    "/aviso sonido=risa 🤡 Te veo... — y suena al aparecer (/sonidos los lista)\n"
     "/cartel Promoción de mochilas — rota sin interrumpir\n\n"
     "También puedes mandarme una foto: sale a pantalla completa, y lo que "
     "escribas de pie de foto es el aviso.\n"
@@ -187,19 +188,37 @@ class AvisoVacio(ValueError):
     """No había qué mandar (ni texto ni imagen)."""
 
 
-def _leer_prefijos(session, crudo: str) -> tuple[str, float, dict | None, list[str]]:
-    """Come los `3h` y `@caja2` del principio. (resto, horas, pantalla, quejas).
+def _leer_prefijos(session, crudo: str) -> tuple[str, float, dict | None, str | None, list[str]]:
+    """Come los `3h`, `@caja2` y `sonido=risa` del principio.
+    (resto, horas, pantalla, sonido, quejas).
 
     Solo del principio y solo si tienen esa forma: así «5 playeras llegaron» o
     un correo en el texto no se confunden con órdenes.
     """
+    from pos_uniformes.services import sonidos_service as sn
+
     horas = HORAS_DEFAULT
     pantalla: dict | None = None
+    sonido: str | None = None
     quejas: list[str] = []
     while crudo:
         partes = crudo.split(maxsplit=1)
         primera = partes[0]
         resto = partes[1].strip() if len(partes) > 1 else ""
+        if primera.lower().startswith("sonido=") and len(primera) > 7:
+            pedido = primera[7:]
+            if sn.existe(pedido):
+                sonido = sn.clave(pedido)
+            else:
+                # Se dice y el aviso sale igual: quedarse sin aviso por un
+                # sonido mal escrito sería el peor de los dos males.
+                hay = ", ".join(sn.nombres()) or "ninguno todavía"
+                quejas.append(
+                    f"No tengo el sonido «{pedido}», así que el aviso va mudo. "
+                    f"Tengo: {hay}."
+                )
+            crudo = resto
+            continue
         if primera.startswith("@") and len(primera) > 1:
             encontrada = buscar_pantalla(session, primera[1:])
             if encontrada is None:
@@ -218,7 +237,7 @@ def _leer_prefijos(session, crudo: str) -> tuple[str, float, dict | None, list[s
             crudo = resto
             continue
         break
-    return crudo, horas, pantalla, quejas
+    return crudo, horas, pantalla, sonido, quejas
 
 
 def mandar(
@@ -242,7 +261,7 @@ def mandar(
     if not crudo and imagen is None:
         return AYUDA_CORTA
 
-    crudo, horas, pantalla, quejas = _leer_prefijos(session, crudo)
+    crudo, horas, pantalla, sonido, quejas = _leer_prefijos(session, crudo)
     if not crudo and imagen is None:
         return AYUDA_CORTA
 
@@ -255,6 +274,7 @@ def mandar(
         imagen_mime=imagen_mime,
         destinos=[pantalla["identificador"]] if pantalla else None,
         pide_acuse=interrumpe,
+        sonido=sonido,
         expira_en=asvc.vence_en(horas),
         # Un aviso pasa por delante de la cartelera; un cartel se forma en la fila.
         prioridad=10 if interrumpe else 0,
@@ -281,6 +301,8 @@ def mandar(
     lineas.append(f"«{cuerpo}»" if cuerpo else "(solo la imagen)")
     if imagen is not None and cuerpo:
         lineas.append("(con tu foto)")
+    if sonido:
+        lineas.append(f"(y suena «{sonido}» al aparecer)")
     lineas.append("")
     lineas.append(falta_para(anuncio.expira_en).capitalize() + ".")
     if interrumpe:

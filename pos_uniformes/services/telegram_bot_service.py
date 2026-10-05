@@ -69,6 +69,7 @@ AYUDA = (
     "/deshacerpago — deshace el último pago\n"
     "/prestamos — los préstamos que te pidieron, para aprobar o rechazar\n"
     "/descansos — los días que te pidieron, con cómo queda la semana\n"
+    "/sonidos — los sonidos que puede hacer un aviso\n"
     "\nLA TIENDA\n"
     "/prenda playera justo sierra — precio y cuántas hay por talla\n"
     "/escuela conalep — cómo va esa escuela\n"
@@ -306,6 +307,18 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
 
         with session_factory() as session:
             return ct.ajustar(session, cmd.argumento, quien=CODIGO_REMOTO)
+    if cmd.nombre in ("sonidos", "sonido"):
+        from pos_uniformes.services import sonidos_service as sn
+
+        nombres = sn.nombres()
+        if not nombres:
+            return (
+                "No hay sonidos todavía.\n\n"
+                "Se ponen como archivos .wav en pos_uniformes\\assets\\sonidos "
+                "y entran a los kioskos con actualizar_pc_principal.bat."
+            )
+        lista = "\n".join(f"· sonido={n}" for n in nombres)
+        return f"🔊 Sonidos que puedo poner en un aviso:\n\n{lista}\n\nEjemplo:\n/aviso sonido={nombres[0]} 🤡 Te veo..."
     if cmd.nombre == "descansos":
         from pos_uniformes.services import telegram_descansos_service as dsc
 

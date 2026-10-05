@@ -97,6 +97,7 @@ def crear_anuncio(
     prioridad: int = 0,
     expira_en: datetime | None = None,
     pide_acuse: bool = False,
+    sonido: str | None = None,
     creado_por: str = "satelite",
 ) -> Anuncio:
     """Crea un anuncio activo. Requiere al menos texto o imagen.
@@ -126,6 +127,7 @@ def crear_anuncio(
         prioridad=int(prioridad),
         expira_en=expira_en,
         pide_acuse=bool(pide_acuse),
+        sonido=(sonido or None),
         creado_por=(creado_por or "satelite")[:60],
     )
     session.add(anuncio)
@@ -256,6 +258,7 @@ def filas_para_cache(session: Session, *, para: str | None = None) -> list[dict]
                 "duracion_seg": a.duracion_seg,
                 "prioridad": a.prioridad,
                 "pide_acuse": bool(a.pide_acuse),
+                "sonido": getattr(a, "sonido", None),
                 "creado_en": (_aware(a.creado_en) or datetime.now(timezone.utc)).isoformat(),
             }
         )

@@ -46,7 +46,7 @@ def save_anuncios_cache(anuncios: list[dict]) -> None:
     """Persiste los anuncios activos en disco (metadata + imágenes).
 
     Cada dict acepta: id, titulo, mensaje, imagen_mime, imagen_bytes (bytes|None),
-    duracion_seg, prioridad, pide_acuse, creado_en (ISO). Sobreescribe el cache
+    duracion_seg, prioridad, pide_acuse, sonido, creado_en (ISO). Sobreescribe el cache
     anterior y borra las imágenes de anuncios que ya no están activos.
     """
     carpeta = _dir()
@@ -73,6 +73,7 @@ def save_anuncios_cache(anuncios: list[dict]) -> None:
                 "duracion_seg": int(a.get("duracion_seg") or 8),
                 "prioridad": int(a.get("prioridad") or 0),
                 "pide_acuse": bool(a.get("pide_acuse")),
+                "sonido": a.get("sonido") or None,
                 "creado_en": a.get("creado_en"),
             }
         )
@@ -118,6 +119,7 @@ def load_anuncios_cache() -> list[dict]:
                 "duracion_seg": int(e.get("duracion_seg") or 8),
                 "prioridad": int(e.get("prioridad") or 0),
                 "pide_acuse": bool(e.get("pide_acuse")),
+                "sonido": e.get("sonido") or None,
                 "creado_en": e.get("creado_en"),
             }
         )

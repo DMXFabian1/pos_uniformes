@@ -256,6 +256,11 @@ class AnuncioOverlay(QWidget):
         else:
             self._render_texto(anuncio.get("titulo"), anuncio.get("mensaje"))
         self._render_cabecera_y_pie(anuncio)
+        # El sonido va al final, cuando lo que se ve ya quedó armado: si algo
+        # del audio truena, el recado ya está en pantalla.
+        from pos_uniformes.ui.helpers.anuncio_sonido import reproducir
+
+        reproducir(anuncio.get("sonido"))
 
     def _render_cabecera_y_pie(self, anuncio: dict) -> None:
         """La tirita de arriba, los botones y la línea de abajo según el modo."""

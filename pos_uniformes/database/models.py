@@ -2033,6 +2033,9 @@ class Anuncio(Base):
     prioridad: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     # Segundos que se muestra en la rotación de cartelera antes de pasar al siguiente.
     duracion_seg: Mapped[int] = mapped_column(Integer, nullable=False, default=8, server_default="8")
+    #: Nombre del sonido de `assets/sonidos` que se oye al aparecer ("risa").
+    #: El audio NO se guarda aquí: viaja dentro de la app del satélite.
+    sonido: Mapped[str | None] = mapped_column(String(60))
     # Cuándo deja de verse por sí solo. NULL = hasta que alguien lo quite.
     # Un aviso de «hoy cerramos temprano» no debe seguir en la cartelera en
     # diciembre: quien lo manda de lejos no vuelve a pasar a apagarlo.
