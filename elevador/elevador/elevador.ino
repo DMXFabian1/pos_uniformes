@@ -128,7 +128,8 @@ int8_t    pisoActual    = -1;       // último piso confirmado por switch
 int8_t    pisoDestino   = -1;
 Direccion direccion     = QUIETO;   // dirección preferente (para SCAN)
 bool      pendiente[3]  = { false, false, false };
-uint32_t  tInicio       = 0;        // marca de tiempo del estado actual
+uint32_t  tInicio       = 0;        // marca de tiempo del estado actual (timeout)
+uint32_t  tArranque     = 0;        // inicio del viaje (rampa de arranque)
 
 bool hayPendientes() {
   return pendiente[0] || pendiente[1] || pendiente[2];
@@ -155,6 +156,7 @@ void iniciarViaje(int8_t destino) {
   pisoDestino = destino;
   direccion   = (destino > pisoActual) ? ARRIBA : ABAJO;
   cambiarEstado(VIAJANDO);
+  tArranque = tInicio;
   Serial.print(F("Viajando del piso ")); Serial.print(pisoActual + 1);
   Serial.print(F(" al piso "));          Serial.println(destino + 1);
 }
@@ -245,8 +247,7 @@ void loop() {
     }
 
     case VIAJANDO: {
-      uint32_t t = ahora - tInicio;
-      motorMover(direccion, pwmRampa(t));
+      motorMover(direccion, pwmRampa(ahora - tArranque));
 
       // Actualizar piso actual al pasar por switches intermedios
       int8_t p = pisoDetectado();
@@ -261,7 +262,7 @@ void loop() {
         pendiente[pisoDestino] = false;
         Serial.print(F("Llegó al piso ")); Serial.println(pisoDestino + 1);
         cambiarEstado(ESPERANDO);
-      } else if (t > TIMEOUT_VIAJE_MS) {
+      } else if (ahora - tInicio > TIMEOUT_VIAJE_MS) {
         motorParar();
         Serial.println(F("ERROR: tiempo de viaje excedido"));
         cambiarEstado(ERROR_);
