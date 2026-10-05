@@ -22,6 +22,7 @@ DESCANSO_HOY = "descanso_hoy"
 POSIBLE_FALTA = "posible_falta"
 SIN_HORARIO = "sin_horario"
 PRESTAMO_SIN_RESPONDER = "prestamo_sin_responder"
+DESCANSO_SIN_RESPONDER = "descanso_sin_responder"
 
 # Antes de esta hora no se sugieren faltas (todavía puede llegar / vender).
 HORA_MINIMA_FALTA = 13
@@ -43,8 +44,8 @@ class Pendiente:
 
 def _orden(p: Pendiente) -> tuple:
     prioridad = {
-        PAGO_ATRASADO: 0, PRESTAMO_SIN_RESPONDER: 1, PAGO_HOY: 2,
-        POSIBLE_FALTA: 3, SIN_HORARIO: 4, DESCANSO_HOY: 5,
+        PAGO_ATRASADO: 0, PRESTAMO_SIN_RESPONDER: 1, DESCANSO_SIN_RESPONDER: 2,
+        PAGO_HOY: 3, POSIBLE_FALTA: 4, SIN_HORARIO: 5, DESCANSO_HOY: 6,
     }
     return (prioridad.get(p.tipo, 9), p.employee_name)
 
@@ -161,6 +162,27 @@ def pendientes_del_dia(session, hoy: date | None = None, ahora: datetime | None 
         except Exception:  # noqa: BLE001
             pass
 
+    # Días de descanso pedidos y sin contestar. El que es para mañana corre
+    # prisa de verdad: si nadie contesta, ella no sabe si venir.
+    try:
+        from pos_uniformes.services.descansos_service import pendientes as descansos_pendientes
+
+        for d in descansos_pendientes(session, hoy=hoy):
+            nombre = str(d.employee_name or d.employee_code).split()[0]
+            faltan = (d.fecha - hoy).days
+            cuando = "HOY" if faltan == 0 else "mañana" if faltan == 1 else f"en {faltan} días"
+            salida.append(Pendiente(
+                DESCANSO_SIN_RESPONDER, d.employee_code, d.employee_name or d.employee_code,
+                f"{nombre} pidió descansar el {d.fecha:%d/%m} ({cuando}) y no le has "
+                "contestado → /descansos",
+                dias=faltan,
+            ))
+    except Exception:  # noqa: BLE001 — base sin la tabla todavía
+        try:
+            session.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+
     salida.sort(key=_orden)
     return salida
 
@@ -169,7 +191,8 @@ def texto_pendientes(pendientes: list[Pendiente]) -> str:
     """Bloque para Telegram / pantalla. Vacío si no hay nada que hacer."""
     accion = [
         p for p in pendientes
-        if p.tipo in (PAGO_HOY, PAGO_ATRASADO, PRESTAMO_SIN_RESPONDER, POSIBLE_FALTA, SIN_HORARIO)
+        if p.tipo in (PAGO_HOY, PAGO_ATRASADO, PRESTAMO_SIN_RESPONDER,
+                      DESCANSO_SIN_RESPONDER, POSIBLE_FALTA, SIN_HORARIO)
     ]
     descansos = [p for p in pendientes if p.tipo == DESCANSO_HOY]
     if not accion and not descansos:
@@ -177,7 +200,8 @@ def texto_pendientes(pendientes: list[Pendiente]) -> str:
     lineas = ["📌 PENDIENTES"]
     for p in accion:
         icono = {
-            PAGO_ATRASADO: "❗", PRESTAMO_SIN_RESPONDER: "🤲", PAGO_HOY: "💵",
+            PAGO_ATRASADO: "❗", PRESTAMO_SIN_RESPONDER: "🤲",
+            DESCANSO_SIN_RESPONDER: "🛌", PAGO_HOY: "💵",
             POSIBLE_FALTA: "❓", SIN_HORARIO: "⚙️",
         }[p.tipo]
         lineas.append(f"{icono} {p.texto}")

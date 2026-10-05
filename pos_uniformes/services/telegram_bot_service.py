@@ -68,6 +68,7 @@ AYUDA = (
     "/pagar Fanny — el desglose; con «si» al final se registra\n"
     "/deshacerpago — deshace el último pago\n"
     "/prestamos — los préstamos que te pidieron, para aprobar o rechazar\n"
+    "/descansos — los días que te pidieron, con cómo queda la semana\n"
     "\nLA TIENDA\n"
     "/prenda playera justo sierra — precio y cuántas hay por talla\n"
     "/escuela conalep — cómo va esa escuela\n"
@@ -305,6 +306,11 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
 
         with session_factory() as session:
             return ct.ajustar(session, cmd.argumento, quien=CODIGO_REMOTO)
+    if cmd.nombre == "descansos":
+        from pos_uniformes.services import telegram_descansos_service as dsc
+
+        with session_factory() as session:
+            return dsc.texto_y_botones(session, hoy=hoy)[0]
     if cmd.nombre == "pagos":
         from pos_uniformes.services import telegram_pagos_service as pg
 
@@ -367,6 +373,7 @@ _CON_BOTONES = {
     "cortes": ("pos_uniformes.services.telegram_cortes_service", "texto_y_botones"),
     "cajón": ("pos_uniformes.services.telegram_cajon_service", "texto_y_botones"),
     "prestamos": ("pos_uniformes.services.telegram_prestamos_service", "texto_y_botones"),
+    "descansos": ("pos_uniformes.services.telegram_descansos_service", "texto_y_botones"),
     "préstamos": ("pos_uniformes.services.telegram_prestamos_service", "texto_y_botones"),
     "menu": ("pos_uniformes.services.telegram_menu_service", "menu_raiz"),
     "menú": ("pos_uniformes.services.telegram_menu_service", "menu_raiz"),
@@ -483,6 +490,11 @@ def atender_toque(dato: str, *, session_factory, hoy: date | None = None) -> tup
 
     if prs.es_de_prestamos(dato):
         return prs.atender(dato, session_factory=session_factory, quien=CODIGO_REMOTO)
+
+    from pos_uniformes.services import telegram_descansos_service as dsc
+
+    if dsc.es_de_descansos(dato):
+        return dsc.atender(dato, session_factory=session_factory, quien=CODIGO_REMOTO)
 
     toque = asis.interpretar_toque(dato)
     if toque is None:

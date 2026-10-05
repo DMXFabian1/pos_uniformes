@@ -2384,6 +2384,44 @@ class PrestamoEmpleada(Base):
     )
 
 
+class SolicitudDescanso(Base):
+    """Un día libre que pidió una empleada y que Daniel aprueba o rechaza.
+
+    Lo pide ella desde la Libreta; a Daniel le llega al celular con cómo queda
+    la semana para poder decidir. Al aprobarlo se marca el descanso en el
+    calendario, y eso MUEVE su descanso fijo de esa semana (no gana un día
+    extra: cambia de día — decisión de Daniel, 2026-10-05).
+
+    Es tabla aparte y no un evento del calendario a propósito: un descanso
+    pedido no es un descanso. Escribirlo en `empleada_evento` desde que se pide
+    haría que el calendario lo pintara como día libre, que la nómina dejara de
+    contar ese día y que el detector de posibles faltas se callara, todo antes
+    de que nadie autorice nada.
+    """
+
+    __tablename__ = "solicitud_descanso"
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('pedido', 'aprobado', 'rechazado', 'cancelado')",
+            name="solicitud_descanso_estado_valido",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_code: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    employee_name: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    fecha: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    motivo: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="pedido", index=True)
+    #: Quién la resolvió, cuándo, y lo que le contestó (va de vuelta a la Libreta).
+    resuelto_por: Mapped[str | None] = mapped_column(String(40))
+    resuelto_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    respuesta: Mapped[str | None] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class CajaRetiro(Base):
     """Dinero que salió del cajón por algo que no es pago a empleada
     (proveedor, renta, cambio, comida...). Lo apuntan Daniel o León; el corte

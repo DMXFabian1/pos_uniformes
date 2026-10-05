@@ -23,6 +23,7 @@ _RAIZ = [
     [("🧾 Cortes", "m:cortes"), ("💰 Pagos", "m:pagos")],
     [("💵 Lo que salió del cajón", "m:cajon")],
     [("👥 Quién vino", "m:asistencia"), ("💵 Préstamos", "m:prestamos")],
+    [("🛌 Días de descanso", "m:descansos")],
     [("🏪 Qué contar", "m:contar"), ("🔎 Sin surtir", "m:faltas")],
     [("📣 Avisos", "m:avisos")],
     [("❔ Ayuda", "m:ayuda")],
@@ -108,6 +109,13 @@ def atender(dato: str, *, session_factory, hoy: date | None = None) -> tuple[str
 
         with session_factory() as session:
             texto, botones = prs.texto_y_botones(session)
+        return "", texto, botones
+
+    if accion == "descansos":
+        from pos_uniformes.services import telegram_descansos_service as dsc
+
+        with session_factory() as session:
+            texto, botones = dsc.texto_y_botones(session, hoy=hoy)
         return "", texto, botones
 
     if accion in ("cajon", "cajón"):

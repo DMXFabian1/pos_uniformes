@@ -173,6 +173,18 @@ def _esperando(session) -> list[str]:
             str(p.employee_name or p.employee_code).split()[0] for p in prestamos
         )
         pendientes.append(f"{OJO} Préstamos por responder: {quienes} → /prestamos")
+    try:
+        from pos_uniformes.services import descansos_service as ds
+
+        descansos = ds.pendientes(session)
+        if descansos:
+            quienes = ", ".join(
+                f"{str(d.employee_name or d.employee_code).split()[0]} {d.fecha:%d/%m}"
+                for d in descansos
+            )
+            pendientes.append(f"{OJO} Días de descanso por responder: {quienes} → /descansos")
+    except Exception:  # noqa: BLE001 — base sin la tabla todavía
+        pass
     avisos = [a for a in asvc.listar_activos(session) if a.pide_acuse]
     sin_ver = [a for a in avisos if not asvc.quien_vio(session, a.id)]
     if sin_ver:

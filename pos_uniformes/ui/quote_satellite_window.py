@@ -1548,6 +1548,20 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_prestamo_aviso.setVisible(False)
         view_ly.addWidget(self.libreta_prestamo_aviso)
 
+        # Pedir un día de descanso: mismo lugar y mismo gesto que el préstamo,
+        # porque es la misma clase de cosa — se pide y Daniel contesta desde el
+        # celular (Daniel, 2026-10-05).
+        self.libreta_descanso_button = QPushButton("🛌  Pedir un día de descanso")
+        self.libreta_descanso_button.setAutoDefault(False)
+        self.libreta_descanso_button.setVisible(False)
+        self.libreta_descanso_button.clicked.connect(self._libreta_pedir_descanso)
+        view_ly.addWidget(self.libreta_descanso_button)
+        self.libreta_descanso_aviso = QLabel("")
+        self.libreta_descanso_aviso.setWordWrap(True)
+        self.libreta_descanso_aviso.setStyleSheet("font-size: 12px; color: #b9770e;")
+        self.libreta_descanso_aviso.setVisible(False)
+        view_ly.addWidget(self.libreta_descanso_aviso)
+
         # Barra del dueño: lo de todos los días (imprimir corte) a la vista;
         # lo ocasional (rango de fechas, meta semanal) plegado bajo "Más
         # opciones". Las correcciones de un movimiento (reimprimir, cambiar
@@ -2255,6 +2269,7 @@ class QuoteSatelliteWindow(QMainWindow):
         # El botón de préstamo es parte de lo que ella ve: se refresca al
         # pintar la Libreta, no al validar el gafete.
         self._libreta_prestamo_refrescar()
+        self._libreta_descanso_refrescar()
         from pos_uniformes.services import libreta_local_queue_service as libreta_cola
         from pos_uniformes.services.libreta_service import (
             filtrar_de_hoy,
@@ -2613,6 +2628,224 @@ class QuoteSatelliteWindow(QMainWindow):
                 session.commit()
             except Exception:  # noqa: BLE001
                 logger.exception("Préstamo: no se pudo avisar")
+
+    # ── Días de descanso (lo pide la empleada, lo aprueba Daniel) ────────
+
+    #: Motivos de descanso a un toque, con la misma idea que los del préstamo:
+    #: el motivo es para que Daniel decida, no para que ella se explique.
+    MOTIVOS_DESCANSO = (
+        "Escuela",
+        "Doctor",
+        "Asunto familiar",
+        "Trámite",
+        "Descansar",
+        "Otra cosa",
+    )
+
+    def _libreta_descanso_refrescar(self) -> None:
+        """El botón solo para quien entró con su gafete, y con su estado."""
+        boton = getattr(self, "libreta_descanso_button", None)
+        aviso = getattr(self, "libreta_descanso_aviso", None)
+        if boton is None or aviso is None:
+            return
+        code = self._libreta_code
+        if not code or str(code).upper() == "VEND-1":
+            boton.setVisible(False)
+            aviso.setVisible(False)
+            return
+        try:
+            from pos_uniformes.services import descansos_service as ds
+
+            with get_session() as session:
+                pendiente = ds.pendiente_de(session, code)
+        except Exception:  # noqa: BLE001 — sin servidor, mejor no ofrecerlo
+            logger.exception("Libreta: no se pudo leer la solicitud de descanso")
+            boton.setVisible(False)
+            aviso.setVisible(False)
+            return
+
+        if pendiente is not None:
+            boton.setVisible(False)
+            aviso.setText(
+                f"🛌 Pediste el {pendiente.fecha:%d/%m} para «{pendiente.motivo}». "
+                "Daniel todavía no responde."
+            )
+            aviso.setVisible(True)
+            return
+        boton.setVisible(True)
+        aviso.setVisible(False)
+
+    def _libreta_pedir_descanso(self) -> None:
+        from pos_uniformes.services import descansos_service as ds
+
+        datos = self._ask_descanso()
+        if datos is None:
+            return
+        try:
+            with get_session() as session:
+                solicitud = ds.pedir(
+                    session,
+                    employee_code=self._libreta_code,
+                    nombre=_nombre_de(self._libreta_code),
+                    fecha=datos["fecha"],
+                    motivo=datos["motivo"],
+                )
+                session.commit()
+                self._avisar_descanso(session, solicitud)
+        except ds.NoSePuede as exc:
+            QMessageBox.information(self, "Descanso", str(exc))
+            return
+        except Exception:  # noqa: BLE001
+            logger.exception("Libreta: no se pudo pedir el descanso")
+            QMessageBox.warning(
+                self, "Sin conexión",
+                "No se pudo mandar la solicitud. Enciende la PC principal e intenta de nuevo.",
+            )
+            return
+        QMessageBox.information(
+            self, "Listo",
+            "Tu solicitud ya le llegó a Daniel.\n\nÉl la aprueba o la rechaza desde su celular.",
+        )
+        self._libreta_descanso_refrescar()
+
+    @staticmethod
+    def _avisar_descanso(session, solicitud) -> None:
+        """Le llega a Daniel al instante con el panorama del día; si no se
+        puede, no se pierde: queda en la cola de alertas."""
+        from pos_uniformes.services import telegram_descansos_service as dsc
+
+        texto = dsc.aviso_de_solicitud(solicitud, session=session)
+        try:
+            from pos_uniformes.services.telegram_service import enviar_mensaje
+
+            enviar_mensaje(texto, botones=dsc.botones_de(solicitud))
+        except Exception:  # noqa: BLE001
+            try:
+                from pos_uniformes.services.alertas_service import encolar
+
+                encolar(session, texto + "\n\nPara responder: /descansos")
+                session.commit()
+            except Exception:  # noqa: BLE001
+                logger.exception("Descanso: no se pudo avisar")
+
+    def _ask_descanso(self) -> dict | None:
+        """Qué día y para qué. El calendario se ve completo: ella escoge
+        tocando, no escribiendo una fecha."""
+        from datetime import date as _date, timedelta as _td
+
+        from PyQt6.QtCore import QDate
+        from PyQt6.QtWidgets import QCalendarWidget
+
+        from pos_uniformes.services import descansos_service as ds
+
+        hoy = _date.today()
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Pedir un día de descanso")
+        dlg.setMinimumWidth(480)
+        dlg.setStyleSheet(
+            "QDialog { background: #f4ede2; }"
+            "QLabel { color: #2c2a27; background: transparent; }"
+            "QLineEdit { background: #ffffff; color: #2c2a27;"
+            "  border: 2px solid #ddd0c0; border-radius: 12px;"
+            "  min-height: 50px; padding: 0 14px; font-size: 18px; }"
+        )
+        ly = QVBoxLayout(dlg)
+        ly.setContentsMargins(22, 20, 22, 18)
+        ly.setSpacing(10)
+
+        titulo = QLabel("Pedir un día de descanso")
+        titulo.setStyleSheet("font-size: 19px; font-weight: 800; color: #73341c;")
+        ly.addWidget(titulo)
+        pista = QLabel(
+            "Escoge el día en el calendario. Daniel lo aprueba desde su celular.\n"
+            "Si te lo da, tu descanso de esa semana se mueve a ese día."
+        )
+        pista.setWordWrap(True)
+        pista.setStyleSheet("font-size: 12px; color: #8a8177;")
+        ly.addWidget(pista)
+
+        calendario = QCalendarWidget()
+        calendario.setGridVisible(True)
+        calendario.setMinimumDate(QDate(hoy.year, hoy.month, hoy.day))
+        tope = hoy + _td(days=ds.DIAS_MAXIMO_ADELANTE)
+        calendario.setMaximumDate(QDate(tope.year, tope.month, tope.day))
+        calendario.setVerticalHeaderFormat(
+            QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader
+        )
+        calendario.setStyleSheet(
+            "QCalendarWidget QAbstractItemView { font-size: 16px; }"
+            "QCalendarWidget QWidget { background: #ffffff; color: #2c2a27; }"
+        )
+        ly.addWidget(calendario)
+
+        _CHIP = (
+            "QPushButton { background: #ffffff; color: #2c2a27;"
+            "  border: 1.5px solid #ddd0c0; border-radius: 10px;"
+            "  min-height: 42px; padding: 0 8px; font-size: 15px; font-weight: 700; }"
+            "QPushButton:checked { background: #f7e3d8; color: #73341c;"
+            "  border: 2px solid #a84f2d; }"
+            "QPushButton:pressed { background: #f1e6d6; }"
+        )
+
+        ly.addWidget(QLabel("¿Para qué?"))
+        motivo_input = QLineEdit()
+        motivo_input.setPlaceholderText("Toca una opción o escríbelo")
+        ly.addWidget(motivo_input)
+
+        grupo_motivo = QButtonGroup(dlg)
+        grupo_motivo.setExclusive(True)
+        rejilla = QGridLayout()
+        rejilla.setSpacing(6)
+        for i, motivo_rapido in enumerate(self.MOTIVOS_DESCANSO):
+            chip = QPushButton(motivo_rapido)
+            chip.setCheckable(True)
+            chip.setAutoDefault(False)
+            chip.setStyleSheet(_CHIP)
+            chip.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            if motivo_rapido == self.MOTIVO_LIBRE:
+                chip.clicked.connect(
+                    lambda _c=False: (motivo_input.clear(), motivo_input.setFocus())
+                )
+            else:
+                chip.clicked.connect(
+                    lambda _c=False, t=motivo_rapido: motivo_input.setText(t)
+                )
+            grupo_motivo.addButton(chip)
+            rejilla.addWidget(chip, i // 3, i % 3)
+        ly.addLayout(rejilla)
+
+        def _soltar_marca(_texto: str) -> None:
+            if any(b.text() == motivo_input.text() for b in grupo_motivo.buttons()):
+                return
+            marcado = grupo_motivo.checkedButton()
+            if marcado is not None:
+                grupo_motivo.setExclusive(False)
+                marcado.setChecked(False)
+                grupo_motivo.setExclusive(True)
+
+        motivo_input.textEdited.connect(_soltar_marca)
+
+        botones = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        botones.button(QDialogButtonBox.StandardButton.Ok).setText("Pedirlo")
+        botones.button(QDialogButtonBox.StandardButton.Cancel).setText("Mejor no")
+        botones.accepted.connect(dlg.accept)
+        botones.rejected.connect(dlg.reject)
+        ly.addWidget(botones)
+
+        while True:
+            if dlg.exec() != int(QDialog.DialogCode.Accepted):
+                return None
+            motivo = motivo_input.text().strip()
+            if not motivo:
+                QMessageBox.information(
+                    dlg, "Falta el motivo",
+                    "Toca una opción o escribe para qué lo necesitas.",
+                )
+                continue
+            elegido = calendario.selectedDate().toPyDate()
+            return {"fecha": elegido, "motivo": motivo}
 
     #: Motivos de préstamo a un toque. Amplios a propósito: el motivo es para
     #: que Daniel decida, no para que ella cuente su vida por pedir prestado de
