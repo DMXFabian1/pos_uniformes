@@ -56,6 +56,7 @@ def pulso(session, *, hoy: date | None = None, ahora: datetime | None = None) ->
     _bloque(session, lineas, lambda: _corte(session, hoy))
     lineas.append("")
     _bloque(session, lineas, lambda: _pantallas(session))
+    _bloque(session, lineas, lambda: _impresion(session, ahora))
     _bloque(session, lineas, lambda: _respaldo())
     lineas.append("")
     _bloque(session, lineas, lambda: _esperando(session))
@@ -123,6 +124,32 @@ def _pantallas(session) -> list[str]:
         return [f"{BIEN} Pantallas: {len(prendidas)} prendidas"]
     marca = OJO if prendidas else OJO
     return [f"{marca} Pantallas: {len(prendidas)} de {len(sats)} · apagada: {', '.join(apagadas)}"]
+
+
+def _impresion(session, ahora) -> list[str]:
+    """¿Está saliendo el papel?
+
+    Con una sola PC conectada a las impresoras, apagarla no da ningún error:
+    los tickets y las etiquetas se quedan en la cola y el que vendió cree que
+    su ticket salió. Este renglón es lo único que lo delata (2026-10-05).
+    """
+    from pos_uniformes.services import trabajos_service as tr
+
+    atorados = tr.esperando_impresion(session, ahora=ahora)
+    if not atorados:
+        return [f"{BIEN} Impresión al día: nada esperando en la cola."]
+    cuantos = {}
+    for t in atorados:
+        nombre = getattr(t.tipo, "value", str(t.tipo)).lower()
+        cuantos[nombre] = cuantos.get(nombre, 0) + 1
+    detalle = ", ".join(f"{n} {nombre}" for nombre, n in sorted(cuantos.items()))
+    espera = ahora - (atorados[0].created_at.astimezone() if atorados[0].created_at else ahora)
+    minutos = int(espera.total_seconds() // 60)
+    cuanto = f"{minutos} min" if minutos < 120 else f"{minutos // 60} h"
+    return [
+        f"{OJO} Sin imprimir: {detalle} — el más viejo lleva {cuanto}.",
+        "   Prende el Servidor de impresión (la PC con las impresoras) y sale solo.",
+    ]
 
 
 def _respaldo() -> list[str]:

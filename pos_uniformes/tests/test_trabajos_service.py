@@ -304,3 +304,52 @@ class SoltarReclamosVencidosTests(unittest.TestCase):
         t = self._atorado(TipoTrabajo.TICKET)
         svc.soltar_reclamos_vencidos(self.session)
         self.assertEqual(svc.reclamar_siguiente(self.session).id, t.id)
+
+
+class EsperandoImpresionTests(unittest.TestCase):
+    """Con una sola PC conectada a las impresoras, apagarla no da ningún error:
+    el papel no sale y nadie se entera (2026-10-05)."""
+
+    def setUp(self) -> None:
+        self.session = _make_session()
+
+    def tearDown(self) -> None:
+        self.session.close()
+
+    def _pendiente(self, tipo=TipoTrabajo.ETIQUETA, *, hace_minutos=60):
+        from datetime import datetime, timedelta, timezone
+
+        t = svc.encolar(self.session, tipo, {"sku": "X"})
+        t.created_at = datetime.now(timezone.utc) - timedelta(minutes=hace_minutos)
+        self.session.flush()
+        return t
+
+    def test_lo_que_lleva_rato_esperando_se_puede_ver(self) -> None:
+        t = self._pendiente()
+        self.assertEqual([x.id for x in svc.esperando_impresion(self.session)], [t.id])
+
+    def test_lo_recien_encolado_no_alarma(self) -> None:
+        """Dos minutos de espera es la impresora trabajando, no un problema."""
+        self._pendiente(hace_minutos=2)
+        self.assertEqual(svc.esperando_impresion(self.session), [])
+
+    def test_el_pedido_no_cuenta(self) -> None:
+        """Un pedido esperando es normal: lo surte una persona."""
+        self._pendiente(TipoTrabajo.PEDIDO, hace_minutos=60 * 5)
+        self.assertEqual(svc.esperando_impresion(self.session), [])
+
+    def test_el_que_esta_en_backoff_no_cuenta_todavia(self) -> None:
+        """Si ya falló y espera su reintento, no está atorado: está esperando turno."""
+        from datetime import datetime, timedelta, timezone
+
+        t = self._pendiente()
+        t.disponible_en = datetime.now(timezone.utc) + timedelta(minutes=5)
+        self.session.flush()
+        self.assertEqual(svc.esperando_impresion(self.session), [])
+
+    def test_sale_el_mas_viejo_primero(self) -> None:
+        viejo = self._pendiente(hace_minutos=300)
+        nuevo = self._pendiente(TipoTrabajo.TICKET, hace_minutos=30)
+        self.assertEqual(
+            [x.id for x in svc.esperando_impresion(self.session)], [viejo.id, nuevo.id]
+        )

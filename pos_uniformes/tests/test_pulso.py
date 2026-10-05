@@ -145,3 +145,52 @@ class EnganchadoAlBotTests(_Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ImpresionEnElPulsoTests(unittest.TestCase):
+    """El renglón que delata que el Servidor de impresión está apagado.
+
+    Con una sola PC conectada a las impresoras, apagarla no da ningún error:
+    el papel no sale y el que vendió cree que su ticket salió (2026-10-05)."""
+
+    _AHORA = datetime(2026, 10, 5, 18, 0).astimezone()
+
+    def _lineas(self, atorados):
+        with patch("pos_uniformes.services.trabajos_service.esperando_impresion",
+                   return_value=atorados):
+            return pul._impresion(object(), self._AHORA)
+
+    def _trabajo(self, tipo, *, hace_minutos):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(
+            tipo=SimpleNamespace(value=tipo),
+            created_at=self._AHORA - timedelta(minutes=hace_minutos),
+        )
+
+    def test_sin_nada_esperando_lo_dice(self) -> None:
+        linea, = self._lineas([])
+        self.assertIn("al día", linea)
+        self.assertIn("✅", linea)
+
+    def test_dice_cuantos_de_cada_cosa_y_cuanto_llevan(self) -> None:
+        texto = "\n".join(self._lineas([
+            self._trabajo("ETIQUETA", hace_minutos=95),
+            self._trabajo("ETIQUETA", hace_minutos=40),
+            self._trabajo("TICKET", hace_minutos=30),
+        ]))
+        self.assertIn("2 etiqueta", texto)
+        self.assertIn("1 ticket", texto)
+        self.assertIn("95 min", texto)
+        self.assertIn("Servidor de impresión", texto)
+
+    def test_con_horas_no_dice_cientos_de_minutos(self) -> None:
+        self.assertIn("5 h", "\n".join(self._lineas([self._trabajo("TICKET", hace_minutos=300)])))
+
+    def test_si_la_cola_no_se_puede_leer_el_pulso_sigue(self) -> None:
+        """Un bloque caído no se lleva la vista entera."""
+        lineas = [""]
+        with patch("pos_uniformes.services.trabajos_service.esperando_impresion",
+                   side_effect=RuntimeError("sin base")):
+            pul._bloque(object(), lineas, lambda: pul._impresion(object(), self._AHORA))
+        self.assertIn("no se pudo leer", "\n".join(lineas))

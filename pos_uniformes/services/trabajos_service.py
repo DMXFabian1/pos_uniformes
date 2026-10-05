@@ -436,6 +436,42 @@ def soltar_reclamos_vencidos(
     return soltados
 
 
+#: Un trabajo de impresión que lleva más de esto esperando ya no está en cola:
+#: nadie lo va a tomar. O el Servidor de impresión está apagado, o su kiosko
+#: está cerrado, o se quedó sin red.
+MINUTOS_PARA_AVISAR = 15
+
+
+def esperando_impresion(
+    session: Session,
+    *,
+    minutos: int = MINUTOS_PARA_AVISAR,
+    ahora: datetime | None = None,
+) -> list[Trabajo]:
+    """Trabajos de impresión que llevan demasiado tiempo PENDIENTES.
+
+    Centralizar la impresión en una sola PC tiene un precio: si esa PC se
+    apaga, todo lo que se manda a imprimir se queda en la cola CALLADO — el
+    que vendió cree que su ticket salió. Ya pasó con dos tickets que esperaron
+    a que el kiosko terminara de actualizarse (2026-10-04). Esto es para poder
+    decirlo en vez de descubrirlo.
+
+    PEDIDO queda fuera: ahí esperar es normal, lo surte una persona.
+    """
+    from datetime import timedelta, timezone
+
+    referencia = ahora or datetime.now(timezone.utc)
+    corte = referencia - timedelta(minutes=minutos)
+    return list(session.scalars(
+        select(Trabajo)
+        .where(Trabajo.estado == EstadoTrabajo.PENDIENTE)
+        .where(Trabajo.tipo.in_(list(_RECLAMABLES)))
+        .where(Trabajo.created_at < corte)
+        .where(_disponible_ahora())
+        .order_by(Trabajo.created_at)
+    ).all())
+
+
 def limpiar_trabajos_viejos(
     session: Session,
     *,
