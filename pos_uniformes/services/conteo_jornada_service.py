@@ -869,6 +869,100 @@ def historial_de_alcance(
     return salida
 
 
+@dataclass(frozen=True)
+class Cobertura:
+    """Cuántas tallas de un alcance se contaron en la vuelta de ahora.
+
+    Existe porque "cuándo se contó esto" se estaba sacando del MÁXIMO de las
+    fechas de sus tallas: contar UNA talla ponía el alcance entero como
+    "contado hoy", y el menú lo escondía por recién contado. Pasó en la tienda
+    el 2026-10-05 — una muchacha contó una playera de Chazarilla (un solo
+    color) y la escuela desapareció del menú, así que la que seguía ya no pudo
+    registrar lo demás.
+    """
+
+    total: int = 0
+    contadas: int = 0
+
+    @property
+    def completa(self) -> bool:
+        return self.total > 0 and self.contadas >= self.total
+
+    @property
+    def a_medias(self) -> bool:
+        return 0 < self.contadas < self.total
+
+    @property
+    def faltan(self) -> int:
+        return max(self.total - self.contadas, 0)
+
+    def texto(self) -> str:
+        if self.a_medias:
+            return f"va a medias: {self.contadas} de {self.total} tallas"
+        return ""
+
+
+def coberturas(session: Session, *, dias: int = DIAS_RECIEN_CONTADA, hoy: date | None = None) -> dict:
+    """Cuánto se lleva contado de cada alcance en los últimos `dias`.
+
+    Mismas claves que `ultimos_conteos`: `escuela_id`, `("basicos", tipo)` y
+    `("basicos", tipo, prenda)`. Con esto el menú puede esconder solo lo que
+    está COMPLETO y enseñar lo que va a medias, que es justo lo que alguien
+    tiene que terminar.
+    """
+    from datetime import datetime as _dt, time as _time, timedelta as _td
+
+    from pos_uniformes.database.models import Producto, TipoPieza, Variante
+
+    hoy = hoy or date.today()
+    corte = _dt.combine(hoy - _td(days=dias), _time.min).astimezone()
+    contada = Variante.ultimo_conteo_at.is_not(None) & (Variante.ultimo_conteo_at >= corte)
+
+    salida: dict = {}
+
+    filas = session.execute(
+        select(
+            Producto.escuela_id,
+            func.count(Variante.id),
+            func.count(case((contada, 1))),
+        )
+        .join(Variante, Variante.producto_id == Producto.id)
+        .where(Producto.escuela_id.is_not(None), Producto.activo.is_(True))
+        .group_by(Producto.escuela_id)
+    ).all()
+    for escuela_id, total, contadas in filas:
+        salida[int(escuela_id)] = Cobertura(int(total or 0), int(contadas or 0))
+
+    basicos = session.execute(
+        select(
+            TipoPieza.nombre,
+            Producto.nombre,
+            func.count(Variante.id),
+            func.count(case((contada, 1))),
+        )
+        .join(Variante, Variante.producto_id == Producto.id)
+        .join(TipoPieza, TipoPieza.id == Producto.tipo_pieza_id)
+        .where(Producto.escuela_id.is_(None), Producto.activo.is_(True))
+        .group_by(TipoPieza.nombre, Producto.nombre)
+    ).all()
+    por_tipo: dict[str, list[int]] = {}
+    for tipo, prenda, total, contadas in basicos:
+        salida[("basicos", str(tipo), str(prenda))] = Cobertura(int(total or 0), int(contadas or 0))
+        acumulado = por_tipo.setdefault(str(tipo), [0, 0])
+        acumulado[0] += int(total or 0)
+        acumulado[1] += int(contadas or 0)
+    for tipo, (total, contadas) in por_tipo.items():
+        salida[("basicos", tipo)] = Cobertura(total, contadas)
+    return salida
+
+
+def cobertura_de(coberturas_dict: dict, escuela_id: int | None, tipo_pieza: str = "", prenda: str = "") -> Cobertura:
+    """La Cobertura de un alcance, o una vacía si no se pudo calcular."""
+    clave = clave_alcance(escuela_id, tipo_pieza, prenda)
+    valor = (coberturas_dict or {}).get(clave)
+    return valor if isinstance(valor, Cobertura) else Cobertura()
+
+
 def ultimos_conteos(session: Session) -> dict:
     """Cuándo se contó cada escuela (y cada prenda básica) por última vez.
 

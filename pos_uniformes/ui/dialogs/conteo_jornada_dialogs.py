@@ -172,6 +172,15 @@ class ConteoNuevaJornadaDialog(QDialog):
                 self._abiertas = {k: ref(j) for k, j in abiertas_por_alcance(session).items()}
             except Exception:  # noqa: BLE001
                 self._abiertas = {}
+            try:
+                # Cuánto se lleva contado de cada una. Sin esto, contar UNA
+                # talla escondía el alcance entero por "recién contado" y la
+                # que seguía ya no podía registrar lo demás (2026-10-05).
+                from pos_uniformes.services.conteo_jornada_service import coberturas
+
+                self._cobertura = coberturas(session)
+            except Exception:  # noqa: BLE001 — sin esto se esconde como antes
+                self._cobertura = {}
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Sin conexión", f"No se pudieron cargar las escuelas:\n{exc}")
             escuelas = []
@@ -188,14 +197,23 @@ class ConteoNuevaJornadaDialog(QDialog):
         self._escuela_combo.clear()
         self._escuela_combo.addItem(f"— {NOMBRE_BASICOS} —", ESCUELA_ID_BASICOS)
         ocultas = 0
+        from pos_uniformes.services.conteo_jornada_service import cobertura_de
+
         for e in self._escuelas:
             u = ultimo_conteo_de(self._ultimos, int(e["escuela_id"]))
             abierta = self._abiertas.get(int(e["escuela_id"]))
-            # Una en proceso siempre se ve: hay que poder seguirla.
-            if abierta is None and u.reciente() and not todas:
+            cob = cobertura_de(getattr(self, "_cobertura", {}), int(e["escuela_id"]))
+            # Una en proceso siempre se ve: hay que poder seguirla. Y una a
+            # medias TAMBIÉN: es justo la que alguien tiene que terminar.
+            if abierta is None and u.reciente() and not cob.a_medias and not todas:
                 ocultas += 1
                 continue
-            estado = _estado_en_proceso(abierta) if abierta is not None else u.texto()
+            if abierta is not None:
+                estado = _estado_en_proceso(abierta)
+            elif cob.a_medias:
+                estado = cob.texto()
+            else:
+                estado = u.texto()
             self._escuela_combo.addItem(f'{e["escuela_nombre"]}   ·  {estado}', e["escuela_id"])
         self._escuela_combo.blockSignals(False)
         self._ocultas_label.setText(
@@ -234,11 +252,38 @@ class ConteoNuevaJornadaDialog(QDialog):
             )
         return self._abiertas.get(int(dato))
 
+    def cobertura_elegida(self):
+        """La Cobertura de lo que está seleccionado ahora."""
+        from pos_uniformes.services.conteo_jornada_service import cobertura_de
+
+        guardadas = getattr(self, "_cobertura", {})
+        dato = self._escuela_combo.currentData()
+        if dato is None:
+            return cobertura_de({}, None)
+        if int(dato) == ESCUELA_ID_BASICOS:
+            return cobertura_de(
+                guardadas, None,
+                str(self._tipo_combo.currentData() or ""),
+                str(self._prenda_combo.currentData() or ""),
+            )
+        return cobertura_de(guardadas, int(dato))
+
     def _pintar_ultimo(self, *_args) -> None:
         abierta = self.abierta_elegida()
         if abierta is not None:
             hoja = f" Ya tiene su {abierta.hoja_texto}: no la imprimas otra vez." if abierta.hoja_texto else ""
             self._ultimo_label.setText(f"En proceso: la está contando {abierta.quien} desde {abierta.iniciada_at.strftime('%H:%M') if abierta.iniciada_at else 'hoy'}. Puedes seguirla.{hoja}")
+            self._ultimo_label.setStyleSheet("color: #b45309; font-size: 12px; font-weight: 700;")
+            return
+        # Lo que va a medias se dice ANTES de la fecha: "ya se contó hoy" es
+        # verdad y es engañoso al mismo tiempo cuando faltan 37 de 40 tallas
+        # (2026-10-05).
+        cob = self.cobertura_elegida()
+        if cob.a_medias:
+            self._ultimo_label.setText(
+                f"Va a medias: {cob.contadas} de {cob.total} tallas contadas, "
+                f"faltan {cob.faltan}. Esta es la que hay que terminar."
+            )
             self._ultimo_label.setStyleSheet("color: #b45309; font-size: 12px; font-weight: 700;")
             return
         u = self.ultimo_elegido()
@@ -279,12 +324,23 @@ class ConteoNuevaJornadaDialog(QDialog):
             # renglones de "todos" no se cuentan en una tarde.
             from pos_uniformes.services.conteo_jornada_service import ultimo_conteo_de
 
+            from pos_uniformes.services.conteo_jornada_service import cobertura_de
+
             for t in tipos:
                 abierta = self._abiertas.get(("basicos", t))
                 u = ultimo_conteo_de(self._ultimos, None, t)
-                if abierta is None and u.reciente() and not self._ver_todas.isChecked():
+                cob = cobertura_de(getattr(self, "_cobertura", {}), None, t)
+                if (
+                    abierta is None and u.reciente() and not cob.a_medias
+                    and not self._ver_todas.isChecked()
+                ):
                     continue
-                estado = _estado_en_proceso(abierta) if abierta is not None else u.texto()
+                if abierta is not None:
+                    estado = _estado_en_proceso(abierta)
+                elif cob.a_medias:
+                    estado = cob.texto()
+                else:
+                    estado = u.texto()
                 self._tipo_combo.addItem(f"{t}   ·  {estado}", t)
         self._on_tipo()
 
@@ -306,10 +362,18 @@ class ConteoNuevaJornadaDialog(QDialog):
                 prendas = []
             finally:
                 session.close()
+            from pos_uniformes.services.conteo_jornada_service import cobertura_de
+
             for prenda in prendas:
                 abierta = self._abiertas.get(("basicos", tipo, prenda))
                 u = ultimo_conteo_de(self._ultimos, None, tipo, prenda)
-                estado = _estado_en_proceso(abierta) if abierta is not None else u.texto()
+                cob = cobertura_de(getattr(self, "_cobertura", {}), None, tipo, prenda)
+                if abierta is not None:
+                    estado = _estado_en_proceso(abierta)
+                elif cob.a_medias:
+                    estado = cob.texto()
+                else:
+                    estado = u.texto()
                 self._prenda_combo.addItem(f"{nombre_corto_prenda(prenda)}   ·  {estado}", prenda)
         self._prenda_combo.setVisible(es_basicos and self._prenda_combo.count() > 1)
         self._prenda_combo.blockSignals(False)
