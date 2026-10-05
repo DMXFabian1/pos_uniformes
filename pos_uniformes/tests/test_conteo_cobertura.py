@@ -136,3 +136,99 @@ class SinDatoTests(_Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UnaSolaPrendaDeUnaEscuelaTests(_Base):
+    """Antes una escuela se contaba entera o nada, así que dos personas no
+    podían repartirse los colores de la misma playera: la primera abría la
+    jornada de toda la escuela y la segunda chocaba con ella
+    (Daniel, 2026-10-05: "hazlo para las escuelas también")."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.blanca = self._producto("Playera Chazarilla Blanca")
+        self.roja = self._producto("Playera Chazarilla Roja")
+        self._tallas(self.blanca, 5)
+        self._tallas(self.roja, 4)
+
+    def test_el_alcance_de_una_prenda_trae_solo_esa(self) -> None:
+        grupos = cj.alcance(self.s, self.escuela.id, "", "Playera Chazarilla Roja")
+        self.assertEqual([g["producto_nombre"] for g in grupos], ["Playera Chazarilla Roja"])
+        self.assertEqual(sum(len(g["variantes"]) for g in grupos), 4)
+
+    def test_sin_prenda_sigue_trayendo_toda_la_escuela(self) -> None:
+        grupos = cj.alcance(self.s, self.escuela.id)
+        self.assertEqual(sum(len(g["variantes"]) for g in grupos), 9)
+
+    def test_la_llave_distingue_la_prenda(self) -> None:
+        self.assertEqual(cj.clave_alcance(7), 7)
+        self.assertEqual(cj.clave_alcance(7, "", "Playera Roja"), (7, "Playera Roja"))
+
+    def test_dos_colores_a_la_vez_no_se_pisan(self) -> None:
+        cj.abrir_jornada(self.s, escuela_id=self.escuela.id,
+                         prenda="Playera Chazarilla Blanca",
+                         empleada_code="VEND-5", empleada_nombre="Cristal")
+        otra = cj.abrir_jornada(self.s, escuela_id=self.escuela.id,
+                                prenda="Playera Chazarilla Roja",
+                                empleada_code="VEND-3", empleada_nombre="Evelyn")
+        self.assertIsNotNone(otra.id)
+        self.assertEqual(otra.prenda, "Playera Chazarilla Roja")
+
+    def test_el_mismo_color_si_choca(self) -> None:
+        """Dos contando lo mismo es el error que las jornadas vinieron a evitar."""
+        cj.abrir_jornada(self.s, escuela_id=self.escuela.id,
+                         prenda="Playera Chazarilla Blanca",
+                         empleada_code="VEND-5", empleada_nombre="Cristal")
+        with self.assertRaises(cj.JornadaEnProceso):
+            cj.abrir_jornada(self.s, escuela_id=self.escuela.id,
+                             prenda="Playera Chazarilla Blanca",
+                             empleada_code="VEND-3", empleada_nombre="Evelyn")
+
+    def test_toda_la_escuela_choca_con_una_prenda_ya_abierta(self) -> None:
+        cj.abrir_jornada(self.s, escuela_id=self.escuela.id,
+                         prenda="Playera Chazarilla Blanca",
+                         empleada_code="VEND-5", empleada_nombre="Cristal")
+        with self.assertRaises(cj.JornadaEnProceso):
+            cj.abrir_jornada(self.s, escuela_id=self.escuela.id,
+                             empleada_code="VEND-3", empleada_nombre="Evelyn")
+
+    def test_una_prenda_choca_con_la_de_toda_la_escuela(self) -> None:
+        cj.abrir_jornada(self.s, escuela_id=self.escuela.id,
+                         empleada_code="VEND-5", empleada_nombre="Cristal")
+        with self.assertRaises(cj.JornadaEnProceso):
+            cj.abrir_jornada(self.s, escuela_id=self.escuela.id,
+                             prenda="Playera Chazarilla Roja",
+                             empleada_code="VEND-3", empleada_nombre="Evelyn")
+
+    def test_el_titulo_dice_que_prenda_es(self) -> None:
+        """Si no, la hoja impresa y el tablero no se distinguen de la de toda
+        la escuela."""
+        j = cj.abrir_jornada(self.s, escuela_id=self.escuela.id,
+                             prenda="Playera Chazarilla Roja",
+                             empleada_code="VEND-5", empleada_nombre="Cristal")
+        self.assertIn("Chazarilla", j.titulo)
+        self.assertIn("Roja", j.titulo)
+
+    def test_cuenta_solo_las_tallas_de_esa_prenda(self) -> None:
+        j = cj.abrir_jornada(self.s, escuela_id=self.escuela.id,
+                             prenda="Playera Chazarilla Roja",
+                             empleada_code="VEND-5", empleada_nombre="Cristal")
+        self.assertEqual(j.total_tallas, 4)
+
+    def test_las_prendas_de_la_escuela_se_pueden_listar(self) -> None:
+        self.assertEqual(
+            sorted(cj.prendas_de_escuela(self.s, self.escuela.id)),
+            ["Playera Chazarilla Blanca", "Playera Chazarilla Roja"],
+        )
+
+    def test_la_cobertura_se_lleva_por_prenda(self) -> None:
+        self._tallas(self._producto("Short Chazarilla"), 3, contadas=3)
+        cobs = cj.coberturas(self.s, hoy=HOY)
+        self.assertTrue(cj.cobertura_de(cobs, self.escuela.id, "", "Short Chazarilla").completa)
+        self.assertFalse(
+            cj.cobertura_de(cobs, self.escuela.id, "", "Playera Chazarilla Roja").completa
+        )
+        # Y la escuela entera va a medias: 3 de 12.
+        de_la_escuela = cj.cobertura_de(cobs, self.escuela.id)
+        self.assertEqual((de_la_escuela.contadas, de_la_escuela.total), (3, 12))
+        self.assertTrue(de_la_escuela.a_medias)

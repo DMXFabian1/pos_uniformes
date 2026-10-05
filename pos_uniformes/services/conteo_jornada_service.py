@@ -106,12 +106,18 @@ def ref(jornada: ConteoJornada) -> JornadaRef:
 
 
 def clave_alcance(escuela_id: int | None, tipo_pieza: str = "", prenda: str = ""):
-    """La llave con la que se indexa un alcance en `ultimos_conteos` y
-    `abiertas_por_alcance`: escuela_id, ("basicos", tipo) o ("basicos", tipo, prenda)."""
-    if escuela_id is not None:
-        return int(escuela_id)
-    tipo = (tipo_pieza or "").strip()
+    """La llave con la que se indexa un alcance en `ultimos_conteos`,
+    `coberturas` y `abiertas_por_alcance`.
+
+    Formas: `escuela_id`, `(escuela_id, prenda)`, `("basicos", tipo)` y
+    `("basicos", tipo, prenda)`. La de escuela con prenda existe desde que se
+    puede contar una sola prenda de una escuela (Daniel, 2026-10-05: "hazlo
+    para las escuelas también"), igual que ya se hacía en básicos.
+    """
     prenda = (prenda or "").strip()
+    if escuela_id is not None:
+        return (int(escuela_id), prenda) if prenda else int(escuela_id)
+    tipo = (tipo_pieza or "").strip()
     return ("basicos", tipo, prenda) if prenda else ("basicos", tipo)
 
 
@@ -131,10 +137,12 @@ def alcance(session: Session, escuela_id: int | None, tipo_pieza: str = "", pren
 
     if escuela_id is None:
         grupos = obtener_variantes_basicos_agrupadas(session, tipo_pieza=tipo_pieza or None)
-        if (prenda or "").strip():
-            grupos = [g for g in grupos if str(g.get("producto_nombre") or "") == prenda.strip()]
     else:
         grupos = obtener_variantes_agrupadas_por_producto(session, escuela_id)
+    # El recorte por prenda vale para las dos: una escuela también se puede
+    # contar de una sola prenda (2026-10-05).
+    if (prenda or "").strip():
+        grupos = [g for g in grupos if str(g.get("producto_nombre") or "") == prenda.strip()]
     return [g for g in grupos if not g.get("virtual")]
 
 
@@ -168,9 +176,9 @@ def alcances_en_lote(
                 basicos = obtener_variantes_basicos_agrupadas(session)
                 cache["basicos"] = basicos
             grupos = [g for g in basicos if not j.tipo_pieza or g["tipo_pieza"] == j.tipo_pieza]
-            prenda = (getattr(j, "prenda", "") or "").strip()
-            if prenda:
-                grupos = [g for g in grupos if str(g.get("producto_nombre") or "") == prenda]
+        prenda = (getattr(j, "prenda", "") or "").strip()
+        if prenda:
+            grupos = [g for g in grupos if str(g.get("producto_nombre") or "") == prenda]
         out[j.id] = [g for g in grupos if not g.get("virtual")]
     return out
 
@@ -178,6 +186,15 @@ def alcances_en_lote(
 def prendas_basicas(session: Session, tipo_pieza: str) -> list[str]:
     """Los productos básicos de un tipo (para elegir una sola prenda)."""
     return [str(g["producto_nombre"]) for g in alcance(session, None, tipo_pieza)]
+
+
+def prendas_de_escuela(session: Session, escuela_id: int) -> list[str]:
+    """Los productos de una escuela, para contar una sola prenda de ahí.
+
+    Lo mismo que `prendas_basicas` pero del lado de las escuelas: antes una
+    escuela se contaba entera o nada, y por eso dos personas no podían
+    repartirse los colores de la misma playera (2026-10-05)."""
+    return [str(g["producto_nombre"]) for g in alcance(session, int(escuela_id))]
 
 
 def nombre_corto_prenda(prenda: str) -> str:
@@ -201,7 +218,7 @@ def abrir_jornada(
     """
     if not empleada_code or not empleada_code.strip():
         raise ValueError("Una jornada necesita el gafete de quien cuenta.")
-    prenda = (prenda or "").strip() if escuela_id is None else ""
+    prenda = (prenda or "").strip()
     abierta = jornada_abierta_de(session, escuela_id, tipo_pieza, prenda)
     if abierta is not None:
         raise JornadaEnProceso(abierta)
@@ -214,6 +231,11 @@ def abrir_jornada(
     else:
         escuela = session.get(Escuela, escuela_id)
         titulo = escuela.nombre if escuela is not None else f"Escuela {escuela_id}"
+        if prenda:
+            # Que el título diga QUÉ se cuenta: si no, la hoja y el tablero
+            # dirían "Chazarilla" para una jornada de una sola prenda y no
+            # habría forma de distinguirla de la de toda la escuela.
+            titulo = f"{titulo} · {nombre_corto_prenda(prenda)}"
     jornada = ConteoJornada(
         escuela_id=escuela_id,
         tipo_pieza=(tipo_pieza or "").strip(),
@@ -241,7 +263,7 @@ def registrar_impresion(
     chicas imprimían conteos que otra ya estaba haciendo, porque imprimir no
     dejaba huella). Abre la jornada a nombre de quien imprime, o si ya hay
     una abierta se pega a ella. Devuelve (jornada, ya_habia)."""
-    prenda = (prenda or "").strip() if escuela_id is None else ""
+    prenda = (prenda or "").strip()
     abierta = jornada_abierta_de(session, escuela_id, tipo_pieza, prenda)
     ya_habia = abierta is not None
     jornada = abierta or abrir_jornada(
@@ -258,8 +280,9 @@ def registrar_impresion(
 def jornada_abierta_de(session: Session, escuela_id: int | None, tipo_pieza: str = "", prenda: str = "") -> ConteoJornada | None:
     """La jornada sin terminar que choca con ese alcance, si hay.
 
-    Básicos: una de todo el tipo choca con cualquiera del tipo; una de una
-    prenda choca con la de todo el tipo y con la de esa misma prenda."""
+    Una de todo el alcance (la escuela entera, o todo el tipo de básicos)
+    choca con cualquiera de ahí; una de una prenda choca con la de todo el
+    alcance y con la de esa misma prenda, no con la de otra prenda."""
     q = select(ConteoJornada).where(ConteoJornada.terminada_at.is_(None))
     if escuela_id is None:
         q = q.where(ConteoJornada.escuela_id.is_(None), ConteoJornada.tipo_pieza == (tipo_pieza or "").strip())
@@ -267,7 +290,14 @@ def jornada_abierta_de(session: Session, escuela_id: int | None, tipo_pieza: str
         if prenda:
             q = q.where(or_(ConteoJornada.prenda == "", ConteoJornada.prenda == prenda))
     else:
+        # Igual que en básicos: una de toda la escuela choca con cualquiera de
+        # esa escuela, y una de una prenda choca con la de toda la escuela y
+        # con la de esa misma prenda — pero NO con la de otra prenda, que es
+        # lo que deja a dos personas contar dos colores a la vez.
         q = q.where(ConteoJornada.escuela_id == escuela_id)
+        prenda = (prenda or "").strip()
+        if prenda:
+            q = q.where(or_(ConteoJornada.prenda == "", ConteoJornada.prenda == prenda))
     return session.scalars(q.order_by(ConteoJornada.iniciada_at.desc())).first()
 
 
@@ -923,15 +953,22 @@ def coberturas(session: Session, *, dias: int = DIAS_RECIEN_CONTADA, hoy: date |
     filas = session.execute(
         select(
             Producto.escuela_id,
+            Producto.nombre,
             func.count(Variante.id),
             func.count(case((contada, 1))),
         )
         .join(Variante, Variante.producto_id == Producto.id)
         .where(Producto.escuela_id.is_not(None), Producto.activo.is_(True))
-        .group_by(Producto.escuela_id)
+        .group_by(Producto.escuela_id, Producto.nombre)
     ).all()
-    for escuela_id, total, contadas in filas:
-        salida[int(escuela_id)] = Cobertura(int(total or 0), int(contadas or 0))
+    por_escuela: dict[int, list[int]] = {}
+    for escuela_id, prenda, total, contadas in filas:
+        salida[(int(escuela_id), str(prenda))] = Cobertura(int(total or 0), int(contadas or 0))
+        acumulado = por_escuela.setdefault(int(escuela_id), [0, 0])
+        acumulado[0] += int(total or 0)
+        acumulado[1] += int(contadas or 0)
+    for escuela_id, (total, contadas) in por_escuela.items():
+        salida[int(escuela_id)] = Cobertura(total, contadas)
 
     basicos = session.execute(
         select(
@@ -984,23 +1021,38 @@ def ultimos_conteos(session: Session) -> dict:
     nombres = nombres_por_codigo(session)
     for escuela_id, tipo_pieza, nombre, code, terminada, prenda in filas:
         quien = mostrar(nombre or code or "", nombres)
-        if escuela_id is None and prenda:
-            # Una prenda sola: cuenta para esa prenda Y como último toque al tipo.
-            salida.setdefault(("basicos", str(tipo_pieza or ""), str(prenda)), UltimoConteo(_a_local(terminada), quien))
+        if prenda:
+            # Una prenda sola cuenta para esa prenda Y como último toque al
+            # alcance completo. Ojo: ese "último toque" ya NO decide si el
+            # alcance se esconde del menú — eso lo decide la cobertura, porque
+            # una prenda contada no es la escuela contada (ver `coberturas`).
+            salida.setdefault(
+                clave_alcance(escuela_id, str(tipo_pieza or ""), str(prenda)),
+                UltimoConteo(_a_local(terminada), quien),
+            )
         clave = int(escuela_id) if escuela_id is not None else ("basicos", str(tipo_pieza or ""))
         if clave not in salida:
             salida[clave] = UltimoConteo(_a_local(terminada), quien)
     # 2. Conteos viejos (sin jornada): la talla contada más recientemente.
     viejos = session.execute(
-        select(Producto.escuela_id, func.max(Variante.ultimo_conteo_at))
+        select(Producto.escuela_id, Producto.nombre, func.max(Variante.ultimo_conteo_at))
         .join(Variante, Variante.producto_id == Producto.id)
         .where(Producto.escuela_id.is_not(None), Variante.ultimo_conteo_at.is_not(None))
-        .group_by(Producto.escuela_id)
+        .group_by(Producto.escuela_id, Producto.nombre)
     ).all()
-    for escuela_id, fecha in viejos:
-        clave = int(escuela_id)
-        if clave not in salida and fecha is not None:
-            salida[clave] = UltimoConteo(_a_local(fecha), "")
+    ultima_de_escuela: dict[int, datetime] = {}
+    for escuela_id, prenda, fecha in viejos:
+        if fecha is None:
+            continue
+        local = _a_local(fecha)
+        salida.setdefault((int(escuela_id), str(prenda)), UltimoConteo(local, ""))
+        previa = ultima_de_escuela.get(int(escuela_id))
+        if previa is None or local > previa:
+            ultima_de_escuela[int(escuela_id)] = local
+    for escuela_id, fecha in ultima_de_escuela.items():
+        # La jornada terminada manda sobre esto (ya se puso arriba); esto solo
+        # cubre las escuelas que nunca tuvieron jornada.
+        salida.setdefault(int(escuela_id), UltimoConteo(fecha, ""))
     # 3. Básicos sin jornada: por prenda (nombre del producto) y por tipo.
     from pos_uniformes.database.models import TipoPieza
 

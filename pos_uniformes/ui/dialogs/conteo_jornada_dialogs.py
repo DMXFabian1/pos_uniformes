@@ -100,7 +100,7 @@ class ConteoNuevaJornadaDialog(QDialog):
         self._session_factory = session_factory or _default_session_factory
         self.escuela_id: int | None = None
         self.tipo_pieza: str = ""
-        self.prenda: str = ""   # básicos: una sola prenda (nombre del producto); "" = todo el tipo
+        self.prenda: str = ""   # una sola prenda (nombre del producto); "" = todo el alcance
         self.titulo: str = ""   # "Práxedis Guerrero" o "Básicos · Camisa", para rotular
 
         layout = QVBoxLayout()
@@ -230,9 +230,10 @@ class ConteoNuevaJornadaDialog(QDialog):
         dato = self._escuela_combo.currentData()
         if dato is None:
             return ultimo_conteo_de({}, None)
+        prenda = str(self._prenda_combo.currentData() or "")
         if int(dato) == ESCUELA_ID_BASICOS:
-            return ultimo_conteo_de(self._ultimos, None, str(self._tipo_combo.currentData() or ""), str(self._prenda_combo.currentData() or ""))
-        return ultimo_conteo_de(self._ultimos, int(dato))
+            return ultimo_conteo_de(self._ultimos, None, str(self._tipo_combo.currentData() or ""), prenda)
+        return ultimo_conteo_de(self._ultimos, int(dato), "", prenda)
 
     def abierta_elegida(self):
         """La JornadaRef en proceso de lo seleccionado, o None."""
@@ -250,7 +251,22 @@ class ConteoNuevaJornadaDialog(QDialog):
             return self._abiertas.get(("basicos", tipo)) or next(
                 (j for k, j in self._abiertas.items() if isinstance(k, tuple) and len(k) == 3 and k[1] == tipo), None
             )
-        return self._abiertas.get(int(dato))
+        # Escuelas: la misma regla. Una prenda choca con la de toda la escuela
+        # y con la de esa prenda; toda la escuela choca con cualquiera de ahí.
+        escuela_id = int(dato)
+        prenda_escuela = str(self._prenda_combo.currentData() or "")
+        if prenda_escuela:
+            return (
+                self._abiertas.get((escuela_id, prenda_escuela))
+                or self._abiertas.get(escuela_id)
+            )
+        return self._abiertas.get(escuela_id) or next(
+            (
+                j for k, j in self._abiertas.items()
+                if isinstance(k, tuple) and len(k) == 2 and k[0] == escuela_id
+            ),
+            None,
+        )
 
     def cobertura_elegida(self):
         """La Cobertura de lo que está seleccionado ahora."""
@@ -260,13 +276,12 @@ class ConteoNuevaJornadaDialog(QDialog):
         dato = self._escuela_combo.currentData()
         if dato is None:
             return cobertura_de({}, None)
+        prenda = str(self._prenda_combo.currentData() or "")
         if int(dato) == ESCUELA_ID_BASICOS:
             return cobertura_de(
-                guardadas, None,
-                str(self._tipo_combo.currentData() or ""),
-                str(self._prenda_combo.currentData() or ""),
+                guardadas, None, str(self._tipo_combo.currentData() or ""), prenda
             )
-        return cobertura_de(guardadas, int(dato))
+        return cobertura_de(guardadas, int(dato), "", prenda)
 
     def _pintar_ultimo(self, *_args) -> None:
         abierta = self.abierta_elegida()
@@ -304,8 +319,6 @@ class ConteoNuevaJornadaDialog(QDialog):
     def _on_escuela(self) -> None:
         es_basicos = self._escuela_combo.currentData() == ESCUELA_ID_BASICOS
         self._tipo_combo.setVisible(es_basicos)
-        if not es_basicos:
-            self._prenda_combo.setVisible(False)
         self._pintar_ultimo()
         if es_basicos and self._tipos_pintados_con != self._ver_todas.isChecked():
             self._tipos_pintados_con = self._ver_todas.isChecked()
@@ -349,9 +362,49 @@ class ConteoNuevaJornadaDialog(QDialog):
         from pos_uniformes.services.conteo_jornada_service import nombre_corto_prenda, prendas_basicas, ultimo_conteo_de
 
         tipo = str(self._tipo_combo.currentData() or "")
-        es_basicos = self._escuela_combo.currentData() == ESCUELA_ID_BASICOS
+        dato = self._escuela_combo.currentData()
+        es_basicos = dato == ESCUELA_ID_BASICOS
         self._prenda_combo.blockSignals(True)
         self._prenda_combo.clear()
+        if not es_basicos and dato is not None:
+            # Una escuela también se puede contar de una sola prenda: es lo que
+            # permite que dos personas se repartan los colores de la misma
+            # playera en vez de que una se quede sin poder registrar
+            # (Daniel, 2026-10-05).
+            from pos_uniformes.services.conteo_jornada_service import (
+                cobertura_de,
+                prendas_de_escuela,
+            )
+
+            escuela_id = int(dato)
+            u_escuela = ultimo_conteo_de(self._ultimos, escuela_id)
+            cob_escuela = cobertura_de(getattr(self, "_cobertura", {}), escuela_id)
+            estado_todas = cob_escuela.texto() or u_escuela.texto()
+            self._prenda_combo.addItem(f"Toda la escuela   ·  {estado_todas}", "")
+            session = self._session_factory()
+            try:
+                prendas = prendas_de_escuela(session, escuela_id)
+            except Exception:  # noqa: BLE001
+                prendas = []
+            finally:
+                session.close()
+            for prenda in prendas:
+                abierta = self._abiertas.get((escuela_id, prenda))
+                u = ultimo_conteo_de(self._ultimos, escuela_id, "", prenda)
+                cob = cobertura_de(getattr(self, "_cobertura", {}), escuela_id, "", prenda)
+                if abierta is not None:
+                    estado = _estado_en_proceso(abierta)
+                elif cob.a_medias:
+                    estado = cob.texto()
+                elif cob.completa:
+                    estado = f"lista · {u.texto()}"
+                else:
+                    estado = u.texto()
+                self._prenda_combo.addItem(f"{nombre_corto_prenda(prenda)}   ·  {estado}", prenda)
+            self._prenda_combo.setVisible(self._prenda_combo.count() > 1)
+            self._prenda_combo.blockSignals(False)
+            self._pintar_ultimo()
+            return
         if es_basicos and tipo:
             u_tipo = ultimo_conteo_de(self._ultimos, None, tipo)
             self._prenda_combo.addItem(f"Todas las de {tipo}   ·  {u_tipo.texto()}", "")
@@ -395,9 +448,19 @@ class ConteoNuevaJornadaDialog(QDialog):
             self.prenda = str(self._prenda_combo.currentData() or "")
             self.titulo = f"Básicos · {nombre_corto_prenda(self.prenda)}" if self.prenda else f"Básicos · {tipo}"
         else:
+            from pos_uniformes.services.conteo_jornada_service import nombre_corto_prenda
+
             self.escuela_id = int(dato)
             self.tipo_pieza = ""
-            self.titulo = self._escuela_combo.currentText().split("   ·  ")[0].strip()
+            self.prenda = str(self._prenda_combo.currentData() or "")
+            nombre_escuela = self._escuela_combo.currentText().split("   ·  ")[0].strip()
+            # Con prenda el título lo dice, para que la hoja impresa y el
+            # tablero no se vean iguales que los de toda la escuela.
+            self.titulo = (
+                f"{nombre_escuela} · {nombre_corto_prenda(self.prenda)}"
+                if self.prenda
+                else nombre_escuela
+            )
         self.accept()
 
 
