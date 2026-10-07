@@ -79,6 +79,28 @@ from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
 _TIW = _TW - 4
 
 
+def _mezclar(base: str, encima: str, cuanto: float) -> str:
+    """Un color a medio camino entre otros dos. `cuanto` 0 = base, 1 = encima.
+
+    Existe para que la ayuda de la tarjeta de escaneo se tiña de temporada sin
+    quedar del mismo color que el título: si los dos van igual, los renglones
+    se leen como un bloque y deja de verse cuál manda."""
+    try:
+        from PyQt6.QtGui import QColor
+
+        a, b = QColor(base), QColor(encima)
+        if not (a.isValid() and b.isValid()):
+            return base
+        t = max(0.0, min(1.0, float(cuanto)))
+        return QColor(
+            round(a.red() + (b.red() - a.red()) * t),
+            round(a.green() + (b.green() - a.green()) * t),
+            round(a.blue() + (b.blue() - a.blue()) * t),
+        ).name()
+    except Exception:  # noqa: BLE001 — sin mezcla, el gris de siempre
+        return base
+
+
 def _temporada_de_hoy():
     """La temporada del calendario, o None. Nunca estorba si algo falla."""
     try:
@@ -271,6 +293,23 @@ class QuickSaleWidget(QWidget):
         hint.setObjectName("gateHint")
         hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
         cl.addWidget(hint)
+
+        if temporada is not None:
+            # El texto de ESTA tarjeta toma el color de la temporada (Daniel,
+            # 07/10). Solo aquí: es la pantalla donde nadie está trabajando. En
+            # las de venta, los precios y las tallas se leen ocho horas al día
+            # y el color de un adorno no tiene nada que hacer ahí.
+            title.setStyleSheet(
+                f"color: {temporada.color}; background: transparent;"
+            )
+            # La ayuda NO va del mismo color: tres renglones del mismo naranja
+            # se leen como un bloque y se pierde cuál es el título. Va a medio
+            # camino entre el gris de siempre y el color, que mantiene el orden
+            # y de todos modos se nota que es temporada.
+            hint.setStyleSheet(
+                f"color: {_mezclar(_MUTED, temporada.color, 0.45)};"
+                " background: transparent;"
+            )
 
         if temporada is not None:
             saludo = QLabel(temporada.saludo)

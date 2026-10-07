@@ -128,3 +128,83 @@ class ElKioskoUsaLaEscenaTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ElTextoDeLaTarjetaSeTineTests(unittest.TestCase):
+    """«la fuente del programa la puedes cambiar de color?» (Daniel, 07/10).
+
+    Acordado: SOLO la tarjeta de escaneo. En las pantallas de venta se leen
+    precios y tallas ocho horas al día, y el color de un adorno no tiene nada
+    que hacer ahí.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _gate(self):
+        from PyQt6.QtWidgets import QWidget
+
+        from pos_uniformes.ui.views.quick_sale_view import QuickSaleWidget
+
+        w = QuickSaleWidget.__new__(QuickSaleWidget)
+        QWidget.__init__(w)
+        return w._build_gate()
+
+    def _color_de(self, gate, nombre):
+        from PyQt6.QtWidgets import QLabel
+
+        etiqueta = next(
+            l for l in gate.findChildren(QLabel) if l.objectName() == nombre
+        )
+        etiqueta.ensurePolished()
+        return etiqueta.palette().color(etiqueta.foregroundRole())
+
+    def test_en_temporada_el_titulo_toma_el_color(self) -> None:
+        from PyQt6.QtGui import QColor
+
+        temp.guardar_ajuste(temp.FIJA, "halloween")
+        esperado = QColor(temp.temporada_de_archivo("halloween").color)
+        self.assertEqual(self._color_de(self._gate(), "gateTitle"), esperado)
+
+    def test_fuera_de_temporada_el_titulo_se_queda_como_siempre(self) -> None:
+        from PyQt6.QtGui import QColor
+
+        from pos_uniformes.ui.views.quick_sale_view import _TEXT
+
+        temp.guardar_ajuste(temp.APAGADA)
+        self.assertEqual(self._color_de(self._gate(), "gateTitle"), QColor(_TEXT))
+
+    def test_la_ayuda_no_va_del_mismo_color_que_el_titulo(self) -> None:
+        """Tres renglones del mismo naranja se leen como un bloque.
+
+        Si la ayuda iguala al título, deja de verse cuál manda. Va a medio
+        camino: se nota la temporada y se conserva el orden.
+        """
+        temp.guardar_ajuste(temp.FIJA, "halloween")
+        gate = self._gate()
+        titulo = self._color_de(gate, "gateTitle")
+        ayuda = self._color_de(gate, "gateHint")
+        self.assertNotEqual(ayuda, titulo)
+
+    def test_la_ayuda_se_tine_pero_sigue_mas_apagada(self) -> None:
+        from PyQt6.QtGui import QColor
+
+        from pos_uniformes.ui.views.quick_sale_view import _MUTED
+
+        temp.guardar_ajuste(temp.FIJA, "halloween")
+        ayuda = self._color_de(self._gate(), "gateHint")
+        self.assertNotEqual(ayuda, QColor(_MUTED))          # se tiñó
+        titulo = QColor(temp.temporada_de_archivo("halloween").color)
+        self.assertGreater(ayuda.blue(), titulo.blue())     # pero más apagada
+
+    def test_mezclar_respeta_los_extremos(self) -> None:
+        from pos_uniformes.ui.views.quick_sale_view import _mezclar
+
+        self.assertEqual(_mezclar("#102030", "#a0b0c0", 0.0), "#102030")
+        self.assertEqual(_mezclar("#102030", "#a0b0c0", 1.0), "#a0b0c0")
+
+    def test_un_color_que_no_existe_no_tumba_la_pantalla(self) -> None:
+        from pos_uniformes.ui.views.quick_sale_view import _mezclar
+
+        self.assertEqual(_mezclar("#102030", "no-es-un-color", 0.5), "#102030")
