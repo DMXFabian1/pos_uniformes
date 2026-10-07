@@ -382,9 +382,15 @@ def sin_marcadores(texto: str, hoy: date | None = None) -> str:
             salida.append(parte)
             continue
         archivo, _, resto = parte.partition(MARCADOR_FIN)
-        arte = "\n".join(
-            r.center(ANCHO_TICKET) for r in _solo_arte_de(temporada_de_archivo(archivo))
-        )
+        renglones = _solo_arte_de(temporada_de_archivo(archivo))
+        if not renglones:
+            # Ni PNG ni dibujo de ASCII: el marcador desaparecía sin decir
+            # nada y el papel salía como si nunca se hubiera pedido un dibujo.
+            # Pasó con el logo el 2026-10-07: la hoja de prueba salió sin logo
+            # y sin pista de por qué. Un hueco que se ve es lo que permite
+            # preguntar; uno que no se ve se queda ahí meses.
+            renglones = [f"(falta el dibujo: {archivo})"]
+        arte = "\n".join(r.center(ANCHO_TICKET) for r in renglones)
         salida.append(arte + resto)
     return "".join(salida)
 

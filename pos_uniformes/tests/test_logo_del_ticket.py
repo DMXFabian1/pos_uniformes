@@ -105,3 +105,28 @@ class LaPruebaDeImpresionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UnDibujoQueFaltaSeNotaTests(unittest.TestCase):
+    """Si el PNG no está, el marcador desaparecía sin dejar rastro.
+
+    Pasó con el logo el 2026-10-07: la hoja de prueba salió sin logo y sin
+    pista de por qué — ni en el papel ni en la cola, que marcó el trabajo como
+    HECHO. Un hueco que se ve es lo que permite preguntar."""
+
+    def test_un_marcador_sin_dibujo_deja_aviso_en_el_papel(self) -> None:
+        texto = temp.sin_marcadores(f"ANTES\n{temp.MARCADOR_INICIO}no_existe{temp.MARCADOR_FIN}\nDESPUES")
+        self.assertIn("falta el dibujo: no_existe", texto)
+        self.assertIn("ANTES", texto)
+        self.assertIn("DESPUES", texto)
+
+    def test_una_temporada_de_verdad_sigue_cayendo_a_su_dibujo_de_ascii(self) -> None:
+        """El aviso es para lo que no tiene dibujo, no para reemplazarlo."""
+        texto = temp.sin_marcadores(
+            f"{temp.MARCADOR_INICIO}halloween{temp.MARCADOR_FIN}"
+        )
+        self.assertNotIn("falta el dibujo", texto)
+        self.assertTrue(texto.strip())
+
+    def test_sin_marcadores_no_toca_un_texto_normal(self) -> None:
+        self.assertEqual(temp.sin_marcadores("Ticket de venta"), "Ticket de venta")
