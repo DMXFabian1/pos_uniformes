@@ -229,7 +229,13 @@ class QuickSaleWidget(QWidget):
     # ─── Gate de empleada ────────────────────────────────────────────────
 
     def _build_gate(self) -> QWidget:
-        wrapper = QWidget()
+        # Esta pantalla es la cara del kiosko cuando nadie está atendiendo, y
+        # era una extensión de color vacía. En temporada se pinta una escena
+        # completa detrás de la tarjeta (Daniel, 07/10).
+        from pos_uniformes.ui.helpers.escena_de_temporada import FondoDeTemporada
+
+        wrapper = FondoDeTemporada()
+        self._gate_fondo = wrapper
         wrapper.setObjectName("gateRoot")
         wrapper.setStyleSheet(_GATE_STYLE)
         outer = QVBoxLayout()
@@ -248,10 +254,13 @@ class QuickSaleWidget(QWidget):
         # algo sutil").
         temporada = _temporada_de_hoy()
 
-        emoji = QLabel(temporada.emoji if temporada else "📋")
-        emoji.setObjectName("gateEmoji")
-        emoji.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        cl.addWidget(emoji)
+        # Con la escena detrás, el emoji suelto sobra: ya hay una calabaza del
+        # tamaño de la pantalla, y dos dicen lo mismo dos veces.
+        if not wrapper.tiene_escena:
+            emoji = QLabel(temporada.emoji if temporada else "📋")
+            emoji.setObjectName("gateEmoji")
+            emoji.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            cl.addWidget(emoji)
 
         title = QLabel("Venta rapida")
         title.setObjectName("gateTitle")

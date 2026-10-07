@@ -574,7 +574,7 @@ def _build_temporada_box(dialog: QWidget) -> QGroupBox:
         # elegir, y el menú parecería no servir.
         temp.quitar_forzada()
         _refrescar_estado()
-        _repintar_la_barra(dialog)
+        _repintar_adornos(dialog)
         QMessageBox.information(dialog, "Guardado", estado.text())
 
     guardar.clicked.connect(_guardar)
@@ -583,17 +583,24 @@ def _build_temporada_box(dialog: QWidget) -> QGroupBox:
     return box
 
 
-def _repintar_la_barra(dialog: QWidget) -> None:
-    """La barra del kiosko relee la temporada sin cerrar la aplicación.
+def _repintar_adornos(dialog: QWidget) -> None:
+    """Todo lo que se adorne relee la temporada sin cerrar la aplicación.
 
     Sin esto habría que reiniciar el kiosko para ver si lo que se eligió era
-    lo que se quería, y entonces nadie lo cambia."""
+    lo que se quería, y entonces nadie lo cambia.
+
+    Se busca por capacidad —quien tenga `releer_temporada`— y no por una lista
+    de widgets: hoy son la barra del encabezado y el fondo de venta rápida, y
+    el que se adorne mañana se va a repintar sin que nadie toque esto.
+    """
     try:
-        ventana = dialog.parent()
-        while ventana is not None and not hasattr(ventana, "header_card"):
-            ventana = ventana.parent()
-        if ventana is not None:
-            ventana.header_card.releer_temporada()
+        ventana = dialog.window()
+        if ventana is None:
+            return
+        for w in [ventana, *ventana.findChildren(QWidget)]:
+            releer = getattr(w, "releer_temporada", None)
+            if callable(releer):
+                releer()
     except Exception:  # noqa: BLE001 — se verá al reabrir; no vale un error
         pass
 

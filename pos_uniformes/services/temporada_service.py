@@ -387,6 +387,28 @@ def carpeta_imagenes_ticket():
     return Path(__file__).resolve().parents[1] / "assets" / "ticket"
 
 
+def carpeta_escenas():
+    """Las ilustraciones de pantalla completa (una por temporada, si la hay)."""
+    from pathlib import Path
+
+    return Path(__file__).resolve().parents[1] / "assets" / "escenas"
+
+
+def escena_de(t: "Temporada | None"):
+    """El SVG de fondo de esa temporada, o None si no tiene.
+
+    Casi ninguna tiene: dibujar una escena es trabajo de ilustración, no de
+    calendario. Halloween es la primera porque Daniel la pidió (07/10). Las
+    demás siguen con su emoji y su saludo, que es lo que había."""
+    if t is None:
+        return None
+    archivo = ARCHIVOS.get(t.nombre)
+    if not archivo:
+        return None
+    ruta = carpeta_escenas() / f"{archivo}.svg"
+    return ruta if ruta.exists() else None
+
+
 def imagen_para_marcador(nombre: str):
     """La ruta del PNG de ese marcador, o None si no está.
 
