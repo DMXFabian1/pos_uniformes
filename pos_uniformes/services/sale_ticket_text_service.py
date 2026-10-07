@@ -79,6 +79,23 @@ def _extract_ticket_notes(observacion: str) -> list[str]:
     return cleaned_parts
 
 
+def _marcador_de_logo() -> str:
+    """El marcador del logo, solo si esta PC dibuja el ticket. '' si no."""
+    try:
+        from pos_uniformes.services.escpos_settings_cache_service import (
+            load_escpos_settings,
+        )
+
+        ajustes = load_escpos_settings()
+        if not (ajustes.enabled and ajustes.ticket_como_imagen):
+            return ""
+        from pos_uniformes.services.temporada_service import marcador_de
+
+        return marcador_de("logo")
+    except Exception:  # noqa: BLE001 — sin logo, el nombre escrito de siempre
+        return ""
+
+
 def build_sale_ticket_text(
     *,
     sale: object,
@@ -100,7 +117,12 @@ def build_sale_ticket_text(
     lines: list[str] = []
 
     # — Encabezado —
-    lines.append(business_name.center(_W))
+    # Con el ticket dibujado, el nombre lo pone el LOGO: escribirlo además
+    # sería decirlo dos veces. Sin ticket dibujado no se mete el marcador,
+    # porque por el camino de Qt la imagen sale apolillada (se reescala dos
+    # veces) y un logo feo es peor que ninguno (Daniel, 2026-10-07).
+    marca = _marcador_de_logo()
+    lines.append(marca if marca else business_name.center(_W))
     if business_address:
         # Centrado PERO partido a lo ancho del papel: la dirección de la tienda
         # mide 54 caracteres y el ticket tiene 38 columnas, así que centrarla

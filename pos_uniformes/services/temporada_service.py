@@ -157,18 +157,73 @@ TEMPORADAS: tuple[Temporada, ...] = (
 )
 
 
+#: Cómo se elige la temporada. Vive en un ajuste porque Daniel quiso poder
+#: encenderlas y apagarlas desde el menú, sin esperar a la fecha y sin depender
+#: de que alguien se acuerde de quitar una prueba (2026-10-07).
+AUTO, APAGADA, FIJA = "auto", "apagada", "fija"
+
+
+def ruta_ajuste():
+    from pos_uniformes.utils.config import runtime_base_dir
+
+    return runtime_base_dir() / "data" / "temporada_ajuste.json"
+
+
+def ajuste() -> tuple[str, str]:
+    """(modo, archivo). Por omisión, el calendario de siempre."""
+    ruta = ruta_ajuste()
+    if not ruta.exists():
+        return AUTO, ""
+    try:
+        import json
+
+        datos = json.loads(ruta.read_text(encoding="utf-8"))
+        modo = str(datos.get("modo") or AUTO)
+        if modo not in (AUTO, APAGADA, FIJA):
+            modo = AUTO
+        return modo, str(datos.get("temporada") or "")
+    except Exception:  # noqa: BLE001 — ajuste ilegible: el calendario de siempre
+        return AUTO, ""
+
+
+def guardar_ajuste(modo: str, archivo: str = "") -> None:
+    """Guarda cómo se eligen las temporadas en ESTA máquina."""
+    import json
+
+    if modo not in (AUTO, APAGADA, FIJA):
+        raise ValueError(f"modo inválido: {modo!r}")
+    if modo == FIJA and temporada_de_archivo(archivo) is None:
+        raise ValueError(f"no conozco la temporada {archivo!r}")
+    ruta = ruta_ajuste()
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    ruta.write_text(
+        json.dumps({"modo": modo, "temporada": archivo if modo == FIJA else ""}),
+        encoding="utf-8",
+    )
+
+
 def actual(hoy: date | None = None) -> Temporada | None:
     """La temporada de hoy, o None si es un día cualquiera del año.
 
     La mayor parte del año no hay nada, y eso está bien: un adorno que sale
     siempre deja de notarse, y entonces no adorna.
 
-    Si hay una temporada **forzada** y no ha vencido, manda esa: es para poder
-    ver el adorno antes de su fecha (`scripts/probar_temporada.bat`).
+    El orden importa:
+
+    1. Una temporada **forzada** que no haya vencido manda sobre todo. Es para
+       mirar un adorno ahora mismo (`scripts/probar_temporada.bat`) y vence
+       sola, para que una prueba no se quede puesta hasta marzo.
+    2. El **ajuste** de la máquina: apagadas, o una fija que Daniel eligió.
+    3. El calendario, que es lo de siempre.
     """
     forzada_ = forzada()
     if forzada_ is not None:
         return forzada_
+    modo, archivo = ajuste()
+    if modo == APAGADA:
+        return None
+    if modo == FIJA:
+        return temporada_de_archivo(archivo)
     hoy = hoy or date.today()
     for t in TEMPORADAS:
         if t.incluye(hoy):

@@ -511,6 +511,77 @@ def _build_anuncios_boxes(dialog: QWidget) -> list[QGroupBox]:
     return [este_box, satelites_box, crear_box, lista_box]
 
 
+def _build_temporada_box(dialog: QWidget) -> QGroupBox:
+    """Encender, apagar o fijar los adornos de temporada en ESTA máquina.
+
+    Existían desde octubre pero solo se podían mirar antes de tiempo con un
+    .bat que vencía en dos horas, y apagarlos no se podía. Daniel los quiso
+    desde el menú (2026-10-07).
+    """
+    from pos_uniformes.services import temporada_service as temp
+
+    box = QGroupBox("Adornos de temporada")
+    box.setObjectName("infoCard")
+    layout = QVBoxLayout()
+    layout.setSpacing(8)
+
+    ayuda = QLabel(
+        "El dibujito del ticket y el motivo de la pantalla. Lo normal es dejarlo "
+        "en automático: casi todo el año no sale nada, y eso es a propósito — un "
+        "adorno que sale siempre deja de notarse."
+    )
+    ayuda.setWordWrap(True)
+    ayuda.setObjectName("subtleLine")
+    layout.addWidget(ayuda)
+
+    combo = QComboBox()
+    combo.addItem("🗓  Automático (por fecha)", (temp.AUTO, ""))
+    combo.addItem("🚫  Apagados", (temp.APAGADA, ""))
+    for nombre, archivo in temp.ARCHIVOS.items():
+        combo.addItem(f"📌  Siempre: {nombre}", (temp.FIJA, archivo))
+    modo_actual, archivo_actual = temp.ajuste()
+    for i in range(combo.count()):
+        if combo.itemData(i) == (modo_actual, archivo_actual):
+            combo.setCurrentIndex(i)
+            break
+    layout.addWidget(combo)
+
+    estado = QLabel("")
+    estado.setWordWrap(True)
+    estado.setObjectName("satNota")
+
+    def _refrescar_estado() -> None:
+        t = temp.actual()
+        if t is None:
+            estado.setText("Ahora mismo no se imprime ningún adorno.")
+        else:
+            estado.setText(f"Ahora mismo: {t.emoji}  {t.nombre} — «{t.saludo}»")
+
+    _refrescar_estado()
+    layout.addWidget(estado)
+
+    guardar = QPushButton("Guardar temporada")
+    guardar.setObjectName("primaryButton")
+
+    def _guardar() -> None:
+        modo, archivo = combo.currentData()
+        try:
+            temp.guardar_ajuste(modo, archivo)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(dialog, "Error", f"No se pudo guardar:\n{exc}")
+            return
+        # Una prueba de dos horas puesta antes taparía lo que se acaba de
+        # elegir, y el menú parecería no servir.
+        temp.quitar_forzada()
+        _refrescar_estado()
+        QMessageBox.information(dialog, "Guardado", estado.text())
+
+    guardar.clicked.connect(_guardar)
+    layout.addWidget(guardar)
+    box.setLayout(layout)
+    return box
+
+
 def _build_precios_box(dialog: QWidget) -> QGroupBox:
     """Pestaña Precios: cambiar el precio de una prenda sin salir del kiosko.
 
@@ -1473,6 +1544,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     tabs.addTab(_make_tab(conteo_box), "📋  Conteos")
     if anuncios_boxes:
         tabs.addTab(_make_tab(*anuncios_boxes), "📣  Anuncios")
+    tabs.addTab(_make_tab(_build_temporada_box(dialog)), "🎃  Temporada")
     tabs.addTab(_make_tab(_build_precios_box(dialog)), "💲  Precios")
     tabs.addTab(_make_tab(_build_camaras_box(dialog)), "📹  Cámaras")
 
