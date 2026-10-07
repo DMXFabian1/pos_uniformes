@@ -1090,7 +1090,12 @@ class QuoteSatelliteWindow(QMainWindow):
         if icon_path is not None:
             self.setWindowIcon(QIcon(str(icon_path)))
 
-        header_card = QFrame()
+        # La barra se adorna sola según la temporada (Daniel, 07/10). El motivo
+        # va al fondo, detrás del título y del operador, que es lo que se lee.
+        from pos_uniformes.ui.helpers.barra_de_temporada import TarjetaConTemporada
+
+        header_card = TarjetaConTemporada()
+        self.header_card = header_card
         header_card.setObjectName("satHeaderCard")
         header_layout = QHBoxLayout()
         header_layout.setContentsMargins(16, 12, 16, 12)

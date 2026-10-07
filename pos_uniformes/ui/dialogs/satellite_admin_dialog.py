@@ -574,12 +574,28 @@ def _build_temporada_box(dialog: QWidget) -> QGroupBox:
         # elegir, y el menú parecería no servir.
         temp.quitar_forzada()
         _refrescar_estado()
+        _repintar_la_barra(dialog)
         QMessageBox.information(dialog, "Guardado", estado.text())
 
     guardar.clicked.connect(_guardar)
     layout.addWidget(guardar)
     box.setLayout(layout)
     return box
+
+
+def _repintar_la_barra(dialog: QWidget) -> None:
+    """La barra del kiosko relee la temporada sin cerrar la aplicación.
+
+    Sin esto habría que reiniciar el kiosko para ver si lo que se eligió era
+    lo que se quería, y entonces nadie lo cambia."""
+    try:
+        ventana = dialog.parent()
+        while ventana is not None and not hasattr(ventana, "header_card"):
+            ventana = ventana.parent()
+        if ventana is not None:
+            ventana.header_card.releer_temporada()
+    except Exception:  # noqa: BLE001 — se verá al reabrir; no vale un error
+        pass
 
 
 def _build_precios_box(dialog: QWidget) -> QGroupBox:
