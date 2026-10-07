@@ -15,6 +15,7 @@ cambiando un número en vez de mover sesenta coordenadas a mano.
 
 from __future__ import annotations
 
+import math
 import random
 from pathlib import Path
 
@@ -71,29 +72,48 @@ def _estrellas(rnd: random.Random) -> str:
     return "\n  ".join(partes)
 
 
-def _trazo_del_murcielago() -> tuple[float, str]:
-    """El murciélago que dibujó DANIEL, pasado a vector.
+def _trazo(nombre: str) -> tuple[float, str]:
+    """Una silueta que dibujó DANIEL, ya pasada a vector.
 
-    Lo mandó el 07/10 («lo hice yo»). El dibujo es suyo; aquí solo se planta.
-    El trazo lo saca `scripts/trazar_murcielago.py` del PNG original, que
-    también vive en assets — para poder re-trazarlo si algún día cambia el
-    dibujo, en vez de tener un contorno suelto que nadie sabe de dónde salió.
+    Las mandó el 07/10 («lo hice yo»): el murciélago y la bruja. Los dibujos
+    son suyos; aquí solo se plantan. El trazo lo saca
+    `scripts/trazar_silueta.py` de los PNG originales, que también viven en
+    assets — para poder re-trazarlos si algún día cambian, en vez de tener un
+    contorno suelto que nadie sabe de dónde salió.
 
     Viene normalizado: ancho 1, alto `razon`, esquina en (0,0).
     """
-    ruta = Path(__file__).resolve().parents[1] / "assets" / "escenas" / "murcielago_de_daniel.path"
+    ruta = Path(__file__).resolve().parents[1] / "assets" / "escenas" / f"{nombre}.path"
     razon, d = ruta.read_text(encoding="utf-8").split("\n", 1)
     return float(razon), d.strip()
 
 
-def _murcielago(trazo: tuple[float, str], x: float, y: float,
-                ancho: float, op: float, giro: float) -> str:
-    """Planta el murciélago centrado en (x, y), de ese ancho."""
+def _silueta(trazo: tuple[float, str], x: float, y: float,
+             ancho: float, op: float = 1.0, giro: float = 0.0,
+             espejo: bool = False) -> str:
+    """Planta una silueta centrada en (x, y), de ese ancho.
+
+    `fill-rule="evenodd"` no es adorno: los dibujos traen huecos —el de la
+    escoba contra la capa, en la bruja— y sin esta regla se rellenan y el
+    dibujo deja de ser el dibujo.
+    """
     razon, d = trazo
     alto = ancho * razon
-    return (f'<g transform="translate({x:.0f},{y:.0f}) rotate({giro:.0f}) '
+    volteo = f" scale({-1 if espejo else 1},1)"
+    return (f'<g transform="translate({x:.0f},{y:.0f}) rotate({giro:.0f}){volteo} '
             f'translate({-ancho / 2:.1f},{-alto / 2:.1f}) scale({ancho:.1f})" '
-            f'opacity="{op:.2f}"><path d="{d}" fill="#120b1e"/></g>')
+            f'opacity="{op:.2f}">'
+            f'<path d="{d}" fill="#120b1e" fill-rule="evenodd"/></g>')
+
+
+def _bruja() -> str:
+    """Una sola, cruzando por delante de la luna.
+
+    Una sola y no una bandada: es una figura que se mira, no textura. Y sobre
+    la luna porque es el único pedazo claro del cielo — contra el morado se
+    perdería, que es lo que ya había pasado con el rizo de la colina.
+    """
+    return _silueta(_trazo("bruja_de_daniel"), 1215, 232, 330, giro=-8)
 
 
 def _bandada(rnd: random.Random) -> str:
@@ -101,14 +121,17 @@ def _bandada(rnd: random.Random) -> str:
 
     Todos del mismo tamaño parecían calcomanías pegadas a la misma distancia.
     """
-    trazo = _trazo_del_murcielago()
+    trazo = _trazo("murcielago_de_daniel")
     partes = []
     for _ in range(11):
-        partes.append(_murcielago(
-            trazo,
-            rnd.uniform(60, ANCHO - 60), rnd.uniform(90, SUELO - 300),
-            rnd.uniform(34, 104), rnd.uniform(0.55, 0.9),
-            rnd.uniform(-16, 16),
+        x, y = rnd.uniform(60, ANCHO - 60), rnd.uniform(90, SUELO - 300)
+        # Despejado alrededor de la bruja: es la figura que se mira, y un
+        # murciélago encima la convierte en una mancha.
+        if math.hypot(x - 1215, y - 232) < 290:
+            continue
+        partes.append(_silueta(
+            trazo, x, y,
+            rnd.uniform(34, 104), rnd.uniform(0.55, 0.9), rnd.uniform(-16, 16),
         ))
     return "\n  ".join(partes)
 
@@ -212,6 +235,7 @@ def construir() -> str:
         _cielo(),
         _estrellas(rnd),
         _luna(),
+        _bruja(),
         _bandada(rnd),
         _cerros(),
         _arbol(170, 1.35), _arbol(1460, 1.15, espejo=True), _arbol(700, 0.8),
