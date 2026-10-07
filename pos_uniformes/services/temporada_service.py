@@ -30,6 +30,9 @@ from datetime import date
 
 #: Ancho útil del ticket (38 columnas menos los bordes del recuadro).
 ANCHO_TICKET = 34
+#: El papel completo. El arte usa 34 porque vive dentro del recuadro; el
+#: respaldo de un marcador no, y se centra contra el papel entero.
+ANCHO_PAPEL_TEXTO = 38
 #: Tope de renglones del dibujo. El ticket es papel que cuesta.
 MAX_RENGLONES = 4
 
@@ -342,6 +345,22 @@ def saludo_de_pantalla(hoy: date | None = None) -> str:
 MARCADOR_INICIO = "[[IMG:"
 MARCADOR_FIN = "]]"
 
+#: Un marcador puede llevar su propio respaldo escrito: `[[IMG:logo|MAXIMODA]]`.
+#:
+#: Existe porque el ticket se ARMA en una máquina y se IMPRIME en otra. El 07/10
+#: Daniel mandó una reimpresión desde la Mac: el texto preguntó «¿esta PC dibuja
+#: tickets?», la Mac dijo que no, y el papel salió de la principal —que sí
+#: dibuja— con el nombre escrito y sin logo. La pregunta estaba en la máquina
+#: equivocada. Ahora el marcador va SIEMPRE y cada camino de impresión decide:
+#: el que sabe poner puntos pone el logo, el que no, escribe el respaldo.
+SEPARADOR_RESPALDO = "|"
+
+
+def partir_marcador(cuerpo: str) -> tuple[str, str]:
+    """`"logo|MAXIMODA"` -> `("logo", "MAXIMODA")`. Sin respaldo, `("logo", "")`."""
+    nombre, _, respaldo = str(cuerpo or "").partition(SEPARADOR_RESPALDO)
+    return nombre.strip(), respaldo.strip()
+
 #: Nombre de archivo por temporada. Si falta el PNG, se usa el ASCII de arriba.
 ARCHIVOS = {
     "Regreso a clases": "regreso_a_clases",
@@ -376,7 +395,8 @@ def imagen_para_marcador(nombre: str):
     es un dibujo: no tiene por qué saber si es una calabaza o el logo de la
     tienda (2026-10-07, al meter el logo).
     """
-    limpio = "".join(c for c in str(nombre or "") if c.isalnum() or c == "_")
+    solo, _ = partir_marcador(nombre)
+    limpio = "".join(c for c in solo if c.isalnum() or c == "_")
     if not limpio:
         return None
     for carpeta in (carpeta_dibujos(), carpeta_imagenes_ticket()):
@@ -386,15 +406,24 @@ def imagen_para_marcador(nombre: str):
     return None
 
 
-def marcador_de(nombre: str) -> str:
+def marcador_de(nombre: str, respaldo: str = "") -> str:
     """El marcador que se escribe en el texto del ticket para pedir ese dibujo.
+
+    `respaldo` es lo que se escribe cuando quien imprime no sabe poner puntos
+    (el camino de Qt, la vista previa). Va dentro del marcador, no aparte,
+    porque el ticket cruza la cola de impresión como una sola cadena: lo que no
+    viaje ahí, no llega.
 
     Vacío si el PNG no está: así quien lo arma no tiene que comprobar nada y un
     archivo que falta nunca deja un `[[...]]` impreso en el papel."""
     limpio = "".join(c for c in str(nombre or "") if c.isalnum() or c == "_")
     if not limpio or imagen_para_marcador(limpio) is None:
         return ""
-    return f"{MARCADOR_INICIO}{limpio}{MARCADOR_FIN}"
+    # Ni el separador ni el cierre pueden ir dentro del respaldo: partirían el
+    # marcador por la mitad y el resto saldría crudo en el papel.
+    limpio_respaldo = str(respaldo or "").replace(SEPARADOR_RESPALDO, " ").replace("]", "")
+    cola = f"{SEPARADOR_RESPALDO}{limpio_respaldo}" if limpio_respaldo else ""
+    return f"{MARCADOR_INICIO}{limpio}{cola}{MARCADOR_FIN}"
 
 
 def marcador_de_ticket(hoy: date | None = None) -> str:
@@ -436,8 +465,15 @@ def sin_marcadores(texto: str, hoy: date | None = None) -> str:
         if i == 0:
             salida.append(parte)
             continue
-        archivo, _, resto = parte.partition(MARCADOR_FIN)
+        cuerpo, _, resto = parte.partition(MARCADOR_FIN)
+        archivo, respaldo = partir_marcador(cuerpo)
         renglones = _solo_arte_de(temporada_de_archivo(archivo))
+        if not renglones and respaldo:
+            # El marcador trae escrito cómo decirse sin dibujo. Es el caso del
+            # logo: sin puntos, el nombre de la tienda. Se centra contra el
+            # papel entero y no contra el recuadro, porque no va dentro de uno.
+            salida.append(respaldo.center(ANCHO_PAPEL_TEXTO) + resto)
+            continue
         if not renglones:
             # Ni PNG ni dibujo de ASCII: el marcador desaparecía sin decir
             # nada y el papel salía como si nunca se hubiera pedido un dibujo.

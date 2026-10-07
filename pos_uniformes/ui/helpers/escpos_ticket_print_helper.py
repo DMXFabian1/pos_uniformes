@@ -89,20 +89,35 @@ def _trozos_con_imagenes(text: str, s: EscPosSettings) -> bytes:
     — un adorno nunca detiene un ticket.
     """
     from pos_uniformes.services.temporada_service import (
+        ANCHO_PAPEL_TEXTO,
         MARCADOR_INICIO,
         imagen_para_marcador,
+        partir_marcador,
     )
 
     salida = bytearray()
-    for parte in text.split(MARCADOR_INICIO):
-        if salida and "]]" in parte:
-            nombre, _, resto = parte.partition("]]")
+    for i, parte in enumerate(text.split(MARCADOR_INICIO)):
+        # `i` y no «¿ya escribí algo?»: eso último daba falso cuando el
+        # marcador abría el texto, y entonces el ticket salía con
+        # «logo|MAXIMODA]]» escrito tal cual. Pasó al subir el logo al
+        # encabezado, que es justo el primer renglón (2026-10-07).
+        if i and "]]" in parte:
+            cuerpo, _, resto = parte.partition("]]")
+            nombre, respaldo = partir_marcador(cuerpo)
             ruta = imagen_para_marcador(nombre)
+            puesto = False
             if ruta is not None:
                 try:
                     salida += _ALINEAR_CENTRO + raster_de_imagen(ruta) + _ALINEAR_IZQ
+                    puesto = True
                 except Exception:  # noqa: BLE001 — sin dibujo, el ticket sigue
                     pass
+            if not puesto and respaldo:
+                # El logo no se pudo poner: el nombre de la tienda escrito es
+                # mejor que un encabezado en blanco.
+                salida += respaldo.center(ANCHO_PAPEL_TEXTO).encode(
+                    s.encoding, errors="replace"
+                )
             parte = resto
         salida += parte.encode(s.encoding, errors="replace")
     return bytes(salida)

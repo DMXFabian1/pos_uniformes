@@ -79,19 +79,21 @@ def _extract_ticket_notes(observacion: str) -> list[str]:
     return cleaned_parts
 
 
-def _marcador_de_logo() -> str:
-    """El marcador del logo, solo si esta PC dibuja el ticket. '' si no."""
-    try:
-        from pos_uniformes.services.escpos_settings_cache_service import (
-            load_escpos_settings,
-        )
+def _marcador_de_logo(business_name: str) -> str:
+    """El marcador del logo, con el nombre escrito como respaldo. '' si no hay PNG.
 
-        ajustes = load_escpos_settings()
-        if not (ajustes.enabled and ajustes.ticket_como_imagen):
-            return ""
+    Aquí NO se pregunta si esta máquina dibuja tickets. Se preguntaba, y estaba
+    mal: el ticket se arma donde se hace la venta y se imprime donde está la
+    impresora. El 07/10 Daniel mandó una reimpresión desde la Mac —que no
+    dibuja— y el papel salió de la principal —que sí— con el nombre escrito.
+    La respuesta correcta dependía de la otra máquina.
+
+    Ahora el marcador va siempre y lleva el nombre dentro: quien imprima pone
+    el logo si sabe poner puntos, y si no, escribe el nombre."""
+    try:
         from pos_uniformes.services.temporada_service import marcador_de
 
-        return marcador_de("logo")
+        return marcador_de("logo", business_name)
     except Exception:  # noqa: BLE001 — sin logo, el nombre escrito de siempre
         return ""
 
@@ -117,11 +119,10 @@ def build_sale_ticket_text(
     lines: list[str] = []
 
     # — Encabezado —
-    # Con el ticket dibujado, el nombre lo pone el LOGO: escribirlo además
-    # sería decirlo dos veces. Sin ticket dibujado no se mete el marcador,
-    # porque por el camino de Qt la imagen sale apolillada (se reescala dos
-    # veces) y un logo feo es peor que ninguno (Daniel, 2026-10-07).
-    marca = _marcador_de_logo()
+    # El nombre lo pone el LOGO cuando se puede, y escribirlo además sería
+    # decirlo dos veces. Cuál de los dos sale lo decide quien imprime, no
+    # quien arma el ticket: el nombre viaja dentro del marcador como respaldo.
+    marca = _marcador_de_logo(business_name)
     lines.append(marca if marca else business_name.center(_W))
     if business_address:
         # Centrado PERO partido a lo ancho del papel: la dirección de la tienda

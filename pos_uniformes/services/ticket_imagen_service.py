@@ -149,11 +149,17 @@ def render_ticket(texto: str, *, ancho: int = ANCHO_PAPEL):
     alto = MARGEN
     plan: list[tuple[str, object]] = []
     for linea in lineas:
-        nombre = _marcador_de_imagen(linea)
-        if nombre is not None:
+        cuerpo = _marcador_de_imagen(linea)
+        if cuerpo is not None:
+            from pos_uniformes.services.temporada_service import partir_marcador
+
+            nombre, respaldo = partir_marcador(cuerpo)
             ruta = imagen_para_marcador(nombre)
             if ruta is None:
-                plan.append(("texto", f"(falta el dibujo: {nombre})".center(COLUMNAS)))
+                # Con respaldo hay cómo decirlo escrito; sin él, el hueco se
+                # ve, que es lo que permite preguntar por qué falta.
+                falta = respaldo or f"(falta el dibujo: {nombre})"
+                plan.append(("texto", falta.center(COLUMNAS)))
                 alto += alto_linea
                 continue
             imagen = QImage(str(ruta))

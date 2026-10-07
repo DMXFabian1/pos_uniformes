@@ -130,3 +130,119 @@ class UnDibujoQueFaltaSeNotaTests(unittest.TestCase):
 
     def test_sin_marcadores_no_toca_un_texto_normal(self) -> None:
         self.assertEqual(temp.sin_marcadores("Ticket de venta"), "Ticket de venta")
+
+
+class ElLogoNoDependeDeLaMaquinaQueArmaTests(unittest.TestCase):
+    """El 07/10 Daniel mandó una reimpresión desde la Mac y salió sin logo.
+
+    El texto preguntaba «¿esta PC dibuja tickets?» para meter el marcador. La
+    Mac no dibuja, así que escribió el nombre; la principal —que sí dibuja—
+    imprimió lo que le llegó. La pregunta estaba en la máquina equivocada: el
+    ticket se arma donde se vende y se imprime donde está la impresora.
+    """
+
+    def test_el_marcador_lleva_el_nombre_como_respaldo(self) -> None:
+        m = temp.marcador_de("logo", "MAXIMODA")
+        self.assertEqual(m, f"{temp.MARCADOR_INICIO}logo|MAXIMODA{temp.MARCADOR_FIN}")
+
+    def test_partir_marcador_separa_nombre_y_respaldo(self) -> None:
+        self.assertEqual(temp.partir_marcador("logo|MAXIMODA"), ("logo", "MAXIMODA"))
+        self.assertEqual(temp.partir_marcador("halloween"), ("halloween", ""))
+
+    def test_el_respaldo_no_estorba_para_encontrar_el_png(self) -> None:
+        self.assertIsNotNone(temp.imagen_para_marcador("logo|MAXIMODA"))
+
+    def test_un_respaldo_no_puede_partir_el_marcador(self) -> None:
+        """Un nombre con «]]» dentro dejaría el resto crudo en el papel."""
+        m = temp.marcador_de("logo", "MAXI]]MODA|S.A.")
+        self.assertEqual(m.count(temp.MARCADOR_FIN), 1)
+        self.assertTrue(m.endswith(temp.MARCADOR_FIN))
+
+    def test_sin_puntos_el_respaldo_se_escribe_centrado(self) -> None:
+        salida = temp.sin_marcadores(temp.marcador_de("logo", "MAXIMODA") + "\nabajo")
+        self.assertIn("MAXIMODA", salida)
+        self.assertNotIn(temp.MARCADOR_INICIO, salida)
+        self.assertNotIn("falta el dibujo", salida)
+        self.assertEqual(salida.split("\n")[0].strip(), "MAXIMODA")
+
+    def _ticket(self, **ajustes):
+        """El texto del ticket de una venta mínima."""
+        from decimal import Decimal
+        from types import SimpleNamespace
+
+        from pos_uniformes.services.sale_ticket_text_service import (
+            build_sale_ticket_text,
+        )
+
+        cero = Decimal("0.00")
+        venta = SimpleNamespace(
+            detalles=[], cliente=None, observacion="", created_at=None,
+            subtotal=cero, total=cero,
+            descuento_porcentaje=cero, descuento_monto=cero,
+        )
+        return build_sale_ticket_text(
+            sale=venta, business_name="MAXIMODA", **ajustes
+        )
+
+    def test_el_marcador_va_aunque_esta_maquina_no_dibuje(self) -> None:
+        """El caso de la Mac: no dibuja, y aun así el ticket pide el logo."""
+        from unittest.mock import patch
+
+        from pos_uniformes.services.escpos_settings_cache_service import EscPosSettings
+
+        apagado = EscPosSettings(enabled=False, ticket_como_imagen=False)
+        with patch(
+            "pos_uniformes.services.escpos_settings_cache_service.load_escpos_settings",
+            return_value=apagado,
+        ):
+            texto = self._ticket()
+        self.assertIn(temp.marcador_de("logo", "MAXIMODA"), texto)
+
+    def test_el_nombre_no_se_dice_dos_veces(self) -> None:
+        texto = self._ticket()
+        encabezado = texto.split("\n")[0]
+        self.assertIn(temp.MARCADOR_INICIO, encabezado)
+        # El nombre aparece UNA vez: dentro del marcador, como respaldo.
+        self.assertEqual(texto.count("MAXIMODA"), 1)
+
+    def test_por_qt_el_logo_sale_escrito_y_no_apolillado(self) -> None:
+        """Qt arma a 302 puntos y el driver estira a 576: el dibujo se deshace."""
+        from pos_uniformes.ui.dialogs.printable_text_dialog import (
+            _bloques_con_imagen,
+        )
+
+        texto = temp.marcador_de("logo", "MAXIMODA") + "\nTicket"
+        self.assertIsNone(_bloques_con_imagen(texto))
+
+    def test_por_escpos_en_texto_el_logo_sale_en_puntos(self) -> None:
+        from pos_uniformes.ui.helpers.escpos_ticket_print_helper import (
+            build_escpos_bytes,
+        )
+
+        datos = build_escpos_bytes(temp.marcador_de("logo", "MAXIMODA") + "\n")
+        self.assertIn(b"\x1dv0", datos)        # raster: el logo son puntos
+        self.assertNotIn(b"MAXIMODA", datos)   # y entonces no se escribe
+
+    def test_si_el_png_no_se_puede_cargar_queda_el_nombre_escrito(self) -> None:
+        from unittest.mock import patch
+
+        from pos_uniformes.ui.helpers import escpos_ticket_print_helper as esc
+
+        texto = f"{temp.MARCADOR_INICIO}logo|MAXIMODA{temp.MARCADOR_FIN}\n"
+        with patch.object(esc, "raster_de_imagen", side_effect=OSError("boom")):
+            datos = esc.build_escpos_bytes(texto)
+        self.assertIn(b"MAXIMODA", datos)
+
+    def test_un_marcador_que_abre_el_ticket_no_sale_crudo(self) -> None:
+        """El guardia era «¿ya escribí algo?» y daba falso en el primer trozo.
+
+        Mientras el dibujo iba al pie nadie lo notó; el logo va en el PRIMER
+        renglón, y el papel habría salido con «logo|MAXIMODA]]» escrito.
+        """
+        from pos_uniformes.ui.helpers.escpos_ticket_print_helper import (
+            build_escpos_bytes,
+        )
+
+        datos = build_escpos_bytes(temp.marcador_de("logo", "MAXIMODA") + "\nTicket\n")
+        self.assertNotIn(b"]]", datos)
+        self.assertNotIn(b"logo", datos)

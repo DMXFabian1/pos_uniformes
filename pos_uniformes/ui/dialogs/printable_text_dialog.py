@@ -237,6 +237,7 @@ def _bloques_con_imagen(content: str):
             MARCADOR_FIN,
             MARCADOR_INICIO,
             imagen_para_marcador,
+            partir_marcador,
         )
     except Exception:  # noqa: BLE001
         return None
@@ -248,7 +249,14 @@ def _bloques_con_imagen(content: str):
         if i == 0:
             bloques.append(("texto", parte))
             continue
-        nombre, _, resto = parte.partition(MARCADOR_FIN)
+        cuerpo, _, resto = parte.partition(MARCADOR_FIN)
+        nombre, respaldo = partir_marcador(cuerpo)
+        if respaldo:
+            # Un marcador con respaldo trae escrito cómo decirse sin dibujo, y
+            # por aquí eso es lo que conviene: Qt arma la página a 302 puntos y
+            # el driver la vuelve a estirar a 576, así que un dibujo fino sale
+            # apolillado. El logo escrito se lee; el logo apolillado, no.
+            return None
         ruta = imagen_para_marcador(nombre)
         if ruta is None:
             # Sin PNG, el renglón se va: el llamador ya puso el de ASCII.

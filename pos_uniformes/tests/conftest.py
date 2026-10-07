@@ -329,3 +329,25 @@ def _nombres_empleadas_limpios():
     ne._cache, ne._cache_en = {}, 0.0
     yield
     ne._cache, ne._cache_en = {}, 0.0
+
+
+@pytest.fixture(autouse=True)
+def _temporada_sin_ajuste_de_esta_maquina(tmp_path):
+    """Los tests ven el calendario, no lo que esta máquina tenga configurado.
+
+    En cuanto las temporadas se pudieron fijar desde el menú (07/10), la Mac de
+    Daniel quedó en «Siempre: Halloween» y 11 tests del calendario empezaron a
+    fallar: estaban leyendo un archivo de la máquina. Un test que depende de
+    cómo quedó configurada la computadora no prueba nada.
+
+    Se aísla el ARCHIVO y no la función: así quien prueba el ajuste mismo
+    sigue pudiendo guardarlo y leerlo de vuelta, solo que en su propia carpeta.
+    Lo mismo con la temporada forzada, que también deja archivo.
+    """
+    from unittest.mock import patch
+
+    from pos_uniformes.services import temporada_service as temp
+
+    with patch.object(temp, "ruta_ajuste", lambda: tmp_path / "temporada_ajuste.json"), \
+         patch.object(temp, "ruta_forzada", lambda: tmp_path / "temporada_forzada.json"):
+        yield
