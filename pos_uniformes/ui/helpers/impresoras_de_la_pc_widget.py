@@ -87,7 +87,16 @@ def construir_caja_impresoras(
 
     resumen = QLabel("")
     resumen.setWordWrap(True)
-    resumen.setObjectName("satStatus")
+    # Estilo en línea y no por objectName: esta caja la usan DOS apps con hojas
+    # de estilo distintas (el kiosko y el POS principal), y la del kiosko pinta
+    # las notas en crema para su barra oscura — sobre este fondo claro el texto
+    # desaparecía y solo quedaba el emoji (2026-10-07).
+    resumen.setStyleSheet(
+        "background: rgba(44, 42, 39, 0.05);"
+        "border: 1px solid rgba(44, 42, 39, 0.12);"
+        "border-radius: 14px; padding: 8px 12px;"
+        "color: #2c2a27; font-weight: 700;"
+    )
 
     def _marcados() -> list[str]:
         return [c for c, cb in casillas.items() if cb.isChecked()]

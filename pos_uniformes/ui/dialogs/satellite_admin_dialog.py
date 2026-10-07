@@ -146,7 +146,7 @@ def _build_anuncios_boxes(dialog: QWidget) -> list[QGroupBox]:
     nombre_in.setPlaceholderText("Nombre de esta pantalla (ej. Entrada, Caja 2)")
     guardar_nombre_btn = QPushButton("Guardar nombre")
     id_lbl = QLabel(f"id: {_mi_id}")
-    id_lbl.setObjectName("satStatus")
+    id_lbl.setObjectName("satNota")
 
     # — Satélites (presencia) —
     satelites_box = QGroupBox("Satélites")
@@ -193,7 +193,7 @@ def _build_anuncios_boxes(dialog: QWidget) -> list[QGroupBox]:
     enviar_btn.setObjectName("primaryButton")
     resultado_lbl = QLabel("")
     resultado_lbl.setWordWrap(True)
-    resultado_lbl.setObjectName("satStatus")
+    resultado_lbl.setObjectName("satNota")
 
     # — Lista de activos —
     lista_box = QGroupBox("Anuncios activos")
@@ -1337,7 +1337,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
         "una, márcala arriba."
     )
     estacion_hint.setWordWrap(True)
-    estacion_hint.setObjectName("satStatus")
+    estacion_hint.setObjectName("satNota")
 
     def _aplicar_visibilidad_rol(marcados: set[str]) -> None:
         """Cada caja de configuración se ve solo si esa impresora existe aquí.

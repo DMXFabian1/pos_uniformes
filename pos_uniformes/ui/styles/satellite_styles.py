@@ -213,6 +213,18 @@ QLabel#quoteActionHint {
     font-size: 12px;
     padding: 2px 0px;
 }
+/* Nota sobre fondo CLARO (diálogos). `satStatus` es su gemelo para la barra
+   oscura del kiosko y su color crema se vuelve invisible aquí: el 2026-10-07
+   el resumen de impresoras salió en blanco sobre blanco y solo se vio el
+   emoji, porque los emoji se pintan a color y no con el color del texto. */
+QLabel#satNota {
+    background: rgba(44, 42, 39, 0.05);
+    border: 1px solid rgba(44, 42, 39, 0.12);
+    border-radius: 14px;
+    padding: 8px 12px;
+    color: #2c2a27;
+    font-weight: 700;
+}
 QLabel#satStatus {
     background: rgba(249, 244, 234, 0.09);
     border: 1px solid rgba(249, 244, 234, 0.14);
