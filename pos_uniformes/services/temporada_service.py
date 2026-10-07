@@ -306,13 +306,40 @@ def carpeta_dibujos():
     return Path(__file__).resolve().parents[1] / "assets" / "temporadas"
 
 
+def carpeta_imagenes_ticket():
+    """Imágenes del ticket que NO son de temporada (el logo, por ahora)."""
+    from pathlib import Path
+
+    return Path(__file__).resolve().parents[1] / "assets" / "ticket"
+
+
 def imagen_para_marcador(nombre: str):
-    """La ruta del PNG de ese marcador, o None si no está."""
+    """La ruta del PNG de ese marcador, o None si no está.
+
+    Busca en los dibujos de temporada y en las imágenes fijas del ticket. Es
+    una sola función y no dos porque del otro lado —el que imprime— un dibujo
+    es un dibujo: no tiene por qué saber si es una calabaza o el logo de la
+    tienda (2026-10-07, al meter el logo).
+    """
     limpio = "".join(c for c in str(nombre or "") if c.isalnum() or c == "_")
     if not limpio:
         return None
-    ruta = carpeta_dibujos() / f"{limpio}.png"
-    return ruta if ruta.exists() else None
+    for carpeta in (carpeta_dibujos(), carpeta_imagenes_ticket()):
+        ruta = carpeta / f"{limpio}.png"
+        if ruta.exists():
+            return ruta
+    return None
+
+
+def marcador_de(nombre: str) -> str:
+    """El marcador que se escribe en el texto del ticket para pedir ese dibujo.
+
+    Vacío si el PNG no está: así quien lo arma no tiene que comprobar nada y un
+    archivo que falta nunca deja un `[[...]]` impreso en el papel."""
+    limpio = "".join(c for c in str(nombre or "") if c.isalnum() or c == "_")
+    if not limpio or imagen_para_marcador(limpio) is None:
+        return ""
+    return f"{MARCADOR_INICIO}{limpio}{MARCADOR_FIN}"
 
 
 def marcador_de_ticket(hoy: date | None = None) -> str:
