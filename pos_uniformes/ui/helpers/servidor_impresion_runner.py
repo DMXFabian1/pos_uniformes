@@ -64,14 +64,20 @@ def correr(app, *, drenar: bool = False, origen: str = "") -> int:
     from PyQt6.QtCore import QTimer
 
     from pos_uniformes.database.connection import get_session
+    from pos_uniformes.services.print_routing_cache_service import tipos_que_atiende
     from pos_uniformes.services.trabajo_dispatcher import TrabajoDispatcher
     from pos_uniformes.ui.helpers.trabajo_print_handlers import build_handlers
 
     app.setQuitOnLastWindowClosed(False)   # no hay ventanas: no se debe salir solo
 
+    tipos = tipos_que_atiende()
+    if tipos is not None:
+        logger.info("Atiendo solo: %s", ", ".join(t.value for t in tipos))
+
     despachador = TrabajoDispatcher(
         get_session,
         build_handlers(),
+        tipos=tipos,
         schedule=QTimer.singleShot,
         on_event=lambda tid, estado, err: logger.info(
             "Trabajo %s → %s%s", tid, getattr(estado, "value", estado), f" ({err})" if err else ""

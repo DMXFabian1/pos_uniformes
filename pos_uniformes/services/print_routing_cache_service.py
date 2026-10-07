@@ -30,16 +30,39 @@ def _cache_path() -> Path:
     return satellite_data_dir() / "data" / _CACHE_FILENAME
 
 
-def save_print_routing(modo: str, origen: str = _DEFAULT_ORIGEN) -> None:
+#: Qué tipos de trabajo atiende esta PC. `None` = todos, que es como se
+#: comportó siempre y sigue siendo lo correcto cuando hay UN solo servidor.
+#: Existe desde que hay dos: la principal estrenó impresora de tickets pero las
+#: Brother de etiquetas siguen en el kiosko, y sin esto la principal reclamaría
+#: etiquetas para mandarlas a una impresora que no tiene y las dejaría en ERROR
+#: (Daniel, 2026-10-07). Se guardan por NOMBRE, no por el enum, para que un
+#: tipo nuevo no rompa el archivo de una máquina vieja.
+_TIPOS_CONOCIDOS = ("TICKET", "ETIQUETA", "CONTEO", "PEDIDO")
+
+
+def _limpiar_tipos(tipos) -> list[str] | None:
+    if tipos is None:
+        return None
+    limpios = [
+        str(t).strip().upper() for t in tipos
+        if str(t).strip().upper() in _TIPOS_CONOCIDOS
+    ]
+    # Lista vacía = "no atiendo nada", que no es un estado útil: sería un
+    # servidor que no sirve. Se trata como "todos", igual que ausente.
+    return sorted(set(limpios)) or None
+
+
+def save_print_routing(modo: str, origen: str = _DEFAULT_ORIGEN, tipos=None) -> None:
     if modo not in _MODOS_VALIDOS:
         raise ValueError(f"modo inválido: {modo!r} (usa MODO_LOCAL o MODO_SATELITE)")
     origen = (origen or _DEFAULT_ORIGEN).strip() or _DEFAULT_ORIGEN
     path = _cache_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps({"modo": modo, "origen": origen}, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    datos = {"modo": modo, "origen": origen}
+    limpios = _limpiar_tipos(tipos)
+    if limpios is not None:
+        datos["tipos"] = limpios
+    path.write_text(json.dumps(datos, ensure_ascii=False), encoding="utf-8")
 
 
 def load_print_routing() -> tuple[str, str]:
@@ -53,6 +76,29 @@ def load_print_routing() -> tuple[str, str]:
         return modo, origen
     except Exception:  # noqa: BLE001
         return MODO_LOCAL, _DEFAULT_ORIGEN
+
+
+def tipos_configurados() -> list[str] | None:
+    """Los nombres de los tipos que atiende esta PC, o None = todos."""
+    try:
+        data = json.loads(_cache_path().read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return None
+    return _limpiar_tipos(data.get("tipos"))
+
+
+def tipos_que_atiende():
+    """Los `TipoTrabajo` que esta PC despacha, o None = todos.
+
+    None y "todos" son lo mismo a propósito: una máquina que nunca configuró
+    nada tiene que seguir comportándose como antes."""
+    nombres = tipos_configurados()
+    if nombres is None:
+        return None
+    from pos_uniformes.database.models import TipoTrabajo
+
+    tipos = [t for t in TipoTrabajo if t.value in nombres]
+    return tipos or None
 
 
 def enviar_al_satelite_activo() -> bool:

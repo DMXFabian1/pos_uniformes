@@ -1328,6 +1328,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
         MODO_SATELITE,
         load_print_routing,
         save_print_routing,
+        tipos_configurados,
     )
 
     routing_box = QGroupBox("Rol de impresión de esta PC")
@@ -1350,14 +1351,52 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     origen_edit.setPlaceholderText("principal / kiosko / caja 2")
     origen_form.addRow("Nombre de esta PC:", origen_edit)
 
+    # Qué atiende esta PC. Desde que hay dos servidores (la principal estrenó
+    # impresora de tickets y las Brother siguen en el kiosko) hace falta
+    # decirlo: si no, el que no tiene etiquetadora reclama etiquetas y las deja
+    # en ERROR, que es peor que no imprimirlas (Daniel, 2026-10-07).
+    tipos_box = QGroupBox("¿Qué imprime esta PC?")
+    tipos_layout = QVBoxLayout()
+    tipos_help = QLabel(
+        "Marca solo lo que esta PC tiene cómo imprimir. Si dejas todo marcado "
+        "atiende lo que caiga, que es lo correcto cuando hay un solo servidor."
+    )
+    tipos_help.setWordWrap(True)
+    tipos_layout.addWidget(tipos_help)
+    _ETIQUETAS_TIPO = (
+        ("TICKET", "🧾  Tickets y cortes"),
+        ("ETIQUETA", "🏷  Etiquetas (Brother)"),
+        ("CONTEO", "📋  Hojas de conteo"),
+        ("PEDIDO", "📦  Pedidos"),
+    )
+    guardados = tipos_configurados()
+    casillas_tipo = {}
+    for clave, etiqueta in _ETIQUETAS_TIPO:
+        cb = QCheckBox(etiqueta)
+        cb.setChecked(guardados is None or clave in guardados)
+        casillas_tipo[clave] = cb
+        tipos_layout.addWidget(cb)
+    tipos_box.setLayout(tipos_layout)
+
     save_routing_btn = QPushButton("Guardar rol")
     save_routing_btn.setObjectName("primaryButton")
 
     def handle_save_routing() -> None:
         modo = MODO_SATELITE if radio_sat.isChecked() else MODO_LOCAL
         origen = origen_edit.text().strip() or "principal"
+        marcados = [c for c, cb in casillas_tipo.items() if cb.isChecked()]
+        # Todos marcados se guarda como "todos" (None), no como la lista: así
+        # un tipo nuevo en el futuro lo atiende sin que nadie vuelva aquí.
+        tipos = None if len(marcados) == len(casillas_tipo) else marcados
+        if not marcados:
+            QMessageBox.warning(
+                dialog, "Falta elegir",
+                "Un Servidor de impresión que no imprime nada no sirve de nada.\n"
+                "Marca al menos una cosa.",
+            )
+            return
         try:
-            save_print_routing(modo, origen)
+            save_print_routing(modo, origen, tipos)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(dialog, "Error", f"No se pudo guardar:\n{exc}")
             return
@@ -1366,7 +1405,13 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
             if modo == MODO_SATELITE
             else "Servidor de impresión (imprime local)"
         )
-        QMessageBox.information(dialog, "Guardado", f"Esta PC ahora es: {etiqueta}.")
+        detalle = ""
+        if modo != MODO_SATELITE:
+            detalle = "\n\nAtiende: " + (
+                "todo lo que caiga" if tipos is None
+                else ", ".join(dict(_ETIQUETAS_TIPO)[c].split("  ")[-1] for c in marcados)
+            )
+        QMessageBox.information(dialog, "Guardado", f"Esta PC ahora es: {etiqueta}.{detalle}")
 
     save_routing_btn.clicked.connect(handle_save_routing)
 
@@ -1374,6 +1419,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     routing_layout.addWidget(radio_local)
     routing_layout.addWidget(radio_sat)
     routing_layout.addLayout(origen_form)
+    routing_layout.addWidget(tipos_box)
     routing_layout.addWidget(save_routing_btn)
     routing_box.setLayout(routing_layout)
 
@@ -1392,6 +1438,9 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
         printer_box.setVisible(es_servidor)
         label_box.setVisible(es_servidor)
         escpos_box.setVisible(es_servidor)
+        # Una Estación no despacha nada, así que preguntarle qué imprime no
+        # tiene sentido.
+        tipos_box.setVisible(es_servidor)
         estacion_hint.setVisible(not es_servidor)
 
     # radio_local y radio_sat son mutuamente exclusivos (mismo padre): basta

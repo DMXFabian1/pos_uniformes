@@ -501,9 +501,16 @@ class QuoteSatelliteWindow(QMainWindow):
             from pos_uniformes.services.trabajo_dispatcher import TrabajoDispatcher
             from pos_uniformes.ui.helpers.trabajo_print_handlers import build_handlers
 
+            from pos_uniformes.services.print_routing_cache_service import tipos_que_atiende
+
             self._trabajo_dispatcher = TrabajoDispatcher(
                 get_session,
                 build_handlers(),
+                # Qué atiende ESTA PC. None = todos, como siempre. Importa desde
+                # que hay dos servidores: sin esto, el que tiene impresora de
+                # tickets pero no las Brother reclamaría etiquetas y las dejaría
+                # en ERROR (2026-10-07).
+                tipos=tipos_que_atiende(),
                 schedule=QTimer.singleShot,
                 on_event=self._on_trabajo_event,
                 # No abrir conexión (que bloquea el hilo de UI hasta el
