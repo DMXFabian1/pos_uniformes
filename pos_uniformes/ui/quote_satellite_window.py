@@ -1365,58 +1365,21 @@ class QuoteSatelliteWindow(QMainWindow):
         # solo quitaba espacio vertical (pedido de Daniel 2026-09-04).
 
         # ── Gate: escanear gafete ────────────────────────────────────────
-        # Réplica exacta del login de Venta Rápida (mismo _GATE_STYLE
-        # importado de quick_sale_view: una sola fuente del look).
+        # La MISMA pantalla que Venta rápida y Conteos, no una copia: antes
+        # estaba calcada a mano y cada adorno había que ponerlo tres veces.
+        from pos_uniformes.ui.helpers.pantalla_de_gafete import construir_gate
         from pos_uniformes.ui.views.quick_sale_view import _GATE_STYLE
 
-        self.libreta_gate = QWidget()
-        self.libreta_gate.setObjectName("gateRoot")
-        self.libreta_gate.setStyleSheet(_GATE_STYLE)
-        gate_outer = QVBoxLayout()
-        gate_outer.setContentsMargins(40, 40, 40, 40)
-
-        gate_card = QFrame()
-        gate_card.setObjectName("gateCard")
-        gate_cl = QVBoxLayout()
-        gate_cl.setContentsMargins(48, 40, 48, 40)
-        gate_cl.setSpacing(12)
-        gate_cl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        gate_icon = QLabel("📒")
-        gate_icon.setObjectName("gateEmoji")
-        gate_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        gate_cl.addWidget(gate_icon)
-
-        gate_title = QLabel("Libreta")
-        gate_title.setObjectName("gateTitle")
-        gate_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        gate_cl.addWidget(gate_title)
-
-        gate_hint = QLabel("Escanea tu gafete para abrir tu libreta")
-        gate_hint.setObjectName("gateHint")
-        gate_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        gate_cl.addWidget(gate_hint)
-
-        gate_cl.addSpacing(8)
-
-        self.libreta_gate_input = QLineEdit()
-        self.libreta_gate_input.setObjectName("gateInput")
-        self.libreta_gate_input.setPlaceholderText("Gafete...")
-        self.libreta_gate_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.libreta_gate_input.returnPressed.connect(self._on_libreta_gate_scan)
-        gate_cl.addWidget(self.libreta_gate_input, 0, Qt.AlignmentFlag.AlignCenter)
-
-        self.libreta_gate_error = QLabel("")
-        self.libreta_gate_error.setObjectName("gateError")
-        self.libreta_gate_error.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.libreta_gate_error.setVisible(False)
-        gate_cl.addWidget(self.libreta_gate_error)
-
-        gate_card.setLayout(gate_cl)
-        gate_outer.addStretch()
-        gate_outer.addWidget(gate_card, 0, Qt.AlignmentFlag.AlignHCenter)
-        gate_outer.addStretch()
-        self.libreta_gate.setLayout(gate_outer)
+        gate = construir_gate(
+            emoji="📒",
+            titulo="Libreta",
+            ayuda="Escanea tu gafete para abrir tu libreta",
+            hoja=_GATE_STYLE,
+            al_escanear=self._on_libreta_gate_scan,
+        )
+        self.libreta_gate = gate.raiz
+        self.libreta_gate_input = gate.entrada
+        self.libreta_gate_error = gate.error
         layout.addWidget(self.libreta_gate)
 
         # ── Vista (empleada o dueño) ─────────────────────────────────────
@@ -4018,47 +3981,19 @@ class QuoteSatelliteWindow(QMainWindow):
         page_layout.setSpacing(0)
         page.setLayout(page_layout)
 
-        # ── Gate: réplica del de la Libreta ─────────────────────────────
-        self.conteos_gate = QWidget()
-        self.conteos_gate.setObjectName("gateRoot")
-        self.conteos_gate.setStyleSheet(_GATE_STYLE)
-        gate_outer = QVBoxLayout()
-        gate_outer.setContentsMargins(40, 40, 40, 40)
-        gate_card = QFrame()
-        gate_card.setObjectName("gateCard")
-        gate_cl = QVBoxLayout()
-        gate_cl.setContentsMargins(48, 40, 48, 40)
-        gate_cl.setSpacing(12)
-        gate_cl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        gate_icon = QLabel("📋")
-        gate_icon.setObjectName("gateEmoji")
-        gate_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        gate_cl.addWidget(gate_icon)
-        gate_title = QLabel("Conteos")
-        gate_title.setObjectName("gateTitle")
-        gate_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        gate_cl.addWidget(gate_title)
-        gate_hint = QLabel("Escanea tu gafete para contar")
-        gate_hint.setObjectName("gateHint")
-        gate_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        gate_cl.addWidget(gate_hint)
-        gate_cl.addSpacing(8)
-        self.conteos_gate_input = QLineEdit()
-        self.conteos_gate_input.setObjectName("gateInput")
-        self.conteos_gate_input.setPlaceholderText("Gafete...")
-        self.conteos_gate_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.conteos_gate_input.returnPressed.connect(self._on_conteos_gate_scan)
-        gate_cl.addWidget(self.conteos_gate_input, 0, Qt.AlignmentFlag.AlignCenter)
-        self.conteos_gate_error = QLabel("")
-        self.conteos_gate_error.setObjectName("gateError")
-        self.conteos_gate_error.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.conteos_gate_error.setVisible(False)
-        gate_cl.addWidget(self.conteos_gate_error)
-        gate_card.setLayout(gate_cl)
-        gate_outer.addStretch()
-        gate_outer.addWidget(gate_card, 0, Qt.AlignmentFlag.AlignHCenter)
-        gate_outer.addStretch()
-        self.conteos_gate.setLayout(gate_outer)
+        # ── Gate: la misma pantalla que Libreta y Venta rápida ──────────
+        from pos_uniformes.ui.helpers.pantalla_de_gafete import construir_gate
+
+        gate = construir_gate(
+            emoji="📋",
+            titulo="Conteos",
+            ayuda="Escanea tu gafete para contar",
+            hoja=_GATE_STYLE,
+            al_escanear=self._on_conteos_gate_scan,
+        )
+        self.conteos_gate = gate.raiz
+        self.conteos_gate_input = gate.entrada
+        self.conteos_gate_error = gate.error
         page_layout.addWidget(self.conteos_gate)
 
         # ── Zona de trabajo ─────────────────────────────────────────────

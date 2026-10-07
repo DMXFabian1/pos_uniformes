@@ -79,7 +79,7 @@ from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
 _TIW = _TW - 4
 
 
-def _mezclar(base: str, encima: str, cuanto: float) -> str:
+def mezclar_colores(base: str, encima: str, cuanto: float) -> str:
     """Un color a medio camino entre otros dos. `cuanto` 0 = base, 1 = encima.
 
     Existe para que la ayuda de la tarjeta de escaneo se tiña de temporada sin
@@ -251,97 +251,28 @@ class QuickSaleWidget(QWidget):
     # ─── Gate de empleada ────────────────────────────────────────────────
 
     def _build_gate(self) -> QWidget:
-        # Esta pantalla es la cara del kiosko cuando nadie está atendiendo, y
-        # era una extensión de color vacía. En temporada se pinta una escena
-        # completa detrás de la tarjeta (Daniel, 07/10).
-        from pos_uniformes.ui.helpers.escena_de_temporada import FondoDeTemporada
+        """La pantalla de «escanea tu gafete», que es la misma de Libreta y
+        Conteos: una sola, en `helpers/pantalla_de_gafete.py`.
 
-        wrapper = FondoDeTemporada()
-        self._gate_fondo = wrapper
-        wrapper.setObjectName("gateRoot")
-        wrapper.setStyleSheet(_GATE_STYLE)
-        outer = QVBoxLayout()
-        outer.setContentsMargins(40, 40, 40, 40)
+        Eran tres copias calcadas a mano. Se juntaron el 07/10, cuando la
+        escena de temporada y el texto en color habían entrado solo aquí y
+        Daniel los pidió en las otras dos: teñir tres copias arregla hoy y se
+        vuelve a romper la próxima vez.
+        """
+        from pos_uniformes.ui.helpers.pantalla_de_gafete import construir_gate
 
-        card = QFrame()
-        card.setObjectName("gateCard")
-        cl = QVBoxLayout()
-        cl.setContentsMargins(48, 40, 48, 40)
-        cl.setSpacing(12)
-        cl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
-        # El motivo de temporada vive AQUÍ y en ningún otro lado de la venta:
-        # es la cara del kiosko cuando nadie está atendiendo. Mientras se vende,
-        # la pantalla es para vender (Daniel, 02/10: "nada exagerado, pero sí
-        # algo sutil").
-        temporada = _temporada_de_hoy()
-
-        # Con la escena detrás, el emoji suelto sobra: ya hay una calabaza del
-        # tamaño de la pantalla, y dos dicen lo mismo dos veces.
-        if not wrapper.tiene_escena:
-            emoji = QLabel(temporada.emoji if temporada else "📋")
-            emoji.setObjectName("gateEmoji")
-            emoji.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            cl.addWidget(emoji)
-
-        title = QLabel("Venta rapida")
-        title.setObjectName("gateTitle")
-        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        cl.addWidget(title)
-
-        hint = QLabel("Escanea tu QR de empleada para comenzar")
-        hint.setObjectName("gateHint")
-        hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        cl.addWidget(hint)
-
-        if temporada is not None:
-            # El texto de ESTA tarjeta toma el color de la temporada (Daniel,
-            # 07/10). Solo aquí: es la pantalla donde nadie está trabajando. En
-            # las de venta, los precios y las tallas se leen ocho horas al día
-            # y el color de un adorno no tiene nada que hacer ahí.
-            title.setStyleSheet(
-                f"color: {temporada.color}; background: transparent;"
-            )
-            # La ayuda NO va del mismo color: tres renglones del mismo naranja
-            # se leen como un bloque y se pierde cuál es el título. Va a medio
-            # camino entre el gris de siempre y el color, que mantiene el orden
-            # y de todos modos se nota que es temporada.
-            hint.setStyleSheet(
-                f"color: {_mezclar(_MUTED, temporada.color, 0.45)};"
-                " background: transparent;"
-            )
-
-        if temporada is not None:
-            saludo = QLabel(temporada.saludo)
-            saludo.setObjectName("gateTemporada")
-            saludo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            saludo.setStyleSheet(
-                f"color: {temporada.color}; font-size: 13px; font-weight: 700;"
-                " background: transparent;"
-            )
-            cl.addWidget(saludo)
-
-        cl.addSpacing(8)
-
-        self._gate_input = QLineEdit()
-        self._gate_input.setObjectName("gateInput")
-        self._gate_input.setPlaceholderText("VEND-1")
-        self._gate_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._gate_input.returnPressed.connect(self._on_gate_scan)
-        cl.addWidget(self._gate_input, 0, Qt.AlignmentFlag.AlignCenter)
-
-        self._gate_error = QLabel("")
-        self._gate_error.setObjectName("gateError")
-        self._gate_error.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._gate_error.setVisible(False)
-        cl.addWidget(self._gate_error)
-
-        card.setLayout(cl)
-        outer.addStretch()
-        outer.addWidget(card, 0, Qt.AlignmentFlag.AlignCenter)
-        outer.addStretch()
-        wrapper.setLayout(outer)
-        return wrapper
+        gate = construir_gate(
+            emoji="📋",
+            titulo="Venta rapida",
+            ayuda="Escanea tu QR de empleada para comenzar",
+            marcador="VEND-1",
+            hoja=_GATE_STYLE,
+            al_escanear=self._on_gate_scan,
+        )
+        self._gate_fondo = gate.raiz
+        self._gate_input = gate.entrada
+        self._gate_error = gate.error
+        return gate.raiz
 
     @staticmethod
     def _normalize_scan(raw: str) -> str:

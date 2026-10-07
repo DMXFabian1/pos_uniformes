@@ -121,9 +121,9 @@ class ElKioskoUsaLaEscenaTests(unittest.TestCase):
         ).resolve().parents[1].joinpath(
             "ui/views/quick_sale_view.py"
         ).read_text(encoding="utf-8")
-        self.assertIn("wrapper = FondoDeTemporada()", codigo)
-        # Con una calabaza del tamaño de la pantalla, el emoji suelto sobra.
-        self.assertIn("if not wrapper.tiene_escena:", codigo)
+        self.assertIn("from pos_uniformes.ui.helpers.pantalla_de_gafete import", codigo)
+        # La pantalla de gafete ya no se arma aquí: es una sola para las tres.
+        self.assertNotIn('setObjectName("gateCard")', codigo)
 
 
 if __name__ == "__main__":
@@ -199,12 +199,97 @@ class ElTextoDeLaTarjetaSeTineTests(unittest.TestCase):
         self.assertGreater(ayuda.blue(), titulo.blue())     # pero más apagada
 
     def test_mezclar_respeta_los_extremos(self) -> None:
-        from pos_uniformes.ui.views.quick_sale_view import _mezclar
+        from pos_uniformes.ui.views.quick_sale_view import mezclar_colores
 
-        self.assertEqual(_mezclar("#102030", "#a0b0c0", 0.0), "#102030")
-        self.assertEqual(_mezclar("#102030", "#a0b0c0", 1.0), "#a0b0c0")
+        self.assertEqual(mezclar_colores("#102030", "#a0b0c0", 0.0), "#102030")
+        self.assertEqual(mezclar_colores("#102030", "#a0b0c0", 1.0), "#a0b0c0")
 
     def test_un_color_que_no_existe_no_tumba_la_pantalla(self) -> None:
-        from pos_uniformes.ui.views.quick_sale_view import _mezclar
+        from pos_uniformes.ui.views.quick_sale_view import mezclar_colores
 
-        self.assertEqual(_mezclar("#102030", "no-es-un-color", 0.5), "#102030")
+        self.assertEqual(mezclar_colores("#102030", "no-es-un-color", 0.5), "#102030")
+
+
+class LasTresPantallasDeGafeteSonLaMismaTests(unittest.TestCase):
+    """«en libreta y conteos aplica lo mismo» (Daniel, 07/10).
+
+    Eran tres copias calcadas a mano —la de Libreta lo decía: «réplica
+    exacta»— y compartían solo la hoja de estilos. Teñir las tres arreglaba
+    ese día y se volvía a romper al siguiente adorno, así que se quedó una
+    sola pantalla. Estos tests son lo que impide que vuelvan a separarse.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self) -> None:
+        # En setUpClass NO: el ajuste se aísla por test, y lo que se guarde
+        # antes del primero se escribe en otra carpeta y no lo ve nadie.
+        temp.guardar_ajuste(temp.FIJA, "halloween")
+
+    def _gates(self):
+        """Las tres pantallas, construidas como las construye la aplicación."""
+        from unittest.mock import MagicMock
+
+        from PyQt6.QtWidgets import QWidget
+
+        from pos_uniformes.ui.views.quick_sale_view import QuickSaleWidget
+
+        venta = QuickSaleWidget.__new__(QuickSaleWidget)
+        QWidget.__init__(venta)
+        hechas = {"Venta rapida": venta._build_gate()}
+
+        from pos_uniformes.ui.helpers.pantalla_de_gafete import construir_gate
+        from pos_uniformes.ui.views.quick_sale_view import _GATE_STYLE
+
+        for titulo, ayuda in (("Libreta", "Escanea tu gafete para abrir tu libreta"),
+                              ("Conteos", "Escanea tu gafete para contar")):
+            hechas[titulo] = construir_gate(
+                emoji="📒", titulo=titulo, ayuda=ayuda, hoja=_GATE_STYLE,
+                al_escanear=MagicMock(),
+            ).raiz
+        return hechas
+
+    def test_las_tres_pintan_la_escena(self) -> None:
+        for nombre, gate in self._gates().items():
+            with self.subTest(pantalla=nombre):
+                self.assertTrue(gate.tiene_escena)
+
+    def test_las_tres_tinen_su_titulo(self) -> None:
+        from PyQt6.QtGui import QColor
+        from PyQt6.QtWidgets import QLabel
+
+        esperado = QColor(temp.temporada_de_archivo("halloween").color)
+        for nombre, gate in self._gates().items():
+            with self.subTest(pantalla=nombre):
+                titulo = next(
+                    l for l in gate.findChildren(QLabel)
+                    if l.objectName() == "gateTitle"
+                )
+                titulo.ensurePolished()
+                self.assertEqual(
+                    titulo.palette().color(titulo.foregroundRole()), esperado
+                )
+
+    def test_ninguna_pagina_arma_su_propia_copia(self) -> None:
+        """Lo que vuelve a separarlas es escribir `gateCard` a mano."""
+        from pathlib import Path
+
+        raiz = Path(__file__).resolve().parents[1]
+        for archivo in ("ui/quote_satellite_window.py", "ui/views/quick_sale_view.py"):
+            with self.subTest(archivo=archivo):
+                codigo = raiz.joinpath(archivo).read_text(encoding="utf-8")
+                self.assertNotIn('setObjectName("gateCard")', codigo)
+
+    def test_las_tres_conservan_sus_textos(self) -> None:
+        """Compartir la pantalla no es volverlas iguales: cada una dice lo suyo."""
+        from PyQt6.QtWidgets import QLabel
+
+        titulos = set()
+        for gate in self._gates().values():
+            titulos.add(next(
+                l.text() for l in gate.findChildren(QLabel)
+                if l.objectName() == "gateTitle"
+            ))
+        self.assertEqual(titulos, {"Venta rapida", "Libreta", "Conteos"})
