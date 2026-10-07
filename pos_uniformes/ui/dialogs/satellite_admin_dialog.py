@@ -1020,6 +1020,15 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     escpos_enabled.setChecked(_esc.enabled)
     escpos_fullcut = QCheckBox("Corte total (desmarca para corte parcial)")
     escpos_fullcut.setChecked(_esc.full_cut)
+    escpos_imagen = QCheckBox("Ticket dibujado (logo nítido, cajas con línea, total grande)")
+    escpos_imagen.setChecked(getattr(_esc, "ticket_como_imagen", False))
+    escpos_imagen_hint = QLabel(
+        "El ticket se manda como imagen de 576 puntos en vez de como texto. Es "
+        "lo que permite el logo sin apolillar y las cajas con línea de verdad. "
+        "Cambia cómo se ve el ticket: pruébalo en una PC antes de ponerlo en las dos."
+    )
+    escpos_imagen_hint.setWordWrap(True)
+    escpos_imagen_hint.setObjectName("satNota")
     escpos_form = QFormLayout()
     escpos_codepage = QSpinBox()
     escpos_codepage.setRange(0, 255)
@@ -1037,6 +1046,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
             encoding=_esc.encoding,
             feed_lines=escpos_feed.value(),
             full_cut=escpos_fullcut.isChecked(),
+            ticket_como_imagen=escpos_imagen.isChecked(),
         )
 
     save_escpos_btn = QPushButton("Guardar ESC/POS")
@@ -1096,6 +1106,8 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     escpos_layout.addWidget(escpos_help)
     escpos_layout.addWidget(escpos_enabled)
     escpos_layout.addWidget(escpos_fullcut)
+    escpos_layout.addWidget(escpos_imagen)
+    escpos_layout.addWidget(escpos_imagen_hint)
     escpos_layout.addLayout(escpos_form)
     escpos_btn_row = QHBoxLayout()
     escpos_btn_row.addWidget(save_escpos_btn)

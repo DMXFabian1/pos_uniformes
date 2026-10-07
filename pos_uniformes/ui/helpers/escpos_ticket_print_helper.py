@@ -10,8 +10,11 @@ y recortada): la impresora imprime a su ancho nativo y corta donde le decimos.
 
 from __future__ import annotations
 
+import logging
 import subprocess
 import sys
+
+logger = logging.getLogger(__name__)
 
 from pos_uniformes.services.escpos_settings_cache_service import (
     EscPosSettings,
@@ -115,6 +118,26 @@ def build_escpos_bytes(text: str, settings: EscPosSettings | None = None) -> byt
     return _INIT + _codepage_cmd(s.codepage) + encoded + feed + corte
 
 
+def build_escpos_imagen(texto: str, settings: EscPosSettings | None = None) -> bytes:
+    """El ticket ENTERO como una sola imagen de puntos, centrada y con corte.
+
+    No va una letra de texto: el papel es un mapa de bits de 576 puntos, que es
+    justo el ancho real del cabezal. Así no hay reescalado en ninguna parte de
+    la cadena (era lo que apolillaba el logo), las cajas salen con línea de
+    verdad y el codepage deja de importar — una imagen no tiene codificación.
+    """
+    import io
+
+    from pos_uniformes.services.ticket_imagen_service import render_ticket_png
+
+    s = settings or EscPosSettings()
+    png = render_ticket_png(texto)
+    raster = raster_de_imagen(io.BytesIO(png))
+    feed = ("\n" * s.feed_lines).encode("ascii", errors="ignore")
+    corte = _CUT_FULL if s.full_cut else _CUT_PARTIAL
+    return _INIT + _ALINEAR_CENTRO + raster + _ALINEAR_IZQ + feed + corte
+
+
 def _send_raw_windows(printer_name: str, data: bytes, copies: int) -> bool:
     """Windows: spooler RAW vía pywin32 (igual que la impresión de etiquetas)."""
     import win32print
@@ -146,6 +169,20 @@ def _send_raw_cups(printer_name: str, data: bytes, copies: int) -> bool:
             detalle = proc.stderr.decode(errors="replace").strip() or "lp falló"
             raise RuntimeError(detalle)
     return True
+
+
+def print_ticket_imagen_escpos(printer_name: str, text: str, *, copies: int = 1) -> bool:
+    """Imprime el ticket dibujado. False si no se pudo (el llamador cae al de siempre)."""
+    if not printer_name:
+        return False
+    try:
+        datos = build_escpos_imagen(text)
+    except Exception:  # noqa: BLE001 — sin dibujo, el ticket sale por el camino viejo
+        logger.exception("ESC/POS: no se pudo dibujar el ticket")
+        return False
+    if sys.platform.startswith("win"):
+        return _send_raw_windows(printer_name, datos, copies)
+    return _send_raw_cups(printer_name, datos, copies)
 
 
 def print_ticket_escpos(printer_name: str, text: str, *, copies: int = 1) -> bool:

@@ -24,6 +24,13 @@ class EscPosSettings:
     encoding: str = "cp850"       # codificación del texto (caja + acentos)
     feed_lines: int = 3           # líneas en blanco antes del corte (offset cuchilla)
     full_cut: bool = True         # True = corte total; False = corte parcial
+    #: Dibujar el ticket como IMAGEN de 576 puntos en vez de mandarlo como
+    #: texto. Es lo que permite el logo nítido, las cajas con línea de verdad y
+    #: el total grande — y de paso se acaban los problemas de codepage, porque
+    #: una imagen no tiene codificación. Apagado por defecto: cambia cómo se ve
+    #: el ticket y eso se enciende a propósito, no por actualizar
+    #: (Daniel, 2026-10-07).
+    ticket_como_imagen: bool = False
 
 
 def _cache_path() -> Path:
@@ -41,6 +48,7 @@ def load_escpos_settings() -> EscPosSettings:
             encoding=str(data.get("encoding", d.encoding)) or d.encoding,
             feed_lines=max(0, int(data.get("feed_lines", d.feed_lines))),
             full_cut=bool(data.get("full_cut", d.full_cut)),
+            ticket_como_imagen=bool(data.get("ticket_como_imagen", d.ticket_como_imagen)),
         )
     except Exception:  # noqa: BLE001
         return EscPosSettings()

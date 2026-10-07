@@ -10,6 +10,8 @@ dialogo mientras hay un QTimer pendiente, no se tocan widgets ya destruidos.
 
 from __future__ import annotations
 
+import logging
+
 from collections.abc import Callable
 
 from PyQt6.QtCore import QSizeF, Qt, QTimer
@@ -49,6 +51,9 @@ _LEGACY_PAGE_HEIGHT_MM = 600.0
 # alto físico en mm es independiente del dpi (la fuente está en puntos), así que
 # medir a 96 dpi coincide con lo que dibuja drawText en la impresora.
 _MEASURE_DPI = 96
+
+
+logger = logging.getLogger(__name__)
 
 
 def _load_print_preferences() -> tuple[str, int]:
@@ -272,6 +277,19 @@ def _dibujar_imagen(painter: QPainter, rect, y: int, ruta: str) -> int:
     return escalada.height()
 
 
+def _ticket_como_imagen_activo() -> bool:
+    """¿Esta máquina imprime el ticket dibujado? Ante la duda, no."""
+    try:
+        from pos_uniformes.services.escpos_settings_cache_service import (
+            load_escpos_settings,
+        )
+
+        s = load_escpos_settings()
+        return bool(s.enabled and s.ticket_como_imagen)
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def _print_ticket_job(content: str) -> bool:
     """Tickets de venta / apartado / presupuesto: camino HISTÓRICO, intacto.
 
@@ -281,8 +299,23 @@ def _print_ticket_job(content: str) -> bool:
     ticket. El alto dinámico y ESC/POS son SOLO para las hojas de conteo
     (ver `_print_conteo_job`), que es donde había problema de corte.
     """
-    printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
     ticket_printer, copies = _load_print_preferences()
+
+    # Camino nuevo: el ticket DIBUJADO, mandado como puntos. Se enciende por
+    # máquina y apagado se comporta exactamente como siempre. Si falla por lo
+    # que sea, se cae al camino de abajo: un ticket tiene que salir.
+    if _ticket_como_imagen_activo():
+        try:
+            from pos_uniformes.ui.helpers.escpos_ticket_print_helper import (
+                print_ticket_imagen_escpos,
+            )
+
+            if print_ticket_imagen_escpos(ticket_printer, content, copies=copies):
+                return True
+        except Exception:  # noqa: BLE001
+            logger.exception("Ticket dibujado: no se pudo, va por el camino de siempre")
+
+    printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
     if ticket_printer:
         printer.setPrinterName(ticket_printer)
     printer.setCopyCount(copies)
