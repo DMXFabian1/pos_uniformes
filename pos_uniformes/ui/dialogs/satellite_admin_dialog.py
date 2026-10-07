@@ -1322,102 +1322,15 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     meili_layout.addWidget(meili_result_label)
     meili_box.setLayout(meili_layout)
 
-    # — Modo de impresión (ajuste por máquina) —
-    from pos_uniformes.services.print_routing_cache_service import (
-        guardar_impresoras,
-        impresoras_de_esta_pc,
-        load_print_routing,
+    # — Impresoras de esta PC (ajuste por máquina) —
+    # La caja vive en un helper porque esto mismo se configura desde
+    # Configuración del POS principal: dos copias se separan, y separarse aquí
+    # significa que una guarde sin la lista y la máquina vuelva a "todo o nada"
+    # en silencio (2026-10-07).
+    from pos_uniformes.ui.helpers.impresoras_de_la_pc_widget import (
+        construir_caja_impresoras,
     )
 
-    routing_box = QGroupBox("Impresoras de esta PC")
-    routing_layout = QVBoxLayout()
-    routing_help = QLabel(
-        "Marca lo que esta PC tiene cómo imprimir. De ahí sale todo lo demás: "
-        "lo que marques se imprime aquí (lo suyo y lo que le manden las otras "
-        "PCs), y lo que no, se va a la cola para que lo imprima quien sí pueda."
-    )
-    routing_help.setWordWrap(True)
-
-    _current_modo, current_origen = load_print_routing()
-
-    origen_form = QFormLayout()
-    origen_edit = QLineEdit(current_origen)
-    origen_edit.setPlaceholderText("principal / kiosko / caja 2")
-    origen_form.addRow("Nombre de esta PC:", origen_edit)
-
-    # UNA sola lista, y de ella salen las dos respuestas que antes pedían dos
-    # interruptores: qué imprime esta PC de lo suyo y qué atiende de la cola.
-    # El modelo viejo (todo aquí / todo allá) dejó de describir la tienda el día
-    # que la principal estrenó impresora de tickets sin tener las Brother
-    # (Daniel, 2026-10-07).
-    _ETIQUETAS_TIPO = (
-        ("TICKET", "🧾  Tickets y cortes"),
-        ("ETIQUETA", "🏷  Etiquetas (Brother)"),
-        ("CONTEO", "📋  Hojas de conteo"),
-        ("PEDIDO", "📦  Pedidos"),
-    )
-    tiene = impresoras_de_esta_pc()
-    casillas_tipo = {}
-    for clave, etiqueta in _ETIQUETAS_TIPO:
-        cb = QCheckBox(etiqueta)
-        cb.setChecked(clave in tiene)
-        casillas_tipo[clave] = cb
-        routing_layout.addWidget(cb)
-
-    # El resumen de lo que marcaste, en las palabras de siempre. Ya no es un
-    # interruptor: es la consecuencia.
-    resumen_rol = QLabel("")
-    resumen_rol.setWordWrap(True)
-    resumen_rol.setObjectName("satStatus")
-
-    def _resumir_rol() -> None:
-        marcados = [c for c, cb in casillas_tipo.items() if cb.isChecked()]
-        nombres = {c: e.split("  ")[-1] for c, e in _ETIQUETAS_TIPO}
-        if not marcados:
-            resumen_rol.setText(
-                "📡  Estación: esta PC no imprime nada. Todo se va a la cola y "
-                "sale donde haya impresora."
-            )
-        elif len(marcados) == len(casillas_tipo):
-            resumen_rol.setText(
-                "🖨  Servidor de impresión: esta PC imprime todo, lo suyo y lo "
-                "que le manden las demás."
-            )
-        else:
-            faltan = [nombres[c] for c in casillas_tipo if c not in marcados]
-            resumen_rol.setText(
-                "🖨  Imprime aquí: " + ", ".join(nombres[c] for c in marcados)
-                + ".\n📡  Se va a la cola: " + ", ".join(faltan) + "."
-            )
-
-    for cb in casillas_tipo.values():
-        cb.toggled.connect(lambda _v: _resumir_rol())
-    _resumir_rol()
-    routing_layout.addWidget(resumen_rol)
-
-    save_routing_btn = QPushButton("Guardar")
-    save_routing_btn.setObjectName("primaryButton")
-
-    def handle_save_routing() -> None:
-        origen = origen_edit.text().strip() or "principal"
-        marcados = [c for c, cb in casillas_tipo.items() if cb.isChecked()]
-        try:
-            guardar_impresoras(origen, marcados)
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(dialog, "Error", f"No se pudo guardar:\n{exc}")
-            return
-        QMessageBox.information(dialog, "Guardado", resumen_rol.text())
-
-    save_routing_btn.clicked.connect(handle_save_routing)
-
-    routing_layout.insertWidget(0, routing_help)
-    routing_layout.addLayout(origen_form)
-    routing_layout.addWidget(save_routing_btn)
-    routing_box.setLayout(routing_layout)
-
-    # Las estaciones no tienen impresoras: se ocultan las cajas de config de
-    # impresora de tickets y de etiquetas (así no intentan autodetectar hardware
-    # que no existe) y se muestra un aviso. El servidor de impresión sí las ve.
     estacion_hint = QLabel(
         "📡  Esta PC no tiene ninguna impresora marcada, así que no hay nada "
         "que configurar aquí. Todo se imprime donde sí haya. Si le conectaste "
@@ -1426,22 +1339,19 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     estacion_hint.setWordWrap(True)
     estacion_hint.setObjectName("satStatus")
 
-    def _aplicar_visibilidad_rol(*_args) -> None:
+    def _aplicar_visibilidad_rol(marcados: set[str]) -> None:
         """Cada caja de configuración se ve solo si esa impresora existe aquí.
 
-        Antes era todo o nada según el modo. Preguntarle a la PC principal por
-        su etiquetadora Brother, que está en el kiosko, es pedirle que
-        autodetecte hardware que no tiene."""
-        tickets = casillas_tipo["TICKET"].isChecked() or casillas_tipo["CONTEO"].isChecked()
-        etiquetas = casillas_tipo["ETIQUETA"].isChecked()
+        Preguntarle a la PC principal por su etiquetadora Brother, que está en
+        el kiosko, es pedirle que autodetecte hardware que no tiene."""
+        tickets = bool({"TICKET", "CONTEO"} & marcados)
+        etiquetas = "ETIQUETA" in marcados
         printer_box.setVisible(tickets)
         escpos_box.setVisible(tickets)
         label_box.setVisible(etiquetas)
         estacion_hint.setVisible(not (tickets or etiquetas))
 
-    for cb in casillas_tipo.values():
-        cb.toggled.connect(_aplicar_visibilidad_rol)
-    _aplicar_visibilidad_rol()
+    routing_box = construir_caja_impresoras(dialog, al_cambiar=_aplicar_visibilidad_rol)
 
     # — Cerrar —
     close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)

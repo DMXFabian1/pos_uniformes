@@ -645,67 +645,18 @@ def build_whatsapp_settings_dialog(window: "MainWindow") -> QDialog:
 
 
 def _build_print_routing_box(dialog: QDialog) -> QGroupBox:
-    """Toggle 'imprimir local' vs 'enviar al satélite' para esta PC.
+    """Qué impresoras tiene esta PC. Es un ajuste POR MÁQUINA (cache local).
 
-    Es un ajuste POR MÁQUINA (cache local), independiente de la config del
-    negocio. En modo satélite, tickets/etiquetas/conteo se encolan para que los
-    imprima la PC satélite.
+    La caja es la MISMA que la del menú admin del kiosko, a propósito: antes
+    había dos copias con modelos distintos y esta guardaba sin la lista de
+    impresoras, así que configurar desde aquí borraba en silencio lo elegido
+    del otro lado y la máquina volvía a "todo o nada" (2026-10-07).
     """
-    from pos_uniformes.services.print_routing_cache_service import (
-        MODO_LOCAL,
-        MODO_SATELITE,
-        load_print_routing,
-        save_print_routing,
+    from pos_uniformes.ui.helpers.impresoras_de_la_pc_widget import (
+        construir_caja_impresoras,
     )
 
-    box = QGroupBox("Modo de impresión de esta PC")
-    box.setObjectName("infoCard")
-    box_layout = QVBoxLayout()
-    box_layout.setSpacing(8)
-
-    hint = QLabel(
-        "Local: imprime en las impresoras conectadas a esta PC.\n"
-        "Enviar al satélite: encola tickets, etiquetas y conteos para que los "
-        "imprima la PC satélite."
-    )
-    hint.setWordWrap(True)
-    hint.setObjectName("subtleLine")
-
-    current_modo, current_origen = load_print_routing()
-    radio_local = QRadioButton("Imprimir local (esta PC tiene las impresoras)")
-    radio_sat = QRadioButton("Enviar al satélite")
-    (radio_sat if current_modo == MODO_SATELITE else radio_local).setChecked(True)
-
-    origen_row = QHBoxLayout()
-    origen_label = QLabel("Nombre de esta PC (origen):")
-    origen_edit = QLineEdit(current_origen)
-    origen_edit.setPlaceholderText("principal / kiosko")
-    origen_row.addWidget(origen_label)
-    origen_row.addWidget(origen_edit, 1)
-
-    save_btn = QPushButton("Guardar modo de impresión")
-    save_btn.setObjectName("toolbarPrimaryButton")
-
-    def _handle_save() -> None:
-        modo = MODO_SATELITE if radio_sat.isChecked() else MODO_LOCAL
-        origen = origen_edit.text().strip() or "principal"
-        try:
-            save_print_routing(modo, origen)
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(dialog, "Error", f"No se pudo guardar:\n{exc}")
-            return
-        etiqueta = "enviar al satélite" if modo == MODO_SATELITE else "imprimir local"
-        QMessageBox.information(dialog, "Guardado", f"Esta PC ahora va a: {etiqueta}.")
-
-    save_btn.clicked.connect(_handle_save)
-
-    box_layout.addWidget(hint)
-    box_layout.addWidget(radio_local)
-    box_layout.addWidget(radio_sat)
-    box_layout.addLayout(origen_row)
-    box_layout.addWidget(save_btn, 0, Qt.AlignmentFlag.AlignLeft)
-    box.setLayout(box_layout)
-    return box
+    return construir_caja_impresoras(dialog, boton="Guardar modo de impresión")
 
 
 def _build_label_printers_box(dialog: QDialog) -> QGroupBox:
