@@ -55,18 +55,16 @@ def load_escpos_settings() -> EscPosSettings:
 
 
 def save_escpos_settings(settings: EscPosSettings) -> None:
+    """Guarda TODOS los campos, sacándolos del dataclass.
+
+    Antes la lista de claves estaba escrita a mano y había que acordarse de
+    agregar cada campo nuevo en dos lugares. No se acordó nadie: `ticket_como_imagen`
+    se leía pero no se escribía, así que Daniel marcaba la casilla, guardaba,
+    volvía a abrir y estaba desmarcada — sin error ni aviso, como si no hubiera
+    tocado nada (2026-10-07). Con `asdict` el campo nuevo se guarda solo.
+    """
+    from dataclasses import asdict
+
     path = _cache_path()
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
-        json.dumps(
-            {
-                "enabled": settings.enabled,
-                "codepage": settings.codepage,
-                "encoding": settings.encoding,
-                "feed_lines": settings.feed_lines,
-                "full_cut": settings.full_cut,
-            },
-            ensure_ascii=False,
-        ),
-        encoding="utf-8",
-    )
+    path.write_text(json.dumps(asdict(settings), ensure_ascii=False), encoding="utf-8")
