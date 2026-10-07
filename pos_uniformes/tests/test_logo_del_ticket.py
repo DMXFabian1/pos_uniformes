@@ -246,3 +246,61 @@ class ElLogoNoDependeDeLaMaquinaQueArmaTests(unittest.TestCase):
         datos = build_escpos_bytes(temp.marcador_de("logo", "MAXIMODA") + "\nTicket\n")
         self.assertNotIn(b"]]", datos)
         self.assertNotIn(b"logo", datos)
+
+
+class ElCorteNoParteElUltimoRenglonTests(unittest.TestCase):
+    """«feliz halloween sale cortado y hay mucho espacio desperdiciado arriba».
+
+    Eran lo mismo: `GS V 0` corta donde está el papel, y se le adelantaba a
+    mano con 3 renglones. La cuchilla está ~1.5 cm por encima del cabezal, así
+    que tres no alcanzaban: el último renglón —el saludo— se partía, y el
+    sobrante encabezaba el ticket siguiente con su hueco delante.
+    """
+
+    def _s(self, **kw):
+        from pos_uniformes.services.escpos_settings_cache_service import EscPosSettings
+
+        return EscPosSettings(**kw)
+
+    def test_la_impresora_calcula_el_avance_y_corta(self) -> None:
+        from pos_uniformes.ui.helpers.escpos_ticket_print_helper import (
+            build_escpos_bytes,
+        )
+
+        datos = build_escpos_bytes("Hola\n", self._s())
+        self.assertTrue(datos.endswith(b"\x1dVA\x00"))   # GS V 65 n
+
+    def test_el_corte_parcial_usa_su_propio_comando(self) -> None:
+        from pos_uniformes.ui.helpers.escpos_ticket_print_helper import (
+            build_escpos_bytes,
+        )
+
+        datos = build_escpos_bytes("Hola\n", self._s(full_cut=False))
+        self.assertTrue(datos.endswith(b"\x1dVB\x00"))   # GS V 66 n
+
+    def test_ya_no_se_empujan_renglones_en_blanco(self) -> None:
+        """Ese empujón a ciegas era el hueco de arriba del ticket siguiente."""
+        from pos_uniformes.ui.helpers.escpos_ticket_print_helper import (
+            build_escpos_bytes,
+        )
+
+        datos = build_escpos_bytes("Hola\n", self._s(feed_lines=3))
+        self.assertNotIn(b"\n\n", datos)
+
+    def test_el_saludo_es_lo_ultimo_y_no_queda_bajo_la_cuchilla(self) -> None:
+        from pos_uniformes.ui.helpers.escpos_ticket_print_helper import (
+            build_escpos_bytes,
+        )
+
+        datos = build_escpos_bytes("Gracias\n¡Feliz Halloween!\n", self._s())
+        cuerpo, _, cola = datos.rpartition(b"\x1dVA")
+        self.assertIn("¡Feliz Halloween!".encode("cp850"), cuerpo)
+        self.assertEqual(cola, b"\x00")   # nada entre el saludo y el corte
+
+    def test_una_impresora_que_no_lo_entienda_vuelve_al_avance_a_mano(self) -> None:
+        from pos_uniformes.ui.helpers.escpos_ticket_print_helper import (
+            build_escpos_bytes,
+        )
+
+        datos = build_escpos_bytes("Hola\n", self._s(corte_calculado=False, feed_lines=3))
+        self.assertTrue(datos.endswith(b"\n\n\n\x1dV\x00"))

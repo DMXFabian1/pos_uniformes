@@ -29,6 +29,29 @@ _CUT_FULL = bytes([_GS, ord("V"), 0])           # GS V 0 -> corte total
 _CUT_PARTIAL = bytes([_GS, ord("V"), 1])        # GS V 1 -> corte parcial
 
 
+def _corte(s: "EscPosSettings") -> bytes:
+    """Avanzar y cortar, dejando que la IMPRESORA calcule cuánto avanzar.
+
+    `GS V 0` corta donde está el papel, así que había que adelantarlo a mano
+    con renglones en blanco (`feed_lines`, 3). Pero la cuchilla no está a la
+    altura del cabezal: está ~1.5 cm más arriba. Tres renglones no alcanzan,
+    y eso explicaba DOS cosas que parecían distintas (Daniel, 2026-10-07):
+    el «¡Feliz Halloween!» —que es el último renglón— salía partido a la
+    mitad, y lo que quedaba del ticket aparecía encabezando el siguiente,
+    con su hueco en blanco delante.
+
+    `GS V 65 n` avanza hasta la posición de corte —la de ESTA impresora, que
+    ella sí conoce— más `n` puntos, y corta. Nada se corta a media frase, y en
+    las impresoras que saben retroceder el papel, el siguiente ticket arranca
+    pegado al cabezal en vez de nacer con 1.5 cm en blanco.
+    """
+    if not getattr(s, "corte_calculado", True):
+        return (("\n" * s.feed_lines).encode("ascii", errors="ignore")
+                + (_CUT_FULL if s.full_cut else _CUT_PARTIAL))
+    n = max(0, min(255, int(getattr(s, "puntos_tras_corte", 0))))
+    return bytes([_GS, ord("V"), 65 if s.full_cut else 66, n])
+
+
 def _codepage_cmd(n: int) -> bytes:
     """ESC t n -> selecciona la tabla de códigos (n=2 suele ser CP850)."""
     return bytes([_ESC, ord("t"), max(0, min(255, int(n)))])
@@ -128,9 +151,7 @@ def build_escpos_bytes(text: str, settings: EscPosSettings | None = None) -> byt
     s = settings or EscPosSettings()
     cuerpo = text if text.endswith("\n") else text + "\n"
     encoded = _trozos_con_imagenes(cuerpo, s)
-    feed = ("\n" * s.feed_lines).encode(s.encoding, errors="replace")
-    corte = _CUT_FULL if s.full_cut else _CUT_PARTIAL
-    return _INIT + _codepage_cmd(s.codepage) + encoded + feed + corte
+    return _INIT + _codepage_cmd(s.codepage) + encoded + _corte(s)
 
 
 def build_escpos_imagen(texto: str, settings: EscPosSettings | None = None) -> bytes:
@@ -148,9 +169,7 @@ def build_escpos_imagen(texto: str, settings: EscPosSettings | None = None) -> b
     s = settings or EscPosSettings()
     png = render_ticket_png(texto)
     raster = raster_de_imagen(io.BytesIO(png))
-    feed = ("\n" * s.feed_lines).encode("ascii", errors="ignore")
-    corte = _CUT_FULL if s.full_cut else _CUT_PARTIAL
-    return _INIT + _ALINEAR_CENTRO + raster + _ALINEAR_IZQ + feed + corte
+    return _INIT + _ALINEAR_CENTRO + raster + _ALINEAR_IZQ + _corte(s)
 
 
 def _send_raw_windows(printer_name: str, data: bytes, copies: int) -> bool:

@@ -31,6 +31,14 @@ class EscPosSettings:
     #: el ticket y eso se enciende a propósito, no por actualizar
     #: (Daniel, 2026-10-07).
     ticket_como_imagen: bool = False
+    #: Dejar que la impresora calcule hasta dónde avanzar antes de cortar
+    #: (`GS V 65`) en vez de empujar `feed_lines` renglones a ciegas. Encendido
+    #: por defecto porque lo de antes cortaba el último renglón a la mitad. Si
+    #: alguna impresora vieja no entendiera el comando, se apaga aquí y vuelve
+    #: el avance a mano (2026-10-07).
+    corte_calculado: bool = True
+    #: Puntos EXTRA más allá de la posición de corte. 0 = al ras.
+    puntos_tras_corte: int = 0
 
 
 def _cache_path() -> Path:
@@ -49,6 +57,10 @@ def load_escpos_settings() -> EscPosSettings:
             feed_lines=max(0, int(data.get("feed_lines", d.feed_lines))),
             full_cut=bool(data.get("full_cut", d.full_cut)),
             ticket_como_imagen=bool(data.get("ticket_como_imagen", d.ticket_como_imagen)),
+            corte_calculado=bool(data.get("corte_calculado", d.corte_calculado)),
+            puntos_tras_corte=max(0, min(255, int(
+                data.get("puntos_tras_corte", d.puntos_tras_corte)
+            ))),
         )
     except Exception:  # noqa: BLE001
         return EscPosSettings()

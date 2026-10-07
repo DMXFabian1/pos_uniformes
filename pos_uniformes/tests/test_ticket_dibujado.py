@@ -173,3 +173,24 @@ class LaPreviaEnseñaLoQueSaleTests(_ConApp):
         ):
             editor = ptd._build_ticket_editor(TICKET)
         self.assertIn("MAXIMODA", editor.toPlainText())
+
+
+class ElCorteDelTicketDibujadoTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_corta_como_el_de_texto(self) -> None:
+        """Dibujado o escrito, el papel se corta igual: lo decide la impresora.
+
+        Si cada camino cortara a su manera, el saludo saldría partido en uno y
+        entero en el otro, y nadie sabría cuál de los dos mirar.
+        """
+        from pos_uniformes.services.escpos_settings_cache_service import EscPosSettings
+        from pos_uniformes.ui.helpers.escpos_ticket_print_helper import (
+            build_escpos_imagen,
+        )
+
+        datos = build_escpos_imagen(TICKET, EscPosSettings())
+        self.assertTrue(datos.endswith(b"\x1dVA\x00"))   # GS V 65 n
+        self.assertNotIn(b"\n\n", datos[-16:])           # sin empujón a ciegas
