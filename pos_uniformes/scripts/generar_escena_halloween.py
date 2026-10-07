@@ -71,21 +71,44 @@ def _estrellas(rnd: random.Random) -> str:
     return "\n  ".join(partes)
 
 
-def _murcielago(x: float, y: float, s: float, op: float) -> str:
-    """Un murciélago de una sola silueta: dos alas y el cuerpo."""
-    d = ("M0,0 c-6,-9 -16,-13 -26,-8 c6,-3 7,-11 3,-16 "
-         "c9,4 16,2 23,-6 c7,8 14,10 23,6 c-4,5 -3,13 3,16 "
-         "c-10,-5 -20,-1 -26,8 z")
-    return (f'<path d="{d}" transform="translate({x:.0f},{y:.0f}) scale({s:.2f})" '
-            f'fill="#120b1e" opacity="{op:.2f}"/>')
+def _trazo_del_murcielago() -> tuple[float, str]:
+    """El murciélago que dibujó DANIEL, pasado a vector.
+
+    Lo mandó el 07/10 («lo hice yo»). El dibujo es suyo; aquí solo se planta.
+    El trazo lo saca `scripts/trazar_murcielago.py` del PNG original, que
+    también vive en assets — para poder re-trazarlo si algún día cambia el
+    dibujo, en vez de tener un contorno suelto que nadie sabe de dónde salió.
+
+    Viene normalizado: ancho 1, alto `razon`, esquina en (0,0).
+    """
+    ruta = Path(__file__).resolve().parents[1] / "assets" / "escenas" / "murcielago_de_daniel.path"
+    razon, d = ruta.read_text(encoding="utf-8").split("\n", 1)
+    return float(razon), d.strip()
+
+
+def _murcielago(trazo: tuple[float, str], x: float, y: float,
+                ancho: float, op: float, giro: float) -> str:
+    """Planta el murciélago centrado en (x, y), de ese ancho."""
+    razon, d = trazo
+    alto = ancho * razon
+    return (f'<g transform="translate({x:.0f},{y:.0f}) rotate({giro:.0f}) '
+            f'translate({-ancho / 2:.1f},{-alto / 2:.1f}) scale({ancho:.1f})" '
+            f'opacity="{op:.2f}"><path d="{d}" fill="#120b1e"/></g>')
 
 
 def _bandada(rnd: random.Random) -> str:
+    """Pocos y de tamaños muy distintos: así se leen como lejos y cerca.
+
+    Todos del mismo tamaño parecían calcomanías pegadas a la misma distancia.
+    """
+    trazo = _trazo_del_murcielago()
     partes = []
     for _ in range(11):
         partes.append(_murcielago(
+            trazo,
             rnd.uniform(60, ANCHO - 60), rnd.uniform(90, SUELO - 300),
-            rnd.uniform(0.55, 1.5), rnd.uniform(0.55, 0.9),
+            rnd.uniform(34, 104), rnd.uniform(0.55, 0.9),
+            rnd.uniform(-16, 16),
         ))
     return "\n  ".join(partes)
 

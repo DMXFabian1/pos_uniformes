@@ -293,3 +293,65 @@ class LasTresPantallasDeGafeteSonLaMismaTests(unittest.TestCase):
                 if l.objectName() == "gateTitle"
             ))
         self.assertEqual(titulos, {"Venta rapida", "Libreta", "Conteos"})
+
+
+class ElMurcielagoDeDanielTests(unittest.TestCase):
+    """«puedes poner este murcielago? lo hice yo» (07/10).
+
+    El dibujo es suyo, así que entra tal cual. Lo único que se le hizo fue
+    pasarlo de puntos a contorno: pegado como PNG se vería pixeleado en una
+    pantalla grande, porque la escena se estira a la que toque.
+    """
+
+    def _carpeta(self):
+        from pathlib import Path
+
+        return Path(__file__).resolve().parents[1] / "assets" / "escenas"
+
+    def test_el_dibujo_original_se_queda_en_el_repositorio(self) -> None:
+        """Sin el PNG, el contorno es un montón de números sin origen.
+
+        Guardarlo es lo que permite re-trazarlo si Daniel cambia el dibujo.
+        """
+        self.assertTrue((self._carpeta() / "murcielago_de_daniel.png").exists())
+
+    def test_el_trazo_sale_del_dibujo_y_no_de_otra_parte(self) -> None:
+        from pos_uniformes.scripts.trazar_murcielago import trazar
+
+        carpeta = self._carpeta()
+        self.assertEqual(
+            (carpeta / "murcielago_de_daniel.path").read_text(encoding="utf-8"),
+            trazar(carpeta / "murcielago_de_daniel.png"),
+        )
+
+    def test_el_contorno_viene_cerrado_y_normalizado(self) -> None:
+        razon, d = (self._carpeta() / "murcielago_de_daniel.path").read_text(
+            encoding="utf-8"
+        ).split("\n", 1)
+        self.assertGreater(float(razon), 0)
+        self.assertTrue(d.strip().startswith("M"))
+        self.assertTrue(d.strip().endswith("Z"))   # sin cerrar, el relleno sangra
+
+    def test_la_escena_usa_el_murcielago_de_daniel(self) -> None:
+        svg = (self._carpeta() / "halloween.svg").read_text(encoding="utf-8")
+        _, d = (self._carpeta() / "murcielago_de_daniel.path").read_text(
+            encoding="utf-8"
+        ).split("\n", 1)
+        self.assertIn(d.strip(), svg)
+
+    def test_la_bandada_no_sale_toda_del_mismo_tamano(self) -> None:
+        """Todos iguales parecen calcomanías pegadas a la misma distancia."""
+        import re
+
+        svg = (self._carpeta() / "halloween.svg").read_text(encoding="utf-8")
+        anchos = {m for m in re.findall(r'scale\((\d+\.\d)\)" opacity', svg)}
+        self.assertGreater(len(anchos), 5)
+
+    def test_simplificar_no_se_come_las_puntas(self) -> None:
+        """La tolerancia es lo que decide si las alas siguen siendo alas."""
+        from pos_uniformes.scripts.trazar_murcielago import TOLERANCIA, _simplificar
+
+        self.assertLessEqual(TOLERANCIA, 2.0)
+        # Un pico de 10 de alto no puede desaparecer con esa tolerancia.
+        pico = [(0, 0), (5, -10), (10, 0)]
+        self.assertEqual(_simplificar(pico, TOLERANCIA), pico)
