@@ -49,7 +49,10 @@ def build_quote_text(
     # — Encabezado —
     lines.append((business_name or "POS Uniformes").center(_W))
     if business_address:
-        lines.append(business_address.center(_W))
+        # Partida al ancho del papel: la dirección real mide 54 caracteres y
+        # el papel tiene 38 columnas (ver sale_ticket_text_service).
+        for trozo in textwrap.wrap(business_address, width=_W) or [business_address]:
+            lines.append(trozo.center(_W))
     if business_phone:
         lines.append(f"Tel: {business_phone}".center(_W))
     lines.append("Presupuesto".center(_W))

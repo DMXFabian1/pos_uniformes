@@ -102,7 +102,13 @@ def build_sale_ticket_text(
     # — Encabezado —
     lines.append(business_name.center(_W))
     if business_address:
-        lines.append(business_address.center(_W))
+        # Centrado PERO partido a lo ancho del papel: la dirección de la tienda
+        # mide 54 caracteres y el ticket tiene 38 columnas, así que centrarla
+        # de un golpe la sacaba del papel (2026-10-07, al llenarla por primera
+        # vez). `center` no recorta: una línea más larga que el ancho sale
+        # como salga.
+        for trozo in textwrap.wrap(business_address, width=_W) or [business_address]:
+            lines.append(trozo.center(_W))
     if business_phone:
         lines.append(f"Tel: {business_phone}".center(_W))
     lines.append("Ticket de venta".center(_W))
