@@ -106,14 +106,20 @@ def _silueta(trazo: tuple[float, str], x: float, y: float,
             f'<path d="{d}" fill="#120b1e" fill-rule="evenodd"/></g>')
 
 
-def _bruja() -> str:
-    """Una sola, cruzando por delante de la luna.
+#: Dónde vuela la bruja y de qué tamaño. A 330 y centrada tapaba la luna
+#: entera (Daniel: «muévela, hazla más pequeña»). Ahora recorta el borde de
+#: arriba a la izquierda: se sigue leyendo contra lo claro —contra el morado
+#: se perdería— y la luna vuelve a verse redonda.
+BRUJA_X, BRUJA_Y, BRUJA_ANCHO = 1058, 168, 186
 
-    Una sola y no una bandada: es una figura que se mira, no textura. Y sobre
-    la luna porque es el único pedazo claro del cielo — contra el morado se
-    perdería, que es lo que ya había pasado con el rizo de la colina.
+
+def _bruja() -> str:
+    """Una sola, cruzando por el filo de la luna.
+
+    Una sola y no una bandada: es una figura que se mira, no textura.
     """
-    return _silueta(_trazo("bruja_de_daniel"), 1215, 232, 330, giro=-8)
+    return _silueta(_trazo("bruja_de_daniel"), BRUJA_X, BRUJA_Y, BRUJA_ANCHO,
+                    giro=-8)
 
 
 def _bandada(rnd: random.Random) -> str:
@@ -123,11 +129,12 @@ def _bandada(rnd: random.Random) -> str:
     """
     trazo = _trazo("murcielago_de_daniel")
     partes = []
-    for _ in range(11):
-        x, y = rnd.uniform(60, ANCHO - 60), rnd.uniform(90, SUELO - 300)
+    for _ in range(26):
+        x, y = rnd.uniform(60, ANCHO - 60), rnd.uniform(70, SUELO - 250)
         # Despejado alrededor de la bruja: es la figura que se mira, y un
-        # murciélago encima la convierte en una mancha.
-        if math.hypot(x - 1215, y - 232) < 290:
+        # murciélago encima la convierte en una mancha. El radio va con su
+        # tamaño, no clavado: si mañana crece, el hueco crece con ella.
+        if math.hypot(x - BRUJA_X, y - BRUJA_Y) < BRUJA_ANCHO * 0.95:
             continue
         partes.append(_silueta(
             trazo, x, y,
