@@ -109,13 +109,39 @@ def enviar_tickets(
     return creados
 
 
+def enviar_corte(
+    session: Session,
+    texto: str,
+    *,
+    origen: str = "principal",
+    prioridad: int = 0,
+    creado_por: str = "SYSTEM",
+) -> Trabajo:
+    """Encola el ticket de un CORTE. Mismo contenido que un ticket, otro tipo.
+
+    Va aparte porque el corte lleva la venta del día, los pagos y los retiros,
+    y Daniel quiere decidir en qué PC sale — con el tipo propio, cada máquina
+    lo dice en la misma lista donde ya dice si imprime tickets o etiquetas."""
+    if not (texto or "").strip():
+        raise ValueError("Un corte sin texto no se encola.")
+    return encolar(
+        session, TipoTrabajo.CORTE, {"texto": texto},
+        origen=origen, prioridad=prioridad, creado_por=creado_por,
+    )
+
+
+#: Lo que se imprime con el camino del ticket. El corte es otro tipo —para
+#: poder elegir en qué PC sale— pero el papel se arma igual.
+_CON_TEXTO = (TipoTrabajo.TICKET, TipoTrabajo.CORTE)
+
+
 def texto_de_ticket(trabajo: Trabajo) -> str:
-    """Extrae el texto imprimible del payload de un trabajo TICKET."""
-    if trabajo.tipo != TipoTrabajo.TICKET:
-        raise ValueError(f"El trabajo id={trabajo.id} no es un TICKET.")
+    """Extrae el texto imprimible del payload de un TICKET o un CORTE."""
+    if trabajo.tipo not in _CON_TEXTO:
+        raise ValueError(f"El trabajo id={trabajo.id} no es un TICKET ni un CORTE.")
     texto = (trabajo.contenido or {}).get("texto", "")
     if not texto:
-        raise ValueError(f"El trabajo TICKET id={trabajo.id} no trae texto.")
+        raise ValueError(f"El trabajo {trabajo.tipo.value} id={trabajo.id} no trae texto.")
     return texto
 
 
@@ -384,7 +410,7 @@ MINUTOS_PARA_SOLTAR = 15
 #: PEDIDO queda fuera: ahí EN_PROCESO significa "alguien lo está preparando",
 #: una persona juntando prendas, y eso tarda lo que tarda. Soltarlo por tiempo
 #: le quitaría el pedido de las manos (ver el docstring de EstadoTrabajo).
-_RECLAMABLES = (TipoTrabajo.TICKET, TipoTrabajo.ETIQUETA, TipoTrabajo.CONTEO)
+_RECLAMABLES = (TipoTrabajo.TICKET, TipoTrabajo.CORTE, TipoTrabajo.ETIQUETA, TipoTrabajo.CONTEO)
 
 
 def soltar_reclamos_vencidos(

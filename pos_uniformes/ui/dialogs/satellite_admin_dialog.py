@@ -1344,7 +1344,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
 
         Preguntarle a la PC principal por su etiquetadora Brother, que está en
         el kiosko, es pedirle que autodetecte hardware que no tiene."""
-        tickets = bool({"TICKET", "CONTEO"} & marcados)
+        tickets = bool({"TICKET", "CORTE", "CONTEO"} & marcados)
         etiquetas = "ETIQUETA" in marcados
         printer_box.setVisible(tickets)
         escpos_box.setVisible(tickets)

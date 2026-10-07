@@ -1932,6 +1932,11 @@ class TipoTrabajo(str, Enum):
     ETIQUETA = "ETIQUETA"
     CONTEO = "CONTEO"
     PEDIDO = "PEDIDO"
+    #: El corte de caja. Se imprime igual que un ticket, pero es su propio tipo
+    #: para poder decir en QUÉ PC sale: lleva la venta del día, los pagos y los
+    #: retiros, y Daniel lo quiere solo donde no queda a la mano de cualquiera
+    #: (2026-10-07).
+    CORTE = "CORTE"
 
 
 class EstadoTrabajo(str, Enum):

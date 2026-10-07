@@ -55,7 +55,7 @@ class PosRoutingToggleTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d, patch(_SDD, return_value=Path(d)):
             box = _build_print_routing_box(QDialog())
             casillas = self._casillas(box)
-            self.assertEqual(len(casillas), 4)
+            self.assertEqual(len(casillas), 5)   # tickets, cortes, etiquetas, conteo, pedidos
             self.assertTrue(all(cb.isChecked() for cb in casillas.values()))
 
     def test_desmarcar_todo_la_vuelve_estacion(self) -> None:

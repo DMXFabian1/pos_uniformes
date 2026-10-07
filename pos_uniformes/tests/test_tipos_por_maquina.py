@@ -140,7 +140,7 @@ class LoSuyoTambienSeRuteaPorTipoTests(_ConCache):
         self.assertFalse(rt.puede_imprimir(TipoTrabajo.ETIQUETA))
 
     def test_el_kiosko_con_todo_imprime_todo(self) -> None:
-        rt.guardar_impresoras("kiosko", ["TICKET", "ETIQUETA", "CONTEO", "PEDIDO"])
+        rt.guardar_impresoras("kiosko", list(rt._TIPOS_CONOCIDOS))
         self.assertTrue(all(rt.puede_imprimir(t) for t in TipoTrabajo))
         self.assertIsNone(rt.tipos_que_atiende())   # None = todos, para el despachador
 
@@ -193,3 +193,51 @@ class LosTresCaminosPreguntanPorTipoTests(unittest.TestCase):
         for modulo in (ticket_routing_helper, label_routing_helper, conteo_routing_helper):
             fuente = inspect.getsource(modulo)
             self.assertIn("puede_imprimir", fuente, modulo.__name__)
+
+
+class ElCorteSoloDondeDanielQuiereTests(_ConCache):
+    """«El corte solo debe salir en el satélite, no en la principal, ya que por
+    privacidad no queda a la mano» (Daniel, 2026-10-07).
+
+    El corte lleva la venta del día, los pagos y los retiros. Desde que hay dos
+    PCs con impresora de tickets, cualquiera de las dos podía reclamarlo."""
+
+    def test_la_principal_imprime_tickets_pero_no_cortes(self) -> None:
+        rt.guardar_impresoras("principal", ["TICKET", "CONTEO"])
+        self.assertTrue(rt.puede_imprimir(TipoTrabajo.TICKET))
+        self.assertFalse(rt.puede_imprimir(TipoTrabajo.CORTE))
+
+    def test_el_corte_encolado_se_lo_lleva_solo_el_kiosko(self) -> None:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import Session
+
+        from pos_uniformes.database.connection import Base
+        from pos_uniformes.services import trabajos_service as svc
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        s = Session(engine)
+        corte = svc.enviar_corte(s, "CORTE\nventa del día", origen="corte_remoto")
+        ticket = svc.enviar_ticket(s, "ticket de venta")
+
+        rt.guardar_impresoras("principal", ["TICKET", "CONTEO"])
+        tomado = svc.reclamar_siguiente(s, tipos=rt.tipos_que_atiende())
+        self.assertEqual(tomado.id, ticket.id)   # se salta el corte, que es más viejo
+
+        rt.guardar_impresoras("kiosko", list(rt._TIPOS_CONOCIDOS))
+        self.assertEqual(svc.reclamar_siguiente(s, tipos=rt.tipos_que_atiende()).id, corte.id)
+        s.close()
+
+    def test_el_corte_se_imprime_con_el_camino_del_ticket(self) -> None:
+        """Es otro tipo para elegir dónde sale, no para armar otro papel."""
+        from pos_uniformes.ui.helpers.trabajo_print_handlers import build_handlers
+
+        handlers = build_handlers()
+        self.assertIs(handlers[TipoTrabajo.CORTE], handlers[TipoTrabajo.TICKET])
+
+    def test_el_corte_remoto_encola_como_corte(self) -> None:
+        import inspect
+
+        from pos_uniformes.services import corte_remoto_service as cr
+
+        self.assertIn("enviar_corte", inspect.getsource(cr.hacer_corte_y_avisar))

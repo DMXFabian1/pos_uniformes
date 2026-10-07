@@ -98,6 +98,9 @@ def build_handlers() -> dict[TipoTrabajo, Handler]:
     """Handlers disponibles en el satélite. Se amplía por fase."""
     return {
         TipoTrabajo.TICKET: _ticket_handler,
+        # Un corte se IMPRIME igual que un ticket; es tipo aparte solo para
+        # poder decir en qué PC sale (Daniel, 2026-10-07).
+        TipoTrabajo.CORTE: _ticket_handler,
         TipoTrabajo.ETIQUETA: _etiqueta_handler,
         TipoTrabajo.CONTEO: _conteo_handler,
     }

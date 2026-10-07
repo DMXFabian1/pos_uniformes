@@ -190,7 +190,10 @@ def hacer_corte_y_avisar(
     )
     impreso = False
     try:
-        trabajos_service.enviar_ticket(session, texto, origen="corte_remoto", creado_por=creado_por)
+        # Como CORTE y no como TICKET: así cada PC decide si los imprime, y el
+        # de la venta del día no sale en la que queda a la mano de cualquiera
+        # (Daniel, 2026-10-07).
+        trabajos_service.enviar_corte(session, texto, origen="corte_remoto", creado_por=creado_por)
         session.commit()
         impreso = True
     except Exception:  # noqa: BLE001

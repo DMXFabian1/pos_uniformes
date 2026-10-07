@@ -37,7 +37,7 @@ def _cache_path() -> Path:
 #: etiquetas para mandarlas a una impresora que no tiene y las dejaría en ERROR
 #: (Daniel, 2026-10-07). Se guardan por NOMBRE, no por el enum, para que un
 #: tipo nuevo no rompa el archivo de una máquina vieja.
-_TIPOS_CONOCIDOS = ("TICKET", "ETIQUETA", "CONTEO", "PEDIDO")
+_TIPOS_CONOCIDOS = ("TICKET", "CORTE", "ETIQUETA", "CONTEO", "PEDIDO")
 
 
 def _limpiar_tipos(tipos) -> list[str] | None:

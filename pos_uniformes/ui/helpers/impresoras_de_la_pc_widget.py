@@ -29,7 +29,11 @@ from PyQt6.QtWidgets import (
 
 #: (clave del TipoTrabajo, cómo se llama en la pantalla).
 TIPOS = (
-    ("TICKET", "🧾  Tickets y cortes"),
+    ("TICKET", "🧾  Tickets de venta"),
+    # Aparte de los tickets a propósito: el corte lleva la venta del día, los
+    # pagos y los retiros, y no tiene por qué salir en la misma PC
+    # (Daniel, 2026-10-07: "por privacidad no queda a la mano").
+    ("CORTE", "🧮  Cortes de caja"),
     ("ETIQUETA", "🏷  Etiquetas (Brother)"),
     ("CONTEO", "📋  Hojas de conteo"),
     ("PEDIDO", "📦  Pedidos"),
