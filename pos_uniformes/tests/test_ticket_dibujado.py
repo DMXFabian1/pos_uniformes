@@ -129,3 +129,47 @@ class ApagadoPorDefectoTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LaPreviaEnseñaLoQueSaleTests(_ConApp):
+    """Una previa que no se parece al papel no sirve para lo que sirve una
+    previa. Con el ticket dibujado encendido seguía enseñando el texto viejo
+    (Daniel, 2026-10-07: "las vistas previas se siguen viendo con el código de
+    antes")."""
+
+    def _editor(self, dibujado: bool):
+        from unittest.mock import patch
+
+        from pos_uniformes.services.escpos_settings_cache_service import EscPosSettings
+        from pos_uniformes.ui.dialogs import printable_text_dialog as ptd
+
+        with patch(
+            "pos_uniformes.services.escpos_settings_cache_service.load_escpos_settings",
+            return_value=EscPosSettings(enabled=True, ticket_como_imagen=dibujado),
+        ):
+            return ptd._build_ticket_editor(TICKET)
+
+    def test_encendido_la_previa_es_la_misma_imagen(self) -> None:
+        self.assertIn("<img", self._editor(True).toHtml())
+
+    def test_apagado_la_previa_sigue_siendo_el_texto_de_siempre(self) -> None:
+        editor = self._editor(False)
+        self.assertNotIn("<img", editor.toHtml())
+        self.assertIn("MAXIMODA", editor.toPlainText())
+
+    def test_si_el_dibujo_truena_la_previa_no_se_queda_en_blanco(self) -> None:
+        """Un adorno no puede dejar sin previa a quien va a cobrar."""
+        from unittest.mock import patch
+
+        from pos_uniformes.services.escpos_settings_cache_service import EscPosSettings
+        from pos_uniformes.ui.dialogs import printable_text_dialog as ptd
+
+        with patch(
+            "pos_uniformes.services.escpos_settings_cache_service.load_escpos_settings",
+            return_value=EscPosSettings(enabled=True, ticket_como_imagen=True),
+        ), patch(
+            "pos_uniformes.services.ticket_imagen_service.render_ticket",
+            side_effect=RuntimeError("sin fuente"),
+        ):
+            editor = ptd._build_ticket_editor(TICKET)
+        self.assertIn("MAXIMODA", editor.toPlainText())

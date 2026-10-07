@@ -390,6 +390,35 @@ def total_del_ticket(content: str) -> str | None:
     return None
 
 
+def pintar_previa(editor: QTextEdit, content: str) -> None:
+    """Pone en la previa EXACTAMENTE lo que va a salir del papel.
+
+    Con el ticket dibujado encendido, la previa enseña la misma imagen que se
+    manda a la impresora. Antes seguía enseñando el texto: previa y papel
+    decían cosas distintas, y una previa que no se parece al papel no sirve
+    para lo que sirve una previa (Daniel, 2026-10-07).
+    """
+    if _ticket_como_imagen_activo():
+        try:
+            from PyQt6.QtCore import QUrl
+            from PyQt6.QtGui import QTextDocument
+
+            from pos_uniformes.services.ticket_imagen_service import render_ticket
+
+            imagen = render_ticket(content)
+            editor.document().addResource(
+                QTextDocument.ResourceType.ImageResource, QUrl("ticket://previa"), imagen
+            )
+            editor.setHtml(
+                '<div align="center"><img src="ticket://previa" '
+                f'width="{imagen.width()}"></div>'
+            )
+            return
+        except Exception:  # noqa: BLE001 — sin dibujo, la previa de siempre
+            logger.exception("Previa dibujada: no se pudo, va la de texto")
+    editor.setPlainText(_sin_marcadores(content))
+
+
 def _build_ticket_editor(content: str) -> QTextEdit:
     editor = QTextEdit()
     editor.setReadOnly(True)
@@ -398,8 +427,7 @@ def _build_ticket_editor(content: str) -> QTextEdit:
         f'QTextEdit {{ font-family: "{mono_family}"; font-size: {TICKET_FONT_POINT_SIZE}pt;'
         f" font-weight: bold; }}"
     )
-    # La vista previa tampoco imprime puntos: enseña el dibujo de ASCII.
-    editor.setPlainText(_sin_marcadores(content))
+    pintar_previa(editor, content)
     return editor
 
 
@@ -559,8 +587,8 @@ def open_tickets_print_dialog(
         alt_checkbox = QCheckBox(alt_checkbox_label)
         alt_checkbox.setChecked(False)
         alt_checkbox.toggled.connect(
-            lambda checked: editor.setPlainText(
-                "\n\n".join(alt_tickets if checked else tickets)
+            lambda checked: pintar_previa(
+                editor, "\n\n".join(alt_tickets if checked else tickets)
             )
         )
 
