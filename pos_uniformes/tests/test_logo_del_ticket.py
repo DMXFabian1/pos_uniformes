@@ -58,12 +58,39 @@ class ElPngEsImprimibleTests(unittest.TestCase):
 
 
 class LaPruebaDeImpresionTests(unittest.TestCase):
-    def test_el_texto_lleva_el_marcador_y_dice_que_mirar(self) -> None:
+    def test_el_texto_lleva_los_dos_anchos_y_dice_que_mirar(self) -> None:
         from pos_uniformes.scripts.probar_logo_ticket import texto_de_prueba
 
         texto = texto_de_prueba()
         self.assertIn(temp.marcador_de("logo"), texto)
-        self.assertIn("deshilachado", texto)
+        self.assertIn(temp.marcador_de("logo_ancho"), texto)
+        self.assertIn("reescalando", texto)
+
+    def test_sin_argumentos_encola_y_avisa_que_no_elige_impresora(self) -> None:
+        """Por la cola no se puede escoger en cuál sale: el kiosko se lleva el
+        trabajo en menos de un segundo (pasó dos veces el 2026-10-07)."""
+        from unittest.mock import MagicMock, patch
+
+        from pos_uniformes.scripts import probar_logo_ticket as prueba
+
+        with patch.object(prueba, "_imprimir_aqui") as aqui, \
+             patch("pos_uniformes.database.connection.get_session") as ses, \
+             patch("pos_uniformes.services.trabajos_service.enviar_ticket",
+                   return_value=MagicMock(id=7)):
+            ses.return_value.__enter__.return_value = MagicMock()
+            self.assertEqual(prueba.main([]), 0)
+        aqui.assert_not_called()
+
+    def test_con_aqui_imprime_local_y_no_toca_la_cola(self) -> None:
+        from unittest.mock import patch
+
+        from pos_uniformes.scripts import probar_logo_ticket as prueba
+
+        with patch.object(prueba, "_imprimir_aqui", return_value=0) as aqui, \
+             patch("pos_uniformes.services.trabajos_service.enviar_ticket") as encolar:
+            self.assertEqual(prueba.main(["--aqui"]), 0)
+        aqui.assert_called_once()
+        encolar.assert_not_called()
 
     def test_ninguna_linea_se_sale_del_papel(self) -> None:
         from pos_uniformes.scripts.probar_logo_ticket import texto_de_prueba
