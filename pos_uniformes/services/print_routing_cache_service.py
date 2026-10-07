@@ -65,6 +65,36 @@ def save_print_routing(modo: str, origen: str = _DEFAULT_ORIGEN, tipos=None) -> 
     path.write_text(json.dumps(datos, ensure_ascii=False), encoding="utf-8")
 
 
+def guardar_impresoras(origen: str, tipos) -> None:
+    """Guarda QUÉ IMPRESORAS tiene esta PC. Es el ajuste de verdad.
+
+    De aquí salen las dos respuestas que antes pedían dos interruptores: lo que
+    esta PC imprime de LO SUYO y lo que atiende de la cola de los demás. Una PC
+    que no tiene ninguna impresora es lo que antes se llamaba "Estación".
+
+    El modelo viejo era un interruptor por máquina —todo aquí o todo allá— y
+    dejó de describir la tienda el día que la PC principal estrenó impresora de
+    tickets sin tener las Brother de etiquetas: en Estación sus tickets se iban
+    al kiosko teniendo la impresora buena enfrente, y en Servidor sus etiquetas
+    salían a una etiquetadora que no existe (Daniel, 2026-10-07).
+
+    Se sigue escribiendo `modo` aunque ya no mande: una PC con un build viejo
+    lee el mismo archivo y tiene que seguir entendiéndolo.
+    """
+    limpios = _limpiar_tipos(tipos) or []
+    modo = MODO_LOCAL if limpios else MODO_SATELITE
+    path = _cache_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        json.dumps(
+            {"modo": modo, "origen": (origen or _DEFAULT_ORIGEN).strip() or _DEFAULT_ORIGEN,
+             "tipos": limpios},
+            ensure_ascii=False,
+        ),
+        encoding="utf-8",
+    )
+
+
 def load_print_routing() -> tuple[str, str]:
     """Devuelve (modo, origen). Ante ausencia o corrupción cae a (MODO_LOCAL, 'principal')."""
     try:
@@ -79,28 +109,51 @@ def load_print_routing() -> tuple[str, str]:
 
 
 def tipos_configurados() -> list[str] | None:
-    """Los nombres de los tipos que atiende esta PC, o None = todos."""
+    """Lo que dice el archivo, tal cual. None = no se ha configurado nunca."""
     try:
         data = json.loads(_cache_path().read_text(encoding="utf-8"))
     except Exception:  # noqa: BLE001
         return None
-    return _limpiar_tipos(data.get("tipos"))
+    if "tipos" not in data:
+        return None
+    return _limpiar_tipos(data.get("tipos")) or []
+
+
+def impresoras_de_esta_pc() -> list[str]:
+    """Qué sabe imprimir esta PC, SIEMPRE como lista concreta.
+
+    Si nunca se configuró, se deduce del interruptor viejo para que ninguna
+    máquina cambie de comportamiento por actualizarse: lo que era Servidor
+    imprime todo, lo que era Estación no imprime nada.
+    """
+    guardado = tipos_configurados()
+    if guardado is not None:
+        return guardado
+    modo, _origen = load_print_routing()
+    return list(_TIPOS_CONOCIDOS) if modo == MODO_LOCAL else []
+
+
+def puede_imprimir(tipo) -> bool:
+    """¿Esta PC tiene cómo imprimir eso? Decide si lo suyo sale aquí o se encola."""
+    nombre = str(getattr(tipo, "value", tipo) or "").strip().upper()
+    return nombre in impresoras_de_esta_pc()
 
 
 def tipos_que_atiende():
-    """Los `TipoTrabajo` que esta PC despacha, o None = todos.
+    """Los `TipoTrabajo` que esta PC despacha de la cola, o None = todos.
 
-    None y "todos" son lo mismo a propósito: una máquina que nunca configuró
-    nada tiene que seguir comportándose como antes."""
-    nombres = tipos_configurados()
-    if nombres is None:
+    None significa "todos" y no "ninguno": es lo que espera el despachador
+    cuando no hay filtro."""
+    nombres = impresoras_de_esta_pc()
+    if not nombres:
+        return []
+    if set(nombres) >= set(_TIPOS_CONOCIDOS):
         return None
     from pos_uniformes.database.models import TipoTrabajo
 
-    tipos = [t for t in TipoTrabajo if t.value in nombres]
-    return tipos or None
+    return [t for t in TipoTrabajo if t.value in nombres]
 
 
 def enviar_al_satelite_activo() -> bool:
-    """True si esta máquina está configurada para enviar sus tickets al satélite."""
-    return load_print_routing()[0] == MODO_SATELITE
+    """True si esta máquina no imprime NADA aquí (lo que antes era Estación)."""
+    return not impresoras_de_esta_pc()

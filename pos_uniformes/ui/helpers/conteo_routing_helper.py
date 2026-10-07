@@ -20,11 +20,14 @@ def maybe_route_conteo_to_satellite(
 ) -> bool:
     """True si las hojas se encolaron para el satélite (no imprimir local)."""
     from pos_uniformes.services.print_routing_cache_service import (
-        enviar_al_satelite_activo,
         load_print_routing,
+        puede_imprimir,
     )
 
-    if not enviar_al_satelite_activo():
+    from pos_uniformes.database.models import TipoTrabajo
+
+    # Por TIPO: ver label_routing_helper.
+    if puede_imprimir(TipoTrabajo.CONTEO):
         return False
 
     hojas = [s for s in sheets if s and s.strip()]

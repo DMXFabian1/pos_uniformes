@@ -27,13 +27,15 @@ def route_tickets(
     if not tickets:
         return
 
+    from pos_uniformes.database.models import TipoTrabajo
     from pos_uniformes.services.print_routing_cache_service import (
-        MODO_SATELITE,
         load_print_routing,
+        puede_imprimir,
     )
 
-    modo, origen = load_print_routing()
-    if modo == MODO_SATELITE:
+    _modo, origen = load_print_routing()
+    # Por TIPO: ver label_routing_helper.
+    if not puede_imprimir(TipoTrabajo.TICKET):
         # Sin diálogo no hay checkbox: al satélite siempre va el juego base.
         # Encolar exitosamente cuenta como "impreso" para on_printed.
         if _enviar_al_satelite(parent, tickets, origen) and on_printed is not None:

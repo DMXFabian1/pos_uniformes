@@ -489,12 +489,13 @@ class QuoteSatelliteWindow(QMainWindow):
         """
         try:
             from pos_uniformes.services.print_routing_cache_service import (
-                MODO_LOCAL,
-                load_print_routing,
+                impresoras_de_esta_pc,
             )
 
-            modo, _origen = load_print_routing()
-            if modo != MODO_LOCAL:
+            # Sin impresoras no hay nada que despachar. Antes esto miraba el
+            # modo; ahora mira qué sabe imprimir esta PC, que es lo mismo
+            # cuando tiene todas y lo correcto cuando tiene algunas.
+            if not impresoras_de_esta_pc():
                 return
 
             from pos_uniformes.database.connection import get_session

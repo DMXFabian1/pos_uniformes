@@ -121,3 +121,75 @@ class EstaEnlazadoTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LoSuyoTambienSeRuteaPorTipoTests(_ConCache):
+    """La mitad que faltaba: qué hace una PC con lo QUE ELLA MISMA genera.
+
+    El modelo viejo era un interruptor por máquina —todo aquí o todo allá— y
+    dejó de describir la tienda el día que la principal estrenó impresora de
+    tickets sin tener las Brother: en Estación sus tickets se iban al kiosko
+    teniendo la impresora buena enfrente, y en Servidor sus etiquetas salían a
+    una etiquetadora que no existe (Daniel, 2026-10-07).
+    """
+
+    def test_la_principal_imprime_sus_tickets_y_encola_sus_etiquetas(self) -> None:
+        rt.guardar_impresoras("principal", ["TICKET", "CONTEO"])
+        self.assertTrue(rt.puede_imprimir(TipoTrabajo.TICKET))
+        self.assertTrue(rt.puede_imprimir(TipoTrabajo.CONTEO))
+        self.assertFalse(rt.puede_imprimir(TipoTrabajo.ETIQUETA))
+
+    def test_el_kiosko_con_todo_imprime_todo(self) -> None:
+        rt.guardar_impresoras("kiosko", ["TICKET", "ETIQUETA", "CONTEO", "PEDIDO"])
+        self.assertTrue(all(rt.puede_imprimir(t) for t in TipoTrabajo))
+        self.assertIsNone(rt.tipos_que_atiende())   # None = todos, para el despachador
+
+    def test_una_pc_sin_impresoras_no_imprime_nada(self) -> None:
+        rt.guardar_impresoras("caja 2", [])
+        self.assertFalse(any(rt.puede_imprimir(t) for t in TipoTrabajo))
+        self.assertEqual(rt.tipos_que_atiende(), [])
+        self.assertTrue(rt.enviar_al_satelite_activo())
+
+
+class NadieCambiaPorActualizarTests(_ConCache):
+    """Una máquina que nunca toque esto tiene que comportarse igual que ayer."""
+
+    def test_lo_que_era_servidor_sigue_imprimiendo_todo(self) -> None:
+        rt.save_print_routing(rt.MODO_LOCAL, "kiosko")      # como se guardaba antes
+        self.assertTrue(all(rt.puede_imprimir(t) for t in TipoTrabajo))
+        self.assertIsNone(rt.tipos_que_atiende())
+
+    def test_lo_que_era_estacion_sigue_sin_imprimir_nada(self) -> None:
+        rt.save_print_routing(rt.MODO_SATELITE, "caja 2")
+        self.assertFalse(any(rt.puede_imprimir(t) for t in TipoTrabajo))
+        self.assertEqual(rt.tipos_que_atiende(), [])
+
+    def test_sin_archivo_imprime_todo_como_siempre(self) -> None:
+        self.assertTrue(rt.puede_imprimir(TipoTrabajo.TICKET))
+
+
+class ElArchivoSigueSiendoLegibleParaUnBuildViejoTests(_ConCache):
+    def test_guardar_impresoras_escribe_tambien_el_modo(self) -> None:
+        """Una PC con el .exe anterior lee el mismo archivo y solo entiende
+        `modo`: si se dejara de escribir, se comportaría como Servidor."""
+        rt.guardar_impresoras("principal", ["TICKET"])
+        datos = json.loads(self._ruta.read_text(encoding="utf-8"))
+        self.assertEqual(datos["modo"], rt.MODO_LOCAL)
+        rt.guardar_impresoras("caja 2", [])
+        datos = json.loads(self._ruta.read_text(encoding="utf-8"))
+        self.assertEqual(datos["modo"], rt.MODO_SATELITE)
+
+
+class LosTresCaminosPreguntanPorTipoTests(unittest.TestCase):
+    def test_tickets_etiquetas_y_conteos(self) -> None:
+        import inspect
+
+        from pos_uniformes.ui.helpers import (
+            conteo_routing_helper,
+            label_routing_helper,
+            ticket_routing_helper,
+        )
+
+        for modulo in (ticket_routing_helper, label_routing_helper, conteo_routing_helper):
+            fuente = inspect.getsource(modulo)
+            self.assertIn("puede_imprimir", fuente, modulo.__name__)

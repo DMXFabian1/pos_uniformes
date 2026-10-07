@@ -1324,102 +1324,94 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
 
     # — Modo de impresión (ajuste por máquina) —
     from pos_uniformes.services.print_routing_cache_service import (
-        MODO_LOCAL,
-        MODO_SATELITE,
+        guardar_impresoras,
+        impresoras_de_esta_pc,
         load_print_routing,
-        save_print_routing,
-        tipos_configurados,
     )
 
-    routing_box = QGroupBox("Rol de impresión de esta PC")
+    routing_box = QGroupBox("Impresoras de esta PC")
     routing_layout = QVBoxLayout()
     routing_help = QLabel(
-        "Servidor de impresión: esta PC tiene las impresoras conectadas e imprime "
-        "tanto lo suyo como lo que le mandan las estaciones.\n"
-        "Estación: no tiene impresoras; envía todo (tickets, etiquetas y conteo) al "
-        "servidor. Las estaciones no configuran ninguna impresora."
+        "Marca lo que esta PC tiene cómo imprimir. De ahí sale todo lo demás: "
+        "lo que marques se imprime aquí (lo suyo y lo que le manden las otras "
+        "PCs), y lo que no, se va a la cola para que lo imprima quien sí pueda."
     )
     routing_help.setWordWrap(True)
 
-    current_modo, current_origen = load_print_routing()
-    radio_local = QRadioButton("🖨  Servidor de impresión (esta PC tiene las impresoras)")
-    radio_sat = QRadioButton("📡  Estación (envía todo al servidor)")
-    (radio_sat if current_modo == MODO_SATELITE else radio_local).setChecked(True)
+    _current_modo, current_origen = load_print_routing()
 
     origen_form = QFormLayout()
     origen_edit = QLineEdit(current_origen)
     origen_edit.setPlaceholderText("principal / kiosko / caja 2")
     origen_form.addRow("Nombre de esta PC:", origen_edit)
 
-    # Qué atiende esta PC. Desde que hay dos servidores (la principal estrenó
-    # impresora de tickets y las Brother siguen en el kiosko) hace falta
-    # decirlo: si no, el que no tiene etiquetadora reclama etiquetas y las deja
-    # en ERROR, que es peor que no imprimirlas (Daniel, 2026-10-07).
-    tipos_box = QGroupBox("¿Qué imprime esta PC?")
-    tipos_layout = QVBoxLayout()
-    tipos_help = QLabel(
-        "Marca solo lo que esta PC tiene cómo imprimir. Si dejas todo marcado "
-        "atiende lo que caiga, que es lo correcto cuando hay un solo servidor."
-    )
-    tipos_help.setWordWrap(True)
-    tipos_layout.addWidget(tipos_help)
+    # UNA sola lista, y de ella salen las dos respuestas que antes pedían dos
+    # interruptores: qué imprime esta PC de lo suyo y qué atiende de la cola.
+    # El modelo viejo (todo aquí / todo allá) dejó de describir la tienda el día
+    # que la principal estrenó impresora de tickets sin tener las Brother
+    # (Daniel, 2026-10-07).
     _ETIQUETAS_TIPO = (
         ("TICKET", "🧾  Tickets y cortes"),
         ("ETIQUETA", "🏷  Etiquetas (Brother)"),
         ("CONTEO", "📋  Hojas de conteo"),
         ("PEDIDO", "📦  Pedidos"),
     )
-    guardados = tipos_configurados()
+    tiene = impresoras_de_esta_pc()
     casillas_tipo = {}
     for clave, etiqueta in _ETIQUETAS_TIPO:
         cb = QCheckBox(etiqueta)
-        cb.setChecked(guardados is None or clave in guardados)
+        cb.setChecked(clave in tiene)
         casillas_tipo[clave] = cb
-        tipos_layout.addWidget(cb)
-    tipos_box.setLayout(tipos_layout)
+        routing_layout.addWidget(cb)
 
-    save_routing_btn = QPushButton("Guardar rol")
+    # El resumen de lo que marcaste, en las palabras de siempre. Ya no es un
+    # interruptor: es la consecuencia.
+    resumen_rol = QLabel("")
+    resumen_rol.setWordWrap(True)
+    resumen_rol.setObjectName("satStatus")
+
+    def _resumir_rol() -> None:
+        marcados = [c for c, cb in casillas_tipo.items() if cb.isChecked()]
+        nombres = {c: e.split("  ")[-1] for c, e in _ETIQUETAS_TIPO}
+        if not marcados:
+            resumen_rol.setText(
+                "📡  Estación: esta PC no imprime nada. Todo se va a la cola y "
+                "sale donde haya impresora."
+            )
+        elif len(marcados) == len(casillas_tipo):
+            resumen_rol.setText(
+                "🖨  Servidor de impresión: esta PC imprime todo, lo suyo y lo "
+                "que le manden las demás."
+            )
+        else:
+            faltan = [nombres[c] for c in casillas_tipo if c not in marcados]
+            resumen_rol.setText(
+                "🖨  Imprime aquí: " + ", ".join(nombres[c] for c in marcados)
+                + ".\n📡  Se va a la cola: " + ", ".join(faltan) + "."
+            )
+
+    for cb in casillas_tipo.values():
+        cb.toggled.connect(lambda _v: _resumir_rol())
+    _resumir_rol()
+    routing_layout.addWidget(resumen_rol)
+
+    save_routing_btn = QPushButton("Guardar")
     save_routing_btn.setObjectName("primaryButton")
 
     def handle_save_routing() -> None:
-        modo = MODO_SATELITE if radio_sat.isChecked() else MODO_LOCAL
         origen = origen_edit.text().strip() or "principal"
         marcados = [c for c, cb in casillas_tipo.items() if cb.isChecked()]
-        # Todos marcados se guarda como "todos" (None), no como la lista: así
-        # un tipo nuevo en el futuro lo atiende sin que nadie vuelva aquí.
-        tipos = None if len(marcados) == len(casillas_tipo) else marcados
-        if not marcados:
-            QMessageBox.warning(
-                dialog, "Falta elegir",
-                "Un Servidor de impresión que no imprime nada no sirve de nada.\n"
-                "Marca al menos una cosa.",
-            )
-            return
         try:
-            save_print_routing(modo, origen, tipos)
+            guardar_impresoras(origen, marcados)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(dialog, "Error", f"No se pudo guardar:\n{exc}")
             return
-        etiqueta = (
-            "Estación (envía al servidor)"
-            if modo == MODO_SATELITE
-            else "Servidor de impresión (imprime local)"
-        )
-        detalle = ""
-        if modo != MODO_SATELITE:
-            detalle = "\n\nAtiende: " + (
-                "todo lo que caiga" if tipos is None
-                else ", ".join(dict(_ETIQUETAS_TIPO)[c].split("  ")[-1] for c in marcados)
-            )
-        QMessageBox.information(dialog, "Guardado", f"Esta PC ahora es: {etiqueta}.{detalle}")
+        QMessageBox.information(dialog, "Guardado", resumen_rol.text())
 
     save_routing_btn.clicked.connect(handle_save_routing)
 
-    routing_layout.addWidget(routing_help)
-    routing_layout.addWidget(radio_local)
-    routing_layout.addWidget(radio_sat)
+    routing_layout.insertWidget(0, routing_help)
     routing_layout.addLayout(origen_form)
-    routing_layout.addWidget(tipos_box)
     routing_layout.addWidget(save_routing_btn)
     routing_box.setLayout(routing_layout)
 
@@ -1427,26 +1419,29 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     # impresora de tickets y de etiquetas (así no intentan autodetectar hardware
     # que no existe) y se muestra un aviso. El servidor de impresión sí las ve.
     estacion_hint = QLabel(
-        "📡  Esta PC es una Estación: no detecta ni configura impresoras. "
-        "Todo se imprime en el Servidor de impresión. Si esta PC tiene las "
-        "impresoras conectadas, cámbiala a «Servidor de impresión» arriba."
+        "📡  Esta PC no tiene ninguna impresora marcada, así que no hay nada "
+        "que configurar aquí. Todo se imprime donde sí haya. Si le conectaste "
+        "una, márcala arriba."
     )
     estacion_hint.setWordWrap(True)
     estacion_hint.setObjectName("satStatus")
 
-    def _aplicar_visibilidad_rol(es_servidor: bool) -> None:
-        printer_box.setVisible(es_servidor)
-        label_box.setVisible(es_servidor)
-        escpos_box.setVisible(es_servidor)
-        # Una Estación no despacha nada, así que preguntarle qué imprime no
-        # tiene sentido.
-        tipos_box.setVisible(es_servidor)
-        estacion_hint.setVisible(not es_servidor)
+    def _aplicar_visibilidad_rol(*_args) -> None:
+        """Cada caja de configuración se ve solo si esa impresora existe aquí.
 
-    # radio_local y radio_sat son mutuamente exclusivos (mismo padre): basta
-    # escuchar el toggle del de servidor. Aplicar estado inicial según el cache.
-    radio_local.toggled.connect(_aplicar_visibilidad_rol)
-    _aplicar_visibilidad_rol(current_modo != MODO_SATELITE)
+        Antes era todo o nada según el modo. Preguntarle a la PC principal por
+        su etiquetadora Brother, que está en el kiosko, es pedirle que
+        autodetecte hardware que no tiene."""
+        tickets = casillas_tipo["TICKET"].isChecked() or casillas_tipo["CONTEO"].isChecked()
+        etiquetas = casillas_tipo["ETIQUETA"].isChecked()
+        printer_box.setVisible(tickets)
+        escpos_box.setVisible(tickets)
+        label_box.setVisible(etiquetas)
+        estacion_hint.setVisible(not (tickets or etiquetas))
+
+    for cb in casillas_tipo.values():
+        cb.toggled.connect(_aplicar_visibilidad_rol)
+    _aplicar_visibilidad_rol()
 
     # — Cerrar —
     close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)

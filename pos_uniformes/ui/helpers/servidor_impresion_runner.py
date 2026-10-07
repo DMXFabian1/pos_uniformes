@@ -49,10 +49,13 @@ def tomar_candado() -> bool:
 
 def es_servidor_de_impresion() -> tuple[bool, str]:
     """(es_servidor, cómo se llama esta PC) según el menú admin del kiosko."""
-    from pos_uniformes.services.print_routing_cache_service import MODO_LOCAL, load_print_routing
+    from pos_uniformes.services.print_routing_cache_service import (
+        impresoras_de_esta_pc,
+        load_print_routing,
+    )
 
-    modo, origen = load_print_routing()
-    return modo == MODO_LOCAL, origen
+    _modo, origen = load_print_routing()
+    return bool(impresoras_de_esta_pc()), origen
 
 
 def correr(app, *, drenar: bool = False, origen: str = "") -> int:

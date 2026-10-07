@@ -22,12 +22,16 @@ def maybe_route_label_to_satellite(
     parent: QWidget | None = None,
 ) -> bool:
     """True si la etiqueta se encoló para el satélite (no imprimir local)."""
+    from pos_uniformes.database.models import TipoTrabajo
     from pos_uniformes.services.print_routing_cache_service import (
-        enviar_al_satelite_activo,
         load_print_routing,
+        puede_imprimir,
     )
 
-    if not enviar_al_satelite_activo():
+    # Por TIPO y no por máquina: la PC principal imprime sus tickets aquí pero
+    # sus etiquetas tienen que irse al kiosko, que es donde están las Brother
+    # (Daniel, 2026-10-07).
+    if puede_imprimir(TipoTrabajo.ETIQUETA):
         return False
 
     from PyQt6.QtWidgets import QMessageBox
