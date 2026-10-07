@@ -111,7 +111,7 @@ def botones_propuesta_corte(session, ahora: datetime | None = None) -> str:
 
 def hacer_corte_y_avisar(
     session, *, creado_por: str, ahora: datetime | None = None,
-    retirar: Decimal | None = None, sin_tarjeta: bool = False,
+    retirar: Decimal | None = None, sin_tarjeta: bool | None = None,
     fondo: Decimal | None = None, otros: Decimal | None = None, nota: str = "",
 ) -> ResultadoCorte:
     """Corte + ticket a la impresora. Devuelve el mensaje para Telegram.
@@ -120,7 +120,11 @@ def hacer_corte_y_avisar(
     con esa cifra —venta declarada = retiro + pagos + salidas— y el real
     calculado queda guardado en `monto_esperado`, que solo ve él.
     `sin_tarjeta`: los cobros con tarjeta del periodo quedan privados y el
-    papel no los menciona.
+    papel no los menciona. **None = lo que el dueño dejó guardado** (la casilla
+    del corte del kiosko, que vive en `caja_parametros.ocultar_tarjeta`). Antes
+    el default era False y pisaba esa preferencia: el kiosko ocultaba las
+    tarjetas y el celular las sacaba, y para que coincidieran había que
+    acordarse de escribir «sintarjeta» cada noche (Daniel, 2026-10-07).
     `fondo`: cuánto se deja en el cajón esa noche (si no, el de siempre).
     `otros`: una salida de último momento que no quedó apuntada.
     `nota`: por qué. Los tres faltaban desde el celular (2026-10-04)."""
@@ -135,6 +139,13 @@ def hacer_corte_y_avisar(
     from pos_uniformes.ui.dialogs.corte_caja_dialog import contar_tarjeta, pagos_previos_del_periodo, texto_ticket_corte_encargado
 
     ahora = ahora or datetime.now().astimezone()
+    if sin_tarjeta is None:
+        from pos_uniformes.services.corte_caja_service import cargar_parametros
+
+        try:
+            sin_tarjeta = bool(getattr(cargar_parametros(session), "ocultar_tarjeta", False))
+        except Exception:  # noqa: BLE001 — sin preferencia, como siempre
+            sin_tarjeta = False
     estado = estado_caja(session, ahora)
     avisos = pagos_que_tocan_hoy(session, ahora.date())
     if estado.resumen.operaciones == 0 and not avisos:

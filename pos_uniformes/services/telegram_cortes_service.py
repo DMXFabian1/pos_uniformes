@@ -367,6 +367,47 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
     return "", texto_, botones
 
 
+def esconder_tarjetas(session: Session, argumento: str, *, quien: str) -> str:
+    """`/sintarjeta <id>`: esconde los cobros con tarjeta de un corte ya hecho.
+
+    Va aparte de `/ajustar` a propósito. Ajustar la cifra y esconder las
+    tarjetas son dos decisiones distintas; si ajustar escondiera de paso, cada
+    corrección de una cifra se llevaría cosas sin que nadie lo pidiera. Esto
+    existe porque el día del corte se puede olvidar —o escribir mal— y lo que
+    quedó visible se queda visible para siempre (Daniel, 2026-10-07).
+    """
+    from pos_uniformes.database.models import LibretaCorte
+    from pos_uniformes.services.historial_cortes_service import periodo_del_corte
+    from pos_uniformes.services.libreta_service import marcar_privadas_del_periodo
+
+    crudo = (argumento or "").strip()
+    if not crudo.isdigit():
+        return (
+            "Se usa así:\n/sintarjeta 12\n\n"
+            "El número de corte sale en /cortes, tocando el que sea."
+        )
+    corte = session.get(LibretaCorte, int(crudo))
+    if corte is None:
+        return "Ese corte ya no existe."
+    try:
+        desde, hasta = periodo_del_corte(session, corte)
+        cuantos = marcar_privadas_del_periodo(session, desde, hasta, creado_por=quien)
+    except Exception as exc:  # noqa: BLE001
+        session.rollback()
+        return str(exc)
+    if not cuantos:
+        return (
+            f"El corte {corte.id} ({corte.fecha:%d/%m}) no tiene cobros con tarjeta "
+            "visibles: o no hubo, o ya estaban escondidos."
+        )
+    return (
+        f"✅ Escondí {cuantos} cobro(s) con tarjeta del corte {corte.id} "
+        f"({corte.fecha:%d/%m}).\n"
+        "El ticket que ya se imprimió no cambia; esto es para lo que se ve de aquí "
+        "en adelante."
+    )
+
+
 def ajustar(session: Session, argumento: str, *, quien: str) -> str:
     """`/ajustar <id> <cifra> <por qué>`. El motivo es obligatorio si mueve dinero."""
     from decimal import InvalidOperation

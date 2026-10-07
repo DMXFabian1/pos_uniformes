@@ -60,6 +60,7 @@ AYUDA = (
     "/cortes — los últimos cortes; toca uno para ajustarlo o borrarlo\n"
     "/cortes 30 — los de los últimos 30 días (para rastrear el dinero)\n"
     "/ajustar 12 12500 depósito al banco — cambia la cifra de ese corte\n"
+    "/sintarjeta 12 — esconde los cobros con tarjeta de un corte ya hecho\n"
     "/retiro 500 gasolina — saca del cajón, con su motivo\n"
     "/cajon — desmarca lo que NO salió del cajón (una transferencia,\n"
     "   algo ya contado). Antes del corte\n"
@@ -121,13 +122,28 @@ class OpcionesCorte:
     """
 
     retirar: Decimal | None = None
-    sin_tarjeta: bool = False
+    #: None = "como lo tengas guardado"; True/False = lo dijiste en el comando.
+    #: Antes era un bool y su default (False) pisaba la preferencia del dueño,
+    #: así que el celular enseñaba las tarjetas aunque el kiosko estuviera en
+    #: ocultar (Daniel, 2026-10-07).
+    sin_tarjeta: bool | None = None
     fondo: Decimal | None = None
     otros: Decimal | None = None
     nota: str = ""
+    #: Lo que hay que decirle aunque el corte se haya hecho. Hoy solo una cosa:
+    #: la nota menciona las tarjetas y nadie pidió ocultarlas, así que lo más
+    #: probable es que la opción se escribiera mal y se haya guardado como
+    #: recado — que es justo lo que pasó el 6-oct y no dio señal ninguna.
+    aviso: str = ""
 
 
 _SIN_TARJETA = {"sintarjeta", "sin-tarjeta", "sin_tarjeta", "st"}
+#: Lo contrario, para un día suelto: «/corte contarjeta».
+_CON_TARJETA = {"contarjeta", "con-tarjeta", "con_tarjeta", "contarjetas"}
+#: «sin tarjeta» escrito con espacio: dos palabras que juntas son la opción.
+#: Daniel lo escribió así el 6-oct, se guardó como NOTA y el corte salió con
+#: las tarjetas — un dedazo que se veía igual que una decisión.
+_PARTIDAS = {("sin", "tarjeta"), ("sin", "tarjetas"), ("con", "tarjeta"), ("con", "tarjetas")}
 #: Palabras que presentan una cifra. Lo demás que no sea número es nota.
 _FONDO = {"fondo", "reactivo"}
 _OTROS = {"otros", "otro", "salida", "salidas", "gasto"}
@@ -139,6 +155,7 @@ _AYUDA_CORTE = (
     "/corte fondo 2000 — deja ese fondo en el cajón\n"
     "/corte otros 350 — descuenta una salida no apuntada\n"
     "/corte sintarjeta — sin los cobros con tarjeta\n"
+    "/corte contarjeta — con ellos, aunque los tengas ocultos por default\n"
     "/corte 5000 deposité al banco — lo demás queda como nota\n"
     "(se pueden juntar: /corte 5000 fondo 2000 deposité al banco)"
 )
@@ -156,7 +173,7 @@ def _cifra(palabra: str) -> Decimal | None:
 def leer_opciones_corte(argumento: str) -> OpcionesCorte:
     """'5000 fondo 2000 deposité al banco' → todo lo del diálogo, en una línea."""
     retirar = fondo = otros = None
-    sin_tarjeta = False
+    sin_tarjeta: bool | None = None
     nota: list[str] = []
 
     palabras = (argumento or "").split()
@@ -164,8 +181,19 @@ def leer_opciones_corte(argumento: str) -> OpcionesCorte:
     while i < len(palabras):
         palabra = palabras[i]
         limpia = palabra.strip().lower()
+        siguiente_limpia = (
+            palabras[i + 1].strip().lower() if i + 1 < len(palabras) else ""
+        )
+        if (limpia, siguiente_limpia) in _PARTIDAS:
+            sin_tarjeta = limpia == "sin"
+            i += 2
+            continue
         if limpia in _SIN_TARJETA:
             sin_tarjeta = True
+            i += 1
+            continue
+        if limpia in _CON_TARJETA:
+            sin_tarjeta = False
             i += 1
             continue
         if limpia in _FONDO or limpia in _OTROS:
@@ -192,9 +220,17 @@ def leer_opciones_corte(argumento: str) -> OpcionesCorte:
         nota.append(palabra)
         i += 1
 
+    texto_nota = " ".join(nota).strip()
+    aviso = ""
+    if sin_tarjeta is None and "tarjet" in texto_nota.lower():
+        aviso = (
+            f"Ojo: «{texto_nota}» se guardó como NOTA, no como opción. "
+            "Si querías esconder los cobros con tarjeta, se escribe "
+            "«sintarjeta» (o «sin tarjeta»)."
+        )
     return OpcionesCorte(
         retirar=retirar, sin_tarjeta=sin_tarjeta, fondo=fondo, otros=otros,
-        nota=" ".join(nota).strip(),
+        nota=texto_nota, aviso=aviso,
     )
 
 
@@ -213,11 +249,14 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
         except ValueError as exc:
             return str(exc)
         with session_factory() as session:
-            return hacer_corte_y_avisar(
+            mensaje = hacer_corte_y_avisar(
                 session, creado_por=CODIGO_REMOTO,
                 retirar=opciones.retirar, sin_tarjeta=opciones.sin_tarjeta,
                 fondo=opciones.fondo, otros=opciones.otros, nota=opciones.nota,
             ).mensaje
+        # El aviso va DESPUÉS y no cancela nada: el corte ya se hizo y hay que
+        # decir lo que se guardó, no tragárselo.
+        return mensaje + ("\n\n⚠️ " + opciones.aviso if opciones.aviso else "")
     if cmd.nombre == "nocorte":
         from pos_uniformes.services.corte_propuesta_service import cancelar
 
@@ -307,6 +346,11 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
 
         with session_factory() as session:
             return ct.ajustar(session, cmd.argumento, quien=CODIGO_REMOTO)
+    if cmd.nombre in ("sintarjeta", "sin-tarjeta", "sin_tarjeta"):
+        from pos_uniformes.services import telegram_cortes_service as ct
+
+        with session_factory() as session:
+            return ct.esconder_tarjetas(session, cmd.argumento, quien=CODIGO_REMOTO)
     if cmd.nombre in ("sonidos", "sonido"):
         from pos_uniformes.services import sonidos_service as sn
 
