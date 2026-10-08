@@ -34,7 +34,7 @@ class RaizTest(unittest.TestCase):
         texto, botones = menu.menu_raiz()
         self.assertIn("¿Qué", texto)
         juntos = " ".join(_textos(botones))
-        for esperado in ("Caja", "Pagos", "Quién vino", "Qué contar", "Resumen"):
+        for esperado in ("Caja", "Pagos", "Las muchachas", "Qué contar", "Resumen"):
             self.assertIn(esperado, juntos)
 
     def test_el_dinero_no_se_mueve_desde_el_tablero(self):
@@ -171,3 +171,60 @@ class TableroTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ElTableroNoRepiteLoQueYaDiceTests(unittest.TestCase):
+    """«son muchos botones y creo que algunos hacen lo mismo» (08/10).
+
+    Dos decían lo que ya estaba dicho, y uno de los dos reescribía el párrafo
+    que el propio menú tenía encima.
+    """
+
+    def _del_raiz(self):
+        return {d for fila in menu._RAIZ for _, d in fila}
+
+    def test_hoy_no_tiene_boton_porque_es_la_cabecera(self) -> None:
+        """`cabecera()` y `/hoy` salen los dos de `texto_hoy()`."""
+        from pathlib import Path
+
+        self.assertNotIn("m:hoy", self._del_raiz())
+        codigo = Path(menu.__file__).read_text(encoding="utf-8")
+        self.assertIn("texto_hoy", codigo)   # la cabecera lo sigue usando
+
+    def test_pendientes_no_tiene_boton_porque_es_parte_del_resumen(self) -> None:
+        self.assertNotIn("m:pendientes", self._del_raiz())
+        self.assertIn("m:resumen", self._del_raiz())
+
+    def test_los_dos_siguen_contestando_desde_mensajes_viejos(self) -> None:
+        """Los botones de ayer siguen en el chat y tienen que servir."""
+        from unittest.mock import patch
+
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        for dato in ("m:hoy", "m:pendientes"):
+            with self.subTest(dato=dato):
+                with patch.object(bot, "atender_texto", return_value="ok") as llamar:
+                    aviso, texto, _ = menu.atender(dato, session_factory=None)
+                self.assertNotEqual(aviso, "No conozco ese botón")
+                llamar.assert_called_once()
+
+    def test_lo_de_ellas_vive_en_su_propio_cajon(self) -> None:
+        self.assertIn("m:gente", self._del_raiz())
+        for suelto in ("m:asistencia", "m:prestamos", "m:descansos"):
+            with self.subTest(dato=suelto):
+                self.assertNotIn(suelto, self._del_raiz())
+                self.assertIn(suelto, {d for fila in menu._GENTE for _, d in fila})
+
+    def test_pagar_se_queda_arriba(self) -> None:
+        """Es lo único de ahí que se usa seguido; esconderlo cuesta un toque
+        todos los días."""
+        self.assertIn("m:pagos", self._del_raiz())
+
+    def test_del_cajon_de_ellas_se_puede_volver(self) -> None:
+        _, texto, botones = menu.atender("m:gente", session_factory=None)
+        self.assertIn("muchachas", texto)
+        self.assertIn("m:raiz", botones)
+
+    def test_el_tablero_cabe_sin_scroll(self) -> None:
+        """Diez renglones de botones tapaban el mensaje en el celular."""
+        self.assertLessEqual(len(menu._RAIZ), 7)

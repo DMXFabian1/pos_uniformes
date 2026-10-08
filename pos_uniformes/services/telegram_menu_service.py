@@ -16,17 +16,31 @@ from datetime import date
 #: Prefijo de los datos que viajan en los botones (máx. 64 bytes por regla de Telegram).
 PREFIJO = "m:"
 
+# Eran quince botones en diez renglones y dos decían lo que ya estaba dicho
+# (Daniel, 2026-10-08: «son muchos botones y creo que algunos hacen lo mismo»):
+#
+# - «Hoy» mandaba EXACTAMENTE la cabecera de este menú: las dos salen de
+#   `texto_hoy()`. Tocarlo reescribía el párrafo que ya se estaba leyendo.
+# - «Pendientes» es una sección de «Resumen», con el mismo texto.
+#
+# «¿Todo en pie?» también repite lo vendido y el último corte, pero agrega
+# pantallas, respaldo y cola de impresión: ése sí se gana su renglón.
 _RAIZ = [
     [("🫀 ¿Todo en pie?", "m:pulso")],
-    [("📅 Hoy", "m:hoy"), ("💵 Caja", "m:estado")],
-    [("📋 Resumen", "m:resumen"), ("⏳ Pendientes", "m:pendientes")],
+    [("💵 Caja", "m:estado"), ("📋 Resumen", "m:resumen")],
     [("🧾 Cortes", "m:cortes"), ("💰 Pagos", "m:pagos")],
     [("💵 Lo que salió del cajón", "m:cajon")],
-    [("👥 Quién vino", "m:asistencia"), ("💵 Préstamos", "m:prestamos")],
-    [("🛌 Días de descanso", "m:descansos")],
-    [("🏪 Qué contar", "m:contar"), ("🔎 Sin surtir", "m:faltas")],
-    [("📣 Avisos", "m:avisos")],
+    [("👥 Las muchachas…", "m:gente"), ("🏪 Qué contar", "m:contar")],
+    [("🔎 Sin surtir", "m:faltas"), ("📣 Avisos", "m:avisos")],
     [("❔ Ayuda", "m:ayuda")],
+]
+
+#: Lo de ellas, junto. Ninguno es de diario, y sueltos ocupaban tres renglones
+#: del tablero. Pagos NO entra aquí: ése sí se usa seguido y se queda arriba.
+_GENTE = [
+    [("👥 Quién vino", "m:asistencia")],
+    [("💵 Préstamos", "m:prestamos")],
+    [("🛌 Días de descanso", "m:descansos")],
 ]
 
 
@@ -89,6 +103,9 @@ def atender(dato: str, *, session_factory, hoy: date | None = None) -> tuple[str
             texto, botones = menu_raiz(session, hoy=hoy)
         return "", texto, botones
 
+    if accion == "gente":
+        return "", "¿De las muchachas, qué?", _con_volver(_GENTE)
+
     # Pagar a alguien: el desglose primero, el dinero después.
     if accion.startswith("pagar:"):
         code = accion.split(":", 1)[1]
@@ -149,6 +166,9 @@ def atender(dato: str, *, session_factory, hoy: date | None = None) -> tuple[str
             texto, botones = ct.texto_y_botones(session)
         return "", texto, botones
 
+    # «hoy» y «pendientes» ya no tienen botón, pero el despachador los sigue
+    # atendiendo: los mensajes viejos del chat conservan sus botones, y tocar
+    # uno no debe contestar «no conozco ese botón».
     comando = {
         "pulso": "/pulso",
         "hoy": "/hoy",

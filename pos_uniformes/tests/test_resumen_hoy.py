@@ -90,7 +90,11 @@ class ElBotLoConoceTest(unittest.TestCase):
         bot = (base / "telegram_bot_service.py").read_text(encoding="utf-8")
         self.assertIn('cmd.nombre == "hoy"', bot)
         menu = (base / "telegram_menu_service.py").read_text(encoding="utf-8")
-        self.assertIn('"m:hoy"', menu)
+        # Botón YA NO: la cabecera del menú sale de la misma `texto_hoy()`,
+        # así que el botón reescribía el párrafo que ya se estaba leyendo
+        # (Daniel, 2026-10-08). El comando sigue vivo y el despachador lo
+        # atiende, para los botones de mensajes viejos.
+        self.assertNotIn('("📅 Hoy"', menu)
         self.assertIn('"hoy": "/hoy"', menu)
 
 
