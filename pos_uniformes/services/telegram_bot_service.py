@@ -437,6 +437,25 @@ _CON_BOTONES = {
 }
 
 
+def _corte_solo_con_nota(argumento: str) -> str:
+    """La nota de un `/corte` que no trae NADA más, o '' si trae algo.
+
+    `/corte abc` hacía el corte con nota «abc»: cerraba el periodo e imprimía
+    el ticket. Un corte no se deshace fácil y un dedazo no debería hacerlo
+    (2026-10-08). Cuando viene una cifra, un fondo o lo de la tarjeta, la
+    intención está clara y no se pregunta nada.
+    """
+    try:
+        o = leer_opciones_corte(argumento)
+    except ValueError:
+        return ""
+    if o.retirar is not None or o.fondo is not None or o.otros is not None:
+        return ""
+    if o.sin_tarjeta is not None:
+        return ""
+    return o.nota
+
+
 def responder(texto: str, *, session_factory, hoy: date | None = None) -> tuple[str, str]:
     """(respuesta, botones) para un mensaje. Es lo que usa el bucle del bot.
 
@@ -444,6 +463,15 @@ def responder(texto: str, *, session_factory, hoy: date | None = None) -> tuple[
     lados; aquí se le agregan los botones a los pocos comandos que los tienen.
     """
     cmd = parsear(texto)
+    if cmd is not None and cmd.nombre == "corte":
+        from pos_uniformes.services import corte_remoto_service as crs
+        from pos_uniformes.services import telegram_corte_botones_service as cb
+
+        nota = _corte_solo_con_nota(cmd.argumento)
+        if nota and cb.cabe_en_un_boton(nota):
+            with session_factory() as session:
+                retiro, _ = crs.cifras_de_propuesta(session)
+            return cb.preguntar_por_la_nota(nota, retiro)
     destino = _CON_BOTONES.get(cmd.nombre) if cmd is not None else None
     if destino is None:
         return atender_texto(texto, session_factory=session_factory, hoy=hoy), ""

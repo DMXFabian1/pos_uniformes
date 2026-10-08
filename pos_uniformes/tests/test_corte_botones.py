@@ -340,3 +340,77 @@ class _SesionBoba:
 
     def commit(self):
         pass
+
+
+class UnDedazoNoDebeHacerUnCorteTests(unittest.TestCase):
+    """`/corte abc` cerraba el periodo e imprimía el ticket.
+
+    `/corte` toma cualquier palabra suelta como nota —decisión del 2026-10-04,
+    para no pedir una palabra clave más— y eso convierte un dedazo en un corte.
+    Pasó de verdad el 2026-10-08, probando: quedó el corte #117 con nota «abc»
+    y salió papel en la tienda. Un corte no se deshace fácil.
+    """
+
+    def setUp(self) -> None:
+        self.factory = lambda: _SesionBoba()
+
+    def _responder(self, entrada):
+        from pos_uniformes.services import corte_remoto_service as crs
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        with patch.object(crs, "cifras_de_propuesta",
+                          return_value=(Decimal("460.00"), Decimal("10760.00"))), \
+             patch.object(crs, "hacer_corte_y_avisar") as hacer:
+            hacer.return_value = MagicMockResultado("corte hecho")
+            texto, botones = bot.responder(entrada, session_factory=self.factory)
+        return texto, botones, hacer
+
+    def test_una_palabra_suelta_pregunta_en_vez_de_cortar(self) -> None:
+        texto, botones, hacer = self._responder("/corte abc")
+        hacer.assert_not_called()
+        self.assertIn("¿Hago el corte con la nota «abc»?", texto)
+        self.assertIn("cc:nota:abc", _datos(botones))
+
+    def test_avisa_lo_que_va_a_pasar_si_dice_que_sí(self) -> None:
+        texto, _, _ = self._responder("/corte abc")
+        self.assertIn("$460", texto)
+        self.assertIn("se imprime el ticket en la tienda", texto)
+
+    def test_con_una_cifra_no_estorba(self) -> None:
+        """La intención está clara: se hace y ya, como siempre."""
+        _, _, hacer = self._responder("/corte 5000")
+        hacer.assert_called_once()
+
+    def test_con_nota_Y_cifra_tampoco(self) -> None:
+        _, _, hacer = self._responder("/corte 5000 deposité al banco")
+        hacer.assert_called_once()
+
+    def test_con_sintarjeta_tampoco(self) -> None:
+        _, _, hacer = self._responder("/corte sintarjeta")
+        hacer.assert_called_once()
+
+    def test_sin_argumento_tampoco(self) -> None:
+        _, _, hacer = self._responder("/corte")
+        hacer.assert_called_once()
+
+    def test_una_frase_larga_se_deja_pasar(self) -> None:
+        """No cabe en el botón, y de todos modos una frase se escribe a
+        propósito: el dedazo que preocupa es corto."""
+        larga = "deposité todo al banco porque mañana no voy a estar en la tienda"
+        self.assertFalse(cb.cabe_en_un_boton(larga))
+        _, _, hacer = self._responder(f"/corte {larga}")
+        hacer.assert_called_once()
+
+    def test_al_confirmar_se_hace_con_esa_nota(self) -> None:
+        from pos_uniformes.services import corte_remoto_service as crs
+
+        with patch.object(crs, "hacer_corte_y_avisar") as hacer:
+            hacer.return_value = MagicMockResultado("listo")
+            aviso, _, _ = cb.atender(
+                "cc:nota:depósito", session_factory=self.factory, quien="VEND-1"
+            )
+        self.assertEqual(aviso, "Corte hecho")
+        self.assertEqual(hacer.call_args.kwargs["nota"], "depósito")
+
+    def test_el_dedazo_se_cancela_con_el_boton_de_siempre(self) -> None:
+        self.assertIn("cc:no", _datos(self._responder("/corte abc")[1]))

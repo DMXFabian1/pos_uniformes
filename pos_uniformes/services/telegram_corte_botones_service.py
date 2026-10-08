@@ -157,6 +157,39 @@ def pantalla_cantidades(que: str, sugerida: Decimal, tope: Decimal) -> tuple[str
     return "\n".join(texto), _teclado(filas)
 
 
+#: Tope de `callback_data` en Telegram. Lo que no quepa no puede ir en botón.
+_TOPE_DATO = 64
+
+
+def cabe_en_un_boton(nota: str) -> bool:
+    """¿La nota cabe en el dato del botón de confirmar?
+
+    Una que no cabe son más de 50 letras, o sea una frase — y una frase se
+    escribe a propósito. El dedazo que preocupa es corto: «abc»,
+    «sintarjets». Por eso lo que no cabe se deja pasar en vez de inventarle
+    un rodeo (2026-10-08).
+    """
+    return len(f"{PREFIJO}nota:{nota}".encode("utf-8")) <= _TOPE_DATO
+
+
+def preguntar_por_la_nota(nota: str, retiro: Decimal) -> tuple[str, str]:
+    """(texto, botones) para confirmar un `/corte` que solo trae nota.
+
+    Existe porque `/corte` toma cualquier palabra suelta como nota y HACE el
+    corte: `/corte abc` cerraba el periodo e imprimía el ticket. Un corte no
+    se deshace fácil y un dedazo no debería hacerlo (Daniel, 2026-10-08).
+    """
+    return (
+        f"¿Hago el corte con la nota «{nota}»?\n\n"
+        f"Saldrían {_pesos(retiro)} del cajón y se imprime el ticket en la tienda.\n"
+        "Si era un dedazo, no toques nada.",
+        _teclado([
+            [(f"✅ Sí, hacer el corte ({_pesos(retiro)})", f"{PREFIJO}nota:{nota}")],
+            [("🚫 No, fue un dedazo", f"{PREFIJO}no")],
+        ]),
+    )
+
+
 def es_de_corte(dato: str) -> bool:
     return str(dato or "").startswith(PREFIJO)
 
@@ -189,6 +222,16 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
         with session_factory() as session:
             texto, botones = _pantalla(session, accion)
         return "", texto, botones
+
+    if accion == "nota":
+        # El corte que se preguntó antes de hacer. La nota viaja en el dato
+        # del botón: sin estado, como todo lo de esta pantalla.
+        with session_factory() as session:
+            resultado = crs.hacer_corte_y_avisar(
+                session, creado_por=quien, nota=crudo
+            )
+            session.commit()
+        return ("Corte hecho" if resultado.hecho else ""), resultado.mensaje, ""
 
     if accion in ("ok", "ret", "fnd", "baja"):
         retirar = fondo = None
