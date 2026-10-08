@@ -57,6 +57,18 @@ def cifras_de_propuesta(session, ahora: datetime | None = None):
     return max(retiro, Decimal("0.00")), Decimal(e.reactivo)
 
 
+def tarjeta_del_periodo(session, ahora: datetime | None = None) -> Decimal:
+    """Lo cobrado con tarjeta desde el último corte.
+
+    Se ofrece como cantidad para bajarle a la venta porque es lo que Daniel
+    baja casi siempre: no entró al cajón, así que la cifra del papel no debe
+    contarlo (07/10)."""
+    from pos_uniformes.services.corte_caja_service import estado_caja
+
+    ahora = ahora or datetime.now().astimezone()
+    return Decimal(estado_caja(session, ahora).resumen.tarjeta or 0)
+
+
 def texto_propuesta_corte(session, ahora: datetime | None = None) -> str:
     """Lo que llega al celular a la hora del corte: qué hay y qué pasaría si
     lo haces. Nada se guarda ni se imprime hasta que Daniel conteste."""

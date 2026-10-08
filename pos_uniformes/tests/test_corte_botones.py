@@ -32,7 +32,7 @@ class LaPropuestaTests(unittest.TestCase):
 
     def test_estan_las_cuatro_salidas(self) -> None:
         datos = _datos(cb.botones_de_propuesta(Decimal("2820"), Decimal("1000")))
-        for esperado in ("cc:ok", "cc:retirar", "cc:fondo", "cc:cajon", "cc:no"):
+        for esperado in ("cc:ok", "cc:bajar", "cc:fondo", "cc:cajon", "cc:no"):
             self.assertIn(esperado, datos, esperado)
 
     def test_el_texto_ya_no_dicta_comandos(self) -> None:
@@ -168,7 +168,7 @@ class CadaBotonDiceLoQueVaAPasarTests(unittest.TestCase):
 
     def test_los_que_abren_otra_pantalla_terminan_en_puntos(self) -> None:
         etiquetas = _etiquetas(cb.botones_de_propuesta(Decimal("7098"), Decimal("500")))
-        self.assertIn("💵 Sacar otra cantidad…", etiquetas)
+        self.assertIn("✂️ Bajarle a la venta…", etiquetas)
         self.assertIn("🪙 Dejar otro fondo…", etiquetas)
 
     def test_el_del_cajon_dice_que_se_va_a_hacer(self) -> None:
@@ -239,3 +239,104 @@ class LaPropuestaDiceQueVaAPasarTests(unittest.TestCase):
 
     def test_la_tarjeta_se_explica(self) -> None:
         self.assertIn("no entra al cajón", self._texto())
+
+
+class BajarleALaVentaTests(unittest.TestCase):
+    """«si esos botones me sirvieran para restar esa cantidad» (Daniel, 07/10).
+
+    Es la misma palanca preguntada por el otro lado: lo que se le baja a la
+    venta es lo que deja de salir del cajón. Él sabe cuánto quiere bajar —lo
+    de tarjeta, un depósito—, no cuánto retiro queda; y así se llama después
+    en la lista de cortes: «lo bajaste tú $1,200».
+    """
+
+    def setUp(self) -> None:
+        self.factory = lambda: _SesionBoba()
+
+    def test_el_boton_de_la_propuesta_habla_de_bajar(self) -> None:
+        etiquetas = _etiquetas(cb.botones_de_propuesta(Decimal("7098"), Decimal("500")))
+        self.assertIn("✂️ Bajarle a la venta…", etiquetas)
+        self.assertNotIn("💵 Sacar otra cantidad…", etiquetas)
+
+    def test_lo_de_tarjeta_va_primero(self) -> None:
+        """Es lo que más se baja: no entró al cajón."""
+        _, botones = cb.pantalla_bajar(Decimal("7098"), Decimal("1368"))
+        etiquetas = _etiquetas(botones)
+        self.assertEqual(etiquetas[0], "✅ Nada, el corte tal cual")
+        self.assertEqual(etiquetas[1], "Bajar $1,368  (lo de tarjeta)")
+
+    def test_sin_tarjeta_no_se_inventa_el_renglon(self) -> None:
+        etiquetas = _etiquetas(cb.pantalla_bajar(Decimal("2820"), Decimal("0"))[1])
+        self.assertNotIn("tarjeta", " ".join(etiquetas))
+
+    def test_no_se_ofrece_bajar_mas_de_lo_que_hay(self) -> None:
+        """Bajar más que el retiro dejaría la venta del papel por debajo de lo
+        que ya salió del cajón."""
+        etiquetas = " ".join(_etiquetas(cb.pantalla_bajar(Decimal("1200"), Decimal("0"))[1]))
+        self.assertIn("$1,000", etiquetas)
+        self.assertNotIn("$2,000", etiquetas)
+
+    def test_la_tarjeta_no_se_repite_si_cae_en_una_redonda(self) -> None:
+        etiquetas = _etiquetas(cb.pantalla_bajar(Decimal("7098"), Decimal("2000"))[1])
+        self.assertEqual(len([e for e in etiquetas if "$2,000" in e]), 1)
+
+    def test_una_tarjeta_mas_grande_que_el_retiro_no_se_ofrece(self) -> None:
+        etiquetas = " ".join(_etiquetas(cb.pantalla_bajar(Decimal("800"), Decimal("1368"))[1]))
+        self.assertNotIn("$1,368", etiquetas)
+
+    def test_bajar_es_retirar_menos_esa_cantidad(self) -> None:
+        """La cuenta que une las dos formas de verlo."""
+        from pos_uniformes.services import corte_remoto_service as crs
+
+        with patch.object(crs, "hacer_corte_y_avisar") as hacer, patch.object(
+            crs, "cifras_de_propuesta",
+            return_value=(Decimal("7098.00"), Decimal("500.00")),
+        ):
+            hacer.return_value = MagicMockResultado("listo")
+            cb.atender("cc:baja:1368", session_factory=self.factory, quien="VEND-1")
+        self.assertEqual(hacer.call_args.kwargs["retirar"], Decimal("5730.00"))
+
+    def test_bajar_mas_que_todo_no_deja_un_retiro_negativo(self) -> None:
+        from pos_uniformes.services import corte_remoto_service as crs
+
+        with patch.object(crs, "hacer_corte_y_avisar") as hacer, patch.object(
+            crs, "cifras_de_propuesta",
+            return_value=(Decimal("500.00"), Decimal("500.00")),
+        ):
+            hacer.return_value = MagicMockResultado("listo")
+            cb.atender("cc:baja:5000", session_factory=self.factory, quien="VEND-1")
+        self.assertEqual(hacer.call_args.kwargs["retirar"], Decimal("0.00"))
+
+    def test_los_botones_viejos_del_chat_siguen_sirviendo(self) -> None:
+        """Los mensajes de ayer se quedan en el chat con sus botones.
+
+        Tocar «Sacar otra cantidad» de anoche no puede contestar «no conozco
+        ese botón»: lleva a la pantalla nueva.
+        """
+        from pos_uniformes.services import corte_remoto_service as crs
+
+        with patch.object(
+            crs, "cifras_de_propuesta",
+            return_value=(Decimal("7098.00"), Decimal("500.00")),
+        ), patch.object(crs, "tarjeta_del_periodo", return_value=Decimal("1368.00")):
+            aviso, texto, botones = cb.atender(
+                "cc:retirar", session_factory=self.factory, quien="VEND-1"
+            )
+        self.assertNotEqual(aviso, "No conozco ese botón")
+        self.assertIn("¿Cuánto le bajo a la venta?", texto)
+
+    def test_la_pantalla_avisa_que_no_sale_en_el_ticket(self) -> None:
+        texto, _ = cb.pantalla_bajar(Decimal("7098"), Decimal("1368"))
+        self.assertIn("no aparece en el ticket de la tienda", texto)
+        self.assertNotIn("**", texto)
+
+
+class _SesionBoba:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_):
+        return False
+
+    def commit(self):
+        pass

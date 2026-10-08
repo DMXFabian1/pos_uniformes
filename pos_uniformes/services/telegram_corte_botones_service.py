@@ -58,7 +58,12 @@ def botones_de_propuesta(retiro: Decimal, fondo: Decimal) -> str:
             # La cifra va EN el botón: es la del mensaje, y tenerla a la mano
             # al momento de tocar es lo que hace que no haya que releer.
             [(f"✅ Hacer el corte y sacar {_pesos(retiro)}", f"{PREFIJO}ok")],
-            [("💵 Sacar otra cantidad…", f"{PREFIJO}retirar"),
+            # «Bajarle a la venta» y no «sacar otra cantidad»: es la misma
+            # operación preguntada por el lado que Daniel la piensa. Él sabe
+            # cuánto quiere bajar —lo de tarjeta, un depósito—, no cuánto
+            # queda de retiro; y así se llama después en la lista de cortes,
+            # «lo bajaste tú $1,200» (07/10).
+            [("✂️ Bajarle a la venta…", f"{PREFIJO}bajar"),
              ("🪙 Dejar otro fondo…", f"{PREFIJO}fondo")],
             # «Algo no salió del cajón» era una negación y no decía qué iba a
             # pasar. Esto es lo que se va a hacer: apuntarlo.
@@ -71,6 +76,41 @@ def botones_de_propuesta(retiro: Decimal, fondo: Decimal) -> str:
 def _cantidades(tope: Decimal) -> list[int]:
     """Las de siempre que caben, de mayor a menor."""
     return [c for c in sorted(DE_SIEMPRE, reverse=True) if Decimal(c) <= tope]
+
+
+def pantalla_bajar(retiro: Decimal, tarjeta: Decimal) -> tuple[str, str]:
+    """(texto, botones) para bajarle una cantidad a la venta del corte.
+
+    `retiro` es lo que saldría tal cual: es el tope, porque bajar más que eso
+    dejaría la venta del papel por debajo de lo que ya salió del cajón.
+
+    Cada botón hace el corte, así que cada uno lo dice. Lo de tarjeta va
+    primero porque es lo que más se baja.
+    """
+    filas = [[("✅ Nada, el corte tal cual", f"{PREFIJO}ok")]]
+    ofrecidas: list[int] = []
+    if 0 < tarjeta <= retiro:
+        entero = int(tarjeta)
+        ofrecidas.append(entero)
+        filas.append([(
+            f"Bajar {_pesos(tarjeta)}  (lo de tarjeta)", f"{PREFIJO}baja:{entero}"
+        )])
+    for c in sorted(DE_SIEMPRE):
+        if Decimal(c) > retiro or c in ofrecidas:
+            continue
+        filas.append([(f"Bajar {_pesos(c)}", f"{PREFIJO}baja:{c}")])
+    filas.append([("‹ Volver", f"{PREFIJO}volver")])
+
+    texto = [
+        "¿Cuánto le bajo a la venta?",
+        "",
+        "Lo que bajes no aparece en el ticket de la tienda.",
+        "Cada botón hace el corte con esa cantidad ya restada.",
+        "",
+        "Para una cifra exacta o con motivo:",
+        "/corte 5000 fondo 2000 deposité al banco",
+    ]
+    return "\n".join(texto), _teclado(filas)
 
 
 def pantalla_cantidades(que: str, sugerida: Decimal, tope: Decimal) -> tuple[str, str]:
@@ -142,17 +182,28 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
             texto, botones = cj.texto_y_botones(session)
         return "", texto + "\n\nCuando termines, vuelve con /corte.", botones
 
-    if accion in ("retirar", "fondo", "volver"):
+    # «retirar» ya no se ofrece, pero se sigue atendiendo: los mensajes viejos
+    # se quedan en el chat con sus botones, y tocar uno no debe contestar «no
+    # conozco ese botón».
+    if accion in ("bajar", "retirar", "fondo", "volver"):
         with session_factory() as session:
             texto, botones = _pantalla(session, accion)
         return "", texto, botones
 
-    if accion in ("ok", "ret", "fnd"):
+    if accion in ("ok", "ret", "fnd", "baja"):
         retirar = fondo = None
         if accion == "ret":
             retirar = _cifra(crudo)
         elif accion == "fnd":
             fondo = _cifra(crudo)
+        elif accion == "baja":
+            # Bajar y retirar son la misma palanca por lados distintos: lo que
+            # se baja de la venta es lo que deja de salir del cajón.
+            cuanto = _cifra(crudo)
+            if cuanto is not None:
+                with session_factory() as session:
+                    calculado, _ = crs.cifras_de_propuesta(session)
+                retirar = max(calculado - cuanto, Decimal("0.00"))
         if accion != "ok" and (retirar is None and fondo is None):
             return "No conozco ese botón", "", ""
         with session_factory() as session:
@@ -183,6 +234,6 @@ def _pantalla(session, accion: str) -> tuple[str, str]:
 
     if accion == "volver":
         return crs.texto_propuesta_corte(session, ahora), botones_de_propuesta(retiro, fondo)
-    if accion == "retirar":
-        return pantalla_cantidades("retirar", retiro, retiro)
+    if accion in ("bajar", "retirar"):
+        return pantalla_bajar(retiro, crs.tarjeta_del_periodo(session, ahora))
     return pantalla_cantidades("fondo", fondo, max(retiro, fondo))
