@@ -160,7 +160,10 @@ class VigilanteTests(unittest.TestCase):
         with self._con_estado(viejo):
             textos = self.v._respaldo_viejo(self.ahora)
         self.assertEqual(len(textos), 1)
-        self.assertIn("6 días", textos[0])
+        # Desde el 2026-10-08 el aviso viaja con su botón: (texto, teclado).
+        texto, botones = textos[0]
+        self.assertIn("6 días", texto)
+        self.assertIn("rs:ahora", botones)
 
     def test_no_avisa_si_esta_al_dia(self) -> None:
         with self._con_estado(est.EstadoRespaldo(ultimo=datetime.now(timezone.utc), archivo=None)):
@@ -201,7 +204,8 @@ class VigilanteTests(unittest.TestCase):
             t.__table__.create(engine)
         with sessionmaker(engine)() as session, self._con_estado(viejo):
             textos = self.v.revisar(session, self.ahora)
-        self.assertTrue(any("respaldo" in t.lower() for t in textos))
+        planos = [t if isinstance(t, str) else t[0] for t in textos]
+        self.assertTrue(any("respaldo" in t.lower() for t in planos))
 
 
 if __name__ == "__main__":

@@ -54,6 +54,8 @@ class ColaTests(unittest.TestCase):
             self.assertTrue(al.encolar(s, "dos"))
             self.assertFalse(al.encolar(s, "   "))
             salidas = []
+            # Un enviador de UN argumento tiene que seguir sirviendo: los
+            # avisos sin teclado son casi todos (2026-10-08).
             self.assertEqual(al.enviar_pendientes(s, salidas.append), 2)
             self.assertEqual(salidas, ["uno", "dos"])
             self.assertEqual(al.pendientes(s), [])
@@ -193,12 +195,16 @@ class ProcesarTests(unittest.TestCase):
         with factory() as s:
             al.encolar(s, "pendiente")
         salidas = []
+
+        def _enviar(texto, botones=""):
+            salidas.append(texto)
+
         v = al.Vigilante(ultimo_id=0)
         with factory() as s:
             _venta(s, datetime(2026, 9, 7, 20, 0))
         with patch.object(al, "datetime", wraps=datetime) as dt:
             dt.now.return_value = datetime(2026, 9, 7, 20, 1).astimezone()
-            n = al.procesar(factory, salidas.append, v)
+            n = al.procesar(factory, _enviar, v)
         self.assertEqual(n, 3)
         self.assertEqual(salidas[0], "pendiente")
         self.assertIn("fuera de horario", salidas[1])

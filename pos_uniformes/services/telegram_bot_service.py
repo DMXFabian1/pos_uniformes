@@ -512,16 +512,29 @@ def mensaje_asistencia(session, hoy: date | None = None) -> tuple[str, str]:
     return asis.texto_asistencia(lista, hoy), ""
 
 
-def atender_toque(dato: str, *, session_factory, hoy: date | None = None) -> tuple[str, str, str] | None:
+def atender_toque(
+    dato: str, *, session_factory, hoy: date | None = None, enviar=None
+) -> tuple[str, str, str] | None:
     """Un botón tocado: (aviso corto, texto nuevo, botones nuevos).
 
     Puede ser del menú (`m:…`) o de la lista de asistencia. None si no es de
-    ninguno de los dos."""
+    ninguno de los dos.
+
+    `enviar(texto)` es para lo que tarda más de lo que Telegram espera por una
+    respuesta: el botón contesta al instante y el resultado llega después.
+    """
     from pos_uniformes.services import asistencia_service as asis
     from pos_uniformes.services import telegram_menu_service as menu
 
     if menu.es_del_menu(dato):
         return menu.atender(dato, session_factory=session_factory, hoy=hoy)
+
+    from pos_uniformes.services import telegram_respaldo_service as rs
+
+    if rs.es_de_respaldo(dato):
+        if enviar is None:
+            return "No puedo hacerlo desde aquí", "", ""
+        return rs.atender(dato, enviar=enviar)
 
     from pos_uniformes.services import telegram_avisos_service as av
 
@@ -595,8 +608,10 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
     except Exception:  # noqa: BLE001 — sin menú fijado, el bot funciona igual
         logger.exception("No se pudo dejar el menú fijado")
 
-    def _mandar(texto: str) -> None:
-        telegram_service.enviar_mensaje(texto, token=token, chat_id=chat_id)
+    def _mandar(texto: str, botones: str = "") -> None:
+        telegram_service.enviar_mensaje(
+            texto, token=token, chat_id=chat_id, botones=botones or None
+        )
 
     while True:
         if on_tick is not None:
@@ -704,8 +719,16 @@ def _atender_toque(toque: dict, *, session_factory, token: str, chat_id: str) ->
         logger.info("Toque ignorado de chat %s", chat)
         return
     dato = str(toque.get("data") or "")
+
+    def _mandar(texto: str, botones: str = "") -> None:
+        telegram_service.enviar_mensaje(
+            texto, token=token, chat_id=chat_id, botones=botones or None
+        )
+
     try:
-        resultado = atender_toque(dato, session_factory=session_factory)
+        resultado = atender_toque(
+            dato, session_factory=session_factory, enviar=_mandar
+        )
     except Exception as exc:  # noqa: BLE001
         logger.exception("Error atendiendo el toque %r", dato)
         resultado = (f"Falló: {exc}", "", "")

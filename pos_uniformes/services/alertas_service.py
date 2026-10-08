@@ -52,15 +52,22 @@ def _local(momento: datetime | None) -> datetime:
 
 
 # ----------------------------------------------------------------- cola
-def encolar(session, texto: str) -> bool:
-    """Deja la alerta en la cola. Devuelve False (sin romper) si no se pudo."""
+def encolar(session, texto: str, botones: str = "") -> bool:
+    """Deja la alerta en la cola. Devuelve False (sin romper) si no se pudo.
+
+    `botones` es el teclado con el que se puede contestar el aviso donde
+    llega. Va aquí y no se arma al mandarlo: quien encola es el único que
+    sabe qué se puede hacer con ese aviso (2026-10-08)."""
     texto = (texto or "").strip()
     if not texto:
         return False
     try:
         from pos_uniformes.database.models import AlertaTelegram
 
-        session.add(AlertaTelegram(texto=texto, created_at=datetime.now().astimezone()))
+        session.add(AlertaTelegram(
+            texto=texto, botones=(botones or "") or None,
+            created_at=datetime.now().astimezone(),
+        ))
         session.commit()
         return True
     except Exception as exc:  # noqa: BLE001 — base sin la tabla, sin red, etc.
@@ -89,7 +96,13 @@ def enviar_pendientes(session, enviar) -> int:
     for alerta in pendientes(session):
         alerta.intentos = int(alerta.intentos or 0) + 1
         try:
-            enviar(alerta.texto)
+            # Con teclado se llama con dos argumentos; sin él, con uno. Así
+            # un enviador de los de antes —que recibe solo el texto— sigue
+            # sirviendo para los avisos de siempre, que son casi todos.
+            if alerta.botones:
+                enviar(alerta.texto, alerta.botones)
+            else:
+                enviar(alerta.texto)
         except Exception as exc:  # noqa: BLE001
             logger.warning("Alerta %s no salió (intento %s): %s", alerta.id, alerta.intentos, exc)
             session.commit()
@@ -247,7 +260,9 @@ class Vigilante:
             estado = est.leer_estado()
             if estado.al_dia:
                 return []
-            return [est.texto_sin_respaldo(estado)]
+            from pos_uniformes.services import telegram_respaldo_service as rs
+
+            return [(est.texto_sin_respaldo(estado), rs.botones_del_aviso())]
         except Exception:  # noqa: BLE001 — el vigilante nunca puede tumbar al bot
             return []
 
@@ -346,8 +361,11 @@ def procesar(session_factory, enviar, vigilante: Vigilante | None = None) -> int
         with session_factory() as session:
             enviadas += enviar_pendientes(session, enviar)
             if vigilante is not None:
-                for texto in vigilante.revisar(session):
-                    if encolar(session, texto):
+                for aviso in vigilante.revisar(session):
+                    # El vigilante puede devolver un texto pelón o (texto,
+                    # botones): casi ninguno tiene nada que ofrecer.
+                    texto, botones = aviso if isinstance(aviso, tuple) else (aviso, "")
+                    if encolar(session, texto, botones):
                         enviadas += enviar_pendientes(session, enviar)
     except Exception as exc:  # noqa: BLE001 — base sin migrar, sin red...
         logger.debug("Alertas: vuelta sin efecto (%s)", exc)

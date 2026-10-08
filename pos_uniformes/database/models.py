@@ -2354,6 +2354,11 @@ class AlertaTelegram(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     enviado_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    #: Teclado de Telegram (JSON) para contestar el aviso donde llega. Vacío
+    #: en los avisos que solo informan. Viaja con la fila y no se arma al
+    #: mandarla: quien encola es el único que sabe qué se puede hacer con ese
+    #: aviso; deducirlo del texto sería adivinar (2026-10-08).
+    botones: Mapped[str | None] = mapped_column(String(2000))
     intentos: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
 
 
