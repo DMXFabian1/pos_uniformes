@@ -369,7 +369,10 @@ def texto_y_botones(session: Session, *, dias: int = 14, argumento: str = "") ->
     if argumento:
         dias = dias_de_argumento(argumento, por_defecto=dias)
     filas = ultimos(session, dias=dias)
-    botones = [
+    # Hacer el corte va ARRIBA: esta pantalla solo sabía mirar hacia atrás, y
+    # lo que se quiere hacer aquí casi siempre es el de hoy.
+    botones = [[("🧾 Hacer el corte de hoy…", f"{PREFIJO}nuevo")]]
+    botones += [
         [(f"{c.fecha:%d/%m} · ${c.contado:,.0f}" + (" ✏️" if c.ajustado else ""),
           f"{PREFIJO}ver:{c.id}")]
         for c in filas
@@ -416,13 +419,40 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
 
     accion = str(dato or "")[len(PREFIJO):]
     que, _, crudo = accion.partition(":")
-    try:
-        corte_id = int(crudo)
-    except ValueError:
-        return "No conozco ese botón", "", ""
 
     def _con_volver(filas):
         return _teclado(list(filas) + [[("‹ Cortes", f"{PREFIJO}lista")]])
+
+    if que == "nuevo":
+        # Hacer el corte desde aquí. Esta pantalla solo sabía mirar hacia
+        # atrás, y hacer uno era acordarse de /corte o esperar la propuesta
+        # de la tarde (Daniel, 2026-10-08).
+        import json
+
+        from pos_uniformes.services import corte_remoto_service as crs
+        from pos_uniformes.services.telegram_corte_botones_service import (
+            botones_de_propuesta,
+        )
+
+        with session_factory() as session:
+            texto_ = crs.texto_propuesta_corte(session)
+            retiro, fondo = crs.cifras_de_propuesta(session)
+        teclado = json.loads(botones_de_propuesta(retiro, fondo))
+        # Se entra desde «Cortes», así que tiene que haber camino de vuelta:
+        # los botones de la propuesta no lo traen porque llega sola.
+        teclado["inline_keyboard"].append(
+            [{"text": "‹ Cortes", "callback_data": f"{PREFIJO}lista"}]
+        )
+        return "", texto_, json.dumps(teclado, ensure_ascii=False)
+
+    # Las que siguen van sobre UN corte y necesitan su número. Antes se pedía
+    # para todas, y el botón «‹ Cortes» —que no lleva ninguno— contestaba «no
+    # conozco ese botón» (visto el 2026-10-08).
+    if que in ("ver", "quitar", "borrar", "borrarok"):
+        try:
+            corte_id = int(crudo)
+        except ValueError:
+            return "No conozco ese botón", "", ""
 
     if que == "ver":
         with session_factory() as session:

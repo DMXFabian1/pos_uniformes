@@ -441,3 +441,104 @@ class LoQueTuAjustasNoEsUnFaltanteTests(unittest.TestCase):
         )
         texto = ct.texto([self._fila(2, "16438", "17438")], dias=14, salidas=salidas)
         self.assertNotIn("Tus ajustes", texto)
+
+
+class HacerElCorteDesdeLaPantallaDeCortesTests(unittest.TestCase):
+    """«en el apartado cortes en el bot solo puedo ver los de antes, y no como
+    tal hacer el nuevo» (Daniel, 2026-10-08).
+
+    La pantalla solo sabía mirar hacia atrás: hacer uno era acordarse de
+    `/corte` o esperar la propuesta de la tarde.
+    """
+
+    def setUp(self) -> None:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import Session
+
+        from pos_uniformes.database.connection import Base
+        from pos_uniformes.database.models import LibretaCorte  # noqa: F401
+
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.factory = lambda: Session(self.engine)
+
+    def _etiquetas(self, botones):
+        import json
+
+        return [b["text"] for fila in json.loads(botones)["inline_keyboard"] for b in fila]
+
+    def _datos(self, botones):
+        import json
+
+        return [b["callback_data"] for fila in json.loads(botones)["inline_keyboard"] for b in fila]
+
+    def test_el_boton_de_hacerlo_va_arriba(self) -> None:
+        """Lo que se quiere hacer aquí casi siempre es el de hoy."""
+        with self.factory() as s:
+            _, botones = ct.texto_y_botones(s)
+        self.assertEqual(self._etiquetas(botones)[0], "🧾 Hacer el corte de hoy…")
+
+    def test_lleva_a_la_propuesta_de_siempre(self) -> None:
+        """La misma que llega sola en la tarde: una sola forma de hacer el
+        corte, no dos que algún día dirán cosas distintas."""
+        from unittest.mock import patch
+
+        from pos_uniformes.services import corte_remoto_service as crs
+
+        with patch.object(crs, "texto_propuesta_corte", return_value="¿Hacemos el corte?"), \
+             patch.object(crs, "cifras_de_propuesta",
+                          return_value=(Decimal("2820.00"), Decimal("1000.00"))):
+            aviso, texto, botones = ct.atender(
+                "co:nuevo", session_factory=self.factory, quien="VEND-1"
+            )
+        self.assertEqual(aviso, "")
+        self.assertIn("¿Hacemos el corte?", texto)
+        self.assertIn("cc:ok", self._datos(botones))
+
+    def test_desde_aqui_hay_camino_de_vuelta(self) -> None:
+        """La propuesta de la tarde no trae «volver» porque llega sola."""
+        from unittest.mock import patch
+
+        from pos_uniformes.services import corte_remoto_service as crs
+
+        with patch.object(crs, "texto_propuesta_corte", return_value="x"), \
+             patch.object(crs, "cifras_de_propuesta",
+                          return_value=(Decimal("2820.00"), Decimal("1000.00"))):
+            _, _, botones = ct.atender(
+                "co:nuevo", session_factory=self.factory, quien="VEND-1"
+            )
+        self.assertEqual(self._datos(botones)[-1], "co:lista")
+
+
+class VolverALaListaNoEstabaSirviendoTests(unittest.TestCase):
+    """El botón «‹ Cortes» contestaba «No conozco ese botón».
+
+    El manejador pedía un número al principio para TODAS las acciones, y ésa
+    no lleva ninguno. Encontrado el 2026-10-08 al agregar «hacer el corte».
+    """
+
+    def setUp(self) -> None:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import Session
+
+        from pos_uniformes.database.connection import Base
+        from pos_uniformes.database.models import LibretaCorte  # noqa: F401
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        self.factory = lambda: Session(engine)
+
+    def test_volver_a_la_lista_funciona(self) -> None:
+        aviso, texto, _ = ct.atender(
+            "co:lista", session_factory=self.factory, quien="VEND-1"
+        )
+        self.assertNotEqual(aviso, "No conozco ese botón")
+        self.assertIn("cortes", texto.lower())
+
+    def test_las_que_sí_llevan_numero_lo_siguen_exigiendo(self) -> None:
+        for dato in ("co:ver:abc", "co:borrar:", "co:quitar:x"):
+            with self.subTest(dato=dato):
+                aviso, _, _ = ct.atender(
+                    dato, session_factory=self.factory, quien="VEND-1"
+                )
+                self.assertEqual(aviso, "No conozco ese botón")
