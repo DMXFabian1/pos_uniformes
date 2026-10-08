@@ -27,6 +27,41 @@ def _nombre(session, code: str) -> str:
     return mostrar(code)
 
 
+def existe_y_trabaja(session, code: str) -> bool:
+    """¿Ese código es de alguien del equipo, y sigue activa?
+
+    Hace falta porque nada más lo comprobaba: `m:pagarok:NADIE` registraba un
+    pago de $1,300 a una empleada inventada — el cálculo le daba el sueldo
+    base por omisión y nadie preguntaba si existía (encontrado el 2026-10-08
+    probando botones viejos).
+
+    El caso real no es un código inventado: es el botón de un mensaje de hace
+    días para alguien que ya se dio de baja.
+    """
+    from sqlalchemy import func, select
+
+    from pos_uniformes.database.models import Empleada
+
+    buscado = str(code or "").strip()
+    if not buscado:
+        return False
+    return session.scalar(
+        select(Empleada).where(
+            func.upper(Empleada.codigo) == buscado.upper(),
+            Empleada.activo.is_(True),
+        )
+    ) is not None
+
+
+def _no_es_del_equipo(session, code: str) -> str:
+    """El mismo recado para los tres caminos, para que no discrepen."""
+    return (
+        f"No tengo a nadie activo con el código «{code}».\n\n"
+        "Si es un botón de hace días, la persona pudo darse de baja. "
+        "Mira /pagos para los de ahora."
+    )
+
+
 def _detalle_texto(det, nombre: str) -> list[str]:
     """El desglose, como lo diría alguien: de dónde sale cada peso."""
     lineas = [f"{nombre}"]
@@ -95,6 +130,8 @@ def quienes_cobran(session: Session, *, hoy: date | None = None) -> list[tuple[s
 def tiene_pendiente(session: Session, code: str, *, hoy: date | None = None) -> bool:
     from pos_uniformes.services import nomina_service as nom
 
+    if not existe_y_trabaja(session, code):
+        return False
     return nom.pago_pendiente(session, code, hoy).total > 0
 
 
@@ -102,6 +139,8 @@ def desglose_por_code(session: Session, code: str, *, hoy: date | None = None) -
     """De dónde sale cada peso. Lo mismo que enseña `/pagar Fulana`."""
     from pos_uniformes.services import nomina_service as nom
 
+    if not existe_y_trabaja(session, code):
+        return _no_es_del_equipo(session, code)
     nombre = _nombre(session, code)
     det = nom.pago_pendiente(session, code, hoy)
     if det.total <= 0:
@@ -113,6 +152,8 @@ def pagar_por_code(session: Session, code: str, *, quien: str, hoy: date | None 
     """Registra el pago. Ya viene confirmado por el segundo toque."""
     from pos_uniformes.services import nomina_service as nom
 
+    if not existe_y_trabaja(session, code):
+        return _no_es_del_equipo(session, code)
     nombre = _nombre(session, code)
     det = nom.pago_pendiente(session, code, hoy)
     if det.total <= 0:

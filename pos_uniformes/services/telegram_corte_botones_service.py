@@ -226,6 +226,10 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
     if accion == "nota":
         # El corte que se preguntó antes de hacer. La nota viaja en el dato
         # del botón: sin estado, como todo lo de esta pantalla.
+        if not crudo.strip():
+            # `cc:nota:` sin nota haría el corte igual, que es justo lo que
+            # este botón existe para impedir.
+            return "No conozco ese botón", "", ""
         with session_factory() as session:
             resultado = crs.hacer_corte_y_avisar(
                 session, creado_por=quien, nota=crudo

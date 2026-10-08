@@ -542,3 +542,67 @@ class VolverALaListaNoEstabaSirviendoTests(unittest.TestCase):
                     dato, session_factory=self.factory, quien="VEND-1"
                 )
                 self.assertEqual(aviso, "No conozco ese botón")
+
+
+class LoQueSeIgnoraSeDiceTests(unittest.TestCase):
+    """`/cortes abc` y `/cortes -5` se iban a los 14 días **sin decir nada**.
+
+    Callarse es la peor forma de ignorar algo: queda creyendo que está viendo
+    lo que pidió (2026-10-08).
+    """
+
+    def setUp(self) -> None:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import Session
+
+        from pos_uniformes.database.connection import Base
+        from pos_uniformes.database.models import LibretaCorte  # noqa: F401
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        self.factory = lambda: Session(engine)
+
+    def _texto(self, argumento):
+        with self.factory() as s:
+            return ct.texto_y_botones(s, argumento=argumento)[0]
+
+    def test_lo_que_no_es_numero_se_avisa(self) -> None:
+        t = self._texto("abc")
+        self.assertIn("No entendí «abc»", t)
+        self.assertIn("14 días", t)
+
+    def test_un_numero_imposible_se_avisa(self) -> None:
+        self.assertIn("Menos de un día", self._texto("0"))
+
+    def test_pedir_dos_años_se_avisa(self) -> None:
+        t = self._texto("9999")
+        self.assertIn("demasiado", t)
+        self.assertIn("180 días", t)
+
+    def test_lo_que_sí_se_pudo_usar_no_lleva_aviso(self) -> None:
+        for bueno in ("30", "7", ""):
+            with self.subTest(argumento=bueno):
+                self.assertNotIn("⚠️", self._texto(bueno))
+
+
+class ElPluralDeLosDiasTests(unittest.TestCase):
+    """Decía «Cortes · 1 días» (2026-10-08)."""
+
+    def test_uno_va_en_singular(self) -> None:
+        self.assertEqual(ct.dias_en_letra(1), "1 día")
+
+    def test_los_demas_en_plural(self) -> None:
+        self.assertEqual(ct.dias_en_letra(14), "14 días")
+        self.assertEqual(ct.dias_en_letra(0), "0 días")
+
+    def test_el_encabezado_lo_usa(self) -> None:
+        from datetime import date as _date
+
+        fila = ct.CorteFila(
+            fecha=_date(2026, 10, 8), hora="17:40", quien="Daniel",
+            contado=Decimal("100"), esperado=Decimal("100"), operaciones=1,
+        )
+        self.assertIn("🧾 Cortes · 1 día\n", ct.texto([fila], dias=1))
+
+    def test_sin_cortes_tampoco_dice_1_dias(self) -> None:
+        self.assertNotIn("1 días", ct.texto([], dias=1))

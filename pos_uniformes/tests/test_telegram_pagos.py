@@ -50,7 +50,13 @@ class PagarTest(unittest.TestCase):
              patch.object(pg, "_nombre", return_value="Evelyn Ortiz"), \
              patch.object(pg, "_detalle_texto", wraps=pg._detalle_texto):
             with patch("pos_uniformes.services.telegram_pagos_service.Session"):
-                sesion = type("S", (), {"commit": lambda self_: None})()
+                sesion = type("S", (), {
+                    "commit": lambda self_: None,
+                    # `pagar_por_code` comprueba que la empleada exista y
+                    # siga activa antes de mover dinero (2026-10-08). La
+                    # sesión falsa tiene que saber contestar eso.
+                    "scalar": lambda self_, *a, **k: object(),
+                })()
                 return pg.pagar(sesion, argumento, quien="VEND-1")
 
     def test_sin_confirmar_enseña_el_desglose_y_no_paga(self):
@@ -92,7 +98,13 @@ class RetiroTest(unittest.TestCase):
     def _correr(self, argumento):
         from pos_uniformes.services import retiros_service
 
-        sesion = type("S", (), {"commit": lambda self_: None})()
+        sesion = type("S", (), {
+                    "commit": lambda self_: None,
+                    # `pagar_por_code` comprueba que la empleada exista y
+                    # siga activa antes de mover dinero (2026-10-08). La
+                    # sesión falsa tiene que saber contestar eso.
+                    "scalar": lambda self_, *a, **k: object(),
+                })()
         with patch.object(retiros_service, "registrar_retiro",
                           side_effect=lambda *a, **k: self.hechos.append(k)):
             return pg.retiro(sesion, argumento, quien="VEND-1")

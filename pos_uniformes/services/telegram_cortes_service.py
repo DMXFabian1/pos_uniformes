@@ -211,10 +211,12 @@ def _renglones_de_corte(c: "CorteFila", dias_abrev) -> list[str]:
 def texto(filas: list[CorteFila], *, dias: int = 14, salidas: SalidasPeriodo | None = None) -> str:
     """Los cortes como se leen en el celular."""
     if not filas:
-        return f"No hay cortes en los últimos {dias} días."
+        if int(dias) == 1:
+            return "No hay cortes en el último día."
+        return f"No hay cortes en los últimos {dias_en_letra(dias)}."
 
     _DIAS = ("lun", "mar", "mié", "jue", "vie", "sáb", "dom")
-    lineas = [f"🧾 Cortes · {dias} días", ""]
+    lineas = [f"🧾 Cortes · {dias_en_letra(dias)}", ""]
     for c in filas:
         lineas += _renglones_de_corte(c, _DIAS)
 
@@ -278,7 +280,7 @@ def _resumen_del_periodo(filas, dias: int, salidas) -> list[str]:
 
     fuera = salidas.cortes > len(filas)
     cuantos = "1 corte" if salidas.cortes == 1 else f"{salidas.cortes} cortes"
-    cabeza = f"De {cuantos} en {dias} días"
+    cabeza = f"De {cuantos} en {dias_en_letra(dias)}"
     lineas = [f"{cabeza} (no solo los {len(filas)} de arriba):" if fuera else f"{cabeza}:"]
 
     # El mismo ancho en los tres renglones para que las cifras caigan en
@@ -364,9 +366,36 @@ def dias_de_argumento(argumento: str, *, por_defecto: int = 14, tope: int = 180)
     return max(1, min(int(texto_arg), tope))
 
 
+def dias_en_letra(dias: int) -> str:
+    """«1 día» / «14 días». Decía «1 días» (2026-10-08)."""
+    return "1 día" if int(dias) == 1 else f"{int(dias)} días"
+
+
+def aviso_del_argumento(argumento: str, *, por_defecto: int = 14, tope: int = 180) -> str:
+    """Qué decirle cuando lo que escribió no se pudo usar tal cual.
+
+    `/cortes abc` y `/cortes -5` se iban a los 14 días **sin decir nada**, y
+    callarse es la peor forma de ignorar algo: queda creyendo que está viendo
+    lo que pidió (2026-10-08).
+    """
+    crudo = str(argumento or "").strip()
+    if not crudo:
+        return ""
+    if not crudo.isdigit():
+        return f"No entendí «{crudo}» como días; te enseño los últimos {dias_en_letra(por_defecto)}."
+    pedidos = int(crudo)
+    if pedidos < 1:
+        return f"Menos de un día no se puede; te enseño {dias_en_letra(1)}."
+    if pedidos > tope:
+        return f"{dias_en_letra(pedidos)} es demasiado; te enseño {dias_en_letra(tope)}."
+    return ""
+
+
 def texto_y_botones(session: Session, *, dias: int = 14, argumento: str = "") -> tuple[str, str]:
     """La lista de siempre, con un botón por corte para poder tocarlo."""
+    aviso = ""
     if argumento:
+        aviso = aviso_del_argumento(argumento, por_defecto=dias)
         dias = dias_de_argumento(argumento, por_defecto=dias)
     filas = ultimos(session, dias=dias)
     # Hacer el corte va ARRIBA: esta pantalla solo sabía mirar hacia atrás, y
@@ -378,8 +407,9 @@ def texto_y_botones(session: Session, *, dias: int = 14, argumento: str = "") ->
         for c in filas
     ]
     botones.append([("‹ Menú", "m:raiz")])
+    cuerpo = texto(filas, dias=dias, salidas=salidas_del_periodo(session, dias=dias))
     return (
-        texto(filas, dias=dias, salidas=salidas_del_periodo(session, dias=dias)),
+        (f"⚠️ {aviso}\n\n" + cuerpo) if aviso else cuerpo,
         _teclado(botones),
     )
 

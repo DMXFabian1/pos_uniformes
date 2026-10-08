@@ -119,7 +119,9 @@ def atender(dato: str, *, session_factory, hoy: date | None = None) -> tuple[str
         code = accion.split(":", 1)[1]
         with session_factory() as session:
             texto = pg.pagar_por_code(session, code, quien=bot.CODIGO_REMOTO, hoy=hoy)
-        return "Pagado", texto, _con_volver()
+        # El globito decía «Pagado» pasara lo que pasara, también cuando no se
+        # pagó nada. Un visto bueno que sale siempre no informa (2026-10-08).
+        return ("Pagado" if texto.startswith("✅") else ""), texto, _con_volver()
 
     if accion == "prestamos":
         from pos_uniformes.services import telegram_prestamos_service as prs
