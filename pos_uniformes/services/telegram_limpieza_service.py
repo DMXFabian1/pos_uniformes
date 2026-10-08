@@ -47,15 +47,17 @@ def ruta_estado() -> Path:
 def _leer() -> dict:
     ruta = ruta_estado()
     if not ruta.exists():
-        return {"menu_id": 0, "mensajes": [], "ultimo_barrido": 0.0}
+        return {"menu_id": 0, "mensajes": [], "ultimo_barrido": 0.0, "menu_refrescado": 0.0}
     try:
         datos = json.loads(ruta.read_text(encoding="utf-8"))
         datos.setdefault("menu_id", 0)
         datos.setdefault("mensajes", [])
         datos.setdefault("ultimo_barrido", 0.0)
+        datos.setdefault("menu_refrescado", 0.0)
+        datos.setdefault("menu_huella", "")
         return datos
     except Exception:  # noqa: BLE001 — un archivo roto no deja mudo al bot
-        return {"menu_id": 0, "mensajes": [], "ultimo_barrido": 0.0}
+        return {"menu_id": 0, "mensajes": [], "ultimo_barrido": 0.0, "menu_refrescado": 0.0}
 
 
 def _guardar(datos: dict) -> None:
@@ -96,6 +98,38 @@ def recordar_menu(message_id: int) -> None:
     # Si ya estaba apuntado como mensaje normal, se saca de la lista: sería la
     # única forma de que el menú se borrara solo a las 24 horas.
     datos["mensajes"] = [m for m in datos["mensajes"] if int(m["id"]) != int(message_id or 0)]
+    _guardar(datos)
+
+
+#: Cada cuánto se reescribe la cabecera del menú fijado. Más seguido sería
+#: gastar llamadas para cambiar un par de cifras; más espaciado y el tablero
+#: enseña números de hace rato, que es lo que lo volvía mentiroso.
+MINUTOS_ENTRE_MENUS = 10.0
+
+
+def toca_refrescar_menu(ahora: float | None = None) -> bool:
+    ahora = ahora if ahora is not None else time.time()
+    return (ahora - float(_leer().get("menu_refrescado") or 0.0)) >= MINUTOS_ENTRE_MENUS * 60
+
+
+def anotar_menu_refrescado(ahora: float | None = None) -> None:
+    datos = _leer()
+    datos["menu_refrescado"] = ahora if ahora is not None else time.time()
+    _guardar(datos)
+
+
+def huella_del_menu() -> str:
+    """Cómo quedó escrito el menú la última vez."""
+    return str(_leer().get("menu_huella") or "")
+
+
+def anotar_huella_del_menu(texto: str) -> None:
+    import hashlib
+
+    datos = _leer()
+    datos["menu_huella"] = hashlib.sha1(
+        str(texto or "").encode("utf-8")
+    ).hexdigest()[:16]
     _guardar(datos)
 
 

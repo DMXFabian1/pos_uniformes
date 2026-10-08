@@ -608,6 +608,9 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
             procesar(session_factory, _mandar, vigilante)
         try:
             barrer_si_toca(token=token, chat_id=chat_id)
+            refrescar_menu_si_toca(
+                session_factory=session_factory, token=token, chat_id=chat_id
+            )
         except Exception:  # noqa: BLE001 — la limpieza nunca tumba el bot
             logger.exception("Falló el barrido de mensajes")
         try:
@@ -756,10 +759,22 @@ def asegurar_menu_fijado(*, session_factory, token: str, chat_id: str) -> int:
 
     fijado = limpieza.menu_fijado()
     if fijado:
+        # Si no cambió una letra, no se toca. Telegram contesta «message is
+        # not modified» con un error, y por ese camino el menú se daba por
+        # perdido y se mandaba uno NUEVO: en una mañana tranquila el chat se
+        # habría llenado de tableros, que es lo contrario de lo que se quiso.
+        import hashlib
+
+        huella = hashlib.sha1(texto.encode("utf-8")).hexdigest()[:16]
+        if huella == limpieza.huella_del_menu():
+            limpieza.anotar_menu_refrescado()
+            return fijado
         try:
             telegram_service.editar_mensaje(
                 fijado, texto, token=token, chat_id=chat_id, botones=botones
             )
+            limpieza.anotar_menu_refrescado()
+            limpieza.anotar_huella_del_menu(texto)
             return fijado
         except Exception as exc:  # noqa: BLE001
             # Lo borró a mano, o es de hace mucho: se manda uno nuevo.
@@ -776,8 +791,26 @@ def asegurar_menu_fijado(*, session_factory, token: str, chat_id: str) -> int:
         return 0
     if mid:
         limpieza.recordar_menu(mid)
+        limpieza.anotar_menu_refrescado()
+        limpieza.anotar_huella_del_menu(texto)
         telegram_service.fijar_mensaje(mid, token=token, chat_id=chat_id)
     return mid
+
+
+def refrescar_menu_si_toca(*, session_factory, token: str, chat_id: str) -> bool:
+    """Reescribe la cabecera del menú fijado cada tantos minutos.
+
+    El menú se escribía SOLO al arrancar el bot, y su cabecera lleva las
+    cifras del día: se quedaba diciendo «todavía no se registra ninguna venta»
+    a media tarde. Un tablero fijado que miente es peor que no tenerlo
+    (Daniel, 2026-10-08, viéndolo en su propia pantalla).
+    """
+    from pos_uniformes.services import telegram_limpieza_service as limpieza
+
+    if not limpieza.menu_fijado() or not limpieza.toca_refrescar_menu():
+        return False
+    asegurar_menu_fijado(session_factory=session_factory, token=token, chat_id=chat_id)
+    return True
 
 
 def barrer_si_toca(*, token: str, chat_id: str) -> int:

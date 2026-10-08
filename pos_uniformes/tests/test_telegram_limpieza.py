@@ -226,3 +226,81 @@ class TocarElMenuNoLoDeshaceTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ElMenuFijadoNoSeQuedaConLaHoraDeAyerTests(unittest.TestCase):
+    """El menú se escribía SOLO al arrancar el bot.
+
+    Su cabecera lleva las cifras del día, así que a media tarde seguía
+    diciendo «todavía no se registra ninguna venta». Un tablero fijado que
+    miente es peor que no tenerlo (Daniel lo vio en su pantalla, 2026-10-08:
+    fijado a las 09:45, leído a las 09:56).
+    """
+
+    def setUp(self) -> None:
+        self._dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._dir.cleanup)
+        parche = patch.object(
+            limpieza, "ruta_estado",
+            return_value=Path(self._dir.name) / "bot_mensajes.json",
+        )
+        parche.start()
+        self.addCleanup(parche.stop)
+        self.factory = lambda: MagicMock(__enter__=lambda s: s, __exit__=lambda *a: False)
+
+    def _refrescar(self, texto="MENU"):
+        from pos_uniformes.services import telegram_bot_service as bot
+        from pos_uniformes.services import telegram_menu_service as menu
+        from pos_uniformes.services import telegram_service
+
+        with patch.object(menu, "menu_raiz", return_value=(texto, "{}")), \
+             patch.object(telegram_service, "editar_mensaje") as editar, \
+             patch.object(telegram_service, "_llamar",
+                          return_value={"result": {"message_id": 7}}) as llamar, \
+             patch.object(telegram_service, "fijar_mensaje"):
+            hecho = bot.refrescar_menu_si_toca(
+                session_factory=self.factory, token="t", chat_id="c"
+            )
+        return hecho, editar, llamar
+
+    def test_sin_menu_fijado_no_hay_nada_que_refrescar(self) -> None:
+        hecho, editar, _ = self._refrescar()
+        self.assertFalse(hecho)
+        editar.assert_not_called()
+
+    def test_con_el_tiempo_cumplido_se_reescribe(self) -> None:
+        limpieza.recordar_menu(42)
+        hecho, editar, _ = self._refrescar("MENU nuevo")
+        self.assertTrue(hecho)
+        editar.assert_called_once()
+
+    def test_no_se_reescribe_antes_de_tiempo(self) -> None:
+        """Cada vuelta del bot son 25 s; refrescar en cada una es gastar."""
+        limpieza.recordar_menu(42)
+        self._refrescar("MENU nuevo")
+        hecho, editar, _ = self._refrescar("MENU más nuevo")
+        self.assertFalse(hecho)
+        editar.assert_not_called()
+
+    def test_si_no_cambio_nada_no_se_toca_el_mensaje(self) -> None:
+        """Telegram contesta «message is not modified» con un ERROR.
+
+        Por ese camino el menú se daba por perdido y se mandaba uno nuevo: en
+        una mañana tranquila el chat se habría llenado de tableros.
+        """
+        limpieza.recordar_menu(42)
+        self._refrescar("IGUAL")
+        limpieza.anotar_menu_refrescado(ahora=0.0)      # que vuelva a tocar
+        hecho, editar, llamar = self._refrescar("IGUAL")
+        self.assertTrue(hecho)
+        editar.assert_not_called()                      # no se edita…
+        llamar.assert_not_called()                      # …ni se manda otro
+        self.assertEqual(limpieza.menu_fijado(), 42)
+
+    def test_cambiar_el_texto_si_lo_reescribe(self) -> None:
+        limpieza.recordar_menu(42)
+        self._refrescar("ANTES")
+        limpieza.anotar_menu_refrescado(ahora=0.0)
+        hecho, editar, _ = self._refrescar("DESPUES")
+        self.assertTrue(hecho)
+        editar.assert_called_once()
