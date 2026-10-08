@@ -40,23 +40,29 @@ class ComoSeLeeTest(unittest.TestCase):
 
     def test_dice_si_falto_o_sobro_y_cuanto(self):
         r = ct.texto([_fila(contado="900", esperado="1000")])
-        self.assertIn("faltó $100.00", r)
+        self.assertIn("faltaron $100", r)
         r = ct.texto([_fila(contado="1100", esperado="1000")])
-        self.assertIn("sobró $100.00", r)
+        self.assertIn("sobraron $100", r)
+
+    def test_la_cifra_dice_de_que_es(self):
+        """Salía «$16,082.00» a secas y había que acordarse de qué era.
+
+        Daniel, 07/10: «el bot al momento de los cortes no es muy claro»."""
+        self.assertIn("$16,082 en caja", ct.texto([_fila()]))
 
     def test_el_que_cuadra_se_celebra(self):
         r = ct.texto([_fila(contado="1000", esperado="1000")])
-        self.assertIn("✅ cuadró", r)
-        self.assertIn("ninguno se pasa", r)
+        self.assertIn("cuadró exacto", r)
+        self.assertIn("👍", r)
 
     def test_dice_quien_y_cuantas_operaciones(self):
         r = ct.texto([_fila(quien="Fanny Ortiz", ops=32)])
         self.assertIn("Fanny Ortiz", r)
-        self.assertIn("32 ops", r)
+        self.assertIn("32 ventas", r)
 
-    def test_señala_el_peor(self):
+    def test_el_peor_sigue_estando_en_la_lista(self):
         filas = [_fila(contado="900", esperado="1000"), _fila(dia=19, contado="0", esperado="2149")]
-        self.assertIn("$2,149.00", ct.texto(filas))
+        self.assertIn("$2,149", ct.texto(filas))
 
 
 class ElAjusteNoEsUnDescuadreTest(unittest.TestCase):
@@ -65,16 +71,22 @@ class ElAjusteNoEsUnDescuadreTest(unittest.TestCase):
     (2026-10-01). Un ajuste lo decidió él; un descuadre, nadie."""
 
     def test_el_ajuste_se_dice_ajuste(self):
+        """Y dice QUIÉN lo hizo, que es lo que lo distingue de un faltante."""
         r = ct.texto([_fila(contado="16082", esperado="17082", ajustado=True)])
-        self.assertIn("✏️ ajustado −$1,000.00", r)
-        self.assertNotIn("faltó", r)
+        self.assertIn("✏️ lo bajaste tú $1,000", r)
+        self.assertNotIn("faltaron", r)
+
+    def test_subir_la_cifra_tambien_se_dice_quien(self):
+        r = ct.texto([_fila(contado="18082", esperado="17082", ajustado=True)])
+        self.assertIn("lo subiste tú $1,000", r)
+        self.assertNotIn("sobraron", r)
 
     def test_el_ajuste_no_enciende_la_alarma(self):
         self.assertFalse(_fila(contado="900", esperado="1000", ajustado=True).llama_la_atencion)
         self.assertTrue(_fila(contado="900", esperado="1000").llama_la_atencion)
 
     def test_sin_ajuste_sigue_diciendo_falto(self):
-        self.assertIn("faltó", ct.texto([_fila(contado="900", esperado="1000")]))
+        self.assertIn("faltaron", ct.texto([_fila(contado="900", esperado="1000")]))
 
     def test_dice_cuanto_sumaron_los_ajustes(self):
         filas = [
@@ -82,10 +94,12 @@ class ElAjusteNoEsUnDescuadreTest(unittest.TestCase):
             _fila(dia=19, contado="20548", esperado="22548", ajustado=True),
         ]
         r = ct.texto(filas)
-        self.assertIn("2 con ajuste tuyo, −$3,000.00", r)
+        self.assertIn("Tus ajustes", r)
+        self.assertIn("−$3,000", r)
+        self.assertIn("en 2", r)
 
     def test_sin_ajustes_no_menciona_el_tema(self):
-        self.assertNotIn("ajuste tuyo", ct.texto([_fila(contado="1000", esperado="1000")]))
+        self.assertNotIn("Tus ajustes", ct.texto([_fila(contado="1000", esperado="1000")]))
 
 
 class ElBotLoConoceTest(unittest.TestCase):
@@ -247,7 +261,9 @@ class SalidasDelPeriodoTests(unittest.TestCase):
         filas = [self._fila(2, "16438", "17438"), self._fila(1, "13591", "14716")]
         salidas = ct.SalidasPeriodo(cortes=13, salio=Decimal("14825.00"), cortes_que_faltaron=11)
         texto = ct.texto(filas, dias=14, salidas=salidas)
-        self.assertIn("11 de 13 con diferencia, −$14,825.00 en total", texto)
+        self.assertIn("Sin explicar", texto)
+        self.assertIn("−$14,825", texto)
+        self.assertIn("en 11", texto)
         self.assertIn("no solo los 2 de arriba", texto)
         self.assertIn("/retiro", texto)
 
@@ -257,14 +273,25 @@ class SalidasDelPeriodoTests(unittest.TestCase):
         filas = [self._fila(2, "16438", "17438")]   # un solo corte en la lista
         salidas = ct.SalidasPeriodo(cortes=13, salio=Decimal("14825.00"), cortes_que_faltaron=11)
         texto = ct.texto(filas, dias=14, salidas=salidas)
-        self.assertIn("−$14,825.00", texto)          # el total del periodo
-        self.assertNotIn("−$1,000.00 en total", texto)   # no el del único visible
+        self.assertIn("−$14,825", texto)       # el total del periodo
+        self.assertNotIn("−$1,000", texto)     # no el del único visible
 
     def test_cuando_todo_cuadra_no_se_habla_de_diferencias(self) -> None:
         filas = [self._fila(3, "17596", "17596")]
         texto = ct.texto(filas, dias=14, salidas=ct.SalidasPeriodo(cortes=1))
-        self.assertNotIn("con diferencia", texto)
+        self.assertNotIn("Sin explicar", texto)
         self.assertNotIn("/retiro", texto)
+
+    def test_la_ayuda_del_retiro_solo_sale_cuando_sirve(self) -> None:
+        """Repetida en todos los mensajes se vuelve paisaje y deja de leerse.
+
+        Sale cuando hay dinero sin justificar, que es cuando hace falta
+        (acordado con Daniel el 07/10). Un ajuste suyo ya está explicado."""
+        filas = [self._fila(2, "16438", "17438", ajustado=True)]
+        solo_ajustes = ct.SalidasPeriodo(
+            cortes=4, ajustado=Decimal("-1000.00"), cortes_ajustados=1
+        )
+        self.assertNotIn("/retiro", ct.texto(filas, dias=14, salidas=solo_ajustes))
 
     def test_tambien_dice_lo_que_sobro(self) -> None:
         filas = [self._fila(2, "16438", "17438")]
@@ -273,8 +300,10 @@ class SalidasDelPeriodoTests(unittest.TestCase):
             sobro=Decimal("40.00"), cortes_que_sobraron=2,
         )
         texto = ct.texto(filas, dias=14, salidas=salidas)
-        self.assertIn("Salió $1,000.00 · sobró $40.00", texto)
-        self.assertIn("−$960.00 en total", texto)   # el neto, no una de las dos
+        self.assertIn("Sin explicar", texto)
+        self.assertIn("−$1,000", texto)
+        self.assertIn("Sobró", texto)
+        self.assertIn("+$40", texto)
 
 
 class DiasDeArgumentoTests(unittest.TestCase):
@@ -313,10 +342,102 @@ class NoFelicitarConElDineroFueraTests(unittest.TestCase):
         texto = ct.texto(filas, dias=14, salidas=salidas)
         self.assertNotIn("👍", texto)
         self.assertNotIn("ninguno se pasa", texto)
-        self.assertIn("1 de 2 cuadraron exacto.", texto)
-        self.assertIn("−$14,825.00", texto)
+        self.assertIn("−$14,825", texto)
 
     def test_cuando_de_verdad_cuadro_todo_si_lo_dice(self) -> None:
         filas = [self._fila(3, "17596", "17596")]
         texto = ct.texto(filas, dias=14, salidas=ct.SalidasPeriodo(cortes=1))
         self.assertIn("👍", texto)
+
+
+class LoQueTuAjustasNoEsUnFaltanteTests(unittest.TestCase):
+    """«el bot al momento de los cortes no es muy claro» (Daniel, 07/10).
+
+    El mensaje distinguía bien «lo bajaste tú» de «no cuadra» renglón por
+    renglón, y después el total del periodo los volvía a sumar en una sola
+    cifra. Esa cifra era justo la que él miraba para saber si tenía un
+    problema: decía −$14,515 cuando casi todo eso lo había sacado él mismo.
+    """
+
+    def _fila(self, dia, contado, esperado, *, ajustado=False):
+        return ct.CorteFila(
+            id=dia, fecha=date(2026, 10, dia), hora="17:40", quien="Daniel",
+            contado=Decimal(contado), esperado=Decimal(esperado),
+            operaciones=20, ajustado=ajustado,
+        )
+
+    def _texto(self):
+        salidas = ct.SalidasPeriodo(
+            cortes=13,
+            salio=Decimal("2425.00"), cortes_que_faltaron=3,
+            sobro=Decimal("310.00"), cortes_que_sobraron=2,
+            ajustado=Decimal("-12400.00"), cortes_ajustados=5,
+        )
+        return ct.texto([self._fila(2, "16438", "17438")], dias=14, salidas=salidas)
+
+    def test_los_ajustes_van_en_su_propio_renglon(self) -> None:
+        texto = self._texto()
+        self.assertIn("Tus ajustes", texto)
+        self.assertIn("−$12,400", texto)
+
+    def test_lo_que_no_cuadra_va_aparte(self) -> None:
+        texto = self._texto()
+        self.assertIn("Sin explicar", texto)
+        self.assertIn("−$2,425", texto)
+
+    def test_la_cifra_que_contesta_la_pregunta(self) -> None:
+        """La que dice si hay un problema: solo lo que nadie decidió."""
+        self.assertIn("No cuadra sin que tú lo decidieras: $2,425", self._texto())
+
+    def test_los_dos_nunca_se_suman_en_una_sola_cifra(self) -> None:
+        """−$14,515 era el número que confundía: ajustes y faltantes juntos."""
+        self.assertNotIn("14,515", self._texto())
+
+    def test_tambien_se_dice_cuantos_cuadraron(self) -> None:
+        """Sin ellos se ve «3 con faltante» sin decir contra cuántos buenos."""
+        self.assertIn("Cuadraron exacto", self._texto())
+        self.assertIn("en 3", self._texto())     # 13 − 5 − 3 − 2
+
+    def test_el_reparto_usa_la_misma_regla_que_la_lista(self) -> None:
+        """Si el renglón dice «lo bajaste tú» y el total lo cuenta como
+        faltante, el mensaje se contradice a sí mismo.
+
+        Se corre la cuenta de verdad contra la base, y no se cuenta cuántas
+        veces aparece una palabra en el archivo: eso pasaba con el código roto
+        y con el bueno por igual.
+        """
+        from datetime import datetime, timedelta, timezone
+
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import Session
+
+        from pos_uniformes.database.connection import Base
+        from pos_uniformes.database.models import LibretaCorte
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        ahora = datetime.now(timezone.utc)
+        with Session(engine) as ses:
+            # Bajado a mano: la cifra final no cuadra con lo que se vendió.
+            ses.add(LibretaCorte(
+                fecha=date.today(), monto_final=Decimal("16000.00"),
+                monto_esperado=Decimal("17000.00"), operaciones=20,
+                reactivo_inicial=Decimal("500.00"), reactivo_final=Decimal("500.00"),
+                retiros_pagos=Decimal("0.00"), otros_retiros=Decimal("0.00"),
+                desde=ahora - timedelta(hours=9), hasta=ahora,
+            ))
+            ses.commit()
+            salidas = ct.salidas_del_periodo(ses, dias=14)
+
+        self.assertEqual(salidas.cortes_ajustados, 1)
+        self.assertEqual(salidas.ajustado, Decimal("-1000.00"))
+        # Y NO como faltante: eso es lo que hacía que el total engañara.
+        self.assertEqual(salidas.cortes_que_faltaron, 0)
+        self.assertEqual(salidas.salio, Decimal("0.00"))
+
+    def test_sin_ajustes_el_renglon_no_aparece(self) -> None:
+        salidas = ct.SalidasPeriodo(
+            cortes=4, salio=Decimal("200.00"), cortes_que_faltaron=1
+        )
+        texto = ct.texto([self._fila(2, "16438", "17438")], dias=14, salidas=salidas)
+        self.assertNotIn("Tus ajustes", texto)

@@ -122,8 +122,10 @@ class EnElCelularTest(unittest.TestCase):
             ajustado=True,
         )
         texto = ct.texto([con, sin])
-        self.assertIn("ajustado −$2,000.00 · Depósito al banco", texto)
-        self.assertIn("1 de ellos sin decir por qué", texto)
+        self.assertIn("lo bajaste tú $2,000 (Depósito al banco)", texto)
+        # «de ellos» no decía de quiénes: ¿de los dos de arriba, o de los 13
+        # del periodo? Ahora lo dice (07/10).
+        self.assertIn("1 de los de arriba sin anotar por qué", texto)
 
 
 if __name__ == "__main__":

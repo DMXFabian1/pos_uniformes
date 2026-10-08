@@ -106,23 +106,37 @@ class SalidasPeriodo:
     """
 
     cortes: int = 0
+    #: Lo que falta SIN que nadie lo haya decidido. Este es el número que
+    #: importa: es el único que puede ser un problema.
     salio: Decimal = Decimal("0.00")
     cortes_que_faltaron: int = 0
     sobro: Decimal = Decimal("0.00")
     cortes_que_sobraron: int = 0
+    #: Lo que el dueño bajó (o subió) a mano. Va APARTE desde el 07/10: el
+    #: total los sumaba juntos, así que el mensaje distinguía «lo bajaste tú»
+    #: de «no cuadra» renglón por renglón y después los volvía a revolver en
+    #: una sola cifra. Daniel: «el bot al momento de los cortes no es muy
+    #: claro». Lo que él ya decidió no es un faltante.
+    ajustado: Decimal = Decimal("0.00")
+    cortes_ajustados: int = 0
+
+    @property
+    def hay_algo(self) -> bool:
+        return bool(self.salio or self.sobro or self.ajustado)
 
 
 def salidas_del_periodo(session: Session, *, dias: int = 14) -> SalidasPeriodo:
     """Suma las diferencias de todos los cortes del periodo (sin tope)."""
     from pos_uniformes.database.models import LibretaCorte
+    from pos_uniformes.services.historial_cortes_service import venta_oficial, venta_real
 
     desde = date.today() - timedelta(days=int(dias))
     filas = session.scalars(
         select(LibretaCorte).where(LibretaCorte.fecha >= desde)
     ).all()
 
-    salio = sobro = Decimal("0.00")
-    n_falto = n_sobro = 0
+    salio = sobro = ajustado = Decimal("0.00")
+    n_falto = n_sobro = n_ajuste = 0
     total = 0
     for c in filas:
         esperado = Decimal(str(c.monto_esperado or 0))
@@ -132,10 +146,19 @@ def salidas_del_periodo(session: Session, *, dias: int = 14) -> SalidasPeriodo:
             continue
         total += 1
         dif = (Decimal(str(c.monto_final or 0)) - esperado).quantize(_CENT)
-        if dif < 0:
+        if not dif:
+            continue
+        # La misma regla que usa la lista para poner ✏️ en vez de ⚠️. Tiene
+        # que ser la misma: si el renglón dice «lo bajaste tú» y el total lo
+        # cuenta como faltante, el mensaje se contradice a sí mismo.
+        real = venta_real(c)
+        if real is not None and real != venta_oficial(c):
+            ajustado += dif
+            n_ajuste += 1
+        elif dif < 0:
             salio += -dif
             n_falto += 1
-        elif dif > 0:
+        else:
             sobro += dif
             n_sobro += 1
     return SalidasPeriodo(
@@ -144,7 +167,45 @@ def salidas_del_periodo(session: Session, *, dias: int = 14) -> SalidasPeriodo:
         cortes_que_faltaron=n_falto,
         sobro=sobro.quantize(_CENT),
         cortes_que_sobraron=n_sobro,
+        ajustado=ajustado.quantize(_CENT),
+        cortes_ajustados=n_ajuste,
     )
+
+
+def _pesos(monto: Decimal) -> str:
+    """$1,200 — sin centavos cuando son cero.
+
+    En el celular, «.00» repetido doce veces es ruido que hay que saltarse
+    para llegar a la cifra."""
+    monto = Decimal(monto)
+    return f"${monto:,.0f}" if monto == monto.to_integral_value() else f"${monto:,.2f}"
+
+
+def _renglones_de_corte(c: "CorteFila", dias_abrev) -> list[str]:
+    """Un corte en dos renglones: cuánto hubo, y qué pasó con él.
+
+    La cifra va con su etiqueta. Antes salía sola —«$8,420.00»— y para saber
+    de qué era había que acordarse (Daniel, 07/10: «no es muy claro»).
+    """
+    dia = f"{dias_abrev[c.fecha.weekday()]} {c.fecha:%d/%m}"
+    if c.diferencia == 0:
+        que_paso = "cuadró exacto"
+    elif c.ajustado:
+        # «lo bajaste tú» y no «ajustado»: quién lo hizo es justo lo que
+        # distingue esto de un faltante, y es lo que se perdía.
+        verbo = "lo subiste tú" if c.diferencia > 0 else "lo bajaste tú"
+        que_paso = f"✏️ {verbo} {_pesos(abs(c.diferencia))}"
+        if c.nota:
+            que_paso += f" ({c.nota})"
+    else:
+        señal = "⚠️ " if c.llama_la_atencion else ""
+        verbo = "sobraron" if c.diferencia > 0 else "faltaron"
+        que_paso = f"{señal}{verbo} {_pesos(abs(c.diferencia))}"
+    hora = f" {c.hora}" if c.hora else ""
+    return [
+        f"{dia}{hora}   {_pesos(c.contado)} en caja",
+        f"   {c.quien} · {c.operaciones} ventas · {que_paso}",
+    ]
 
 
 def texto(filas: list[CorteFila], *, dias: int = 14, salidas: SalidasPeriodo | None = None) -> str:
@@ -153,79 +214,119 @@ def texto(filas: list[CorteFila], *, dias: int = 14, salidas: SalidasPeriodo | N
         return f"No hay cortes en los últimos {dias} días."
 
     _DIAS = ("lun", "mar", "mié", "jue", "vie", "sáb", "dom")
-    lineas = [f"🧾 Últimos cortes ({len(filas)}):", ""]
-    cuadrados = 0
+    lineas = [f"🧾 Cortes · {dias} días", ""]
     for c in filas:
-        dia = f"{_DIAS[c.fecha.weekday()]} {c.fecha:%d/%m}"
-        if c.diferencia == 0:
-            cuadrados += 1
-            marca = "✅ cuadró"
-        elif c.ajustado:
-            signo = "+" if c.diferencia > 0 else "−"
-            marca = f"✏️ ajustado {signo}${abs(c.diferencia):,.2f}"
-            if c.nota:
-                marca += f" · {c.nota}"
-        else:
-            señal = "⚠️" if c.llama_la_atencion else "·"
-            verbo = "sobró" if c.diferencia > 0 else "faltó"
-            marca = f"{señal} {verbo} ${abs(c.diferencia):,.2f}"
-        lineas.append(f"{dia} {c.hora} · ${c.contado:,.2f} — {marca}")
-        lineas.append(f"   {c.quien} · {c.operaciones} ops")
+        lineas += _renglones_de_corte(c, _DIAS)
 
-    ojo = [c for c in filas if c.llama_la_atencion]
     lineas.append("")
-    if ojo:
-        peor = max(ojo, key=lambda c: abs(c.diferencia))
-        lineas.append(
-            f"{len(ojo)} de {len(filas)} se pasan de ${OJO:,.0f}. "
-            f"El más: {peor.fecha:%d/%m} con ${abs(peor.diferencia):,.2f}."
-        )
-        # Lo que se ajusta a mano no entra aquí: eso lo decidió el dueño.
-    elif salidas is not None and (salidas.salio or salidas.sobro):
-        # NO va el 👍. Aquí «ajustado» significa solo «tuvo diferencia», así que
-        # nada llama la atención nunca y el mensaje felicitaba («ninguno se pasa
-        # de $50 👍») justo encima del renglón que decía que habían salido
-        # $14,825. Un visto bueno que sale pase lo que pase no informa nada, y
-        # enseña a no leer el que sí importa (2026-10-04).
-        lineas.append(f"{cuadrados} de {len(filas)} cuadraron exacto.")
-    else:
-        lineas.append(f"{cuadrados} cuadraron exacto y ninguno se pasa de ${OJO:,.0f}. 👍")
-    # El total con el que Daniel rastrea su dinero. Antes sumaba SOLO los
-    # cortes que caben en el mensaje (tope de 10), así que en un periodo largo
-    # decía menos de lo que de verdad salió: un número de dinero que depende
-    # de cuántos renglones caben en la pantalla no sirve para rastrear nada
-    # ("sólo necesito que sea trazable para mí", 2026-10-04). `salidas` lo trae
-    # calculado sobre TODOS los cortes del periodo.
-    if salidas is not None and (salidas.salio or salidas.sobro):
-        neto = salidas.sobro - salidas.salio
-        cuantos = salidas.cortes_que_faltaron + salidas.cortes_que_sobraron
-        # Solo se aclara "no solo los de arriba" cuando de verdad hay más de
-        # los que caben: si no, es ruido.
-        alcance = (
-            f"{dias} días, no solo los {len(filas)} de arriba"
-            if salidas.cortes > len(filas)
-            else f"{dias} días"
-        )
-        lineas.append(
-            f"{cuantos} de {salidas.cortes} con diferencia, "
-            f"{'−' if neto < 0 else '+'}${abs(neto):,.2f} en total ({alcance})."
-        )
-        if salidas.salio and salidas.sobro:
-            lineas.append(f"   Salió ${salidas.salio:,.2f} · sobró ${salidas.sobro:,.2f}")
-        lineas.append("   Lo que saques del cajón queda anotado con /retiro 2000 me lo llevé.")
-    else:
-        ajustados = [c for c in filas if c.ajustado]
-        if ajustados:
-            suma = sum((c.diferencia for c in ajustados), Decimal("0"))
-            lineas.append(f"{len(ajustados)} con ajuste tuyo, {'−' if suma < 0 else '+'}${abs(suma):,.2f} en total.")
+    lineas.append("────────────")
+    lineas += _resumen_del_periodo(filas, dias, salidas)
+    return "\n".join(lineas)
 
-    # Esto se cuenta sobre los que se enseñan y no sobre el periodo, a
-    # propósito: la nota es de cada corte y solo se puede leer en los que
-    # están arriba.
+
+def _salidas_de_filas(filas) -> SalidasPeriodo:
+    """El mismo reparto, pero contando solo los cortes que se enseñan.
+
+    Es el respaldo para cuando no hay acumulado del periodo. La regla de qué
+    es ajuste y qué es faltante es la misma de `salidas_del_periodo`, y tiene
+    que serlo: dos reglas parecidas acaban discrepando y nadie se entera.
+    """
+    salio = sobro = ajustado = Decimal("0.00")
+    n_falto = n_sobro = n_ajuste = 0
+    for c in filas:
+        if not c.diferencia:
+            continue
+        if c.ajustado:
+            ajustado += c.diferencia
+            n_ajuste += 1
+        elif c.diferencia < 0:
+            salio += -c.diferencia
+            n_falto += 1
+        else:
+            sobro += c.diferencia
+            n_sobro += 1
+    return SalidasPeriodo(
+        cortes=len(filas),
+        salio=salio, cortes_que_faltaron=n_falto,
+        sobro=sobro, cortes_que_sobraron=n_sobro,
+        ajustado=ajustado, cortes_ajustados=n_ajuste,
+    )
+
+
+def _resumen_del_periodo(filas, dias: int, salidas) -> list[str]:
+    """El cierre: de dónde viene cada peso de diferencia.
+
+    Lo importante de aquí es que **lo que el dueño ajustó va aparte de lo que
+    no cuadra**. Antes iban sumados en una sola cifra, y esa cifra era la que
+    él miraba para saber si tenía un problema: le decía que le faltaban
+    $14,515 cuando casi todo eso lo había sacado él mismo.
+
+    Las cuentas son del PERIODO completo, no de los renglones que caben
+    arriba. Un número de dinero que depende de cuántos renglones caben en la
+    pantalla no sirve para rastrear nada.
+    """
+    if salidas is None:
+        # Sin el acumulado del periodo, se reparten los que se enseñan. Así el
+        # cierre dice siempre lo mismo y no hay dos formatos que mantener.
+        salidas = _salidas_de_filas(filas)
+    if not salidas.hay_algo:
+        # Sin nada que repartir, el cierre es una sola frase.
+        cuantos = salidas.cortes or len(filas)
+        if cuantos == 1:
+            return ["Cuadró exacto. 👍"]
+        return [f"Los {cuantos} cuadraron exacto. 👍"]
+
+    fuera = salidas.cortes > len(filas)
+    cuantos = "1 corte" if salidas.cortes == 1 else f"{salidas.cortes} cortes"
+    cabeza = f"De {cuantos} en {dias} días"
+    lineas = [f"{cabeza} (no solo los {len(filas)} de arriba):" if fuera else f"{cabeza}:"]
+
+    # El mismo ancho en los tres renglones para que las cifras caigan en
+    # columna: en una lista de dinero, comparar es la única razón de leerla.
+    partidas = []
+    if salidas.cortes_ajustados:
+        partidas.append(("Tus ajustes", salidas.ajustado, salidas.cortes_ajustados))
+    if salidas.cortes_que_faltaron:
+        partidas.append(("Sin explicar", -salidas.salio, salidas.cortes_que_faltaron))
+    if salidas.cortes_que_sobraron:
+        partidas.append(("Sobró", salidas.sobro, salidas.cortes_que_sobraron))
+    # Los que cuadraron van en la misma tabla, sin cifra: es la parte sana del
+    # periodo y sin ella las cuentas no suman — se vería «3 con faltante» sin
+    # decir nunca contra cuántos buenos.
+    cuadraron = salidas.cortes - sum(n for _, _, n in partidas)
+    if cuadraron > 0:
+        partidas.append(("Cuadraron exacto", None, cuadraron))
+
+    etiqueta = max(len(n) for n, _, _ in partidas)
+    ancho = max((len(_pesos(abs(m))) for _, m, _ in partidas if m is not None), default=0)
+    for nombre, monto, cuantos in partidas:
+        if monto is None:
+            cifra = " " * (ancho + 1)
+        else:
+            signo = "−" if monto < 0 else "+"
+            cifra = f"{signo}{_pesos(abs(monto))}".rjust(ancho + 1)
+        lineas.append(f"   {nombre.ljust(etiqueta + 2)}{cifra}  en {cuantos}")
+
+    # El renglón que contesta la pregunta: ¿hay un problema o no?
+    if salidas.salio:
+        lineas.append("")
+        lineas.append(
+            f"No cuadra sin que tú lo decidieras: {_pesos(salidas.salio)}"
+        )
+        # La ayuda sale SOLO aquí: es cuando sirve. Repetida en todos los
+        # mensajes se vuelve parte del paisaje y deja de leerse.
+        lineas.append("   Lo que saques del cajón queda anotado con /retiro 2000 me lo llevé.")
+
     sin_decir = [c for c in filas if c.ajustado and not c.nota]
     if sin_decir:
-        lineas.append(f"{len(sin_decir)} de ellos sin decir por qué (son de antes).")
-    return "\n".join(lineas)
+        # Se cuenta sobre los que se enseñan y no sobre el periodo, a
+        # propósito: la nota es de cada corte y solo se puede leer en los de
+        # arriba. Por eso se dice «de los de arriba» y no a secas.
+        lineas.append("")
+        lineas.append(
+            f"{len(sin_decir)} de los de arriba sin anotar por qué."
+        )
+    return lineas
 
 
 def resumen(session: Session, *, dias: int = 14) -> str:
