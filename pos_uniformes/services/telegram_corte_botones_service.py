@@ -46,14 +46,24 @@ def botones_de_propuesta(retiro: Decimal, fondo: Decimal) -> str:
     """Los botones que acompañan a «¿Hacemos el corte?».
 
     `retiro` es lo que saldría del cajón tal cual, y `fondo` lo que quedaría.
+
+    Cada botón dice **lo que va a pasar al tocarlo**, y los que abren otra
+    pantalla terminan en «…». Antes decían «Retirar otra cantidad» y «Cambiar
+    el fondo», que suenan a ajustar un dato y volver, cuando en realidad
+    llevan a una pantalla donde cualquier cifra cierra el corte de una
+    (Daniel, 07/10: «esas opciones son poco claras»).
     """
     return _teclado(
         [
-            [("✅ Hacer el corte", f"{PREFIJO}ok")],
-            [("💵 Retirar otra cantidad", f"{PREFIJO}retirar"),
-             ("💰 Cambiar el fondo", f"{PREFIJO}fondo")],
-            [("🔎 Algo no salió del cajón", f"{PREFIJO}cajon")],
-            [("🙅 Hoy no", f"{PREFIJO}no")],
+            # La cifra va EN el botón: es la del mensaje, y tenerla a la mano
+            # al momento de tocar es lo que hace que no haya que releer.
+            [(f"✅ Hacer el corte y sacar {_pesos(retiro)}", f"{PREFIJO}ok")],
+            [("💵 Sacar otra cantidad…", f"{PREFIJO}retirar"),
+             ("🪙 Dejar otro fondo…", f"{PREFIJO}fondo")],
+            # «Algo no salió del cajón» era una negación y no decía qué iba a
+            # pasar. Esto es lo que se va a hacer: apuntarlo.
+            [("➖ Apuntar algo que ya salió del cajón", f"{PREFIJO}cajon")],
+            [("🚫 Hoy no", f"{PREFIJO}no")],
         ]
     )
 
@@ -64,33 +74,44 @@ def _cantidades(tope: Decimal) -> list[int]:
 
 
 def pantalla_cantidades(que: str, sugerida: Decimal, tope: Decimal) -> tuple[str, str]:
-    """(texto, botones) para elegir cuánto retirar o cuánto dejar de fondo."""
+    """(texto, botones) para elegir cuánto sacar o cuánto dejar de fondo.
+
+    Cada cifra cierra el corte al tocarla, así que **el botón lo dice**: no
+    «$5,000» sino «Hacer el corte sacando $5,000». Antes la advertencia vivía
+    en el texto de arriba, escrita `**hace el corte**` — y como el bot manda
+    sin formato, los asteriscos salían a la vista y la única advertencia del
+    flujo se leía como basura (07/10).
+    """
     accion = "ret" if que == "retirar" else "fnd"
-    titulo = (
-        "¿Cuánto se retira del cajón?" if que == "retirar"
-        else "¿Cuánto se queda de fondo?"
-    )
+    if que == "retirar":
+        titulo = "¿Cuánto sacas del cajón?"
+        def etiqueta(monto: str) -> str:
+            return f"Hacer el corte sacando {monto}"
+    else:
+        titulo = "¿Cuánto se queda para mañana?"
+        def etiqueta(monto: str) -> str:
+            return f"Hacer el corte dejando {monto}"
+
     filas = []
     if sugerida > 0:
-        filas.append([(f"{_pesos(sugerida)}  (lo calculado)", f"{PREFIJO}{accion}:{int(sugerida)}")])
-    fila: list = []
+        filas.append([(
+            f"✅ {etiqueta(_pesos(sugerida))}  (lo calculado)",
+            f"{PREFIJO}{accion}:{int(sugerida)}",
+        )])
     for c in _cantidades(tope):
         if Decimal(c) == sugerida.quantize(Decimal("1")):
             continue
-        fila.append((_pesos(c), f"{PREFIJO}{accion}:{c}"))
-        if len(fila) == 3:
-            filas.append(fila)
-            fila = []
-    if fila:
-        filas.append(fila)
+        # Uno por renglón: tres cifras sueltas en fila se tocan sin leer, y
+        # aquí cada toque hace el corte.
+        filas.append([(etiqueta(_pesos(c)), f"{PREFIJO}{accion}:{c}")])
     filas.append([("‹ Volver", f"{PREFIJO}volver")])
 
     texto = [
         titulo,
         "",
-        "Tocar una cantidad **hace el corte** con ella.",
+        "Cada botón hace el corte con esa cantidad.",
         "",
-        "Para juntar las dos cosas o poner un motivo:",
+        "Para las dos cosas a la vez, o con un motivo:",
         "/corte 5000 fondo 2000 deposité al banco",
     ]
     return "\n".join(texto), _teclado(filas)

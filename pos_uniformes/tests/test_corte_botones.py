@@ -49,7 +49,9 @@ class LasCantidadesTests(unittest.TestCase):
     def test_la_calculada_va_primero(self) -> None:
         # Casi siempre es la que se usa.
         _, botones = cb.pantalla_cantidades("retirar", Decimal("2820"), Decimal("2820"))
-        self.assertEqual(_etiquetas(botones)[0], "$2,820  (lo calculado)")
+        self.assertEqual(
+            _etiquetas(botones)[0], "✅ Hacer el corte sacando $2,820  (lo calculado)"
+        )
 
     def test_solo_se_ofrecen_las_que_caben(self) -> None:
         # Ofrecer $5,000 cuando hay $2,820 es ofrecer un error.
@@ -148,3 +150,92 @@ class MagicMockResultado:
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CadaBotonDiceLoQueVaAPasarTests(unittest.TestCase):
+    """«esas opciones son poco claras» (Daniel, 07/10).
+
+    «Retirar otra cantidad» y «Cambiar el fondo» suenan a ajustar un dato y
+    volver, y en realidad llevan a una pantalla donde cualquier cifra cierra
+    el corte de una. La advertencia existía, pero escrita `**hace el corte**`
+    — y como el bot manda sin formato, salía con los asteriscos a la vista.
+    """
+
+    def test_el_boton_principal_dice_cuanto_saca(self) -> None:
+        """Es la cifra de la decisión; tenerla en el botón evita releer."""
+        etiquetas = _etiquetas(cb.botones_de_propuesta(Decimal("7098"), Decimal("500")))
+        self.assertIn("✅ Hacer el corte y sacar $7,098", etiquetas)
+
+    def test_los_que_abren_otra_pantalla_terminan_en_puntos(self) -> None:
+        etiquetas = _etiquetas(cb.botones_de_propuesta(Decimal("7098"), Decimal("500")))
+        self.assertIn("💵 Sacar otra cantidad…", etiquetas)
+        self.assertIn("🪙 Dejar otro fondo…", etiquetas)
+
+    def test_el_del_cajon_dice_que_se_va_a_hacer(self) -> None:
+        """Era «Algo no salió del cajón»: una negación, sin decir qué pasa."""
+        etiquetas = _etiquetas(cb.botones_de_propuesta(Decimal("7098"), Decimal("500")))
+        self.assertIn("➖ Apuntar algo que ya salió del cajón", etiquetas)
+
+    def test_cada_cantidad_avisa_que_hace_el_corte(self) -> None:
+        for que, verbo in (("retirar", "sacando"), ("fondo", "dejando")):
+            with self.subTest(pantalla=que):
+                _, botones = cb.pantalla_cantidades(que, Decimal("2000"), Decimal("5000"))
+                etiquetas = [e for e in _etiquetas(botones) if "Volver" not in e]
+                self.assertTrue(etiquetas)
+                for e in etiquetas:
+                    self.assertIn("Hacer el corte", e)
+                    self.assertIn(verbo, e)
+
+    def test_ningun_mensaje_lleva_formato_que_el_bot_no_manda(self) -> None:
+        """El bot manda sin parse_mode: los asteriscos salen tal cual.
+
+        Pasó con la única advertencia del flujo, que se leía como basura."""
+        textos = [
+            cb.pantalla_cantidades("retirar", Decimal("2000"), Decimal("5000"))[0],
+            cb.pantalla_cantidades("fondo", Decimal("500"), Decimal("5000"))[0],
+        ]
+        for t in textos:
+            self.assertNotIn("**", t)
+            self.assertNotIn("__", t)
+
+
+class LaPropuestaDiceQueVaAPasarTests(unittest.TestCase):
+    """El mensaje enumeraba lo que HAY y escondía lo que PASARÍA.
+
+    «Se retiraría: $7,098.00 · queda de fondo $500.00» iba como un renglón
+    más de la lista, con las dos cifras pegadas por un punto. Y que el corte
+    IMPRIME el ticket en la tienda no se decía en ninguna parte, siendo lo que
+    lo vuelve un hecho y no un número (Daniel, 07/10).
+    """
+
+    def _texto(self):
+        from types import SimpleNamespace
+
+        from pos_uniformes.services import corte_remoto_service as crs
+
+        resumen = SimpleNamespace(
+            efectivo=Decimal("8420.00"), operaciones=31, tarjeta=Decimal("1368.00")
+        )
+        estado = SimpleNamespace(
+            resumen=resumen, pagos=Decimal("0.00"), total_retiros=Decimal("0.00"),
+            reactivo=Decimal("500.00"), esperado=Decimal("8920.00"), desde=None,
+        )
+        with patch(
+            "pos_uniformes.services.corte_caja_service.estado_caja", return_value=estado
+        ), patch(
+            "pos_uniformes.services.corte_caja_service.pagos_que_tocan_hoy", return_value=[]
+        ):
+            return crs.texto_propuesta_corte(object())
+
+    def test_separa_lo_que_hay_de_lo_que_pasaria(self) -> None:
+        self.assertIn("Si lo hago ahora:", self._texto())
+
+    def test_dice_cuanto_sacas_y_cuanto_queda(self) -> None:
+        self.assertIn("sacas $8,420.00 y se quedan $500.00 para mañana", self._texto())
+
+    def test_avisa_que_se_imprime_en_la_tienda(self) -> None:
+        """Es lo que no se puede deshacer desde el celular."""
+        self.assertIn("se imprime el ticket en la tienda", self._texto())
+
+    def test_la_tarjeta_se_explica(self) -> None:
+        self.assertIn("no entra al cajón", self._texto())

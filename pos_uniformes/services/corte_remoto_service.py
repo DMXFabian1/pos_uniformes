@@ -72,7 +72,7 @@ def texto_propuesta_corte(session, ahora: datetime | None = None) -> str:
         f"• Venta en efectivo: ${e.resumen.efectivo:,.2f} ({e.resumen.operaciones} ops)",
     ]
     if e.resumen.tarjeta:
-        lineas.append(f"• Con tarjeta: ${e.resumen.tarjeta:,.2f} (no está en el cajón)")
+        lineas.append(f"• Con tarjeta: ${e.resumen.tarjeta:,.2f} (no entra al cajón)")
     for a in avisos:
         prest = Decimal(getattr(a, "prestamos", 0) or 0)
         resta = f" (ya sin ${prest:,.2f} del préstamo)" if prest else ""
@@ -81,7 +81,17 @@ def texto_propuesta_corte(session, ahora: datetime | None = None) -> str:
         lineas.append(f"• Pagos ya hechos: -${e.pagos:,.2f}")
     if e.total_retiros:
         lineas.append(f"• Ya salió del cajón: -${e.total_retiros:,.2f}")
-    lineas.append(f"• Se retiraría: ${retiro:,.2f} · queda de fondo ${e.reactivo:,.2f}")
+    # Lo que PASA si se hace, aparte de lo que HAY. Antes iban las dos cifras
+    # en un mismo renglón separadas por un punto, y la consecuencia se leía
+    # como un dato más de la lista. Y que se imprime en la tienda no se decía
+    # en ninguna parte: eso es lo que vuelve el corte un hecho, no un número
+    # (Daniel, 07/10: «esas opciones son poco claras»).
+    lineas += [
+        "",
+        "Si lo hago ahora:",
+        f"  sacas ${retiro:,.2f} y se quedan ${e.reactivo:,.2f} para mañana",
+        "  se imprime el ticket en la tienda",
+    ]
     return "\n".join(lineas)
 
 
