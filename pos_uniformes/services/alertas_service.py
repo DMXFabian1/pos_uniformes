@@ -30,6 +30,11 @@ TOLERANCIA_DIFERENCIA = Decimal("50.00")
 # Minutos después del cierre para avisar que no hubo corte.
 MINUTOS_SIN_CORTE = 10
 
+#: Cuánto se espera antes de avisar que una pantalla se apagó. Un kiosko que
+#: se reinicia tarda un par de minutos en volver a latir (el margen de
+#: «encendido» ya son 2.5), y avisar de eso enseñaría a ignorar los avisos.
+MINUTOS_PANTALLA_MUERTA = 10.0
+
 #: A partir de qué hora se avisa del respaldo viejo. Un aviso a las 3 de la
 #: mañana se lee a las 9 ya mezclado con lo demás, o no se lee.
 HORA_AVISO_RESPALDO = 10
@@ -156,6 +161,13 @@ class Vigilante:
     ultimo_id: int | None = None
     dia_sin_corte_avisado: date | None = None
     dia_respaldo_avisado: date | None = None
+    #: Pantallas que SÍ estuvieron prendidas hoy: {identificador: nombre}.
+    pantallas_vistas_hoy: dict = field(default_factory=dict, repr=False)
+    #: Desde cuándo se ve apagada cada una (para no avisar de un reinicio).
+    pantallas_sin_latir: dict = field(default_factory=dict, repr=False)
+    #: De cuáles ya se avisó, para no repetirlo cada 25 segundos.
+    pantallas_avisadas: set = field(default_factory=set, repr=False)
+    dia_de_las_pantallas: date | None = None
     _apertura: object = field(default=None, repr=False)
 
     def revisar(self, session, ahora: datetime | None = None) -> list[str]:
@@ -165,6 +177,7 @@ class Vigilante:
         textos += self._movimientos_fuera_de_horario(session, ahora)
         textos += self._cierre_sin_corte(session, ahora)
         textos += self._respaldo_viejo(ahora)
+        textos += self._pantalla_apagada(session, ahora)
         return textos
 
     def _movimientos_fuera_de_horario(self, session, ahora: datetime) -> list[str]:
@@ -237,6 +250,93 @@ class Vigilante:
             return [est.texto_sin_respaldo(estado)]
         except Exception:  # noqa: BLE001 — el vigilante nunca puede tumbar al bot
             return []
+
+
+    def _pantalla_apagada(self, session, ahora: datetime) -> list[str]:
+        """Avisa cuando una pantalla que estaba trabajando se apaga.
+
+        Daniel lo pidió el 2026-10-08: hasta hoy, una pantalla muerta solo se
+        sabía preguntando `/pulso`. Y una pantalla muerta en horas de tienda
+        es una muchacha que no puede cotizar ni vender — de lo más caro que
+        puede pasar sin que nadie se entere.
+
+        Se avisa de la que **estaba prendida hoy y se apagó**, no de la que no
+        está prendida. No es lo mismo: la lista incluye la Mac de Daniel, que
+        casi nunca está, y un kiosko descompuesto desde hace una semana, que
+        ya se sabe. Lo que es noticia es el cambio.
+
+        Y se espera un rato antes de decir nada: un kiosko que se reinicia
+        tarda un par de minutos en volver a latir, y avisar de eso sería
+        enseñar a ignorar los avisos.
+        """
+        from pos_uniformes.services.horario_tienda_service import hora_apertura, hora_cierre
+
+        # Todo lo de aquí se compara contra el último latido, que viene de la
+        # base: se trabaja sin zona para que las dos horas sean comparables.
+        ahora = _local(ahora)
+        hoy = ahora.date()
+        dia_nuevo = self.dia_de_las_pantallas != hoy
+        if dia_nuevo:
+            # Día nuevo: lo de ayer no se arrastra. Un kiosko apagado anoche
+            # no es noticia hoy en la mañana.
+            self.dia_de_las_pantallas = hoy
+            self.pantallas_vistas_hoy = {}
+            self.pantallas_sin_latir = {}
+            self.pantallas_avisadas = set()
+
+        hora = ahora.time()
+        if not (hora_apertura(hoy) <= hora <= hora_cierre(hoy)):
+            return []
+
+        try:
+            from pos_uniformes.services import satelite_registry_service as rsvc
+
+            estado = rsvc.listar_con_estado(session, ahora=ahora)
+        except Exception:  # noqa: BLE001 — el vigilante nunca tumba al bot
+            return []
+
+        if dia_nuevo:
+            # Quién trabajó hoy sale del DATO y no solo de lo que este
+            # vigilante alcanzó a ver. Si no, un reinicio del bot a media
+            # mañana le borraba la memoria y una pantalla muerta desde antes
+            # ya no se reportaba nunca.
+            for s in estado:
+                visto = s.get("ultimo_visto")
+                if visto is not None and _local(visto).date() == hoy:
+                    self.pantallas_vistas_hoy[s["identificador"]] = s["nombre"]
+
+        textos: list[str] = []
+        for s in estado:
+            ident, nombre = s["identificador"], s["nombre"]
+            if s["online"]:
+                self.pantallas_vistas_hoy[ident] = nombre
+                self.pantallas_sin_latir.pop(ident, None)
+                if ident in self.pantallas_avisadas:
+                    # Volvió: cerrar el aviso vale tanto como darlo. Sin esto,
+                    # queda con la duda de si tiene que ir a la tienda.
+                    self.pantallas_avisadas.discard(ident)
+                    textos.append(f"✅ {nombre} ya volvió.")
+                continue
+            if ident not in self.pantallas_vistas_hoy:
+                continue          # no es que se apagara: nunca estuvo hoy
+            if ident in self.pantallas_avisadas:
+                continue
+            # Desde el ÚLTIMO LATIDO, no desde que el bot lo notó: si el bot
+            # se reinicia, lo contrario volvería a esperar diez minutos con la
+            # pantalla muerta desde hace media hora.
+            visto = s.get("ultimo_visto")
+            desde = _local(visto) if visto is not None else None
+            if desde is None:
+                desde = self.pantallas_sin_latir.setdefault(ident, ahora)
+            minutos = (ahora - desde).total_seconds() / 60.0
+            if minutos < MINUTOS_PANTALLA_MUERTA:
+                continue
+            self.pantallas_avisadas.add(ident)
+            textos.append(
+                f"⚠️ {nombre} lleva {int(minutos)} min sin responder, y la tienda "
+                "está abierta.\nSi está apagada, ahí no se puede cotizar ni vender."
+            )
+        return textos
 
 
 def procesar(session_factory, enviar, vigilante: Vigilante | None = None) -> int:
