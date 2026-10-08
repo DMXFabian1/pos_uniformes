@@ -291,9 +291,50 @@ def enviar_mensaje(
         datos = {"chat_id": chat_id, "text": parte, "disable_web_page_preview": "true"}
         if botones and i == len(partes) - 1:
             datos["reply_markup"] = botones
-        _llamar(token, "sendMessage", datos)
+        respuesta = _llamar(token, "sendMessage", datos)
+        # Se anota AQUÍ y no en cada sitio que manda un aviso: este es el único
+        # camino por el que sale un mensaje, así que no hay forma de agregar
+        # uno nuevo y que se quede sin barrer (2026-10-08).
+        _anotar_para_barrer(respuesta)
         enviados += 1
     return enviados
+
+
+def _anotar_para_barrer(respuesta: dict) -> None:
+    """Apunta el mensaje recién mandado para que el barrido lo borre mañana."""
+    try:
+        mid = int(((respuesta or {}).get("result") or {}).get("message_id") or 0)
+        if mid:
+            from pos_uniformes.services import telegram_limpieza_service as limpieza
+
+            limpieza.anotar(mid)
+    except Exception:  # noqa: BLE001 — no poder apuntarlo no impide mandarlo
+        pass
+
+
+def borrar_mensaje(message_id: int, *, token: str | None = None, chat_id: str | None = None) -> bool:
+    """Borra un mensaje del bot. False si Telegram no deja (pasó de 48 h)."""
+    token, chat_id = _credenciales(token, chat_id)
+    try:
+        _llamar(token, "deleteMessage",
+                {"chat_id": chat_id, "message_id": str(int(message_id))})
+        return True
+    except Exception:  # noqa: BLE001 — ya borrado, o muy viejo
+        return False
+
+
+def fijar_mensaje(message_id: int, *, token: str | None = None, chat_id: str | None = None) -> bool:
+    """Fija un mensaje arriba del chat, sin avisar con una notificación."""
+    token, chat_id = _credenciales(token, chat_id)
+    try:
+        _llamar(token, "pinChatMessage", {
+            "chat_id": chat_id,
+            "message_id": str(int(message_id)),
+            "disable_notification": "true",
+        })
+        return True
+    except Exception:  # noqa: BLE001 — sin fijar, el menú sigue sirviendo
+        return False
 
 
 def editar_mensaje(

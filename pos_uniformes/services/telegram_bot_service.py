@@ -590,6 +590,10 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
     offset = None
     vigilante = Vigilante() if alertas else None
     logger.info("Bot escuchando (chat %s)…", chat_id)
+    try:
+        asegurar_menu_fijado(session_factory=session_factory, token=token, chat_id=chat_id)
+    except Exception:  # noqa: BLE001 — sin menú fijado, el bot funciona igual
+        logger.exception("No se pudo dejar el menú fijado")
 
     def _mandar(texto: str) -> None:
         telegram_service.enviar_mensaje(texto, token=token, chat_id=chat_id)
@@ -602,6 +606,10 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
                 pass
         if alertas:
             procesar(session_factory, _mandar, vigilante)
+        try:
+            barrer_si_toca(token=token, chat_id=chat_id)
+        except Exception:  # noqa: BLE001 — la limpieza nunca tumba el bot
+            logger.exception("Falló el barrido de mensajes")
         try:
             datos = {"timeout": ESPERA_GETUPDATES_SEG}
             if offset is not None:
@@ -703,9 +711,88 @@ def _atender_toque(toque: dict, *, session_factory, token: str, chat_id: str) ->
     except Exception as exc:  # noqa: BLE001
         logger.warning("No se pudo responder el toque: %s", exc)
     if resultado and resultado[1] and msg.get("message_id") is not None:
+        tocado = int(msg["message_id"])
+        try:
+            from pos_uniformes.services import telegram_limpieza_service as limpieza
+
+            es_el_menu = tocado == limpieza.menu_fijado()
+        except Exception:  # noqa: BLE001
+            es_el_menu = False
+        if es_el_menu:
+            # El menú fijado se queda siendo el menú. Si se reescribiera, al
+            # primer toque el tablero de arriba se convertiría en una lista de
+            # cortes y ya no habría de dónde salir (2026-10-08).
+            try:
+                telegram_service.enviar_mensaje(
+                    resultado[1], token=token, chat_id=chat_id, botones=resultado[2] or None
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("No se pudo responder al menú: %s", exc)
+            return
         try:
             telegram_service.editar_mensaje(
-                int(msg["message_id"]), resultado[1], token=token, chat_id=chat_id, botones=resultado[2]
+                tocado, resultado[1], token=token, chat_id=chat_id, botones=resultado[2]
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning("No se pudo actualizar la lista: %s", exc)
+
+
+def asegurar_menu_fijado(*, session_factory, token: str, chat_id: str) -> int:
+    """Deja un menú fijado arriba del chat. Devuelve su id (0 si no se pudo).
+
+    La primera vez lo manda y lo fija; después solo lo reescribe, porque
+    mandar uno nuevo cada arranque dejaría el chat lleno de menús viejos
+    —justo lo que se quiere evitar— y además desfijaría el anterior.
+    """
+    from pos_uniformes.services import telegram_limpieza_service as limpieza
+    from pos_uniformes.services import telegram_menu_service as menu
+    from pos_uniformes.services import telegram_service
+
+    try:
+        with session_factory() as session:
+            texto, botones = menu.menu_raiz(session)
+    except Exception:  # noqa: BLE001 — sin base, el menú sin el día puesto
+        texto, botones = menu.menu_raiz()
+
+    fijado = limpieza.menu_fijado()
+    if fijado:
+        try:
+            telegram_service.editar_mensaje(
+                fijado, texto, token=token, chat_id=chat_id, botones=botones
+            )
+            return fijado
+        except Exception as exc:  # noqa: BLE001
+            # Lo borró a mano, o es de hace mucho: se manda uno nuevo.
+            logger.info("El menú fijado ya no se puede reescribir (%s)", exc)
+
+    try:
+        respuesta = telegram_service._llamar(token, "sendMessage", {
+            "chat_id": chat_id, "text": texto, "reply_markup": botones,
+            "disable_web_page_preview": "true",
+        })
+        mid = int((respuesta.get("result") or {}).get("message_id") or 0)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("No se pudo mandar el menú: %s", exc)
+        return 0
+    if mid:
+        limpieza.recordar_menu(mid)
+        telegram_service.fijar_mensaje(mid, token=token, chat_id=chat_id)
+    return mid
+
+
+def barrer_si_toca(*, token: str, chat_id: str) -> int:
+    """Borra los mensajes del bot que ya cumplieron 24 horas.
+
+    Se llama en cada vuelta del long-polling, pero el servicio decide cuándo
+    de verdad toca: barrer cada 25 segundos sería una llamada por mensaje para
+    nada."""
+    from pos_uniformes.services import telegram_limpieza_service as limpieza
+    from pos_uniformes.services import telegram_service
+
+    if not limpieza.toca_barrer():
+        return 0
+    return limpieza.barrer(
+        borrar=lambda mid: telegram_service.borrar_mensaje(
+            mid, token=token, chat_id=chat_id
+        )
+    )
