@@ -397,3 +397,91 @@ class LosDibujosDeDanielTests(unittest.TestCase):
         # Un pico de 10 de alto no puede desaparecer con esa tolerancia.
         pico = [(0, 0), (5, -10), (10, 0)]
         self.assertEqual(_simplificar(pico, TOLERANCIA), pico)
+
+
+class CambiarLaTemporadaRepintaLaTarjetaTests(unittest.TestCase):
+    """«tengo que cerrar el programa para que se vean los cambios».
+
+    El fondo sí releía la temporada, pero el color del texto y el saludo se
+    ponían al construir la tarjeta: al cambiar de temporada el fondo cambiaba
+    y las letras se quedaban con la de antes. Medio arreglo se ve igual de
+    roto que ninguno (2026-10-08).
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _gate(self):
+        from unittest.mock import MagicMock
+
+        from pos_uniformes.ui.helpers.pantalla_de_gafete import construir_gate
+        from pos_uniformes.ui.views.quick_sale_view import _GATE_STYLE
+
+        return construir_gate(
+            emoji="📒", titulo="Libreta", ayuda="Escanea tu gafete",
+            hoja=_GATE_STYLE, al_escanear=MagicMock(),
+        ).raiz
+
+    def _etiqueta(self, raiz, nombre):
+        from PyQt6.QtWidgets import QLabel
+
+        return next(
+            l for l in raiz.findChildren(QLabel) if l.objectName() == nombre
+        )
+
+    def test_el_saludo_aparece_al_encender_la_temporada(self) -> None:
+        temp.guardar_ajuste(temp.APAGADA)
+        raiz = self._gate()
+        # `isHidden` y no `isVisible`: nada está «visible» mientras la ventana
+        # no se muestra, así que con isVisible estos asserts pasaban solos.
+        self.assertTrue(self._etiqueta(raiz, "gateTemporada").isHidden())
+
+        temp.guardar_ajuste(temp.FIJA, "halloween")
+        raiz.releer_temporada()
+        saludo = self._etiqueta(raiz, "gateTemporada")
+        self.assertEqual(saludo.text(), "¡Feliz Halloween!")
+
+    def test_el_titulo_cambia_de_color_sin_reconstruir(self) -> None:
+        from PyQt6.QtGui import QColor
+
+        temp.guardar_ajuste(temp.APAGADA)
+        raiz = self._gate()
+        titulo = self._etiqueta(raiz, "gateTitle")
+        titulo.ensurePolished()
+        antes = titulo.palette().color(titulo.foregroundRole())
+
+        temp.guardar_ajuste(temp.FIJA, "halloween")
+        raiz.releer_temporada()
+        titulo.ensurePolished()
+        self.assertNotEqual(titulo.palette().color(titulo.foregroundRole()), antes)
+        self.assertEqual(
+            titulo.palette().color(titulo.foregroundRole()),
+            QColor(temp.temporada_de_archivo("halloween").color),
+        )
+
+    def test_apagar_la_temporada_deja_la_tarjeta_como_siempre(self) -> None:
+        """El camino de vuelta: si solo se supiera encender, apagar no se vería."""
+        from PyQt6.QtGui import QColor
+
+        from pos_uniformes.ui.views.quick_sale_view import _TEXT
+
+        temp.guardar_ajuste(temp.FIJA, "halloween")
+        raiz = self._gate()
+        temp.guardar_ajuste(temp.APAGADA)
+        raiz.releer_temporada()
+
+        titulo = self._etiqueta(raiz, "gateTitle")
+        titulo.ensurePolished()
+        self.assertEqual(titulo.palette().color(titulo.foregroundRole()), QColor(_TEXT))
+        self.assertTrue(self._etiqueta(raiz, "gateTemporada").isHidden())
+
+    def test_el_emoji_suelto_sale_solo_cuando_no_hay_escena(self) -> None:
+        temp.guardar_ajuste(temp.FIJA, "halloween")
+        raiz = self._gate()
+        self.assertTrue(self._etiqueta(raiz, "gateEmoji").isHidden())
+
+        temp.guardar_ajuste(temp.APAGADA)
+        raiz.releer_temporada()
+        self.assertFalse(self._etiqueta(raiz, "gateEmoji").isHidden())
+        self.assertEqual(self._etiqueta(raiz, "gateEmoji").text(), "📒")

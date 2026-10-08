@@ -114,3 +114,41 @@ class ElKioskoUsaEstaBarraTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GuardarRepintaSinCerrarElProgramaTests(unittest.TestCase):
+    """«cuando selecciono una temporada y le doy guardar tengo que cerrar el
+    programa para que se vean los cambios» (Daniel, 2026-10-08).
+
+    El menú buscaba los adornos en `dialog.window()`, y un diálogo YA es una
+    ventana: devolvía el propio menú, donde no hay ningún adorno. Esto se
+    prueba con una ventana de verdad y un diálogo hijo, que es el único modo
+    de que el error aparezca — con un widget suelto el bug no se nota.
+    """
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_se_repinta_lo_de_la_ventana_principal(self) -> None:
+        from PyQt6.QtWidgets import QDialog, QMainWindow
+
+        from pos_uniformes.ui.dialogs.satellite_admin_dialog import _repintar_adornos
+
+        temp.guardar_ajuste(temp.APAGADA)
+        ventana = QMainWindow()
+        barra = bt.TarjetaConTemporada(ventana)
+        ventana.setCentralWidget(barra)
+        dialogo = QDialog(ventana)
+        self.addCleanup(ventana.deleteLater)
+
+        temp.guardar_ajuste(temp.FIJA, "halloween")
+        _repintar_adornos(dialogo)
+        self.assertIsNotNone(barra._temporada)
+
+    def test_sin_padre_tampoco_truena(self) -> None:
+        from PyQt6.QtWidgets import QDialog
+
+        from pos_uniformes.ui.dialogs.satellite_admin_dialog import _repintar_adornos
+
+        _repintar_adornos(QDialog())   # no debe lanzar

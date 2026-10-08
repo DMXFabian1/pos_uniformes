@@ -64,15 +64,12 @@ def construir_gate(
     dentro.setSpacing(12)
     dentro.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-    temporada = _temporada()
-
-    # Con la escena detrás ya hay una calabaza del tamaño de la pantalla: el
-    # emoji suelto diría lo mismo dos veces.
-    if not raiz.tiene_escena:
-        icono = QLabel(temporada.emoji if temporada else emoji)
-        icono.setObjectName("gateEmoji")
-        icono.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        dentro.addWidget(icono)
+    # El emoji suelto solo cuando NO hay escena: con una calabaza del tamaño
+    # de la pantalla detrás, dos dirían lo mismo dos veces.
+    icono = QLabel("")
+    icono.setObjectName("gateEmoji")
+    icono.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    dentro.addWidget(icono)
 
     etiqueta_titulo = QLabel(titulo)
     etiqueta_titulo.setObjectName("gateTitle")
@@ -84,16 +81,24 @@ def construir_gate(
     etiqueta_ayuda.setAlignment(Qt.AlignmentFlag.AlignCenter)
     dentro.addWidget(etiqueta_ayuda)
 
-    if temporada is not None:
-        _tenir(etiqueta_titulo, etiqueta_ayuda, temporada)
-        saludo = QLabel(temporada.saludo)
-        saludo.setObjectName("gateTemporada")
-        saludo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        saludo.setStyleSheet(
-            f"color: {temporada.color}; font-size: 13px; font-weight: 700;"
-            " background: transparent;"
-        )
-        dentro.addWidget(saludo)
+    saludo = QLabel("")
+    saludo.setObjectName("gateTemporada")
+    saludo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    dentro.addWidget(saludo)
+
+    _vestir(raiz, icono, etiqueta_titulo, etiqueta_ayuda, saludo, emoji)
+
+    # Al cambiar la temporada desde el menú se repinta TODO lo de la tarjeta,
+    # no solo el fondo. El color y el saludo se ponían al construirla, así que
+    # el fondo cambiaba y el texto se quedaba con la temporada de antes
+    # (2026-10-08).
+    repintar_fondo = raiz.releer_temporada
+
+    def releer() -> None:
+        repintar_fondo()
+        _vestir(raiz, icono, etiqueta_titulo, etiqueta_ayuda, saludo, emoji)
+
+    raiz.releer_temporada = releer
 
     dentro.addSpacing(8)
 
@@ -126,6 +131,34 @@ def _temporada():
         return actual()
     except Exception:  # noqa: BLE001 — un adorno no impide escanear un gafete
         return None
+
+
+def _vestir(raiz, icono: QLabel, titulo: QLabel, ayuda: QLabel,
+            saludo: QLabel, emoji_fijo: str) -> None:
+    """Deja la tarjeta como toca para la temporada de ahora mismo.
+
+    Una sola función para construirla y para repintarla: si fueran dos, un día
+    una pondría algo que la otra no quita y la tarjeta quedaría a medio vestir.
+    """
+    from pos_uniformes.ui.views.quick_sale_view import _MUTED, _TEXT
+
+    temporada = _temporada()
+    icono.setText(temporada.emoji if temporada else emoji_fijo)
+    icono.setVisible(not raiz.tiene_escena)
+
+    if temporada is None:
+        titulo.setStyleSheet(f"color: {_TEXT}; background: transparent;")
+        ayuda.setStyleSheet(f"color: {_MUTED}; background: transparent;")
+        saludo.setVisible(False)
+        return
+
+    _tenir(titulo, ayuda, temporada)
+    saludo.setText(temporada.saludo)
+    saludo.setStyleSheet(
+        f"color: {temporada.color}; font-size: 13px; font-weight: 700;"
+        " background: transparent;"
+    )
+    saludo.setVisible(True)
 
 
 def _tenir(titulo: QLabel, ayuda: QLabel, temporada) -> None:

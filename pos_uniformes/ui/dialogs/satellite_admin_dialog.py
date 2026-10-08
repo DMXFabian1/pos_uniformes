@@ -592,15 +592,29 @@ def _repintar_adornos(dialog: QWidget) -> None:
     Se busca por capacidad —quien tenga `releer_temporada`— y no por una lista
     de widgets: hoy son la barra del encabezado y el fondo de venta rápida, y
     el que se adorne mañana se va a repintar sin que nadie toque esto.
+
+    Se recorren TODAS las ventanas de la aplicación y no `dialog.window()`:
+    un diálogo ya es una ventana, así que eso devolvía el propio menú y los
+    adornos se buscaban donde no hay ninguno. Guardar no cambiaba nada hasta
+    cerrar el programa (Daniel, 2026-10-08).
     """
     try:
-        ventana = dialog.window()
-        if ventana is None:
-            return
-        for w in [ventana, *ventana.findChildren(QWidget)]:
-            releer = getattr(w, "releer_temporada", None)
-            if callable(releer):
-                releer()
+        from PyQt6.QtWidgets import QApplication
+
+        app = QApplication.instance()
+        ventanas = list(app.topLevelWidgets()) if app is not None else []
+        padre = dialog.parent() if dialog is not None else None
+        if padre is not None and padre.window() not in ventanas:
+            ventanas.append(padre.window())
+        vistos = set()
+        for ventana in ventanas:
+            for w in [ventana, *ventana.findChildren(QWidget)]:
+                if id(w) in vistos:
+                    continue
+                vistos.add(id(w))
+                releer = getattr(w, "releer_temporada", None)
+                if callable(releer):
+                    releer()
     except Exception:  # noqa: BLE001 — se verá al reabrir; no vale un error
         pass
 
