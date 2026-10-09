@@ -38,6 +38,7 @@ def build_school_tariff_text(
     tariff: dict,
     business_name: str = "MAXIMODA",
     business_phone: str = "",
+    business_address: str = "",
     genero_filter: str | None = None,
 ) -> str:
     """Genera el texto del tarifario listo para ticket térmico.
@@ -65,9 +66,12 @@ def build_school_tariff_text(
     lines: list[str] = []
 
     # — Encabezado —
-    lines.append(business_name.center(_W))
-    if business_phone:
-        lines.append(f"Tel: {business_phone}".center(_W))
+    # El mismo que los tickets. Antes llevaba nombre y teléfono y nada más:
+    # la lista de precios es justo lo que el cliente se lleva a su casa, así
+    # que la dirección hace más falta aquí que en ningún otro (2026-10-09).
+    from pos_uniformes.services.sale_ticket_text_service import encabezado_de_ticket
+
+    lines += encabezado_de_ticket(business_name, business_address, business_phone)
     lines.append("Lista de precios".center(_W))
 
     # — Escuela —

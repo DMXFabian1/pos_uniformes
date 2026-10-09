@@ -43,3 +43,37 @@ def load_business_info() -> tuple[str, str, str] | None:
         )
     except Exception:  # noqa: BLE001
         return None
+
+
+def datos_del_negocio() -> tuple[str, str, str]:
+    """(nombre, teléfono, dirección) para encabezar un ticket.
+
+    La base manda y el cache es la red de abajo: sin esto, cada constructor
+    de ticket cargaba lo suyo —uno el nombre y el teléfono por separado, otro
+    los tres juntos— y los tickets de la misma tienda salían diciendo cosas
+    distintas (2026-10-09, al homogeneizarlos).
+
+    No avisa de la falta de conexión: eso lo hace Venta Rápida, que tiene
+    pantalla para decirlo. Aquí el silencio es correcto porque hay cache.
+    """
+    try:
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.services.business_settings_service import (
+            BusinessSettingsService,
+        )
+
+        with get_session() as session:
+            config = BusinessSettingsService.get_or_create(session)
+            info = (
+                config.nombre_negocio or "Uniformes",
+                config.telefono or "",
+                config.direccion or "",
+            )
+        try:
+            save_business_info(*info)
+        except Exception:  # noqa: BLE001 — sin cache, igual se imprime
+            pass
+        return info
+    except Exception:  # noqa: BLE001 — sin base, lo del último arranque
+        cache = load_business_info()
+        return cache if cache and cache[0] else ("Uniformes", "", "")

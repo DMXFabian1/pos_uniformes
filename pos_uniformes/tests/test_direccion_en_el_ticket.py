@@ -39,21 +39,35 @@ class DireccionLargaTests(unittest.TestCase):
         self.assertIn("Belisario", texto)
         self.assertEqual(_lineas_largas(texto), [])
 
-    def test_el_presupuesto_tampoco(self) -> None:
+    def test_ningun_encabezado_se_sale_del_papel(self) -> None:
+        """Antes esto miraba el `textwrap` dentro de cada archivo.
+
+        Dejó de servir cuando el encabezado se juntó en uno solo (09/10): la
+        línea ya no está en esos archivos y los tests fallaban aunque el
+        ticket saliera bien. Ahora se mira lo que de verdad se imprime.
+        """
+        from pos_uniformes.services.sale_ticket_text_service import (
+            encabezado_de_ticket,
+        )
+
+        lineas = encabezado_de_ticket("MAXIMODA", DIRECCION, "4731518099")
+        self.assertEqual([l for l in lineas if len(l) > TICKET_CHAR_WIDTH], [])
+        self.assertIn("Belisario", "\n".join(lineas))
+
+    def test_el_presupuesto_usa_ese_encabezado(self) -> None:
         import inspect
 
         from pos_uniformes.services import quote_text_service
 
-        fuente = inspect.getsource(quote_text_service)
-        self.assertIn("textwrap.wrap(business_address", fuente)
+        self.assertIn("encabezado_de_ticket", inspect.getsource(quote_text_service))
 
-    def test_el_recibo_de_apartado_tampoco(self) -> None:
+    def test_el_recibo_de_apartado_tambien(self) -> None:
         import inspect
 
         from pos_uniformes.services import layaway_receipt_text_service
 
-        fuente = inspect.getsource(layaway_receipt_text_service)
-        self.assertIn("textwrap.wrap(business_address", fuente)
+        self.assertIn("encabezado_de_ticket",
+                      inspect.getsource(layaway_receipt_text_service))
 
     def test_una_direccion_corta_se_queda_en_un_renglon(self) -> None:
         from types import SimpleNamespace

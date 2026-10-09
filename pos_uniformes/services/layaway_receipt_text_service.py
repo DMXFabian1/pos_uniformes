@@ -45,14 +45,9 @@ def build_layaway_receipt_text(
     lines: list[str] = []
 
     # — Encabezado —
-    lines.append(business_name.center(_W))
-    if business_address:
-        # Partida al ancho del papel: la dirección real mide 54 caracteres y
-        # el papel tiene 38 columnas (ver sale_ticket_text_service).
-        for trozo in textwrap.wrap(business_address, width=_W) or [business_address]:
-            lines.append(trozo.center(_W))
-    if business_phone:
-        lines.append(f"Tel: {business_phone}".center(_W))
+    from pos_uniformes.services.sale_ticket_text_service import encabezado_de_ticket
+
+    lines += encabezado_de_ticket(business_name, business_address, business_phone)
     lines.append("Comprobante de apartado".center(_W))
 
     # — Datos del apartado —

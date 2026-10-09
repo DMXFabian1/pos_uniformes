@@ -9413,12 +9413,16 @@ QLabel#favDialogPriceLabel {
                 escuela_id, nivel_id = escuela_data if isinstance(escuela_data, tuple) else (escuela_data, None)
                 with get_session() as session:
                     tariff = build_school_tariff(session, escuela_id, nivel_id=nivel_id)
-            business_name = _load_business_name()
-            business_phone = _load_business_phone()
+            from pos_uniformes.services.business_info_cache_service import (
+                datos_del_negocio,
+            )
+
+            nombre, telefono, direccion = datos_del_negocio()
             text = build_school_tariff_text(
                 tariff=tariff,
-                business_name=business_name,
-                business_phone=business_phone,
+                business_name=nombre,
+                business_phone=telefono,
+                business_address=direccion,
             )
             self._current_tariff = tariff
             # Vista previa HTML moderna; plain text solo va a impresión
@@ -9588,11 +9592,15 @@ QLabel#favDialogPriceLabel {
         genero_filter: str | None = genero_result[0]
 
         # ── Regenerar texto con el filtro elegido ───────────────────────
+        from pos_uniformes.services.business_info_cache_service import datos_del_negocio
         from pos_uniformes.services.school_tariff_text_service import build_school_tariff_text
+
+        nombre, telefono, direccion = datos_del_negocio()
         content = build_school_tariff_text(
             tariff=self._current_tariff,
-            business_name=_load_business_name(),
-            business_phone=_load_business_phone(),
+            business_name=nombre,
+            business_phone=telefono,
+            business_address=direccion,
             genero_filter=genero_filter,
         )
         from pos_uniformes.ui.dialogs.printable_text_dialog import open_printable_text_dialog
@@ -10874,26 +10882,13 @@ def _catalog_row_icon(row: dict[str, object]) -> QPixmap:
     return _scaled_asset_pixmap("qr_icons/default.png", 72)
 
 
-def _load_business_name() -> str:
-    try:
-        from pos_uniformes.database.connection import get_session
-        from pos_uniformes.services.business_settings_service import BusinessSettingsService
-        with get_session() as session:
-            config = BusinessSettingsService.get_or_create(session)
-            return config.nombre_negocio or "MAXIMODA"
-    except Exception:  # noqa: BLE001
-        return "MAXIMODA"
+def _encabezado_del_negocio() -> list[str]:
+    """Las primeras líneas del ticket, iguales a las del POS y el kiosko."""
+    from pos_uniformes.services.business_info_cache_service import datos_del_negocio
+    from pos_uniformes.services.sale_ticket_text_service import encabezado_de_ticket
 
-
-def _load_business_phone() -> str:
-    try:
-        from pos_uniformes.database.connection import get_session
-        from pos_uniformes.services.business_settings_service import BusinessSettingsService
-        with get_session() as session:
-            config = BusinessSettingsService.get_or_create(session)
-            return str(getattr(config, "telefono", "") or "")
-    except Exception:  # noqa: BLE001
-        return ""
+    nombre, telefono, direccion = datos_del_negocio()
+    return encabezado_de_ticket(nombre, direccion, telefono)
 
 
 def _build_snapshot_ticket_text(snapshot: QuoteDetailSnapshot) -> str:
@@ -10905,11 +10900,13 @@ def _build_snapshot_ticket_text(snapshot: QuoteDetailSnapshot) -> str:
     )
 
     _IW = _W - 4
-    biz = _load_business_name()
     lines: list[str] = []
 
     # — Encabezado —
-    lines.append(biz.center(_W))
+    # El MISMO de los tickets de venta: logo cuando se puede, dirección
+    # partida y teléfono. Un presupuesto es lo que el cliente se lleva para
+    # volver o para llamar; es donde más falta hacen (2026-10-09).
+    lines += _encabezado_del_negocio()
     lines.append("Presupuesto".center(_W))
     lines.append("")
     lines.append("ESTE NO ES UN COMPROBANTE".center(_W))
@@ -10994,11 +10991,10 @@ def _build_cart_ticket_text(
     )
 
     _IW = _W - 4
-    biz = _load_business_name()
     lines: list[str] = []
 
     # — Encabezado —
-    lines.append(biz.center(_W))
+    lines += _encabezado_del_negocio()
     lines.append("Presupuesto".center(_W))
     lines.append("")
     lines.append("ESTE NO ES UN COMPROBANTE".center(_W))
@@ -11094,10 +11090,9 @@ def _build_sale_ticket_text(
     )
 
     _IW = _W - 4
-    biz = _load_business_name()
     lines: list[str] = []
 
-    lines.append(biz.center(_W))
+    lines += _encabezado_del_negocio()
     lines.append("Ticket de Venta".center(_W))
     lines.append("")
 

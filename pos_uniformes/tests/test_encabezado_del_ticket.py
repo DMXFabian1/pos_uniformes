@@ -90,3 +90,95 @@ class TodoSLosTicketsUsanElMismoTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NingunTicketArmaSuPropioEncabezadoTests(unittest.TestCase):
+    """La barrida completa que pidió Daniel: «revisa de una todos los lugares
+    donde se hace ticket para que sea homogéneo» (2026-10-09).
+
+    Eran OCHO constructores y cada uno escribía el encabezado a su manera:
+    tres con logo y dirección partida, tres con el nombre a secas, uno con
+    nombre y teléfono, uno con la dirección ya partida pero sin logo. Este
+    test es lo que impide que vuelvan a separarse.
+    """
+
+    #: Todo lo que arma un ticket para el CLIENTE.
+    ARCHIVOS = (
+        "services/sale_ticket_text_service.py",
+        "services/quote_text_service.py",
+        "services/school_tariff_text_service.py",
+        "services/layaway_receipt_text_service.py",
+        "ui/views/quick_sale_view.py",
+        "ui/quote_satellite_window.py",
+    )
+
+    def _codigo(self, ruta):
+        from pathlib import Path
+
+        return Path(__file__).resolve().parents[1].joinpath(ruta).read_text(
+            encoding="utf-8"
+        )
+
+    def test_nadie_centra_el_nombre_del_negocio_a_mano(self) -> None:
+        for ruta in self.ARCHIVOS:
+            with self.subTest(archivo=ruta):
+                codigo = self._codigo(ruta)
+                for a_mano in ("biz_name.center(", "biz.center(",
+                               "business_name.center(", "nombre_negocio.center("):
+                    self.assertNotIn(a_mano, codigo)
+
+    def test_nadie_centra_la_direccion_a_mano(self) -> None:
+        for ruta in self.ARCHIVOS:
+            with self.subTest(archivo=ruta):
+                codigo = self._codigo(ruta)
+                for a_mano in ("biz_addr.center(", "business_address.center("):
+                    self.assertNotIn(a_mano, codigo)
+
+    def test_todos_llaman_al_encabezado_compartido(self) -> None:
+        for ruta in self.ARCHIVOS:
+            with self.subTest(archivo=ruta):
+                self.assertIn("encabezado_de_ticket", self._codigo(ruta))
+
+    def test_el_telefono_tampoco_se_escribe_aparte(self) -> None:
+        """Iba suelto en el tarifario, después del nombre y sin dirección."""
+        for ruta in self.ARCHIVOS:
+            with self.subTest(archivo=ruta):
+                codigo = self._codigo(ruta)
+                self.assertNotIn('f"Tel: {business_phone}".center(', codigo)
+                self.assertNotIn('f"Tel: {biz_phone}".center(', codigo)
+
+
+class LosDatosDelNegocioSalenDeUnSoloLadoTests(unittest.TestCase):
+    """Cada constructor cargaba lo suyo: uno el nombre y el teléfono por
+    funciones separadas, otro los tres juntos con cache. Los tickets de la
+    misma tienda podían decir cosas distintas."""
+
+    def test_devuelve_los_tres_datos(self) -> None:
+        from unittest.mock import patch
+
+        from pos_uniformes.services import business_info_cache_service as bic
+
+        with patch.object(bic, "load_business_info", return_value=None), \
+             patch("pos_uniformes.database.connection.get_session",
+                   side_effect=OSError("sin base")):
+            self.assertEqual(bic.datos_del_negocio(), ("Uniformes", "", ""))
+
+    def test_sin_base_usa_el_cache(self) -> None:
+        from unittest.mock import patch
+
+        from pos_uniformes.services import business_info_cache_service as bic
+
+        guardado = ("MAXIMODA", "4731518099", DIRECCION)
+        with patch.object(bic, "load_business_info", return_value=guardado), \
+             patch("pos_uniformes.database.connection.get_session",
+                   side_effect=OSError("sin base")):
+            self.assertEqual(bic.datos_del_negocio(), guardado)
+
+    def test_ya_no_hay_cargadores_sueltos(self) -> None:
+        from pathlib import Path
+
+        codigo = Path(__file__).resolve().parents[1].joinpath(
+            "ui/quote_satellite_window.py"
+        ).read_text(encoding="utf-8")
+        self.assertNotIn("def _load_business_name", codigo)
+        self.assertNotIn("def _load_business_phone", codigo)
