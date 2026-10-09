@@ -10237,9 +10237,14 @@ QLabel#favDialogPriceLabel {
         lookup_row = None
         if self.lookup_snapshot is not None:
             lookup_row = self._find_row_by_sku(self.lookup_snapshot.sku)
-        self.kiosk_visual_icon_label.setPixmap(
-            _catalog_row_icon(lookup_row) if lookup_row is not None else _scaled_asset_pixmap("qr_icons/default.png", 112)
-        )
+        if lookup_row is not None:
+            icono = _catalog_row_icon(lookup_row)
+        else:
+            # Sin producto, el hueco lo ocupa la temporada; si no hay, la «M».
+            icono = _icono_de_temporada(124)
+            if icono.isNull():
+                icono = _scaled_asset_pixmap("qr_icons/default.png", 112)
+        self.kiosk_visual_icon_label.setPixmap(icono)
         self.kiosk_lookup_sku_label.setText(lookup_view.sku_label)
         self.kiosk_lookup_product_label.setText(lookup_view.product_label)
         self.kiosk_lookup_talla_label.setText(lookup_view.talla_label)
@@ -10750,6 +10755,53 @@ def _asset_path(relative_path: str) -> Path:
 def _icon_from_asset(relative_path: str) -> QIcon:
     asset_path = _asset_path(relative_path)
     return QIcon(str(asset_path)) if asset_path.exists() else QIcon()
+
+
+def _icono_de_temporada(size: int) -> QPixmap:
+    """El dibujo de la temporada, para el hueco del producto. Vacío si no hay.
+
+    Ese hueco enseña una «M» genérica mientras nadie escanea nada: es la
+    superficie más grande de la pantalla y está esperando. En temporada lo
+    ocupa la calabaza, y al escanear vuelve el producto — el adorno se quita
+    solo cuando hay trabajo que hacer (Daniel, 2026-10-09).
+
+    El PNG es el mismo que va al papel: un dibujo de tinta negra, sin medios
+    tonos. En pantalla se tiñe del color de la temporada, porque negro puro
+    sobre crema se ve como un error de carga y no como un adorno.
+    """
+    try:
+        from PyQt6.QtGui import QBitmap, QColor, QImage
+
+        from pos_uniformes.services.temporada_service import (
+            ARCHIVOS,
+            actual,
+            imagen_para_marcador,
+        )
+
+        t = actual()
+        if t is None:
+            return QPixmap()
+        ruta = imagen_para_marcador(ARCHIVOS.get(t.nombre, ""))
+        if ruta is None:
+            return QPixmap()
+        imagen = QImage(str(ruta))
+        if imagen.isNull():
+            return QPixmap()
+        # El dibujo es tinta negra sobre papel BLANCO, sin transparencia: si se
+        # tiñe tal cual sale un rectángulo de color (pasó al escribir esto).
+        # Se recorta con una máscara de 1 bit, que es justo lo que el dibujo
+        # ya es — `setAlphaChannel` sobre un Grayscale8 no recorta nada.
+        mono = imagen.convertToFormat(QImage.Format.Format_Mono)
+        tenido = QPixmap(mono.size())
+        tenido.fill(QColor(t.color))
+        tenido.setMask(QBitmap.fromImage(mono))
+        return tenido.scaled(
+            size, size,
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
+        )
+    except Exception:  # noqa: BLE001 — sin adorno, la «M» de siempre
+        return QPixmap()
 
 
 def _scaled_asset_pixmap(relative_path: str, size: int) -> QPixmap:
