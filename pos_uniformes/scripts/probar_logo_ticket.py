@@ -27,34 +27,40 @@ if __package__ in {None, ""}:
 
 
 def texto_de_prueba() -> str:
-    """El logo en los dos anchos, para saber a quién culpar.
+    """El logo tal como va a salir en el ticket.
 
-    A 500 puntos el driver tiene que reescalar la imagen para acomodarla en la
-    página; a 576 —el ancho completo del papel— no. Si B sale limpia y A no, el
-    culpable es el reescalado y no la impresora ni el tamaño del logo."""
+    Antes esto imprimía DOS logos, de 500 y 576 puntos, para averiguar si lo
+    que lo apolillaba era el reescalado. Ya se sabe que sí: a 500 el programa
+    tenía que estirarlo y se comía las serifas (medido en papel el 07/10).
+    Ahora el logo viene a 552 —el ancho útil exacto— y no lo toca nadie, así
+    que la comparación perdió el sentido y lo que queda es mirar UNO.
+
+    Lo que hay que mirar son las serifas finas: MAXIMODA es una Didone y sus
+    trazos delgados quedan en 1-2 puntos a cualquier tamaño que quepa en el
+    papel. Eso no se arregla creciendo, y engordarlos la volvería otra letra.
+    """
     from pos_uniformes.services.temporada_service import marcador_de
 
-    a, b = marcador_de("logo"), marcador_de("logo_ancho")
-    if not a and not b:
+    marca = marcador_de("logo")
+    if not marca:
         return ""
     ancho = 38
-    lineas = ["PRUEBA DEL LOGO".center(ancho), ""]
-    if a:
-        lineas += ["A) 500 puntos de ancho", a, ""]
-    if b:
-        lineas += ["B) 576 puntos (ancho completo)", b, ""]
-    lineas += [
-        "Si B sale limpia y A no, el driver",
-        "esta reescalando la imagen.",
+    return "\n".join([
+        "PRUEBA DEL LOGO".center(ancho),
         "",
-        "Si las dos salen apolilladas, hay que",
-        "mandarla por ESC/POS crudo.",
+        marca,
+        "",
+        "Mira las serifas finas: las patitas",
+        "delgadas de la A, la M y la X.",
+        "",
+        "Si se ven completas, asi queda.",
+        "Si se cortan, hay que buscar una",
+        "version de trazo mas parejo.",
         "",
         "-" * ancho,
         "",
         "",
-    ]
-    return "\n".join(lineas)
+    ])
 
 
 def _imprimir_aqui(texto: str) -> int:

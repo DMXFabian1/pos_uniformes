@@ -40,6 +40,26 @@ ALTO_MAXIMO = 340
 PASO_ALTO = 40
 
 
+def preparar_a_lo_ancho(origen: Path, ancho: int = ANCHO_MAXIMO):
+    """Igual, pero al ANCHO exacto del papel y sin tocarle el trazo.
+
+    Es para el logo de la tienda. Con una tipografía de trazo contrastado
+    —MAXIMODA es una Didone— las serifas quedan en 1-2 puntos a cualquier
+    tamaño que quepa en el papel: no es cuestión de crecer, es la letra. Y
+    engordarlas la convertiría en otra tipografía, que es peor que una serifa
+    tenue (09/10).
+
+    Lo que sí se evita es el reescalado: a 552 justos no lo encoge nadie al
+    imprimir, que era lo que lo dejaba apolillado (07/10, medido en papel).
+    """
+    from PIL import Image
+
+    gris = _aplanar(origen)
+    alto = max(1, round(gris.height * ancho / gris.width))
+    gris = gris.resize((ancho, alto), Image.LANCZOS)
+    return gris.point(lambda v: 0 if v < UMBRAL else 255).convert("1")
+
+
 def preparar(origen: Path, *, alto: int = ALTO):
     """El dibujo listo para el papel, del tamaño que de verdad necesita.
 
@@ -56,23 +76,28 @@ def preparar(origen: Path, *, alto: int = ALTO):
     return _engordar_si_hace_falta(im)
 
 
-def _a_dos_tonos(origen: Path, alto: int):
+def _aplanar(origen: Path):
+    """El dibujo en grises, sobre blanco y sin márgenes.
+
+    La forma puede venir en el ALFA (negro sobre transparente, como los manda
+    Daniel) o en el color: aplanar sobre BLANCO deja las dos igual. Y se
+    recorta el aire, que en el papel son renglones en blanco que nadie pidió.
+    """
     from PIL import Image
 
     im = Image.open(origen)
-    # La forma puede venir en el ALFA (negro sobre transparente, como los
-    # manda Daniel) o en el color. Aplanar sobre BLANCO deja las dos igual.
     if "A" in im.getbands():
         fondo = Image.new("RGBA", im.size, (255, 255, 255, 255))
         im = Image.alpha_composite(fondo, im.convert("RGBA"))
     gris = im.convert("L")
-
-    # Se recorta el aire: el dibujo suele venir con márgenes que en el papel
-    # son renglones en blanco que nadie pidió.
     caja = gris.point(lambda v: 255 if v < UMBRAL else 0).getbbox()
-    if caja:
-        gris = gris.crop(caja)
+    return gris.crop(caja) if caja else gris
 
+
+def _a_dos_tonos(origen: Path, alto: int):
+    from PIL import Image
+
+    gris = _aplanar(origen)
     ancho = max(1, round(gris.width * alto / gris.height))
     if ancho > ANCHO_MAXIMO:
         ancho, alto = ANCHO_MAXIMO, max(1, round(gris.height * ANCHO_MAXIMO / gris.width))

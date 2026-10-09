@@ -58,13 +58,20 @@ class ElPngEsImprimibleTests(unittest.TestCase):
 
 
 class LaPruebaDeImpresionTests(unittest.TestCase):
-    def test_el_texto_lleva_los_dos_anchos_y_dice_que_mirar(self) -> None:
+    def test_el_texto_lleva_el_logo_y_dice_que_mirar(self) -> None:
+        """Ya no son dos anchos: la comparación resolvió lo que tenía que
+        resolver (era el reescalado) y el logo ahora viene al ancho exacto.
+        Lo que queda por mirar son las serifas (2026-10-09)."""
         from pos_uniformes.scripts.probar_logo_ticket import texto_de_prueba
 
         texto = texto_de_prueba()
         self.assertIn(temp.marcador_de("logo"), texto)
-        self.assertIn(temp.marcador_de("logo_ancho"), texto)
-        self.assertIn("reescalando", texto)
+        self.assertIn("serifas", texto)
+
+    def test_ya_no_hay_un_logo_que_el_papel_tenga_que_encoger(self) -> None:
+        """`logo_ancho` medía 576 y el útil son 552: lo encogía el propio
+        renderizador, que es exactamente lo que lo apolillaba."""
+        self.assertIsNone(temp.imagen_para_marcador("logo_ancho"))
 
     def test_sin_argumentos_encola_y_avisa_que_no_elige_impresora(self) -> None:
         """Por la cola no se puede escoger en cuál sale: el kiosko se lleva el
@@ -304,3 +311,45 @@ class ElCorteNoParteElUltimoRenglonTests(unittest.TestCase):
 
         datos = build_escpos_bytes("Hola\n", self._s(corte_calculado=False, feed_lines=3))
         self.assertTrue(datos.endswith(b"\n\n\n\x1dV\x00"))
+
+
+class ElLogoDeLaTiendaEnElPapelTests(unittest.TestCase):
+    """El logo que mandó Daniel, preparado para la térmica (2026-10-09)."""
+
+    def _carpeta(self):
+        from pathlib import Path
+
+        return Path(__file__).resolve().parents[1] / "assets" / "ticket"
+
+    def test_el_original_se_queda_guardado(self) -> None:
+        self.assertTrue((self._carpeta() / "originales" / "logo.png").exists())
+
+    def test_sale_de_su_original(self) -> None:
+        from PIL import Image
+
+        from pos_uniformes.scripts.preparar_dibujo_temporada import preparar_a_lo_ancho
+
+        carpeta = self._carpeta()
+        esperado = preparar_a_lo_ancho(carpeta / "originales" / "logo.png")
+        actual = Image.open(carpeta / "logo.png")
+        self.assertEqual(actual.size, esperado.size)
+        self.assertEqual(actual.convert("L").tobytes(), esperado.convert("L").tobytes())
+
+    def test_mide_el_ancho_util_exacto(self) -> None:
+        """Ni un punto más, y por eso nadie lo encoge.
+
+        El renderizador solo reescala lo que pasa del ancho útil; cumpliendo
+        esto, el logo llega al papel tal cual. Encogerlo es lo que lo
+        apolillaba (07/10, medido en papel)."""
+        from PIL import Image
+
+        from pos_uniformes.services.ticket_imagen_service import ANCHO_PAPEL, MARGEN
+
+        self.assertEqual(
+            Image.open(self._carpeta() / "logo.png").width, ANCHO_PAPEL - MARGEN * 2
+        )
+
+    def test_queda_en_dos_tonos(self) -> None:
+        from PIL import Image
+
+        self.assertEqual(Image.open(self._carpeta() / "logo.png").mode, "1")
