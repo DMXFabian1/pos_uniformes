@@ -5671,7 +5671,11 @@ class QuoteSatelliteWindow(QMainWindow):
         self.kiosk_lookup_detail_label.setObjectName("satKioskBody")
         self.kiosk_lookup_context_label.setObjectName("satKioskBody")
         self.kiosk_lookup_notes_label.setObjectName("satKioskBody")
-        self.kiosk_visual_icon_label.setFixedSize(148, 148)
+        self.kiosk_visual_icon_label.setFixedSize(_HUECO_VISUAL, _HUECO_VISUAL)
+        # Sin esto el dibujo se pega a la IZQUIERDA de su caja: una «M» de 112
+        # en una caja de 148 deja 36 puntos de aire a la derecha, y se lee
+        # como que está fuera de lugar (Daniel, 2026-10-09).
+        self.kiosk_visual_icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.kiosk_lookup_product_label.setWordWrap(True)
         self.kiosk_lookup_detail_label.setWordWrap(True)
         self.kiosk_lookup_context_label.setWordWrap(True)
@@ -10241,9 +10245,9 @@ QLabel#favDialogPriceLabel {
             icono = _catalog_row_icon(lookup_row)
         else:
             # Sin producto, el hueco lo ocupa la temporada; si no hay, la «M».
-            icono = _icono_de_temporada(124)
+            icono = _icono_de_temporada(_DIBUJO_VISUAL)
             if icono.isNull():
-                icono = _scaled_asset_pixmap("qr_icons/default.png", 112)
+                icono = _scaled_asset_pixmap("qr_icons/default.png", _DIBUJO_VISUAL)
         self.kiosk_visual_icon_label.setPixmap(icono)
         self.kiosk_lookup_sku_label.setText(lookup_view.sku_label)
         self.kiosk_lookup_product_label.setText(lookup_view.product_label)
@@ -10755,6 +10759,13 @@ def _asset_path(relative_path: str) -> Path:
 def _icon_from_asset(relative_path: str) -> QIcon:
     asset_path = _asset_path(relative_path)
     return QIcon(str(asset_path)) if asset_path.exists() else QIcon()
+
+
+#: La caja del dibujo del producto, y qué tan grande se dibuja dentro. Van
+#: juntos para que el producto, el adorno de temporada y la «M» ocupen lo
+#: mismo: si cada uno trae su tamaño, al escanear la tarjeta da un brinco.
+_HUECO_VISUAL = 148
+_DIBUJO_VISUAL = 118
 
 
 def _icono_de_temporada(size: int) -> QPixmap:

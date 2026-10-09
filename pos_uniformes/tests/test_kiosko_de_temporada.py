@@ -117,3 +117,39 @@ class LaPantallaLoUsaTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ElDibujoVaCentradoEnSuCajaTests(unittest.TestCase):
+    """«esa M se ve fuera de lugar, siento que no está centrada» (09/10).
+
+    No era la «M»: dentro de su archivo está centrada (3 puntos de margen a
+    cada lado). Era la etiqueta, que sin `setAlignment` pega el dibujo a la
+    IZQUIERDA — 112 en una caja de 148 deja 36 puntos de aire a la derecha.
+    """
+
+    def test_la_etiqueta_centra_lo_que_le_pongan(self) -> None:
+        from pathlib import Path
+
+        codigo = Path(__file__).resolve().parents[1].joinpath(
+            "ui/quote_satellite_window.py"
+        ).read_text(encoding="utf-8")
+        self.assertIn(
+            "self.kiosk_visual_icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)",
+            codigo,
+        )
+
+    def test_el_adorno_y_la_M_miden_lo_mismo(self) -> None:
+        """Con tamaños distintos, la tarjeta da un brinco al escanear."""
+        from pos_uniformes.ui import quote_satellite_window as q
+
+        temp.guardar_ajuste(temp.APAGADA)
+        m = q._scaled_asset_pixmap("qr_icons/default.png", q._DIBUJO_VISUAL)
+        temp.guardar_ajuste(temp.FIJA, "halloween")
+        adorno = q._icono_de_temporada(q._DIBUJO_VISUAL)
+        self.assertEqual(max(m.width(), m.height()), q._DIBUJO_VISUAL)
+        self.assertEqual(max(adorno.width(), adorno.height()), q._DIBUJO_VISUAL)
+
+    def test_el_dibujo_cabe_en_su_caja(self) -> None:
+        from pos_uniformes.ui import quote_satellite_window as q
+
+        self.assertLess(q._DIBUJO_VISUAL, q._HUECO_VISUAL)
