@@ -84,3 +84,47 @@ class LaPruebaDeDosHorasSigueMandandoTests(_ConAjuste):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LaTemporadaSobreviveAlCerrarElProgramaTests(unittest.TestCase):
+    """«quise poner halloween desde ahora, y ahorita que reinicié ya no
+    aparece» (Daniel, 2026-10-09).
+
+    Lo estaba guardando con `runtime_base_dir`, que en el kiosko empaquetado
+    es la carpeta del .exe. Los otros ajustes por máquina —impresoras,
+    ESC/POS— viven en `satellite_data_dir` (AppData en el bundle) justamente
+    porque esa carpeta sí dura.
+    """
+
+    def test_vive_donde_los_demas_ajustes_de_maquina(self) -> None:
+        """El conftest aísla `ruta_ajuste` por test, así que no se llama:
+        se comprueba la carpeta que el módulo dice usar."""
+        from pos_uniformes.services import escpos_settings_cache_service as esc
+        from pos_uniformes.services import print_routing_cache_service as rut
+        from pos_uniformes.utils.config import satellite_data_dir
+
+        vecinos = {esc._cache_path().parent, rut._cache_path().parent}
+        self.assertEqual(len(vecinos), 1, "los otros ajustes ya no coinciden")
+        self.assertEqual(satellite_data_dir() / "data", vecinos.pop())
+
+    def test_no_se_guarda_junto_al_exe(self) -> None:
+        """Esa carpeta la reemplaza la actualización del kiosko.
+
+        Se mira la IMPORTACIÓN y no la palabra: el porqué está escrito en un
+        comentario del propio archivo, y buscar el nombre a secas hacía
+        fallar el test por su propia explicación."""
+        from pathlib import Path
+
+        from pos_uniformes.services import temporada_service as t
+
+        codigo = Path(t.__file__).read_text(encoding="utf-8")
+        self.assertNotIn("import runtime_base_dir", codigo)
+        self.assertEqual(codigo.count("import satellite_data_dir"), 2)
+
+    def test_lo_guardado_se_lee_de_vuelta(self) -> None:
+        """La comprobación de siempre, por si el camino cambia otra vez."""
+        from pos_uniformes.services import temporada_service as t
+
+        t.guardar_ajuste(t.FIJA, "halloween")
+        self.assertEqual(t.ajuste(), (t.FIJA, "halloween"))
+        self.assertTrue(t.ruta_ajuste().exists())

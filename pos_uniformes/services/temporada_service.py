@@ -167,9 +167,19 @@ AUTO, APAGADA, FIJA = "auto", "apagada", "fija"
 
 
 def ruta_ajuste():
-    from pos_uniformes.utils.config import runtime_base_dir
+    """Dónde vive el ajuste de ESTA máquina.
 
-    return runtime_base_dir() / "data" / "temporada_ajuste.json"
+    `satellite_data_dir` y no `runtime_base_dir`: en el kiosko empaquetado el
+    segundo es la carpeta del .exe, y esa carpeta la reemplaza la
+    actualización — Daniel ponía Halloween, cerraba el programa y al volver
+    ya no estaba (2026-10-09). En AppData sobrevive, que es donde ya viven
+    los otros ajustes por máquina (impresoras, ESC/POS).
+
+    Fuera del kiosko las dos carpetas son la misma, así que nada se mueve.
+    """
+    from pos_uniformes.utils.config import satellite_data_dir
+
+    return satellite_data_dir() / "data" / "temporada_ajuste.json"
 
 
 def ajuste() -> tuple[str, str]:
@@ -245,9 +255,10 @@ HORAS_FORZADA = 2.0
 
 
 def ruta_forzada():
-    from pos_uniformes.utils.config import runtime_base_dir
+    """La prueba de dos horas, en la misma carpeta que el ajuste."""
+    from pos_uniformes.utils.config import satellite_data_dir
 
-    return runtime_base_dir() / "data" / "temporada_forzada.json"
+    return satellite_data_dir() / "data" / "temporada_forzada.json"
 
 
 def forzada() -> "Temporada | None":
