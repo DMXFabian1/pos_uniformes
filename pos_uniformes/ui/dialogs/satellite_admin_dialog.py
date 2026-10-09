@@ -566,7 +566,7 @@ def _build_temporada_box(dialog: QWidget) -> QGroupBox:
     def _guardar() -> None:
         modo, archivo = combo.currentData()
         try:
-            temp.guardar_ajuste(modo, archivo)
+            en_la_tienda = temp.guardar_ajuste(modo, archivo)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(dialog, "Error", f"No se pudo guardar:\n{exc}")
             return
@@ -575,7 +575,19 @@ def _build_temporada_box(dialog: QWidget) -> QGroupBox:
         temp.quitar_forzada()
         _refrescar_estado()
         _repintar_adornos(dialog)
-        QMessageBox.information(dialog, "Guardado", estado.text())
+        if en_la_tienda:
+            QMessageBox.information(
+                dialog, "Guardado",
+                estado.text() + "\n\nLas demás pantallas se enteran en un minuto.",
+            )
+        else:
+            # Decirlo importa: creería que ya quedó en toda la tienda.
+            QMessageBox.warning(
+                dialog, "Solo en esta pantalla",
+                estado.text()
+                + "\n\nNo se pudo avisar a la base, así que las otras pantallas "
+                  "siguen como estaban. Vuelve a guardar cuando haya conexión.",
+            )
 
     guardar.clicked.connect(_guardar)
     layout.addWidget(guardar)

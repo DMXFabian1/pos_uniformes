@@ -219,6 +219,13 @@ class ConfiguracionNegocio(Base):
     telefono: Mapped[str | None] = mapped_column(String(40))
     direccion: Mapped[str | None] = mapped_column(Text())
     pie_ticket: Mapped[str | None] = mapped_column(Text())
+    #: Cómo se eligen los adornos de temporada en TODA la tienda: "auto"
+    #: (calendario), "apagada", o "fija" con `temporada_archivo`. Vacío =
+    #: automático. Vive aquí y no en cada máquina porque es de la tienda
+    #: (2026-10-09): ponerlo en una y que las otras no se enteren era peor
+    #: que no tenerlo.
+    temporada_modo: Mapped[str | None] = mapped_column(String(16))
+    temporada_archivo: Mapped[str | None] = mapped_column(String(40))
     transferencia_banco: Mapped[str | None] = mapped_column(String(120))
     transferencia_beneficiario: Mapped[str | None] = mapped_column(String(160))
     transferencia_clabe: Mapped[str | None] = mapped_column(String(40))

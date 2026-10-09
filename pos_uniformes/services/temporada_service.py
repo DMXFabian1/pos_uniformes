@@ -25,8 +25,11 @@ fiesta: es **el regreso a clases**. Va primero por eso.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import date
+
+logger = logging.getLogger(__name__)
 
 #: Ancho útil del ticket (38 columnas menos los bordes del recuadro).
 ANCHO_TICKET = 34
@@ -182,8 +185,61 @@ def ruta_ajuste():
     return satellite_data_dir() / "data" / "temporada_ajuste.json"
 
 
+#: Cuánto vale lo leído de la base antes de volver a preguntar. La temporada
+#: se consulta en cada ticket y en cada repintado: sin esto sería una
+#: consulta por renglón impreso. Medio minuto sobra para algo que se cambia
+#: tres veces al año.
+SEGUNDOS_DE_MEMORIA = 30.0
+_memoria: tuple[float, object] = (0.0, None)
+
+
+def olvidar_lo_leido() -> None:
+    """Tira la memoria para que la próxima lectura vaya a la base.
+
+    La llama quien acaba de guardar: si no, su propio cambio tardaría medio
+    minuto en verse en la máquina que lo hizo."""
+    global _memoria
+    _memoria = (0.0, None)
+
+
+def _ajuste_de_la_tienda():
+    """Lo que dice la BASE, o None si no hay nada o no se puede preguntar.
+
+    Es de la tienda y no de la máquina: ponerlo en una pantalla y que las
+    otras no se enteren era peor que no tenerlo (Daniel, 2026-10-09).
+    """
+    import time
+
+    global _memoria
+    ahora = time.time()
+    guardado_en, valor = _memoria
+    if ahora - guardado_en < SEGUNDOS_DE_MEMORIA:
+        return valor
+    leido = None
+    try:
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.services.business_settings_service import (
+            BusinessSettingsService,
+        )
+
+        with get_session() as session:
+            config = BusinessSettingsService.get_or_create(session)
+            modo = str(getattr(config, "temporada_modo", "") or "")
+            if modo in (AUTO, APAGADA, FIJA):
+                leido = (modo, str(getattr(config, "temporada_archivo", "") or ""))
+    except Exception:  # noqa: BLE001 — sin red manda el cache de esta máquina
+        return None
+    _memoria = (ahora, leido)
+    return leido
+
+
 def ajuste() -> tuple[str, str]:
-    """(modo, archivo). Por omisión, el calendario de siempre."""
+    """(modo, archivo). La tienda manda; el archivo local es la red de abajo.
+
+    Por omisión, el calendario de siempre."""
+    de_la_tienda = _ajuste_de_la_tienda()
+    if de_la_tienda is not None:
+        return de_la_tienda
     ruta = ruta_ajuste()
     if not ruta.exists():
         return AUTO, ""
@@ -199,20 +255,46 @@ def ajuste() -> tuple[str, str]:
         return AUTO, ""
 
 
-def guardar_ajuste(modo: str, archivo: str = "") -> None:
-    """Guarda cómo se eligen las temporadas en ESTA máquina."""
+def guardar_ajuste(modo: str, archivo: str = "") -> bool:
+    """Guarda cómo se eligen las temporadas en TODA la tienda.
+
+    Devuelve True si llegó a la base —o sea, si las demás pantallas se van a
+    enterar— y False si solo quedó en ésta.
+
+    Se escribe en los dos lados a propósito: la base es la que ven las demás,
+    y el archivo local es lo que salva al kiosko cuando se queda sin red.
+    """
     import json
 
     if modo not in (AUTO, APAGADA, FIJA):
         raise ValueError(f"modo inválido: {modo!r}")
     if modo == FIJA and temporada_de_archivo(archivo) is None:
         raise ValueError(f"no conozco la temporada {archivo!r}")
+    elegido = archivo if modo == FIJA else ""
+
     ruta = ruta_ajuste()
     ruta.parent.mkdir(parents=True, exist_ok=True)
     ruta.write_text(
-        json.dumps({"modo": modo, "temporada": archivo if modo == FIJA else ""}),
-        encoding="utf-8",
+        json.dumps({"modo": modo, "temporada": elegido}), encoding="utf-8"
     )
+    olvidar_lo_leido()
+
+    try:
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.services.business_settings_service import (
+            BusinessSettingsService,
+        )
+
+        with get_session() as session:
+            config = BusinessSettingsService.get_or_create(session)
+            config.temporada_modo = modo
+            config.temporada_archivo = elegido
+            session.commit()
+        olvidar_lo_leido()
+        return True
+    except Exception:  # noqa: BLE001 — esta máquina ya quedó bien; se avisa
+        logger.warning("La temporada no llegó a la base: solo cambia esta pantalla")
+        return False
 
 
 def actual(hoy: date | None = None) -> Temporada | None:

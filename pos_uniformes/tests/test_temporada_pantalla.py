@@ -88,15 +88,36 @@ class LaMarcaDeTemporadaTests(unittest.TestCase):
 class NoSePintaLaVentanaEnteraTests(unittest.TestCase):
     """La pantalla es para vender; el adorno es un detalle, no un disfraz."""
 
-    def test_el_motivo_vive_en_dos_lugares_y_no_mas(self) -> None:
+    def test_el_motivo_se_PINTA_en_dos_lugares_y_no_mas(self) -> None:
+        """La barra del kiosko y la tarjeta del gate. Nada más.
+
+        Antes esto contaba cuántas veces se importaba `actual`, y se rompió
+        al colgar del latido una LECTURA que no pinta nada: solo decide si
+        hay que repintar (2026-10-09). Contar importaciones medía algo
+        parecido pero no lo que importa; ahora se cuentan los lugares que
+        de verdad ponen un adorno en pantalla.
+        """
         from pathlib import Path
 
         raiz = Path(__file__).resolve().parents[1]
         ventana = (raiz / "ui" / "quote_satellite_window.py").read_text(encoding="utf-8")
         venta = (raiz / "ui" / "views" / "quick_sale_view.py").read_text(encoding="utf-8")
-        # La barra del kiosko y la tarjeta del gate. Nada más.
-        self.assertEqual(ventana.count("temporada_service import actual"), 1)
+        # En la ventana: la barra del encabezado y el hueco del producto.
+        self.assertEqual(ventana.count("TarjetaConTemporada()"), 1)
+        self.assertEqual(ventana.count("_icono_de_temporada("), 2)   # def + uso
+        # En venta rápida: solo la tarjeta del gate.
         self.assertEqual(venta.count("temporada_service import actual"), 1)
+
+    def test_la_lectura_del_latido_no_pinta_nada(self) -> None:
+        """Lee para saber si cambió; quien pinta son los widgets."""
+        from pathlib import Path
+
+        ventana = (
+            Path(__file__).resolve().parents[1] / "ui" / "quote_satellite_window.py"
+        ).read_text(encoding="utf-8")
+        trozo = ventana[ventana.index("def _repintar_si_cambio_la_temporada"):][:700]
+        self.assertIn("releer_temporada", trozo)
+        self.assertNotIn("setStyleSheet", trozo)
 
     def test_en_venta_rapida_solo_esta_en_el_gate(self) -> None:
         # Mientras se vende, la pantalla es para vender.

@@ -7774,6 +7774,24 @@ class QuoteSatelliteWindow(QMainWindow):
 
         threading.Thread(target=_worker, daemon=True, name="anuncio-acuse").start()
 
+    def _repintar_si_cambio_la_temporada(self, nombre: str) -> None:
+        """Repinta los adornos si la temporada cambió en otra pantalla.
+
+        Corre en el hilo de la UI porque toca widgets; quien lee la base es
+        el latido, que ya está fuera. Daniel, 2026-10-09: «si pongo una
+        temporada en una quiero que se replique en las demás».
+        """
+        if nombre == getattr(self, "_temporada_vista", None):
+            return
+        self._temporada_vista = nombre
+        for w in [self, *self.findChildren(QWidget)]:
+            releer = getattr(w, "releer_temporada", None)
+            if callable(releer):
+                try:
+                    releer()
+                except Exception:  # noqa: BLE001 — un adorno no tumba nada
+                    pass
+
     def _enviar_heartbeat(self) -> None:
         """Registra/actualiza este satélite en la DB (off-thread, best-effort)."""
         import threading
@@ -7793,6 +7811,18 @@ class QuoteSatelliteWindow(QMainWindow):
                 with get_session() as session:
                     registrar(session, get_satellite_id(), get_satellite_name())
                     session.commit()
+
+                # De paso, la temporada: ya estamos hablando con la base y
+                # se cambia tres veces al año — no merece su propio reloj.
+                # Se lee AQUÍ (fuera del hilo de la UI, que es donde se
+                # puede tardar) y se repinta allá, que es donde se puede
+                # tocar la pantalla.
+                from pos_uniformes.services.temporada_service import actual
+
+                nombre = getattr(actual(), "nombre", "")
+                QTimer.singleShot(
+                    0, lambda n=nombre: self._repintar_si_cambio_la_temporada(n)
+                )
             except Exception:  # noqa: BLE001 — presencia es best-effort
                 pass
 

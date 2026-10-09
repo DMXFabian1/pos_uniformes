@@ -343,11 +343,19 @@ def _temporada_sin_ajuste_de_esta_maquina(tmp_path):
     Se aísla el ARCHIVO y no la función: así quien prueba el ajuste mismo
     sigue pudiendo guardarlo y leerlo de vuelta, solo que en su propia carpeta.
     Lo mismo con la temporada forzada, que también deja archivo.
+
+    Y desde que la temporada vive en la BASE (2026-10-09), también se aísla
+    esa lectura: un test que guardaba «Halloween» se lo dejaba puesto a toda
+    la base de pruebas y los siguientes veían una temporada que no habían
+    pedido. Quien prueba el camino de la base lo parchea a mano.
     """
     from unittest.mock import patch
 
     from pos_uniformes.services import temporada_service as temp
 
+    temp.olvidar_lo_leido()
     with patch.object(temp, "ruta_ajuste", lambda: tmp_path / "temporada_ajuste.json"), \
-         patch.object(temp, "ruta_forzada", lambda: tmp_path / "temporada_forzada.json"):
+         patch.object(temp, "ruta_forzada", lambda: tmp_path / "temporada_forzada.json"), \
+         patch.object(temp, "_ajuste_de_la_tienda", return_value=None):
         yield
+    temp.olvidar_lo_leido()

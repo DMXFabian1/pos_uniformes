@@ -128,3 +128,125 @@ class LaTemporadaSobreviveAlCerrarElProgramaTests(unittest.TestCase):
         t.guardar_ajuste(t.FIJA, "halloween")
         self.assertEqual(t.ajuste(), (t.FIJA, "halloween"))
         self.assertTrue(t.ruta_ajuste().exists())
+
+
+#: La lectura real, capturada al importar: el conftest la sustituye en cada
+#: test para que ninguno herede la temporada de otro.
+from pos_uniformes.services.temporada_service import (  # noqa: E402
+    _ajuste_de_la_tienda as _LECTURA_DE_VERDAD,
+)
+
+
+class LaTemporadaEsDeLaTiendaTests(unittest.TestCase):
+    """«si pongo una temporada en una quiero que se replique en las demás»
+    (Daniel, 2026-10-09).
+
+    Era un ajuste por máquina: había que ponerlo tres veces y se
+    desincronizaban. Ahora la base manda y el archivo local es la red de
+    abajo, para que el kiosko sin red siga sabiendo qué mes es.
+    """
+
+    def setUp(self) -> None:
+        from pos_uniformes.services import temporada_service as t
+
+        t.olvidar_lo_leido()
+        self.addCleanup(t.olvidar_lo_leido)
+
+    def test_lo_que_dice_la_base_manda_sobre_el_archivo(self) -> None:
+        from unittest.mock import patch
+
+        from pos_uniformes.services import temporada_service as t
+
+        t.guardar_ajuste(t.FIJA, "halloween")      # deja el archivo local
+        with patch.object(t, "_ajuste_de_la_tienda", return_value=(t.APAGADA, "")):
+            self.assertEqual(t.ajuste(), (t.APAGADA, ""))
+
+    def test_sin_base_manda_el_archivo_de_esta_maquina(self) -> None:
+        """El kiosko sin red tiene que seguir sabiendo qué mes es."""
+        from unittest.mock import patch
+
+        from pos_uniformes.services import temporada_service as t
+
+        t.guardar_ajuste(t.FIJA, "navidad")
+        with patch.object(t, "_ajuste_de_la_tienda", return_value=None):
+            self.assertEqual(t.ajuste(), (t.FIJA, "navidad"))
+
+    def test_guardar_dice_si_llego_a_las_demas(self) -> None:
+        """Sin eso creería que ya quedó en toda la tienda."""
+        from unittest.mock import patch
+
+        from pos_uniformes.services import temporada_service as t
+
+        with patch("pos_uniformes.database.connection.get_session",
+                   side_effect=OSError("sin red")):
+            self.assertFalse(t.guardar_ajuste(t.FIJA, "halloween"))
+        # Y aun así esta máquina quedó bien.
+        with patch.object(t, "_ajuste_de_la_tienda", return_value=None):
+            self.assertEqual(t.ajuste(), (t.FIJA, "halloween"))
+
+    def test_no_se_pregunta_a_la_base_en_cada_renglon(self) -> None:
+        """`actual()` se llama por ticket y por repintado.
+
+        Se devuelve la función de verdad: el conftest la parchea para que
+        ningún test herede la temporada de otro, y aquí es justamente lo que
+        se quiere medir."""
+        from unittest.mock import patch
+
+        from pos_uniformes.services import temporada_service as t
+
+        with patch.object(t, "_ajuste_de_la_tienda", _LECTURA_DE_VERDAD), \
+             patch("pos_uniformes.services.business_settings_service"
+                   ".BusinessSettingsService.get_or_create") as leer:
+            leer.return_value = type("C", (), {"temporada_modo": t.APAGADA,
+                                               "temporada_archivo": ""})()
+            for _ in range(5):
+                t.ajuste()
+        self.assertEqual(leer.call_count, 1)
+
+    def test_al_guardar_se_olvida_lo_memorizado(self) -> None:
+        """Si no, el propio cambio tardaría medio minuto en verse aquí."""
+        from unittest.mock import patch
+
+        from pos_uniformes.services import temporada_service as t
+
+        with patch.object(t, "_ajuste_de_la_tienda", return_value=None):
+            t.ajuste()                                    # llena la memoria
+            t.guardar_ajuste(t.FIJA, "san_valentin")
+            self.assertEqual(t._memoria, (0.0, None))
+
+    def test_un_modo_raro_en_la_base_no_manda(self) -> None:
+        """Una columna con basura no puede apagar los adornos de la tienda."""
+        from unittest.mock import patch
+
+        with patch("pos_uniformes.services.business_settings_service"
+                   ".BusinessSettingsService.get_or_create") as leer:
+            leer.return_value = type("C", (), {"temporada_modo": "vete a saber",
+                                               "temporada_archivo": ""})()
+            self.assertIsNone(_LECTURA_DE_VERDAD())
+
+
+class ElKioskoSeEnteraSinReiniciarTests(unittest.TestCase):
+    def test_el_latido_lee_y_la_pantalla_repinta(self) -> None:
+        """Leer va en el hilo del latido, repintar en el de la UI: tocar
+        widgets desde un hilo tumba Qt."""
+        from pathlib import Path
+
+        codigo = Path(__file__).resolve().parents[1].joinpath(
+            "ui/quote_satellite_window.py"
+        ).read_text(encoding="utf-8")
+        trozo = codigo[codigo.index("def _enviar_heartbeat"):][:1800]
+        self.assertIn("from pos_uniformes.services.temporada_service import actual",
+                      trozo)
+        self.assertIn("QTimer.singleShot(", trozo)
+        self.assertIn("_repintar_si_cambio_la_temporada", trozo)
+
+    def test_no_repinta_si_no_cambio(self) -> None:
+        """Repintar cada minuto sin motivo parpadearía la pantalla."""
+        from pathlib import Path
+
+        codigo = Path(__file__).resolve().parents[1].joinpath(
+            "ui/quote_satellite_window.py"
+        ).read_text(encoding="utf-8")
+        trozo = codigo[codigo.index("def _repintar_si_cambio_la_temporada"):][:700]
+        self.assertIn("_temporada_vista", trozo)
+        self.assertIn("return", trozo)
