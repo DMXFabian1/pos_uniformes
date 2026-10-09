@@ -174,28 +174,33 @@ class ElDibujoDeDanielListoParaElPapelTests(unittest.TestCase):
 
         return Path(__file__).resolve().parents[1] / "assets" / "temporadas"
 
-    def test_el_original_se_queda_guardado(self) -> None:
-        """Sin él no se puede volver a preparar si cambia el tamaño."""
-        self.assertTrue((self._carpeta() / "originales" / "halloween.png").exists())
+    def _originales(self):
+        return sorted((self._carpeta() / "originales").glob("*.png"))
 
-    def test_el_que_se_imprime_sale_del_original(self) -> None:
+    def test_hay_originales_guardados(self) -> None:
+        """Sin ellos no se puede volver a preparar si cambia el tamaño."""
+        self.assertTrue(self._originales())
+
+    def test_cada_uno_sale_de_su_original(self) -> None:
         from PIL import Image
 
         from pos_uniformes.scripts.preparar_dibujo_temporada import preparar
 
-        carpeta = self._carpeta()
-        esperado = preparar(carpeta / "originales" / "halloween.png")
-        actual = Image.open(carpeta / "halloween.png")
-        self.assertEqual(actual.size, esperado.size)
-        self.assertEqual(actual.convert("L").tobytes(),
-                         esperado.convert("L").tobytes())
+        for original in self._originales():
+            with self.subTest(dibujo=original.name):
+                esperado = preparar(original)
+                actual = Image.open(self._carpeta() / original.name)
+                self.assertEqual(actual.size, esperado.size)
+                self.assertEqual(actual.convert("L").tobytes(),
+                                 esperado.convert("L").tobytes())
 
-    def test_queda_en_dos_tonos(self) -> None:
+    def test_todos_quedan_en_dos_tonos(self) -> None:
         """La térmica no tiene medios tonos: un gris sale como suciedad."""
         from PIL import Image
 
-        im = Image.open(self._carpeta() / "halloween.png")
-        self.assertEqual(im.mode, "1")
+        for p in self._carpeta().glob("*.png"):
+            with self.subTest(dibujo=p.name):
+                self.assertEqual(Image.open(p).mode, "1")
 
     def test_cabe_en_el_papel_sin_que_nadie_lo_encoja(self) -> None:
         from PIL import Image
@@ -221,16 +226,55 @@ class ElDibujoDeDanielListoParaElPapelTests(unittest.TestCase):
 
         from pos_uniformes.scripts.preparar_dibujo_temporada import preparar
 
-        im = preparar(self._carpeta() / "originales" / "halloween.png")
-        datos = im.convert("L").tobytes()
-        tinta = sum(1 for v in datos if v < 128)
-        self.assertGreater(tinta, 0, "no quedó nada de dibujo")
-        self.assertLess(tinta / len(datos), 0.9, "salió un bloque negro")
+        for original in self._originales():
+            with self.subTest(dibujo=original.name):
+                datos = preparar(original).convert("L").tobytes()
+                tinta = sum(1 for v in datos if v < 128)
+                self.assertGreater(tinta, 0, "no quedó nada de dibujo")
+                self.assertLess(tinta / len(datos), 0.9, "salió un bloque negro")
 
     def test_se_le_quita_el_aire_de_los_bordes(self) -> None:
         """Los márgenes del archivo son renglones en blanco que nadie pidió."""
         from PIL import Image
 
-        im = Image.open(self._carpeta() / "halloween.png").convert("L")
-        caja = im.point(lambda v: 255 if v < 128 else 0).getbbox()
-        self.assertEqual(caja, (0, 0, im.width, im.height))
+        for original in self._originales():
+            with self.subTest(dibujo=original.name):
+                im = Image.open(self._carpeta() / original.name).convert("L")
+                caja = im.point(lambda v: 255 if v < 128 else 0).getbbox()
+                self.assertEqual(caja, (0, 0, im.width, im.height))
+
+
+class LosTrazosAguantanLaTermicaTests(unittest.TestCase):
+    """Una línea de 1 punto a 203 dpi se la come la impresora.
+
+    Le pasó a las serifas del logo el 07/10. Los dibujos de Daniel tienen
+    trazo de 7 puntos; esto es para que no entre uno más fino sin que nadie
+    lo note hasta ver el papel.
+    """
+
+    def test_ningun_dibujo_es_casi_todo_pelo(self) -> None:
+        from collections import Counter
+        from pathlib import Path
+
+        from PIL import Image
+
+        carpeta = Path(__file__).resolve().parents[1] / "assets" / "temporadas"
+        for p in sorted(carpeta.glob("*.png")):
+            with self.subTest(dibujo=p.name):
+                im = Image.open(p).convert("L")
+                px = im.load()
+                rachas = Counter()
+                for y in range(im.height):
+                    largo = 0
+                    for x in range(im.width):
+                        if px[x, y] < 128:
+                            largo += 1
+                        elif largo:
+                            rachas[largo] += 1
+                            largo = 0
+                    if largo:
+                        rachas[largo] += 1
+                total = sum(rachas.values())
+                self.assertTrue(total, "el dibujo está vacío")
+                finas = sum(c for largo, c in rachas.items() if largo <= 2)
+                self.assertLess(finas / total, 0.25, "demasiada línea de 1-2 puntos")
