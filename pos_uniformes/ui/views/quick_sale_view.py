@@ -2432,11 +2432,15 @@ class QuickSaleWidget(QWidget):
         if store_copy:
             lines.append("COPIA TIENDA".center(_TW))
         else:
-            lines.append(biz_name.center(_TW))
-            if biz_addr:
-                lines.append(biz_addr.center(_TW))
-            if biz_phone:
-                lines.append(f"Tel: {biz_phone}".center(_TW))
+            # El MISMO encabezado que el POS principal: logo cuando se puede
+            # y la dirección partida. Estaba escrito aparte aquí, y por eso
+            # el kiosko imprimía el nombre a secas con la dirección saliéndose
+            # del papel (Daniel, 2026-10-09).
+            from pos_uniformes.services.sale_ticket_text_service import (
+                encabezado_de_ticket,
+            )
+
+            lines += encabezado_de_ticket(biz_name, biz_addr, biz_phone)
         lines.append("Ticket de venta".center(_TW))
         if reimpresion:
             lines.append("*** REIMPRESIÓN ***".center(_TW))
@@ -2533,13 +2537,12 @@ class QuickSaleWidget(QWidget):
             (total * self._MIN_LAYAWAY_PERCENT / Decimal("100")).quantize(Decimal("0.01"))
         )
 
-        lines: list[str] = []
+        from pos_uniformes.services.sale_ticket_text_service import (
+            encabezado_de_ticket,
+        )
 
-        lines.append(biz_name.center(_TW))
-        if biz_addr:
-            lines.append(biz_addr.center(_TW))
-        if biz_phone:
-            lines.append(f"Tel: {biz_phone}".center(_TW))
+        lines: list[str] = []
+        lines += encabezado_de_ticket(biz_name, biz_addr, biz_phone)
         lines.append("Ticket de apartado".center(_TW))
         if reimpresion:
             lines.append("*** REIMPRESIÓN ***".center(_TW))

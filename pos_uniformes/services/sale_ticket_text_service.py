@@ -98,6 +98,33 @@ def _marcador_de_logo(business_name: str) -> str:
         return ""
 
 
+def encabezado_de_ticket(nombre: str, direccion: str = "", telefono: str = "") -> list[str]:
+    """Las primeras líneas de CUALQUIER ticket al cliente.
+
+    Está aquí y no copiado en cada constructor porque ya pasó al revés: el
+    POS principal tenía el logo y la dirección partida, y Venta Rápida del
+    kiosko seguía escribiendo el nombre a secas con la dirección saliéndose
+    del papel. Daniel lo vio el 09/10 —«el logo sigue sin aparecer»— y el
+    ticket era de la otra máquina.
+
+    - El nombre lo pone el LOGO cuando se puede, y escribirlo además sería
+      decirlo dos veces. Cuál de los dos sale lo decide quien IMPRIME: el
+      nombre viaja dentro del marcador como respaldo.
+    - La dirección va centrada PERO partida: la de la tienda mide 54
+      caracteres y el ticket tiene 38 columnas. `center` no recorta — una
+      línea más larga que el ancho sale como salga.
+    """
+    lineas: list[str] = []
+    marca = _marcador_de_logo(nombre)
+    lineas.append(marca if marca else nombre.center(_W))
+    if direccion:
+        for trozo in textwrap.wrap(direccion, width=_W) or [direccion]:
+            lineas.append(trozo.center(_W))
+    if telefono:
+        lineas.append(f"Tel: {telefono}".center(_W))
+    return lineas
+
+
 def build_sale_ticket_text(
     *,
     sale: object,
@@ -119,21 +146,7 @@ def build_sale_ticket_text(
     lines: list[str] = []
 
     # — Encabezado —
-    # El nombre lo pone el LOGO cuando se puede, y escribirlo además sería
-    # decirlo dos veces. Cuál de los dos sale lo decide quien imprime, no
-    # quien arma el ticket: el nombre viaja dentro del marcador como respaldo.
-    marca = _marcador_de_logo(business_name)
-    lines.append(marca if marca else business_name.center(_W))
-    if business_address:
-        # Centrado PERO partido a lo ancho del papel: la dirección de la tienda
-        # mide 54 caracteres y el ticket tiene 38 columnas, así que centrarla
-        # de un golpe la sacaba del papel (2026-10-07, al llenarla por primera
-        # vez). `center` no recorta: una línea más larga que el ancho sale
-        # como salga.
-        for trozo in textwrap.wrap(business_address, width=_W) or [business_address]:
-            lines.append(trozo.center(_W))
-    if business_phone:
-        lines.append(f"Tel: {business_phone}".center(_W))
+    lines += encabezado_de_ticket(business_name, business_address, business_phone)
     lines.append("Ticket de venta".center(_W))
 
     # — Datos —
