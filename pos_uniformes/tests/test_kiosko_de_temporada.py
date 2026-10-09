@@ -212,12 +212,18 @@ class ElDibujoDeDanielListoParaElPapelTests(unittest.TestCase):
                 self.assertLessEqual(Image.open(p).width, ANCHO_MAXIMO)
 
     def test_no_se_come_media_cuenta(self) -> None:
-        """Un dibujo alto es papel que se paga en cada venta."""
+        """Un dibujo alto es papel que se paga en cada venta.
+
+        El tope no es el de siempre (190): uno con mucho detalle fino puede
+        crecer hasta `ALTO_MAXIMO` para que los trazos aguanten la térmica.
+        Lo que no puede es crecer sin límite."""
         from PIL import Image
+
+        from pos_uniformes.scripts.preparar_dibujo_temporada import ALTO_MAXIMO
 
         for p in self._carpeta().glob("*.png"):
             with self.subTest(dibujo=p.name):
-                self.assertLessEqual(Image.open(p).height, 260)
+                self.assertLessEqual(Image.open(p).height, ALTO_MAXIMO)
 
     def test_la_transparencia_se_aplana_sobre_blanco(self) -> None:
         """Los manda negros sobre transparente: sin aplanar, el papel sale
@@ -278,3 +284,56 @@ class LosTrazosAguantanLaTermicaTests(unittest.TestCase):
                 self.assertTrue(total, "el dibujo está vacío")
                 finas = sum(c for largo, c in rachas.items() if largo <= 2)
                 self.assertLess(finas / total, 0.25, "demasiada línea de 1-2 puntos")
+
+
+class CrecerAntesQueEngordarTests(unittest.TestCase):
+    """«Día de las Madres» quedó con trazo de 2 puntos al bajarlo a 190.
+
+    Engordarlo lo arreglaba en el número y lo arruinaba en el papel: los
+    brazos y las manos se cerraban en una mancha (se vio en pantalla el
+    09/10). Un dibujo con detalle fino no necesita más tinta, necesita más
+    espacio.
+    """
+
+    def _carpeta(self):
+        from pathlib import Path
+
+        return Path(__file__).resolve().parents[1] / "assets" / "temporadas"
+
+    def test_el_que_tiene_detalle_fino_crece(self) -> None:
+        from PIL import Image
+
+        from pos_uniformes.scripts.preparar_dibujo_temporada import ALTO
+
+        alto = Image.open(self._carpeta() / "dia_de_las_madres.png").height
+        self.assertGreater(alto, ALTO)
+
+    def test_los_demas_se_quedan_del_tamaño_de_siempre(self) -> None:
+        """Crecer cuesta papel: solo el que lo necesita."""
+        from PIL import Image
+
+        from pos_uniformes.scripts.preparar_dibujo_temporada import ALTO
+
+        for nombre in ("halloween", "navidad", "san_valentin", "anio_nuevo"):
+            with self.subTest(dibujo=nombre):
+                self.assertEqual(
+                    Image.open(self._carpeta() / f"{nombre}.png").height, ALTO
+                )
+
+    def test_crecer_no_es_infinito(self) -> None:
+        from pos_uniformes.scripts.preparar_dibujo_temporada import ALTO, ALTO_MAXIMO
+
+        self.assertGreater(ALTO_MAXIMO, ALTO)
+        self.assertLessEqual(ALTO_MAXIMO / 203 * 2.54, 4.5)   # cm de papel
+
+    def test_engordar_queda_de_ultimo_recurso(self) -> None:
+        """Si se engordara siempre, el de las Madres saldría como mancha."""
+        from pathlib import Path
+
+        codigo = Path(__file__).resolve().parents[1].joinpath(
+            "scripts/preparar_dibujo_temporada.py"
+        ).read_text(encoding="utf-8")
+        trozo = codigo[codigo.index("def preparar("):codigo.index("def _a_dos_tonos")]
+        self.assertIn("while _proporcion_de_pelo", trozo)
+        self.assertLess(trozo.index("while _proporcion_de_pelo"),
+                        trozo.index("_engordar_si_hace_falta"))
