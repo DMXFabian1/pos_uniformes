@@ -81,7 +81,10 @@ class ElHuecoDelProductoTests(unittest.TestCase):
                     self.assertLessEqual(abs(a - b), 4, f"canal {canal}: {a} vs {b}")
 
     def test_no_sale_un_rectangulo_macizo(self) -> None:
-        """Lo que se vio en pantalla cuando el teñido estaba mal."""
+        """Lo que se vio en pantalla cuando el teñido estaba mal.
+
+        El que de verdad caza el error es el de las esquinas transparentes;
+        éste cuida el caso de un dibujo que llene las esquinas."""
         temp.guardar_ajuste(temp.FIJA, "halloween")
         img = self._como_imagen(self._icono())
         total = sum(1 for y in range(img.height()) for x in range(img.width()))
@@ -89,8 +92,10 @@ class ElHuecoDelProductoTests(unittest.TestCase):
             1 for y in range(img.height()) for x in range(img.width())
             if img.pixelColor(x, y).alpha() > 128
         )
-        # Un dibujo de línea ocupa una parte chica de su caja.
-        self.assertLess(pintados / total, 0.5)
+        # Un rectángulo macizo es TODO opaco. El margen deja pasar una
+        # silueta rellena —la calabaza de Daniel ocupa el 59% de su caja—
+        # sin dejar pasar el error, que da 100%.
+        self.assertLess(pintados / total, 0.9)
 
     def test_una_temporada_sin_dibujo_no_truena(self) -> None:
         from unittest.mock import patch
@@ -153,3 +158,79 @@ class ElDibujoVaCentradoEnSuCajaTests(unittest.TestCase):
         from pos_uniformes.ui import quote_satellite_window as q
 
         self.assertLess(q._DIBUJO_VISUAL, q._HUECO_VISUAL)
+
+
+class ElDibujoDeDanielListoParaElPapelTests(unittest.TestCase):
+    """Daniel manda los dibujos grandes y con transparencia; la térmica quiere
+    blanco y negro puro y del tamaño exacto con que va a imprimir.
+
+    Se prepara UNA vez (`scripts/preparar_dibujo_temporada.py`) y no al
+    imprimir: encoger un dibujo de un bit en el último momento es lo que
+    apolilló el logo el 07/10.
+    """
+
+    def _carpeta(self):
+        from pathlib import Path
+
+        return Path(__file__).resolve().parents[1] / "assets" / "temporadas"
+
+    def test_el_original_se_queda_guardado(self) -> None:
+        """Sin él no se puede volver a preparar si cambia el tamaño."""
+        self.assertTrue((self._carpeta() / "originales" / "halloween.png").exists())
+
+    def test_el_que_se_imprime_sale_del_original(self) -> None:
+        from PIL import Image
+
+        from pos_uniformes.scripts.preparar_dibujo_temporada import preparar
+
+        carpeta = self._carpeta()
+        esperado = preparar(carpeta / "originales" / "halloween.png")
+        actual = Image.open(carpeta / "halloween.png")
+        self.assertEqual(actual.size, esperado.size)
+        self.assertEqual(actual.convert("L").tobytes(),
+                         esperado.convert("L").tobytes())
+
+    def test_queda_en_dos_tonos(self) -> None:
+        """La térmica no tiene medios tonos: un gris sale como suciedad."""
+        from PIL import Image
+
+        im = Image.open(self._carpeta() / "halloween.png")
+        self.assertEqual(im.mode, "1")
+
+    def test_cabe_en_el_papel_sin_que_nadie_lo_encoja(self) -> None:
+        from PIL import Image
+
+        from pos_uniformes.scripts.preparar_dibujo_temporada import ANCHO_MAXIMO
+
+        for p in self._carpeta().glob("*.png"):
+            with self.subTest(dibujo=p.name):
+                self.assertLessEqual(Image.open(p).width, ANCHO_MAXIMO)
+
+    def test_no_se_come_media_cuenta(self) -> None:
+        """Un dibujo alto es papel que se paga en cada venta."""
+        from PIL import Image
+
+        for p in self._carpeta().glob("*.png"):
+            with self.subTest(dibujo=p.name):
+                self.assertLessEqual(Image.open(p).height, 260)
+
+    def test_la_transparencia_se_aplana_sobre_blanco(self) -> None:
+        """Los manda negros sobre transparente: sin aplanar, el papel sale
+        todo negro (o todo blanco, según quién lo lea)."""
+        from PIL import Image
+
+        from pos_uniformes.scripts.preparar_dibujo_temporada import preparar
+
+        im = preparar(self._carpeta() / "originales" / "halloween.png")
+        datos = im.convert("L").tobytes()
+        tinta = sum(1 for v in datos if v < 128)
+        self.assertGreater(tinta, 0, "no quedó nada de dibujo")
+        self.assertLess(tinta / len(datos), 0.9, "salió un bloque negro")
+
+    def test_se_le_quita_el_aire_de_los_bordes(self) -> None:
+        """Los márgenes del archivo son renglones en blanco que nadie pidió."""
+        from PIL import Image
+
+        im = Image.open(self._carpeta() / "halloween.png").convert("L")
+        caja = im.point(lambda v: 255 if v < 128 else 0).getbbox()
+        self.assertEqual(caja, (0, 0, im.width, im.height))
