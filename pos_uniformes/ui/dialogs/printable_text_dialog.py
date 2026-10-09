@@ -391,7 +391,13 @@ def total_del_ticket(content: str) -> str | None:
             re.IGNORECASE,
         )
     for raw in (content or "").splitlines():
-        linea = raw.replace("│", " ").replace("|", " ").strip()
+        # Todos los costados de caja, no solo el sencillo: el total va dentro
+        # del marco DOBLE y el recuadro del diálogo dejó de salir cuando el
+        # ticket cambió de marco (Daniel, 2026-10-09).
+        linea = raw
+        for borde in "│|║┃":
+            linea = linea.replace(borde, " ")
+        linea = linea.strip()
         match = _RE_TOTAL_LINEA.match(linea)
         if match:
             return f"${match.group(1)}"
@@ -424,7 +430,80 @@ def pintar_previa(editor: QTextEdit, content: str) -> None:
             return
         except Exception:  # noqa: BLE001 — sin dibujo, la previa de siempre
             logger.exception("Previa dibujada: no se pudo, va la de texto")
+    elif _escpos_activo() and _pintar_con_dibujos(editor, content):
+        # Sin el ticket dibujado pero CON ESC/POS, el papel lleva el logo en
+        # puntos y la previa enseñaba «MAXIMODA» escrito: decían cosas
+        # distintas, que es justo lo que una previa no puede hacer.
+        return
     editor.setPlainText(_sin_marcadores(content))
+
+
+def _escpos_activo() -> bool:
+    """¿Esta PC manda los tickets por ESC/POS? Entonces imprime los dibujos."""
+    try:
+        from pos_uniformes.services.escpos_settings_cache_service import (
+            load_escpos_settings,
+        )
+
+        return bool(load_escpos_settings().enabled)
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def _pintar_con_dibujos(editor: QTextEdit, content: str) -> bool:
+    """La previa como HTML: el texto tal cual y los dibujos como imágenes.
+
+    Devuelve False si no hay ningún dibujo que poner, para dejar pasar la
+    previa de texto de siempre.
+    """
+    from html import escape
+
+    from PyQt6.QtCore import QUrl
+    from PyQt6.QtGui import QImage, QTextDocument
+
+    from pos_uniformes.services.temporada_service import (
+        MARCADOR_FIN,
+        MARCADOR_INICIO,
+        imagen_para_marcador,
+        partir_marcador,
+    )
+
+    if MARCADOR_INICIO not in (content or ""):
+        return False
+    piezas: list[str] = []
+    puestos = 0
+    for i, parte in enumerate(content.split(MARCADOR_INICIO)):
+        if i == 0:
+            piezas.append(escape(parte))
+            continue
+        cuerpo, _, resto = parte.partition(MARCADOR_FIN)
+        nombre, respaldo = partir_marcador(cuerpo)
+        ruta = imagen_para_marcador(nombre)
+        imagen = QImage(str(ruta)) if ruta is not None else None
+        if imagen is None or imagen.isNull():
+            piezas.append(escape(respaldo or f"(falta el dibujo: {nombre})"))
+        else:
+            clave = f"ticket://previa/{nombre}"
+            editor.document().addResource(
+                QTextDocument.ResourceType.ImageResource, QUrl(clave), imagen
+            )
+            piezas.append(
+                f'</pre><div align="center"><img src="{clave}" '
+                f'width="{min(imagen.width(), 360)}"></div><pre>'
+            )
+            puestos += 1
+        piezas.append(escape(resto))
+    if not puestos:
+        return False
+    # La fuente va escrita en el HTML: la hoja de estilos del QTextEdit no
+    # alcanza al contenido enriquecido, y sin esto el ticket sale con letra
+    # proporcional — los recuadros dejan de cuadrar y la previa deja de
+    # parecerse al papel, que es para lo único que sirve.
+    tipografia = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont).family()
+    abre = (f'<pre style="font-family: \'{tipografia}\'; '
+            f'font-size: {TICKET_FONT_POINT_SIZE}pt; font-weight: bold; margin: 0">')
+    editor.setHtml(abre + "".join(piezas).replace("<pre>", abre) + "</pre>")
+    return True
 
 
 def _build_ticket_editor(content: str) -> QTextEdit:
