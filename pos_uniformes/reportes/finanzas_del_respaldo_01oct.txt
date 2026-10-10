@@ -1,0 +1,129 @@
+INFORME DE FINANZAS - MAXIMODA  (del respaldo del 1-oct, NO esta al dia)
+===============================
+Hecho el          : 2026-10-09 18:31
+Periodo del informe: ultimos 400 dias (desde 2025-09-04)
+Hay datos desde   : 2026-09-02 17:44
+Ultimo movimiento : 2026-09-21 15:05
+
+EN UNA LINEA
+============
+Entro (neto)         : $273,131.00
+Nomina               : -$13,036.68
+Retiros del cajon    : -$889.00
+QUEDA                : $259,205.32
+
+Ojo: 'queda' no es ganancia. Falta todo lo que no se
+registra (mercancia, renta, servicios). Ver el final.
+
+LO QUE ENTRO
+============
+Operaciones cobradas : 620 (1,195 piezas)
+Cobrado              : $273,779.00
+Recibido de verdad   : $273,131.00
+Se quedo la terminal : $648.00
+
+por donde entro
+---------------
+Efectivo     $259,334.00 (95%)  neto    $259,334.00  602 ops
+Tarjeta       $14,445.00 (5%)   neto     $13,797.00  18 ops
+
+por tipo de operacion
+---------------------
+venta        $272,977.00        neto    $272,329.00  618 ops
+apartado         $617.00        neto        $617.00  1 ops
+abono            $185.00        neto        $185.00  1 ops
+
+mes por mes
+-----------
+2026-09  cobrado    $273,779.00  neto    $273,131.00    620 ops   1,195 pz
+
+quien cobro
+-----------
+VEND-5                 VEND-5       $67,993.00  24.8%   148 ops   323 com
+VEND-3                 VEND-3       $52,976.00  19.3%   136 ops   244 com
+VEND-4                 VEND-4       $49,763.00  18.2%   112 ops   236 com
+Fanny Ortiz            VEND-7       $40,051.00  14.6%    89 ops   191 com
+Katherine Posada       VEND-8       $31,661.00  11.6%    65 ops   135 com
+VEND-6                 VEND-6       $30,440.00  11.1%    67 ops   139 com
+León Fabian            ENC-1           $705.00   0.3%     2 ops     2 com
+Daniel Fabian          VEND-1          $190.00   0.1%     1 ops     1 com
+
+LO QUE SALIO
+============
+
+nomina pagada
+-------------
+Cristal Torres          2 pagos  base    $2,600.00  comis    $406.00  faltas -     $0.00  prest -     $0.00  =    $3,006.00
+Evelyn Ortiz            2 pagos  base    $2,600.00  comis    $348.00  faltas -     $0.00  prest -     $0.00  =    $2,948.00
+Stayce Chavarria        2 pagos  base    $2,600.00  comis    $332.00  faltas -     $0.00  prest -     $0.00  =    $2,932.00
+Fanny Ortiz             1 pagos  base    $1,300.00  comis    $298.00  faltas -     $0.00  prest -     $0.00  =    $1,598.00
+Katherine Posada        1 pagos  base    $1,300.00  comis    $226.00  faltas -     $0.00  prest -     $0.00  =    $1,526.00
+Nayeli Herrera          2 pagos  base      $866.68  comis    $160.00  faltas -     $0.00  prest -     $0.00  =    $1,026.68
+TOTAL NOMINA                                                           $13,036.68
+
+retiros del cajon (gastos descontados)
+--------------------------------------
+Liquidación Fany                           1         $730.00
+Cinta Adhesiva                             1          $91.00
+Comisones                                  1          $40.00
+Evelyn, resto de comisiones.               1          $28.00
+TOTAL RETIROS                                        $889.00
+
+ultimos retiros, uno por uno
+----------------------------
+2026-09-19 17:58        $40.00  Comisones                          VEND-1
+2026-09-18 17:35       $730.00  Liquidación Fany                   VEND-1
+2026-09-18 17:34        $28.00  Evelyn, resto de comisiones.       VEND-1
+2026-09-14 17:35        $91.00  Cinta Adhesiva                     VEND-1
+
+LOS CORTES
+==========
+   id fecha            esperado       contado          dif  nota
+   29 2026-09-20     $22,548.00    $20,548.00   $-2,000.00  
+   28 2026-09-19     $17,627.00    $16,627.00   $-1,000.00  
+   26 2026-09-18     $17,082.00    $16,082.00   $-1,000.00  
+   25 2026-09-17     $15,626.00    $15,426.00     $-200.00  
+   24 2026-09-16     $17,733.00    $16,233.00   $-1,500.00  
+   23 2026-09-15     $18,115.00    $16,615.00   $-1,500.00  
+   20 2026-09-14     $23,569.00    $21,420.00   $-2,149.00  
+   19 2026-09-13     $29,708.66    $27,708.66   $-2,000.00  
+   17 2026-09-12     $20,682.00    $18,682.00   $-2,000.00  
+   16 2026-09-11     $20,076.00    $20,076.00        $0.00  
+   15 2026-09-10     $14,506.00    $14,506.00        $0.00  
+   13 2026-09-09     $26,202.00    $23,202.00   $-3,000.00  
+    7 2026-09-08     $21,526.00    $21,526.00        $0.00  
+    6 2026-09-07          $0.00    $14,237.00   $14,237.00  
+    4 2026-09-06          $0.00    $32,082.00   $32,082.00  
+    2 2026-09-05          $0.00    $22,738.00   $22,738.00  
+
+Cortes en el periodo : 16
+Cerraron cortos      : 10
+Faltante acumulado   : $16,349.00
+
+AL DIA DE HOY
+=============
+Fondo del cajon      : $11,160.00
+Sueldo base por ciclo: $1,300.00
+Pesos por comision   : $2.00
+Descuento por falta  : $217.00
+
+apartados vivos (dinero por cobrar, NO vendido)
+-----------------------------------------------
+Apartados activos    : 0
+Ya abonaron          : $0.00
+Falta que paguen     : $0.00
+
+prestamos a empleadas
+---------------------
+(ninguno)
+Prestado sin cobrar  : $0.00
+
+LO QUE ESTA CUENTA NO SABE
+==========================
+Esto NO es una utilidad. El sistema no guarda lo que costo la
+mercancia, ni la renta, ni la luz, ni los pedidos a proveedor:
+la tabla de compras tiene 0 renglones.
+
+Lo unico que el sistema sabe que salio son los retiros del
+cajon y la nomina. Todo lo demas se paga por fuera y no deja
+rastro aqui.
