@@ -115,9 +115,13 @@ class LaPantallaLoUsaTests(unittest.TestCase):
         ).read_text(encoding="utf-8")
         trozo = codigo[codigo.index("def _apply_lookup_view"):][:900]
         self.assertIn("_catalog_row_icon(lookup_row)", trozo)
-        self.assertIn("_icono_de_temporada", trozo)
-        # Y si no hay temporada, la «M» de siempre.
-        self.assertIn('_scaled_asset_pixmap("qr_icons/default.png"', trozo)
+        self.assertIn("_icono_del_hueco()", trozo)
+        # El relleno vive en su propia función (desde el 10/10 también la
+        # usa el repintado al cambiar de temporada): la temporada, y si no
+        # hay, la «M» de siempre.
+        hueco = codigo[codigo.index("def _icono_del_hueco"):][:500]
+        self.assertIn("_icono_de_temporada", hueco)
+        self.assertIn('_scaled_asset_pixmap("qr_icons/default.png"', hueco)
 
 
 if __name__ == "__main__":

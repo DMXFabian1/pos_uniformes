@@ -1005,6 +1005,15 @@ class QuoteSatelliteWindow(QMainWindow):
         self.kiosk_lookup_context_label = QLabel("")
         self.kiosk_lookup_notes_label = QLabel("")
         self.kiosk_visual_icon_label = QLabel()
+
+        # Al cambiar de temporada, el dibujo del hueco cambia con ella (si no
+        # hay producto puesto). Se vio el 10/10: la barra ya decía Halloween y
+        # el hueco seguía con la catrina, porque solo se pintaba al construir.
+        def _releer_hueco() -> None:
+            if getattr(self, "lookup_snapshot", None) is None:
+                self.kiosk_visual_icon_label.setPixmap(self._icono_del_hueco())
+
+        self.kiosk_visual_icon_label.releer_temporada = _releer_hueco
         self.kiosk_recent_table = QTableWidget()
 
         self.quote_folio_input = QLabel()
@@ -10346,6 +10355,14 @@ QLabel#favDialogPriceLabel {
         if _post_action is not None:
             _post_action()
 
+    @staticmethod
+    def _icono_del_hueco() -> QPixmap:
+        """Sin producto, el hueco lo ocupa la temporada; si no hay, la «M»."""
+        icono = _icono_de_temporada(_DIBUJO_VISUAL)
+        if icono.isNull():
+            icono = _scaled_asset_pixmap("qr_icons/default.png", _DIBUJO_VISUAL)
+        return icono
+
     def _apply_lookup_view(self, lookup_view) -> None:
         lookup_row = None
         if self.lookup_snapshot is not None:
@@ -10353,10 +10370,7 @@ QLabel#favDialogPriceLabel {
         if lookup_row is not None:
             icono = _catalog_row_icon(lookup_row)
         else:
-            # Sin producto, el hueco lo ocupa la temporada; si no hay, la «M».
-            icono = _icono_de_temporada(_DIBUJO_VISUAL)
-            if icono.isNull():
-                icono = _scaled_asset_pixmap("qr_icons/default.png", _DIBUJO_VISUAL)
+            icono = self._icono_del_hueco()
         self.kiosk_visual_icon_label.setPixmap(icono)
         self.kiosk_lookup_sku_label.setText(lookup_view.sku_label)
         self.kiosk_lookup_product_label.setText(lookup_view.product_label)

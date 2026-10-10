@@ -85,6 +85,41 @@ class LaMarcaDeTemporadaTests(unittest.TestCase):
         self.assertEqual(con_temporada, sin_temporada + 1)
 
 
+class ElHuecoDelProductoCambiaConLaTemporadaTests(unittest.TestCase):
+    """La barra ya decía Halloween y el hueco de la «M» seguía con la
+    catrina de Día de Muertos (Daniel, 2026-10-10): solo se pintaba al
+    construir la página."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_el_dibujo_del_hueco_se_repinta_al_cambiar(self) -> None:
+        muertos = next(t for t in temp.TEMPORADAS if t.nombre == "Día de Muertos")
+        with patch.object(temp, "actual", return_value=muertos):
+            w = QuoteSatelliteWindow(user_id=1)
+            w.kiosk_visual_icon_label.releer_temporada()
+            antes = w.kiosk_visual_icon_label.pixmap().toImage()
+        with patch.object(temp, "actual", return_value=_HALLOWEEN):
+            w._repintar_si_cambio_la_temporada("Halloween")
+        despues = w.kiosk_visual_icon_label.pixmap().toImage()
+        self.assertNotEqual(antes, despues)
+        w.close()
+
+    def test_con_un_producto_puesto_no_se_toca(self) -> None:
+        with patch.object(temp, "actual", return_value=_HALLOWEEN):
+            w = QuoteSatelliteWindow(user_id=1)
+        from PyQt6.QtGui import QPixmap
+
+        producto = QPixmap(10, 10)
+        producto.fill()
+        w.kiosk_visual_icon_label.setPixmap(producto)
+        w.lookup_snapshot = object()          # hay producto en pantalla
+        w.kiosk_visual_icon_label.releer_temporada()
+        self.assertEqual(w.kiosk_visual_icon_label.pixmap().size(), producto.size())
+        w.close()
+
+
 class NoSePintaLaVentanaEnteraTests(unittest.TestCase):
     """La pantalla es para vender; el adorno es un detalle, no un disfraz."""
 
