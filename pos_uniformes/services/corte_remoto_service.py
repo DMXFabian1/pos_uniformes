@@ -184,6 +184,11 @@ def hacer_corte_y_avisar(
         marcar_privadas_del_periodo(
             session, auto.estado.desde, auto.estado.hasta, creado_por=creado_por
         )
+    # El corte se guarda AQUÍ, antes de armar el papel y encolarlo. Antes el
+    # único commit venía después de enviar_corte: si eso fallaba (o fallaba
+    # la lectura de retiros, que hace rollback), el corte y sus pagos se
+    # perdían y el celular ya había dicho «Corte hecho» (2026-10-10).
+    session.commit()
     rows = operaciones_del_periodo(session, auto.estado.desde, auto.estado.hasta)
     try:
         from pos_uniformes.services.retiros_service import retiros_del_periodo

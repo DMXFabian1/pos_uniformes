@@ -97,3 +97,50 @@ class TicketConRetiroTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ElCorteSeGuardaAntesDelPapelTests(unittest.TestCase):
+    """El commit del corte iba después de encolar el ticket: si encolar
+    fallaba, rollback, y el celular ya había dicho «Corte hecho» con un corte
+    que no existía (2026-10-10)."""
+
+    def _correr(self, *, enviar):
+        estado = _estado()
+        corte = SimpleNamespace(
+            monto_final=Decimal("7480.00"), reactivo_final=Decimal("1000.00"),
+            reactivo_inicial=Decimal("1000.00"), periodo_label="09/09", nota=None,
+            created_at=_HASTA, retiros_pagos=Decimal("0"), otros_retiros=Decimal("0"),
+            operaciones=11, piezas=23, creado_por="VEND-1",
+        )
+        auto = SimpleNamespace(corte=corte, estado=estado, pagos=[])
+        datos = SimpleNamespace(por_empleada=[], tarjeta=Decimal("0.00"), tarjeta_ops=0, retiros=[])
+        manager = MagicMock()
+        session = manager.session
+        with patch("pos_uniformes.services.corte_caja_service.estado_caja", return_value=estado), \
+             patch("pos_uniformes.services.corte_caja_service.pagos_que_tocan_hoy", return_value=[]), \
+             patch("pos_uniformes.services.corte_caja_service.cerrar_corte_automatico", return_value=auto), \
+             patch("pos_uniformes.services.corte_caja_service.operaciones_del_periodo", return_value=[]), \
+             patch("pos_uniformes.services.corte_caja_service.datos_ticket_encargado", return_value=datos), \
+             patch("pos_uniformes.services.corte_caja_service.cargar_parametros", return_value=SimpleNamespace(ocultar_tarjeta=False)), \
+             patch("pos_uniformes.services.retiros_service.retiros_del_periodo", return_value=[]), \
+             patch("pos_uniformes.ui.dialogs.corte_caja_dialog.pagos_previos_del_periodo", return_value=[]), \
+             patch("pos_uniformes.ui.dialogs.corte_caja_dialog.texto_ticket_corte_encargado", return_value="TICKET"), \
+             patch("pos_uniformes.services.trabajos_service.enviar_corte", manager.enviar):
+            manager.enviar.side_effect = enviar
+            resultado = crs.hacer_corte_y_avisar(session, creado_por="VEND-1", ahora=_HASTA)
+        return resultado, manager
+
+    def test_el_commit_del_corte_va_antes_de_encolar_el_ticket(self) -> None:
+        resultado, manager = self._correr(enviar=None)
+        nombres = [c[0] for c in manager.mock_calls]
+        self.assertIn("session.commit", nombres)
+        self.assertLess(nombres.index("session.commit"), nombres.index("enviar"))
+        self.assertTrue(resultado.impreso)
+
+    def test_si_encolar_falla_el_corte_ya_quedo_y_el_mensaje_lo_dice(self) -> None:
+        resultado, manager = self._correr(enviar=RuntimeError("sin impresora"))
+        nombres = [c[0] for c in manager.mock_calls]
+        self.assertLess(nombres.index("session.commit"), nombres.index("enviar"))
+        self.assertTrue(resultado.hecho)
+        self.assertFalse(resultado.impreso)
+        self.assertIn("quedó guardado", resultado.mensaje)
