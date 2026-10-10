@@ -174,13 +174,21 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
 
     accion = str(dato or "")[len(PREFIJO):]
     que, _, crudo = accion.partition(":")
+
+    def _con_volver(filas):
+        return _teclado(list(filas) + [[("‹ Descansos", f"{PREFIJO}lista")]])
+
+    # «‹ Descansos» no lleva id: hay que atenderlo ANTES de pedir el número.
+    # Pedirlo primero lo mandaba a «No conozco ese botón», y el botón de
+    # regreso nunca funcionó (mismo tropiezo que cortes el 08/10; 2026-10-10).
+    if que == "lista":
+        with session_factory() as session:
+            texto, botones = texto_y_botones(session)
+        return "", texto, botones
     try:
         solicitud_id = int(crudo)
     except ValueError:
         return "No conozco ese botón", "", ""
-
-    def _con_volver(filas):
-        return _teclado(list(filas) + [[("‹ Descansos", f"{PREFIJO}lista")]])
 
     if que == "ver":
         with session_factory() as session:

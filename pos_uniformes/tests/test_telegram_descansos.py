@@ -126,3 +126,35 @@ class ElAvisoTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ElBotonDeRegresoTests(unittest.TestCase):
+    """«‹ Descansos» (dc:lista) no lleva id; se pedía el número antes de mirar
+    la acción y el botón de regreso nunca funcionó (2026-10-10)."""
+
+    def test_volver_a_la_lista_funciona(self) -> None:
+        from contextlib import contextmanager
+        from unittest.mock import MagicMock, patch
+
+        from pos_uniformes.services import telegram_descansos_service as tds
+
+        @contextmanager
+        def factory():
+            yield MagicMock()
+
+        with patch.object(tds, "texto_y_botones", return_value=("LISTA", "BOTONES")):
+            aviso, texto, botones = tds.atender("dc:lista", session_factory=factory, quien="VEND-1")
+        self.assertEqual((aviso, texto, botones), ("", "LISTA", "BOTONES"))
+
+    def test_un_boton_sin_numero_sigue_sin_conocerse(self) -> None:
+        from contextlib import contextmanager
+        from unittest.mock import MagicMock
+
+        from pos_uniformes.services import telegram_descansos_service as tds
+
+        @contextmanager
+        def factory():
+            yield MagicMock()
+
+        aviso, _, _ = tds.atender("dc:ok:", session_factory=factory, quien="VEND-1")
+        self.assertEqual(aviso, "No conozco ese botón")
