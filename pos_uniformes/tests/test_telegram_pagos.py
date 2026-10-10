@@ -176,3 +176,54 @@ class ElBotLosConoceTest(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DeshacerSoloElDeHoyTests(unittest.TestCase):
+    """El último pago de la tabla puede ser de otro día y de otra persona;
+    deshacerlo desde el celular sin verlo era demasiado fácil (2026-10-10)."""
+
+    def _ultimo(self, fecha):
+        from types import SimpleNamespace
+
+        ultimo = SimpleNamespace(id=7, employee_code="VEND-2", total=Decimal("1300.00"), fecha=fecha)
+        sesion = type("S", (), {
+            "scalars": lambda s_, *a, **k: type("R", (), {"first": lambda r_: ultimo})(),
+            "commit": lambda s_: None,
+        })()
+        return sesion
+
+    def test_el_de_otro_dia_no_se_toca(self):
+        from pos_uniformes.services import nomina_service as nom
+
+        with patch.object(pg, "_nombre", return_value="Ana"), patch.object(nom, "deshacer_pago") as des:
+            r = pg.deshacer_pago(self._ultimo(date(2026, 10, 9)), quien="VEND-1", hoy=date(2026, 10, 10))
+        des.assert_not_called()
+        self.assertIn("no de hoy", r)
+
+    def test_el_de_hoy_si(self):
+        from pos_uniformes.services import nomina_service as nom
+
+        with patch.object(pg, "_nombre", return_value="Ana"), patch.object(nom, "deshacer_pago") as des:
+            r = pg.deshacer_pago(self._ultimo(date(2026, 10, 10)), quien="VEND-1", hoy=date(2026, 10, 10))
+        des.assert_called_once()
+        self.assertIn("Deshecho", r)
+
+
+class RetiroRepetidoTests(unittest.TestCase):
+    def test_el_mismo_retiro_dos_veces_seguidas_es_uno(self):
+        """Telegram reentregando o dos toques: no hay confirmación en /retiro,
+        así que esta es la red (2026-10-10)."""
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from pos_uniformes.database.models import Base, CajaRetiro
+        from pos_uniformes.services import retiros_service
+
+        engine = create_engine("sqlite://")
+        Base.metadata.create_all(engine)
+        with sessionmaker(engine)() as s, patch("pos_uniformes.services.alertas_service.encolar"):
+            retiros_service.registrar_retiro(s, monto=Decimal("500"), motivo="gasolina", creado_por="VEND-1")
+            with self.assertRaises(ValueError):
+                retiros_service.registrar_retiro(s, monto=Decimal("500"), motivo="gasolina", creado_por="VEND-1")
+            retiros_service.registrar_retiro(s, monto=Decimal("500"), motivo="hielo", creado_por="VEND-1")
+            self.assertEqual(s.query(CajaRetiro).count(), 2)

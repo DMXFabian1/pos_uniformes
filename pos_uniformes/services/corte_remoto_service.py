@@ -172,6 +172,14 @@ def hacer_corte_y_avisar(
     avisos = pagos_que_tocan_hoy(session, ahora.date())
     if estado.resumen.operaciones == 0 and not avisos:
         return ResultadoCorte(False, "Sin corte: no hay ventas ni pagos desde el último corte.")
+    if retirar is not None and Decimal(retirar) > Decimal(estado.esperado):
+        # «/corte 50000» con un dedo de más cerraba un corte con más dinero
+        # del que había y el ticket declaraba una venta inflada (2026-10-10).
+        return ResultadoCorte(
+            False,
+            f"No hay tanto en el cajón: se esperan ${Decimal(estado.esperado):,.2f} y pediste "
+            f"retirar ${Decimal(retirar):,.2f}. Revisa la cifra y vuelve a mandar /corte.",
+        )
 
     auto = cerrar_corte_automatico(
         session, creado_por=creado_por, ahora=ahora, retirar=retirar,

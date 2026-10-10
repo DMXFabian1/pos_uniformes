@@ -144,3 +144,18 @@ class ElCorteSeGuardaAntesDelPapelTests(unittest.TestCase):
         self.assertTrue(resultado.hecho)
         self.assertFalse(resultado.impreso)
         self.assertIn("quedó guardado", resultado.mensaje)
+
+
+class NoSeRetiraMasDeLoQueHayTests(unittest.TestCase):
+    def test_un_dedo_de_mas_no_cierra_el_corte(self) -> None:
+        """«/corte 50000» cerraba un corte con más dinero del que había y el
+        ticket declaraba venta inflada (2026-10-10)."""
+        estado = _estado()
+        with patch("pos_uniformes.services.corte_caja_service.estado_caja", return_value=estado), \
+             patch("pos_uniformes.services.corte_caja_service.pagos_que_tocan_hoy", return_value=[]), \
+             patch("pos_uniformes.services.corte_caja_service.cerrar_corte_automatico") as cerrar, \
+             patch("pos_uniformes.services.corte_caja_service.cargar_parametros", return_value=SimpleNamespace(ocultar_tarjeta=False)):
+            r = crs.hacer_corte_y_avisar(MagicMock(), creado_por="VEND-1", ahora=_HASTA, retirar=Decimal("50000"))
+        cerrar.assert_not_called()
+        self.assertFalse(r.hecho)
+        self.assertIn("No hay tanto en el cajón", r.mensaje)

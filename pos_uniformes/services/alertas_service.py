@@ -515,5 +515,24 @@ def procesar(session_factory, enviar, vigilante: Vigilante | None = None) -> int
                     if encolar(session, texto, botones):
                         enviadas += enviar_pendientes(session, enviar)
     except Exception as exc:  # noqa: BLE001 — base sin migrar, sin red...
-        logger.debug("Alertas: vuelta sin efecto (%s)", exc)
+        _avisar_vuelta_fallida(exc)
     return enviadas
+
+
+#: Cada cuánto se escribe en el log que las vueltas están fallando. A DEBUG
+#: no se veía nada: una base caída o una migración faltante dejaba las
+#: alertas sin salir y el log diciendo que todo iba bien (2026-10-10).
+_SEGUNDOS_ENTRE_AVISOS_DE_FALLA = 30 * 60
+_ultimo_aviso_de_falla = 0.0
+
+
+def _avisar_vuelta_fallida(exc: BaseException) -> None:
+    import time
+
+    global _ultimo_aviso_de_falla
+    ahora = time.time()
+    if ahora - _ultimo_aviso_de_falla >= _SEGUNDOS_ENTRE_AVISOS_DE_FALLA:
+        _ultimo_aviso_de_falla = ahora
+        logger.warning("Alertas: las vueltas están fallando (%s)", exc, exc_info=True)
+    else:
+        logger.debug("Alertas: vuelta sin efecto (%s)", exc)

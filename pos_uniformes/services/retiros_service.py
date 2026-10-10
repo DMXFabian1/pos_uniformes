@@ -27,6 +27,26 @@ def registrar_retiro(session, *, monto, motivo: str, creado_por: str):
     motivo = (motivo or "").strip()[:120]
     if not motivo:
         raise ValueError("Escribe para qué fue el dinero.")
+    # El mismo retiro (monto y motivo) dos veces en dos minutos es un doble
+    # envío —Telegram reentregando, dos toques— y no dos retiros. Desde el
+    # celular no hay confirmación, así que esta es la red (2026-10-10).
+    from datetime import timedelta
+
+    from sqlalchemy import select
+
+    hace_poco = datetime.now().astimezone() - timedelta(minutes=2)
+    repetido = session.scalars(
+        select(CajaRetiro).where(
+            CajaRetiro.monto == monto,
+            CajaRetiro.motivo == motivo,
+            CajaRetiro.created_at >= hace_poco,
+        ).limit(1)
+    ).first()
+    if repetido is not None:
+        raise ValueError(
+            f"Ese retiro (${monto:,.2f} para {motivo}) ya quedó apuntado hace un momento. "
+            "Si de verdad son dos, espera dos minutos o cambia el motivo."
+        )
     retiro = CajaRetiro(
         monto=monto,
         motivo=motivo,

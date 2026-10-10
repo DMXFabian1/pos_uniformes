@@ -225,14 +225,18 @@ def retiro(session: Session, argumento: str, *, quien: str) -> str:
         # Sin motivo, el corte de la noche es un misterio.
         return f"¿Para qué son los ${monto:,.2f}? Por ejemplo:\n/retiro {partes[0]} gasolina"
 
-    retiros_service.registrar_retiro(session, monto=monto, motivo=motivo, creado_por=quien)
+    try:
+        retiros_service.registrar_retiro(session, monto=monto, motivo=motivo, creado_por=quien)
+    except ValueError as exc:
+        session.rollback()
+        return f"No lo apunté: {exc}"
     session.commit()
     return f"✅ Retirado del cajón: ${monto:,.2f} para {motivo}.\n\nEl corte de hoy ya lo toma en cuenta."
 
 
 # ------------------------------------------------------------ /deshacerpago
 
-def deshacer_pago(session: Session, *, quien: str) -> str:
+def deshacer_pago(session: Session, *, quien: str, hoy: date | None = None) -> str:
     """Deshace el último pago registrado. La red debajo de /pagar."""
     from pos_uniformes.database.models import EmpleadaPago
     from pos_uniformes.services import nomina_service as nom
@@ -246,6 +250,16 @@ def deshacer_pago(session: Session, *, quien: str) -> str:
 
     nombre = _nombre(session, str(ultimo.employee_code))
     monto = Decimal(str(ultimo.total or 0))
+    hoy_ = hoy or date.today()
+    if ultimo.fecha != hoy_:
+        # La red debajo de /pagar es para el dedazo de HOY. El último pago de
+        # la tabla puede ser de otro día y de otra persona (el encargado en el
+        # kiosko), y deshacerlo desde el celular sin verlo era demasiado fácil
+        # (2026-10-10).
+        return (
+            f"El último pago es del {ultimo.fecha:%d/%m} a {nombre} (${monto:,.2f}), no de hoy. "
+            "Desde aquí solo se deshace el de hoy; ese se corrige en la tienda."
+        )
     try:
         nom.deshacer_pago(session, int(ultimo.id), creado_por=quien)
     except PermissionError as exc:
