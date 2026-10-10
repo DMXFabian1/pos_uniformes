@@ -50,6 +50,16 @@ class Temporada:
     arte: tuple[str, ...]       # ASCII puro, para la impresora
     emoji: str                  # solo para la pantalla
     color: str                  # acento sutil para la pantalla
+    #: Paleta de la barra del encabezado (degradado oscuro → medio → claro).
+    #: Vacío = la de siempre (terracota). Es lo único de la ventana que cambia
+    #: de color con la temporada; los botones de acción no (2026-10-10).
+    color_barra: str = ""
+    color_barra_claro: str = ""
+    #: Si dos temporadas se empalman un día, gana la de mayor prioridad; a
+    #: igual prioridad, la que va primero en la lista.
+    prioridad: int = 0
+    #: Un renglón chico debajo del saludo en el pie del menú. Opcional.
+    mensaje_secundario: str = ""
 
     def incluye(self, dia: date) -> bool:
         md = (dia.month, dia.day)
@@ -73,6 +83,7 @@ TEMPORADAS: tuple[Temporada, ...] = (
         ),
         emoji="✏️",
         color="#c2763a",
+        color_barra="#1f3a5f", color_barra_claro="#35598a", prioridad=10,
     ),
     Temporada(
         nombre="Independencia",
@@ -84,6 +95,7 @@ TEMPORADAS: tuple[Temporada, ...] = (
         ),
         emoji="🇲🇽",
         color="#2e7d5b",
+        color_barra="#1f5e3a", color_barra_claro="#2e8b57", prioridad=5,
     ),
     Temporada(
         nombre="Halloween",
@@ -97,6 +109,7 @@ TEMPORADAS: tuple[Temporada, ...] = (
         ),
         emoji="🎃",
         color="#d4752a",
+        color_barra="#4a2358", color_barra_claro="#b85a1f", prioridad=0,
     ),
     Temporada(
         nombre="Día de Muertos",
@@ -110,6 +123,7 @@ TEMPORADAS: tuple[Temporada, ...] = (
         ),
         emoji="💀",
         color="#b5651d",
+        color_barra="#6b1f3a", color_barra_claro="#c9661a", prioridad=1,
     ),
     Temporada(
         nombre="Navidad",
@@ -123,6 +137,7 @@ TEMPORADAS: tuple[Temporada, ...] = (
         ),
         emoji="🎄",
         color="#2e7d5b",
+        color_barra="#7a1a1e", color_barra_claro="#b3262c", prioridad=0,
     ),
     Temporada(
         nombre="Año nuevo y Reyes",
@@ -134,6 +149,7 @@ TEMPORADAS: tuple[Temporada, ...] = (
         ),
         emoji="✨",
         color="#a8812a",
+        color_barra="#1e2a4a", color_barra_claro="#6b2338", prioridad=0,
     ),
     Temporada(
         nombre="San Valentín",
@@ -147,6 +163,7 @@ TEMPORADAS: tuple[Temporada, ...] = (
         ),
         emoji="❤️",
         color="#b03a48",
+        color_barra="#9b1b3a", color_barra_claro="#d94c6a", prioridad=0,
     ),
     Temporada(
         nombre="Día de las Madres",
@@ -159,6 +176,7 @@ TEMPORADAS: tuple[Temporada, ...] = (
         ),
         emoji="🌷",
         color="#b03a63",
+        color_barra="#b03a63", color_barra_claro="#c9607a", prioridad=0,
     ),
 )
 
@@ -191,6 +209,7 @@ def ruta_ajuste():
 #: tres veces al año.
 SEGUNDOS_DE_MEMORIA = 30.0
 _memoria: tuple[float, object] = (0.0, None)
+_memoria_fechas: tuple[float, object] = (0.0, None)
 
 
 def olvidar_lo_leido() -> None:
@@ -198,8 +217,9 @@ def olvidar_lo_leido() -> None:
 
     La llama quien acaba de guardar: si no, su propio cambio tardaría medio
     minuto en verse en la máquina que lo hizo."""
-    global _memoria
+    global _memoria, _memoria_fechas
     _memoria = (0.0, None)
+    _memoria_fechas = (0.0, None)
 
 
 def _ajuste_de_la_tienda():
@@ -278,6 +298,7 @@ def guardar_ajuste(modo: str, archivo: str = "") -> bool:
         json.dumps({"modo": modo, "temporada": elegido}), encoding="utf-8"
     )
     olvidar_lo_leido()
+    anotar("ajuste", modo=modo, temporada=elegido)
 
     try:
         from pos_uniformes.database.connection import get_session
@@ -313,17 +334,37 @@ def actual(hoy: date | None = None) -> Temporada | None:
     """
     forzada_ = forzada()
     if forzada_ is not None:
-        return forzada_
+        # La prueba enseña hasta un borrador (para eso es); lo archivado no.
+        return forzada_ if estado_guardado(forzada_) != ARCHIVADO else None
     modo, archivo = ajuste()
     if modo == APAGADA:
         return None
     if modo == FIJA:
-        return temporada_de_archivo(archivo)
-    hoy = hoy or date.today()
-    for t in TEMPORADAS:
-        if t.incluye(hoy):
-            return t
-    return None
+        fija = temporada_de_archivo(archivo)
+        return fija if fija is not None and _sale_al_publico(fija) else None
+    hoy = hoy or hoy_en_mexico()
+    candidatas = [t for t in temporadas_vigentes() if t.incluye(hoy) and _sale_al_publico(t)]
+    if not candidatas:
+        return None
+    # La de mayor prioridad; a igual prioridad, la que va primero en la lista
+    # (max() devuelve la primera de las máximas, así que el orden se respeta).
+    return max(candidatas, key=lambda t: t.prioridad)
+
+
+def hoy_en_mexico() -> date:
+    """La fecha de la tienda, no la de la máquina.
+
+    Un kiosko con el reloj en otra zona (o una Mac de viaje) decidiría la
+    temporada con un día de diferencia justo en los bordes. La tienda está en
+    San Felipe, Gto.: `America/Mexico_City`. Si el sistema no trae la zona,
+    la fecha local es lo mejor que hay."""
+    try:
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+
+        return datetime.now(ZoneInfo("America/Mexico_City")).date()
+    except Exception:  # noqa: BLE001 — sin tzdata, la fecha local
+        return date.today()
 
 
 # ── Forzar una temporada para verla antes ────────────────────────────────────
@@ -358,7 +399,7 @@ def forzada() -> "Temporada | None":
             hasta = hasta.replace(tzinfo=timezone.utc)
         if hasta <= datetime.now(timezone.utc):
             return None
-        return next((t for t in TEMPORADAS if t.nombre == datos["nombre"]), None)
+        return next((t for t in temporadas_vigentes() if t.nombre == datos["nombre"]), None)
     except Exception:  # noqa: BLE001 — un archivo raro no fuerza nada
         return None
 
@@ -383,6 +424,7 @@ def forzar(nombre_archivo: str, *, horas: float = HORAS_FORZADA) -> "Temporada |
         ),
         encoding="utf-8",
     )
+    anotar("prueba", temporada=nombre_archivo, horas=horas)
     return t
 
 
@@ -393,6 +435,7 @@ def quitar_forzada() -> bool:
         return False
     try:
         ruta.unlink()
+        anotar("prueba_quitada")
         return True
     except OSError:
         return False
@@ -490,9 +533,9 @@ def carpeta_escenas():
 def escena_de(t: "Temporada | None"):
     """El SVG de fondo de esa temporada, o None si no tiene.
 
-    Casi ninguna tiene: dibujar una escena es trabajo de ilustración, no de
-    calendario. Halloween es la primera porque Daniel la pidió (07/10). Las
-    demás siguen con su emoji y su saludo, que es lo que había."""
+    Halloween fue la primera (07/10, dibujada por script); desde el 10/10 las
+    ocho llevan ilustración de Daniel envuelta en SVG. Si a alguna le faltara
+    el archivo, se queda con su emoji y su saludo, que es lo que había."""
     if t is None:
         return None
     archivo = ARCHIVOS.get(t.nombre)
@@ -555,7 +598,7 @@ def marcador_de_ticket(hoy: date | None = None) -> str:
 def temporada_de_archivo(archivo: str) -> "Temporada | None":
     """La temporada a la que pertenece ese dibujo. Lo contrario de `ARCHIVOS`."""
     buscado = str(archivo or "").strip()
-    for t in TEMPORADAS:
+    for t in temporadas_vigentes():
         if ARCHIVOS.get(t.nombre) == buscado:
             return t
     return None
@@ -608,3 +651,352 @@ def _solo_arte_de(t: "Temporada | None") -> list[str]:
     arte = [a for a in t.arte[:MAX_RENGLONES] if len(a) <= ANCHO_TICKET]
     ancho = max((len(a) for a in arte), default=0)
     return [a.ljust(ancho) for a in arte]
+
+
+# ── El tema: lo que la PANTALLA toma de la temporada ─────────────────────────
+#
+# Daniel (2026-10-10): «misma interfaz, diferente ambientación». La temporada
+# ya decidía el saludo, el emoji y un acento; ahora también da la paleta de la
+# barra del encabezado. Fuera de temporada no hay «nada»: hay Maximoda, con su
+# terracota de siempre y un «Bienvenido». Un solo objeto para que la ventana,
+# el gate y el menú no tengan cada uno su idea de qué color toca.
+
+@dataclass(frozen=True)
+class Tema:
+    nombre: str
+    saludo: str
+    emoji: str
+    color: str              # acento: título del gate, raya del menú
+    color_barra: str        # centro del degradado del encabezado
+    color_barra_claro: str  # extremo claro del degradado
+    color_barra_oscuro: str # extremo oscuro del degradado
+    secundario: str = ""    # renglón opcional bajo el saludo (pie del menú)
+
+
+#: La tienda tal cual: terracota, crema y vino. Es exactamente lo que había
+#: antes de que existieran los temas, para que fuera de temporada no cambie
+#: ni un pixel.
+TEMA_MAXIMODA = Tema(
+    nombre="Maximoda",
+    saludo="Bienvenido a Maximoda",
+    emoji="",
+    color="#87492c",
+    color_barra="#a84f2d",
+    color_barra_claro="#c96a35",
+    color_barra_oscuro="#6f331d",
+)
+
+
+def _oscurecer(color_hex: str, cuanto: float = 0.35) -> str:
+    """Un tono más oscuro del mismo color, para el arranque del degradado."""
+    try:
+        h = color_hex.lstrip("#")
+        r, g, b = (int(h[i:i + 2], 16) for i in (0, 2, 4))
+        f = 1.0 - max(0.0, min(1.0, cuanto))
+        return "#%02x%02x%02x" % (int(r * f), int(g * f), int(b * f))
+    except Exception:  # noqa: BLE001 — un color raro no tumba la pantalla
+        return TEMA_MAXIMODA.color_barra_oscuro
+
+
+def tema_de(t: "Temporada | None") -> Tema:
+    """El tema de esa temporada; sin temporada, Maximoda."""
+    if t is None:
+        return TEMA_MAXIMODA
+    barra = t.color_barra or TEMA_MAXIMODA.color_barra
+    claro = t.color_barra_claro or (
+        TEMA_MAXIMODA.color_barra_claro if not t.color_barra else t.color
+    )
+    return Tema(
+        nombre=t.nombre,
+        saludo=t.saludo,
+        emoji=t.emoji,
+        color=t.color,
+        color_barra=barra,
+        color_barra_claro=claro,
+        color_barra_oscuro=_oscurecer(barra),
+        secundario=t.mensaje_secundario,
+    )
+
+
+def tema_activo(hoy: date | None = None) -> Tema:
+    """Lo que la pantalla debe vestir ahora mismo. Nunca None.
+
+    En temporada, el tema de la temporada. Fuera, Maximoda con su bienvenida.
+    Con los adornos **apagados** desde el menú, Maximoda sin saludo: apagar
+    es apagar, no cambiar de frase."""
+    try:
+        t = actual(hoy)
+    except Exception:  # noqa: BLE001 — un adorno no puede impedir que abra
+        t = None
+    if t is not None:
+        return tema_de(t)
+    try:
+        if ajuste()[0] == APAGADA:
+            return Tema(**{**TEMA_MAXIMODA.__dict__, "saludo": ""})
+    except Exception:  # noqa: BLE001
+        pass
+    return TEMA_MAXIMODA
+
+
+# ── Fechas configurables ─────────────────────────────────────────────────────
+#
+# Las fechas de arriba son el calendario de fábrica. La tienda puede mover el
+# inicio, el fin o la prioridad de cualquiera sin tocar código: se guarda en
+# `configuracion_negocio.temporada_fechas` (es de la TIENDA, como el modo) y
+# se cachea en esta máquina para cuando no haya red. Formato:
+#   {"halloween": {"desde": "10-15", "hasta": "11-02", "prioridad": 2}}
+# Cada clave es el archivo de la temporada (`ARCHIVOS`); cada campo es
+# opcional y lo que falte se queda de fábrica. Además de fechas, la misma
+# entrada puede traer `estado` (ciclo de vida), `saludo` y `secundario`:
+#   {"navidad": {"estado": "borrador", "saludo": "¡Felices fiestas!"}}
+#
+# Ciclo de vida (Daniel, 2026-10-10): borrador y en_revision solo se ven en
+# PRUEBA (forzada de 2 h en una pantalla); aprobado entra al calendario y a
+# «Siempre: X»; archivado no sale por ningún camino. «programado» y «activo»
+# no se guardan: se deducen de la fecha (aprobado y todavía no / aprobado y
+# hoy).
+
+BORRADOR, EN_REVISION, APROBADO, ARCHIVADO = "borrador", "en_revision", "aprobado", "archivado"
+ESTADOS_GUARDABLES = (BORRADOR, EN_REVISION, APROBADO, ARCHIVADO)
+PROGRAMADO, ACTIVO = "programado", "activo"
+
+
+def _fechas_de_la_tienda():
+    """Lo que dice la BASE, o None si no hay nada o no se puede preguntar."""
+    import time
+
+    global _memoria_fechas
+    ahora = time.time()
+    guardado_en, valor = _memoria_fechas
+    if ahora - guardado_en < SEGUNDOS_DE_MEMORIA:
+        return valor
+    leido = None
+    try:
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.services.business_settings_service import (
+            BusinessSettingsService,
+        )
+
+        with get_session() as session:
+            config = BusinessSettingsService.get_or_create(session)
+            datos = getattr(config, "temporada_fechas", None)
+            leido = dict(datos) if isinstance(datos, dict) else {}
+    except Exception:  # noqa: BLE001 — sin red manda el cache de esta máquina
+        return None
+    _memoria_fechas = (ahora, leido)
+    return leido
+
+
+def ruta_fechas():
+    """El cache local de las fechas, junto al ajuste."""
+    from pos_uniformes.utils.config import satellite_data_dir
+
+    return satellite_data_dir() / "data" / "temporada_fechas.json"
+
+
+def fechas_configuradas() -> dict:
+    """Los ajustes de fechas vigentes: la base manda; sin red, el cache local."""
+    de_la_tienda = _fechas_de_la_tienda()
+    if de_la_tienda is not None:
+        return de_la_tienda
+    ruta = ruta_fechas()
+    if not ruta.exists():
+        return {}
+    try:
+        import json
+
+        datos = json.loads(ruta.read_text(encoding="utf-8"))
+        return datos if isinstance(datos, dict) else {}
+    except Exception:  # noqa: BLE001 — cache ilegible: el calendario de fábrica
+        return {}
+
+
+def _md(valor) -> "tuple[int, int] | None":
+    """`"10-15"` → `(10, 15)`. None si no es una fecha mes-día válida."""
+    try:
+        mes, dia = str(valor).replace("/", "-").split("-")
+        mes, dia = int(mes), int(dia)
+        if 1 <= mes <= 12 and 1 <= dia <= 31:
+            return (mes, dia)
+    except Exception:  # noqa: BLE001
+        pass
+    return None
+
+
+def validar_fechas(datos: dict) -> dict:
+    """Deja solo lo que se entiende; lanza ValueError si algo está mal escrito.
+
+    Mejor avisar al guardar que descubrir en octubre que Halloween no salió
+    porque alguien escribió «31-10»."""
+    limpio: dict = {}
+    conocidos = set(ARCHIVOS.values())
+    for archivo, campos in (datos or {}).items():
+        if archivo not in conocidos:
+            raise ValueError(f"no conozco la temporada {archivo!r}")
+        if not isinstance(campos, dict):
+            raise ValueError(f"{archivo}: se esperaba un diccionario")
+        entrada: dict = {}
+        for clave in ("desde", "hasta"):
+            if clave in campos and campos[clave] not in (None, ""):
+                if _md(campos[clave]) is None:
+                    raise ValueError(f"{archivo}: {clave} debe ser mes-día, p. ej. 10-15")
+                m, d = _md(campos[clave])
+                entrada[clave] = f"{m:02d}-{d:02d}"
+        if "prioridad" in campos and campos["prioridad"] not in (None, ""):
+            try:
+                entrada["prioridad"] = int(campos["prioridad"])
+            except (TypeError, ValueError):
+                raise ValueError(f"{archivo}: la prioridad debe ser un entero")
+        if campos.get("estado"):
+            if campos["estado"] not in ESTADOS_GUARDABLES:
+                raise ValueError(
+                    f"{archivo}: estado desconocido {campos['estado']!r}; "
+                    f"vale {', '.join(ESTADOS_GUARDABLES)}"
+                )
+            if campos["estado"] != APROBADO:
+                entrada["estado"] = campos["estado"]
+        for clave in ("saludo", "secundario"):
+            texto = str(campos.get(clave) or "").strip().replace("\n", " ")
+            if texto:
+                if len(texto) > 60:
+                    raise ValueError(f"{archivo}: {clave} no puede pasar de 60 letras")
+                entrada[clave] = texto
+        if entrada:
+            limpio[archivo] = entrada
+    return limpio
+
+
+def temporadas_vigentes() -> tuple[Temporada, ...]:
+    """Las temporadas con las fechas y prioridades que la tienda configuró."""
+    from dataclasses import replace
+
+    ajustes = fechas_configuradas()
+    if not ajustes:
+        return TEMPORADAS
+    salida = []
+    for t in TEMPORADAS:
+        cambios = ajustes.get(ARCHIVOS.get(t.nombre, ""), {})
+        if not isinstance(cambios, dict) or not cambios:
+            salida.append(t)
+            continue
+        kw = {}
+        if _md(cambios.get("desde")):
+            kw["desde"] = _md(cambios["desde"])
+        if _md(cambios.get("hasta")):
+            kw["hasta"] = _md(cambios["hasta"])
+        if isinstance(cambios.get("prioridad"), int):
+            kw["prioridad"] = cambios["prioridad"]
+        if str(cambios.get("saludo") or "").strip():
+            kw["saludo"] = str(cambios["saludo"]).strip()
+        if str(cambios.get("secundario") or "").strip():
+            kw["mensaje_secundario"] = str(cambios["secundario"]).strip()
+        salida.append(replace(t, **kw) if kw else t)
+    return tuple(salida)
+
+
+def estado_guardado(t: "Temporada") -> str:
+    """borrador / en_revision / aprobado / archivado. De fábrica, aprobado."""
+    ajustes = fechas_configuradas()
+    entrada = ajustes.get(ARCHIVOS.get(t.nombre, ""), {}) if isinstance(ajustes, dict) else {}
+    estado = entrada.get("estado") if isinstance(entrada, dict) else None
+    return estado if estado in ESTADOS_GUARDABLES else APROBADO
+
+
+def estado_de(t: "Temporada", hoy: date | None = None) -> str:
+    """El estado tal como lo pide el ciclo de vida, incluidos los deducidos.
+
+    `activo` si es la que manda hoy; `programado` si está aprobada y hoy no
+    toca; si no, lo guardado."""
+    guardado = estado_guardado(t)
+    if guardado != APROBADO:
+        return guardado
+    vigente = actual(hoy)
+    if vigente is not None and vigente.nombre == t.nombre:
+        return ACTIVO
+    return PROGRAMADO
+
+
+def _sale_al_publico(t: "Temporada") -> bool:
+    """Solo lo aprobado entra al calendario o a «Siempre: X»."""
+    return estado_guardado(t) == APROBADO
+
+
+def guardar_fechas(datos: dict) -> bool:
+    """Guarda las fechas en TODA la tienda. True si llegó a la base.
+
+    Igual que `guardar_ajuste`: local primero (para sin red), base después."""
+    import json
+
+    global _memoria_fechas
+    limpio = validar_fechas(datos)
+    ruta = ruta_fechas()
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    ruta.write_text(json.dumps(limpio, ensure_ascii=False), encoding="utf-8")
+    _memoria_fechas = (0.0, None)
+    anotar("fechas", configuradas=limpio)
+    try:
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.services.business_settings_service import (
+            BusinessSettingsService,
+        )
+
+        with get_session() as session:
+            config = BusinessSettingsService.get_or_create(session)
+            config.temporada_fechas = limpio
+            session.commit()
+        _memoria_fechas = (0.0, None)
+        return True
+    except Exception:  # noqa: BLE001
+        logger.warning("Las fechas de temporada no llegaron a la base: solo esta pantalla")
+        return False
+
+
+# ── Bitácora ─────────────────────────────────────────────────────────────────
+#
+# Cuando algo sale raro en octubre («¿quién puso Navidad?»), lo que se quiere
+# es un renglón con fecha. Va al log de la aplicación y a un archivo local
+# chico, de a un JSON por renglón, que se recorta solo.
+
+MAX_RENGLONES_BITACORA = 300
+
+
+def ruta_bitacora():
+    from pos_uniformes.utils.config import satellite_data_dir
+
+    return satellite_data_dir() / "data" / "temporada_bitacora.jsonl"
+
+
+def anotar(evento: str, **datos) -> None:
+    """Un renglón en la bitácora. Nunca lanza: anotar no vale un error."""
+    import json
+    from datetime import datetime
+
+    renglon = {"cuando": datetime.now().isoformat(timespec="seconds"), "evento": evento, **datos}
+    logger.info("temporada: %s %s", evento, datos)
+    try:
+        ruta = ruta_bitacora()
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        lineas = ruta.read_text(encoding="utf-8").splitlines() if ruta.exists() else []
+        lineas.append(json.dumps(renglon, ensure_ascii=False))
+        ruta.write_text("\n".join(lineas[-MAX_RENGLONES_BITACORA:]) + "\n", encoding="utf-8")
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def bitacora(ultimos: int = 50) -> list[dict]:
+    """Los últimos renglones, el más reciente al final."""
+    import json
+
+    try:
+        ruta = ruta_bitacora()
+        if not ruta.exists():
+            return []
+        salida = []
+        for linea in ruta.read_text(encoding="utf-8").splitlines()[-ultimos:]:
+            try:
+                salida.append(json.loads(linea))
+            except ValueError:
+                continue
+        return salida
+    except Exception:  # noqa: BLE001
+        return []

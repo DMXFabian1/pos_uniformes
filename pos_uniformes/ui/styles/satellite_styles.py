@@ -8,7 +8,18 @@ from pos_uniformes.ui.styles.interactive_hover_styles import (
 )
 
 
-def build_satellite_stylesheet() -> str:
+def build_satellite_stylesheet(tema=None) -> str:
+    """La hoja del kiosko, vestida con el tema de la temporada.
+
+    `tema` es un `temporada_service.Tema`; sin él, Maximoda (la terracota de
+    siempre, pixel por pixel). Lo que cambia de color es la **ambientación**:
+    el degradado del encabezado, la pestaña y el botón de navegación
+    marcados, el filo de la tarjeta del producto y las tarjetas destacadas de
+    la Libreta. Lo que NO cambia es lo funcional: botones de acción, peligro,
+    deshabilitados, campos. Un botón rojo que un día sale verde deja de
+    decir «cuidado» (Daniel, 2026-10-10: misma interfaz, diferente
+    ambientación).
+    """
     combo_popup = build_combo_popup_hover_styles(
         popup_background="#fffdf8",
         popup_color="#1f1f1b",
@@ -75,12 +86,46 @@ def build_satellite_stylesheet() -> str:
         ),
     ))
 
-    return "\n".join([
+    hoja = "\n".join([
         _BASE_STYLES,
         combo_popup,
         _COMPONENT_STYLES,
         button_hover,
     ])
+    return _vestir_hoja(hoja, tema)
+
+
+#: Los colores de fábrica que la temporada puede cambiar. Son los del
+#: degradado terracota del encabezado y de los acentos de navegación.
+_BARRA_OSCURO, _BARRA, _BARRA_CLARO = "#6f331d", "#a84f2d", "#c96a35"
+_NAV_MARCADO, _NAV_MARCADO_BORDE = "#87492c", "#8a4326"
+
+
+def _vestir_hoja(hoja: str, tema) -> str:
+    """Cambia SOLO los colores de ambientación por los del tema.
+
+    Se hace por reemplazo de los tonos de fábrica y no con una plantilla
+    porque la hoja es un bloque de 800 líneas con llaves por todos lados: una
+    f-string la volvería ilegible. El precio es que `#a84f2d` aparece también
+    en un par de botones de acento (agregar al carrito, precio del kiosko), y
+    esos acompañan al encabezado a propósito: son el mismo color de marca.
+    Los botones funcionales usan otros tonos (#87492c, #b65246…) y no se tocan,
+    salvo el de navegación marcado, que es señalización del menú, no acción.
+    """
+    if tema is None:
+        return hoja
+    barra = getattr(tema, "color_barra", "") or _BARRA
+    claro = getattr(tema, "color_barra_claro", "") or _BARRA_CLARO
+    oscuro = getattr(tema, "color_barra_oscuro", "") or _BARRA_OSCURO
+    if (barra, claro, oscuro) == (_BARRA, _BARRA_CLARO, _BARRA_OSCURO):
+        return hoja
+    hoja = hoja.replace(_BARRA_OSCURO, oscuro).replace(_BARRA_CLARO, claro)
+    hoja = hoja.replace(_BARRA, barra)
+    hoja = hoja.replace(
+        f"QPushButton#navButton:checked {{\n    background: {_NAV_MARCADO};",
+        f"QPushButton#navButton:checked {{\n    background: {barra};",
+    )
+    return hoja.replace(f"border-color: {_NAV_MARCADO_BORDE};", f"border-color: {oscuro};")
 
 
 _BASE_STYLES = """

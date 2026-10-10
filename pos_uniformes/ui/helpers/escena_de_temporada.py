@@ -7,8 +7,9 @@ extraño mundo de Jack».
 La película es de Disney, así que la escena es **original**: no hay personajes
 suyos, ni arte bajado de internet. Lo que sí se puede tomar es el género —noche
 morada, luna grande, árboles pelones, cerca chueca, calabazas encendidas—, que
-es de donde esa película también lo tomó. La dibuja
-`scripts/generar_escena_halloween.py`.
+es de donde esa película también lo tomó. Esa primera escena la dibujaba
+`scripts/generar_escena_halloween.py`; desde el 10/10 las ocho temporadas
+llevan una ilustración de Daniel envuelta en SVG (`assets/escenas/`).
 
 Va SOLO en esta pantalla. Mientras se vende, la pantalla es para vender.
 """

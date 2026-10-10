@@ -23,14 +23,30 @@ class LaEscenaExisteTests(unittest.TestCase):
     def test_halloween_tiene_escena(self) -> None:
         self.assertIsNotNone(temp.escena_de(temp.temporada_de_archivo("halloween")))
 
-    def test_las_demas_temporadas_siguen_sin_escena(self) -> None:
-        """Dibujar una escena es trabajo de ilustración, no de calendario.
-
-        Si esto empieza a fallar es porque alguien agregó una escena nueva:
-        bienvenida sea, pero que sea a propósito y no por copiar un archivo.
-        """
+    def test_las_ocho_temporadas_tienen_escena(self) -> None:
+        """Desde el 10/10 las ocho llevan ilustración de Daniel. Si una deja
+        de encontrarse, el kiosko se queda con el crema sin avisar."""
         con_escena = [t.nombre for t in temp.TEMPORADAS if temp.escena_de(t)]
-        self.assertEqual(con_escena, ["Halloween"])
+        self.assertEqual(con_escena, [t.nombre for t in temp.TEMPORADAS])
+
+    def test_cada_escena_se_puede_dibujar(self) -> None:
+        """Son imágenes envueltas en SVG: si el envoltorio o la imagen embebida
+        se rompen, QSvgRenderer dice válido y pinta negro."""
+        from PyQt6.QtGui import QImage, QPainter
+        from PyQt6.QtSvg import QSvgRenderer
+
+        for t in temp.TEMPORADAS:
+            with self.subTest(temporada=t.nombre):
+                r = QSvgRenderer(str(temp.escena_de(t)))
+                self.assertTrue(r.isValid())
+                lienzo = QImage(400, 250, QImage.Format.Format_RGB32)
+                lienzo.fill(0)
+                p = QPainter(lienzo); r.render(p); p.end()
+                muestras = [lienzo.pixelColor(x, y) for x in (40, 200, 360) for y in (30, 125, 220)]
+                self.assertTrue(
+                    any(c.red() + c.green() + c.blue() > 60 for c in muestras),
+                    "la imagen embebida no se decodificó: todo negro",
+                )
 
     def test_sin_temporada_no_hay_escena(self) -> None:
         self.assertIsNone(temp.escena_de(None))
@@ -42,13 +58,16 @@ class LaEscenaExisteTests(unittest.TestCase):
         ruta = temp.escena_de(temp.temporada_de_archivo("halloween"))
         self.assertTrue(QSvgRenderer(str(ruta)).isValid())
 
-    def test_el_generador_reproduce_el_mismo_archivo(self) -> None:
-        """La escena del repositorio es la que sale del script, no una versión
-        suelta que alguien editó a mano y ya nadie puede regenerar."""
+    def test_el_generador_de_halloween_sigue_produciendo_un_svg_valido(self) -> None:
+        """La escena de Halloween del kiosko es ahora una ilustración de Daniel
+        (10/10); el script que dibujaba la noche morada queda como origen de
+        los dibujos trazados (bruja, murciélago) y tiene que seguir corriendo."""
+        from PyQt6.QtCore import QByteArray
+        from PyQt6.QtSvg import QSvgRenderer
+
         from pos_uniformes.scripts.generar_escena_halloween import construir
 
-        ruta = temp.escena_de(temp.temporada_de_archivo("halloween"))
-        self.assertEqual(ruta.read_text(encoding="utf-8"), construir())
+        self.assertTrue(QSvgRenderer(QByteArray(construir().encode("utf-8"))).isValid())
 
 
 class ElFondoDelKioskoTests(unittest.TestCase):
@@ -90,7 +109,11 @@ class ElFondoDelKioskoTests(unittest.TestCase):
                 img = self._fondo(ancho, alto).grab().toImage()
                 for x in (3, ancho - 4):
                     c = img.pixelColor(x, alto - 3)
-                    self.assertLess(c.red(), 90, f"x={x}")
+                    # Lo que sea menos el crema del kiosko (#fdf8f3).
+                    self.assertFalse(
+                        c.red() > 245 and c.green() > 240 and c.blue() > 235,
+                        f"x={x}: la esquina quedó sin escena",
+                    )
 
     def test_la_cerca_y_las_calabazas_nunca_se_recortan(self) -> None:
         """Se ancla abajo: lo que sobra es cielo, y el cielo es lo que se va."""
@@ -346,7 +369,9 @@ class LosDibujosDeDanielTests(unittest.TestCase):
     def test_la_escena_usa_los_dibujos_de_daniel(self) -> None:
         from pos_uniformes.scripts.trazar_silueta import SILUETAS
 
-        svg = (self._carpeta() / "halloween.svg").read_text(encoding="utf-8")
+        from pos_uniformes.scripts.generar_escena_halloween import construir
+
+        svg = construir()
         for nombre in SILUETAS:
             with self.subTest(dibujo=nombre):
                 _, d = (self._carpeta() / f"{nombre}.path").read_text(
@@ -368,7 +393,9 @@ class LosDibujosDeDanielTests(unittest.TestCase):
 
     def test_los_huecos_se_dibujan_como_huecos(self) -> None:
         """Con varios contornos y sin `evenodd`, el hueco se rellena igual."""
-        svg = (self._carpeta() / "halloween.svg").read_text(encoding="utf-8")
+        from pos_uniformes.scripts.generar_escena_halloween import construir
+
+        svg = construir()
         self.assertIn('fill-rule="evenodd"', svg)
 
     def test_una_mota_del_borde_no_cuenta_como_hueco(self) -> None:
@@ -385,7 +412,9 @@ class LosDibujosDeDanielTests(unittest.TestCase):
         """Todos iguales parecen calcomanías pegadas a la misma distancia."""
         import re
 
-        svg = (self._carpeta() / "halloween.svg").read_text(encoding="utf-8")
+        from pos_uniformes.scripts.generar_escena_halloween import construir
+
+        svg = construir()
         anchos = {m for m in re.findall(r'scale\((\d+\.\d)\)" opacity', svg)}
         self.assertGreater(len(anchos), 5)
 

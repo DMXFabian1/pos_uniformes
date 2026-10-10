@@ -235,6 +235,11 @@ class ConfiguracionNegocio(Base):
     whatsapp_cliente_promocion: Mapped[str | None] = mapped_column(Text())
     whatsapp_cliente_seguimiento: Mapped[str | None] = mapped_column(Text())
     whatsapp_cliente_saludo: Mapped[str | None] = mapped_column(Text())
+    # Fechas y prioridades de las temporadas que la tienda movió de las de
+    # fábrica: {"halloween": {"desde": "10-15", "hasta": "11-02", "prioridad": 2}}
+    temporada_fechas: Mapped[dict | None] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql")
+    )
     impresora_preferida: Mapped[str | None] = mapped_column(String(200))
     impresora_tickets: Mapped[str | None] = mapped_column(String(200))
     copias_ticket: Mapped[int] = mapped_column(Integer, nullable=False, default=1)

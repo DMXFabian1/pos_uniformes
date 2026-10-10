@@ -346,6 +346,11 @@ class QuoteSatelliteWindow(QMainWindow):
     _db_refresh_ready = pyqtSignal(object, object)
     # Avisa (en hilo de UI) que el cache de anuncios se refrescó desde la DB.
     _anuncios_ready = pyqtSignal()
+    # El latido leyó la temporada de la tienda (en su hilo); el repintado va
+    # por aquí al hilo de la UI. Un QTimer.singleShot desde un hilo de Python
+    # no sirve: Qt solo arma timers en hilos suyos, así que la otra pantalla
+    # nunca se enteraba del cambio (2026-10-10).
+    _temporada_leida = pyqtSignal(str)
     _conteo_banner_ready = pyqtSignal(object)   # lista de escuelas vencidas, o None si no se pudo
     # Lo de la sección Conteos, ya leído en un hilo (dict) — ver _refresh_conteos_vista.
     _conteos_datos_listos = pyqtSignal(object)
@@ -478,6 +483,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self._anuncio_listener = None
         self._anuncio_inmediato_pendiente = None
         self._anuncios_ready.connect(self._on_anuncios_ready)
+        self._temporada_leida.connect(self._repintar_si_cambio_la_temporada)
         QTimer.singleShot(2_500, self._setup_anuncio_cartelera)
 
     def _start_trabajo_dispatcher(self) -> None:
@@ -1081,7 +1087,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.quote_open_share_button.setIconSize(QSize(18, 18))
 
     def _apply_styles(self) -> None:
-        self.setStyleSheet(build_satellite_stylesheet())
+        self.setStyleSheet(build_satellite_stylesheet(self._tema_de_hoy()))
 
     def _build_ui(self) -> None:
         self.setWindowTitle(f"{satellite_display_name()} | {satellite_build_label()}")
@@ -1298,13 +1304,46 @@ class QuoteSatelliteWindow(QMainWindow):
         raya.setStyleSheet(f"background: {t.color}; border: none;")
         ly.addWidget(raya)
 
-        saludo = QLabel(f"{t.emoji}  {t.saludo}")
+        saludo = QLabel("")
         saludo.setAlignment(Qt.AlignmentFlag.AlignCenter)
         saludo.setWordWrap(True)
-        saludo.setStyleSheet(
-            f"color: {t.color}; font-size: 12px; font-weight: 700; background: transparent;"
-        )
         ly.addWidget(saludo)
+        # El renglón secundario (opcional) va aquí y no en la tarjeta del
+        # gate: ahí movería el campo de entrada; aquí el pie ya tiene su hueco.
+        secundario = QLabel("")
+        secundario.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        secundario.setWordWrap(True)
+        secundario.setVisible(False)
+        ly.addWidget(secundario)
+
+        def vestir(t) -> None:
+            raya.setStyleSheet(f"background: {t.color}; border: none;")
+            saludo.setText(f"{t.emoji}  {t.saludo}")
+            saludo.setStyleSheet(
+                f"color: {t.color}; font-size: 12px; font-weight: 700;"
+                " background: transparent;"
+            )
+            extra = getattr(t, "mensaje_secundario", "") or ""
+            secundario.setText(extra)
+            secundario.setStyleSheet("color: #8a8177; font-size: 11px; background: transparent;")
+            secundario.setVisible(bool(extra))
+
+        def releer() -> None:
+            # Se vio el 10/10: el gate ya decía Día de Muertos y aquí seguía
+            # «¡Feliz Halloween!». Si la temporada se apaga a media jornada,
+            # la marca se queda con la última (la raya y el saludo son chicos);
+            # sin temporada al arrancar no hay marca, y eso sigue igual.
+            try:
+                from pos_uniformes.services.temporada_service import actual as hoy
+
+                nueva = hoy()
+            except Exception:  # noqa: BLE001
+                return
+            if nueva is not None:
+                vestir(nueva)
+
+        vestir(t)
+        caja.releer_temporada = releer
         return caja
 
     @staticmethod
@@ -7774,6 +7813,33 @@ class QuoteSatelliteWindow(QMainWindow):
 
         threading.Thread(target=_worker, daemon=True, name="anuncio-acuse").start()
 
+    @staticmethod
+    def _tema_de_hoy():
+        """El tema de la temporada, o None (= Maximoda) si algo truena."""
+        try:
+            from pos_uniformes.services.temporada_service import tema_activo
+
+            return tema_activo()
+        except Exception:  # noqa: BLE001 — un adorno no puede impedir que abra
+            return None
+
+    def releer_temporada(self) -> None:
+        """La ventana entera se viste del tema: el degradado del encabezado y
+        los acentos del menú. Solo colores; nada se mueve de lugar.
+
+        Lo llama el mismo recorrido que repinta la barra y el gate (menú de
+        Temporada y latido), así que cambiar de temporada cambia TODO a la vez.
+        """
+        try:
+            hoja = build_satellite_stylesheet(self._tema_de_hoy())
+            # Solo si cambió: re-aplicar la misma hoja hace que Qt vuelva a
+            # pulir todo y mueva un par de pixeles (medido el 10/10: el campo
+            # del kiosko crecía 2 px). Si no cambió, no hay nada que vestir.
+            if hoja != self.styleSheet():
+                self.setStyleSheet(hoja)
+        except Exception:  # noqa: BLE001 — la hoja de siempre sigue puesta
+            pass
+
     def _repintar_si_cambio_la_temporada(self, nombre: str) -> None:
         """Repinta los adornos si la temporada cambió en otra pantalla.
 
@@ -7791,6 +7857,12 @@ class QuoteSatelliteWindow(QMainWindow):
                     releer()
                 except Exception:  # noqa: BLE001 — un adorno no tumba nada
                     pass
+        try:
+            from pos_uniformes.services.temporada_service import anotar
+
+            anotar("aplicada", temporada=nombre or "Maximoda")
+        except Exception:  # noqa: BLE001 — anotar no vale un error
+            pass
 
     def _enviar_heartbeat(self) -> None:
         """Registra/actualiza este satélite en la DB (off-thread, best-effort)."""
@@ -7816,13 +7888,12 @@ class QuoteSatelliteWindow(QMainWindow):
                 # se cambia tres veces al año — no merece su propio reloj.
                 # Se lee AQUÍ (fuera del hilo de la UI, que es donde se
                 # puede tardar) y se repinta allá, que es donde se puede
-                # tocar la pantalla.
+                # tocar la pantalla. El cruce de hilos va por señal, como el
+                # watchdog: es lo único que Qt entrega de un hilo al otro.
                 from pos_uniformes.services.temporada_service import actual
 
-                nombre = getattr(actual(), "nombre", "")
-                QTimer.singleShot(
-                    0, lambda n=nombre: self._repintar_si_cambio_la_temporada(n)
-                )
+                nombre = getattr(actual(), "nombre", "") or ""
+                self._temporada_leida.emit(str(nombre))
             except Exception:  # noqa: BLE001 — presencia es best-effort
                 pass
 

@@ -591,6 +591,181 @@ def _build_temporada_box(dialog: QWidget) -> QGroupBox:
 
     guardar.clicked.connect(_guardar)
     layout.addWidget(guardar)
+
+    # ── Probar sin tocar la tienda ───────────────────────────────────────
+    # La prueba es de ESTA pantalla y vence sola a las dos horas: así se
+    # mira un borrador de Navidad en octubre sin que la tienda lo vea y sin
+    # que se quede puesto por accidente. Manda sobre el ajuste mientras dura.
+    prueba_fila = QHBoxLayout()
+    prueba_combo = QComboBox()
+    for nombre, archivo in temp.ARCHIVOS.items():
+        prueba_combo.addItem(nombre, archivo)
+    probar = QPushButton("Probar aquí 2 h")
+    probar.setObjectName("secondaryButton")
+    quitar = QPushButton("Volver a lo normal")
+    quitar.setObjectName("ghostButton")
+    prueba_fila.addWidget(QLabel("Previsualizar:"))
+    prueba_fila.addWidget(prueba_combo, 1)
+    prueba_fila.addWidget(probar)
+    prueba_fila.addWidget(quitar)
+    layout.addLayout(prueba_fila)
+    prueba_estado = QLabel("")
+    prueba_estado.setObjectName("subtleLine")
+    prueba_estado.setWordWrap(True)
+    layout.addWidget(prueba_estado)
+
+    def _refrescar_prueba() -> None:
+        f = temp.forzada()
+        prueba_estado.setText(
+            f"Prueba puesta en esta pantalla: {f.emoji} {f.nombre} (vence sola en ≤ 2 h)."
+            if f is not None else
+            "Sin prueba. La prueba solo se ve en esta pantalla; la tienda sigue con lo de arriba."
+        )
+
+    def _probar() -> None:
+        t = temp.forzar(prueba_combo.currentData())
+        if t is None:
+            QMessageBox.warning(dialog, "Temporada", "No conozco esa temporada.")
+            return
+        _refrescar_estado()
+        _refrescar_prueba()
+        _repintar_adornos(dialog)
+
+    def _quitar_prueba() -> None:
+        temp.quitar_forzada()
+        _refrescar_estado()
+        _refrescar_prueba()
+        _repintar_adornos(dialog)
+
+    probar.clicked.connect(_probar)
+    quitar.clicked.connect(_quitar_prueba)
+    _refrescar_prueba()
+
+    box.setLayout(layout)
+    return box
+
+
+def _build_fechas_box(dialog: QWidget) -> QGroupBox:
+    """Mover el inicio, el fin o la prioridad de cada temporada, para toda la tienda.
+
+    Las fechas de fábrica viven en el código; esto es la campaña de ESTA
+    tienda. Vacío = de fábrica. Se guarda en la base (todas las pantallas) y
+    en esta máquina (para sin red), igual que el modo. Daniel, 2026-10-10.
+    """
+    from pos_uniformes.services import temporada_service as temp
+
+    box = QGroupBox("Temporadas: fechas, estado y mensajes")
+    box.setObjectName("infoCard")
+    layout = QVBoxLayout()
+    layout.setSpacing(8)
+
+    ayuda = QLabel(
+        "Mes-día, por ejemplo 10-15. Deja vacío para usar lo de fábrica. "
+        "Si dos temporadas se empalman, gana la de mayor prioridad. Borrador y "
+        "En revisión solo se ven con «Probar aquí»; Archivado no sale nunca."
+    )
+    ayuda.setWordWrap(True)
+    ayuda.setObjectName("subtleLine")
+    layout.addWidget(ayuda)
+
+    forma = QFormLayout()
+    forma.setSpacing(6)
+    campos: dict[str, tuple[QLineEdit, QLineEdit, QSpinBox]] = {}
+    configuradas = temp.fechas_configuradas()
+    for t in temp.TEMPORADAS:
+        archivo = temp.ARCHIVOS.get(t.nombre, "")
+        if not archivo:
+            continue
+        de_fabrica = f"{t.desde[0]:02d}-{t.desde[1]:02d} a {t.hasta[0]:02d}-{t.hasta[1]:02d}"
+        ajuste = configuradas.get(archivo, {}) if isinstance(configuradas, dict) else {}
+        desde = QLineEdit(str(ajuste.get("desde", "") or ""))
+        desde.setPlaceholderText(f"{t.desde[0]:02d}-{t.desde[1]:02d}")
+        desde.setMaximumWidth(80)
+        hasta = QLineEdit(str(ajuste.get("hasta", "") or ""))
+        hasta.setPlaceholderText(f"{t.hasta[0]:02d}-{t.hasta[1]:02d}")
+        hasta.setMaximumWidth(80)
+        prioridad = QSpinBox()
+        prioridad.setRange(0, 99)
+        prioridad.setValue(int(ajuste.get("prioridad", t.prioridad) or 0))
+        prioridad.setMaximumWidth(60)
+        estado = QComboBox()
+        for etiqueta, valor in (("Aprobado", temp.APROBADO), ("Borrador", temp.BORRADOR),
+                                ("En revisión", temp.EN_REVISION), ("Archivado", temp.ARCHIVADO)):
+            estado.addItem(etiqueta, valor)
+        estado.setCurrentIndex(max(0, estado.findData(ajuste.get("estado") or temp.APROBADO)))
+        saludo = QLineEdit(str(ajuste.get("saludo", "") or ""))
+        saludo.setPlaceholderText(t.saludo)
+        saludo.setMaxLength(60)
+        secundario = QLineEdit(str(ajuste.get("secundario", "") or ""))
+        secundario.setPlaceholderText("renglón secundario (opcional)")
+        secundario.setMaxLength(60)
+        fila = QHBoxLayout()
+        fila.addWidget(desde)
+        fila.addWidget(QLabel("a"))
+        fila.addWidget(hasta)
+        fila.addWidget(QLabel("prioridad"))
+        fila.addWidget(prioridad)
+        fila.addWidget(estado)
+        fila.addStretch()
+        contenedor = QWidget()
+        contenedor.setLayout(fila)
+        contenedor.setToolTip(f"De fábrica: {de_fabrica}, prioridad {t.prioridad}")
+        forma.addRow(f"{t.emoji} {t.nombre}", contenedor)
+        textos = QHBoxLayout()
+        textos.addWidget(saludo, 1)
+        textos.addWidget(secundario, 1)
+        caja_textos = QWidget()
+        caja_textos.setLayout(textos)
+        forma.addRow("", caja_textos)
+        campos[archivo] = (desde, hasta, prioridad, estado, saludo, secundario)
+    layout.addLayout(forma)
+
+    guardar = QPushButton("Guardar fechas")
+    guardar.setObjectName("primaryButton")
+
+    def _guardar() -> None:
+        datos: dict = {}
+        for archivo, (desde, hasta, prioridad, estado, saludo, secundario) in campos.items():
+            de_fabrica = next(
+                t for t in temp.TEMPORADAS if temp.ARCHIVOS.get(t.nombre) == archivo
+            )
+            entrada: dict = {}
+            if desde.text().strip():
+                entrada["desde"] = desde.text().strip()
+            if hasta.text().strip():
+                entrada["hasta"] = hasta.text().strip()
+            if prioridad.value() != de_fabrica.prioridad:
+                entrada["prioridad"] = prioridad.value()
+            if estado.currentData() != temp.APROBADO:
+                entrada["estado"] = estado.currentData()
+            if saludo.text().strip():
+                entrada["saludo"] = saludo.text().strip()
+            if secundario.text().strip():
+                entrada["secundario"] = secundario.text().strip()
+            if entrada:
+                datos[archivo] = entrada
+        try:
+            en_la_tienda = temp.guardar_fechas(datos)
+        except ValueError as exc:
+            QMessageBox.warning(dialog, "Revisa las fechas", str(exc))
+            return
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(dialog, "Error", f"No se pudo guardar:\n{exc}")
+            return
+        _repintar_adornos(dialog)
+        if en_la_tienda:
+            QMessageBox.information(
+                dialog, "Guardado", "Las demás pantallas se enteran en un minuto."
+            )
+        else:
+            QMessageBox.warning(
+                dialog, "Solo en esta pantalla",
+                "No se pudo avisar a la base, así que las otras pantallas siguen "
+                "como estaban. Vuelve a guardar cuando haya conexión.",
+            )
+
+    guardar.clicked.connect(_guardar)
+    layout.addWidget(guardar)
     box.setLayout(layout)
     return box
 
@@ -1593,7 +1768,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     tabs.addTab(_make_tab(conteo_box), "📋  Conteos")
     if anuncios_boxes:
         tabs.addTab(_make_tab(*anuncios_boxes), "📣  Anuncios")
-    tabs.addTab(_make_tab(_build_temporada_box(dialog)), "🎃  Temporada")
+    tabs.addTab(_make_tab(_build_temporada_box(dialog), _build_fechas_box(dialog)), "🎃  Temporada")
     tabs.addTab(_make_tab(_build_precios_box(dialog)), "💲  Precios")
     tabs.addTab(_make_tab(_build_camaras_box(dialog)), "📹  Cámaras")
 

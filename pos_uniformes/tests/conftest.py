@@ -356,6 +356,9 @@ def _temporada_sin_ajuste_de_esta_maquina(tmp_path):
     temp.olvidar_lo_leido()
     with patch.object(temp, "ruta_ajuste", lambda: tmp_path / "temporada_ajuste.json"), \
          patch.object(temp, "ruta_forzada", lambda: tmp_path / "temporada_forzada.json"), \
-         patch.object(temp, "_ajuste_de_la_tienda", return_value=None):
+         patch.object(temp, "ruta_fechas", lambda: tmp_path / "temporada_fechas.json"), \
+         patch.object(temp, "ruta_bitacora", lambda: tmp_path / "temporada_bitacora.jsonl"), \
+         patch.object(temp, "_ajuste_de_la_tienda", return_value=None), \
+         patch.object(temp, "_fechas_de_la_tienda", return_value=None):
         yield
     temp.olvidar_lo_leido()

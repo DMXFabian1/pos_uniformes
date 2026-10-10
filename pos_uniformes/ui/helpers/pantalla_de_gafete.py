@@ -133,6 +133,16 @@ def _temporada():
         return None
 
 
+def _tema():
+    """El tema de hoy (Maximoda fuera de temporada), o None si algo truena."""
+    try:
+        from pos_uniformes.services.temporada_service import tema_activo
+
+        return tema_activo()
+    except Exception:  # noqa: BLE001
+        return None
+
+
 def _vestir(raiz, icono: QLabel, titulo: QLabel, ayuda: QLabel,
             saludo: QLabel, emoji_fijo: str) -> None:
     """Deja la tarjeta como toca para la temporada de ahora mismo.
@@ -149,7 +159,17 @@ def _vestir(raiz, icono: QLabel, titulo: QLabel, ayuda: QLabel,
     if temporada is None:
         titulo.setStyleSheet(f"color: {_TEXT}; background: transparent;")
         ayuda.setStyleSheet(f"color: {_MUTED}; background: transparent;")
-        saludo.setVisible(False)
+        # Fuera de temporada la tarjeta saluda como Maximoda; con los adornos
+        # apagados desde el menú, no saluda (apagar es apagar).
+        tema = _tema()
+        bienvenida = tema.saludo if tema is not None else ""
+        if bienvenida:
+            saludo.setText(bienvenida)
+            saludo.setStyleSheet(
+                f"color: {tema.color}; font-size: 13px; font-weight: 700;"
+                " background: transparent;"
+            )
+        saludo.setVisible(bool(bienvenida))
         return
 
     _tenir(titulo, ayuda, temporada)

@@ -119,7 +119,8 @@ class LaTemporadaSobreviveAlCerrarElProgramaTests(unittest.TestCase):
 
         codigo = Path(t.__file__).read_text(encoding="utf-8")
         self.assertNotIn("import runtime_base_dir", codigo)
-        self.assertEqual(codigo.count("import satellite_data_dir"), 2)
+        # Ajuste, forzada, fechas y bitácora: cuatro archivos, todos en AppData.
+        self.assertEqual(codigo.count("import satellite_data_dir"), 4)
 
     def test_lo_guardado_se_lee_de_vuelta(self) -> None:
         """La comprobación de siempre, por si el camino cambia otra vez."""
@@ -237,8 +238,55 @@ class ElKioskoSeEnteraSinReiniciarTests(unittest.TestCase):
         trozo = codigo[codigo.index("def _enviar_heartbeat"):][:1800]
         self.assertIn("from pos_uniformes.services.temporada_service import actual",
                       trozo)
-        self.assertIn("QTimer.singleShot(", trozo)
-        self.assertIn("_repintar_si_cambio_la_temporada", trozo)
+        # El cruce de hilos es una señal, no un QTimer: Qt solo arma timers
+        # en hilos suyos, y el latido es un threading.Thread. Con singleShot
+        # la otra pantalla nunca se enteraba (2026-10-10).
+        self.assertIn("_temporada_leida.emit(", trozo)
+        self.assertNotIn("QTimer.singleShot(", trozo)
+        self.assertNotIn("_repintar_si_cambio_la_temporada(", trozo)
+        # Y la señal llega al repintado en el hilo de la UI.
+        self.assertIn(
+            "self._temporada_leida.connect(self._repintar_si_cambio_la_temporada)",
+            codigo,
+        )
+
+    def test_la_senal_cruza_de_un_hilo_al_de_la_ui(self) -> None:
+        """Emitir desde un threading.Thread debe ejecutar el repintado en el
+        hilo de la UI, no en el del latido ni en ninguno."""
+        import threading
+        import time
+
+        from PyQt6.QtCore import QObject, pyqtSignal
+        from PyQt6.QtWidgets import QApplication
+
+        app = QApplication.instance() or QApplication([])
+
+        class _Ventana(QObject):
+            _temporada_leida = pyqtSignal(str)
+
+            def __init__(self) -> None:
+                super().__init__()
+                self.visto: list[tuple[str, int]] = []
+                self._temporada_leida.connect(self._repintar)
+
+            def _repintar(self, nombre: str) -> None:
+                self.visto.append((nombre, threading.get_ident()))
+
+        ventana = _Ventana()
+        hilo = threading.Thread(
+            target=lambda: ventana._temporada_leida.emit("Halloween"), daemon=True
+        )
+        hilo.start()
+        hilo.join(timeout=5)
+        # La señal viene encolada: hay que dejar que el hilo de la UI la
+        # despache. Sin esperar un plazo fijo: se sale en cuanto llega.
+        for _ in range(100):
+            app.processEvents()
+            if ventana.visto:
+                break
+            time.sleep(0.01)
+        self.assertEqual([n for n, _ in ventana.visto], ["Halloween"])
+        self.assertEqual(ventana.visto[0][1], threading.get_ident())
 
     def test_no_repinta_si_no_cambio(self) -> None:
         """Repintar cada minuto sin motivo parpadearía la pantalla."""
