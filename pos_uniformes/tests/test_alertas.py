@@ -61,21 +61,45 @@ class ColaTests(unittest.TestCase):
             self.assertEqual(al.pendientes(s), [])
             self.assertEqual(al.enviar_pendientes(s, salidas.append), 0)
 
-    def test_sin_red_se_queda_pendiente_y_cuenta_intentos(self) -> None:
+    def test_sin_red_se_queda_pendiente_sin_gastar_intentos(self) -> None:
+        """En un apagón de internet el bot da una vuelta cada 25-40 s: contar
+        intentos ahí descartaba la alerta a los 3 minutos (2026-10-10)."""
         def falla(_t):
             raise OSError("sin red")
 
         with self.factory() as s:
             al.encolar(s, "uno")
             al.encolar(s, "dos")
-            self.assertEqual(al.enviar_pendientes(s, falla), 0)
+            for _ in range(al.MAX_INTENTOS * 3):
+                self.assertEqual(al.enviar_pendientes(s, falla), 0)
             pend = al.pendientes(s)
             self.assertEqual([p.texto for p in pend], ["uno", "dos"])
-            self.assertEqual(pend[0].intentos, 1)
-            self.assertEqual(pend[1].intentos, 0)  # se detuvo en la primera
+            self.assertEqual([p.intentos for p in pend], [0, 0])
+
+    def test_si_telegram_rechaza_el_mensaje_si_se_cuenta_y_se_descarta(self) -> None:
+        def rechaza(_t):
+            raise RuntimeError("Telegram respondió: Bad Request: message is too long")
+
+        with self.factory() as s:
+            al.encolar(s, "uno")
+            al.encolar(s, "dos")
             for _ in range(al.MAX_INTENTOS):
-                al.enviar_pendientes(s, falla)
+                al.enviar_pendientes(s, rechaza)
             self.assertEqual([p.texto for p in al.pendientes(s)], ["dos"])  # "uno" agotó intentos
+
+    def test_una_alerta_atrasada_dice_de_cuando_es(self) -> None:
+        salidas = []
+        ahora = datetime(2026, 10, 10, 9, 0).astimezone()
+        with self.factory() as s:
+            al.encolar(s, "⏰ Ya cerró la tienda y no se ha hecho corte")
+            vieja = al.pendientes(s)[0]
+            vieja.created_at = datetime(2026, 10, 9, 18, 10).astimezone()
+            al.encolar(s, "fresca")
+            al.pendientes(s)[1].created_at = ahora - timedelta(minutes=5)
+            s.commit()
+            al.enviar_pendientes(s, salidas.append, ahora=ahora)
+        self.assertEqual(salidas[0], "🕒 (de ayer 18:10) ⏰ Ya cerró la tienda y no se ha hecho corte")
+        self.assertEqual(salidas[1], "fresca")
 
     def test_encolar_sin_tabla_no_rompe(self) -> None:
         factory = _sqlite()  # sin alerta_telegram

@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -90,21 +90,63 @@ def pendientes(session) -> list:
     return list(session.scalars(stmt).all())
 
 
-def enviar_pendientes(session, enviar) -> int:
-    """Manda cada alerta pendiente con `enviar(texto)`; marca enviadas. Devuelve cuántas salieron."""
+#: A partir de cuánto retraso una alerta dice de cuándo es. Una alerta de
+#: «ya cerró la tienda sin corte» que llega a la mañana siguiente, sin fecha,
+#: se lee como de ahora.
+MINUTOS_PARA_FECHAR = 30
+
+
+def _es_falla_de_red(exc: BaseException) -> bool:
+    """¿Falló la red (o Telegram no contestó), o fue Telegram rechazando ESTE
+    mensaje? Lo segundo viene como RuntimeError «Telegram respondió: …» desde
+    telegram_service._llamar; todo lo demás es red."""
+    return not (isinstance(exc, RuntimeError) and str(exc).startswith("Telegram respondió"))
+
+
+def _fechada(alerta, ahora: datetime | None = None) -> str:
+    """El texto, con «(de ayer 18:10)» delante si lleva rato esperando."""
+    ahora = ahora or datetime.now().astimezone()
+    creada = alerta.created_at
+    if creada is None:
+        return alerta.texto
+    if creada.tzinfo is None:
+        # Sin zona solo pasa en SQLite (tests): `encolar` la escribe en hora
+        # local con zona y SQLite se la quita. Postgres la devuelve con zona.
+        creada = creada.replace(tzinfo=ahora.tzinfo)
+    if ahora - creada < timedelta(minutes=MINUTOS_PARA_FECHAR):
+        return alerta.texto
+    local = _local(creada)
+    cuando = f"de las {local:%H:%M}" if local.date() == _local(ahora).date() else f"de ayer {local:%H:%M}" \
+        if local.date() == _local(ahora).date() - timedelta(days=1) else f"del {local:%d/%m %H:%M}"
+    return f"🕒 ({cuando}) {alerta.texto}"
+
+
+def enviar_pendientes(session, enviar, ahora: datetime | None = None) -> int:
+    """Manda cada alerta pendiente con `enviar(texto)`; marca enviadas. Devuelve cuántas salieron.
+
+    Los intentos solo se cuentan cuando Telegram rechazó ESE mensaje. Sin red
+    no se cuenta nada: antes, en un apagón de internet, cada vuelta del bot
+    (25-40 s) sumaba un intento y a los cinco (~3 min) la alerta se descartaba
+    para siempre; en una hora sin línea se perdían cortes, retiros y «cierre
+    sin corte», y al volver el bot decía «lo que quedó en cola ya te va
+    llegando» (2026-10-10)."""
     enviadas = 0
     for alerta in pendientes(session):
-        alerta.intentos = int(alerta.intentos or 0) + 1
         try:
             # Con teclado se llama con dos argumentos; sin él, con uno. Así
             # un enviador de los de antes —que recibe solo el texto— sigue
             # sirviendo para los avisos de siempre, que son casi todos.
+            texto = _fechada(alerta, ahora)
             if alerta.botones:
-                enviar(alerta.texto, alerta.botones)
+                enviar(texto, alerta.botones)
             else:
-                enviar(alerta.texto)
+                enviar(texto)
         except Exception as exc:  # noqa: BLE001
-            logger.warning("Alerta %s no salió (intento %s): %s", alerta.id, alerta.intentos, exc)
+            if _es_falla_de_red(exc):
+                logger.warning("Alerta %s no salió (sin línea, se reintenta): %s", alerta.id, exc)
+            else:
+                alerta.intentos = int(alerta.intentos or 0) + 1
+                logger.warning("Alerta %s rechazada (intento %s): %s", alerta.id, alerta.intentos, exc)
             session.commit()
             break  # sin red: lo demás tampoco va a salir ahora
         alerta.enviado_at = datetime.now().astimezone()
