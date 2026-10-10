@@ -55,6 +55,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--revisar", action="store_true", help="solo decir cómo va, sin respaldar")
     parser.add_argument("--sin-avisar", action="store_true", help="no mandar nada por Telegram")
     parser.add_argument("--carpeta", default=None, help="dónde guardar (default: la de siempre)")
+    # La tarea «POS Respaldo» lo manda y el .bat lo reenvía tal cual. Aquí no
+    # hace nada (es para que el .bat no haga pausa), pero si el parser no lo
+    # conoce, argparse sale con error 2 ANTES de respaldar: así estuvo del
+    # 1 al 10 de octubre de 2026 y la tarea diaria nunca respaldó nada.
+    parser.add_argument("--callado", action="store_true", help="sin pausa (tarea programada)")
     args = parser.parse_args(argv)
 
     carpeta = Path(args.carpeta).expanduser().resolve() if args.carpeta else None
