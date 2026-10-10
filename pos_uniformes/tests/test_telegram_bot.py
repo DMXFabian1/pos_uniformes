@@ -65,7 +65,9 @@ class AtenderTests(unittest.TestCase):
         with patch("pos_uniformes.services.resumen_diario_service.texto_solo_pendientes", return_value=""):
             self.assertEqual(bot.atender_texto("/pendientes", session_factory=_sesion), "Sin pendientes. ✅")
         self.assertIn("/corte", bot.atender_texto("/ayuda", session_factory=_sesion))
-        self.assertIn("No entendí", bot.atender_texto("hola", session_factory=_sesion))
+        suelto = bot.atender_texto("hola", session_factory=_sesion)
+        self.assertIn("No entendí", suelto)
+        self.assertNotIn("/corte 5000", suelto)   # ya no manda la ayuda entera
         self.assertIn("No conozco /x", bot.atender_texto("/x", session_factory=_sesion))
 
 
@@ -102,6 +104,39 @@ class EscucharTests(unittest.TestCase):
         textos = [c.args[0] for c in enviar.call_args_list]
         self.assertEqual(len(textos), 2)  # aviso del /corte viejo + respuesta de /ayuda; el "hola" viejo, nada
         self.assertIn("No atendí «/corte»", textos[0])
+
+
+class ArgumentosQueNoSeTragaTests(unittest.TestCase):
+    """«/faltas 30» ignoraba el 30; «/contar Playera» y «/pagos Fanny»
+    tragaban el argumento en silencio (2026-10-10)."""
+
+    def test_faltas_con_dias(self) -> None:
+        with patch("pos_uniformes.services.telegram_inventario_service.faltas", return_value="F") as faltas:
+            self.assertEqual(bot.atender_texto("/faltas 30", session_factory=_sesion), "F")
+        self.assertEqual(faltas.call_args.args[1], 30)
+        self.assertIn("como días", bot.atender_texto("/faltas treinta", session_factory=_sesion))
+
+    def test_lo_que_no_lleva_argumento_lo_dice(self) -> None:
+        with patch("pos_uniformes.services.telegram_inventario_service.contar", return_value="C"):
+            r = bot.atender_texto("/contar Playera", session_factory=_sesion)
+        self.assertTrue(r.startswith("(/contar no lleva nada después"))
+        self.assertTrue(r.endswith("C"))
+        with patch("pos_uniformes.services.telegram_inventario_service.contar", return_value="C"):
+            self.assertEqual(bot.atender_texto("/contar", session_factory=_sesion), "C")
+
+
+class MensajesEditadosTests(unittest.TestCase):
+    def test_una_edicion_se_avisa_y_no_se_ejecuta(self) -> None:
+        updates = {"result": [
+            {"update_id": 7, "edited_message": {"chat": {"id": 123}, "text": "/corte 500", "date": 1}},
+        ]}
+        with patch("pos_uniformes.services.telegram_service._llamar", return_value=updates), \
+             patch("pos_uniformes.services.telegram_service.enviar_mensaje") as enviar, \
+             patch.object(bot, "atender_texto") as atender:
+            bot.escuchar(session_factory=_sesion, token="t", chat_id="123", una_vez=True, alertas=False)
+        atender.assert_not_called()
+        self.assertIn("editados", enviar.call_args.args[0])
+        self.assertEqual(bot._leer_offset(), 8)
 
 
 class ElOffsetSobreviveAlReinicioTests(unittest.TestCase):

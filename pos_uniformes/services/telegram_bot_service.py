@@ -257,11 +257,24 @@ def leer_opciones_corte(argumento: str) -> OpcionesCorte:
     )
 
 
+def _sin_argumento(cmd) -> str:
+    """Un aviso corto cuando se le pone algo a un comando que no lleva nada.
+
+    Antes «/contar Playera» o «/pagos Fanny» tragaban el argumento en
+    silencio y contestaban lo de siempre: parecía que sí lo habían tomado en
+    cuenta (2026-10-10)."""
+    if not (cmd.argumento or "").strip():
+        return ""
+    return f"(/{cmd.nombre} no lleva nada después; «{cmd.argumento.strip()}» no se usó)\n\n"
+
+
 def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> str:
     """Devuelve la respuesta para un mensaje. `session_factory()` abre sesión."""
     cmd = parsear(texto)
     if cmd is None:
-        return "No entendí. " + AYUDA
+        # Un «gracias», un sticker o una nota de voz recibían las 2 KB de la
+        # ayuda completa cada vez (2026-10-10). Una línea basta.
+        return "No entendí. Para ver qué puedo hacer: /menu (botones) o /ayuda."
     if cmd.nombre in ("ayuda", "help", "start"):
         return AYUDA
     if cmd.nombre == "corte":
@@ -327,7 +340,7 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
             return texto_solo_pendientes(session, hoy) or "Sin pendientes. ✅"
     if cmd.nombre == "asistencia":
         with session_factory() as session:
-            return mensaje_asistencia(session, hoy)[0]
+            return _sin_argumento(cmd) + mensaje_asistencia(session, hoy)[0]
     if cmd.nombre in ("menu", "menú"):
         from pos_uniformes.services import telegram_menu_service as menu
 
@@ -396,7 +409,7 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
         from pos_uniformes.services import telegram_pagos_service as pg
 
         with session_factory() as session:
-            return pg.pagos(session, hoy=hoy)
+            return _sin_argumento(cmd) + pg.pagos(session, hoy=hoy)
     if cmd.nombre == "pagar":
         from pos_uniformes.services import telegram_pagos_service as pg
 
@@ -421,7 +434,7 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
         from pos_uniformes.services import telegram_inventario_service as inv
 
         with session_factory() as session:
-            return inv.contar(session)
+            return _sin_argumento(cmd) + inv.contar(session)
     if cmd.nombre == "escuela":
         from pos_uniformes.services import telegram_inventario_service as inv
 
@@ -430,8 +443,14 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
     if cmd.nombre == "faltas":
         from pos_uniformes.services import telegram_inventario_service as inv
 
+        dias = inv.DIAS_FALTAS
+        if cmd.argumento:
+            try:
+                dias = max(1, min(365, int(cmd.argumento.strip())))
+            except ValueError:
+                return f"No entendí «{cmd.argumento}» como días. Por ejemplo: /faltas 30"
         with session_factory() as session:
-            return inv.faltas(session, hoy=hoy)
+            return inv.faltas(session, dias, hoy=hoy)
     if cmd.nombre in ("vino", "falta", "descanso"):
         from pos_uniformes.services import asistencia_service as asis
 
@@ -755,6 +774,17 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
                     _guardar_offset(offset)
                 continue
             _guardar_offset(offset)
+            if upd.get("edited_message") and not upd.get("message"):
+                # Editar «/retiro 50» a «500» no hace nada: se dice, en vez
+                # de dejarlo creer que sí (2026-10-10).
+                editado = upd["edited_message"]
+                if str((editado.get("chat") or {}).get("id", "")) == str(chat_id):
+                    try:
+                        _mandar("No atiendo mensajes editados; mándalo de nuevo como mensaje nuevo.")
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning("No se pudo avisar de la edición: %s", exc)
+                _guardar_offset(offset)
+                continue
             msg = upd.get("message") or {}
             chat = str((msg.get("chat") or {}).get("id", ""))
             texto = msg.get("text") or ""
