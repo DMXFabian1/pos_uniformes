@@ -152,9 +152,14 @@ def faltas(session: Session, dias: int = DIAS_FALTAS, *, hoy: date | None = None
     """Lo que se tocó estando agotado: la lista de qué pedir."""
     from pos_uniformes.services import demanda_service
 
+    from pos_uniformes.utils.date_format import local_day_window
+
+    # Días de la TIENDA, no de UTC: con medianoche UTC (18:00 local) lo que
+    # pedían por la tarde no salía hasta el día siguiente (2026-10-10). Se
+    # convierte a UTC para que Postgres y SQLite comparen lo mismo.
     hasta_dia = hoy or date.today()
-    hasta = datetime.combine(hasta_dia, time.max, tzinfo=timezone.utc)
-    desde = datetime.combine(hasta_dia - timedelta(days=int(dias)), time.min, tzinfo=timezone.utc)
+    desde = local_day_window(hasta_dia - timedelta(days=int(dias)))[0].astimezone(timezone.utc)
+    hasta = local_day_window(hasta_dia)[1].astimezone(timezone.utc)
 
     filas = demanda_service.listar(session, desde, hasta)
     agrupadas = demanda_service.por_producto_talla(filas)

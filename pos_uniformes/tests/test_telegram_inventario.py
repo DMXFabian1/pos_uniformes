@@ -131,6 +131,21 @@ class FaltasTest(_Base):
         self.assertIn("Playera JS · 10 — 4 veces 🔴", r)
         self.assertIn("una vez", r)
 
+    def test_lo_pedido_en_la_tarde_sale_el_mismo_dia(self):
+        """Con la ventana en UTC, lo de después de las 18:00 (hora de la
+        tienda) caía en «mañana» y no salía hasta el día siguiente."""
+        from datetime import date as _date
+
+        from pos_uniformes.services.demanda_service import TALLA_AGOTADA
+
+        hoy = _date(2026, 10, 10)
+        tarde = datetime(2026, 10, 10, 19, 30).astimezone().astimezone(timezone.utc)
+        self.s.add(DemandaNoAtendida(
+            tipo=TALLA_AGOTADA, sku="X", producto="Suéter JS", talla="8", piezas=1, created_at=tarde,
+        ))
+        self.s.flush()
+        self.assertIn("Suéter JS · 8", inv.faltas(self.s, hoy=hoy))
+
     def test_lo_viejo_no_entra(self):
         self._falta("Playera JS", "10", hace_dias=30)
         self.assertIn("Nadie pidió", inv.faltas(self.s, dias=7))
