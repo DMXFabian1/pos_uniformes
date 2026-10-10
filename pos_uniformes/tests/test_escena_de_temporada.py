@@ -505,10 +505,13 @@ class CambiarLaTemporadaRepintaLaTarjetaTests(unittest.TestCase):
         self.assertEqual(titulo.palette().color(titulo.foregroundRole()), QColor(_TEXT))
         self.assertTrue(self._etiqueta(raiz, "gateTemporada").isHidden())
 
-    def test_el_emoji_suelto_sale_solo_cuando_no_hay_escena(self) -> None:
+    def test_el_emoji_de_la_tarjeta_sale_siempre(self) -> None:
+        """Con escena o sin ella. Se escondía con escena, y desde que las ocho
+        temporadas tienen escena no salía nunca (Daniel, 2026-10-10)."""
         temp.guardar_ajuste(temp.FIJA, "halloween")
         raiz = self._gate()
-        self.assertTrue(self._etiqueta(raiz, "gateEmoji").isHidden())
+        self.assertFalse(self._etiqueta(raiz, "gateEmoji").isHidden())
+        self.assertEqual(self._etiqueta(raiz, "gateEmoji").text(), "🎃")
 
         temp.guardar_ajuste(temp.APAGADA)
         raiz.releer_temporada()

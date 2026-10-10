@@ -39,6 +39,10 @@ class EscPosSettings:
     corte_calculado: bool = True
     #: Puntos EXTRA más allá de la posición de corte. 0 = al ras.
     puntos_tras_corte: int = 0
+    #: Los adornos festivos a trazo del ticket dibujado (lápices, calaveritas,
+    #: corazones…). Encendido: es parte de la temporada, que ya se apaga desde
+    #: el menú. Apagado aquí = el ticket dibujado de antes, sin más (2026-10-10).
+    adornos_de_temporada: bool = True
 
 
 def _cache_path() -> Path:
@@ -61,6 +65,9 @@ def load_escpos_settings() -> EscPosSettings:
             puntos_tras_corte=max(0, min(255, int(
                 data.get("puntos_tras_corte", d.puntos_tras_corte)
             ))),
+            adornos_de_temporada=bool(
+                data.get("adornos_de_temporada", d.adornos_de_temporada)
+            ),
         )
     except Exception:  # noqa: BLE001
         return EscPosSettings()

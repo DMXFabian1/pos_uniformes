@@ -64,8 +64,10 @@ def construir_gate(
     dentro.setSpacing(12)
     dentro.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-    # El emoji suelto solo cuando NO hay escena: con una calabaza del tamaño
-    # de la pantalla detrás, dos dirían lo mismo dos veces.
+    # El emoji de la tarjeta sale SIEMPRE: en temporada el de la temporada
+    # (🎃, 🎄…), fuera de ella el de la pantalla (📒, 📋). Se escondía cuando
+    # había escena de fondo, y desde que las ocho temporadas tienen escena ya
+    # no salía nunca; Daniel lo quiso de vuelta (2026-10-10).
     icono = QLabel("")
     icono.setObjectName("gateEmoji")
     icono.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -154,7 +156,7 @@ def _vestir(raiz, icono: QLabel, titulo: QLabel, ayuda: QLabel,
 
     temporada = _temporada()
     icono.setText(temporada.emoji if temporada else emoji_fijo)
-    icono.setVisible(not raiz.tiene_escena)
+    icono.setVisible(True)
 
     if temporada is None:
         titulo.setStyleSheet(f"color: {_TEXT}; background: transparent;")

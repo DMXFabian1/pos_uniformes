@@ -1324,6 +1324,14 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     )
     escpos_imagen_hint.setWordWrap(True)
     escpos_imagen_hint.setObjectName("satNota")
+    escpos_adornos = QCheckBox("Adornos de temporada en el ticket dibujado (lápices, calaveritas, corazones…)")
+    escpos_adornos.setChecked(getattr(_esc, "adornos_de_temporada", True))
+    escpos_adornos_hint = QLabel(
+        "Solo aplica con el ticket dibujado. Desmárcalo para volver al ticket "
+        "dibujado de antes; los datos, el logo y el dibujo del pie no cambian."
+    )
+    escpos_adornos_hint.setWordWrap(True)
+    escpos_adornos_hint.setObjectName("satNota")
     escpos_form = QFormLayout()
     escpos_codepage = QSpinBox()
     escpos_codepage.setRange(0, 255)
@@ -1335,13 +1343,19 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     escpos_form.addRow("Líneas antes del corte:", escpos_feed)
 
     def _escpos_actuales() -> EscPosSettings:
-        return EscPosSettings(
+        from dataclasses import replace
+
+        # Sobre lo guardado, para no pisar con defaults lo que este cuadro no
+        # enseña (corte calculado, puntos tras corte).
+        return replace(
+            _esc,
             enabled=escpos_enabled.isChecked(),
             codepage=escpos_codepage.value(),
             encoding=_esc.encoding,
             feed_lines=escpos_feed.value(),
             full_cut=escpos_fullcut.isChecked(),
             ticket_como_imagen=escpos_imagen.isChecked(),
+            adornos_de_temporada=escpos_adornos.isChecked(),
         )
 
     save_escpos_btn = QPushButton("Guardar ESC/POS")
@@ -1403,6 +1417,8 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     escpos_layout.addWidget(escpos_fullcut)
     escpos_layout.addWidget(escpos_imagen)
     escpos_layout.addWidget(escpos_imagen_hint)
+    escpos_layout.addWidget(escpos_adornos)
+    escpos_layout.addWidget(escpos_adornos_hint)
     escpos_layout.addLayout(escpos_form)
     escpos_btn_row = QHBoxLayout()
     escpos_btn_row.addWidget(save_escpos_btn)
