@@ -172,19 +172,79 @@ def cabe_en_un_boton(nota: str) -> bool:
     return len(f"{PREFIJO}nota:{nota}".encode("utf-8")) <= _TOPE_DATO
 
 
+#: Las notas que no caben en un botón esperan aquí, con una clave corta.
+_ARCHIVO_NOTAS = "corte_notas_pendientes.json"
+#: Una nota guardada que nadie confirmó en este plazo se olvida.
+HORAS_NOTA_PENDIENTE = 12.0
+
+
+def ruta_notas():
+    from pos_uniformes.utils.config import runtime_base_dir
+
+    return runtime_base_dir() / "data" / _ARCHIVO_NOTAS
+
+
+def _leer_notas() -> dict:
+    import json
+
+    try:
+        return json.loads(ruta_notas().read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return {}
+
+
+def _escribir_notas(datos: dict) -> None:
+    import json
+
+    ruta = ruta_notas()
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    ruta.write_text(json.dumps(datos, ensure_ascii=False), encoding="utf-8")
+
+
+def guardar_nota_pendiente(nota: str) -> str:
+    """Guarda la nota y devuelve su clave (`#a1b2c3d4`), que sí cabe en el botón."""
+    import hashlib
+    import time
+
+    clave = "#" + hashlib.sha1(f"{time.time()}{nota}".encode("utf-8")).hexdigest()[:8]
+    datos = {k: v for k, v in _leer_notas().items()
+             if time.time() - float(v.get("cuando", 0)) < HORAS_NOTA_PENDIENTE * 3600}
+    datos[clave] = {"nota": nota, "cuando": time.time()}
+    _escribir_notas(datos)
+    return clave
+
+
+def nota_pendiente(clave: str) -> str | None:
+    """La nota guardada bajo esa clave, o None si venció o no existe."""
+    import time
+
+    entrada = _leer_notas().get(clave)
+    if not entrada:
+        return None
+    if time.time() - float(entrada.get("cuando", 0)) >= HORAS_NOTA_PENDIENTE * 3600:
+        return None
+    return str(entrada.get("nota") or "") or None
+
+
 def preguntar_por_la_nota(nota: str, retiro: Decimal) -> tuple[str, str]:
     """(texto, botones) para confirmar un `/corte` que solo trae nota.
 
     Existe porque `/corte` toma cualquier palabra suelta como nota y HACE el
     corte: `/corte abc` cerraba el periodo e imprimía el ticket. Un corte no
     se deshace fácil y un dedazo no debería hacerlo (Daniel, 2026-10-08).
+
+    Si la nota no cabe en el dato del botón (64 bytes), se guarda en disco y
+    el botón lleva solo una clave. Antes la nota larga se dejaba pasar sin
+    preguntar, y «lo que no cabe» no es más seguro que lo que cabe
+    (2026-10-10).
     """
+    dato = nota if cabe_en_un_boton(nota) else guardar_nota_pendiente(nota)
     return (
         f"¿Hago el corte con la nota «{nota}»?\n\n"
         f"Saldrían {_pesos(retiro)} del cajón y se imprime el ticket en la tienda.\n"
         "Si era un dedazo, no toques nada.",
         _teclado([
-            [(f"✅ Sí, hacer el corte ({_pesos(retiro)})", f"{PREFIJO}nota:{nota}")],
+            [(f"✅ Sí, hacer el corte ({_pesos(retiro)})", f"{PREFIJO}nota:{dato}")],
             [("🚫 No, fue un dedazo", f"{PREFIJO}no")],
         ]),
     )
@@ -230,9 +290,14 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
             # `cc:nota:` sin nota haría el corte igual, que es justo lo que
             # este botón existe para impedir.
             return "No conozco ese botón", "", ""
+        nota = crudo
+        if crudo.startswith("#"):
+            nota = nota_pendiente(crudo)
+            if not nota:
+                return "Ya venció", "Esa pregunta ya venció. Si todavía quieres el corte, manda /corte otra vez.", ""
         with session_factory() as session:
             resultado = crs.hacer_corte_y_avisar(
-                session, creado_por=quien, nota=crudo
+                session, creado_por=quien, nota=nota
             )
             session.commit()
         return ("Corte hecho" if resultado.hecho else ""), resultado.mensaje, ""

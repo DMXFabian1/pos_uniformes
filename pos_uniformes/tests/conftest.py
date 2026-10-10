@@ -341,8 +341,11 @@ def _vigilante_sin_memoria_de_esta_maquina(tmp_path):
 
     from pos_uniformes.services import telegram_bot_service as tbs
 
+    from pos_uniformes.services import telegram_corte_botones_service as tcb
+
     with patch.object(al, "ruta_memoria", lambda: tmp_path / "bot_vigilante.json"), \
-         patch.object(tbs, "ruta_offset", lambda: tmp_path / "bot_offset.json"):
+         patch.object(tbs, "ruta_offset", lambda: tmp_path / "bot_offset.json"), \
+         patch.object(tcb, "ruta_notas", lambda: tmp_path / "corte_notas_pendientes.json"):
         yield
 
 

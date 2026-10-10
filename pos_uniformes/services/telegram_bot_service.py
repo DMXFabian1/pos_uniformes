@@ -517,7 +517,11 @@ def responder(texto: str, *, session_factory, hoy: date | None = None) -> tuple[
         from pos_uniformes.services import telegram_corte_botones_service as cb
 
         nota = _corte_solo_con_nota(cmd.argumento)
-        if nota and cb.cabe_en_un_boton(nota):
+        if nota:
+            # Corta o larga, se pregunta. Una larga no cabe en el botón y
+            # antes se dejaba pasar: el corte se hacía sin preguntar
+            # (2026-10-10). Ahora la nota larga se guarda y el botón lleva
+            # solo una clave.
             with session_factory() as session:
                 retiro, _ = crs.cifras_de_propuesta(session)
             return cb.preguntar_por_la_nota(nota, retiro)
@@ -557,9 +561,14 @@ def atender_foto(msg: dict, *, session_factory, token: str | None = None) -> str
     if not file_id:
         return None
     pie = (msg.get("caption") or "").strip()
-    # Un pie que empieza con otro comando no es un aviso: se atiende como texto.
+    # Un pie que empieza con otro comando no es un aviso. Antes se atendía
+    # como texto, pero por ESE camino «/corte abc» se saltaba la pregunta
+    # anti-dedazo y hacía el corte (2026-10-10). Los comandos van solos.
     if pie.startswith("/") and not pie.lower().startswith(("/aviso", "/cartel")):
-        return atender_texto(pie, session_factory=session_factory)
+        return (
+            f"No atiendo «{pie.split()[0]}» en el pie de una foto. "
+            "Mándalo como mensaje aparte; la foto sola, con /aviso o /cartel, sí la pongo."
+        )
     interrumpe = True
     if pie.lower().startswith("/cartel"):
         interrumpe = False

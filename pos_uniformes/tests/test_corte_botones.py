@@ -393,13 +393,33 @@ class UnDedazoNoDebeHacerUnCorteTests(unittest.TestCase):
         _, _, hacer = self._responder("/corte")
         hacer.assert_called_once()
 
-    def test_una_frase_larga_se_deja_pasar(self) -> None:
-        """No cabe en el botón, y de todos modos una frase se escribe a
-        propósito: el dedazo que preocupa es corto."""
+    def test_una_frase_larga_tambien_se_pregunta(self) -> None:
+        """No cabe en el botón: antes se dejaba pasar y el corte se hacía sin
+        preguntar. Ahora la nota espera en disco y el botón lleva una clave
+        (2026-10-10)."""
+        from pos_uniformes.services import corte_remoto_service as crs
+
         larga = "deposité todo al banco porque mañana no voy a estar en la tienda"
         self.assertFalse(cb.cabe_en_un_boton(larga))
-        _, _, hacer = self._responder(f"/corte {larga}")
-        hacer.assert_called_once()
+        texto, botones, hacer = self._responder(f"/corte {larga}")
+        hacer.assert_not_called()
+        self.assertIn(f"«{larga}»", texto)
+        dato = next(d for d in _datos(botones) if d.startswith("cc:nota:"))
+        self.assertTrue(dato.startswith("cc:nota:#"))
+        self.assertLessEqual(len(dato.encode("utf-8")), 64)
+        with patch.object(crs, "hacer_corte_y_avisar") as hacer:
+            hacer.return_value = MagicMockResultado("listo")
+            aviso, _, _ = cb.atender(dato, session_factory=self.factory, quien="VEND-1")
+        self.assertEqual(aviso, "Corte hecho")
+        self.assertEqual(hacer.call_args.kwargs["nota"], larga)
+
+    def test_una_clave_vencida_o_inventada_no_hace_el_corte(self) -> None:
+        from pos_uniformes.services import corte_remoto_service as crs
+
+        with patch.object(crs, "hacer_corte_y_avisar") as hacer:
+            aviso, texto, _ = cb.atender("cc:nota:#nadie", session_factory=self.factory, quien="VEND-1")
+        hacer.assert_not_called()
+        self.assertIn("venció", texto)
 
     def test_al_confirmar_se_hace_con_esa_nota(self) -> None:
         from pos_uniformes.services import corte_remoto_service as crs

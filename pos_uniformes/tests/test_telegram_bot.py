@@ -125,6 +125,17 @@ class ArgumentosQueNoSeTragaTests(unittest.TestCase):
             self.assertEqual(bot.atender_texto("/contar", session_factory=_sesion), "C")
 
 
+class ComandoEnPieDeFotoTests(unittest.TestCase):
+    def test_un_corte_en_el_pie_de_una_foto_no_se_ejecuta(self) -> None:
+        """Por ese camino «/corte abc» se saltaba la pregunta anti-dedazo
+        (2026-10-10)."""
+        msg = {"caption": "/corte abc", "photo": [{"file_id": "f", "width": 10, "height": 10}]}
+        with patch.object(bot, "atender_texto") as atender:
+            r = bot.atender_foto(msg, session_factory=_sesion, token="t")
+        atender.assert_not_called()
+        self.assertIn("No atiendo «/corte»", r)
+
+
 class MensajesEditadosTests(unittest.TestCase):
     def test_una_edicion_se_avisa_y_no_se_ejecuta(self) -> None:
         updates = {"result": [
