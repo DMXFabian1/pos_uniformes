@@ -35,9 +35,44 @@ class EstadoTests(unittest.TestCase):
 
     def test_nocorte_cancela_solo_la_de_hoy(self) -> None:
         prop.anotar_propuesta(datetime(2026, 9, 9, 17, 30))
-        self.assertFalse(prop.cancelar(hoy=date(2026, 9, 10)))  # la de ayer no
         self.assertTrue(prop.cancelar(hoy=date(2026, 9, 9)))
         self.assertTrue(prop.leer().cancelado)
+        # Al día siguiente, la de ayer ya no cuenta: el /nocorte queda anotado
+        # para HOY (por adelantado) y la vieja se va.
+        self.assertFalse(prop.cancelar(hoy=date(2026, 9, 10)))
+        self.assertTrue(prop.cancelada_hoy(date(2026, 9, 10)))
+        self.assertFalse(prop.cancelada_hoy(date(2026, 9, 9)))
+
+
+class NoCorteAnticipadoTests(unittest.TestCase):
+    """«/nocorte» antes de la propuesta no se guardaba: el bot contestaba que
+    no había nada que cancelar y a las 18:50 cerraba solo (2026-10-10)."""
+
+    def setUp(self) -> None:
+        self._dir = tempfile.TemporaryDirectory()
+        self._patch = patch.object(prop, "ruta_estado", return_value=Path(self._dir.name) / "corte_propuesto.json")
+        self._patch.start()
+
+    def tearDown(self) -> None:
+        self._patch.stop()
+        self._dir.cleanup()
+
+    def test_el_no_de_antes_vale_para_hoy(self) -> None:
+        hoy = date(2026, 9, 9)
+        self.assertFalse(prop.cancelar(hoy=hoy))          # no había propuesta: se anota
+        self.assertTrue(prop.cancelada_hoy(hoy))
+        p = prop.anotar_propuesta(datetime(2026, 9, 9, 17, 30))
+        self.assertTrue(p.cancelado)                      # la propuesta respeta el no
+        self.assertFalse(prop.toca_recordar(p, hoy=hoy, hubo_corte_despues=False))
+        self.assertFalse(prop.toca_cerrar_solo(
+            p, hoy=hoy, minutos_tras_cierre=60, hubo_corte_despues=False, hubo_movimiento=True,
+        ))
+
+    def test_el_no_de_ayer_no_vale_hoy(self) -> None:
+        prop.cancelar(hoy=date(2026, 9, 8))
+        self.assertFalse(prop.cancelada_hoy(date(2026, 9, 9)))
+        p = prop.anotar_propuesta(datetime(2026, 9, 9, 17, 30))
+        self.assertFalse(p.cancelado)
 
 
 class RecordatorioTests(unittest.TestCase):
@@ -261,7 +296,7 @@ class BotTests(unittest.TestCase):
         self.assertIn("no se hace el corte", r)
         with patch.object(prop, "cancelar", return_value=False):
             r = bot.atender_texto("/nocorte", session_factory=None)
-        self.assertIn("No hay ningún corte propuesto", r)
+        self.assertIn("Anotado: hoy no se hace el corte", r)
 
     def test_el_comando_esta_en_la_ayuda(self) -> None:
         from pos_uniformes.services import telegram_bot_service as bot

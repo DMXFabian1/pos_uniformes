@@ -71,7 +71,11 @@ def main(argv: list[str] | None = None) -> int:
 
         if not args.hacer:
             # Lo normal: preguntar primero. Nada se guarda ni se imprime.
-            from pos_uniformes.services.corte_propuesta_service import anotar_propuesta
+            from pos_uniformes.services.corte_propuesta_service import anotar_propuesta, cancelada_hoy
+
+            if cancelada_hoy(ahora.date()):
+                print("Sin propuesta: Daniel ya dijo /nocorte hoy.")
+                return 0
             from pos_uniformes.services.corte_remoto_service import texto_propuesta_corte
 
             from pos_uniformes.services.corte_remoto_service import propuesta_de_corte

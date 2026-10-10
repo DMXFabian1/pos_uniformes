@@ -74,8 +74,17 @@ def _guardar(p: Propuesta) -> None:
     )
 
 
+def cancelada_hoy(hoy: date | None = None) -> bool:
+    """¿Daniel ya dijo /nocorte para hoy (antes o después de la propuesta)?"""
+    p = leer()
+    return p.hay and p.fecha == (hoy or date.today()) and p.cancelado
+
+
 def anotar_propuesta(momento: datetime) -> Propuesta:
-    p = Propuesta(fecha=momento.date(), momento=momento, recordado=False, cancelado=False)
+    """Hoy se propuso el corte. Si Daniel ya había dicho /nocorte para hoy,
+    el «no» se respeta: queda anotada pero cancelada."""
+    p = Propuesta(fecha=momento.date(), momento=momento, recordado=False,
+                  cancelado=cancelada_hoy(momento.date()))
     _guardar(p)
     return p
 
@@ -87,12 +96,17 @@ def anotar_recordatorio() -> None:
 
 
 def cancelar(hoy: date | None = None) -> bool:
-    """Daniel contestó /nocorte. Devuelve si había algo que cancelar."""
+    """Daniel contestó /nocorte. Vale para hoy aunque la propuesta no haya
+    llegado todavía: antes contestaba «no hay nada que cancelar» y el cierre
+    automático de las 18:50 seguía en pie (2026-10-10). Devuelve True si
+    había una propuesta de hoy; False si se anotó por adelantado."""
+    hoy = hoy or date.today()
     p = leer()
-    if not p.hay or p.fecha != (hoy or date.today()):
-        return False
-    _guardar(Propuesta(p.fecha, p.momento, p.recordado, True))
-    return True
+    if p.hay and p.fecha == hoy:
+        _guardar(Propuesta(p.fecha, p.momento, p.recordado, True))
+        return True
+    _guardar(Propuesta(fecha=hoy, momento=None, recordado=False, cancelado=True))
+    return False
 
 
 #: Cuánto se espera después de cerrar antes de hacer el corte sin él. Da tiempo
