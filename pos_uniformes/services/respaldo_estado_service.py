@@ -26,9 +26,21 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-#: Arriba de esto el respaldo ya es viejo y se avisa. Dos días deja pasar un
-#: domingo cerrado sin dar lata, y no deja pasar una semana muerta.
-DIAS_PARA_AVISAR = 2
+#: Arriba de esto el respaldo ya es viejo y se avisa. El respaldo sale a las
+#: 20:30 y el aviso se revisa desde las 10:00: 36 horas cubren una noche
+#: normal (13.5 h) y delatan la primera noche que falló (37.5 h). Con dos
+#: días pasaban ~38 h entre la falla y el aviso, con dos días de trabajo
+#: expuestos (2026-10-10). El lunes se dan 60 h, por el domingo cerrado.
+HORAS_PARA_AVISAR = 36
+HORAS_PARA_AVISAR_LUNES = 60
+DIAS_PARA_AVISAR = 2   # compatibilidad: lo que decía el texto del aviso
+
+
+def horas_para_avisar(hoy=None) -> int:
+    from datetime import date as _date
+
+    hoy = hoy or _date.today()
+    return HORAS_PARA_AVISAR_LUNES if hoy.weekday() == 0 else HORAS_PARA_AVISAR
 
 #: Un dump bueno de esta tienda pesa cientos de KB. Mucho menos que esto
 #: significa que `pg_dump` escribió algo que no es la base (pasó con una
@@ -61,7 +73,7 @@ class EstadoRespaldo:
             return False
         if self.sospechoso:
             return False
-        return _aware(self.ultimo) > datetime.now(timezone.utc) - timedelta(days=DIAS_PARA_AVISAR)
+        return _aware(self.ultimo) > datetime.now(timezone.utc) - timedelta(hours=horas_para_avisar())
 
     @property
     def sospechoso(self) -> bool:

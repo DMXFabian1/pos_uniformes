@@ -254,3 +254,36 @@ class ConexionReutilizadaTests(unittest.TestCase):
         except RuntimeError as otro:
             self.assertIsNotNone(otro.__context__)
             self.assertFalse(self.tg._es_de_certificado(otro))
+
+
+class ElResumenSaleUnaVezTests(unittest.TestCase):
+    """Con 90 min de tolerancia las tareas de 16:45 y 17:45 pueden caer en
+    la misma ventana: se recuerda qué día ya salió (2026-10-10)."""
+
+    def test_se_recuerda_el_dia(self) -> None:
+        import tempfile
+        from datetime import date
+        from pathlib import Path
+        from unittest.mock import patch
+
+        from pos_uniformes.scripts import resumen_diario_telegram as rd
+
+        with tempfile.TemporaryDirectory() as d, \
+             patch.object(rd, "ruta_resumen_enviado", lambda: Path(d) / "resumen_enviado.json"):
+            self.assertFalse(rd.resumen_ya_enviado(date(2026, 10, 10)))
+            rd.anotar_resumen_enviado(date(2026, 10, 10))
+            self.assertTrue(rd.resumen_ya_enviado(date(2026, 10, 10)))
+            self.assertFalse(rd.resumen_ya_enviado(date(2026, 10, 11)))
+
+    def test_la_tolerancia_es_de_hora_y_media(self) -> None:
+        from datetime import datetime
+
+        from pos_uniformes.scripts import resumen_diario_telegram as rd
+        from pos_uniformes.services.horario_tienda_service import es_momento_de_resumen, hora_resumen
+
+        from datetime import timedelta
+
+        dia = datetime(2026, 10, 12)      # lunes: cierre 18:00, resumen 17:45
+        tarde = datetime.combine(dia.date(), hora_resumen(dia.date())) + timedelta(minutes=65)
+        self.assertTrue(es_momento_de_resumen(tarde, tolerancia_min=rd.TOLERANCIA_RESUMEN_MIN))
+        self.assertFalse(es_momento_de_resumen(tarde))   # con los 20 min de antes no

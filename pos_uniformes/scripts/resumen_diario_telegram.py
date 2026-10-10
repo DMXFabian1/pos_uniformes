@@ -54,8 +54,15 @@ def main(argv: list[str] | None = None) -> int:
         from pos_uniformes.services.horario_tienda_service import es_momento_de_resumen, hora_resumen
 
         ahora = datetime.now()
-        if not es_momento_de_resumen(ahora):
+        # 90 min y no 20: Windows dispara tarde si la PC acaba de prender o
+        # tiene tareas encoladas, y «No es la hora» era un día sin resumen
+        # sin aviso. Como las dos tareas (16:45 y 17:45) pueden caer en la
+        # misma ventana, se recuerda cuál día ya salió (2026-10-10).
+        if not es_momento_de_resumen(ahora, tolerancia_min=TOLERANCIA_RESUMEN_MIN):
             print(f"No es la hora del resumen de hoy ({hora_resumen(ahora.date()):%H:%M}); no se envía.")
+            return 0
+        if resumen_ya_enviado(ahora.date()):
+            print("El resumen de hoy ya salió; no se manda dos veces.")
             return 0
 
     from pos_uniformes.services import telegram_service
@@ -115,7 +122,38 @@ def main(argv: list[str] | None = None) -> int:
         print(texto)
         return 1
     print(f"Resumen enviado ({n} mensaje(s)).")
+    if args.si_toca and not args.pendientes and not args.asistencia:
+        anotar_resumen_enviado(hoy)
     return 0
+
+
+TOLERANCIA_RESUMEN_MIN = 90
+
+
+def ruta_resumen_enviado():
+    from pos_uniformes.utils.config import runtime_base_dir
+
+    return runtime_base_dir() / "data" / "resumen_enviado.json"
+
+
+def resumen_ya_enviado(hoy) -> bool:
+    import json
+
+    try:
+        return json.loads(ruta_resumen_enviado().read_text(encoding="utf-8")).get("fecha") == hoy.isoformat()
+    except Exception:  # noqa: BLE001
+        return False
+
+
+def anotar_resumen_enviado(hoy) -> None:
+    import json
+
+    try:
+        ruta = ruta_resumen_enviado()
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        ruta.write_text(json.dumps({"fecha": hoy.isoformat()}), encoding="utf-8")
+    except Exception:  # noqa: BLE001 — recordar no vale un error
+        pass
 
 
 if __name__ == "__main__":

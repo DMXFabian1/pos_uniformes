@@ -188,9 +188,13 @@ class VigilanteTests(unittest.TestCase):
             # Y a las 10 sí.
             self.assertEqual(len(self.v._respaldo_viejo(self.ahora.replace(hour=10))), 1)
 
-    def test_si_no_se_puede_leer_el_bot_sigue(self) -> None:
+    def test_si_no_se_puede_leer_el_bot_sigue_y_lo_dice(self) -> None:
+        """Antes devolvía [] en silencio y se daba por avisado; el silencio
+        no es éxito (2026-10-10)."""
         with patch.object(est, "leer_estado", side_effect=OSError("disco")):
-            self.assertEqual(self.v._respaldo_viejo(self.ahora), [])
+            textos = self.v._respaldo_viejo(self.ahora)
+        self.assertEqual(len(textos), 1)
+        self.assertIn("No pude revisar el respaldo", textos[0])
 
     def test_va_en_la_revision_de_cada_vuelta(self) -> None:
         viejo = est.EstadoRespaldo(ultimo=None, archivo=None)
@@ -253,3 +257,19 @@ class HojaEmergenciaTests(unittest.TestCase):
             self.hoja.main(["--salida", str(destino)])
             self.assertTrue(destino.exists())
             self.assertIn("Si algo falla", destino.read_text(encoding="utf-8"))
+
+
+class CuandoSeAvisaTests(unittest.TestCase):
+    """Con dos días pasaban ~38 h entre la noche que falló y el aviso; ahora
+    36 h entre semana (una noche fallida se nota a la mañana siguiente) y 60
+    el lunes, por el domingo cerrado (2026-10-10)."""
+
+    def test_entre_semana_36_horas(self) -> None:
+        from datetime import date
+
+        self.assertEqual(est.horas_para_avisar(date(2026, 10, 7)), 36)   # miércoles
+
+    def test_el_lunes_60(self) -> None:
+        from datetime import date
+
+        self.assertEqual(est.horas_para_avisar(date(2026, 10, 12)), 60)  # lunes
