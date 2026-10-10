@@ -81,5 +81,44 @@ class EscucharTests(unittest.TestCase):
         self.assertIn("No atendí «/corte»", textos[0])
 
 
+class ElOffsetSobreviveAlReinicioTests(unittest.TestCase):
+    """El offset vivía solo en memoria: tras un reinicio Telegram reenviaba el
+    último lote y un /retiro o un botón se ejecutaba dos veces (2026-10-10)."""
+
+    def test_lo_atendido_queda_en_disco_y_el_siguiente_arranque_lo_salta(self) -> None:
+        import time
+
+        updates = {"result": [
+            {"update_id": 41, "message": {"chat": {"id": 123}, "text": "/ayuda", "date": int(time.time())}},
+            {"update_id": 42, "callback_query": {"id": "q", "data": "x:nada",
+                                                 "message": {"chat": {"id": 123}}}},
+        ]}
+        llamadas = []
+
+        def falso_llamar(token, metodo, datos=None, timeout=None):
+            llamadas.append((metodo, dict(datos or {})))
+            return updates if metodo == "getUpdates" else {"ok": True}
+
+        with patch("pos_uniformes.services.telegram_service._llamar", side_effect=falso_llamar), \
+             patch("pos_uniformes.services.telegram_service.enviar_mensaje"):
+            bot.escuchar(session_factory=_sesion, token="t", chat_id="123", una_vez=True, alertas=False)
+        self.assertEqual(bot._leer_offset(), 43)
+        primera = next(d for m, d in llamadas if m == "getUpdates")
+        self.assertNotIn("offset", primera)          # primer arranque: sin memoria
+
+        llamadas.clear()
+        updates["result"] = []
+        with patch("pos_uniformes.services.telegram_service._llamar", side_effect=falso_llamar), \
+             patch("pos_uniformes.services.telegram_service.enviar_mensaje"):
+            bot.escuchar(session_factory=_sesion, token="t", chat_id="123", una_vez=True, alertas=False)
+        segunda = next(d for m, d in llamadas if m == "getUpdates")
+        self.assertEqual(segunda.get("offset"), 43)  # «reiniciado»: no pide lo ya atendido
+
+    def test_una_memoria_rota_arranca_como_antes(self) -> None:
+        bot.ruta_offset().parent.mkdir(parents=True, exist_ok=True)
+        bot.ruta_offset().write_text("{nada", encoding="utf-8")
+        self.assertIsNone(bot._leer_offset())
+
+
 if __name__ == "__main__":
     unittest.main()

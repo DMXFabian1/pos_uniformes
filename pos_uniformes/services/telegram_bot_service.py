@@ -620,6 +620,44 @@ def _es_viejo(msg: dict, ahora: float | None = None) -> bool:
 
 ESPERA_GETUPDATES_SEG = 25  # una vuelta cada ~25 s: alertas casi al momento y pocas consultas
 
+#: Hasta dónde ya atendimos, en disco. Vivía solo en memoria: cada reinicio
+#: del bot (al abrir el POS, al actualizar, al reiniciar la PC) arrancaba sin
+#: offset y Telegram reenviaba el último lote; un /retiro o un botón de hace
+#: minutos se ejecutaba dos veces (2026-10-10).
+_ARCHIVO_OFFSET = "bot_offset.json"
+
+
+def ruta_offset():
+    from pos_uniformes.utils.config import runtime_base_dir
+
+    return runtime_base_dir() / "data" / _ARCHIVO_OFFSET
+
+
+def _leer_offset() -> int | None:
+    import json
+
+    try:
+        ruta = ruta_offset()
+        if not ruta.exists():
+            return None
+        valor = json.loads(ruta.read_text(encoding="utf-8")).get("offset")
+        return int(valor) if valor is not None else None
+    except Exception:  # noqa: BLE001 — sin memoria se arranca como antes
+        return None
+
+
+def _guardar_offset(offset: int | None) -> None:
+    import json
+
+    if offset is None:
+        return
+    try:
+        ruta = ruta_offset()
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        ruta.write_text(json.dumps({"offset": int(offset)}), encoding="utf-8")
+    except Exception:  # noqa: BLE001 — recordar no vale un error
+        pass
+
 
 def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False, alertas: bool = True, on_tick=None) -> None:
     """Long-polling: atiende mensajes del chat autorizado hasta que lo paren.
@@ -628,7 +666,7 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
     from pos_uniformes.services import telegram_service
     from pos_uniformes.services.alertas_service import Vigilante, procesar
 
-    offset = None
+    offset = _leer_offset()
     vigilante = Vigilante() if alertas else None
     logger.info("Bot escuchando (chat %s)…", chat_id)
     try:
@@ -687,8 +725,12 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
             offset = int(upd["update_id"]) + 1
             toque = upd.get("callback_query")
             if toque:
-                _atender_toque(toque, session_factory=session_factory, token=token, chat_id=chat_id)
+                try:
+                    _atender_toque(toque, session_factory=session_factory, token=token, chat_id=chat_id)
+                finally:
+                    _guardar_offset(offset)
                 continue
+            _guardar_offset(offset)
             msg = upd.get("message") or {}
             chat = str((msg.get("chat") or {}).get("id", ""))
             texto = msg.get("text") or ""
@@ -732,6 +774,8 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.warning("No se pudo responder: %s", exc)
+            finally:
+                _guardar_offset(offset)
         if una_vez:
             return
 
