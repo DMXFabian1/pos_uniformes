@@ -189,3 +189,36 @@ class EstaEnLaRondaDelVigilanteTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LaRestaContraPostgresTests(unittest.TestCase):
+    """`ultimo_visto` llega de Postgres CON zona. El vigilante trabajaba sin
+    zona y la resta levantaba TypeError, que el except convertía en «nada que
+    avisar». Desde que existe, este aviso no salió nunca (2026-10-10)."""
+
+    def test_el_vigilante_pregunta_con_zona_y_la_resta_no_truena(self) -> None:
+        from datetime import timezone
+        from types import SimpleNamespace
+
+        from pos_uniformes.services import satelite_registry_service as rsvc
+
+        v = al.Vigilante()
+        muerto_hace = ABIERTA - timedelta(minutes=30)
+        sat = SimpleNamespace(
+            identificador="k1", nombre="Kiosko 1",
+            ultimo_visto=muerto_hace.astimezone(timezone.utc),   # como Postgres
+        )
+        vistos = []
+
+        def listar(session, *, ahora=None):
+            vistos.append(ahora)
+            # La resta de verdad, como la hace el registro contra Postgres.
+            online = rsvc.esta_online(sat, ahora=ahora)
+            return [{"identificador": "k1", "nombre": "Kiosko 1", "online": online,
+                     "ultimo_visto": sat.ultimo_visto}]
+
+        with patch("pos_uniformes.services.satelite_registry_service.listar_con_estado", listar):
+            v._pantalla_apagada(object(), ABIERTA - timedelta(minutes=40))   # la vio prendida
+            textos = v._pantalla_apagada(object(), ABIERTA)
+        self.assertTrue(all(a.tzinfo is not None for a in vistos), vistos)
+        self.assertTrue(any("Kiosko 1" in t for t in textos), textos)

@@ -369,8 +369,13 @@ class Vigilante:
         try:
             from pos_uniformes.services import satelite_registry_service as rsvc
 
-            estado = rsvc.listar_con_estado(session, ahora=ahora)
+            # Con zona: `ultimo_visto` viene de Postgres con zona, y restarle
+            # una hora sin zona levanta TypeError. Ese TypeError caía aquí
+            # abajo, en el except, y este aviso devolvió [] en silencio desde
+            # que existe (se vio el 2026-10-10).
+            estado = rsvc.listar_con_estado(session, ahora=ahora.astimezone())
         except Exception:  # noqa: BLE001 — el vigilante nunca tumba al bot
+            logger.warning("No se pudo revisar las pantallas", exc_info=True)
             return []
 
         if dia_nuevo:
