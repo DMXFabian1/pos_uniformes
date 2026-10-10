@@ -186,13 +186,56 @@ def hay_telegram() -> bool:
         return False
 
 
-def reiniciar_servicios() -> None:
-    """Bot y PWA toman el código nuevo; si el supervisor no corre, se levanta."""
+def huella_del_codigo() -> str:
+    """Con qué código corren bot y PWA: VERSION más el commit, si git contesta."""
+    partes = []
+    try:
+        partes.append((_raiz_repo() / "pos_uniformes" / "VERSION").read_text(encoding="utf-8").strip())
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        salida = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"], cwd=str(_raiz_repo()),
+            capture_output=True, text=True, timeout=10,
+        )
+        if salida.returncode == 0:
+            partes.append(salida.stdout.strip())
+    except Exception:  # noqa: BLE001
+        pass
+    return "+".join(partes)
+
+
+def ruta_huella_reiniciada() -> Path:
+    return _base() / "data" / "servicios_reiniciados_con.txt"
+
+
+def reiniciar_servicios(*, solo_si_cambio: bool = False) -> bool:
+    """Bot y PWA toman el código nuevo; si el supervisor no corre, se levanta.
+
+    Con `solo_si_cambio`, el reinicio solo se pide si el código es distinto
+    del que ya corrían. Antes se pedía SIEMPRE y abrir_pos.bat corre esto en
+    cada apertura: cada vez que Daniel abría el POS se mataba el bot a media
+    vuelta, Telegram reenviaba lo último y el vigilante volvía a avisar
+    (2026-10-10). Devuelve True si se pidió el reinicio."""
     from pos_uniformes.scripts import supervisor
 
-    supervisor.pedir_reinicio()
+    huella = huella_del_codigo()
+    pedido = True
+    if solo_si_cambio:
+        try:
+            anterior = ruta_huella_reiniciada().read_text(encoding="utf-8").strip()
+        except Exception:  # noqa: BLE001
+            anterior = ""
+        pedido = not huella or huella != anterior
+    if pedido:
+        supervisor.pedir_reinicio()
+        try:
+            ruta_huella_reiniciada().parent.mkdir(parents=True, exist_ok=True)
+            ruta_huella_reiniciada().write_text(huella, encoding="utf-8")
+        except Exception:  # noqa: BLE001
+            pass
     if not sys.platform.startswith("win"):
-        return
+        return pedido
     vbs = scripts_dir() / "correr_oculto.vbs"
     try:
         subprocess.Popen(
@@ -202,6 +245,7 @@ def reiniciar_servicios() -> None:
         )
     except Exception:  # noqa: BLE001 — el mutex evita duplicados; si falla, la tarea lo levanta
         pass
+    return pedido
 
 
 # ───────────────────────────────────────────────────────────── pasos únicos
@@ -408,8 +452,10 @@ def main(argv: list[str] | None = None) -> int:
         log.info(h)
         print(f"  {h}")
     try:
-        reiniciar_servicios()
-        print("  bot y PWA se reinician con el codigo nuevo")
+        if reiniciar_servicios(solo_si_cambio="--forzar" not in argv):
+            print("  bot y PWA se reinician con el codigo nuevo")
+        else:
+            print("  bot y PWA siguen: el codigo no cambio")
     except Exception:  # noqa: BLE001
         log.exception("Reinicio de servicios")
     return 0

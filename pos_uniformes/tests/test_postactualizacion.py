@@ -180,6 +180,27 @@ class MainTests(unittest.TestCase):
             self.assertEqual(post.main([]), 0)
         rein.assert_called_once()
 
+    def test_sin_cambio_de_codigo_no_se_reinicia_el_bot(self) -> None:
+        """abrir_pos.bat corre esto en cada apertura: reiniciar siempre mataba
+        al bot a media vuelta y repetía avisos (2026-10-10)."""
+        with tempfile.TemporaryDirectory() as d:
+            from pos_uniformes.scripts import supervisor
+
+            with patch.object(supervisor, "_base", return_value=Path(d)), \
+                 patch.object(post, "_base", return_value=Path(d)), \
+                 patch.object(post, "huella_del_codigo", return_value="2026.11.11+abc123"), \
+                 patch.object(post.sys, "platform", "darwin"):
+                self.assertTrue(post.reiniciar_servicios(solo_si_cambio=True))   # primera vez: no hay huella
+                self.assertTrue(supervisor.hay_bandera())                       # (la consume)
+                self.assertFalse(post.reiniciar_servicios(solo_si_cambio=True))  # mismo código: nada
+                self.assertFalse(supervisor.hay_bandera())
+            with patch.object(supervisor, "_base", return_value=Path(d)), \
+                 patch.object(post, "_base", return_value=Path(d)), \
+                 patch.object(post, "huella_del_codigo", return_value="2026.11.12+def456"), \
+                 patch.object(post.sys, "platform", "darwin"):
+                self.assertTrue(post.reiniciar_servicios(solo_si_cambio=True))   # cambió: sí
+                self.assertTrue(supervisor.hay_bandera())
+
     def test_reiniciar_servicios_deja_la_bandera(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             from pos_uniformes.scripts import supervisor
