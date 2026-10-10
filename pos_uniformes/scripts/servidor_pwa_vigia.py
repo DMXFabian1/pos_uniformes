@@ -59,6 +59,10 @@ def _pid_guardado() -> int | None:
 def matar(pid: int | None) -> None:
     if not pid or pid == os.getpid():
         return
+    from pos_uniformes.scripts.telegram_bot_vigia import es_proceso_python
+
+    if not es_proceso_python(pid):   # el .pid puede ser de otro programa (2026-10-10)
+        return
     try:
         if sys.platform.startswith("win"):
             subprocess.run(["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True, timeout=20)

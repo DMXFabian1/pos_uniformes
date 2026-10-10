@@ -150,6 +150,28 @@ class MensajesEditadosTests(unittest.TestCase):
         self.assertEqual(bot._leer_offset(), 8)
 
 
+class OtroBotConElMismoTokenTests(unittest.TestCase):
+    def test_un_409_no_cuenta_como_apagon(self) -> None:
+        """Dos bots con el mismo token (uno en la Mac) daban 409 en
+        getUpdates y se contaba como «sin internet»: mensajes «Volví a tener
+        línea» falsos (2026-10-10)."""
+        from pos_uniformes.services import bot_conexion_service as conexion
+
+        with patch("pos_uniformes.services.telegram_service._llamar",
+                   side_effect=RuntimeError("Telegram respondió: Conflict: terminated by other getUpdates request")), \
+             patch.object(conexion, "anotar_fallo") as fallo, patch.object(bot.time, "sleep"):
+            bot.escuchar(session_factory=_sesion, token="t", chat_id="123", una_vez=True, alertas=False)
+        fallo.assert_not_called()
+
+    def test_un_error_de_red_si_cuenta(self) -> None:
+        from pos_uniformes.services import bot_conexion_service as conexion
+
+        with patch("pos_uniformes.services.telegram_service._llamar", side_effect=OSError("sin red")), \
+             patch.object(conexion, "anotar_fallo") as fallo, patch.object(bot.time, "sleep"):
+            bot.escuchar(session_factory=_sesion, token="t", chat_id="123", una_vez=True, alertas=False)
+        fallo.assert_called_once()
+
+
 class ElOffsetSobreviveAlReinicioTests(unittest.TestCase):
     """El offset vivía solo en memoria: tras un reinicio Telegram reenviaba el
     último lote y un /retiro o un botón se ejecutaba dos veces (2026-10-10)."""

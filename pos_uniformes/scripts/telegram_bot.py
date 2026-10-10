@@ -20,7 +20,11 @@ import time
 from pathlib import Path
 
 NOMBRE_MUTEX = "Global\\POSUniformesTelegramBot"
-MAX_SEG_SIN_LATIDO = 180
+#: Una vuelta sana puede pasar de tres minutos sin estar colgada: el barrido
+#: borra mensajes en serie con timeout de 15 s ×2, una foto baja hasta 10 MB,
+#: y un getUpdates fallido son 80 s. Con 180 el supervisor mataba un bot sano
+#: a media operación y Telegram reenviaba lo último (2026-10-10).
+MAX_SEG_SIN_LATIDO = 600
 
 
 def _base() -> Path:

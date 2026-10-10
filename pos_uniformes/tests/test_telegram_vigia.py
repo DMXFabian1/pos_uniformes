@@ -79,8 +79,46 @@ class EscucharLatidoTests(unittest.TestCase):
             "pos_uniformes.services.telegram_service.enviar_mensaje"
         ):
             bot.escuchar(session_factory=_sesion, token="t", chat_id="1", una_vez=True, alertas=False, on_tick=lambda: latidos.append(1))
-        self.assertEqual(latidos, [1])
+        # Dos por vuelta: al empezar y justo antes de getUpdates. Con uno solo,
+        # un barrido largo más la espera de getUpdates pasaban del margen y el
+        # supervisor mataba un bot sano (2026-10-10).
+        self.assertEqual(latidos, [1, 1])
 
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class NoMatarAUnDesconocidoTests(unittest.TestCase):
+    """El .pid nunca se borra: tras reiniciar Windows ese número puede ser
+    del POS o del kiosko. Matarlo a ciegas al prender la PC era posible
+    (2026-10-10)."""
+
+    def test_un_pid_que_no_es_python_se_deja_en_paz(self) -> None:
+        from types import SimpleNamespace
+
+        from pos_uniformes.scripts import telegram_bot_vigia as vigia
+
+        with patch.object(vigia.subprocess, "run", return_value=SimpleNamespace(stdout='"notepad.exe","4242"')), \
+             patch.object(vigia.sys, "platform", "win32"), patch.object(vigia.os, "kill") as kill:
+            vigia.matar(4242)
+        kill.assert_not_called()
+
+    def test_un_python_si_se_mata(self) -> None:
+        from types import SimpleNamespace
+
+        from pos_uniformes.scripts import telegram_bot_vigia as vigia
+
+        with patch.object(vigia.subprocess, "run", return_value=SimpleNamespace(stdout="python3.12")) as run, \
+             patch.object(vigia.sys, "platform", "darwin"), patch.object(vigia.os, "kill") as kill:
+            vigia.matar(4242)
+        kill.assert_called_once()
+        self.assertEqual(run.call_args.args[0][:2], ["ps", "-p"])
+
+    def test_si_no_se_puede_mirar_no_se_mata(self) -> None:
+        from pos_uniformes.scripts import telegram_bot_vigia as vigia
+
+        with patch.object(vigia.subprocess, "run", side_effect=OSError("sin tasklist")), \
+             patch.object(vigia.os, "kill") as kill:
+            vigia.matar(4242)
+        kill.assert_not_called()

@@ -35,8 +35,29 @@ def _pid_guardado() -> int | None:
         return None
 
 
+def es_proceso_python(pid: int) -> bool:
+    """¿El PID sigue siendo un Python? El .pid nunca se borra: tras reiniciar
+    Windows ese número puede ser de otro programa (el POS, el kiosko), y
+    matarlo a ciegas al prender la PC era posible (2026-10-10)."""
+    try:
+        if sys.platform.startswith("win"):
+            salida = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {int(pid)}", "/FO", "CSV", "/NH"],
+                capture_output=True, text=True, timeout=20,
+            ).stdout
+        else:
+            salida = subprocess.run(
+                ["ps", "-p", str(int(pid)), "-o", "comm="], capture_output=True, text=True, timeout=20,
+            ).stdout
+    except Exception:  # noqa: BLE001 — sin poder mirar, mejor no matar
+        return False
+    return "python" in (salida or "").lower()
+
+
 def matar(pid: int | None) -> None:
     if not pid or pid == os.getpid():
+        return
+    if not es_proceso_python(pid):
         return
     try:
         if sys.platform.startswith("win"):

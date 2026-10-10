@@ -754,12 +754,29 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
             )
         except Exception:  # noqa: BLE001 — la limpieza nunca tumba el bot
             logger.exception("Falló el barrido de mensajes")
+        if on_tick is not None:
+            # Segundo latido: el barrido y el menú pueden tardar, y la espera
+            # de getUpdates son hasta 40 s más.
+            try:
+                on_tick()
+            except Exception:  # noqa: BLE001
+                pass
         try:
             datos = {"timeout": ESPERA_GETUPDATES_SEG}
             if offset is not None:
                 datos["offset"] = offset
             payload = telegram_service._llamar(token, "getUpdates", datos, timeout=ESPERA_GETUPDATES_SEG + 15)
         except Exception as exc:  # noqa: BLE001
+            if "conflict" in str(exc).lower():
+                # 409: OTRO bot está usando este token (uno en la Mac contra
+                # producción, dos instancias). No es un hueco de internet y
+                # contarlo como tal mandaba «Volví a tener línea» falsos
+                # (2026-10-10).
+                logger.error("Otro bot está usando el mismo token (409 Conflict): %s", exc)
+                time.sleep(30)
+                if una_vez:
+                    return
+                continue
             logger.warning("getUpdates falló: %s", exc)
             # Se anota el hueco: el bot no puede avisar mientras está
             # incomunicado —esa es la falla— pero sí contarlo al volver.
