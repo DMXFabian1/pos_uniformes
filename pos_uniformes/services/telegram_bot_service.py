@@ -733,8 +733,10 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
         logger.exception("No se pudo dejar el menú fijado")
 
     def _mandar(texto: str, botones: str = "") -> None:
+        # Alertas, cortes y avisos del vigilante: se quedan en el chat. Lo que
+        # se barre a las 24 h son las respuestas a comandos y el ruido.
         telegram_service.enviar_mensaje(
-            texto, token=token, chat_id=chat_id, botones=botones or None
+            texto, token=token, chat_id=chat_id, botones=botones or None, conservar=True
         )
 
     while True:

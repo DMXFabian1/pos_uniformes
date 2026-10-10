@@ -304,3 +304,19 @@ class ElMenuFijadoNoSeQuedaConLaHoraDeAyerTests(unittest.TestCase):
         hecho, editar, _ = self._refrescar("DESPUES")
         self.assertTrue(hecho)
         editar.assert_called_once()
+
+
+class LoImportanteNoSeBarreTests(unittest.TestCase):
+    def test_con_conservar_el_mensaje_no_se_apunta(self) -> None:
+        """Alertas, cortes y resúmenes se quedan: Daniel de viaje dos días
+        abría el chat y las alertas de anteayer ya no existían (2026-10-10)."""
+        from unittest.mock import patch
+
+        from pos_uniformes.services import telegram_limpieza_service as limpieza
+        from pos_uniformes.services import telegram_service as ts
+
+        with patch.object(limpieza, "anotar") as anotar:
+            ts._anotar_para_barrer({"result": {"message_id": 5}}, conservar=True)
+            anotar.assert_not_called()
+            ts._anotar_para_barrer({"result": {"message_id": 6}})
+            anotar.assert_called_once_with(6)

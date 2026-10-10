@@ -108,7 +108,8 @@ def main(argv: list[str] | None = None) -> int:
         print(texto)
         return 0
     try:
-        n = telegram_service.enviar_mensaje(texto, botones=botones)
+        # El resumen se queda en el chat; no se barre a las 24 h.
+        n = telegram_service.enviar_mensaje(texto, botones=botones, conservar=True)
     except Exception as exc:  # noqa: BLE001
         print(f"No se pudo enviar: {exc}")
         print(texto)

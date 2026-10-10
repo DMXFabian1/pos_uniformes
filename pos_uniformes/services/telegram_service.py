@@ -279,11 +279,15 @@ def teclado(filas: list[list[tuple[str, str]]]) -> str:
 
 
 def enviar_mensaje(
-    texto: str, *, token: str | None = None, chat_id: str | None = None, botones: str | None = None
+    texto: str, *, token: str | None = None, chat_id: str | None = None, botones: str | None = None,
+    conservar: bool = False,
 ) -> int:
     """Manda el texto (partido si es largo). Devuelve cuántos mensajes salieron.
 
-    `botones`: lo que devuelve `teclado()`; van en el último pedazo."""
+    `botones`: lo que devuelve `teclado()`; van en el último pedazo.
+    `conservar`: no barrerlo a las 24 h. Para alertas, cortes y resúmenes:
+    Daniel de viaje dos días abría el chat y las alertas de anteayer ya no
+    existían, solo la notificación sin cuerpo (2026-10-10)."""
     token, chat_id = _credenciales(token, chat_id)
     enviados = 0
     partes = partir_mensaje(texto)
@@ -295,13 +299,17 @@ def enviar_mensaje(
         # Se anota AQUÍ y no en cada sitio que manda un aviso: este es el único
         # camino por el que sale un mensaje, así que no hay forma de agregar
         # uno nuevo y que se quede sin barrer (2026-10-08).
-        _anotar_para_barrer(respuesta)
+        _anotar_para_barrer(conservar=conservar, respuesta=respuesta)
         enviados += 1
     return enviados
 
 
-def _anotar_para_barrer(respuesta: dict) -> None:
-    """Apunta el mensaje recién mandado para que el barrido lo borre mañana."""
+def _anotar_para_barrer(respuesta: dict, *, conservar: bool = False) -> None:
+    """Apunta el mensaje recién mandado para que el barrido lo borre mañana.
+
+    Con `conservar` no se apunta: lo que no está en la lista no se barre."""
+    if conservar:
+        return
     try:
         mid = int(((respuesta or {}).get("result") or {}).get("message_id") or 0)
         if mid:
