@@ -332,6 +332,18 @@ def _nombres_empleadas_limpios():
 
 
 @pytest.fixture(autouse=True)
+def _vigilante_sin_memoria_de_esta_maquina(tmp_path):
+    """Lo que el vigilante del bot ya avisó hoy vive en disco (2026-10-10):
+    un test no debe leer lo que otro, o la máquina, dejó anotado."""
+    from unittest.mock import patch
+
+    from pos_uniformes.services import alertas_service as al
+
+    with patch.object(al, "ruta_memoria", lambda: tmp_path / "bot_vigilante.json"):
+        yield
+
+
+@pytest.fixture(autouse=True)
 def _temporada_sin_ajuste_de_esta_maquina(tmp_path):
     """Los tests ven el calendario, no lo que esta máquina tenga configurado.
 

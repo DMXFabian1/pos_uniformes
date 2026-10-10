@@ -276,3 +276,33 @@ class BotIntegraTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReiniciarElBotNoRepiteLosAvisosTests(unittest.TestCase):
+    """Daniel recibió dos «el último respaldo es de hace 2 días» iguales a las
+    14:42 (2026-10-10): el bot se reinició y el vigilante nuevo no sabía que
+    el de antes ya había avisado. Reiniciar no es un día nuevo."""
+
+    def _ahora(self):
+        # Hora LOCAL de la tienda: antes de las 10 el vigilante no avisa.
+        return datetime(2026, 10, 10, 14, 42).astimezone()
+
+    def test_un_vigilante_nuevo_sabe_que_hoy_ya_se_aviso(self) -> None:
+        from pos_uniformes.services import respaldo_estado_service as est
+
+        estado = SimpleNamespace(al_dia=False, dias=2)
+        with patch.object(est, "leer_estado", return_value=estado), \
+             patch.object(est, "texto_sin_respaldo", return_value="⚠️ viejo"):
+            primero = al.Vigilante()
+            self.assertEqual(len(primero._respaldo_viejo(self._ahora())), 1)
+            # «Se reinicia el bot»: otro objeto, mismo día.
+            segundo = al.Vigilante()
+            self.assertEqual(segundo._respaldo_viejo(self._ahora()), [])
+            # Al día siguiente vuelve a avisar.
+            manana = self._ahora() + timedelta(days=1)
+            self.assertEqual(len(segundo._respaldo_viejo(manana)), 1)
+
+    def test_una_memoria_rota_no_tumba_al_vigilante(self) -> None:
+        al.ruta_memoria().write_text("{esto no es json", encoding="utf-8")
+        v = al.Vigilante()
+        self.assertIsNone(v.dia_respaldo_avisado)

@@ -167,6 +167,50 @@ def texto_fuera_de_horario(row, apertura, cierre) -> str:
 
 
 # ----------------------------------------------------------------- vigilante
+_ARCHIVO_MEMORIA = "bot_vigilante.json"
+
+
+def ruta_memoria():
+    """Dónde recuerda el vigilante qué ya avisó hoy (junto a bot_conexion.json)."""
+    from pos_uniformes.utils.config import runtime_base_dir
+
+    return runtime_base_dir() / "data" / _ARCHIVO_MEMORIA
+
+
+def _cargar_memoria() -> dict:
+    """{"dia_respaldo_avisado": date | None, ...}. Vacío si no hay o no se lee."""
+    import json
+
+    try:
+        ruta = ruta_memoria()
+        if not ruta.exists():
+            return {}
+        crudo = json.loads(ruta.read_text(encoding="utf-8"))
+        salida = {}
+        for clave in ("dia_respaldo_avisado", "dia_sin_corte_avisado"):
+            valor = crudo.get(clave)
+            try:
+                salida[clave] = date.fromisoformat(valor) if valor else None
+            except (TypeError, ValueError):
+                salida[clave] = None
+        return salida
+    except Exception:  # noqa: BLE001 — sin memoria se avisa una vez más, no se cae
+        return {}
+
+
+def _guardar_memoria(datos: dict) -> None:
+    import json
+
+    try:
+        ruta = ruta_memoria()
+        ruta.parent.mkdir(parents=True, exist_ok=True)
+        ruta.write_text(json.dumps(
+            {k: (v.isoformat() if v else None) for k, v in datos.items()}
+        ), encoding="utf-8")
+    except Exception:  # noqa: BLE001 — recordar no vale un error
+        pass
+
+
 @dataclass
 class Vigilante:
     """Estado entre vueltas del bot: qué ya se avisó y hasta qué movimiento se revisó."""
@@ -182,6 +226,23 @@ class Vigilante:
     pantallas_avisadas: set = field(default_factory=set, repr=False)
     dia_de_las_pantallas: date | None = None
     _apertura: object = field(default=None, repr=False)
+
+    # Lo «avisado hoy» se guarda en disco. Vivía solo en memoria, y cada vez
+    # que el bot se reiniciaba (al actualizar, al abrir el POS, al reiniciar
+    # la PC) volvía a mandar el mismo aviso de respaldo: Daniel recibió dos
+    # iguales a las 14:42 (2026-10-10). Reiniciar no es un día nuevo.
+    def __post_init__(self) -> None:
+        memoria = _cargar_memoria()
+        if self.dia_respaldo_avisado is None:
+            self.dia_respaldo_avisado = memoria.get("dia_respaldo_avisado")
+        if self.dia_sin_corte_avisado is None:
+            self.dia_sin_corte_avisado = memoria.get("dia_sin_corte_avisado")
+
+    def _recordar(self) -> None:
+        _guardar_memoria({
+            "dia_respaldo_avisado": self.dia_respaldo_avisado,
+            "dia_sin_corte_avisado": self.dia_sin_corte_avisado,
+        })
 
     def revisar(self, session, ahora: datetime | None = None) -> list[str]:
         """Devuelve los textos a mandar ahora (puede ser vacío)."""
@@ -228,6 +289,7 @@ class Vigilante:
             select(func.count(LibretaCorte.id)).where(LibretaCorte.fecha == hoy)
         )
         self.dia_sin_corte_avisado = hoy  # se avisa una sola vez al día (o se anota que no hacía falta)
+        self._recordar()
         if hubo_corte:
             return []
         hubo_movimiento = session.scalar(
@@ -254,6 +316,7 @@ class Vigilante:
         if ahora.hour < HORA_AVISO_RESPALDO:
             return []
         self.dia_respaldo_avisado = hoy
+        self._recordar()
         try:
             from pos_uniformes.services import respaldo_estado_service as est
 
