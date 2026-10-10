@@ -43,7 +43,8 @@ class FormatearTests(unittest.TestCase):
         d = DatosResumen(fecha=date(2026, 9, 8), horas_sin_corte=50.0)
         t = formatear(d)
         self.assertIn("Sin operaciones registradas hoy", t)
-        self.assertIn("SIN CORTE HOY. El último fue hace 2.1 días", t)
+        self.assertIn("Sin corte hoy (no hubo ventas). El último fue hace 2.1 días", t)
+        self.assertNotIn("❗", t)
         self.assertNotIn("AFLUENCIA", t)
         self.assertNotIn("EMPLEADAS", t)
         self.assertIn("Descansa: nadie", t)
@@ -287,3 +288,16 @@ class ElResumenSaleUnaVezTests(unittest.TestCase):
         tarde = datetime.combine(dia.date(), hora_resumen(dia.date())) + timedelta(minutes=65)
         self.assertTrue(es_momento_de_resumen(tarde, tolerancia_min=rd.TOLERANCIA_RESUMEN_MIN))
         self.assertFalse(es_momento_de_resumen(tarde))   # con los 20 min de antes no
+
+
+class DiaSinVentasTests(unittest.TestCase):
+    def test_sin_ventas_no_grita_sin_corte(self) -> None:
+        from pos_uniformes.services.resumen_diario_service import DatosResumen, formatear
+
+        from datetime import date
+
+        texto = formatear(DatosResumen(fecha=date(2026, 10, 10), operaciones=0, horas_sin_corte=30.0))
+        self.assertNotIn("❗ SIN CORTE", texto)
+        self.assertIn("no hubo ventas", texto)
+        con_ventas = formatear(DatosResumen(fecha=date(2026, 10, 10), operaciones=3, horas_sin_corte=30.0))
+        self.assertIn("❗ SIN CORTE", con_ventas)

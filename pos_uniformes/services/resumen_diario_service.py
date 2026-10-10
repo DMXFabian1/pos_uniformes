@@ -113,6 +113,10 @@ def formatear(d: DatosResumen) -> str:
     else:
         if d.horas_sin_corte is None:
             lineas.append("• Sin corte hoy (nunca se ha hecho uno).")
+        elif not d.operaciones and d.horas_sin_corte >= 24:
+            # Sin ventas hoy no había nada que cortar HOY: sin el ❗, pero se
+            # dice desde cuándo, por si lo de ayer sigue sin corte (2026-10-10).
+            lineas.append(f"• Sin corte hoy (no hubo ventas). El último fue hace {d.horas_sin_corte / 24:.1f} días.")
         elif d.horas_sin_corte >= 24:
             lineas.append(f"• ❗ SIN CORTE HOY. El último fue hace {d.horas_sin_corte / 24:.1f} días.")
         else:

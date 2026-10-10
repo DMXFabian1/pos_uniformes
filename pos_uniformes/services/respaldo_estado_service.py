@@ -147,7 +147,7 @@ def texto_sin_respaldo(estado: EstadoRespaldo) -> str:
         return (
             "🛑 No hay ningún respaldo de la base.\n\n"
             "Una falla de disco hoy se lleva TODO: catálogo, ventas, cortes, conteos.\n"
-            "En la tienda: scripts\\respaldo_diario.bat"
+            "Toca «Hacer el respaldo ahora» aquí abajo."
         )
     if estado.sospechoso:
         return (

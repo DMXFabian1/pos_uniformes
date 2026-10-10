@@ -44,6 +44,12 @@ def ruta_estado() -> Path:
     return runtime_base_dir() / "data" / "bot_mensajes.json"
 
 
+#: El hilo del respaldo también manda mensajes (y los anota) mientras el
+#: principal barre o refresca el menú: sin candado un apunte se perdía y
+#: ese mensaje no se barría nunca (2026-10-10).
+_CANDADO = __import__("threading").RLock()
+
+
 def _leer() -> dict:
     ruta = ruta_estado()
     if not ruta.exists():
@@ -79,11 +85,12 @@ def anotar(message_id: int) -> None:
     mid = int(message_id or 0)
     if mid <= 0:
         return
-    datos = _leer()
-    if mid == int(datos.get("menu_id") or 0):
-        return
-    datos["mensajes"].append({"id": mid, "ts": time.time()})
-    _guardar(datos)
+    with _CANDADO:
+        datos = _leer()
+        if mid == int(datos.get("menu_id") or 0):
+            return
+        datos["mensajes"].append({"id": mid, "ts": time.time()})
+        _guardar(datos)
 
 
 def menu_fijado() -> int:

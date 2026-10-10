@@ -94,7 +94,7 @@ class TextosTests(unittest.TestCase):
     def test_sin_ninguno_dice_lo_que_se_pierde(self) -> None:
         texto = est.texto_sin_respaldo(est.EstadoRespaldo(ultimo=None, archivo=None))
         self.assertIn("TODO", texto)
-        self.assertIn("respaldo_diario.bat", texto)
+        self.assertIn("Hacer el respaldo ahora", texto)   # el botón, no «ve a la PC»
 
     def test_viejo_dice_cuantos_dias_de_trabajo(self) -> None:
         estado = est.EstadoRespaldo(

@@ -434,3 +434,22 @@ class UnDedazoNoDebeHacerUnCorteTests(unittest.TestCase):
 
     def test_el_dedazo_se_cancela_con_el_boton_de_siempre(self) -> None:
         self.assertIn("cc:no", _datos(self._responder("/corte abc")[1]))
+
+
+class DesdeElCajonSeVuelveTests(unittest.TestCase):
+    def test_el_cajon_trae_boton_de_regreso(self) -> None:
+        """«vuelve con /corte» obligaba a escribir (2026-10-10)."""
+        import json
+        from contextlib import contextmanager
+        from unittest.mock import MagicMock, patch
+
+        from pos_uniformes.services import telegram_cajon_service as cj
+
+        @contextmanager
+        def factory():
+            yield MagicMock()
+
+        with patch.object(cj, "texto_y_botones", return_value=("CAJON", json.dumps({"inline_keyboard": [[{"text": "x", "callback_data": "cj:1"}]]}))):
+            _, texto, botones = cb.atender("cc:cajon", session_factory=factory, quien="VEND-1")
+        self.assertIn("cc:volver", _datos(botones))
+        self.assertIn("Volver a la propuesta", texto)

@@ -25,6 +25,15 @@ class ParsearTests(unittest.TestCase):
         self.assertIsNone(bot.parsear("hola"))
 
 
+class DosCantidadesTests(unittest.TestCase):
+    def test_dos_cifras_sueltas_no_se_adivinan(self) -> None:
+        """«/corte 5000 3000»: la segunda pisaba a la primera sin decir nada."""
+        with self.assertRaises(ValueError) as ctx:
+            bot.leer_opciones_corte("5000 3000")
+        self.assertIn("dos cantidades", str(ctx.exception))
+        self.assertEqual(bot.leer_opciones_corte("5000 deposité 2 cajas").retirar, Decimal("5000.00"))
+
+
 class LeerCifraTests(unittest.TestCase):
     """«/corte 5000,50» retiraba medio millón: se borraban todas las comas
     (2026-10-10). Una sola regla para /corte, /retiro y /ajustar."""
@@ -134,6 +143,15 @@ class ComandoEnPieDeFotoTests(unittest.TestCase):
             r = bot.atender_foto(msg, session_factory=_sesion, token="t")
         atender.assert_not_called()
         self.assertIn("No atiendo «/corte»", r)
+
+
+class BotonDesconocidoTests(unittest.TestCase):
+    def test_un_boton_de_otra_version_lo_dice(self) -> None:
+        toque = {"id": "q1", "data": "zz:nada", "message": {"chat": {"id": "123"}, "message_id": 5}}
+        with patch("pos_uniformes.services.telegram_service.responder_toque") as responder, \
+             patch("pos_uniformes.services.telegram_service.editar_mensaje"):
+            bot._atender_toque(toque, session_factory=_sesion, token="t", chat_id="123")
+        self.assertIn("No conozco ese botón", responder.call_args.args[1])
 
 
 class MensajesEditadosTests(unittest.TestCase):

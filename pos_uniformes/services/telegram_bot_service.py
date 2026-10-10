@@ -238,6 +238,13 @@ def leer_opciones_corte(argumento: str) -> OpcionesCorte:
             # la nota: en «5000 deposité 2 cajas» el 2 es parte del recado.
             if valor < 0:
                 raise ValueError("Lo que se retira no puede ser negativo.")
+            if retirar is not None:
+                # «/corte 5000 3000»: la segunda pisaba a la primera sin
+                # decir nada (2026-10-10). No se adivina cuál quiso.
+                raise ValueError(
+                    f"Van dos cantidades ({retirar:,.2f} y {valor:,.2f}) y no sé cuál es la "
+                    "que se retira. Manda una sola.\n\n" + _AYUDA_CORTE
+                )
             retirar = valor
             i += 1
             continue
@@ -892,6 +899,10 @@ def _atender_toque(toque: dict, *, session_factory, token: str, chat_id: str) ->
     except Exception as exc:  # noqa: BLE001
         logger.exception("Error atendiendo el toque %r", dato)
         resultado = (f"Falló: {exc}", "", "")
+    if resultado is None:
+        # Un botón de una versión vieja del bot: antes, globito vacío y nada
+        # (2026-10-10). Mejor decirlo.
+        resultado = ("No conozco ese botón; es de una versión vieja. Usa /menu.", "", "")
     try:
         telegram_service.responder_toque(str(toque.get("id", "")), resultado[0] if resultado else "", token=token)
     except Exception as exc:  # noqa: BLE001

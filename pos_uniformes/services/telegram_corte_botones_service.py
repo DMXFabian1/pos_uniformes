@@ -271,9 +271,21 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
     if accion == "cajon":
         from pos_uniformes.services import telegram_cajon_service as cj
 
+        import json
+
         with session_factory() as session:
             texto, botones = cj.texto_y_botones(session)
-        return "", texto + "\n\nCuando termines, vuelve con /corte.", botones
+        # Con botón de regreso: antes «vuelve con /corte» obligaba a escribir,
+        # justo lo que esta pantalla vino a evitar (2026-10-10).
+        try:
+            teclado = json.loads(botones) if botones else {"inline_keyboard": []}
+            teclado.setdefault("inline_keyboard", []).append(
+                [{"text": "‹ Volver a la propuesta", "callback_data": f"{PREFIJO}volver"}]
+            )
+            botones = json.dumps(teclado, ensure_ascii=False)
+        except Exception:  # noqa: BLE001 — sin botón de regreso, el texto lo dice
+            pass
+        return "", texto + "\n\nCuando termines, toca «Volver a la propuesta» o manda /corte.", botones
 
     # «retirar» ya no se ofrece, pero se sigue atendiendo: los mensajes viejos
     # se quedan en el chat con sus botones, y tocar uno no debe contestar «no
