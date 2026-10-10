@@ -195,6 +195,21 @@ def registrar_pago_con_monto(session, employee_code: str, *, creado_por: str, fe
         raise PermissionError("Solo el dueño o el encargado registran pagos.")
     fecha = fecha or date.today()
     code = str(employee_code).strip().upper()
+    # Un pago por persona por día. Desde el celular, «/pagar X si» dos veces
+    # o dos toques en «Sí, pagar» registraban dos pagos de $1,300 el mismo
+    # día: el pendiente del sueldo semanal nunca baja a cero por sí solo
+    # (2026-10-10). El candado va aquí, en el servicio, para que valga para
+    # el bot, el menú, el kiosko y lo que venga.
+    ya_cobro = (
+        session.query(EmpleadaPago)
+        .filter(EmpleadaPago.employee_code == code, EmpleadaPago.fecha == fecha)
+        .first()
+    )
+    if ya_cobro is not None:
+        raise ValueError(
+            f"Ya se le pagó hoy (${ya_cobro.total:,.2f}). "
+            "Si fue un error, deshaz ese pago antes de volver a pagar."
+        )
     detalle = pago_pendiente(session, code, fecha)
     emp = session.query(Empleada).filter(Empleada.codigo == code).first()
     pago = EmpleadaPago(

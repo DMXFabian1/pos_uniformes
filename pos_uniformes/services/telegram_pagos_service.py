@@ -160,7 +160,9 @@ def pagar_por_code(session: Session, code: str, *, quien: str, hoy: date | None 
         return f"{nombre} no tiene nada pendiente ahora mismo."
     try:
         nom.registrar_pago_con_monto(session, code, creado_por=quien, fecha=hoy)
-    except PermissionError as exc:
+    except (PermissionError, ValueError) as exc:
+        # ValueError = ya cobró hoy (doble toque o reentrega de Telegram).
+        session.rollback()
         return f"No se pudo: {exc}"
     session.commit()
     return f"✅ Pagado a {nombre}: ${det.total:,.2f}\n\nSi fue un error, /deshacerpago"

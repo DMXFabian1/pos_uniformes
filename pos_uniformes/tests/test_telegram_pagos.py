@@ -77,6 +77,23 @@ class PagarTest(unittest.TestCase):
             self._correr(f"Evelyn {palabra}")
             self.assertEqual(len(self.registrados), 1, palabra)
 
+    def test_si_ya_cobro_hoy_lo_dice_y_no_paga(self):
+        """El servicio rechaza el segundo pago del día; el bot lo cuenta en
+        vez de decir «Pagado» (doble toque, 2026-10-10)."""
+        from pos_uniformes.services import asistencia_service as asis
+        from pos_uniformes.services import nomina_service as nom
+
+        with patch.object(asis, "buscar_code", return_value="VEND-5"), \
+             patch.object(nom, "pago_pendiente", return_value=_Det()), \
+             patch.object(nom, "registrar_pago_con_monto",
+                          side_effect=ValueError("Ya se le pagó hoy ($1,300.00).")), \
+             patch.object(pg, "_nombre", return_value="Evelyn Ortiz"):
+            sesion = type("S", (), {"commit": lambda s_: None, "rollback": lambda s_: None,
+                                    "scalar": lambda s_, *a, **k: object()})()
+            texto = pg.pagar(sesion, "Evelyn si", quien="VEND-1")
+        self.assertIn("Ya se le pagó hoy", texto)
+        self.assertNotIn("✅", texto)
+
     def test_si_no_debe_nada_no_ofrece_pagar(self):
         r = self._correr("Evelyn", det=_Det(total="0.00"))
         self.assertIn("no tiene nada pendiente", r)

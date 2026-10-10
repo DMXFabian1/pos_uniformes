@@ -146,6 +146,22 @@ class RegistrarPagoTests(unittest.TestCase):
         self.assertEqual(pago.hasta, date(2026, 9, 8))
 
 
+class UnPagoPorDiaTests(unittest.TestCase):
+    """Dos toques en «Sí, pagar» o «/pagar X si» dos veces registraban dos
+    pagos el mismo día (2026-10-10): el pendiente semanal no baja solo."""
+
+    def test_el_segundo_pago_del_dia_se_rechaza(self) -> None:
+        from pos_uniformes.database.models import EmpleadaPago
+
+        session = MagicMock()
+        de_hoy = EmpleadaPago(employee_code="VEND-2", fecha=date(2026, 9, 8), total=Decimal("1300.00"))
+        session.query.return_value.filter.return_value.first.return_value = de_hoy
+        with self.assertRaises(ValueError) as ctx:
+            nomina.registrar_pago_con_monto(session, "VEND-2", creado_por="ENC-1", fecha=date(2026, 9, 8))
+        self.assertIn("Ya se le pagó hoy", str(ctx.exception))
+        session.add.assert_not_called()
+
+
 class TextoEncargadoTests(unittest.TestCase):
     def test_texto_con_descansos_y_pagos(self) -> None:
         r = ResumenEncargado(
