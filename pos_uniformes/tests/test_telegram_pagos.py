@@ -142,6 +142,11 @@ class RetiroTest(unittest.TestCase):
         self._correr("$1,500 proveedor")
         self.assertEqual(self.hechos[0]["monto"], Decimal("1500"))
 
+    def test_la_coma_decimal_no_multiplica_por_cien(self):
+        """«/retiro 500,50 gas» apuntaba $50,050 (2026-10-10)."""
+        self._correr("500,50 gasolina")
+        self.assertEqual(self.hechos[-1]["monto"], Decimal("500.50"))
+
     def test_lo_que_no_es_cantidad_no_pasa(self):
         self.assertIn("No entendí", self._correr("abc gasolina"))
         self.assertEqual(self.hechos, [])

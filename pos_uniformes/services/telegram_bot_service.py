@@ -161,13 +161,36 @@ _AYUDA_CORTE = (
 )
 
 
-def _cifra(palabra: str) -> Decimal | None:
-    """'$5,000.50' → Decimal. None si no es un número."""
-    crudo = palabra.strip().lower().replace("$", "").replace(",", "").replace("_", "")
+def leer_cifra(palabra: str) -> Decimal | None:
+    """'$5,000.50' → 5000.50; '5000,50' → 5000.50; 'abc' → None.
+
+    La coma vale como separador de miles solo cuando va de tres en tres
+    (5,000 · 1,250,000.75); si va seguida de uno o dos dígitos al final es
+    el decimal de quien escribe a la mexicana (5000,50). Antes se borraban
+    todas las comas y «/corte 5000,50» retiraba medio millón (2026-10-10).
+    Es la única regla: la usan /corte, /retiro y /ajustar."""
+    import re
+
+    crudo = str(palabra or "").strip().lower().replace("$", "").replace("_", "").replace(" ", "")
+    if not crudo:
+        return None
+    if "," in crudo:
+        if re.fullmatch(r"-?\d{1,3}(,\d{3})+(\.\d+)?", crudo):
+            crudo = crudo.replace(",", "")
+        elif re.fullmatch(r"-?\d+,\d{1,2}", crudo) and "." not in crudo:
+            crudo = crudo.replace(",", ".")
+        else:
+            return None   # «5,00,0» o «1,5,5»: no se adivina
     try:
-        return Decimal(crudo).quantize(Decimal("0.01"))
+        valor = Decimal(crudo)
     except (InvalidOperation, ValueError):
         return None
+    if not valor.is_finite():
+        return None
+    return valor.quantize(Decimal("0.01"))
+
+
+_cifra = leer_cifra
 
 
 def leer_opciones_corte(argumento: str) -> OpcionesCorte:
@@ -262,7 +285,8 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
 
         if cancelar(hoy):
             return "Ok, hoy no se hace el corte. Cuando quieras, /corte."
-        return "No hay ningún corte propuesto hoy. Si lo quieres hacer, /corte."
+        return ("Anotado: hoy no se hace el corte, ni te lo propongo ni lo cierro solo. "
+                "Cuando quieras, /corte.")
     if cmd.nombre == "estado":
         from pos_uniformes.services.corte_remoto_service import texto_estado_actual
 

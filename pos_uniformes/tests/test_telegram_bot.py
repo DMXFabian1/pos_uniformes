@@ -5,6 +5,7 @@ from __future__ import annotations
 import unittest
 from contextlib import contextmanager
 from datetime import date
+from decimal import Decimal
 from unittest.mock import MagicMock, patch
 
 from pos_uniformes.services import telegram_bot_service as bot
@@ -22,6 +23,28 @@ class ParsearTests(unittest.TestCase):
         self.assertEqual(bot.parsear("  /Estado@mi_bot  "), bot.Comando("estado"))
         self.assertEqual(bot.parsear("/resumen 2026-09-07"), bot.Comando("resumen", "2026-09-07"))
         self.assertIsNone(bot.parsear("hola"))
+
+
+class LeerCifraTests(unittest.TestCase):
+    """«/corte 5000,50» retiraba medio millón: se borraban todas las comas
+    (2026-10-10). Una sola regla para /corte, /retiro y /ajustar."""
+
+    def test_miles_con_coma(self) -> None:
+        self.assertEqual(bot.leer_cifra("$5,000"), Decimal("5000.00"))
+        self.assertEqual(bot.leer_cifra("1,250,000.75"), Decimal("1250000.75"))
+
+    def test_coma_decimal_a_la_mexicana(self) -> None:
+        self.assertEqual(bot.leer_cifra("5000,50"), Decimal("5000.50"))
+        self.assertEqual(bot.leer_cifra("500,5"), Decimal("500.50"))
+
+    def test_lo_ambiguo_no_se_adivina(self) -> None:
+        for raro in ("5,00,0", "1,5,5", "5,0000", "nan", "inf", "abc", ""):
+            with self.subTest(raro=raro):
+                self.assertIsNone(bot.leer_cifra(raro))
+
+    def test_lo_de_siempre_sigue_igual(self) -> None:
+        self.assertEqual(bot.leer_cifra("5000"), Decimal("5000.00"))
+        self.assertEqual(bot.leer_cifra("5000.5"), Decimal("5000.50"))
 
 
 class AtenderTests(unittest.TestCase):

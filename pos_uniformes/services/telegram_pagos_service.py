@@ -212,10 +212,10 @@ def retiro(session: Session, argumento: str, *, quien: str) -> str:
     if not partes:
         return "¿Cuánto y para qué? Por ejemplo:\n/retiro 500 gasolina"
 
-    crudo = partes[0].replace("$", "").replace(",", "")
-    try:
-        monto = Decimal(crudo)
-    except InvalidOperation:
+    from pos_uniformes.services.telegram_bot_service import leer_cifra
+
+    monto = leer_cifra(partes[0])
+    if monto is None:
         return f"No entendí «{partes[0]}» como cantidad. Por ejemplo:\n/retiro 500 gasolina"
     if monto <= 0:
         return "El retiro tiene que ser mayor a cero."
@@ -223,7 +223,7 @@ def retiro(session: Session, argumento: str, *, quien: str) -> str:
     motivo = " ".join(partes[1:]).strip()
     if not motivo:
         # Sin motivo, el corte de la noche es un misterio.
-        return f"¿Para qué son los ${monto:,.2f}? Por ejemplo:\n/retiro {crudo} gasolina"
+        return f"¿Para qué son los ${monto:,.2f}? Por ejemplo:\n/retiro {partes[0]} gasolina"
 
     retiros_service.registrar_retiro(session, monto=monto, motivo=motivo, creado_por=quien)
     session.commit()

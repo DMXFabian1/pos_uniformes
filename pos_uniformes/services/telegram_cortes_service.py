@@ -581,10 +581,14 @@ def ajustar(session: Session, argumento: str, *, quien: str) -> str:
             "Se usa así:\n/ajustar 12 12500 depósito al banco\n\n"
             "El número de corte sale en /cortes, tocando el que sea."
         )
+    from pos_uniformes.services.telegram_bot_service import leer_cifra
+
     try:
         corte_id = int(partes[0])
-        cifra = Decimal(partes[1].replace("$", "").replace(",", ""))
-    except (ValueError, InvalidOperation):
+    except ValueError:
+        return "No entendí. Se usa así:\n/ajustar 12 12500 depósito al banco"
+    cifra = leer_cifra(partes[1])
+    if cifra is None:
         return "No entendí. Se usa así:\n/ajustar 12 12500 depósito al banco"
     nota = partes[2].strip() if len(partes) > 2 else ""
     try:
