@@ -131,6 +131,14 @@ def botones_propuesta_corte(session, ahora: datetime | None = None) -> str:
     return botones_de_propuesta(retiro, fondo)
 
 
+def _local_hora(corte) -> str:
+    momento = getattr(corte, "created_at", None)
+    try:
+        return momento.astimezone().strftime("a las %H:%M") if momento else "hoy"
+    except Exception:  # noqa: BLE001
+        return "hoy"
+
+
 def hacer_corte_y_avisar(
     session, *, creado_por: str, ahora: datetime | None = None,
     retirar: Decimal | None = None, sin_tarjeta: bool | None = None,
@@ -172,6 +180,18 @@ def hacer_corte_y_avisar(
     avisos = pagos_que_tocan_hoy(session, ahora.date())
     if estado.resumen.operaciones == 0 and not avisos:
         return ResultadoCorte(False, "Sin corte: no hay ventas ni pagos desde el último corte.")
+    from pos_uniformes.services.corte_caja_service import ultimo_corte
+
+    previo = ultimo_corte(session)
+    if previo is not None and previo.fecha == ahora.date() and "segundo" not in (nota or "").lower():
+        # Dos toques con una venta en medio hacían dos cortes el mismo día.
+        # El segundo se pide con la palabra «segundo» en la nota (2026-10-10).
+        hora_previo = _local_hora(previo)
+        return ResultadoCorte(
+            False,
+            f"Hoy ya hay un corte ({hora_previo}). Si de verdad quieres otro, manda:\n"
+            "/corte segundo",
+        )
     if retirar is not None and Decimal(retirar) > Decimal(estado.esperado):
         # «/corte 50000» con un dedo de más cerraba un corte con más dinero
         # del que había y el ticket declaraba una venta inflada (2026-10-10).

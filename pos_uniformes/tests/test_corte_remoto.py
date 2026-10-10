@@ -159,3 +159,30 @@ class NoSeRetiraMasDeLoQueHayTests(unittest.TestCase):
         cerrar.assert_not_called()
         self.assertFalse(r.hecho)
         self.assertIn("No hay tanto en el cajón", r.mensaje)
+
+
+class DosCortesElMismoDiaTests(unittest.TestCase):
+    def _correr(self, nota=None):
+        estado = _estado()
+        previo = SimpleNamespace(fecha=_HASTA.date(), created_at=_HASTA)
+        with patch("pos_uniformes.services.corte_caja_service.estado_caja", return_value=estado), \
+             patch("pos_uniformes.services.corte_caja_service.pagos_que_tocan_hoy", return_value=[]), \
+             patch("pos_uniformes.services.corte_caja_service.ultimo_corte", return_value=previo), \
+             patch("pos_uniformes.services.corte_caja_service.cerrar_corte_automatico") as cerrar, \
+             patch("pos_uniformes.services.corte_caja_service.cargar_parametros", return_value=SimpleNamespace(ocultar_tarjeta=False)):
+            cerrar.side_effect = RuntimeError("hasta aquí")   # si llega, es que lo dejó pasar
+            try:
+                r = crs.hacer_corte_y_avisar(MagicMock(), creado_por="VEND-1", ahora=_HASTA, nota=nota)
+            except RuntimeError:
+                return "paso"
+        return r
+
+    def test_el_segundo_del_dia_se_detiene(self) -> None:
+        """Dos toques con una venta en medio hacían dos cortes (2026-10-10)."""
+        r = self._correr()
+        self.assertFalse(r.hecho)
+        self.assertIn("ya hay un corte", r.mensaje)
+        self.assertIn("/corte segundo", r.mensaje)
+
+    def test_con_la_palabra_segundo_pasa(self) -> None:
+        self.assertEqual(self._correr(nota="segundo"), "paso")

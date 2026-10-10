@@ -185,8 +185,16 @@ def texto_resumen(estado: EstadoRespaldo) -> str:
     """Una línea para el resumen diario o el reporte, siempre legible."""
     if estado.ultimo is None:
         return "Respaldo: ninguno. ⚠️"
-    dias = estado.dias or 0
-    cuando = "hoy" if dias == 0 else ("ayer" if dias == 1 else f"hace {dias} días")
+    # Con la hora: «hoy» a las 10 de la mañana era el de anoche a las 20:30,
+    # y el ✅ duraba hasta 47 h (2026-10-10).
+    ultimo = _aware(estado.ultimo).astimezone()
+    hoy = datetime.now().astimezone().date()
+    if ultimo.date() == hoy:
+        cuando = f"hoy {ultimo:%H:%M}"
+    elif ultimo.date() == hoy - timedelta(days=1):
+        cuando = f"ayer {ultimo:%H:%M}"
+    else:
+        cuando = f"{ultimo:%d/%m %H:%M}"
     marca = "✅" if estado.al_dia else "⚠️"
     linea = f"Respaldo: {cuando} {marca}"
     if estado.sospechoso:

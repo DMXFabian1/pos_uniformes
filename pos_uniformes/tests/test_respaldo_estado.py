@@ -273,3 +273,14 @@ class CuandoSeAvisaTests(unittest.TestCase):
         from datetime import date
 
         self.assertEqual(est.horas_para_avisar(date(2026, 10, 12)), 60)  # lunes
+
+
+class LaLineaDelResumenDiceLaHoraTests(unittest.TestCase):
+    def test_el_de_anoche_no_es_hoy(self) -> None:
+        """«Respaldo: hoy ✅» a las 10 de la mañana era el de anoche a las 20:30
+        (2026-10-10)."""
+        from datetime import datetime, timedelta
+
+        anoche = (datetime.now().astimezone() - timedelta(days=1)).replace(hour=20, minute=30)
+        estado = est.EstadoRespaldo(ultimo=anoche, archivo=None, tamano=500 * 1024)
+        self.assertIn("ayer 20:30", est.texto_resumen(estado))

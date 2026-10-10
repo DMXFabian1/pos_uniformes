@@ -501,11 +501,35 @@ class Vigilante:
         return textos
 
 
+_DIAS_QUE_SE_GUARDAN_LAS_ENVIADAS = 30
+_ultima_limpieza: date | None = None
+
+
+def limpiar_viejas(session, hoy: date | None = None) -> int:
+    """Borra las alertas enviadas hace más de 30 días. Nadie las limpiaba y
+    la tabla crecía sin que nada la mirara (2026-10-10). Las que agotaron
+    intentos sin salir se quedan, que son las que vale la pena ver."""
+    from sqlalchemy import delete
+
+    from pos_uniformes.database.models import AlertaTelegram
+
+    limite = datetime.now().astimezone() - timedelta(days=_DIAS_QUE_SE_GUARDAN_LAS_ENVIADAS)
+    borradas = session.execute(
+        delete(AlertaTelegram).where(AlertaTelegram.enviado_at.is_not(None), AlertaTelegram.enviado_at < limite)
+    ).rowcount or 0
+    session.commit()
+    return int(borradas)
+
+
 def procesar(session_factory, enviar, vigilante: Vigilante | None = None) -> int:
     """Una vuelta completa: manda la cola y lo que vea el vigilante. Nunca truena."""
+    global _ultima_limpieza
     enviadas = 0
     try:
         with session_factory() as session:
+            if _ultima_limpieza != date.today():
+                _ultima_limpieza = date.today()
+                limpiar_viejas(session)
             enviadas += enviar_pendientes(session, enviar)
             if vigilante is not None:
                 for aviso in vigilante.revisar(session):

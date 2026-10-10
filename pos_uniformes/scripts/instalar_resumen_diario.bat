@@ -43,6 +43,7 @@ if /I "%~2"=="auto" (
     schtasks /Create /F /TN "POS Corte 1730" /SC DAILY /ST 17:30 /TR "wscript.exe \"%~dp0correr_oculto.vbs\" corte_automatico.bat" >nul
     schtasks /Create /F /TN "POS Corte recordatorio 1650" /SC DAILY /ST 16:50 /TR "wscript.exe \"%~dp0correr_oculto.vbs\" corte_automatico.bat --recordar" >nul
     schtasks /Create /F /TN "POS Corte recordatorio 1750" /SC DAILY /ST 17:50 /TR "wscript.exe \"%~dp0correr_oculto.vbs\" corte_automatico.bat --recordar" >nul
+    schtasks /Create /F /TN "POS Corte final" /SC DAILY /ST 18:50 /TR "wscript.exe \"%~dp0correr_oculto.vbs\" corte_automatico.bat --cerrar" >nul
     echo   Tareas de corte y recordatorio creadas.
 ) else (
     echo   Corte automatico por hora NO activado: Daniel lo ordena con /corte. ^(instalar_resumen_diario.bat HH:MM auto lo activa^)

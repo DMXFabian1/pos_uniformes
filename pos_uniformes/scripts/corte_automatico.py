@@ -174,13 +174,27 @@ def _cerrar_si_nadie_contesto(*, simular: bool = False) -> int:
             hubo_corte_despues=hubo_corte_despues,
             hubo_movimiento=hubo_movimiento,
         ):
-            print(
+            razon = (
                 "No toca cerrar solo "
                 f"(propuesta de {propuesta.fecha}, recordado={propuesta.recordado}, "
                 f"cancelado={propuesta.cancelado}, corte={hubo_corte_despues}, "
                 f"movimiento={hubo_movimiento}, {minutos:.0f} min tras cerrar; "
                 f"se esperan {MINUTOS_DESPUES_DE_CERRAR})."
             )
+            print(razon)
+            # Lo normal (ya hay corte, dijo /nocorte, no hubo ventas) no se
+            # avisa. Lo raro sí: que hoy no hubiera propuesta, o que el
+            # recordatorio no haya corrido. Antes se quedaba en una consola
+            # oculta y un día sin corte no lo sabía nadie (2026-10-10).
+            raro = not (propuesta.hay and propuesta.fecha == ahora.date()) or not propuesta.recordado
+            if raro and not hubo_corte_despues and not propuesta.cancelado and hubo_movimiento:
+                _mandar(
+                    "⚠️ No cerré el día solo: "
+                    + ("hoy no se propuso el corte (¿no corrió la tarea de las 17:30?)"
+                       if not (propuesta.hay and propuesta.fecha == ahora.date())
+                       else "el recordatorio no corrió; lo intento en un rato")
+                    + ". Si quieres, manda /corte."
+                )
             return 0
         if simular:
             print(f"Haría el corte solo: venta ${estado.resumen.efectivo:,.2f}.")

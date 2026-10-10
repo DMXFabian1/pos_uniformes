@@ -395,3 +395,22 @@ class ElVigilanteNoSeEngañaTests(unittest.TestCase):
             # muerto → avisa (el reloj corre desde el último latido).
             textos = v._pantalla_apagada(object(), self._ahora())
         self.assertTrue(any("Kiosko 1" in t for t in textos), textos)
+
+
+class LaTablaSeLimpiaSolaTests(unittest.TestCase):
+    def test_las_enviadas_viejas_se_van_y_las_mudas_se_quedan(self) -> None:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from pos_uniformes.database.models import AlertaTelegram, Base
+
+        engine = create_engine("sqlite://")
+        Base.metadata.create_all(engine)
+        with sessionmaker(engine)() as s:
+            vieja = AlertaTelegram(texto="vieja", enviado_at=datetime.now().astimezone() - timedelta(days=40))
+            fresca = AlertaTelegram(texto="fresca", enviado_at=datetime.now().astimezone() - timedelta(days=2))
+            muda = AlertaTelegram(texto="muda", intentos=al.MAX_INTENTOS)
+            s.add_all([vieja, fresca, muda])
+            s.commit()
+            self.assertEqual(al.limpiar_viejas(s), 1)
+            self.assertEqual(sorted(a.texto for a in s.query(AlertaTelegram).all()), ["fresca", "muda"])

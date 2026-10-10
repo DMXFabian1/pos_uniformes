@@ -112,6 +112,10 @@ def cancelar(hoy: date | None = None) -> bool:
 #: Cuánto se espera después de cerrar antes de hacer el corte sin él. Da tiempo
 #: a que conteste tras el recordatorio y a que termine la última venta.
 MINUTOS_DESPUES_DE_CERRAR = 45
+#: Si el recordatorio no corrió (Windows se saltó la tarea), se espera esto
+#: de más y se cierra igual: el último eslabón existe justo para cuando los
+#: demás fallan, y antes se quedaba callado (2026-10-10).
+MINUTOS_EXTRA_SIN_RECORDATORIO = 20
 
 
 def toca_cerrar_solo(
@@ -133,13 +137,14 @@ def toca_cerrar_solo(
         return False          # hoy no se propuso: no es el camino normal
     if p.cancelado:
         return False          # dijo /nocorte
-    if not p.recordado:
-        return False          # todavía no se le ha insistido
     if hubo_corte_despues:
         return False          # ya hay corte
     if not hubo_movimiento:
         return False          # día sin ventas: nada que cortar
-    return minutos_tras_cierre >= MINUTOS_DESPUES_DE_CERRAR
+    espera = MINUTOS_DESPUES_DE_CERRAR
+    if not p.recordado:
+        espera += MINUTOS_EXTRA_SIN_RECORDATORIO   # no se le insistió: un rato más
+    return minutos_tras_cierre >= espera
 
 
 def toca_recordar(p: Propuesta, *, hoy: date, hubo_corte_despues: bool) -> bool:

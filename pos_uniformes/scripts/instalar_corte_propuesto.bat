@@ -17,6 +17,8 @@ if not errorlevel 1 echo   POS Corte 1730 - propone a las 17:30
 schtasks /Create /F /TN "POS Corte recordatorio 1650" /SC DAILY /ST 16:50 /TR "wscript.exe \"%~dp0correr_oculto.vbs\" corte_automatico.bat --recordar" >nul
 if not errorlevel 1 echo   POS Corte recordatorio 1650 - recuerda a las 16:50
 schtasks /Create /F /TN "POS Corte recordatorio 1750" /SC DAILY /ST 17:50 /TR "wscript.exe \"%~dp0correr_oculto.vbs\" corte_automatico.bat --recordar" >nul
+schtasks /Create /F /TN "POS Corte final" /SC DAILY /ST 18:50 /TR "wscript.exe \"%~dp0correr_oculto.vbs\" corte_automatico.bat --cerrar" >nul
+if not errorlevel 1 echo   POS Corte final - cierra solo a las 18:50 si nadie contesto
 if not errorlevel 1 echo   POS Corte recordatorio 1750 - recuerda a las 17:50
 
 echo.

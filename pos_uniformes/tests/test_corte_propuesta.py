@@ -359,6 +359,12 @@ class CerrarSoloTests(unittest.TestCase):
         # Primero se le insiste; esto es el último eslabón, no el primero.
         self.assertFalse(self._toca(self._propuesta(recordado=False)))
 
+    def test_sin_recordatorio_se_cierra_un_rato_despues(self) -> None:
+        """Si Windows se saltó la tarea del recordatorio, el cierre no se
+        queda callado: espera 20 min más y cierra (2026-10-10)."""
+        tarde = prop.MINUTOS_DESPUES_DE_CERRAR + prop.MINUTOS_EXTRA_SIN_RECORDATORIO
+        self.assertTrue(self._toca(self._propuesta(recordado=False), minutos_tras_cierre=tarde))
+
     def test_si_ya_hay_corte_no_se_hace_otro(self) -> None:
         self.assertFalse(self._toca(hubo_corte_despues=True))
 
