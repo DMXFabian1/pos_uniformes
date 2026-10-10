@@ -330,3 +330,68 @@ class ReiniciarElBotNoRepiteLosAvisosTests(unittest.TestCase):
         al.ruta_memoria().write_text("{esto no es json", encoding="utf-8")
         v = al.Vigilante()
         self.assertIsNone(v.dia_respaldo_avisado)
+
+
+class ElVigilanteNoSeEngañaTests(unittest.TestCase):
+    """Cuatro huecos vistos el 2026-10-10 en la auditoría del bot."""
+
+    def _ahora(self):
+        return datetime(2026, 10, 10, 14, 42).astimezone()
+
+    def test_si_no_puede_leer_el_respaldo_lo_dice_en_vez_de_callarse(self) -> None:
+        from pos_uniformes.services import respaldo_estado_service as est
+
+        with patch.object(est, "leer_estado", side_effect=OSError("carpeta inaccesible")):
+            v = al.Vigilante()
+            textos = v._respaldo_viejo(self._ahora())
+        self.assertEqual(len(textos), 1)
+        self.assertIn("No pude revisar el respaldo", textos[0])
+        self.assertEqual(v._respaldo_viejo(self._ahora()), [])   # una vez al día
+
+    def test_con_propuesta_de_hoy_no_se_repite_el_cierre_sin_corte(self) -> None:
+        from pos_uniformes.services import corte_propuesta_service as prop
+
+        v = al.Vigilante()
+        session = MagicMock()
+        session.scalar.side_effect = [0, 5]          # sin corte, con movimiento
+        propuesta = prop.Propuesta(fecha=date(2026, 10, 10), momento=None, recordado=True, cancelado=False)
+        with patch.object(prop, "leer", return_value=propuesta):
+            noche = datetime(2026, 10, 10, 18, 20).astimezone()
+            self.assertEqual(v._cierre_sin_corte(session, al._local(noche)), [])
+
+    def test_sin_propuesta_el_cierre_sin_corte_sigue_avisando(self) -> None:
+        from pos_uniformes.services import corte_propuesta_service as prop
+
+        v = al.Vigilante()
+        session = MagicMock()
+        session.scalar.side_effect = [0, 5]
+        with patch.object(prop, "leer", return_value=prop.Propuesta()):
+            noche = datetime(2026, 10, 10, 18, 20).astimezone()
+            self.assertEqual(len(v._cierre_sin_corte(session, al._local(noche))), 1)
+
+    def test_el_ultimo_id_sobrevive_al_reinicio(self) -> None:
+        v = al.Vigilante()
+        session = MagicMock()
+        session.scalar.return_value = 40
+        self.assertEqual(v._movimientos_fuera_de_horario(session, al._local(self._ahora())), [])
+        self.assertEqual(v.ultimo_id, 40)
+        # «Se reinicia el bot»: el nuevo sigue desde el 40, no desde el máximo actual.
+        v2 = al.Vigilante()
+        self.assertEqual(v2.ultimo_id, 40)
+
+    def test_si_la_base_no_contesta_la_siembra_de_pantallas_se_repite(self) -> None:
+        from datetime import timezone
+
+        v = al.Vigilante()
+        muerto_hace = self._ahora() - timedelta(minutes=30)
+        pantallas = [{"identificador": "k1", "nombre": "Kiosko 1", "online": False,
+                      "ultimo_visto": muerto_hace.astimezone(timezone.utc)}]
+        with patch("pos_uniformes.services.satelite_registry_service.listar_con_estado",
+                   side_effect=RuntimeError("base dormida")):
+            self.assertEqual(v._pantalla_apagada(object(), self._ahora()), [])
+        with patch("pos_uniformes.services.satelite_registry_service.listar_con_estado",
+                   return_value=pantallas):
+            # Ya con la base: la siembra ve que k1 trabajó hoy y lleva 30 min
+            # muerto → avisa (el reloj corre desde el último latido).
+            textos = v._pantalla_apagada(object(), self._ahora())
+        self.assertTrue(any("Kiosko 1" in t for t in textos), textos)

@@ -235,6 +235,10 @@ def _cargar_memoria() -> dict:
                 salida[clave] = date.fromisoformat(valor) if valor else None
             except (TypeError, ValueError):
                 salida[clave] = None
+        try:
+            salida["ultimo_id"] = int(crudo["ultimo_id"]) if crudo.get("ultimo_id") is not None else None
+        except (TypeError, ValueError):
+            salida["ultimo_id"] = None
         return salida
     except Exception:  # noqa: BLE001 — sin memoria se avisa una vez más, no se cae
         return {}
@@ -246,9 +250,9 @@ def _guardar_memoria(datos: dict) -> None:
     try:
         ruta = ruta_memoria()
         ruta.parent.mkdir(parents=True, exist_ok=True)
-        ruta.write_text(json.dumps(
-            {k: (v.isoformat() if v else None) for k, v in datos.items()}
-        ), encoding="utf-8")
+        ruta.write_text(json.dumps({
+            k: (v.isoformat() if isinstance(v, date) else v) for k, v in datos.items()
+        }), encoding="utf-8")
     except Exception:  # noqa: BLE001 — recordar no vale un error
         pass
 
@@ -279,11 +283,17 @@ class Vigilante:
             self.dia_respaldo_avisado = memoria.get("dia_respaldo_avisado")
         if self.dia_sin_corte_avisado is None:
             self.dia_sin_corte_avisado = memoria.get("dia_sin_corte_avisado")
+        if self.ultimo_id is None:
+            # Hasta qué venta se revisó el horario. Sin esto, cada reinicio
+            # «marcaba dónde vamos» y las ventas hechas mientras el bot estaba
+            # abajo nunca se revisaban (2026-10-10).
+            self.ultimo_id = memoria.get("ultimo_id")
 
     def _recordar(self) -> None:
         _guardar_memoria({
             "dia_respaldo_avisado": self.dia_respaldo_avisado,
             "dia_sin_corte_avisado": self.dia_sin_corte_avisado,
+            "ultimo_id": self.ultimo_id,
         })
 
     def revisar(self, session, ahora: datetime | None = None) -> list[str]:
@@ -301,8 +311,10 @@ class Vigilante:
         from pos_uniformes.services.horario_tienda_service import hora_apertura, hora_cierre
 
         if self.ultimo_id is None:
-            # Primera vuelta: no reclamar lo viejo, solo marcar dónde vamos.
+            # Primera vuelta de la vida del bot (sin memoria): no reclamar lo
+            # viejo, solo marcar dónde vamos.
             self.ultimo_id = int(session.scalar(select(func.coalesce(func.max(LibretaVenta.id), 0))) or 0)
+            self._recordar()
             return []
         rows = list(session.scalars(
             select(LibretaVenta).where(LibretaVenta.id > self.ultimo_id).order_by(LibretaVenta.id)
@@ -314,6 +326,8 @@ class Vigilante:
             apertura, cierre = hora_apertura(momento.date()), hora_cierre(momento.date())
             if not (apertura <= momento.time() <= cierre):
                 textos.append(texto_fuera_de_horario(row, apertura, cierre))
+        if rows:
+            self._recordar()
         return textos
 
     def _cierre_sin_corte(self, session, ahora: datetime) -> list[str]:
@@ -334,6 +348,19 @@ class Vigilante:
         self._recordar()
         if hubo_corte:
             return []
+        # Si hoy hubo propuesta de corte, esa conversación ya está en marcha:
+        # o dijo /nocorte (y este aviso lo contradiría) o el cierre automático
+        # lo hace solo a los 45 min. Cuatro mensajes por una decisión era
+        # demasiado (2026-10-10). Este aviso queda para cuando la tarea de la
+        # propuesta no corrió.
+        try:
+            from pos_uniformes.services import corte_propuesta_service as prop
+
+            p = prop.leer()
+            if p.hay and p.fecha == hoy:
+                return []
+        except Exception:  # noqa: BLE001 — sin propuesta legible, se avisa como siempre
+            pass
         hubo_movimiento = session.scalar(
             select(func.count(LibretaVenta.id)).where(LibretaVenta.created_at >= inicio)
         )
@@ -357,19 +384,27 @@ class Vigilante:
         # Después de abrir: un aviso a las 3 de la mañana no lo lee nadie.
         if ahora.hour < HORA_AVISO_RESPALDO:
             return []
-        self.dia_respaldo_avisado = hoy
-        self._recordar()
         try:
             from pos_uniformes.services import respaldo_estado_service as est
 
             estado = est.leer_estado()
-            if estado.al_dia:
-                return []
+        except Exception as exc:  # noqa: BLE001 — el vigilante nunca puede tumbar al bot
+            # Antes se marcaba «avisado» ANTES de leer: si leer tronaba, ese
+            # día no salía nada y se daba por avisado. El silencio no es éxito.
+            self.dia_respaldo_avisado = hoy
+            self._recordar()
+            logger.warning("No se pudo revisar el respaldo", exc_info=True)
+            return [f"⚠️ No pude revisar el respaldo: {exc}"]
+        self.dia_respaldo_avisado = hoy
+        self._recordar()
+        if estado.al_dia:
+            return []
+        try:
             from pos_uniformes.services import telegram_respaldo_service as rs
 
             return [(est.texto_sin_respaldo(estado), rs.botones_del_aviso())]
-        except Exception:  # noqa: BLE001 — el vigilante nunca puede tumbar al bot
-            return []
+        except Exception:  # noqa: BLE001 — sin botón, el aviso sale igual
+            return [est.texto_sin_respaldo(estado)]
 
 
     def _pantalla_apagada(self, session, ahora: datetime) -> list[str]:
@@ -396,13 +431,6 @@ class Vigilante:
         ahora = _local(ahora)
         hoy = ahora.date()
         dia_nuevo = self.dia_de_las_pantallas != hoy
-        if dia_nuevo:
-            # Día nuevo: lo de ayer no se arrastra. Un kiosko apagado anoche
-            # no es noticia hoy en la mañana.
-            self.dia_de_las_pantallas = hoy
-            self.pantallas_vistas_hoy = {}
-            self.pantallas_sin_latir = {}
-            self.pantallas_avisadas = set()
 
         hora = ahora.time()
         if not (hora_apertura(hoy) <= hora <= hora_cierre(hoy)):
@@ -421,6 +449,15 @@ class Vigilante:
             return []
 
         if dia_nuevo:
+            # Día nuevo: lo de ayer no se arrastra. Un kiosko apagado anoche
+            # no es noticia hoy en la mañana. Se limpia AQUÍ, ya con la base
+            # contestando: si la primera lectura del día fallaba, el día
+            # quedaba marcado y la siembra de abajo ya no se repetía
+            # (2026-10-10).
+            self.dia_de_las_pantallas = hoy
+            self.pantallas_vistas_hoy = {}
+            self.pantallas_sin_latir = {}
+            self.pantallas_avisadas = set()
             # Quién trabajó hoy sale del DATO y no solo de lo que este
             # vigilante alcanzó a ver. Si no, un reinicio del bot a media
             # mañana le borraba la memoria y una pantalla muerta desde antes
