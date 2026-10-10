@@ -61,6 +61,7 @@ AYUDA = (
     "/cortes 30 — los de los últimos 30 días (para rastrear el dinero)\n"
     "/ajustar 12 12500 depósito al banco — cambia la cifra de ese corte\n"
     "/sintarjeta 12 — esconde los cobros con tarjeta de un corte ya hecho\n"
+    "/contarjeta 12 — los vuelve a enseñar (si fue un error)\n"
     "/retiro 500 gasolina — saca del cajón, con su motivo\n"
     "/cajon — desmarca lo que NO salió del cajón (una transferencia,\n"
     "   algo ya contado). Antes del corte\n"
@@ -388,6 +389,11 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
 
         with session_factory() as session:
             return ct.esconder_tarjetas(session, cmd.argumento, quien=CODIGO_REMOTO)
+    if cmd.nombre in ("contarjeta", "con-tarjeta", "con_tarjeta"):
+        from pos_uniformes.services import telegram_cortes_service as ct
+
+        with session_factory() as session:
+            return ct.mostrar_tarjetas(session, cmd.argumento, quien=CODIGO_REMOTO)
     if cmd.nombre in ("sonidos", "sonido"):
         from pos_uniformes.services import sonidos_service as sn
 

@@ -569,6 +569,39 @@ def esconder_tarjetas(session: Session, argumento: str, *, quien: str) -> str:
     )
 
 
+def mostrar_tarjetas(session: Session, argumento: str, *, quien: str) -> str:
+    """`/contarjeta <id>`: la reversa de /sintarjeta. Un número equivocado
+    escondía el periodo de otro corte sin camino de vuelta (2026-10-10)."""
+    from pos_uniformes.database.models import LibretaCorte
+    from pos_uniformes.services.historial_cortes_service import periodo_del_corte
+    from pos_uniformes.services.libreta_service import mostrar_tarjetas_del_periodo
+
+    crudo = (argumento or "").strip()
+    if not crudo.isdigit():
+        return (
+            "Se usa así:\n/contarjeta 12\n\n"
+            "El número de corte sale en /cortes, tocando el que sea."
+        )
+    corte = session.get(LibretaCorte, int(crudo))
+    if corte is None:
+        return "Ese corte ya no existe."
+    try:
+        desde, hasta = periodo_del_corte(session, corte)
+        cuantos = mostrar_tarjetas_del_periodo(session, desde, hasta, creado_por=quien)
+    except Exception as exc:  # noqa: BLE001
+        session.rollback()
+        return str(exc)
+    if not cuantos:
+        return (
+            f"El corte {corte.id} ({corte.fecha:%d/%m}) no tiene cobros con tarjeta "
+            "escondidos: o no hubo, o ya estaban a la vista."
+        )
+    return (
+        f"✅ Destapé {cuantos} cobro(s) con tarjeta del corte {corte.id} "
+        f"({corte.fecha:%d/%m}). Ya se ven en /cortes y en la Libreta."
+    )
+
+
 def ajustar(session: Session, argumento: str, *, quien: str) -> str:
     """`/ajustar <id> <cifra> <por qué>`. El motivo es obligatorio si mueve dinero."""
     from decimal import InvalidOperation

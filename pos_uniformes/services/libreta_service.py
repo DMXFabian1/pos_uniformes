@@ -529,6 +529,30 @@ def marcar_privadas_del_periodo(session, desde, hasta, *, creado_por: str) -> in
     return cuantos
 
 
+def mostrar_tarjetas_del_periodo(session, desde, hasta, *, creado_por: str) -> int:
+    """La reversa de `marcar_privadas_del_periodo`: vuelve visibles los cobros
+    con tarjeta del periodo. Devuelve cuántos se destaparon.
+
+    Existe porque /sintarjeta con un número equivocado escondía el periodo
+    de otro corte y desde el celular no había camino de vuelta (2026-10-10)."""
+    from pos_uniformes.services.nomina_service import OWNER_CODE
+
+    if str(creado_por or "").strip().upper() != OWNER_CODE:
+        raise SoloElDueno("Solo el dueño puede destapar movimientos.")
+    stmt = select(LibretaVenta).where(
+        LibretaVenta.created_at > desde if desde is not None else sa_true(),
+        LibretaVenta.created_at <= hasta,
+        LibretaVenta.pago_tarjeta.is_(True),
+    )
+    cuantos = 0
+    for entry in session.scalars(stmt).all():
+        if entry.privado:
+            entry.privado = False
+            cuantos += 1
+    session.commit()
+    return cuantos
+
+
 def comisiones_ocultas(rows: list) -> int:
     """Comisiones que el encargado dejaría de ver (para avisar al ocultar)."""
     return sum(int(getattr(r, "comisiones", 0) or 0) for r in rows if getattr(r, "privado", False))

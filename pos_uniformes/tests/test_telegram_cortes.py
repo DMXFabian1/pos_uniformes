@@ -606,3 +606,36 @@ class ElPluralDeLosDiasTests(unittest.TestCase):
 
     def test_sin_cortes_tampoco_dice_1_dias(self) -> None:
         self.assertNotIn("1 días", ct.texto([], dias=1))
+
+
+class ConTarjetaTests(unittest.TestCase):
+    """/sintarjeta no tenía reversa: un número equivocado escondía el periodo
+    de otro corte para siempre desde el celular (2026-10-10)."""
+
+    def test_contarjeta_destapa_lo_escondido(self) -> None:
+        from datetime import datetime, timezone
+        from decimal import Decimal
+
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from pos_uniformes.database.models import Base, LibretaCorte, LibretaVenta
+        from pos_uniformes.services import telegram_cortes_service as ct
+
+        engine = create_engine("sqlite://")
+        Base.metadata.create_all(engine)
+        with sessionmaker(engine)() as s:
+            t0 = datetime(2026, 10, 9, 12, 0, tzinfo=timezone.utc)
+            s.add(LibretaVenta(employee_code="VEND-2", employee_name="Ana", tipo="venta", piezas=1,
+                               comisiones=1, monto_total=Decimal("100"), pago_tarjeta=True, privado=True,
+                               created_at=t0))
+            s.add(LibretaCorte(fecha=t0.date(), monto_final=Decimal("100"), reactivo_inicial=Decimal("0"),
+                               reactivo_final=Decimal("0"), operaciones=1, piezas=1, creado_por="VEND-1",
+                               hasta=datetime(2026, 10, 9, 23, 0, tzinfo=timezone.utc), created_at=t0))
+            s.commit()
+            corte_id = s.query(LibretaCorte).first().id
+            r = ct.mostrar_tarjetas(s, str(corte_id), quien="VEND-1")
+            self.assertIn("Destapé 1", r)
+            self.assertFalse(s.query(LibretaVenta).first().privado)
+            self.assertIn("ya estaban a la vista", ct.mostrar_tarjetas(s, str(corte_id), quien="VEND-1"))
+            self.assertIn("Se usa así", ct.mostrar_tarjetas(s, "", quien="VEND-1"))

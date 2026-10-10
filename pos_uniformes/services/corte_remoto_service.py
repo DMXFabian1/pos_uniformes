@@ -252,5 +252,7 @@ def hacer_corte_y_avisar(
         # ya no da error — se vuelve nota. Si no se enseña, el corte sale sin
         # esconder la tarjeta y nadie se entera hasta ver el papel.
         lineas.append(f"📝 Nota: «{nota}»")
-    lineas.append("🖨 Ticket enviado a la impresora de la tienda." if impreso else "⚠️ El corte quedó guardado pero no se pudo encolar el ticket.")
+    # «Encolado» y no «enviado»: lo imprime la PC que tenga la impresora
+    # cuando lo tome; si está apagada, /pulso lo dice (2026-10-10).
+    lineas.append("🖨 Ticket en la cola de la impresora de la tienda." if impreso else "⚠️ El corte quedó guardado pero no se pudo encolar el ticket.")
     return ResultadoCorte(True, "\n".join(lineas), impreso)
