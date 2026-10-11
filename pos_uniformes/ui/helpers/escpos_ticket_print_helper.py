@@ -61,6 +61,9 @@ def _codepage_cmd(n: int) -> bytes:
 #: las térmicas de 80 mm, y solo se usa para centrar la imagen.
 PUNTOS_POR_LINEA = 576
 
+#: Alto máximo de cada imagen que se le manda a la térmica (ver raster_de_imagen).
+FILAS_POR_FRANJA = 128
+
 _ALINEAR_CENTRO = bytes([_ESC, ord("a"), 1])
 _ALINEAR_IZQ = bytes([_ESC, ord("a"), 0])
 
@@ -87,20 +90,31 @@ def raster_de_imagen(ruta) -> bytes:
     bytes_por_fila = (ancho + 7) // 8
     pixeles = img.load()
 
-    datos = bytearray()
+    filas = []
     for y in range(alto):
         fila = bytearray(bytes_por_fila)
         for x in range(ancho):
             if not pixeles[x, y]:          # 0 = negro = quemar
                 fila[x // 8] |= 0x80 >> (x % 8)
-        datos += fila
+        filas.append(bytes(fila))
 
-    cabecera = bytes(
-        [_GS, ord("v"), ord("0"), 0,
-         bytes_por_fila & 0xFF, (bytes_por_fila >> 8) & 0xFF,
-         alto & 0xFF, (alto >> 8) & 0xFF]
-    )
-    return cabecera + bytes(datos)
+    # En franjas, cada una con su cabecera. Un ticket largo dibujado entero es
+    # una sola imagen de miles de filas, y la térmica no la aguanta: se llena
+    # su memoria, hace una pausa, sigue avanzando papel y ya no quema nada —
+    # la calabaza y los términos salían en blanco cuando el ticket pasaba de
+    # cierto número de productos (Daniel, 2026-10-11). Franjas cortas caben
+    # en cualquier impresora y salen pegadas, sin costura visible.
+    salida = bytearray()
+    for inicio in range(0, max(alto, 1), FILAS_POR_FRANJA):
+        franja = filas[inicio:inicio + FILAS_POR_FRANJA]
+        n = len(franja)
+        salida += bytes(
+            [_GS, ord("v"), ord("0"), 0,
+             bytes_por_fila & 0xFF, (bytes_por_fila >> 8) & 0xFF,
+             n & 0xFF, (n >> 8) & 0xFF]
+        )
+        salida += b"".join(franja)
+    return bytes(salida)
 
 
 def _trozos_con_imagenes(text: str, s: EscPosSettings) -> bytes:

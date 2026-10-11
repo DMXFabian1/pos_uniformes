@@ -95,6 +95,33 @@ class ElRasterTests(unittest.TestCase):
         img.save(ruta)
         self.assertEqual(esc.raster_de_imagen(ruta)[8], 0b10000000)
 
+    def test_una_imagen_larga_se_manda_en_franjas_que_la_impresora_aguanta(self) -> None:
+        # Un ticket con muchos productos es una imagen de miles de filas; mandada
+        # entera, la térmica se quedaba sin memoria y lo último salía en blanco.
+        import tempfile
+        from pathlib import Path
+
+        from PIL import Image
+
+        alto = esc.FILAS_POR_FRANJA * 3 + 5
+        img = Image.new("1", (16, alto), 1)
+        img.putpixel((0, alto - 1), 0)          # el último punto, el que se perdía
+        ruta = Path(tempfile.mkdtemp()) / "largo.png"
+        img.save(ruta)
+        datos = esc.raster_de_imagen(ruta)
+
+        altos, i, cuerpo = [], 0, b""
+        while i < len(datos):
+            self.assertEqual(datos[i:i + 4], bytes([0x1D, ord("v"), ord("0"), 0]))
+            ancho = datos[i + 4] + (datos[i + 5] << 8)
+            n = datos[i + 6] + (datos[i + 7] << 8)
+            altos.append(n)
+            cuerpo += datos[i + 8:i + 8 + ancho * n]
+            i += 8 + ancho * n
+        self.assertTrue(all(n <= esc.FILAS_POR_FRANJA for n in altos))
+        self.assertEqual(sum(altos), alto)      # ninguna fila se pierde
+        self.assertEqual(cuerpo[-2], 0b10000000)
+
     def test_la_calabaza_de_verdad_cabe_en_el_papel(self) -> None:
         ruta = temp.imagen_para_marcador("halloween")
         datos = esc.raster_de_imagen(ruta)
