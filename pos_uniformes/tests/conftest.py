@@ -51,6 +51,10 @@ if not _USA_BASE_REAL:
     # aparte con `alembic upgrade head`.
     os.environ["POS_UNIFORMES_AUTO_CREATE_SCHEMA"] = "0"
 
+# Lo que dice el .env de la máquina sobre SÍ MISMA no aplica a los tests: en la
+# Mac de desarrollo los satélites de prueba dejaban de latir (2026-10-11).
+os.environ["POS_UNIFORMES_SATELITE_DESARROLLO"] = "0"
+
 # Señales de que un archivo de test necesita cada dependencia.
 # `pos_uniformes.ui` importa PyQt6 en cadena: un test que lo toca es un test Qt
 # aunque nunca escriba "PyQt6".

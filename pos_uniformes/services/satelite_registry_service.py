@@ -25,6 +25,27 @@ def _ahora() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def es_de_desarrollo() -> bool:
+    """Esta máquina no es pantalla de la tienda (`POS_UNIFORMES_SATELITE_DESARROLLO=1`).
+
+    La Mac de Daniel corre el satélite contra la base de producción. Latía
+    como un kiosko más, y cada vez que la cerraba el bot de la tienda avisaba
+    que se había apagado, y al abrirla que «ya volvió» (2026-10-11). Sin
+    latido, para el vigilante nunca estuvo prendida hoy y no hay noticia.
+    """
+    import os
+
+    valor = os.getenv("POS_UNIFORMES_SATELITE_DESARROLLO")
+    if valor is None:
+        try:
+            from pos_uniformes.utils.config import load_runtime_env_overrides
+
+            valor = load_runtime_env_overrides().get("POS_UNIFORMES_SATELITE_DESARROLLO", "")
+        except Exception:  # noqa: BLE001 — sin config, es una pantalla normal
+            valor = ""
+    return (valor or "").strip().lower() in {"1", "si", "sí", "true"}
+
+
 def registrar(
     session: Session,
     identificador: str,
@@ -32,11 +53,16 @@ def registrar(
     *,
     ahora: datetime | None = None,
 ) -> Satelite:
-    """Alta o actualización (upsert) del satélite + heartbeat. No hace commit."""
+    """Alta o actualización (upsert) del satélite + heartbeat. No hace commit.
+
+    En una máquina de desarrollo no escribe nada: devuelve el registro que
+    hubiera (o uno sin guardar) y no late."""
     momento = ahora or _ahora()
     sat = session.scalar(
         select(Satelite).where(Satelite.identificador == identificador)
     )
+    if es_de_desarrollo():
+        return sat or Satelite(identificador=identificador[:40], nombre=(nombre or "satelite")[:60])
     if sat is None:
         sat = Satelite(
             identificador=identificador[:40],
