@@ -225,6 +225,7 @@
         </div>
         <div class="hero-title" id="hero-title">Saldo actual</div>
         <div class="hero-amount tnum" id="hero-amount">$0.00</div>
+        <div id="hero-pend" class="hidden" style="margin-top:4px;font-size:12.5px;font-weight:700;opacity:.85;position:relative;z-index:1"></div>
         <div class="hero-sub" style="display:inline-flex;background:rgba(255,255,255,.16);padding:5px 11px;border-radius:999px;font-weight:700;opacity:.9"><span class="msr" style="font-size:15px">swap_horiz</span><span id="hero-sub"></span></div>
       </div>
 
@@ -310,6 +311,15 @@
   function other(n) { return n === P1 ? P2 : P1; }
   function signForType(t) { if (t === P1 + ' prestó dinero' || t === P2 + ' recibió un pago') return 1; if (t === P2 + ' prestó dinero' || t === P1 + ' recibió un pago') return -1; return 1; }
   function signed(m) { return m.tipo === 'Ajuste' ? Number(m.monto) : signForType(m.tipo) * Math.abs(Number(m.monto)); }
+  // Convención única de signo: todo se muestra desde el punto de vista del
+  // usuario activo (positivo = a su favor). Los datos se guardan siempre
+  // desde el punto de vista de P1; aquí solo se traducen al mostrar.
+  function relativo(n) { return ST.identity === P2 ? -Number(n || 0) : Number(n || 0); }
+  function etiquetaSaldo(v) {
+    var rel = relativo(v);
+    if (Math.abs(rel) < 0.005) return 'A mano';
+    return rel > 0 ? 'A tu favor ' + money(rel) : 'Debes ' + money(-rel);
+  }
 
   function typeMeta(t) {
     if (t === P1 + ' prestó dinero') return { icon: 'north_east', short: 'Préstamo de ' + P1, hint: P1 + ' le da dinero a ' + P2 };
@@ -346,7 +356,7 @@
   function chrono(a, b) { var fa = String(a.fecha), fb = String(b.fecha); if (fa < fb) return -1; if (fa > fb) return 1; return String(a.creadoEn) < String(b.creadoEn) ? -1 : 1; }
 
    
-  var ST = { identity: null, tab: 'inicio', movements: [], saldo: 0, busy: false };
+  var ST = { identity: null, tab: 'inicio', movements: [], saldo: 0, pendienteNeto: 0, busy: false };
   var REG = null;
   var KEY_ID = 'lm_identity';
 
@@ -359,11 +369,18 @@
   function onState(s) {
     ST.movements = (s && s.movimientos) || [];
     ST.saldo = (s && s.saldo) || 0;
+    ST.pendienteNeto = (s && s.pendienteNeto) || 0;
     ST.busy = false;
     $('#loader').classList.add('hidden');
     renderAll();
   }
   function onErr(e) { ST.busy = false; toast('Error de conexión', 'error', 'var(--bad)'); if (window.console) console.error(e); }
+  function onErrServidor(e) {
+    ST.busy = false;
+    var msg = (e && e.message) ? String(e.message).replace(/^Error:\s*/, '') : 'Error de conexión';
+    toast(msg, 'error', 'var(--bad)');
+    if (window.console) console.error(e);
+  }
 
    
   
@@ -372,8 +389,8 @@
   function fetchSilent() {
     if (!hasBackend() || overlayOpen()) return;
     google.script.run.withSuccessHandler(function (s) {
-      if (overlayOpen()) return; 
-      ST.movements = (s && s.movimientos) || []; ST.saldo = (s && s.saldo) || 0; renderAll();
+      if (overlayOpen()) return;
+      ST.movements = (s && s.movimientos) || []; ST.saldo = (s && s.saldo) || 0; ST.pendienteNeto = (s && s.pendienteNeto) || 0; renderAll();
     }).withFailureHandler(function () {}).api_getEstado();
   }
   function startSync() {
@@ -394,21 +411,37 @@
     $('#me-name').textContent = ST.identity;
   }
   function renderHero() {
-    
-    var bal = ST.saldo;
+    var bal = relativo(ST.saldo);
     $('#hero-title').textContent = 'Saldo actual';
     $('#hero-amount').textContent = money(Math.abs(bal));
-    $('#hero-sub').textContent = Math.abs(bal) < 0.005 ? 'Están a mano' : ('A favor de ' + (bal > 0 ? P1 : P2));
+    $('#hero-sub').textContent = Math.abs(bal) < 0.005 ? 'Están a mano' : (bal > 0 ? 'A tu favor' : 'Le debes a ' + other(ST.identity));
+    var pend = relativo(ST.pendienteNeto);
+    var hp = $('#hero-pend');
+    if (Math.abs(pend) >= 0.005) {
+      hp.textContent = (pend >= 0 ? '+' : '−') + money(Math.abs(pend)) + ' por aprobar';
+      hp.classList.remove('hidden');
+    } else {
+      hp.classList.add('hidden');
+    }
   }
   function rowHtml(m) {
-    var meta = typeMeta(m.tipo), st = statusMeta(m.estado), s = signed(m), pos = s >= 0;
+    var meta = typeMeta(m.tipo), st = statusMeta(m.estado), s = relativo(signed(m)), pos = s >= 0;
     var concept = (m.concepto && m.concepto.trim()) ? m.concepto : meta.short;
     var by = m.registradoPor === ST.identity ? 'Tú' : m.registradoPor;
     var amt = (pos ? '+' : '−') + money(Math.abs(m.monto));
-    var bal = m.saldoDespues != null ? '<small>Saldo ' + money(m.saldoDespues) + '</small>' : '';
+    var bal = '';
+    if (m.saldoDespues != null) {
+      var rel = relativo(m.saldoDespues);
+      bal = Math.abs(rel) < 0.005 ? '<small>A mano</small>'
+        : rel > 0 ? '<small style="color:var(--ok)">A tu favor ' + money(rel) + '</small>'
+          : '<small style="color:var(--bad)">Debes ' + money(-rel) + '</small>';
+    }
+    var orig = (m.monedaOriginal && m.montoOriginal)
+      ? '<span class="meta" style="color:var(--text-3)">' + esc(m.monedaOriginal) + ' ' + Number(m.montoOriginal).toLocaleString('es-MX') + '</span>'
+      : '';
     return '<button class="row" data-uuid="' + m.uuid + '">' +
       '<span class="ico"><span class="msr" style="font-size:23px">' + meta.icon + '</span></span>' +
-      '<span class="mid"><span class="concept">' + esc(concept) + '</span>' +
+      '<span class="mid"><span class="concept">' + esc(concept) + '</span>' + orig +
       '<span class="meta">' + esc(by) + ' · ' + '<span class="chip ' + st.cls + '"><span class="msr fill" style="font-size:12px">' + st.icon + '</span>' + st.label + '</span></span></span>' +
       '<span class="amt"><b class="tnum" style="color:' + (m.estado === 'Confirmado' ? 'var(--text)' : 'var(--text-3)') + '">' + amt + '</b>' + bal + '</span></button>';
   }
@@ -440,7 +473,7 @@
     if (actionable.length) {
       html += '<div class="subhead">Requieren tu aprobación</div>';
       actionable.forEach(function (m) {
-        var meta = typeMeta(m.tipo), s = signed(m), amt = (s >= 0 ? '+' : '−') + money(Math.abs(m.monto));
+        var meta = typeMeta(m.tipo), s = relativo(signed(m)), amt = (s >= 0 ? '+' : '−') + money(Math.abs(m.monto));
         html += '<div class="pcard"><div class="head">' +
           '<span class="ico"><span class="msr" style="font-size:25px">' + meta.icon + '</span></span>' +
           '<span class="mid"><span class="concept" style="font-size:15px;font-weight:800">' + esc(m.concepto || meta.short) + '</span>' +
@@ -454,7 +487,7 @@
     if (waiting.length) {
       html += '<div class="subhead">Esperando aprobación</div>';
       waiting.forEach(function (m) {
-        var s = signed(m), amt = (s >= 0 ? '+' : '−') + money(Math.abs(m.monto));
+        var s = relativo(signed(m)), amt = (s >= 0 ? '+' : '−') + money(Math.abs(m.monto));
         html += '<div class="pcard" style="display:flex;align-items:center;gap:12px;border:none"><span class="ico" style="color:var(--text-3)"><span class="msr" style="font-size:22px">schedule</span></span>' +
           '<span class="mid"><span class="concept">' + esc(m.concepto || typeMeta(m.tipo).short) + '</span><span class="meta" style="color:var(--warn)">Esperando a ' + other(m.registradoPor) + '</span></span>' +
           '<b class="tnum" style="font-size:15px">' + amt + '</b></div>';
@@ -469,7 +502,7 @@
     var conf = ST.movements.filter(function (m) { return m.estado === 'Confirmado'; });
     var sum = function (p) { return conf.filter(p).reduce(function (a, m) { return a + Math.abs(m.monto); }, 0); };
     var asc = conf.slice().sort(chrono), run = 0, series = [];
-    asc.forEach(function (m) { run += signed(m); series.push({ fecha: m.fecha, bal: run }); });
+    asc.forEach(function (m) { run += signed(m); series.push({ fecha: m.fecha, bal: relativo(run) }); });
     var bals = series.map(function (x) { return x.bal; });
     var pend = ST.movements.filter(function (m) { return m.estado === 'Pendiente'; }).length;
 
@@ -495,11 +528,18 @@
   }
   function stat(k, v, color, size) { return '<div class="stat"><div class="k">' + k + '</div><div class="val tnum" style="' + (color ? 'color:' + color + ';' : '') + (size ? 'font-size:' + size + 'px;' : '') + '">' + v + '</div></div>'; }
   function renderBadges() {
-    var n = ST.movements.filter(function (m) { return m.estado === 'Pendiente' && m.registradoPor !== ST.identity; }).length;
+    var pend = ST.movements.filter(function (m) { return m.estado === 'Pendiente'; });
+    var paraMi = pend.filter(function (m) { return m.registradoPor !== ST.identity; }).length;
+    var total = pend.length;
     var nb = $('#nav-badge'), pb = $('#pend-badge');
-    if (n > 0) { nb.textContent = n; nb.classList.remove('hidden'); pb.textContent = n; pb.classList.remove('hidden'); }
-    else { nb.classList.add('hidden'); pb.classList.add('hidden'); }
-    $('#pend-summary').textContent = ST.movements.filter(function (m) { return m.estado === 'Pendiente'; }).length === 0 ? 'Todo al día' : (n > 0 ? n + ' por aprobar' : 'Esperando respuesta');
+    if (total > 0) {
+      var colorB = paraMi > 0 ? 'var(--bad)' : 'var(--text-3)';
+      nb.textContent = total; nb.style.background = colorB; nb.classList.remove('hidden');
+      pb.textContent = total; pb.style.background = colorB; pb.classList.remove('hidden');
+    } else {
+      nb.classList.add('hidden'); pb.classList.add('hidden');
+    }
+    $('#pend-summary').textContent = total === 0 ? 'Todo al día' : (paraMi > 0 ? paraMi + ' por aprobar' : 'Esperando respuesta');
   }
 
    
@@ -513,10 +553,29 @@
    
   function clearOverlays() { $('#overlays').innerHTML = ''; }
 
-  function openRegister() {
-    REG = { type: ST.identity + ' recibió un pago', amount: '', concept: '', date: todayStr(), dir: 1, method: 'Transferencia' };
+  function openRegister(mantener, editarMov) {
+    if (editarMov) {
+      REG = {
+        type: editarMov.tipo, amount: montoEditable(editarMov.monto), concept: editarMov.concepto || '',
+        date: editarMov.fecha, dir: Number(editarMov.monto) < 0 ? -1 : 1,
+        method: editarMov.metodo || 'Transferencia',
+        monedaOriginal: editarMov.monedaOriginal || '',
+        montoOriginal: editarMov.montoOriginal ? montoEditable(editarMov.montoOriginal) : '',
+        editUuid: editarMov.uuid
+      };
+    } else {
+      REG = {
+        type: (mantener && mantener.type) || (ST.identity + ' recibió un pago'),
+        amount: '', concept: '',
+        date: (mantener && mantener.date) || todayStr(),
+        dir: 1,
+        method: (mantener && mantener.method) || 'Transferencia',
+        monedaOriginal: '', montoOriginal: '', editUuid: null
+      };
+    }
+    var editando = !!REG.editUuid;
     var html = '<div class="backdrop" data-close></div><div class="sheet" style="height:94%"><div class="grab"></div>' +
-      '<div class="sheet-h"><b>Registrar movimiento</b><button class="x" data-close><span class="msr" style="font-size:20px">close</span></button></div>' +
+      '<div class="sheet-h"><b>' + (editando ? 'Editar movimiento' : 'Registrar movimiento') + '</b><button class="x" data-close><span class="msr" style="font-size:20px">close</span></button></div>' +
       '<div class="sheet-body">' +
       '<div class="amount-lab">Monto</div><div class="amount zero" id="r-amount">$0</div><div class="effect" id="r-effect">Ingresa el monto con el teclado</div>' +
       '<div class="keypad" id="r-keypad"></div>' +
@@ -524,21 +583,54 @@
       '<div id="r-dir"></div>' +
       '<div id="r-method-wrap"><div class="flabel">¿Cómo se movió el dinero?</div><div class="methods" id="r-methods"></div></div>' +
       '<div class="flabel">Concepto <span style="font-weight:600;text-transform:none;letter-spacing:0">(opcional)</span></div>' +
-      '<input class="input" id="r-concept" placeholder="Ej. Renta, súper, gasolina…">' +
+      '<input class="input" id="r-concept" placeholder="Ej. Renta, súper, gasolina…" value="' + esc(REG.concept) + '">' +
       '<div class="chips" id="r-chips"></div>' +
+      '<div class="flabel">Moneda original <span style="font-weight:600;text-transform:none;letter-spacing:0">(opcional)</span></div>' +
+      '<div style="display:flex;gap:8px">' +
+      '<input class="input" id="r-moneda" placeholder="COP, USD…" maxlength="6" autocapitalize="characters" style="flex:1;text-transform:uppercase" value="' + esc(REG.monedaOriginal) + '">' +
+      '<input class="input" id="r-monto-orig" inputmode="decimal" placeholder="Monto en esa moneda" style="flex:1.7" value="' + esc(REG.montoOriginal) + '">' +
+      '</div>' +
       '<div class="flabel">Fecha del movimiento</div>' +
       '<label class="daterow"><span class="msr" style="font-size:22px;color:var(--accent)">calendar_today</span><span id="r-datelabel" style="flex:1;font-size:14.5px;font-weight:700"></span><span class="msr" style="color:var(--text-3)">expand_more</span><input type="date" id="r-date" value="' + REG.date + '"></label>' +
       '</div>' +
-      '<div class="sheet-foot"><button class="cta" id="r-submit" disabled><span class="msr" style="font-size:20px">check_circle</span>Registrar movimiento</button></div></div>';
+      '<div class="sheet-foot" style="display:flex;flex-direction:column;gap:8px">' +
+      '<button class="cta" id="r-submit" disabled><span class="msr" style="font-size:20px">check_circle</span>' + (editando ? 'Guardar cambios' : 'Registrar movimiento') + '</button>' +
+      (editando ? '' : '<button class="cta" id="r-submit-otro" disabled style="background:var(--surface-2);color:var(--text-2);padding:12px;font-size:13.5px"><span class="msr" style="font-size:18px">repeat</span>Registrar y agregar otro</button>') +
+      '</div></div>';
     var ov = el('<div>' + html + '</div>');
     $('#overlays').appendChild(ov);
     buildKeypad(); buildTypes(); buildMethods(); buildChips(); updateDir();
     $('#r-datelabel').textContent = fmtDateLong(REG.date);
     ov.addEventListener('click', function (e) { if (e.target.closest('[data-close]')) closeOverlay(ov); });
     $('#r-concept', ov).addEventListener('input', function (e) { REG.concept = e.target.value; syncChips(); });
+    $('#r-moneda', ov).addEventListener('input', function (e) { REG.monedaOriginal = e.target.value.toUpperCase(); });
+    $('#r-monto-orig', ov).addEventListener('input', function (e) { REG.montoOriginal = e.target.value; });
     $('#r-date', ov).addEventListener('change', function (e) { if (e.target.value) { REG.date = e.target.value; $('#r-datelabel').textContent = fmtDateLong(REG.date); } });
-    $('#r-submit', ov).addEventListener('click', submitRegister);
+    $('#r-submit', ov).addEventListener('click', function () { submitRegister(false); });
+    var otroBtn = $('#r-submit-otro', ov);
+    if (otroBtn) otroBtn.addEventListener('click', function () { submitRegister(true); });
+    document.removeEventListener('keydown', regKeydown);
+    document.addEventListener('keydown', regKeydown);
     refreshAmount();
+  }
+  function montoEditable(n) {
+    var a = Math.abs(Number(n) || 0);
+    return a % 1 === 0 ? String(a) : a.toFixed(2);
+  }
+  // Teclado físico en el registro: dígitos/punto/Backspace capturan el monto,
+  // Enter registra. Dentro de un campo de texto solo Enter (para salir de él).
+  function regKeydown(e) {
+    if (!document.getElementById('r-keypad')) { document.removeEventListener('keydown', regKeydown); return; }
+    var enCampo = e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT');
+    if (enCampo) { if (e.key === 'Enter') e.target.blur(); return; }
+    if (e.key >= '0' && e.key <= '9') { keyPress(e.key); e.preventDefault(); return; }
+    if (e.key === '.' || e.key === ',') { keyPress('.'); e.preventDefault(); return; }
+    if (e.key === 'Backspace') { keyPress('back'); e.preventDefault(); return; }
+    if (e.key === 'Enter') {
+      var b = document.getElementById('r-submit');
+      if (b && !b.disabled) submitRegister(false);
+      e.preventDefault();
+    }
   }
   function closeOverlay(ov) { if (ov && ov.parentNode) ov.parentNode.removeChild(ov); }
 
@@ -561,6 +653,8 @@
     var val = parseFloat(a) || 0;
     $('#r-effect').textContent = val > 0 ? effectFor(REG.type, val, REG.dir) : 'Ingresa el monto con el teclado';
     $('#r-submit').disabled = !(val > 0);
+    var otro = document.getElementById('r-submit-otro');
+    if (otro) otro.disabled = !(val > 0);
   }
   function buildTypes() {
     var me = ST.identity;
@@ -584,20 +678,80 @@
     $('#r-methods').innerHTML = METODOS.map(function (m) { return '<button class="method' + (REG.method === m ? ' sel' : '') + '" data-m="' + m + '"><span class="msr" style="font-size:18px">' + ic[m] + '</span>' + m + '</button>'; }).join('');
     $('#r-methods').addEventListener('click', function (e) { var b = e.target.closest('[data-m]'); if (b) { REG.method = b.getAttribute('data-m'); buildMethods(); } });
   }
+  // Últimos 6 conceptos usados por el usuario activo (los fijos solo de arranque).
+  function conceptosRecientes() {
+    var vistos = {}, propios = [];
+    ST.movements.slice()
+      .sort(function (a, b) { return String(a.creadoEn) < String(b.creadoEn) ? 1 : -1; })
+      .forEach(function (m) {
+        if (m.registradoPor !== ST.identity) return;
+        var c = (m.concepto || '').trim();
+        if (!c) return;
+        var k = c.toLowerCase();
+        if (vistos[k]) return;
+        vistos[k] = true;
+        propios.push(c);
+      });
+    return propios.length ? propios.slice(0, 6) : CHIPS;
+  }
   function buildChips() {
-    $('#r-chips').innerHTML = CHIPS.map(function (c) { return '<button class="cchip' + (REG.concept === c ? ' sel' : '') + '" data-c="' + esc(c) + '">' + esc(c) + '</button>'; }).join('');
+    $('#r-chips').innerHTML = conceptosRecientes().map(function (c) { return '<button class="cchip' + (REG.concept === c ? ' sel' : '') + '" data-c="' + esc(c) + '">' + esc(c) + '</button>'; }).join('');
     $('#r-chips').addEventListener('click', function (e) { var b = e.target.closest('[data-c]'); if (b) { REG.concept = b.getAttribute('data-c'); $('#r-concept').value = REG.concept; syncChips(); } });
   }
   function syncChips() { [].forEach.call(document.querySelectorAll('#r-chips .cchip'), function (b) { b.classList.toggle('sel', b.getAttribute('data-c') === REG.concept); }); }
 
-  function submitRegister() {
+  function submitRegister(yOtro) {
     var amt = parseFloat(REG.amount);
     if (!amt || amt <= 0) { toast('Ingresa un monto válido', 'error', 'var(--bad)'); return; }
-    var payload = { registradoPor: ST.identity, tipo: REG.type, monto: amt, concepto: REG.concept, metodo: REG.method, fecha: REG.date, dir: REG.dir };
+    var moneda = (REG.monedaOriginal || '').trim().toUpperCase();
+    var montoOrig = parseFloat(String(REG.montoOriginal || '').replace(/,/g, '')) || 0;
+    if (moneda && !montoOrig) { toast('Falta el monto en ' + moneda, 'error', 'var(--bad)'); return; }
+    if (!moneda && montoOrig) { toast('Falta la moneda original (COP, USD…)', 'error', 'var(--bad)'); return; }
+    var payload = {
+      registradoPor: ST.identity, tipo: REG.type, monto: amt, concepto: REG.concept,
+      metodo: REG.method, fecha: REG.date, dir: REG.dir,
+      monedaOriginal: moneda, montoOriginal: montoOrig || ''
+    };
+    var editUuid = REG.editUuid;
+    var mantener = { type: REG.type, method: REG.method, date: REG.date };
     clearOverlays();
+    document.removeEventListener('keydown', regKeydown);
+
+    if (editUuid) {
+      toast('Guardando cambios…', 'schedule', 'var(--accent)');
+      if (!hasBackend()) { toast('(demo) Editado', 'check_circle', 'var(--ok)'); return; }
+      google.script.run
+        .withSuccessHandler(function (s) { onState(s); toast('Cambios guardados', 'check_circle', 'var(--ok)'); })
+        .withFailureHandler(onErrServidor)
+        .api_editarMovimiento(editUuid, ST.identity, payload);
+      return;
+    }
+
+    // Inserción optimista: el pendiente aparece al instante y la respuesta
+    // del servidor lo sustituye por el definitivo (o lo quita si falló).
+    var tmp = {
+      id: '…', uuid: 'tmp-' + Date.now(), creadoEn: new Date().toISOString(), fecha: REG.date, hora: '',
+      registradoPor: ST.identity, tipo: REG.type,
+      monto: REG.type === 'Ajuste' ? REG.dir * amt : amt,
+      concepto: REG.concept, metodo: REG.type === 'Ajuste' ? '' : REG.method, estado: 'Pendiente',
+      aprobado1: ST.identity === P1, fechaAprob1: '', aprobado2: ST.identity === P2, fechaAprob2: '',
+      saldoDespues: null, monedaOriginal: moneda, montoOriginal: montoOrig
+    };
+    ST.movements.push(tmp);
+    ST.pendienteNeto += signed(tmp);
+    renderAll();
     toast('Registrado — falta que ' + other(ST.identity) + ' apruebe', 'schedule', 'var(--warn)');
+    if (yOtro) openRegister(mantener);
     if (!hasBackend()) { demoRegister(payload); return; }
-    google.script.run.withSuccessHandler(onState).withFailureHandler(onErr).api_registrarMovimiento(payload);
+    google.script.run
+      .withSuccessHandler(onState)
+      .withFailureHandler(function (e) {
+        ST.movements = ST.movements.filter(function (m) { return m.uuid !== tmp.uuid; });
+        ST.pendienteNeto -= signed(tmp);
+        renderAll();
+        onErrServidor(e);
+      })
+      .api_registrarMovimiento(payload);
   }
   function approve(uuid) {
     toast('Confirmando…', 'schedule', 'var(--accent)');
@@ -612,25 +766,49 @@
    
   function openDetail(uuid) {
     var m = ST.movements.filter(function (x) { return x.uuid === uuid; })[0]; if (!m) return;
-    var meta = typeMeta(m.tipo), st = statusMeta(m.estado), s = signed(m);
+    var meta = typeMeta(m.tipo), st = statusMeta(m.estado), s = relativo(signed(m));
+    var puedeEditar = m.estado === 'Pendiente' && m.registradoPor === ST.identity && String(m.uuid).indexOf('tmp-') !== 0;
     var rows = [
-      ['Tipo', m.tipo], ['Método', m.metodo || '—'], ['Concepto', (m.concepto && m.concepto.trim()) ? m.concepto : '—'],
+      ['Tipo', m.tipo], ['Método', m.metodo || '—'], ['Concepto', (m.concepto && m.concepto.trim()) ? m.concepto : '—']
+    ];
+    if (m.monedaOriginal && m.montoOriginal) {
+      rows.push(['Moneda original', m.monedaOriginal + ' ' + Number(m.montoOriginal).toLocaleString('es-MX')]);
+    }
+    rows = rows.concat([
       ['Registrado por', m.registradoPor], ['Fecha del movimiento', fmtDateLong(m.fecha)], ['Registrado el', fmtStamp(m.creadoEn)],
       ['Aprobado por ' + P1, m.aprobado1 ? fmtStamp(m.fechaAprob1) : 'Pendiente'],
       ['Aprobado por ' + P2, m.aprobado2 ? fmtStamp(m.fechaAprob2) : 'Pendiente'],
-      ['Saldo después', m.saldoDespues != null ? money(m.saldoDespues) : '— (no confirmado)'],
+      ['Saldo después', m.saldoDespues != null ? etiquetaSaldo(m.saldoDespues) : '— (no confirmado)'],
       ['ID', '#' + m.id]
-    ];
+    ]);
     var html = '<div class="backdrop" data-close></div><div class="sheet" style="max-height:90%"><div class="grab"></div><div class="sheet-body">' +
       '<div class="detail-top"><span class="detail-ico"><span class="msr" style="font-size:32px">' + meta.icon + '</span></span>' +
       '<span class="tnum" style="font-size:32px;font-weight:800;letter-spacing:-1px">' + (s >= 0 ? '+' : '−') + money(Math.abs(m.monto)) + '</span>' +
       '<span style="font-size:14px;font-weight:700">' + esc(m.concepto || meta.short) + '</span>' +
       '<span class="chip ' + st.cls + '" style="font-size:12px;padding:5px 12px"><span class="msr fill" style="font-size:15px">' + st.icon + '</span>' + st.label + '</span></div>' +
       '<div class="card" style="margin-top:20px;overflow:hidden">' + rows.map(function (r) { return '<div class="drow"><span class="dk">' + r[0] + '</span><span class="dv">' + esc(r[1]) + '</span></div>'; }).join('') + '</div>' +
-      '<div style="margin-top:14px;font-size:11px;color:var(--text-3);text-align:center;line-height:1.5;font-weight:600">Los movimientos nunca se editan ni se eliminan.<br>Un error se corrige con un movimiento de <b>Ajuste</b>.</div>' +
+      (puedeEditar
+        ? '<div class="btns" style="margin-top:16px"><button class="btn reject" id="d-del"><span class="msr" style="font-size:18px">delete</span>Eliminar</button>' +
+          '<button class="btn accept" id="d-edit"><span class="msr" style="font-size:18px">edit</span>Editar</button></div>' +
+          '<div style="margin-top:12px;font-size:11px;color:var(--text-3);text-align:center;line-height:1.5;font-weight:600">Puedes editarlo o eliminarlo mientras ' + esc(other(ST.identity)) + ' no lo apruebe.</div>'
+        : '<div style="margin-top:14px;font-size:11px;color:var(--text-3);text-align:center;line-height:1.5;font-weight:600">Los movimientos confirmados no se editan ni se eliminan.<br>Un error se corrige con un movimiento de <b>Ajuste</b>.</div>') +
       '</div></div>';
     var ov = el('<div>' + html + '</div>'); $('#overlays').appendChild(ov);
     ov.addEventListener('click', function (e) { if (e.target.closest('[data-close]')) closeOverlay(ov); });
+    if (puedeEditar) {
+      $('#d-edit', ov).addEventListener('click', function () { closeOverlay(ov); openRegister(null, m); });
+      var confirmado = false;
+      $('#d-del', ov).addEventListener('click', function () {
+        if (!confirmado) { confirmado = true; $('#d-del', ov).innerHTML = '<span class="msr" style="font-size:18px">warning</span>¿Seguro? Toca otra vez'; return; }
+        closeOverlay(ov);
+        toast('Eliminando…', 'schedule', 'var(--accent)');
+        if (!hasBackend()) { toast('(demo) Eliminado', 'delete', 'var(--bad)'); return; }
+        google.script.run
+          .withSuccessHandler(function (s2) { onState(s2); toast('Movimiento eliminado', 'delete', 'var(--bad)'); })
+          .withFailureHandler(onErrServidor)
+          .api_eliminarMovimiento(uuid, ST.identity);
+      });
+    }
   }
 
    
@@ -678,7 +856,7 @@
       mk(3, '2026-07-04', P2 + ' prestó dinero', 300, 'Farmacia', 'Efectivo', 'Pendiente', P2)
     ];
     var saldo = d.filter(function (m) { return m.estado === 'Confirmado'; }).reduce(function (a, m) { return a + signed(m); }, 0) + 1000;
-    return { saldo: 1250, movimientos: d };
+    return { saldo: 1250, pendienteNeto: -300, movimientos: d };
   }
   function mk(id, fecha, tipo, monto, concepto, metodo, estado, reg) {
     return { id: id, uuid: 'demo-' + id, creadoEn: fecha + 'T10:00:00Z', fecha: fecha, hora: '10:00', registradoPor: reg || (tipo.indexOf(P2) === 0 ? P2 : P1), tipo: tipo, monto: monto, concepto: concepto, metodo: metodo, estado: estado, aprobado1: estado === 'Confirmado' || reg !== P2, fechaAprob1: '', aprobado2: estado === 'Confirmado' || reg === P2, fechaAprob2: '', saldoDespues: estado === 'Confirmado' ? null : null };

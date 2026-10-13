@@ -3,11 +3,13 @@
  *
  * Cada movimiento que registra una persona queda "Pendiente" hasta que la otra
  * lo aprueba (queda "Confirmado") o lo rechaza. Solo lo confirmado cuenta para
- * el saldo. Los movimientos nunca se editan ni se borran: un error se corrige
- * con un movimiento de tipo "Ajuste".
+ * el saldo. Un movimiento Pendiente puede ser editado o eliminado por quien lo
+ * registró; una vez Confirmado ya no se toca: un error se corrige con un
+ * movimiento de tipo "Ajuste".
  *
  * Los datos viven en la hoja "Movimientos" de la hoja de cálculo a la que está
- * vinculado este proyecto de Apps Script.
+ * vinculado este proyecto de Apps Script. Las columnas se localizan por su
+ * encabezado (no por posición), y las que falten se agregan solas al final.
  */
 
 // ═══════════════════ CONFIGURACIÓN — edita solo esto ═══════════════════
@@ -26,7 +28,8 @@ var ESTADOS = ['Pendiente', 'Confirmado', 'Rechazado'];
 
 var COLUMNAS = [
   'id', 'uuid', 'creadoEn', 'fecha', 'hora', 'registradoPor', 'tipo', 'monto',
-  'concepto', 'metodo', 'estado', 'aprobado1', 'fechaAprob1', 'aprobado2', 'fechaAprob2'
+  'concepto', 'metodo', 'estado', 'aprobado1', 'fechaAprob1', 'aprobado2', 'fechaAprob2',
+  'monedaOriginal', 'montoOriginal'
 ];
 
 function tiposValidos() {
@@ -103,6 +106,41 @@ function validarFecha_(fecha) {
   return f;
 }
 
+/** Valida la pareja opcional moneda original + monto original. */
+function validarMonedaOriginal_(payload) {
+  var moneda = limpiarTexto(payload.monedaOriginal, 6).toUpperCase();
+  var montoCrudo = payload.montoOriginal;
+  var tiene = montoCrudo !== '' && montoCrudo != null && Number(montoCrudo) !== 0;
+  if (moneda && !tiene) throw new Error('Pusiste la moneda original pero falta el monto original');
+  if (!moneda && tiene) throw new Error('Pusiste el monto original pero falta la moneda (COP, USD…)');
+  if (!moneda) return { monedaOriginal: '', montoOriginal: '' };
+  if (!/^[A-Z]{3,6}$/.test(moneda)) throw new Error('La moneda original debe ser un código tipo COP o USD');
+  return { monedaOriginal: moneda, montoOriginal: validarMonto(montoCrudo) };
+}
+
+/** Valida los campos editables de un movimiento (alta y edición comparten reglas). */
+function datosDeMovimiento_(payload) {
+  var tipo = validarEnLista(limpiarTexto(payload.tipo, 60), tiposValidos(), 'tipo');
+  var monto = validarMonto(payload.monto);
+  var metodo = '';
+  if (tipo !== 'Ajuste') {
+    metodo = validarEnLista(limpiarTexto(payload.metodo, 30), METODOS, 'método');
+  } else {
+    // Un ajuste guarda el monto con signo según la dirección elegida.
+    monto = (Number(payload.dir) < 0 ? -1 : 1) * monto;
+  }
+  var mo = validarMonedaOriginal_(payload);
+  return {
+    tipo: tipo,
+    monto: monto,
+    metodo: metodo,
+    concepto: limpiarTexto(payload.concepto, 120),
+    fecha: validarFecha_(payload.fecha),
+    monedaOriginal: mo.monedaOriginal,
+    montoOriginal: mo.montoOriginal
+  };
+}
+
 // ─────────────────────────── Hoja de datos ───────────────────────────
 
 function obtenerHoja_() {
@@ -123,17 +161,63 @@ function obtenerHoja_() {
     hoja = ss.insertSheet(CONFIG.NOMBRE_HOJA);
     hoja.getRange(1, 1, 1, COLUMNAS.length).setValues([COLUMNAS]).setFontWeight('bold');
     hoja.setFrozenRows(1);
+  } else {
+    asegurarColumnas_(hoja);
   }
   return hoja;
+}
+
+/** Agrega al final los encabezados que falten (migraciones sin tocar datos). */
+function asegurarColumnas_(hoja) {
+  var actuales = leerEncabezados_(hoja);
+  var faltantes = COLUMNAS.filter(function (c) { return actuales.indexOf(c) === -1; });
+  if (!faltantes.length) return;
+  hoja.getRange(1, actuales.length + 1, 1, faltantes.length).setValues([faltantes]).setFontWeight('bold');
+}
+
+function leerEncabezados_(hoja) {
+  var ancho = Math.max(1, hoja.getLastColumn());
+  return hoja.getRange(1, 1, 1, ancho).getValues()[0]
+    .map(function (v) { return String(v || '').trim(); })
+    .filter(function (v) { return v !== ''; });
+}
+
+/** Mapa encabezado → índice de columna (base 0). */
+function mapaColumnas_(hoja) {
+  var mapa = {};
+  leerEncabezados_(hoja).forEach(function (nombre, i) { mapa[nombre] = i; });
+  return mapa;
+}
+
+/** Escribe una fila nueva colocando cada valor bajo su encabezado. */
+function escribirFila_(hoja, filaObj) {
+  var encabezados = leerEncabezados_(hoja);
+  hoja.appendRow(encabezados.map(function (h) {
+    return filaObj.hasOwnProperty(h) ? filaObj[h] : '';
+  }));
+}
+
+/** Actualiza celdas de una fila existente, por nombre de encabezado. */
+function actualizarCeldas_(hoja, filaNum, cambios) {
+  var mapa = mapaColumnas_(hoja);
+  Object.keys(cambios).forEach(function (campo) {
+    if (mapa.hasOwnProperty(campo)) {
+      hoja.getRange(filaNum, mapa[campo] + 1).setValue(cambios[campo]);
+    }
+  });
 }
 
 function leerMovimientos_(hoja) {
   var ultima = hoja.getLastRow();
   if (ultima < 2) return [];
-  var valores = hoja.getRange(2, 1, ultima - 1, COLUMNAS.length).getValues();
+  var mapa = mapaColumnas_(hoja);
+  var ancho = Math.max(1, hoja.getLastColumn());
+  var valores = hoja.getRange(2, 1, ultima - 1, ancho).getValues();
   return valores.map(function (fila) {
     var m = {};
-    COLUMNAS.forEach(function (col, i) { m[col] = fila[i]; });
+    COLUMNAS.forEach(function (col) {
+      m[col] = mapa.hasOwnProperty(col) ? fila[mapa[col]] : '';
+    });
     m.id = Number(m.id);
     m.monto = Number(m.monto);
     m.fecha = normalizarFecha_(m.fecha);
@@ -142,6 +226,8 @@ function leerMovimientos_(hoja) {
     m.aprobado2 = m.aprobado2 === true || m.aprobado2 === 'TRUE' || m.aprobado2 === 'true';
     m.fechaAprob1 = normalizarStamp_(m.fechaAprob1);
     m.fechaAprob2 = normalizarStamp_(m.fechaAprob2);
+    m.monedaOriginal = limpiarTexto(m.monedaOriginal, 6).toUpperCase();
+    m.montoOriginal = Number(m.montoOriginal) || 0;
     return m;
   });
 }
@@ -169,10 +255,18 @@ function cronologico_(a, b) {
   return a.creadoEn < b.creadoEn ? -1 : 1;
 }
 
+function buscarPorUuid_(movimientos, uuid) {
+  for (var i = 0; i < movimientos.length; i++) {
+    if (String(movimientos[i].uuid) === String(uuid)) return i;
+  }
+  return -1;
+}
+
 // ─────────────────────────── API para la app ───────────────────────────
 
 function api_getEstado() {
   var movimientos = leerMovimientos_(obtenerHoja_());
+  // El saldo SOLO suma movimientos confirmados.
   var confirmados = movimientos.filter(function (m) { return m.estado === 'Confirmado'; }).sort(cronologico_);
   var saldo = 0;
   var saldoPorUuid = {};
@@ -183,7 +277,15 @@ function api_getEstado() {
   movimientos.forEach(function (m) {
     m.saldoDespues = saldoPorUuid.hasOwnProperty(m.uuid) ? saldoPorUuid[m.uuid] : null;
   });
-  return { saldo: Math.round(saldo * 100) / 100, movimientos: movimientos };
+  // Lo pendiente se informa aparte, nunca dentro del saldo.
+  var pendienteNeto = movimientos
+    .filter(function (m) { return m.estado === 'Pendiente'; })
+    .reduce(function (a, m) { return a + montoConSigno_(m); }, 0);
+  return {
+    saldo: Math.round(saldo * 100) / 100,
+    pendienteNeto: Math.round(pendienteNeto * 100) / 100,
+    movimientos: movimientos
+  };
 }
 
 function api_registrarMovimiento(payload) {
@@ -191,18 +293,7 @@ function api_registrarMovimiento(payload) {
   lock.waitLock(20000);
   try {
     var registradoPor = validarEnLista(limpiarTexto(payload.registradoPor, 40), CONFIG.PERSONAS, 'persona');
-    var tipo = validarEnLista(limpiarTexto(payload.tipo, 60), tiposValidos(), 'tipo');
-    var monto = validarMonto(payload.monto);
-    var concepto = limpiarTexto(payload.concepto, 120);
-    var fecha = validarFecha_(payload.fecha);
-    var metodo = '';
-    if (tipo !== 'Ajuste') {
-      metodo = validarEnLista(limpiarTexto(payload.metodo, 30), METODOS, 'método');
-    } else {
-      // Un ajuste guarda el monto con signo según la dirección elegida.
-      var dir = Number(payload.dir) < 0 ? -1 : 1;
-      monto = dir * monto;
-    }
+    var datos = datosDeMovimiento_(payload);
 
     var hoja = obtenerHoja_();
     var movimientos = leerMovimientos_(hoja);
@@ -210,24 +301,75 @@ function api_registrarMovimiento(payload) {
     var ahora = ahoraIso();
     var esPersona1 = registradoPor === CONFIG.PERSONAS[0];
 
-    var fila = {
+    escribirFila_(hoja, {
       id: maxId + 1,
       uuid: generarUuid(),
       creadoEn: ahora,
-      fecha: fecha,
+      fecha: datos.fecha,
       hora: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'HH:mm'),
       registradoPor: registradoPor,
-      tipo: tipo,
-      monto: monto,
-      concepto: concepto,
-      metodo: metodo,
+      tipo: datos.tipo,
+      monto: datos.monto,
+      concepto: datos.concepto,
+      metodo: datos.metodo,
       estado: 'Pendiente',
       aprobado1: esPersona1,
       fechaAprob1: esPersona1 ? ahora : '',
       aprobado2: !esPersona1,
-      fechaAprob2: !esPersona1 ? ahora : ''
-    };
-    hoja.appendRow(COLUMNAS.map(function (c) { return fila[c]; }));
+      fechaAprob2: !esPersona1 ? ahora : '',
+      monedaOriginal: datos.monedaOriginal,
+      montoOriginal: datos.montoOriginal
+    });
+    return api_getEstado();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Solo quien registró un movimiento puede editarlo, y solo mientras está Pendiente. */
+function api_editarMovimiento(uuid, quien, payload) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    quien = validarEnLista(limpiarTexto(quien, 40), CONFIG.PERSONAS, 'persona');
+    var hoja = obtenerHoja_();
+    var movimientos = leerMovimientos_(hoja);
+    var idx = buscarPorUuid_(movimientos, uuid);
+    if (idx === -1) throw new Error('Movimiento no encontrado');
+    var m = movimientos[idx];
+    if (m.estado !== 'Pendiente') throw new Error('Solo se pueden editar movimientos pendientes');
+    if (m.registradoPor !== quien) throw new Error('Solo quien lo registró puede editarlo');
+
+    var datos = datosDeMovimiento_(payload);
+    actualizarCeldas_(hoja, idx + 2, {
+      tipo: datos.tipo,
+      monto: datos.monto,
+      concepto: datos.concepto,
+      metodo: datos.metodo,
+      fecha: datos.fecha,
+      monedaOriginal: datos.monedaOriginal,
+      montoOriginal: datos.montoOriginal
+    });
+    return api_getEstado();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+/** Solo quien registró un movimiento puede eliminarlo, y solo mientras está Pendiente. */
+function api_eliminarMovimiento(uuid, quien) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    quien = validarEnLista(limpiarTexto(quien, 40), CONFIG.PERSONAS, 'persona');
+    var hoja = obtenerHoja_();
+    var movimientos = leerMovimientos_(hoja);
+    var idx = buscarPorUuid_(movimientos, uuid);
+    if (idx === -1) throw new Error('Movimiento no encontrado');
+    var m = movimientos[idx];
+    if (m.estado !== 'Pendiente') throw new Error('Solo se pueden eliminar movimientos pendientes');
+    if (m.registradoPor !== quien) throw new Error('Solo quien lo registró puede eliminarlo');
+    hoja.deleteRow(idx + 2);
     return api_getEstado();
   } finally {
     lock.releaseLock();
@@ -249,10 +391,7 @@ function resolverPendiente_(uuid, quien, aprobar) {
     quien = validarEnLista(limpiarTexto(quien, 40), CONFIG.PERSONAS, 'persona');
     var hoja = obtenerHoja_();
     var movimientos = leerMovimientos_(hoja);
-    var idx = -1;
-    for (var i = 0; i < movimientos.length; i++) {
-      if (String(movimientos[i].uuid) === String(uuid)) { idx = i; break; }
-    }
+    var idx = buscarPorUuid_(movimientos, uuid);
     if (idx === -1) throw new Error('Movimiento no encontrado');
     var m = movimientos[idx];
     if (m.estado !== 'Pendiente') throw new Error('Este movimiento ya fue resuelto');
@@ -260,16 +399,14 @@ function resolverPendiente_(uuid, quien, aprobar) {
 
     var filaNum = idx + 2; // +1 encabezado, +1 índice base 1
     var ahora = ahoraIso();
-    var colEstado = COLUMNAS.indexOf('estado') + 1;
     if (aprobar) {
       var esPersona1 = quien === CONFIG.PERSONAS[0];
-      var colAprob = COLUMNAS.indexOf(esPersona1 ? 'aprobado1' : 'aprobado2') + 1;
-      var colFechaAprob = COLUMNAS.indexOf(esPersona1 ? 'fechaAprob1' : 'fechaAprob2') + 1;
-      hoja.getRange(filaNum, colAprob).setValue(true);
-      hoja.getRange(filaNum, colFechaAprob).setValue(ahora);
-      hoja.getRange(filaNum, colEstado).setValue('Confirmado');
+      var cambios = { estado: 'Confirmado' };
+      cambios[esPersona1 ? 'aprobado1' : 'aprobado2'] = true;
+      cambios[esPersona1 ? 'fechaAprob1' : 'fechaAprob2'] = ahora;
+      actualizarCeldas_(hoja, filaNum, cambios);
     } else {
-      hoja.getRange(filaNum, colEstado).setValue('Rechazado');
+      actualizarCeldas_(hoja, filaNum, { estado: 'Rechazado' });
     }
     return api_getEstado();
   } finally {

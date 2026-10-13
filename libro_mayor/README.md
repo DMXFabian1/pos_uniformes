@@ -4,9 +4,13 @@ Registro compartido de préstamos y pagos entre dos personas, alojado como
 web app de Google Apps Script con los datos en una hoja de cálculo de Google.
 
 Cada movimiento que registra una persona queda **Pendiente** hasta que la otra
-lo **aprueba** o **rechaza**. Solo lo confirmado cuenta para el saldo, que
-indica quién le debe a quién. Los movimientos nunca se editan ni se borran:
-un error se corrige con un movimiento de **Ajuste**.
+lo **aprueba** o **rechaza**. Solo lo confirmado cuenta para el saldo (lo
+pendiente se muestra aparte como "por aprobar"), y todo se lee desde el punto
+de vista del usuario activo: "a tu favor" / "le debes". Quien registró un
+movimiento puede editarlo o eliminarlo mientras siga Pendiente; una vez
+Confirmado ya no se toca: un error se corrige con un movimiento de **Ajuste**.
+Cada movimiento puede llevar opcionalmente su moneda y monto originales
+(p. ej. COP 212,511) además del monto en MXN.
 
 ## Archivos
 
