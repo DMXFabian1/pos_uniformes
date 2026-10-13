@@ -122,6 +122,69 @@ class ElRasterTests(unittest.TestCase):
         self.assertEqual(sum(altos), alto)      # ninguna fila se pierde
         self.assertEqual(cuerpo[-2], 0b10000000)
 
+    @staticmethod
+    def _desarmar(datos: bytes) -> list[tuple[str, int]]:
+        """[("img", filas) | ("avance", puntos), …] en el orden en que van."""
+        piezas, i = [], 0
+        while i < len(datos):
+            if datos[i:i + 4] == bytes([0x1D, ord("v"), ord("0"), 0]):
+                ancho = datos[i + 4] + (datos[i + 5] << 8)
+                n = datos[i + 6] + (datos[i + 7] << 8)
+                piezas.append(("img", n))
+                i += 8 + ancho * n
+            elif datos[i:i + 2] == bytes([0x1B, ord("J")]):
+                piezas.append(("avance", datos[i + 2]))
+                i += 3
+            else:
+                raise AssertionError(f"byte inesperado en {i}")
+        return piezas
+
+    def _con_hueco(self, arriba: int, hueco: int, abajo: int):
+        import tempfile
+        from pathlib import Path
+
+        from PIL import Image
+
+        img = Image.new("1", (16, arriba + hueco + abajo), 1)
+        for y in list(range(arriba)) + list(range(arriba + hueco, arriba + hueco + abajo)):
+            img.putpixel((0, y), 0)
+        ruta = Path(tempfile.mkdtemp()) / "hueco.png"
+        img.save(ruta)
+        return ruta
+
+    def test_el_alto_de_franja_se_puede_escoger(self) -> None:
+        # Menos franjas = menos pausas: es lo que se ajusta en la tienda.
+        ruta = self._con_hueco(300, 0, 0)
+        piezas = self._desarmar(esc.raster_de_imagen(ruta, filas_por_franja=256))
+        self.assertEqual(piezas, [("img", 256), ("img", 44)])
+
+    def test_un_tramo_largo_en_blanco_se_avanza_sin_mandar_puntos(self) -> None:
+        ruta = self._con_hueco(10, 300, 10)
+        piezas = self._desarmar(esc.raster_de_imagen(ruta, saltar_blancos=True))
+        self.assertEqual(piezas, [("img", 10), ("avance", 255), ("avance", 45), ("img", 10)])
+
+    def test_el_aire_entre_renglones_no_parte_la_imagen(self) -> None:
+        # Partirla en cada renglón sería agregar pausas, que es lo que se quiere quitar.
+        ruta = self._con_hueco(10, esc.BLANCAS_PARA_AVANZAR - 1, 10)
+        piezas = self._desarmar(esc.raster_de_imagen(ruta, saltar_blancos=True))
+        self.assertEqual(piezas, [("img", 10 + esc.BLANCAS_PARA_AVANZAR - 1 + 10)])
+
+    def test_saltar_blancos_no_cambia_el_largo_del_ticket(self) -> None:
+        ruta = self._con_hueco(40, 500, 40)
+        piezas = self._desarmar(esc.raster_de_imagen(ruta, saltar_blancos=True))
+        self.assertEqual(sum(n for _, n in piezas), 580)
+
+    def test_el_ticket_dibujado_usa_los_ajustes_de_esta_impresora(self) -> None:
+        # Antes salía siempre con los de fábrica, sin importar lo guardado.
+        from pos_uniformes.services.escpos_settings_cache_service import EscPosSettings
+
+        guardados = EscPosSettings(filas_por_franja=512)
+        with patch.object(esc, "load_escpos_settings", return_value=guardados), \
+                patch.object(esc, "build_escpos_imagen", return_value=b"x") as armar, \
+                patch.object(esc, "_send_raw_windows"), patch.object(esc, "_send_raw_cups"):
+            esc.print_ticket_imagen_escpos("Termica", "hola")
+        self.assertIs(armar.call_args.args[1], guardados)
+
     def test_la_calabaza_de_verdad_cabe_en_el_papel(self) -> None:
         ruta = temp.imagen_para_marcador("halloween")
         datos = esc.raster_de_imagen(ruta)

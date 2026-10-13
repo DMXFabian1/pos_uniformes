@@ -43,6 +43,15 @@ class EscPosSettings:
     #: corazones…). Encendido: es parte de la temporada, que ya se apaga desde
     #: el menú. Apagado aquí = el ticket dibujado de antes, sin más (2026-10-10).
     adornos_de_temporada: bool = True
+    #: Alto de cada franja del ticket dibujado. Mandado de una pieza, la
+    #: térmica se quedaba sin memoria y lo último salía en blanco; en franjas
+    #: chicas sale completo pero se detiene entre una y otra. Más alto = menos
+    #: pausas, con el riesgo de volver a llenarle la memoria (2026-10-13).
+    filas_por_franja: int = 128
+    #: Mandar los tramos largos en blanco como avance de papel en vez de puntos.
+    #: Apagado: medido en un ticket de 25 productos ahorra solo 9% (casi todo el
+    #: blanco es el aire entre renglones) y agrega 4 pausas (2026-10-13).
+    saltar_filas_en_blanco: bool = False
 
 
 def _cache_path() -> Path:
@@ -67,6 +76,12 @@ def load_escpos_settings() -> EscPosSettings:
             ))),
             adornos_de_temporada=bool(
                 data.get("adornos_de_temporada", d.adornos_de_temporada)
+            ),
+            filas_por_franja=max(16, min(1024, int(
+                data.get("filas_por_franja", d.filas_por_franja)
+            ))),
+            saltar_filas_en_blanco=bool(
+                data.get("saltar_filas_en_blanco", d.saltar_filas_en_blanco)
             ),
         )
     except Exception:  # noqa: BLE001

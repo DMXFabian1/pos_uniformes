@@ -63,12 +63,17 @@ PUNTOS_POR_LINEA = 576
 
 #: Alto máximo de cada imagen que se le manda a la térmica (ver raster_de_imagen).
 FILAS_POR_FRANJA = 128
+#: Desde cuántas filas en blanco seguidas conviene avanzar papel en vez de
+#: mandar puntos vacíos. Menos que esto es el aire entre renglones.
+BLANCAS_PARA_AVANZAR = 12
 
 _ALINEAR_CENTRO = bytes([_ESC, ord("a"), 1])
 _ALINEAR_IZQ = bytes([_ESC, ord("a"), 0])
 
 
-def raster_de_imagen(ruta) -> bytes:
+def raster_de_imagen(
+    ruta, *, filas_por_franja: int | None = None, saltar_blancos: bool = False
+) -> bytes:
     """Convierte un PNG a los bytes de `GS v 0` (imagen de puntos).
 
     La térmica no sabe de PNG: recibe un mapa de bits, un bit por punto, 1 =
@@ -79,6 +84,9 @@ def raster_de_imagen(ruta) -> bytes:
     comando es el byte: una imagen de 240 puntos ocupa 30 bytes por fila, pero
     una de 243 ocuparía 31 y los 5 puntos de más tienen que ir en blanco, no
     con basura.
+
+    Con `saltar_blancos`, cada tramo largo de filas vacías se manda como avance
+    de papel (`ESC J`) en vez de puntos: no hay nada que quemar ahí.
     """
     from PIL import Image
 
@@ -98,22 +106,58 @@ def raster_de_imagen(ruta) -> bytes:
                 fila[x // 8] |= 0x80 >> (x % 8)
         filas.append(bytes(fila))
 
+    alto_franja = int(filas_por_franja or FILAS_POR_FRANJA)
+
     # En franjas, cada una con su cabecera. Un ticket largo dibujado entero es
     # una sola imagen de miles de filas, y la térmica no la aguanta: se llena
     # su memoria, hace una pausa, sigue avanzando papel y ya no quema nada —
     # la calabaza y los términos salían en blanco cuando el ticket pasaba de
     # cierto número de productos (Daniel, 2026-10-11). Franjas cortas caben
     # en cualquier impresora y salen pegadas, sin costura visible.
+    def _franjas(tramo: list[bytes]) -> bytes:
+        salida = bytearray()
+        for inicio in range(0, max(len(tramo), 1), alto_franja):
+            franja = tramo[inicio:inicio + alto_franja]
+            n = len(franja)
+            salida += bytes(
+                [_GS, ord("v"), ord("0"), 0,
+                 bytes_por_fila & 0xFF, (bytes_por_fila >> 8) & 0xFF,
+                 n & 0xFF, (n >> 8) & 0xFF]
+            )
+            salida += b"".join(franja)
+        return bytes(salida)
+
+    if not saltar_blancos:
+        return _franjas(filas)
+
+    vacia = bytes(bytes_por_fila)
     salida = bytearray()
-    for inicio in range(0, max(alto, 1), FILAS_POR_FRANJA):
-        franja = filas[inicio:inicio + FILAS_POR_FRANJA]
-        n = len(franja)
-        salida += bytes(
-            [_GS, ord("v"), ord("0"), 0,
-             bytes_por_fila & 0xFF, (bytes_por_fila >> 8) & 0xFF,
-             n & 0xFF, (n >> 8) & 0xFF]
-        )
-        salida += b"".join(franja)
+    tramo: list[bytes] = []
+    y = 0
+    while y < alto:
+        if filas[y] != vacia:
+            tramo.append(filas[y])
+            y += 1
+            continue
+        fin = y
+        while fin < alto and filas[fin] == vacia:
+            fin += 1
+        blancas = fin - y
+        if blancas < BLANCAS_PARA_AVANZAR:
+            # Un hueco corto (el aire entre renglones) se queda en la imagen:
+            # cortarla ahí solo agregaría pausas.
+            tramo.extend(filas[y:fin])
+        else:
+            if tramo:
+                salida += _franjas(tramo)
+                tramo = []
+            while blancas > 0:
+                paso = min(255, blancas)
+                salida += bytes([_ESC, ord("J"), paso])   # avanzar `paso` puntos
+                blancas -= paso
+        y = fin
+    if tramo or not salida:
+        salida += _franjas(tramo)
     return bytes(salida)
 
 
@@ -182,7 +226,11 @@ def build_escpos_imagen(texto: str, settings: EscPosSettings | None = None) -> b
 
     s = settings or EscPosSettings()
     png = render_ticket_png(texto)
-    raster = raster_de_imagen(io.BytesIO(png))
+    raster = raster_de_imagen(
+        io.BytesIO(png),
+        filas_por_franja=s.filas_por_franja,
+        saltar_blancos=s.saltar_filas_en_blanco,
+    )
     return _INIT + _ALINEAR_CENTRO + raster + _ALINEAR_IZQ + _corte(s)
 
 
@@ -224,7 +272,9 @@ def print_ticket_imagen_escpos(printer_name: str, text: str, *, copies: int = 1)
     if not printer_name:
         return False
     try:
-        datos = build_escpos_imagen(text)
+        # Con los ajustes de ESTA impresora: antes salía siempre con los de
+        # fábrica, sin importar lo guardado (2026-10-13).
+        datos = build_escpos_imagen(text, load_escpos_settings())
     except Exception:  # noqa: BLE001 — sin dibujo, el ticket sale por el camino viejo
         logger.exception("ESC/POS: no se pudo dibujar el ticket")
         return False
