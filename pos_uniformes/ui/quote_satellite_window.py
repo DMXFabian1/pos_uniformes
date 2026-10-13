@@ -8737,6 +8737,18 @@ QLabel#favDialogPriceLabel {
         if selected:
             self._print_labels_for_skus(selected, mode)
 
+    def _fila_con_multicolor(self, row: dict) -> dict:
+        """La fila del catálogo + si su producto tiene varios colores (para que
+        la etiqueta diga cuál: «Short Deportivo Rojo»)."""
+        from pos_uniformes.services.nombre_con_color_service import multicolor_en_filas
+
+        return {
+            **row,
+            "producto_multicolor": multicolor_en_filas(
+                getattr(self, "catalog_snapshot_rows", None) or [], row.get("producto_id")
+            ),
+        }
+
     def _print_labels_for_skus(self, skus: list[str], mode: str = "standard") -> None:
         from pos_uniformes.services.inventory_label_service import (
             render_inventory_label_from_cache_row,
@@ -8750,7 +8762,7 @@ QLabel#favDialogPriceLabel {
                 continue
             try:
                 result = render_inventory_label_from_cache_row(
-                    row, mode=mode, requested_copies=1
+                    self._fila_con_multicolor(row), mode=mode, requested_copies=1
                 )
                 # El tipo elegido decide la impresora: Normal/Split → rollo
                 # continuo; Label (dk1221) → troquelada. paper_mode = mode.
@@ -8826,6 +8838,8 @@ QLabel#favDialogPriceLabel {
         """Construye el snapshot del kiosko buscando en catalog_snapshot_rows (sin DB)."""
         from decimal import Decimal as _Decimal
 
+        from pos_uniformes.services.nombre_con_color_service import multicolor_en_filas
+
         normalized = sku.strip().upper()
         row = self._find_row_by_sku(normalized)
         if row is None:
@@ -8847,6 +8861,7 @@ QLabel#favDialogPriceLabel {
             location_label="",
             description_text=str(row.get("producto_descripcion") or ""),
             origin_label="Legacy" if row.get("origen_legacy") else "Catalogo actual",
+            multicolor=multicolor_en_filas(self.catalog_snapshot_rows, row.get("producto_id")),
         )
 
     def _handle_add_lookup_to_quote(self) -> None:
@@ -10805,7 +10820,8 @@ QLabel#favDialogPriceLabel {
 
             def _render_label_offline(mode: str, requested_copies: int, show_price: bool | None = None) -> "object":
                 return render_inventory_label_from_cache_row(
-                    offline_render_state["row"], mode=mode, requested_copies=requested_copies, show_price=show_price,
+                    self._fila_con_multicolor(offline_render_state["row"]),
+                    mode=mode, requested_copies=requested_copies, show_price=show_price,
                 )
 
             def _load_context_offline(idx: int) -> "InventoryLabelContext":

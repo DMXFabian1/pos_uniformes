@@ -676,7 +676,9 @@ class QuickSaleWidget(QWidget):
         else:
             base_item = {
                 "sku": snap.sku,
-                "nombre": snap.product_name,
+                # Con color si su producto tiene varios (Short Deportivo Rojo):
+                # de aquí lo toman el ticket, la Libreta y la demanda.
+                "nombre": getattr(snap, "sale_name", snap.product_name),
                 "talla": snap.size_label,
                 "color": snap.color_label,
                 "precio": snap.price,

@@ -55,10 +55,13 @@ def _build_fake_variante_from_cache_row(row: dict) -> SimpleNamespace:
         categoria=SimpleNamespace(nombre=str(row.get("categoria_nombre") or "")),
         tipo_prenda=SimpleNamespace(nombre=str(row.get("tipo_prenda_nombre") or "")),
         escudo=None,
+        # Lo pone quien llama (tiene el catálogo completo); sin dato, un color.
+        multicolor=bool(row.get("producto_multicolor", False)),
     )
     return SimpleNamespace(
         sku=str(row["sku"]),
         talla=str(row.get("talla") or ""),
+        color=str(row.get("color") or ""),
         precio_venta=Decimal(str(row.get("precio_venta") or "0")),
         producto=producto,
     )

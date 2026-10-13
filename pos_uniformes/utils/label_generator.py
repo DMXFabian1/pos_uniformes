@@ -268,12 +268,15 @@ class LabelGenerator:
 
     @classmethod
     def _label_title(cls, variante: Variante) -> str:
+        from pos_uniformes.services.nombre_con_color_service import nombre_de_variante
+
         producto = variante.producto
         preferred_name = getattr(producto, "nombre_base", "") or getattr(producto, "nombre", "")
         title = cls._clean_name(preferred_name, variante.talla)
-        if title:
-            return title
-        return cls._clean_name(getattr(producto, "nombre", ""), variante.talla)
+        if not title:
+            title = cls._clean_name(getattr(producto, "nombre", ""), variante.talla)
+        # Producto de varios colores: la etiqueta dice cuál (Short Deportivo Rojo).
+        return nombre_de_variante(variante, title)
 
     @staticmethod
     def _clean_name(nombre: str, talla: str) -> str:

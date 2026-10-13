@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
 from pos_uniformes.database.models import Producto, Variante
+from pos_uniformes.services.nombre_con_color_service import multicolor_de_producto
 
 
 @dataclass(frozen=True)
@@ -25,6 +26,15 @@ class QuoteKioskLookupSnapshot:
     location_label: str
     description_text: str
     origin_label: str
+    #: El producto tiene más de un color: el nombre visible lleva el color.
+    multicolor: bool = False
+
+    @property
+    def sale_name(self) -> str:
+        """Nombre para carrito, ticket y Libreta (con color si hace falta)."""
+        from pos_uniformes.services.nombre_con_color_service import nombre_con_color
+
+        return nombre_con_color(self.product_name, self.color_label, multicolor=self.multicolor)
 
 
 def load_quote_kiosk_lookup_snapshot(session, *, sku: str) -> QuoteKioskLookupSnapshot:
@@ -61,4 +71,5 @@ def load_quote_kiosk_lookup_snapshot(session, *, sku: str) -> QuoteKioskLookupSn
         location_label=str(product.ubicacion or "Sin ubicacion"),
         description_text=str(product.descripcion or ""),
         origin_label="Legacy" if bool(variant.origen_legacy) else "Catalogo actual",
+        multicolor=multicolor_de_producto(product),
     )
