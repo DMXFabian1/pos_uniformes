@@ -2224,6 +2224,16 @@ class EmpleadaEvento(Base):
     fecha: Mapped[date] = mapped_column(Date, nullable=False, index=True)
     tipo: Mapped[str] = mapped_column(String(20), nullable=False)
     nota: Mapped[str | None] = mapped_column(String(200))
+    #: La solicitud de descanso que produjo este evento (al aprobarla). Quitar
+    #: el evento desde el calendario revoca la solicitud: nunca queda una
+    #: aprobación huérfana ni un evento sin explicación.
+    solicitud_id: Mapped[int | None] = mapped_column(
+        ForeignKey("solicitud_descanso.id"), index=True
+    )
+    #: Igual, para los días de vacaciones (tipo "vacaciones").
+    vacacion_id: Mapped[int | None] = mapped_column(
+        ForeignKey("solicitud_vacaciones.id"), index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -2427,8 +2437,11 @@ class SolicitudDescanso(Base):
     __tablename__ = "solicitud_descanso"
     __table_args__ = (
         CheckConstraint(
-            "estado IN ('pedido', 'aprobado', 'rechazado', 'cancelado')",
+            "estado IN ('pedido', 'aprobado', 'rechazado', 'cancelado', 'vencido', 'revocado')",
             name="solicitud_descanso_estado_valido",
+        ),
+        CheckConstraint(
+            "tipo IN ('cambio', 'intercambio')", name="solicitud_descanso_tipo_valido"
         ),
     )
 
@@ -2442,6 +2455,181 @@ class SolicitudDescanso(Base):
     resuelto_por: Mapped[str | None] = mapped_column(String(40))
     resuelto_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     respuesta: Mapped[str | None] = mapped_column(String(200))
+    #: "cambio" (mueve su descanso de esa semana) o "intercambio" (dos
+    #: compañeras se cambian el día; ambas aceptan y Daniel aprueba).
+    tipo: Mapped[str] = mapped_column(String(20), nullable=False, default="cambio", server_default="cambio")
+    #: kiosko | calendario | telegram | movil | admin
+    origen: Mapped[str | None] = mapped_column(String(20))
+    #: El día de descanso que ella deja (pasa a trabajo al aprobar).
+    fecha_fijo: Mapped[date | None] = mapped_column(Date)
+    #: Intercambio: la compañera, el día que ella pasa a descansar y cuándo aceptó.
+    companera_code: Mapped[str | None] = mapped_column(String(40), index=True)
+    companera_name: Mapped[str | None] = mapped_column(String(120))
+    fecha_companera: Mapped[date | None] = mapped_column(Date)
+    companera_acepto_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: Cuándo vio ella la respuesta en la Libreta (None = todavía no).
+    avisada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    companera_avisada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    ultimo_recordatorio_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    recordatorios: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class AuditoriaAusencias(Base):
+    """Bitácora de todo lo que mueve descansos: quién, cuándo, desde dónde,
+    qué había antes y qué quedó. Solo se agrega; nunca se edita ni se borra."""
+
+    __tablename__ = "auditoria_ausencias"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    actor: Mapped[str] = mapped_column(String(40), nullable=False)
+    origen: Mapped[str] = mapped_column(String(20), nullable=False)
+    operacion: Mapped[str] = mapped_column(String(40), nullable=False)
+    entidad: Mapped[str] = mapped_column(String(40), nullable=False)
+    entidad_id: Mapped[int | None] = mapped_column(Integer)
+    solicitud_id: Mapped[int | None] = mapped_column(Integer, index=True)
+    employee_code: Mapped[str | None] = mapped_column(String(40), index=True)
+    antes: Mapped[dict | None] = mapped_column(JSON().with_variant(JSONB(), "postgresql"))
+    despues: Mapped[dict | None] = mapped_column(JSON().with_variant(JSONB(), "postgresql"))
+    motivo: Mapped[str | None] = mapped_column(String(200))
+
+
+class ExpedienteVacacional(Base):
+    """Fecha de ingreso de la empleada, capturada por Daniel. Sin esto no hay
+    vacaciones: el saldo nunca se infiere de datos incompletos."""
+
+    __tablename__ = "expediente_vacacional"
+
+    employee_code: Mapped[str] = mapped_column(String(40), primary_key=True)
+    fecha_ingreso: Mapped[date] = mapped_column(Date, nullable=False)
+    #: Antigüedad reconocida si es anterior al ingreso; None = desde el ingreso.
+    antiguedad_desde: Mapped[date | None] = mapped_column(Date)
+    #: Contrato o condición más favorable que la ley: el cálculo automático
+    #: no se aplica sin que alguien lo revise.
+    condiciones_especiales: Mapped[str | None] = mapped_column(String(300))
+    #: ¿Puede pedirlas ella desde su Libreta? Arranca en NO: Daniel las
+    #: gestiona y lo abre una por una cuando vea que todo va bien.
+    autoservicio: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    capturado_por: Mapped[str] = mapped_column(String(40), nullable=False)
+    nota: Mapped[str | None] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class PeriodoVacaciones(Base):
+    """Un año de servicio cumplido y los días que le corresponden (LFT art. 76)."""
+
+    __tablename__ = "periodo_vacaciones"
+    __table_args__ = (
+        UniqueConstraint("employee_code", "anio_servicio", name="uq_periodo_vacaciones_anio"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_code: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    anio_servicio: Mapped[int] = mapped_column(Integer, nullable=False)
+    aniversario: Mapped[date] = mapped_column(Date, nullable=False)
+    #: Hasta cuándo deben concederse (LFT art. 81: seis meses tras el aniversario).
+    fecha_limite: Mapped[date] = mapped_column(Date, nullable=False)
+    dias_correspondientes: Mapped[int] = mapped_column(Integer, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class SolicitudVacaciones(Base):
+    """Vacaciones pedidas. Al aprobarse reservan días y se pintan en el
+    calendario; al pasar los días se consumen; cancelar o revocar devuelve lo
+    que no se disfrutó."""
+
+    __tablename__ = "solicitud_vacaciones"
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('pedido', 'aprobado', 'rechazado', 'cancelado', 'vencido', 'revocado')",
+            name="solicitud_vacaciones_estado_valido",
+        ),
+        CheckConstraint("hasta >= desde AND dias > 0", name="solicitud_vacaciones_rango"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_code: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    employee_name: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    periodo_id: Mapped[int] = mapped_column(ForeignKey("periodo_vacaciones.id"), nullable=False)
+    desde: Mapped[date] = mapped_column(Date, nullable=False)
+    hasta: Mapped[date] = mapped_column(Date, nullable=False)
+    #: Días LABORABLES del rango (sus descansos no cuentan).
+    dias: Mapped[int] = mapped_column(Integer, nullable=False)
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="pedido", index=True)
+    motivo: Mapped[str | None] = mapped_column(String(200))
+    origen: Mapped[str | None] = mapped_column(String(20))
+    resuelto_por: Mapped[str | None] = mapped_column(String(40))
+    resuelto_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    respuesta: Mapped[str | None] = mapped_column(String(200))
+    #: Prima vacacional estimada al aprobar (LFT art. 80). Pagarla todavía no
+    #: pasa por la nómina del POS: queda como dato para Daniel.
+    prima_estimada: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    #: Cuándo vio ella la respuesta en la Libreta.
+    avisada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class PrimaVacacional(Base):
+    """La prima de vacaciones de una solicitud (LFT art. 80). La nómina del
+    POS no la paga sola: queda PENDIENTE hasta que Daniel la marca pagada.
+    Una por solicitud (único), así no se registra ni se paga dos veces."""
+
+    __tablename__ = "prima_vacacional"
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('pendiente', 'pagada', 'cancelada')", name="prima_vacacional_estado_valido"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    solicitud_id: Mapped[int] = mapped_column(
+        ForeignKey("solicitud_vacaciones.id"), nullable=False, unique=True
+    )
+    employee_code: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    dias: Mapped[int] = mapped_column(Integer, nullable=False)
+    salario_diario: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    porcentaje: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+    monto: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="pendiente", index=True)
+    pagada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    pagada_por: Mapped[str | None] = mapped_column(String(40))
+    nota: Mapped[str | None] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class MovimientoVacaciones(Base):
+    """El saldo de vacaciones es la SUMA de estos renglones; nunca se edita."""
+
+    __tablename__ = "movimiento_vacaciones"
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('generacion', 'reserva', 'liberacion', 'consumo', 'ajuste')",
+            name="movimiento_vacaciones_tipo_valido",
+        ),
+        CheckConstraint("tipo = 'ajuste' OR dias > 0", name="movimiento_vacaciones_dias_positivos"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_code: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    periodo_id: Mapped[int] = mapped_column(ForeignKey("periodo_vacaciones.id"), nullable=False, index=True)
+    solicitud_id: Mapped[int | None] = mapped_column(ForeignKey("solicitud_vacaciones.id"))
+    tipo: Mapped[str] = mapped_column(String(20), nullable=False)
+    dias: Mapped[int] = mapped_column(Integer, nullable=False)
+    actor: Mapped[str] = mapped_column(String(40), nullable=False)
+    motivo: Mapped[str | None] = mapped_column(String(200))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

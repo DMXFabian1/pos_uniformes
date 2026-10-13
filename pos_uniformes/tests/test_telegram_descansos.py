@@ -158,3 +158,66 @@ class ElBotonDeRegresoTests(unittest.TestCase):
 
         aviso, _, _ = tds.atender("dc:ok:", session_factory=factory, quien="VEND-1")
         self.assertEqual(aviso, "No conozco ese botón")
+
+
+class BotonViejoTests(unittest.TestCase):
+    """14: un botón de un aviso viejo no puede decidir algo ya decidido, ni
+    aprobar un día que ya pasó. Se prueba contra la base, no contra el texto."""
+
+    def setUp(self) -> None:
+        from datetime import timedelta
+
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from pos_uniformes.database.connection import Base
+        from pos_uniformes.database.models import Empleada, EmpleadaHorario
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        self.factory = sessionmaker(bind=engine)
+        with self.factory() as s:
+            s.add(Empleada(codigo="VEND-5", nombre_completo="Cristal Torres", activo=True))
+            s.add(EmpleadaHorario(employee_code="VEND-5", descanso_weekday=6))
+            s.commit()
+            hoy = date.today()
+            # Un miércoles a 8-14 días: siempre con anticipación y en semana con domingo.
+            dia = hoy + timedelta(days=8)
+            while dia.weekday() != 2:
+                dia += timedelta(days=1)
+            sol = ds.pedir(s, employee_code="VEND-5", nombre="Cristal Torres", fecha=dia,
+                           motivo="Escuela", hoy=hoy)
+            s.commit()
+            self.sid = sol.id
+
+    def _eventos(self) -> int:
+        from pos_uniformes.database.models import EmpleadaEvento
+
+        with self.factory() as s:
+            return s.query(EmpleadaEvento).count()
+
+    def _estado(self) -> str:
+        from pos_uniformes.database.models import SolicitudDescanso
+
+        with self.factory() as s:
+            return s.get(SolicitudDescanso, self.sid).estado
+
+    def test_aprobar_desde_un_aviso_ya_rechazado_no_hace_nada(self) -> None:
+        from pos_uniformes.services import telegram_descansos_service as tds
+
+        aviso, _t, _b = tds.atender(f"dc:no:{self.sid}", session_factory=self.factory, quien="VEND-1")
+        self.assertEqual(aviso, "Rechazado")
+        aviso, _t, _b = tds.atender(f"dc:ok:{self.sid}", session_factory=self.factory, quien="VEND-1")
+        self.assertIn("ya está rechazado", aviso)
+        self.assertEqual(self._estado(), ds.RECHAZADO)
+        self.assertEqual(self._eventos(), 0)
+
+    def test_dos_toques_en_dárselo_aplican_una_vez(self) -> None:
+        from pos_uniformes.services import telegram_descansos_service as tds
+
+        tds.atender(f"dc:ok:{self.sid}", session_factory=self.factory, quien="VEND-1")
+        n = self._eventos()
+        aviso, _t, _b = tds.atender(f"dc:ok:{self.sid}", session_factory=self.factory, quien="VEND-1")
+        self.assertIn("ya está aprobado", aviso)
+        self.assertEqual(self._eventos(), n)
+        self.assertEqual(n, 2)   # el descanso y el domingo que pasa a trabajo

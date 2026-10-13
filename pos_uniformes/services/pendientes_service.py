@@ -126,6 +126,8 @@ def pendientes_del_dia(session, hoy: date | None = None, ahora: datetime | None 
         estado = estado_del_dia(h, hoy)
         if estado == DESCANSO:
             salida.append(Pendiente(DESCANSO_HOY, code, e.nombre_completo, f"{nombre} descansa hoy"))
+        elif estado == "vacaciones":
+            salida.append(Pendiente(DESCANSO_HOY, code, e.nombre_completo, f"{nombre} está de vacaciones"))
         elif (
             estado == TRABAJO
             and h.configurado  # sin horario no se adivina nada

@@ -71,6 +71,8 @@ AYUDA = (
     "/deshacerpago — deshace el último pago\n"
     "/prestamos — los préstamos que te pidieron, para aprobar o rechazar\n"
     "/descansos — los días que te pidieron, con cómo queda la semana\n"
+    "/receso 2026-10-27 2026-11-04 — tus vacaciones: el calendario lo dice\n"
+    "   y tu martes deja de ocupar el cupo · /receso quitar\n"
     "/sonidos — los sonidos que puede hacer un aviso\n"
     "\nLA TIENDA\n"
     "/prenda playera justo sierra — precio y cuántas hay por talla\n"
@@ -418,6 +420,28 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
 
         with session_factory() as session:
             return dsc.texto_y_botones(session, hoy=hoy)[0]
+    if cmd.nombre in ("vacaciones", "primas", "ingreso") and _vacaciones_en_obra():
+        from pos_uniformes.services import vacaciones_service as vs
+
+        return vs.EN_CONSTRUCCION_TEXTO
+    if cmd.nombre == "receso":
+        with session_factory() as session:
+            return _receso(session, cmd.argumento, hoy=hoy)
+    if cmd.nombre == "vacaciones":
+        from pos_uniformes.services import telegram_vacaciones_service as vac
+
+        with session_factory() as session:
+            return vac.comando(session, cmd.argumento, quien=CODIGO_REMOTO)
+    if cmd.nombre == "primas":
+        from pos_uniformes.services import telegram_vacaciones_service as vac
+
+        with session_factory() as session:
+            return vac.primas(session)[0]
+    if cmd.nombre == "ingreso":
+        from pos_uniformes.services import telegram_vacaciones_service as vac
+
+        with session_factory() as session:
+            return vac.ingreso(session, cmd.argumento, quien=CODIGO_REMOTO)
     if cmd.nombre == "pagos":
         from pos_uniformes.services import telegram_pagos_service as pg
 
@@ -487,6 +511,8 @@ _CON_BOTONES = {
     "cajón": ("pos_uniformes.services.telegram_cajon_service", "texto_y_botones"),
     "prestamos": ("pos_uniformes.services.telegram_prestamos_service", "texto_y_botones"),
     "descansos": ("pos_uniformes.services.telegram_descansos_service", "texto_y_botones"),
+    "primas": ("pos_uniformes.services.telegram_vacaciones_service", "primas"),
+    "vacaciones": ("pos_uniformes.services.telegram_vacaciones_service", "con_botones"),
     "préstamos": ("pos_uniformes.services.telegram_prestamos_service", "texto_y_botones"),
     "menu": ("pos_uniformes.services.telegram_menu_service", "menu_raiz"),
     "menú": ("pos_uniformes.services.telegram_menu_service", "menu_raiz"),
@@ -512,6 +538,52 @@ def _corte_solo_con_nota(argumento: str) -> str:
     return o.nota
 
 
+def _vacaciones_en_obra() -> bool:
+    from pos_uniformes.services import vacaciones_service as vs
+
+    return bool(vs.EN_CONSTRUCCION)
+
+
+def _receso(session, argumento: str, *, hoy: date | None = None) -> str:
+    """`/receso 2026-10-27 2026-11-04` apunta las vacaciones de Daniel en el
+    calendario; `/receso quitar` las borra; `/receso` solo las enseña.
+
+    Es lo único de vacaciones que sí se usa mientras el módulo está en
+    construcción (Daniel, 2026-10-13: «solo sí dejar mi periodo vacacional
+    claro»). Esos días su martes no cuenta en el cupo de las muchachas y el
+    calendario y los pendientes dicen «Daniel (vacaciones)».
+    """
+    from pos_uniformes.services import calendario_empleadas_service as cal
+
+    arg = (argumento or "").strip().lower()
+    if arg in ("quitar", "borrar", "no"):
+        n = cal.quitar_receso(session, CODIGO_REMOTO, actor=CODIGO_REMOTO, origen="telegram")
+        return "No había receso apuntado." if not n else f"Listo, quité tu receso ({n} días)."
+    if arg:
+        partes = arg.split()
+        if len(partes) != 2:
+            return "Así: /receso 2026-10-27 2026-11-04 (desde y hasta), o /receso quitar"
+        try:
+            desde, hasta = (date.fromisoformat(x) for x in partes)
+        except ValueError:
+            return "No entendí las fechas. Así: /receso 2026-10-27 2026-11-04"
+        if hasta < desde:
+            return "La segunda fecha va después de la primera."
+        if (hasta - desde).days > 60:
+            return "Más de 60 días no parece un receso. Revísalo."
+        cal.marcar_receso(session, CODIGO_REMOTO, desde, hasta, actor=CODIGO_REMOTO, origen="telegram")
+    dias = cal.receso_de(session, CODIGO_REMOTO)
+    if not dias:
+        return "No tienes receso apuntado. Así: /receso 2026-10-27 2026-11-04"
+    hoy = hoy or date.today()
+    estado = "ya pasó" if dias[-1] < hoy else ("va corriendo" if dias[0] <= hoy else f"empieza en {(dias[0] - hoy).days} días")
+    return (
+        f"🏖️ Tu receso: del {dias[0]:%d/%m/%Y} al {dias[-1]:%d/%m/%Y} ({len(dias)} días, {estado}).\n"
+        "Esos días tu martes no ocupa el cupo de las muchachas y el calendario lo dice.\n"
+        "/receso quitar lo borra."
+    )
+
+
 def responder(texto: str, *, session_factory, hoy: date | None = None) -> tuple[str, str]:
     """(respuesta, botones) para un mensaje. Es lo que usa el bucle del bot.
 
@@ -533,6 +605,8 @@ def responder(texto: str, *, session_factory, hoy: date | None = None) -> tuple[
                 retiro, _ = crs.cifras_de_propuesta(session)
             return cb.preguntar_por_la_nota(nota, retiro)
     destino = _CON_BOTONES.get(cmd.nombre) if cmd is not None else None
+    if destino is not None and cmd.nombre in ("vacaciones", "primas") and _vacaciones_en_obra():
+        destino = None
     if destino is None:
         return atender_texto(texto, session_factory=session_factory, hoy=hoy), ""
     modulo, funcion = destino
@@ -658,6 +732,15 @@ def atender_toque(
 
     if dsc.es_de_descansos(dato):
         return dsc.atender(dato, session_factory=session_factory, quien=CODIGO_REMOTO)
+
+    from pos_uniformes.services import telegram_vacaciones_service as vac
+
+    if vac.es_de_vacaciones(dato):
+        if _vacaciones_en_obra():
+            from pos_uniformes.services import vacaciones_service as vs
+
+            return vs.EN_CONSTRUCCION_TEXTO, "", ""
+        return vac.atender(dato, session_factory=session_factory, quien=CODIGO_REMOTO)
 
     toque = asis.interpretar_toque(dato)
     if toque is None:

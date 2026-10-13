@@ -25,6 +25,9 @@ TRABAJO = "trabajo"
 DESCANSO = "descanso"
 FALTA = "falta"
 PAGO = "pago"
+#: De vacaciones (módulo vacaciones_service). Pagado, no trabajado, y no es
+#: descanso: no cuenta para mover descansos ni para el tope de cambios.
+VACACIONES = "vacaciones"
 
 MODO_SEMANA = "semana"     # sueldo fijo, un descanso a la semana
 MODO_POR_DIA = "por_dia"   # solo ciertos días; cobra por día trabajado
@@ -42,6 +45,10 @@ class HorarioEmpleada:
     modo_pago: str = MODO_SEMANA
     # Modo por_dia: weekdays que trabaja (p.ej. [5, 6] = sábado y domingo).
     dias_trabajo: list[int] = field(default_factory=list)
+    # Días en que se registró un pago. Va aparte de `eventos` porque un día
+    # puede tener pago Y otra marca (le pagaron el día que descansó): en un
+    # solo dict uno pisaba al otro según el orden en que llegaran de la base.
+    pagos: set[date] = field(default_factory=set)
 
     @property
     def por_dia(self) -> bool:
@@ -70,13 +77,32 @@ def estado_del_dia(horario: HorarioEmpleada, dia: date) -> str:
     if evento == PAGO:
         # El pago se cobra en un día trabajado; se pinta como pago.
         return PAGO
-    if evento in (FALTA, DESCANSO, TRABAJO):
+    if evento == VACACIONES:
+        return VACACIONES
+    if evento in (FALTA, DESCANSO):
+        # Faltó o descansó aunque ese día se le haya pagado: el pago no la
+        # vuelve día trabajado (ni le quita la falta a la nómina).
         return evento
+    if evento == TRABAJO:
+        return PAGO if dia in horario.pagos else TRABAJO
     if horario.por_dia:
         return TRABAJO if dia.weekday() in horario.dias_trabajo else DESCANSO
     if horario.descanso_weekday is not None and dia.weekday() == horario.descanso_weekday:
         return DESCANSO
     return TRABAJO
+
+
+def es_descanso_efectivo(horario: HorarioEmpleada, dia: date) -> bool:
+    """¿Ese día descansa, de verdad? Como `estado_del_dia`, salvo que un pago
+    registrado en su día de descanso fijo no le quita el descanso (se pinta
+    "pago", pero no vino a trabajar). Es lo que se usa para contar los
+    descansos de una semana."""
+    estado = estado_del_dia(horario, dia)
+    if estado == DESCANSO:
+        return True
+    if estado == PAGO and horario.eventos.get(dia) == PAGO and not horario.por_dia:
+        return horario.descanso_weekday is not None and dia.weekday() == horario.descanso_weekday
+    return False
 
 
 def es_dia_trabajado(horario: HorarioEmpleada, dia: date) -> bool:
@@ -226,7 +252,12 @@ def cargar_horario(session, employee_code: str) -> HorarioEmpleada:
         .all()
     )
     for ev in filas:
-        horario.eventos[ev.fecha] = ev.tipo
+        if ev.tipo == PAGO:
+            horario.pagos.add(ev.fecha)
+            # El pago solo ocupa el día si no hay otra marca: la marca manda.
+            horario.eventos.setdefault(ev.fecha, PAGO)
+        else:
+            horario.eventos[ev.fecha] = ev.tipo
     return horario
 
 
@@ -267,27 +298,61 @@ _NOTA_DESCANSO_MOVIDO = "descanso movido al "
 
 
 def marcar_dia(
-    session, employee_code: str, fecha: date, tipo: str, *, nota: str | None = None
+    session, employee_code: str, fecha: date, tipo: str, *, nota: str | None = None,
+    commit: bool = True, actor: str | None = None, origen: str = "admin",
 ) -> None:
     """Marca el día (falta/descanso/trabajo); reemplaza la marca previa.
+
+    Es el camino ADMINISTRATIVO (el dueño, el encargado, Telegram): apunta lo
+    que pasó o lo que se decidió, también en días pasados, y queda en la
+    bitácora. Lo que piden las empleadas va por `descansos_service`.
 
     Un descanso en un día que no es el suyo **mueve** el descanso de esa
     semana: el fijo pasa a "trabaja" (Daniel, 2026-09-13: "faltó, pero
     tomamos ese día como descanso" — no es falta, y no descansa dos veces).
+
+    Si el día tenía un evento de una solicitud aprobada, la solicitud se
+    revoca primero (ver `quitar_marca`).
     """
     code = str(employee_code).strip().upper()
-    quitar_marca(session, code, fecha, commit=False)
+    if tipo not in (FALTA, DESCANSO, TRABAJO):
+        raise ValueError(f"tipo inválido: {tipo!r}")
+    antes = cargar_horario(session, code).eventos.get(fecha)
+    quitar_marca(session, code, fecha, commit=False, actor=actor, origen=origen, auditar=False)
     from pos_uniformes.database.models import EmpleadaEvento
 
     session.add(EmpleadaEvento(employee_code=code, fecha=fecha, tipo=tipo, nota=nota))
+    movidos: list[date] = []
     if tipo == DESCANSO:
         session.flush()
         for otro in _otros_descansos_fijos_de_la_semana(session, code, fecha):
+            movidos.append(otro)
             session.add(EmpleadaEvento(
                 employee_code=code, fecha=otro, tipo=TRABAJO,
                 nota=f"{_NOTA_DESCANSO_MOVIDO}{fecha.strftime('%d/%m')}",
             ))
-    session.commit()
+    _auditar(
+        session, actor=actor, origen=origen, operacion="marcar_dia", code=code,
+        antes={"fecha": fecha.isoformat(), "tipo": antes},
+        despues={"fecha": fecha.isoformat(), "tipo": tipo,
+                 "fijo_movido_a_trabajo": [d.isoformat() for d in movidos]},
+        motivo=nota,
+    )
+    if commit:
+        session.commit()
+    else:
+        session.flush()
+
+
+def _auditar(session, *, actor, origen, operacion, code, antes=None, despues=None,
+             motivo=None, solicitud_id=None) -> None:
+    from pos_uniformes.services.auditoria_ausencias_service import registrar
+
+    registrar(
+        session, actor=actor, origen=origen, operacion=operacion,
+        entidad="empleada_evento", employee_code=code, antes=antes, despues=despues,
+        motivo=motivo, solicitud_id=solicitud_id,
+    )
 
 
 def _otros_descansos_fijos_de_la_semana(session, code: str, fecha: date) -> list[date]:
@@ -306,10 +371,128 @@ def _otros_descansos_fijos_de_la_semana(session, code: str, fecha: date) -> list
     return out
 
 
-def quitar_marca(session, employee_code: str, fecha: date, *, commit: bool = True) -> None:
+_NOTA_RECESO = "receso del dueño"
+
+
+def marcar_receso(
+    session, employee_code: str, desde: date, hasta: date, *, actor: str | None = None,
+    origen: str = "admin", commit: bool = True,
+) -> int:
+    """Apunta las vacaciones del dueño: un evento VACACIONES por día, de
+    `desde` a `hasta`. Reemplaza el receso anterior si había. Esos días
+    `estado_del_dia` no es DESCANSO, así que su día fijo deja de contar en el
+    cupo de las muchachas, y el calendario y los pendientes lo dicen.
+
+    Va aparte del módulo de vacaciones (que sigue en construcción): no toca
+    expedientes, saldos ni primas. Devuelve cuántos días quedaron."""
     from pos_uniformes.database.models import EmpleadaEvento
 
     code = str(employee_code).strip().upper()
+    if hasta < desde:
+        raise ValueError("hasta va después de desde")
+    antes = receso_de(session, code)
+    quitar_receso(session, code, actor=actor, origen=origen, commit=False, auditar=False)
+    dias: list[date] = []
+    d = desde
+    while d <= hasta:
+        quitar_marca(session, code, d, commit=False, actor=actor, origen=origen, auditar=False)
+        session.add(EmpleadaEvento(employee_code=code, fecha=d, tipo=VACACIONES, nota=_NOTA_RECESO))
+        dias.append(d)
+        d += timedelta(days=1)
+    _auditar(
+        session, actor=actor, origen=origen, operacion="marcar_receso", code=code,
+        antes={"desde": antes[0].isoformat(), "hasta": antes[-1].isoformat()} if antes else None,
+        despues={"desde": desde.isoformat(), "hasta": hasta.isoformat(), "dias": len(dias)},
+    )
+    if commit:
+        session.commit()
+    else:
+        session.flush()
+    return len(dias)
+
+
+def receso_de(session, employee_code: str) -> list[date]:
+    """Los días apuntados como receso, en orden."""
+    from pos_uniformes.database.models import EmpleadaEvento
+
+    code = str(employee_code).strip().upper()
+    return sorted(
+        f for (f,) in session.query(EmpleadaEvento.fecha).filter(
+            EmpleadaEvento.employee_code == code,
+            EmpleadaEvento.tipo == VACACIONES,
+            EmpleadaEvento.nota == _NOTA_RECESO,
+        ).all()
+    )
+
+
+def quitar_receso(
+    session, employee_code: str, *, actor: str | None = None, origen: str = "admin",
+    commit: bool = True, auditar: bool = True,
+) -> int:
+    """Borra el receso apuntado (solo los días con la nota del receso)."""
+    from pos_uniformes.database.models import EmpleadaEvento
+
+    code = str(employee_code).strip().upper()
+    antes = receso_de(session, code)
+    n = session.query(EmpleadaEvento).filter(
+        EmpleadaEvento.employee_code == code,
+        EmpleadaEvento.tipo == VACACIONES,
+        EmpleadaEvento.nota == _NOTA_RECESO,
+    ).delete()
+    if auditar and n:
+        _auditar(
+            session, actor=actor, origen=origen, operacion="quitar_receso", code=code,
+            antes={"desde": antes[0].isoformat(), "hasta": antes[-1].isoformat()}, despues=None,
+        )
+    if commit:
+        session.commit()
+    else:
+        session.flush()
+    return n
+
+
+def quitar_marca(
+    session, employee_code: str, fecha: date, *, commit: bool = True,
+    actor: str | None = None, origen: str = "admin", auditar: bool = True,
+) -> None:
+    """Quita la marca del día (nunca el pago) y regresa el fijo si se había movido.
+
+    Si la marca la puso una solicitud aprobada, no se borra a escondidas: se
+    REVOCA la solicitud completa (sus eventos de ese día y el fijo que movió),
+    y queda en la bitácora. Así la aprobación nunca apunta a un evento que ya
+    no existe."""
+    from pos_uniformes.database.models import EmpleadaEvento
+
+    code = str(employee_code).strip().upper()
+    ligadas = {
+        sid for (sid,) in session.query(EmpleadaEvento.solicitud_id).filter(
+            EmpleadaEvento.employee_code == code,
+            EmpleadaEvento.fecha == fecha,
+            EmpleadaEvento.solicitud_id.isnot(None),
+        ).all()
+    }
+    if ligadas:
+        from pos_uniformes.services import descansos_service as ds
+
+        for sid in sorted(ligadas):
+            ds.revocar(
+                session, sid, quien=actor or "sistema", origen=origen,
+                motivo=f"se cambió el {fecha:%d/%m} desde el calendario",
+                permitir_periodo_pagado=True,
+            )
+    vacaciones = {
+        vid for (vid,) in session.query(EmpleadaEvento.vacacion_id).filter(
+            EmpleadaEvento.employee_code == code,
+            EmpleadaEvento.fecha == fecha,
+            EmpleadaEvento.vacacion_id.isnot(None),
+        ).all()
+    }
+    if vacaciones:
+        from pos_uniformes.services import vacaciones_service as vs
+
+        for vid in sorted(vacaciones):
+            vs.revocar_por_calendario(session, vid, quien=actor or "sistema", fecha=fecha)
+    antes = cargar_horario(session, code).eventos.get(fecha) if auditar else None
     # Si lo que se quita es un descanso que movió el fijo, el fijo vuelve.
     session.query(EmpleadaEvento).filter(
         EmpleadaEvento.employee_code == code,
@@ -323,8 +506,15 @@ def quitar_marca(session, employee_code: str, fecha: date, *, commit: bool = Tru
         EmpleadaEvento.fecha == fecha,
         EmpleadaEvento.tipo != PAGO,  # el historial de pagos no se pisa al remarcar
     ).delete()
+    if auditar and antes not in (None, PAGO):
+        _auditar(
+            session, actor=actor, origen=origen, operacion="quitar_marca", code=code,
+            antes={"fecha": fecha.isoformat(), "tipo": antes}, despues=None,
+        )
     if commit:
         session.commit()
+    else:
+        session.flush()
 
 
 def registrar_pago(session, employee_code: str, fecha: date) -> None:
@@ -456,6 +646,11 @@ def chips_calendario_mes(session, year: int, month: int, hoy: date) -> dict[date
                 _agregar(fecha, PAGO, code)
             elif estado == FALTA:
                 _agregar(fecha, FALTA, code)
+            elif estado == VACACIONES:
+                # Se ve con los descansos (está fuera), marcado como vacaciones.
+                nombre = nombres.get(code, code)
+                if fecha.year == year and fecha.month == month:
+                    resultado.setdefault(fecha, []).append((DESCANSO, f"{nombre} (vacaciones)"))
         proximo = fecha_proximo_pago(horario, hoy)
         if proximo is not None and proximo not in horario.eventos:
             _agregar(proximo, PAGO, code)
@@ -466,6 +661,13 @@ def chips_calendario_mes(session, year: int, month: int, hoy: date) -> dict[date
 # 1) Cupo: máximo 1 empleada descansando por día.
 # 2) Anticipación: descansos y cambios se piden con 7 días.
 # 3) Intercambios: si ambas aceptan con gafete, quedan hechos solos.
+#
+# Desde 2026-10-12 la validación sigue aquí (pura, con los horarios que pasa
+# quien llama) y la APLICACIÓN la hace descansos_service en una sola
+# transacción, ligada a una solicitud y con bitácora. Correcciones mínimas
+# autorizadas por Daniel: D2 (el tope cuenta el mes del día que descansa y
+# borrar el día no devuelve el cambio), D3 (si la semana ya tiene dos
+# descansos no se mueve uno solo) y D4 (intercambio solo en la misma semana).
 
 ANTICIPACION_DIAS = 7
 CUPO_DESCANSOS_POR_DIA = 1
@@ -541,26 +743,29 @@ def aplicar_solicitud_descanso(
     code: str,
     fecha: date,
     hoy: date,
+    *,
+    nombre: str = "",
+    origen: str = "calendario",
 ) -> tuple[bool, str]:
     """Valida y aplica: el descanso de esa semana se MUEVE al día pedido
     (cuota de 1 por semana se cumple sola); si esa semana no tenía, se
-    otorga. Devuelve (ok, mensaje para la empleada)."""
-    code = str(code).strip().upper()
-    ok, motivo = validar_solicitud_descanso(horarios, code, fecha, hoy)
-    if not ok:
-        return False, motivo
-    tope = _valida_cuota_mensual(session, code, hoy)
-    if tope is not None:
-        return False, tope
-    propio = horarios.get(code) or HorarioEmpleada(employee_code=code)
-    viejo = descanso_en_semana(propio, fecha)
-    if viejo is not None and viejo != fecha:
-        marcar_dia(session, code, viejo, TRABAJO, nota="movió su descanso")
-    marcar_dia(session, code, fecha, DESCANSO, nota=_NOTA_PEDIDO)
-    if viejo is not None and viejo != fecha:
+    otorga. Devuelve (ok, mensaje para la empleada). Confirma todo junto o
+    nada (antes eran dos commits separados)."""
+    from pos_uniformes.services import descansos_service as ds
+
+    try:
+        s = ds.autoservicio(session, horarios, code, fecha, hoy, nombre=nombre, origen=origen)
+        session.commit()
+    except ds.NoSePuede as exc:
+        session.rollback()
+        return False, str(exc)
+    except Exception:
+        session.rollback()
+        raise
+    if s.fecha_fijo is not None and s.fecha_fijo != fecha:
         return True, (
             f"Listo: descansas el {fecha.strftime('%d/%b')} y trabajas el "
-            f"{viejo.strftime('%d/%b')} (tu descanso de esa semana se movió)."
+            f"{s.fecha_fijo.strftime('%d/%b')} (tu descanso de esa semana se movió)."
         )
     return True, f"Listo: descansas el {fecha.strftime('%d/%b')}."
 
@@ -585,6 +790,10 @@ def validar_intercambio(
             return False, (
                 f"Los cambios se piden con {ANTICIPACION_DIAS} días de anticipación."
             )
+    # D4 (2026-10-12): de semanas distintas, una se quedaba sin descanso una
+    # semana y la otra también, en la otra.
+    if _semana_de(fecha_a) != _semana_de(fecha_b):
+        return False, "Los dos días tienen que ser de la misma semana."
     ha, hb = horarios.get(code_a), horarios.get(code_b)
     if ha is None or estado_del_dia(ha, fecha_a) != DESCANSO:
         return False, f"El {fecha_a.strftime('%d/%b')} no es descanso de {code_a}."
@@ -601,25 +810,73 @@ def aplicar_intercambio(
     code_b: str,
     fecha_b: date,
     hoy: date,
+    *,
+    nombre_a: str = "",
+    nombre_b: str = "",
+    origen: str = "calendario",
 ) -> tuple[bool, str]:
-    """Intercambio directo (suma cero: el cupo por día no cambia)."""
-    ok, motivo = validar_intercambio(horarios, code_a, fecha_a, code_b, fecha_b, hoy)
-    if not ok:
-        return False, motivo
+    """Intercambio directo (suma cero: el cupo por día no cambia). Las cuatro
+    marcas van en una sola transacción: o queda completo o no queda nada."""
+    from pos_uniformes.services import descansos_service as ds
+
+    try:
+        ds.intercambio_directo(
+            session, horarios, code_a, fecha_a, code_b, fecha_b, hoy,
+            nombre_a=nombre_a, nombre_b=nombre_b, origen=origen,
+        )
+        session.commit()
+    except ds.NoSePuede as exc:
+        session.rollback()
+        return False, str(exc)
+    except Exception:
+        session.rollback()
+        raise
     code_a = str(code_a).strip().upper()
     code_b = str(code_b).strip().upper()
-    for code in (code_a, code_b):
-        tope = _valida_cuota_mensual(session, code, hoy)
-        if tope is not None:
-            return False, f"{code}: {tope}"
-    marcar_dia(session, code_a, fecha_a, TRABAJO, nota=f"intercambio con {code_b}")
-    marcar_dia(session, code_a, fecha_b, DESCANSO, nota=f"intercambio con {code_b}")
-    marcar_dia(session, code_b, fecha_b, TRABAJO, nota=f"intercambio con {code_a}")
-    marcar_dia(session, code_b, fecha_a, DESCANSO, nota=f"intercambio con {code_a}")
     return True, (
         f"Hecho: {code_a} descansa el {fecha_b.strftime('%d/%b')} y "
         f"{code_b} el {fecha_a.strftime('%d/%b')}."
     )
+
+
+def origen_del_dia(session, employee_code: str, fecha: date) -> str:
+    """De dónde sale lo que el calendario pinta ese día, en palabras."""
+    from pos_uniformes.database.models import (
+        EmpleadaEvento, SolicitudDescanso, SolicitudVacaciones,
+    )
+
+    code = str(employee_code).strip().upper()
+    horario = cargar_horario(session, code)
+    eventos = session.query(EmpleadaEvento).filter(
+        EmpleadaEvento.employee_code == code, EmpleadaEvento.fecha == fecha
+    ).all()
+    partes: list[str] = []
+    for ev in eventos:
+        if ev.tipo == PAGO:
+            partes.append("💵 pago registrado")
+            continue
+        texto = {VACACIONES: "🏖️ vacaciones", DESCANSO: "🛌 descanso", FALTA: "✗ falta",
+                 TRABAJO: "trabaja"}.get(ev.tipo, ev.tipo)
+        if ev.vacacion_id:
+            sv = session.get(SolicitudVacaciones, ev.vacacion_id)
+            texto += f" — solicitud de vacaciones #{ev.vacacion_id}"
+            if sv is not None and sv.resuelto_por:
+                texto += f", aprobada por {sv.resuelto_por}"
+        elif ev.solicitud_id:
+            sd = session.get(SolicitudDescanso, ev.solicitud_id)
+            if sd is not None:
+                como = "intercambio" if sd.tipo == "intercambio" else "cambio de descanso"
+                quien = "las reglas del Calendario" if sd.resuelto_por == "REGLAS" else sd.resuelto_por
+                texto += f" — {como} #{sd.id}, aprobado por {quien}"
+        elif ev.nota:
+            texto += f" — {ev.nota}"
+        else:
+            texto += " — marcado a mano"
+        partes.append(texto)
+    if not [p for p in partes if not p.startswith("💵")]:
+        estado = estado_del_dia(horario, fecha)
+        partes.insert(0, "🛌 descanso fijo" if estado == DESCANSO else "día normal de trabajo")
+    return f"{fecha:%d/%m}: " + " · ".join(partes)
 
 
 def cargar_horarios_todos(session) -> dict[str, HorarioEmpleada]:
@@ -644,38 +901,17 @@ ENCARGADO_CODE = "ENC-1"
 # juntos, para que no se brinque la regla pidiendo en vez de cambiar).
 CAMBIOS_POR_MES = 2
 
+# Notas con las que el autoservicio marcaba antes del 2026-10-12 (sin
+# solicitud ligada). Se siguen contando para el tope de esos eventos viejos.
 _NOTA_PEDIDO = "pedido desde la Libreta"
 _NOTA_INTERCAMBIO = "intercambio con "
 
 
 def cambios_del_mes(session, employee_code: str, hoy: date) -> int:
-    """Movimientos de autoservicio hechos este mes (pedidos + intercambios)."""
-    from datetime import datetime
+    """Movimientos de autoservicio (pedidos + intercambios) del mes de `hoy`.
 
-    from pos_uniformes.database.models import EmpleadaEvento
+    D2 (2026-10-12): cuenta el mes del DÍA que pasa a descansar, no el mes en
+    que se pidió, y quitar el día después no devuelve el cambio."""
+    from pos_uniformes.services import descansos_service as ds
 
-    inicio_mes = datetime(hoy.year, hoy.month, 1)
-    filas = (
-        session.query(EmpleadaEvento)
-        .filter(
-            EmpleadaEvento.employee_code == str(employee_code).strip().upper(),
-            EmpleadaEvento.tipo == DESCANSO,
-            EmpleadaEvento.created_at >= inicio_mes,
-        )
-        .all()
-    )
-    return sum(
-        1
-        for f in filas
-        if f.nota and (f.nota == _NOTA_PEDIDO or f.nota.startswith(_NOTA_INTERCAMBIO))
-    )
-
-
-def _valida_cuota_mensual(session, employee_code: str, hoy: date) -> str | None:
-    usados = cambios_del_mes(session, employee_code, hoy)
-    if usados >= CAMBIOS_POR_MES:
-        return (
-            f"Ya usaste tus {CAMBIOS_POR_MES} cambios de este mes. "
-            "El siguiente mes puedes volver a pedir."
-        )
-    return None
+    return ds.cambios_usados(session, employee_code, (hoy.year, hoy.month))

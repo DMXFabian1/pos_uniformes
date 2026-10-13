@@ -514,7 +514,7 @@ def encargado_marcas(
     horario = cargar_horario(db, code)
     hoy = date.today()
     desde = hoy - timedelta(days=14)
-    etiqueta = {FALTA: "Faltó", DESCANSO: "Descansó", TRABAJO: "Sí vino"}
+    etiqueta = {FALTA: "Faltó", DESCANSO: "Descansó", TRABAJO: "Sí vino", "vacaciones": "Vacaciones"}
     marcas = [
         {"fecha": f.isoformat(), "tipo": t, "texto": etiqueta.get(t, t)}
         for f, t in sorted(horario.eventos.items(), reverse=True)
@@ -540,11 +540,11 @@ def encargado_marcar(
 
     quien = str(empleada.codigo).upper()
     if body.tipo == "quitar":
-        quitar_marca(db, body.employee_code, body.fecha)
+        quitar_marca(db, body.employee_code, body.fecha, actor=quien, origen="movil")
     else:
         marcar_dia(
             db, body.employee_code, body.fecha, body.tipo,
-            nota=f"apuntado por {quien} (celular)",
+            nota=f"apuntado por {quien} (celular)", actor=quien, origen="movil",
         )
     db.commit()
     return {"ok": True}

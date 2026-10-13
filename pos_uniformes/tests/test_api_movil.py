@@ -7,6 +7,8 @@ dependency_overrides — sin tocar Postgres.
 from __future__ import annotations
 
 import unittest
+
+from pos_uniformes.database import models as _m
 from datetime import timedelta
 from datetime import date, datetime
 from decimal import Decimal
@@ -31,7 +33,7 @@ from pos_uniformes.database.models import (
     PrestamoEmpleada,
 )
 
-_TABLAS = (Empleada, EmpleadaHorario, EmpleadaEvento, LibretaCorte, LibretaVenta, CajaParametros, EmpleadaPago, CajaRetiro,
+_TABLAS = (Empleada, EmpleadaHorario, EmpleadaEvento, _m.SolicitudDescanso, _m.AuditoriaAusencias, LibretaCorte, LibretaVenta, CajaParametros, EmpleadaPago, CajaRetiro,
     PrestamoEmpleada,
 )
 

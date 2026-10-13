@@ -165,6 +165,18 @@ except Exception:
     _TOUCH_SCROLL_AVAILABLE = False
 
 
+
+def _vacaciones_en_obra() -> bool:
+    """Vacaciones no se estrena todavía (Daniel, 2026-10-13); ver
+    `vacaciones_service.EN_CONSTRUCCION`."""
+    try:
+        from pos_uniformes.services import vacaciones_service as vs
+
+        return bool(vs.EN_CONSTRUCCION)
+    except Exception:  # noqa: BLE001 — sin el módulo, no se ofrece
+        return True
+
+
 class _MeilisearchWorker(QThread):
     """Ejecuta operaciones de Meilisearch en segundo plano."""
 
@@ -1585,6 +1597,28 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_descanso_aviso.setStyleSheet("font-size: 12px; color: #b9770e;")
         self.libreta_descanso_aviso.setVisible(False)
         view_ly.addWidget(self.libreta_descanso_aviso)
+        # La respuesta de Daniel (o que se venció) se le dice a ELLA aquí, y
+        # se queda hasta que la lee: antes el botón solo reaparecía, sin decir
+        # si fue un sí, un no o nadie contestó (auditoría 2026-10-12).
+        self.libreta_descanso_respuesta = QLabel("")
+        self.libreta_descanso_respuesta.setWordWrap(True)
+        self.libreta_descanso_respuesta.setStyleSheet(
+            "font-size: 13px; font-weight: 600; color: #2c2a27;"
+            "background: #fbf3e4; border: 1px solid #e3c99a; border-radius: 8px; padding: 6px 10px;"
+        )
+        self.libreta_descanso_respuesta.setVisible(False)
+        view_ly.addWidget(self.libreta_descanso_respuesta)
+        # Vacaciones: módulo aparte de los descansos (no gasta sus cambios).
+        self.libreta_vacaciones_button = QPushButton("🏖️  Mis vacaciones")
+        self.libreta_vacaciones_button.setAutoDefault(False)
+        self.libreta_vacaciones_button.setVisible(False)
+        self.libreta_vacaciones_button.clicked.connect(self._libreta_abrir_vacaciones)
+        view_ly.addWidget(self.libreta_vacaciones_button)
+        self.libreta_descanso_visto_button = QPushButton("Entendido")
+        self.libreta_descanso_visto_button.setAutoDefault(False)
+        self.libreta_descanso_visto_button.setVisible(False)
+        self.libreta_descanso_visto_button.clicked.connect(self._libreta_descanso_visto)
+        view_ly.addWidget(self.libreta_descanso_visto_button)
 
         # Barra del dueño: lo de todos los días (imprimir corte) a la vista;
         # lo ocasional (rango de fechas, meta semanal) plegado bajo "Más
@@ -2475,7 +2509,11 @@ class QuoteSatelliteWindow(QMainWindow):
 
         try:
             with get_session() as session:
-                marcar_dia(session, code, _date.today(), tipo, nota=f"apuntado por {self._libreta_code or 'VEND-1'} desde Pendientes")
+                marcar_dia(
+                    session, code, _date.today(), tipo,
+                    nota=f"apuntado por {self._libreta_code or 'VEND-1'} desde Pendientes",
+                    actor=self._libreta_code or "VEND-1", origen="kiosko",
+                )
         except Exception:  # noqa: BLE001
             logger.exception("Pendientes: no se pudo marcar %s", tipo)
             self._set_status("No se pudo guardar. Inténtalo otra vez.")
@@ -2673,31 +2711,102 @@ class QuoteSatelliteWindow(QMainWindow):
         if boton is None or aviso is None:
             return
         code = self._libreta_code
+        vac = getattr(self, "libreta_vacaciones_button", None)
         if not code or str(code).upper() == "VEND-1":
             boton.setVisible(False)
             aviso.setVisible(False)
+            if vac is not None:
+                # Daniel: el panel de vacaciones del equipo (solo él, 2026-10-12).
+                # Mientras el módulo esté en construcción, ni él lo ve (2026-10-13).
+                vac.setText("🏖️  Vacaciones del equipo")
+                vac.setVisible(str(code or "").upper() == "VEND-1" and not _vacaciones_en_obra())
             return
+        if vac is not None:
+            self._libreta_vacaciones_refrescar(vac, code)
         try:
             from pos_uniformes.services import descansos_service as ds
 
             with get_session() as session:
                 pendiente = ds.pendiente_de(session, code)
+                respuestas = [
+                    (r.id, ds.texto_de_respuesta(r, code))
+                    for r in ds.respuestas_sin_ver(session, code)
+                ]
         except Exception:  # noqa: BLE001 — sin servidor, mejor no ofrecerlo
             logger.exception("Libreta: no se pudo leer la solicitud de descanso")
             boton.setVisible(False)
             aviso.setVisible(False)
             return
 
+        self._libreta_descanso_respuestas = [rid for rid, _t in respuestas]
+        etiqueta = getattr(self, "libreta_descanso_respuesta", None)
+        visto = getattr(self, "libreta_descanso_visto_button", None)
+        if etiqueta is not None and visto is not None:
+            etiqueta.setText("\n\n".join(t for _rid, t in respuestas))
+            etiqueta.setVisible(bool(respuestas))
+            visto.setVisible(bool(respuestas))
+
         if pendiente is not None:
             boton.setVisible(False)
             aviso.setText(
                 f"🛌 Pediste el {pendiente.fecha:%d/%m} para «{pendiente.motivo}». "
-                "Daniel todavía no responde."
+                "Daniel todavía no responde; si el día llega sin respuesta, se cierra sola."
             )
             aviso.setVisible(True)
             return
         boton.setVisible(True)
         aviso.setVisible(False)
+
+    def _libreta_vacaciones_refrescar(self, boton, code) -> None:
+        """El botón dice si hay una respuesta nueva de Daniel."""
+        if _vacaciones_en_obra():
+            boton.setVisible(False)
+            return
+        try:
+            from pos_uniformes.services import vacaciones_service as vs
+
+            with get_session() as session:
+                abierto = vs.expediente(session, code).autoservicio
+                nuevas = len(vs.respuestas_sin_ver(session, code)) if abierto else 0
+        except Exception:  # noqa: BLE001 — sin servidor, no se ofrece
+            boton.setVisible(False)
+            return
+        if not abierto:
+            # Hasta que Daniel se lo abra, ella no ve nada de vacaciones.
+            boton.setVisible(False)
+            return
+        boton.setText("🏖️  Mis vacaciones" + (f"  · {nuevas} respuesta nueva" if nuevas == 1 else
+                                               f"  · {nuevas} respuestas nuevas" if nuevas else ""))
+        boton.setVisible(True)
+
+    def _libreta_abrir_vacaciones(self) -> None:
+        if str(self._libreta_code or "").upper() == "VEND-1":
+            from pos_uniformes.ui.dialogs.vacaciones_equipo_dialog import VacacionesEquipoDialog
+
+            VacacionesEquipoDialog(self, session_factory=get_session, quien="VEND-1").exec()
+            return
+        from pos_uniformes.ui.dialogs.vacaciones_dialog import VacacionesDialog
+
+        dlg = VacacionesDialog(
+            self, employee_code=self._libreta_code, nombre=_nombre_de(self._libreta_code),
+            session_factory=get_session,
+        )
+        dlg.exec()
+        self._libreta_descanso_refrescar()
+
+    def _libreta_descanso_visto(self) -> None:
+        """Ya leyó las respuestas: no se le vuelven a enseñar."""
+        from pos_uniformes.services import descansos_service as ds
+
+        code = self._libreta_code
+        try:
+            with get_session() as session:
+                for rid in getattr(self, "_libreta_descanso_respuestas", []):
+                    ds.marcar_vista(session, rid, code)
+                session.commit()
+        except Exception:  # noqa: BLE001 — se le vuelve a enseñar la próxima vez
+            logger.exception("Libreta: no se pudo marcar la respuesta como vista")
+        self._libreta_descanso_refrescar()
 
     def _libreta_pedir_descanso(self) -> None:
         from pos_uniformes.services import descansos_service as ds
@@ -2713,6 +2822,7 @@ class QuoteSatelliteWindow(QMainWindow):
                     nombre=_nombre_de(self._libreta_code),
                     fecha=datos["fecha"],
                     motivo=datos["motivo"],
+                    origen="kiosko",
                 )
                 session.commit()
                 self._avisar_descanso(session, solicitud)
@@ -2738,19 +2848,7 @@ class QuoteSatelliteWindow(QMainWindow):
         puede, no se pierde: queda en la cola de alertas."""
         from pos_uniformes.services import telegram_descansos_service as dsc
 
-        texto = dsc.aviso_de_solicitud(solicitud, session=session)
-        try:
-            from pos_uniformes.services.telegram_service import enviar_mensaje
-
-            enviar_mensaje(texto, botones=dsc.botones_de(solicitud))
-        except Exception:  # noqa: BLE001
-            try:
-                from pos_uniformes.services.alertas_service import encolar
-
-                encolar(session, texto + "\n\nPara responder: /descansos")
-                session.commit()
-            except Exception:  # noqa: BLE001
-                logger.exception("Descanso: no se pudo avisar")
+        dsc.avisar_a_daniel(session, solicitud)
 
     def _ask_descanso(self) -> dict | None:
         """Qué día y para qué. El calendario se ve completo: ella escoge
@@ -2781,7 +2879,8 @@ class QuoteSatelliteWindow(QMainWindow):
         titulo.setStyleSheet("font-size: 19px; font-weight: 800; color: #73341c;")
         ly.addWidget(titulo)
         pista = QLabel(
-            "Escoge el día en el calendario. Daniel lo aprueba desde su celular.\n"
+            f"Escoge el día en el calendario (con {ds.ANTICIPACION_DIAS} días de anticipación). "
+            "Daniel lo aprueba desde su celular.\n"
             "Si te lo da, tu descanso de esa semana se mueve a ese día."
         )
         pista.setWordWrap(True)
@@ -2790,7 +2889,8 @@ class QuoteSatelliteWindow(QMainWindow):
 
         calendario = QCalendarWidget()
         calendario.setGridVisible(True)
-        calendario.setMinimumDate(QDate(hoy.year, hoy.month, hoy.day))
+        primero = hoy + _td(days=ds.ANTICIPACION_DIAS)
+        calendario.setMinimumDate(QDate(primero.year, primero.month, primero.day))
         tope = hoy + _td(days=ds.DIAS_MAXIMO_ADELANTE)
         calendario.setMaximumDate(QDate(tope.year, tope.month, tope.day))
         calendario.setVerticalHeaderFormat(

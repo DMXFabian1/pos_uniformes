@@ -7,6 +7,8 @@ Lógica pura — sin base de datos ni Qt.
 from __future__ import annotations
 
 import unittest
+
+from pos_uniformes.database import models as _m
 from datetime import date, timedelta
 
 from pos_uniformes.services.calendario_empleadas_service import (
@@ -165,7 +167,7 @@ class AccesoDatosTests(unittest.TestCase):
         )
 
         engine = create_engine("sqlite://")
-        for tabla in (EmpleadaHorario, EmpleadaEvento, LibretaVenta):
+        for tabla in (EmpleadaHorario, EmpleadaEvento, _m.AuditoriaAusencias, _m.SolicitudDescanso, LibretaVenta):
             tabla.__table__.create(engine)
         self.session = sessionmaker(bind=engine)()
 
@@ -260,7 +262,7 @@ class ChipsCalendarioCompartidoTests(unittest.TestCase):
         )
 
         engine = create_engine("sqlite://")
-        for tabla in (Empleada, EmpleadaHorario, EmpleadaEvento):
+        for tabla in (Empleada, EmpleadaHorario, EmpleadaEvento, _m.AuditoriaAusencias, _m.SolicitudDescanso):
             tabla.__table__.create(engine)
         self.session = sessionmaker(bind=engine)()
         self.session.add(
@@ -349,7 +351,7 @@ class AutoservicioDescansosTests(unittest.TestCase):
         )
 
         engine = create_engine("sqlite://")
-        for t in (EmpleadaHorario, EmpleadaEvento):
+        for t in (EmpleadaHorario, EmpleadaEvento, _m.AuditoriaAusencias, _m.SolicitudDescanso):
             t.__table__.create(engine)
         session = sessionmaker(bind=engine)()
 
@@ -376,7 +378,7 @@ class AutoservicioDescansosTests(unittest.TestCase):
         )
 
         engine = create_engine("sqlite://")
-        for t in (EmpleadaHorario, EmpleadaEvento):
+        for t in (EmpleadaHorario, EmpleadaEvento, _m.AuditoriaAusencias, _m.SolicitudDescanso):
             t.__table__.create(engine)
         session = sessionmaker(bind=engine)()
 
@@ -431,7 +433,7 @@ class LimiteMensualTests(unittest.TestCase):
         from pos_uniformes.database.models import EmpleadaEvento, EmpleadaHorario
 
         engine = create_engine("sqlite://")
-        for t in (EmpleadaHorario, EmpleadaEvento):
+        for t in (EmpleadaHorario, EmpleadaEvento, _m.AuditoriaAusencias, _m.SolicitudDescanso):
             t.__table__.create(engine)
         self.session = sessionmaker(bind=engine)()
 
@@ -446,7 +448,10 @@ class LimiteMensualTests(unittest.TestCase):
             cambios_del_mes,
         )
 
-        hoy = date.today()
+        # Fechas fijas (antes: date.today()). Con D2 el tope cuenta el mes del
+        # día pedido, y con hoy + 8/15/22 los días caían en meses distintos
+        # según la fecha en que corriera la prueba.
+        hoy = date(2026, 10, 1)
         horarios = {"VEND-2": HorarioEmpleada(employee_code="VEND-2")}
         f1 = hoy + timedelta(days=8)
         f2 = hoy + timedelta(days=15)
@@ -469,9 +474,11 @@ class LimiteMensualTests(unittest.TestCase):
             cambios_del_mes,
         )
 
-        hoy = date.today()
-        f_a = hoy + timedelta(days=10)
-        f_b = hoy + timedelta(days=11)
+        # Fechas fijas (antes: date.today()): con D4 los dos días tienen que
+        # ser de la misma semana, y hoy + 10/11 a veces no lo eran.
+        hoy = date(2026, 10, 2)
+        f_a = hoy + timedelta(days=10)   # lunes 12-oct
+        f_b = hoy + timedelta(days=11)   # martes 13-oct, misma semana
         horarios = {
             "VEND-2": HorarioEmpleada(employee_code="VEND-2", eventos={f_a: DESCANSO}),
             "VEND-3": HorarioEmpleada(employee_code="VEND-3", eventos={f_b: DESCANSO}),
@@ -506,7 +513,7 @@ class DescansoMovidoTests(unittest.TestCase):
         from pos_uniformes.database.models import EmpleadaEvento, EmpleadaHorario
 
         engine = create_engine("sqlite://")
-        for t in (EmpleadaHorario, EmpleadaEvento):
+        for t in (EmpleadaHorario, EmpleadaEvento, _m.AuditoriaAusencias, _m.SolicitudDescanso):
             t.__table__.create(engine)
         self.session = sessionmaker(bind=engine)()
         # Fanny descansa los jueves.

@@ -18,10 +18,12 @@ from decimal import Decimal
 from pos_uniformes.services.corte_caja_service import ParametrosCaja, cargar_parametros
 from pos_uniformes.services.calendario_empleadas_service import (
     ENCARGADO_CODE,
+    VACACIONES,
     HorarioEmpleada,
     cargar_horario,
     comisiones_desde_ultimo_pago,
     es_dia_trabajado,
+    estado_del_dia,
     faltas_netas_en_rango,
     fecha_proximo_pago,
     quienes_descansan,
@@ -128,7 +130,8 @@ def calcular_pago(
         dias = 0
         dia = inicio
         while dia <= hasta:
-            if es_dia_trabajado(horario, dia):
+            # Las vacaciones se pagan (LFT art. 76) aunque no se trabajen.
+            if es_dia_trabajado(horario, dia) or estado_del_dia(horario, dia) == VACACIONES:
                 dias += 1
             dia += timedelta(days=1)
         return DetallePago(

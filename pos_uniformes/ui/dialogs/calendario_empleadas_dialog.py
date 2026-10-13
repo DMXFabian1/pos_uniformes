@@ -60,6 +60,8 @@ _COLORES_DIA = {
     DESCANSO: ("#dce8f7", "#2b5c8a"),
     FALTA: ("#f6d3cb", "#a33b25"),
     PAGO: ("#d9ecd0", "#3d6b2f"),
+    # Vacaciones: su propio color, para no confundirlas con descanso ni falta.
+    "vacaciones": ("#efe2f7", "#6b3d8a"),
 }
 
 
@@ -196,10 +198,18 @@ class CalendarioEmpleadasDialog(QDialog):
             '<span style="background:#dce8f7; color:#2b5c8a;">&nbsp;Descanso&nbsp;</span> '
             '<span style="background:#f6d3cb; color:#a33b25;">&nbsp;Falta&nbsp;</span> '
             '<span style="background:#d9ecd0; color:#3d6b2f;">&nbsp;Pago&nbsp;</span> '
+            '<span style="background:#efe2f7; color:#6b3d8a;">&nbsp;Vacaciones&nbsp;</span> '
             "&nbsp;(hoy va subrayado)"
         )
         leyenda.setStyleSheet("font-size: 12px;")
         ly.addWidget(leyenda)
+        # De dónde salió lo del día seleccionado (fijo, cambio, intercambio,
+        # vacaciones, marca de León...): se toca el día y se lee aquí.
+        self.origen = QLabel("")
+        self.origen.setWordWrap(True)
+        self.origen.setStyleSheet("font-size: 12px; color: #5f564c;")
+        ly.addWidget(self.origen)
+        self.cal.selectionChanged.connect(self._mostrar_origen)
 
         # ── Autoservicio de la empleada: pedir/cambiar SIN pasar por Daniel.
         # Las reglas (cupo 1 por día, 7 días de anticipación) deciden solas.
@@ -391,16 +401,32 @@ class CalendarioEmpleadasDialog(QDialog):
             )
             return False
 
+    def _mostrar_origen(self) -> None:
+        from pos_uniformes.services.calendario_empleadas_service import origen_del_dia
+
+        try:
+            from pos_uniformes.database.connection import get_session
+
+            with get_session() as session:
+                texto = origen_del_dia(session, self._codigo_activo(), self._fecha_seleccionada())
+        except Exception:  # noqa: BLE001 — sin conexión no se dice nada
+            texto = ""
+        self.origen.setText(texto)
+
     def _marcar(self, tipo: str) -> None:
         fecha = self._fecha_seleccionada()
         if self._con_sesion(
-            lambda s: marcar_dia(s, self._codigo_activo(), fecha, tipo)
+            lambda s: marcar_dia(
+                s, self._codigo_activo(), fecha, tipo, actor=self._code, origen="calendario"
+            )
         ):
             self._recargar()
 
     def _quitar(self) -> None:
         fecha = self._fecha_seleccionada()
-        if self._con_sesion(lambda s: quitar_marca(s, self._codigo_activo(), fecha)):
+        if self._con_sesion(lambda s: quitar_marca(
+            s, self._codigo_activo(), fecha, actor=self._code, origen="calendario"
+        )):
             self._recargar()
 
     def _pagar(self) -> None:
@@ -429,7 +455,8 @@ class CalendarioEmpleadasDialog(QDialog):
             with get_session() as session:
                 horarios = cargar_horarios_todos(session)
                 ok, msg = aplicar_solicitud_descanso(
-                    session, horarios, self._code, fecha, hoy
+                    session, horarios, self._code, fecha, hoy,
+                    nombre=_nombre_de(self._code), origen="calendario",
                 )
                 if not ok:
                     libres = dias_libres_cercanos(horarios, self._code, hoy)
@@ -521,10 +548,15 @@ class CalendarioEmpleadasDialog(QDialog):
             code_b = combo_b.currentData()
             if not code_b:
                 return
+            mio = combo_mio.currentData()
             for f in self._proximos_descansos(horarios[code_b], hoy):
+                # D4: solo días de la misma semana que el mío.
+                if mio is not None and f.isocalendar()[:2] != mio.isocalendar()[:2]:
+                    continue
                 combo_suyo.addItem(f.strftime("%A %d/%b"), f)
 
         combo_b.currentIndexChanged.connect(lambda _i: _rellenar_suyos())
+        combo_mio.currentIndexChanged.connect(lambda _i: _rellenar_suyos())
         _rellenar_suyos()
 
         ly.addWidget(QLabel("Para aceptar, tu compañera pasa SU gafete:"))
@@ -567,7 +599,9 @@ class CalendarioEmpleadasDialog(QDialog):
                 with get_session() as session:
                     horarios_frescos = cargar_horarios_todos(session)
                     ok, msg = aplicar_intercambio(
-                        session, horarios_frescos, self._code, fecha_a, code_b, fecha_b, hoy
+                        session, horarios_frescos, self._code, fecha_a, code_b, fecha_b, hoy,
+                        nombre_a=_nombre_de(self._code), nombre_b=_nombre_de(code_b),
+                        origen="calendario",
                     )
             except Exception:  # noqa: BLE001
                 logger.exception("Calendario: fallo el intercambio")
@@ -1197,6 +1231,7 @@ class CalendarioEncargadoDialog(QDialog):
                     fecha,
                     self._sel_tipo,
                     nota="apuntado por el encargado (ENC-1)",
+                    actor="ENC-1", origen="calendario",
                 )
         except Exception:  # noqa: BLE001
             logger.exception("Encargado: no se pudo apuntar")
@@ -1222,7 +1257,7 @@ class CalendarioEncargadoDialog(QDialog):
             from pos_uniformes.database.connection import get_session
 
             with get_session() as session:
-                quitar_marca(session, code, fecha)
+                quitar_marca(session, code, fecha, actor="ENC-1", origen="calendario")
         except Exception:  # noqa: BLE001
             logger.exception("Encargado: no se pudo deshacer")
             QMessageBox.warning(self, "No se borró", "Inténtalo otra vez.")

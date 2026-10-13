@@ -56,7 +56,9 @@ def clasificar(*, estado_dia: str, movimientos: int, primera: datetime | None, c
 
     if estado_dia == C_FALTA:
         return FALTA
-    if estado_dia == C_DESCANSO:
+    from pos_uniformes.services.calendario_empleadas_service import VACACIONES as C_VACACIONES
+
+    if estado_dia in (C_DESCANSO, C_VACACIONES):
         return DESCANSO
     if confirmado_trabajo:
         return PRESENTE
@@ -266,9 +268,9 @@ def marcar(session, code: str, accion: str, hoy: date | None = None) -> str:
     tipo = {VINO: C_TRABAJO, NO_VINO: C_FALTA, DESCANSA: C_DESCANSO}[accion]
     # Mismo botón dos veces = quitar la marca: vuelve a lo que el sistema deduce.
     if cargar_horario(session, code).eventos.get(hoy) == tipo:
-        quitar_marca(session, code, hoy)
+        quitar_marca(session, code, hoy, actor="VEND-1", origen="telegram")
         return f"{nombre}: marca quitada ↩"
-    marcar_dia(session, code, hoy, tipo, nota=NOTA_TELEGRAM)
+    marcar_dia(session, code, hoy, tipo, nota=NOTA_TELEGRAM, actor="VEND-1", origen="telegram")
     return {VINO: f"{nombre}: vino ✅", NO_VINO: f"{nombre}: falta ✗", DESCANSA: f"{nombre}: descansa 🛌"}[accion]
 
 

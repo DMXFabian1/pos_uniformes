@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import os
 import unittest
+
+from pos_uniformes.database import models as _m
 from datetime import date
 from decimal import Decimal
 from types import SimpleNamespace
@@ -53,7 +55,7 @@ class DeshacerPagoTests(unittest.TestCase):
         from pos_uniformes.database.models import EmpleadaEvento, EmpleadaHorario, EmpleadaPago
 
         engine = create_engine("sqlite://")
-        for t in (EmpleadaPago, EmpleadaHorario, EmpleadaEvento):
+        for t in (EmpleadaPago, EmpleadaHorario, EmpleadaEvento, _m.AuditoriaAusencias, _m.SolicitudDescanso):
             t.__table__.create(engine)
         self.session = sessionmaker(bind=engine)()
         from pos_uniformes.services.calendario_empleadas_service import guardar_horario, registrar_pago

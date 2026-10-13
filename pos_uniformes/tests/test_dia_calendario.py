@@ -33,6 +33,10 @@ def _factory():
     Empleada.__table__.create(engine)
     EmpleadaHorario.__table__.create(engine)
     EmpleadaEvento.__table__.create(engine)
+    from pos_uniformes.database.models import AuditoriaAusencias, SolicitudDescanso
+
+    SolicitudDescanso.__table__.create(engine)
+    AuditoriaAusencias.__table__.create(engine)
     return sessionmaker(bind=engine)
 
 

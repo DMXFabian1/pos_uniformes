@@ -40,8 +40,17 @@ _RAIZ = [
 _GENTE = [
     [("👥 Quién vino", "m:asistencia")],
     [("💵 Préstamos", "m:prestamos")],
-    [("🛌 Días de descanso", "m:descansos")],
+    [("🛌 Días de descanso", "m:descansos"), ("🏖️ Vacaciones", "m:vacaciones")],
 ]
+
+
+def _gente():
+    """Las filas de «Las muchachas…». Vacaciones solo si ya se estrenó."""
+    from pos_uniformes.services import vacaciones_service as vs
+
+    if not vs.EN_CONSTRUCCION:
+        return _GENTE
+    return [[b for b in fila if b[1] != "m:vacaciones"] for fila in _GENTE]
 
 
 def _teclado(filas):
@@ -104,7 +113,7 @@ def atender(dato: str, *, session_factory, hoy: date | None = None) -> tuple[str
         return "", texto, botones
 
     if accion == "gente":
-        return "", "¿De las muchachas, qué?", _con_volver(_GENTE)
+        return "", "¿De las muchachas, qué?", _con_volver(_gente())
 
     # Pagar a alguien: el desglose primero, el dinero después.
     if accion.startswith("pagar:"):
@@ -135,6 +144,17 @@ def atender(dato: str, *, session_factory, hoy: date | None = None) -> tuple[str
 
         with session_factory() as session:
             texto, botones = dsc.texto_y_botones(session, hoy=hoy)
+        return "", texto, botones
+
+    if accion == "vacaciones":
+        from pos_uniformes.services import telegram_vacaciones_service as vac
+        from pos_uniformes.services import vacaciones_service as vs
+
+        if vs.EN_CONSTRUCCION:
+            return "", vs.EN_CONSTRUCCION_TEXTO, ""
+
+        with session_factory() as session:
+            texto, botones = vac.texto_y_botones(session)
         return "", texto, botones
 
     if accion in ("cajon", "cajón"):

@@ -42,6 +42,34 @@ def _pila(solicitud) -> str:
     return str(solicitud.employee_name or solicitud.employee_code).split()[0]
 
 
+def encabezado(s, hoy) -> list[str]:
+    """Quién pide qué. Un intercambio dice las dos mitades y si la compañera
+    ya aceptó: Daniel no aprueba algo que una de las dos no ha dicho."""
+    nombre = s.employee_name or s.employee_code
+    if getattr(s, "tipo", "cambio") == "intercambio":
+        otra = s.companera_name or s.companera_code
+        acepto = "✔️ las dos aceptaron" if s.companera_acepto_at else f"⏳ falta que {otra.split()[0]} acepte"
+        return [
+            f"🔄 {nombre} y {otra} se quieren cambiar el descanso "
+            f"({_cuando_es(s.fecha, hoy)}):",
+            f"· {nombre.split()[0]} descansaría el {contexto_dia(s)}",
+            f"· {otra.split()[0]} descansaría el {_dia(s.fecha_companera)}",
+            acepto,
+        ]
+    lineas = [
+        f"🛌 {nombre} pide descansar el {contexto_dia(s)} ({_cuando_es(s.fecha, hoy)})",
+        f"Para: {s.motivo}",
+    ]
+    if getattr(s, "fecha_fijo", None):
+        lineas.append(f"Su descanso del {_dia(s.fecha_fijo)} pasaría a trabajo.")
+    return lineas
+
+
+def _dia(fecha) -> str:
+    _DIAS = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
+    return f"{_DIAS[fecha.weekday()]} {fecha:%d/%m}"
+
+
 def _cuando_es(fecha, hoy) -> str:
     dias = (fecha - hoy).days
     if dias == 0:
@@ -136,12 +164,7 @@ def detalle(session: Session, solicitud_id: int, *, hoy=None) -> tuple[str, list
     if s is None:
         return "Esa solicitud ya no existe.", []
 
-    lineas = [
-        f"🛌 {s.employee_name or s.employee_code} pide el "
-        f"{contexto_dia(s)} ({_cuando_es(s.fecha, hoy)})",
-        f"Para: {s.motivo}",
-        "",
-    ]
+    lineas = encabezado(s, hoy) + [""]
     try:
         lineas.extend(texto_de_contexto(ds.contexto_de(session, s)))
     except Exception:  # noqa: BLE001 — sin panorama se contesta igual
@@ -150,7 +173,8 @@ def detalle(session: Session, solicitud_id: int, *, hoy=None) -> tuple[str, list
     filas = []
     if s.estado == ds.PEDIDO:
         lineas.append("")
-        lineas.append("Si lo apruebas, su descanso fijo de esa semana se mueve a este día.")
+        if s.tipo != ds.INTERCAMBIO:
+            lineas.append("Si lo apruebas, su descanso fijo de esa semana se mueve a este día.")
         filas.append([
             (f"✅ Dárselo", f"{PREFIJO}ok:{s.id}"),
             ("✖️ Ahora no", f"{PREFIJO}no:{s.id}"),
@@ -202,8 +226,7 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
                 aviso = "Aprobado"
                 hecho = (
                     f"✅ {_pila(s)} descansa el {contexto_dia(s)}.\n"
-                    "Su descanso fijo de esa semana se movió a ese día: ya quedó en "
-                    "el calendario y lo ve todo el mundo."
+                    "Ya quedó en el calendario y se le avisa en la Libreta."
                 )
             elif que == "no":
                 s = ds.rechazar(session, solicitud_id, quien=quien)
@@ -241,12 +264,8 @@ def aviso_de_solicitud(solicitud, *, session: Session | None = None, hoy=None) -
     from datetime import date as _date
 
     hoy = hoy or _date.today()
-    lineas = [
-        f"🛌 {solicitud.employee_name or solicitud.employee_code} pide descansar el "
-        f"{contexto_dia(solicitud)} ({_cuando_es(solicitud.fecha, hoy)})",
-        f"Para: {solicitud.motivo}",
-    ]
-    if session is not None:
+    lineas = encabezado(solicitud, hoy)
+    if session is not None and getattr(solicitud, "tipo", "cambio") != "intercambio":
         try:
             from pos_uniformes.services import descansos_service as ds
 
@@ -255,3 +274,27 @@ def aviso_de_solicitud(solicitud, *, session: Session | None = None, hoy=None) -
         except Exception:  # noqa: BLE001
             pass
     return "\n".join(lineas)
+
+
+def avisar_a_daniel(session: Session, solicitud) -> None:
+    """Le llega al instante con el panorama del día; si no hay internet (o el
+    kiosko no tiene el token), no se pierde: queda en la cola de alertas que
+    el bot de la PC servidor manda en cuanto puede. Nunca truena: la
+    solicitud ya quedó guardada y los recordatorios la vuelven a mostrar."""
+    import logging
+
+    texto = aviso_de_solicitud(solicitud, session=session)
+    botones = botones_de(solicitud)
+    try:
+        from pos_uniformes.services.telegram_service import enviar_mensaje
+
+        enviar_mensaje(texto, botones=botones)
+        return
+    except Exception:  # noqa: BLE001
+        pass
+    try:
+        from pos_uniformes.services.alertas_service import encolar
+
+        encolar(session, texto, botones)
+    except Exception:  # noqa: BLE001
+        logging.getLogger(__name__).exception("Descanso: no se pudo avisar")
