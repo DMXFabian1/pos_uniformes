@@ -100,5 +100,24 @@ class DondeSeVeTests(unittest.TestCase):
         self.assertEqual(QuoteKioskLookupSnapshot(**base).sale_name, "Short Deportivo")
 
 
+class PresupuestoTests(unittest.TestCase):
+    def test_linea_del_presupuesto_con_conexion(self) -> None:
+        from pos_uniformes.ui.helpers.quote_sports_uniform_helper import _enrich_quote_line_item
+
+        short = _producto("Short Deportivo", ["Rojo", "Negro"])
+        negro = short.variantes[1]
+        linea = {"producto_nombre": "", "pricing_rule_label": ""}
+        _enrich_quote_line_item(linea, variant=negro)
+        self.assertEqual(linea["producto_nombre"], "Short Deportivo Negro")
+
+    def test_un_solo_color_queda_igual(self) -> None:
+        from pos_uniformes.ui.helpers.quote_sports_uniform_helper import _enrich_quote_line_item
+
+        pijama = _producto("Pijama de Cuadros", ["Cuadros"])
+        linea = {"producto_nombre": "", "pricing_rule_label": ""}
+        _enrich_quote_line_item(linea, variant=pijama.variantes[0])
+        self.assertEqual(linea["producto_nombre"], "Pijama de Cuadros")
+
+
 if __name__ == "__main__":
     unittest.main()

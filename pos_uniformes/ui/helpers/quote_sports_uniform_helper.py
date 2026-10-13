@@ -135,10 +135,13 @@ def _enrich_quote_line_item(line_item: dict[str, object], *, variant) -> None:
     school_name = str(getattr(getattr(product, "escuela", None), "nombre", "") or "General")
 
     base_name = str(getattr(product, "nombre_base", "") or getattr(product, "nombre", "") or "").strip()
+    from pos_uniformes.services.nombre_con_color_service import nombre_de_variante
+
     line_item["producto_nombre"] = (
         build_three_piece_quote_description(base_name, school_name=school_name)
         if pricing_rule_label == THREE_PIECE_PLAYERA_PRICING_LABEL
-        else base_name
+        # Producto de varios colores: el presupuesto dice cuál (Short Deportivo Rojo).
+        else nombre_de_variante(variant, base_name)
     )
     line_item["escuela_nombre"] = school_name
     line_item["nivel_educativo_nombre"] = str(

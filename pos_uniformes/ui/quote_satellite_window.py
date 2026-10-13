@@ -8923,7 +8923,13 @@ QLabel#favDialogPriceLabel {
         if row is None:
             QMessageBox.warning(self, "SKU no encontrado", f"'{normalized_sku}' no esta en el catalogo local.")
             return
-        product_name = str(row.get("producto_nombre_base") or row.get("producto_nombre") or normalized_sku)
+        from pos_uniformes.services.nombre_con_color_service import multicolor_en_filas, nombre_con_color
+
+        product_name = nombre_con_color(
+            str(row.get("producto_nombre_base") or row.get("producto_nombre") or normalized_sku),
+            row.get("color"),
+            multicolor=multicolor_en_filas(self.catalog_snapshot_rows, row.get("producto_id")),
+        )
         unit_price = Decimal(str(row.get("precio_venta") or "0"))
         existing = next((i for i in self.quote_cart if str(i.get("sku", "")) == normalized_sku), None)
         if existing:

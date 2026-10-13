@@ -79,12 +79,15 @@ class PresupuestoService:
                 raise ValueError(f"No existe una presentacion activa para el SKU '{sku}'.")
 
             precio_unitario = cls._money(item.precio_unitario if item.precio_unitario is not None else variante.precio_venta)
+            from pos_uniformes.services.nombre_con_color_service import nombre_de_variante
+
+            nombre_base = nombre_de_variante(variante, variante.producto.nombre_base)
             descripcion_snapshot = (
                 (item.descripcion_snapshot or "").strip()
                 or (
-                    f"{variante.producto.nombre_base} ({item.pricing_rule_label})"
+                    f"{nombre_base} ({item.pricing_rule_label})"
                     if item.pricing_rule_label.strip()
-                    else variante.producto.nombre_base
+                    else nombre_base
                 )
             )
             subtotal_linea = (precio_unitario * Decimal(item.cantidad)).quantize(Decimal("0.01"))
