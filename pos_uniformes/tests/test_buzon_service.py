@@ -30,6 +30,10 @@ class EnviarTests(_Base):
     def test_sin_destino_es_para_todas(self) -> None:
         self.assertIsNone(bz.enviar(self.s, "hola", de="Entrada", para="  ").para)
 
+    def test_el_separador_de_linea_de_qt_se_vuelve_salto_normal(self) -> None:
+        m = bz.enviar(self.s, "uno\u2028dos", de="Entrada")
+        self.assertEqual(m.texto, "uno\ndos")
+
     def test_vacio_no_se_manda(self) -> None:
         with self.assertRaises(bz.NoSePuede):
             bz.enviar(self.s, "   \n ", de="Entrada")
@@ -61,6 +65,41 @@ class DestinosTests(_Base):
         self.s.flush()
         bz.enviar(self.s, "hola", de="Claude")
         self.assertEqual(bz.destinos(self.s, yo="Entrada"), ["Caja", "Claude"])
+
+    def test_un_chat_que_solo_tiene_lo_que_mande_yo_tambien_existe(self) -> None:
+        bz.enviar(self.s, "hola", de="Entrada", para="Claude")
+        self.assertEqual(bz.destinos(self.s, yo="Entrada"), ["Claude"])
+
+
+
+class ConversacionTests(_Base):
+    def test_un_chat_privado_trae_lo_de_ida_y_vuelta_y_nada_mas(self) -> None:
+        bz.enviar(self.s, "script", de="Claude", para="Entrada")
+        bz.enviar(self.s, "resultado", de="Entrada", para="Claude")
+        bz.enviar(self.s, "a todas", de="Claude")
+        bz.enviar(self.s, "otra cosa", de="Claude", para="Caja")
+        textos = [m.texto for m in bz.conversacion(self.s, yo="Entrada", con="Claude")]
+        self.assertEqual(textos, ["script", "resultado"])
+
+    def test_el_grupo_son_los_que_van_a_todas(self) -> None:
+        bz.enviar(self.s, "privado", de="Claude", para="Entrada")
+        bz.enviar(self.s, "a todas", de="Claude")
+        textos = [m.texto for m in bz.conversacion(self.s, yo="Entrada", con=bz.GRUPO)]
+        self.assertEqual(textos, ["a todas"])
+
+    def test_renombrar_se_lleva_el_historial(self) -> None:
+        self.s.add(Satelite(identificador="a", nombre="DESKTOP-AT4V4QO"))
+        bz.enviar(self.s, "hola", de="Claude", para="DESKTOP-AT4V4QO")
+        bz.enviar(self.s, "respuesta", de="DESKTOP-AT4V4QO", para="Claude")
+        self.assertEqual(bz.renombrar(self.s, "DESKTOP-AT4V4QO", "Entrada"), 2)
+        textos = [m.texto for m in bz.conversacion(self.s, yo="Entrada", con="Claude")]
+        self.assertEqual(textos, ["hola", "respuesta"])
+        self.assertIn("Entrada", bz.destinos(self.s, yo="Claude"))
+
+    def test_lo_que_parece_comando_va_en_letra_fija(self) -> None:
+        self.assertTrue(bz.parece_codigo('Get-Content "$env:APPDATA"'))
+        self.assertTrue(bz.parece_codigo("Total: 2\nVEND-4 venta"))
+        self.assertFalse(bz.parece_codigo("Ya actualicé, revisen sus kioskos."))
 
 
 if __name__ == "__main__":

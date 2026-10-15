@@ -1,26 +1,36 @@
-"""Ventana del buzón: un chat de texto entre las PCs de la tienda.
+"""Ventana del buzón: un chat entre las PCs de la tienda, como WhatsApp.
 
-Para pasar comandos y respuestas sin WhatsApp (Daniel, 2026-10-15). Cada
-mensaje trae su botón «Copiar»: el comando se pega tal cual en PowerShell, y lo
-que conteste PowerShell se pega aquí de regreso. No ejecuta nada.
+Para pasar comandos y respuestas sin WhatsApp (Daniel, 2026-10-15). La primera
+versión era una lista con un «Para:» que nadie entendía: se mandaba el script en
+vez de su resultado, y desde la PC equivocada. Ahora es como el WhatsApp que ya
+saben usar: los chats a la izquierda, la conversación a la derecha, y lo que
+escribes va al chat que tienes abierto.
+
+Cada mensaje trae «Copiar»: el comando se pega tal cual en PowerShell, y lo que
+conteste PowerShell se pega aquí de regreso. Nada se ejecuta solo.
 """
 
 from __future__ import annotations
 
 import logging
+from datetime import date, datetime, timedelta
 
-from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtGui import QFont, QFontDatabase, QTextOption
+from PyQt6.QtCore import QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QFont, QFontDatabase
 from PyQt6.QtWidgets import (
     QApplication,
-    QComboBox,
     QDialog,
     QFrame,
     QHBoxLayout,
+    QInputDialog,
     QLabel,
+    QListWidget,
+    QListWidgetItem,
     QPlainTextEdit,
     QPushButton,
     QScrollArea,
+    QSplitter,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -28,26 +38,35 @@ from PyQt6.QtWidgets import (
 logger = logging.getLogger(__name__)
 
 #: Cada cuánto se buscan mensajes nuevos con la ventana abierta.
-REFRESCO_MS = 10_000
-#: Renglones que se ven de un mensaje antes de que tenga su propio scroll.
-RENGLONES_VISIBLES = 14
+REFRESCO_MS = 5_000
+#: Ancho máximo de una burbuja: más ancho y se lee como documento, no como chat.
+ANCHO_BURBUJA = 560
 
-TODAS = "Todas las PCs"
-
-_ESTILO = """
-QDialog { background: #f4ede2; }
-QLabel { color: #2c2a27; background: transparent; }
-QFrame#tarjeta { background: #ffffff; border: 1px solid #ddd0c0; border-radius: 12px; }
-QFrame#tarjetaMia { background: #fbf3e6; border: 1px solid #e3c9a8; border-radius: 12px; }
-QPlainTextEdit { background: #fffdf9; color: #2c2a27; border: 1px solid #e8dccd;
-                 border-radius: 8px; padding: 6px; }
-QComboBox { background: #ffffff; color: #2c2a27; border: 1px solid #ddd0c0;
-            border-radius: 8px; min-height: 34px; padding: 0 10px; }
-QPushButton { background: #f8f2e9; color: #73341c; font-weight: 700;
-              border: 1px solid #ddd0c0; border-radius: 10px; min-height: 34px; padding: 0 14px; }
-QPushButton#enviar { background: #a84f2d; color: #ffffff; border: none; }
-QScrollArea { background: #f4ede2; border: none; }
-QScrollArea > QWidget > QWidget { background: #f4ede2; }
+_VERDE = "#00a884"
+_ESTILO = f"""
+QDialog {{ background: #f0f2f5; }}
+QLabel {{ color: #111b21; background: transparent; }}
+QListWidget {{ background: #ffffff; border: none; outline: none; }}
+QListWidget::item {{ border-bottom: 1px solid #f0f2f5; }}
+QListWidget::item:selected {{ background: #f0f2f5; }}
+QListWidget::item:hover {{ background: #f5f6f6; }}
+QFrame#cabecera {{ background: #f0f2f5; border-bottom: 1px solid #e1e4e6; }}
+QScrollArea {{ background: #efeae2; border: none; }}
+QScrollArea > QWidget > QWidget {{ background: #efeae2; }}
+QFrame#mia {{ background: #d9fdd3; border-radius: 10px; }}
+QFrame#otra {{ background: #ffffff; border-radius: 10px; }}
+QLabel#fecha {{ background: #ffffff; color: #54656f; border-radius: 8px;
+               padding: 4px 10px; font-size: 11px; }}
+QFrame#barraEscribir {{ background: #f0f2f5; }}
+QPlainTextEdit#escribir {{ background: #ffffff; color: #111b21; border: none;
+                          border-radius: 10px; padding: 6px 10px; font-size: 14px; }}
+QPushButton#enviar {{ background: {_VERDE}; color: #ffffff; border: none; border-radius: 22px;
+                     font-size: 18px; font-weight: 700; }}
+QPushButton#suave {{ background: transparent; color: #54656f; border: none; font-size: 13px;
+                    padding: 4px 8px; }}
+QPushButton#suave:hover {{ color: {_VERDE}; }}
+QToolButton#copiar {{ background: transparent; color: #027eb5; border: none; font-size: 12px;
+                     padding: 0 2px; }}
 """
 
 
@@ -66,10 +85,157 @@ def _mono() -> QFont:
     return fuente
 
 
-class BuzonDialog(QDialog):
-    """El chat. `session_factory` y `yo` se pueden cambiar para las pruebas."""
+def _local(momento: datetime | None) -> datetime | None:
+    if momento is None:
+        return None
+    try:
+        return momento.astimezone()
+    except Exception:  # noqa: BLE001
+        return momento
 
-    def __init__(self, parent: QWidget | None = None, *, session_factory=None, yo: str | None = None) -> None:
+
+def _hora(momento: datetime | None) -> str:
+    m = _local(momento)
+    return m.strftime("%H:%M") if m else ""
+
+
+def _dia(momento: datetime | None, hoy: date | None = None) -> str:
+    """«Hoy», «Ayer» o la fecha, como los separadores de WhatsApp."""
+    m = _local(momento)
+    if m is None:
+        return ""
+    hoy = hoy or date.today()
+    if m.date() == hoy:
+        return "Hoy"
+    if m.date() == hoy - timedelta(days=1):
+        return "Ayer"
+    dias = ("lun", "mar", "mié", "jue", "vie", "sáb", "dom")
+    return f"{dias[m.weekday()]} {m:%d/%m}"
+
+
+def _cuando_en_lista(momento: datetime | None) -> str:
+    m = _local(momento)
+    if m is None:
+        return ""
+    return _hora(m) if m.date() == date.today() else _dia(m)
+
+
+def _estado(chat) -> str:
+    if chat.es_grupo:
+        return "Lo que se manda aquí lo ven todas las PCs"
+    if chat.en_linea:
+        return "en línea"
+    if chat.visto is not None:
+        return f"últ. vez {_dia(chat.visto).lower()} a las {_hora(chat.visto)}"
+    return ""
+
+
+class _Escribir(QPlainTextEdit):
+    """Enter manda; Shift+Enter hace otro renglón. Crece hasta 6 renglones."""
+
+    enviar = pyqtSignal()
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.setObjectName("escribir")
+        self.setPlaceholderText("Escribe un mensaje o pega lo que salió en pantalla")
+        self.textChanged.connect(self._ajustar_alto)
+        self._ajustar_alto()
+
+    def keyPressEvent(self, event) -> None:  # noqa: N802 — nombre de Qt
+        if event.key() in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
+            if event.modifiers() & Qt.KeyboardModifier.ShiftModifier:
+                # A mano: Qt mete un «separador de línea» (U+2028) y no un
+                # salto, y ese carácter rompe el comando al pegarlo en PowerShell.
+                self.insertPlainText("\n")
+            else:
+                self.enviar.emit()
+            return
+        super().keyPressEvent(event)
+
+    def _ajustar_alto(self) -> None:
+        total = max(self.document().blockCount(), 1)
+        renglones = min(total, 6)
+        self.setFixedHeight(self.fontMetrics().lineSpacing() * renglones + 22)
+        self.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAsNeeded if total > 6 else Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+
+
+class _ItemChat(QWidget):
+    """Un renglón de la lista: nombre, último mensaje, hora y no leídos."""
+
+    def __init__(self, chat, yo: str) -> None:
+        super().__init__()
+        ly = QHBoxLayout(self)
+        ly.setContentsMargins(14, 10, 14, 10)
+        ly.setSpacing(10)
+
+        avatar = QLabel("👥" if chat.es_grupo else (chat.nombre[:1].upper() or "?"))
+        avatar.setFixedSize(42, 42)
+        avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        avatar.setStyleSheet(
+            "background: #dfe5e7; color: #54656f; border-radius: 21px;"
+            "font-size: 17px; font-weight: 700;"
+        )
+        ly.addWidget(avatar)
+
+        columna = QVBoxLayout()
+        columna.setSpacing(2)
+        arriba = QHBoxLayout()
+        punto = ""
+        if chat.en_linea is True:
+            punto = f"<span style='color:{_VERDE}'>●</span> "
+        elif chat.en_linea is False:
+            punto = "<span style='color:#c4c9cc'>●</span> "
+        self.nombre = QLabel(f"{punto}<b>{chat.nombre}</b>")
+        self.nombre.setStyleSheet("font-size: 14px;")
+        arriba.addWidget(self.nombre, 1)
+        self.cuando = QLabel(_cuando_en_lista(chat.ultimo_at))
+        self.cuando.setStyleSheet(
+            f"font-size: 11px; color: {_VERDE if chat.no_leidos else '#667781'};"
+        )
+        arriba.addWidget(self.cuando)
+        columna.addLayout(arriba)
+
+        abajo = QHBoxLayout()
+        vista = " ".join((chat.ultimo_texto or "").split())
+        if vista and chat.ultimo_de == yo:
+            vista = f"Tú: {vista}"
+        elif vista and chat.es_grupo:
+            vista = f"{chat.ultimo_de}: {vista}"
+        previa = QLabel()
+        previa.setStyleSheet("font-size: 12px; color: #667781;")
+        previa.setText(previa.fontMetrics().elidedText(
+            vista or "Sin mensajes todavía", Qt.TextElideMode.ElideRight, 200
+        ))
+        abajo.addWidget(previa, 1)
+        self.globo: QLabel | None = None
+        if chat.no_leidos:
+            self.globo = QLabel(str(chat.no_leidos))
+            self.globo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.globo.setMinimumWidth(20)
+            self.globo.setStyleSheet(
+                f"background: {_VERDE}; color: #ffffff; border-radius: 10px;"
+                "font-size: 11px; font-weight: 700; padding: 1px 6px;"
+            )
+            abajo.addWidget(self.globo)
+        columna.addLayout(abajo)
+        ly.addLayout(columna, 1)
+
+
+class BuzonDialog(QDialog):
+    """El chat. Los parámetros con nombre son para las pruebas."""
+
+    def __init__(
+        self,
+        parent: QWidget | None = None,
+        *,
+        session_factory=None,
+        yo: str | None = None,
+        leer_leidos=None,
+        guardar_leido=None,
+    ) -> None:
         super().__init__(parent)
         from pos_uniformes.services import buzon_service as bz
 
@@ -79,68 +245,110 @@ class BuzonDialog(QDialog):
             session_factory = get_session
         self._session_factory = session_factory
         self._yo = yo or bz.mi_nombre()
-        self._ultimo_id: int | None = None
+        self._leer_leidos = leer_leidos or bz.leidos
+        self._guardar_leido = guardar_leido or bz.marcar_leido
+        self._abierto: str = bz.GRUPO
+        self._chats: list = []
+        self._ultimo_pintado: tuple[str, int] | None = None
 
         self.setWindowTitle("Buzón entre PCs")
         self.setStyleSheet(_ESTILO)
-        self.resize(760, 720)
+        self.resize(1000, 700)
 
-        ly = QVBoxLayout(self)
-        ly.setContentsMargins(18, 16, 18, 14)
-        ly.setSpacing(10)
+        raiz = QHBoxLayout(self)
+        raiz.setContentsMargins(0, 0, 0, 0)
+        divisor = QSplitter(Qt.Orientation.Horizontal)
+        divisor.setChildrenCollapsible(False)
+        raiz.addWidget(divisor)
 
-        titulo = QLabel("💬 Buzón entre PCs")
-        titulo.setStyleSheet("font-size: 19px; font-weight: 800; color: #73341c;")
-        ly.addWidget(titulo)
-        pista = QLabel(
-            f"Esta PC firma como <b>{self._yo}</b>. Escribe o pega un texto y mándalo; "
-            "en la otra PC se copia con un toque. Nada se ejecuta solo."
-        )
-        pista.setWordWrap(True)
-        pista.setStyleSheet("font-size: 12px; color: #8a8177;")
-        ly.addWidget(pista)
+        # ── Izquierda: quién soy y la lista de chats ──
+        izquierda = QWidget()
+        # Con selector: sin él, el blanco se hereda a cada etiqueta de la lista
+        # y el renglón escogido salía con recuadros blancos encima.
+        izquierda.setObjectName("panelChats")
+        izquierda.setStyleSheet("QWidget#panelChats { background: #ffffff; }")
+        izq = QVBoxLayout(izquierda)
+        izq.setContentsMargins(0, 0, 0, 0)
+        izq.setSpacing(0)
+        yo_barra = QFrame()
+        yo_barra.setObjectName("cabecera")
+        yo_ly = QHBoxLayout(yo_barra)
+        yo_ly.setContentsMargins(14, 12, 10, 12)
+        self.yo_label = QLabel()
+        self.yo_label.setStyleSheet("font-size: 13px; color: #54656f;")
+        yo_ly.addWidget(self.yo_label, 1)
+        cambiar = QPushButton("✏️ Cambiar")
+        cambiar.setObjectName("suave")
+        cambiar.setToolTip("Cambiar cómo aparece esta PC en el chat")
+        cambiar.clicked.connect(self._pedir_nombre)
+        yo_ly.addWidget(cambiar)
+        izq.addWidget(yo_barra)
+        self.lista = QListWidget()
+        self.lista.currentRowChanged.connect(self._al_escoger_chat)
+        izq.addWidget(self.lista, 1)
+        divisor.addWidget(izquierda)
+
+        # ── Derecha: la conversación ──
+        derecha = QWidget()
+        der = QVBoxLayout(derecha)
+        der.setContentsMargins(0, 0, 0, 0)
+        der.setSpacing(0)
+        cabecera = QFrame()
+        cabecera.setObjectName("cabecera")
+        cab = QVBoxLayout(cabecera)
+        cab.setContentsMargins(16, 10, 16, 10)
+        cab.setSpacing(0)
+        self.titulo = QLabel()
+        self.titulo.setStyleSheet("font-size: 16px; font-weight: 700;")
+        self.subtitulo = QLabel()
+        self.subtitulo.setStyleSheet("font-size: 12px; color: #667781;")
+        cab.addWidget(self.titulo)
+        cab.addWidget(self.subtitulo)
+        der.addWidget(cabecera)
 
         self.estado = QLabel("")
         self.estado.setWordWrap(True)
-        self.estado.setStyleSheet("font-size: 12px; color: #a33b25; font-weight: 600;")
+        self.estado.setStyleSheet(
+            "background: #fff3c4; color: #7a5b00; padding: 8px 14px; font-size: 12px;"
+        )
         self.estado.setVisible(False)
-        ly.addWidget(self.estado)
+        der.addWidget(self.estado)
 
-        self._lista = QWidget()
-        self._lista_ly = QVBoxLayout(self._lista)
-        self._lista_ly.setContentsMargins(0, 0, 6, 0)
-        self._lista_ly.setSpacing(10)
-        self._lista_ly.addStretch()
+        self._mensajes = QWidget()
+        self._mensajes_ly = QVBoxLayout(self._mensajes)
+        self._mensajes_ly.setContentsMargins(40, 12, 40, 12)
+        self._mensajes_ly.setSpacing(4)
+        self._mensajes_ly.addStretch()
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
-        self._scroll.setWidget(self._lista)
-        ly.addWidget(self._scroll, 1)
+        self._scroll.setWidget(self._mensajes)
+        der.addWidget(self._scroll, 1)
 
-        fila = QHBoxLayout()
-        fila.addWidget(QLabel("Para:"))
-        self.destino = QComboBox()
-        self.destino.addItem(TODAS)
-        fila.addWidget(self.destino, 1)
-        self.actualizar_btn = QPushButton("Actualizar")
-        self.actualizar_btn.clicked.connect(self.refrescar)
-        fila.addWidget(self.actualizar_btn)
-        ly.addLayout(fila)
-
-        self.editor = QPlainTextEdit()
-        self.editor.setFont(_mono())
-        self.editor.setPlaceholderText("Escribe o pega aquí (un comando, lo que salió en pantalla…)")
-        self.editor.setFixedHeight(120)
-        ly.addWidget(self.editor)
-
-        abajo = QHBoxLayout()
-        abajo.addStretch()
-        self.enviar_btn = QPushButton("Enviar")
+        barra = QFrame()
+        barra.setObjectName("barraEscribir")
+        bly = QHBoxLayout(barra)
+        bly.setContentsMargins(12, 8, 12, 8)
+        bly.setSpacing(8)
+        pegar = QPushButton("📋 Pegar")
+        pegar.setObjectName("suave")
+        pegar.setToolTip("Pegar lo que copiaste (por ejemplo, lo que salió en PowerShell)")
+        pegar.clicked.connect(self._pegar)
+        bly.addWidget(pegar, 0, Qt.AlignmentFlag.AlignBottom)
+        self.editor = _Escribir()
+        self.editor.enviar.connect(self.enviar)
+        bly.addWidget(self.editor, 1)
+        self.enviar_btn = QPushButton("➤")
         self.enviar_btn.setObjectName("enviar")
+        self.enviar_btn.setFixedSize(QSize(44, 44))
+        self.enviar_btn.setToolTip("Enviar (Enter). Shift+Enter hace otro renglón.")
         self.enviar_btn.clicked.connect(self.enviar)
-        abajo.addWidget(self.enviar_btn)
-        ly.addLayout(abajo)
+        bly.addWidget(self.enviar_btn, 0, Qt.AlignmentFlag.AlignBottom)
+        der.addWidget(barra)
 
-        # Hijo de la ventana: muere con ella (un singleShot suelto puede
+        divisor.addWidget(derecha)
+        divisor.setSizes([320, 680])
+
+        # Hijos de la ventana: mueren con ella (un singleShot suelto puede
         # disparar con la ventana ya borrada).
         self._timer = QTimer(self)
         self._timer.setInterval(REFRESCO_MS)
@@ -151,6 +359,7 @@ class BuzonDialog(QDialog):
         self._bajar.setInterval(0)
         self._bajar.timeout.connect(self._bajar_al_final)
 
+        self._pintar_yo()
         self.refrescar()
 
     # ── Datos ───────────────────────────────────────────────────────────
@@ -160,27 +369,30 @@ class BuzonDialog(QDialog):
 
         try:
             with self._session_factory() as session:
-                mensajes = bz.recientes(session, yo=self._yo)
-                destinos = bz.destinos(session, yo=self._yo)
+                chats = bz.chats(session, yo=self._yo, leidos=self._leer_leidos())
+                mensajes = bz.conversacion(session, yo=self._yo, con=self._abierto)
                 filas = [(m.id, m.de, m.para, m.texto, m.created_at) for m in mensajes]
         except Exception:  # noqa: BLE001 — sin base, se dice y se sigue
             logger.exception("Buzón: no se pudo leer")
-            self._avisar("Sin conexión con la PC principal: no se pudieron leer los mensajes.")
+            self._avisar("Sin conexión con la PC principal. Se vuelve a intentar sola en unos segundos.")
             return
         self._avisar("")
-        self._poner_destinos(destinos)
-        ultimo = filas[-1][0] if filas else None
-        if ultimo == self._ultimo_id and self._lista_ly.count() > 1:
-            return  # nada nuevo: no se repinta (no se pierde lo que se seleccionó)
-        self._ultimo_id = ultimo
-        self._pintar(filas)
+        self._pintar_lista(chats)
+        self._pintar_conversacion(filas)
+
+    def abrir_chat(self, clave: str) -> None:
+        for i, chat in enumerate(self._chats):
+            if chat.clave == clave:
+                self.lista.setCurrentRow(i)
+                return
 
     def enviar(self) -> None:
         from pos_uniformes.services import buzon_service as bz
 
         texto = self.editor.toPlainText()
-        para = self.destino.currentText()
-        para = None if para == TODAS else para
+        if not texto.strip():
+            return
+        para = None if self._abierto == bz.GRUPO else self._abierto
         try:
             with self._session_factory() as session:
                 bz.enviar(session, texto, de=self._yo, para=para)
@@ -191,9 +403,55 @@ class BuzonDialog(QDialog):
         except Exception:  # noqa: BLE001
             logger.exception("Buzón: no se pudo enviar")
             # Lo escrito se queda en el cuadro: no se pierde por un tropiezo de red.
-            self._avisar("Sin conexión con la PC principal: no se mandó. Tu texto sigue ahí.")
+            self._avisar("Sin conexión con la PC principal: no se mandó. Tu mensaje sigue escrito abajo.")
             return
         self.editor.clear()
+        self.refrescar()
+
+    # ── Acciones ────────────────────────────────────────────────────────
+
+    def _al_escoger_chat(self, fila: int) -> None:
+        if 0 <= fila < len(self._chats) and self._chats[fila].clave != self._abierto:
+            self._abierto = self._chats[fila].clave
+            self._ultimo_pintado = None
+            self.refrescar()
+            self.editor.setFocus()
+
+    def _pegar(self) -> None:
+        self.editor.insertPlainText(QApplication.clipboard().text())
+        self.editor.setFocus()
+
+    def _pedir_nombre(self) -> None:
+        nuevo, ok = QInputDialog.getText(
+            self, "Nombre de esta PC",
+            "¿Cómo se llama esta PC en el chat? (por ejemplo: Entrada, Caja, PC principal)",
+            text=self._yo,
+        )
+        if ok and nuevo.strip() and nuevo.strip() != self._yo:
+            self.renombrar(nuevo.strip())
+
+    def renombrar(self, nuevo: str) -> None:
+        """Cambia el nombre de esta PC y se lleva su historial al nombre nuevo."""
+        from pos_uniformes.services import buzon_service as bz
+
+        viejo = self._yo
+        try:
+            with self._session_factory() as session:
+                bz.renombrar(session, viejo, nuevo)
+                session.commit()
+        except Exception:  # noqa: BLE001
+            logger.exception("Buzón: no se pudo renombrar")
+            self._avisar("Sin conexión con la PC principal: el nombre no se cambió.")
+            return
+        try:
+            from pos_uniformes.services.satellite_identity_service import set_satellite_name
+
+            set_satellite_name(nuevo)
+        except Exception:  # noqa: BLE001 — sin identidad local, solo el buzón
+            pass
+        self._yo = nuevo
+        self._ultimo_pintado = None
+        self._pintar_yo()
         self.refrescar()
 
     # ── Pintar ──────────────────────────────────────────────────────────
@@ -202,78 +460,152 @@ class BuzonDialog(QDialog):
         self.estado.setText(texto)
         self.estado.setVisible(bool(texto))
 
-    def _poner_destinos(self, destinos: list[str]) -> None:
-        actual = self.destino.currentText()
-        nuevos = [TODAS, *destinos]
-        if [self.destino.itemText(i) for i in range(self.destino.count())] == nuevos:
-            return
-        self.destino.blockSignals(True)
-        self.destino.clear()
-        self.destino.addItems(nuevos)
-        indice = self.destino.findText(actual)
-        self.destino.setCurrentIndex(max(indice, 0))
-        self.destino.blockSignals(False)
+    def _pintar_yo(self) -> None:
+        self.yo_label.setText(f"Esta PC es <b style='color:#111b21'>{self._yo}</b>")
 
-    def _pintar(self, filas) -> None:
-        while self._lista_ly.count() > 1:     # el último es el resorte
-            item = self._lista_ly.takeAt(0)
-            if item.widget() is not None:
-                item.widget().deleteLater()
+    def _pintar_lista(self, chats) -> None:
+        self._chats = list(chats)
+        self.lista.blockSignals(True)
+        for i in range(self.lista.count()):
+            viejo = self.lista.itemWidget(self.lista.item(i))
+            if viejo is not None:
+                viejo.hide()
+        self.lista.clear()
+        fila_abierta = 0
+        for i, chat in enumerate(self._chats):
+            item = QListWidgetItem()
+            item.setSizeHint(QSize(0, 66))
+            self.lista.addItem(item)
+            self.lista.setItemWidget(item, _ItemChat(chat, self._yo))
+            if chat.clave == self._abierto:
+                fila_abierta = i
+        self.lista.setCurrentRow(fila_abierta)
+        self.lista.blockSignals(False)
+        actual = self._chats[fila_abierta] if self._chats else None
+        if actual is not None:
+            self._abierto = actual.clave
+            self.titulo.setText(("👥 " if actual.es_grupo else "") + actual.nombre)
+            self.subtitulo.setText(_estado(actual))
+            self.subtitulo.setVisible(bool(_estado(actual)))
+
+    def _pintar_conversacion(self, filas) -> None:
+        ultimo = filas[-1][0] if filas else 0
+        if ultimo:
+            self._guardar_leido(self._abierto, ultimo)
+            self._apagar_globo()          # el chat abierto no tiene pendientes
+        firma = (self._abierto, ultimo)
+        if firma == self._ultimo_pintado:
+            return  # nada nuevo: no se repinta (no se pierde lo seleccionado)
+        self._ultimo_pintado = firma
+
+        while self._mensajes_ly.count() > 1:     # el último es el resorte
+            item = self._mensajes_ly.takeAt(0)
+            viejo = item.widget()
+            if viejo is not None:
+                # Fuera de la pantalla YA: deleteLater solo lo borra cuando el
+                # bucle de eventos llega a eso, y mientras se encimaba con lo nuevo.
+                viejo.hide()
+                viejo.setParent(None)
+                viejo.deleteLater()
+
         if not filas:
-            vacio = QLabel("Todavía no hay mensajes.")
+            vacio = QLabel(
+                "Todavía no hay mensajes aquí.\nEscribe abajo y dale Enter para mandarlo."
+            )
+            vacio.setObjectName("fecha")
             vacio.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            vacio.setStyleSheet("color: #8a8177; padding: 30px;")
-            self._lista_ly.insertWidget(0, vacio)
+            self._mensajes_ly.insertWidget(0, vacio, 0, Qt.AlignmentFlag.AlignHCenter)
             return
-        for i, (_id, de, para, texto, creado) in enumerate(filas):
-            self._lista_ly.insertWidget(i, self._tarjeta(de, para, texto, creado))
-        # Después de que el layout acomode las tarjetas, si no el máximo es viejo.
+        posicion = 0
+        dia_anterior = None
+        for _id, de, _para, texto, creado in filas:
+            dia = _dia(creado)
+            if dia != dia_anterior:
+                separador = QLabel(dia)
+                separador.setObjectName("fecha")
+                self._mensajes_ly.insertWidget(posicion, separador, 0, Qt.AlignmentFlag.AlignHCenter)
+                posicion += 1
+                dia_anterior = dia
+            self._mensajes_ly.insertWidget(posicion, self._burbuja(de, texto, creado))
+            posicion += 1
+        # Después de que el layout acomode las burbujas, si no el máximo es viejo.
         self._bajar.start()
+
+    def _apagar_globo(self) -> None:
+        from dataclasses import replace
+
+        for i, chat in enumerate(self._chats):
+            if chat.clave == self._abierto and chat.no_leidos:
+                self._chats[i] = replace(chat, no_leidos=0)
+                renglon = self.lista.itemWidget(self.lista.item(i))
+                if renglon is not None and renglon.globo is not None:
+                    renglon.globo.hide()
+                    renglon.cuando.setStyleSheet("font-size: 11px; color: #667781;")
 
     def _bajar_al_final(self) -> None:
         barra = self._scroll.verticalScrollBar()
         barra.setValue(barra.maximum())
 
-    def _tarjeta(self, de: str, para: str | None, texto: str, creado) -> QFrame:
+    def _burbuja(self, de: str, texto: str, creado) -> QWidget:
+        from pos_uniformes.services import buzon_service as bz
+
         mio = de == self._yo
-        tarjeta = QFrame()
-        tarjeta.setObjectName("tarjetaMia" if mio else "tarjeta")
-        ly = QVBoxLayout(tarjeta)
-        ly.setContentsMargins(12, 10, 12, 10)
-        ly.setSpacing(6)
+        fila = QWidget()
+        fly = QHBoxLayout(fila)
+        fly.setContentsMargins(0, 2, 0, 2)
+        if mio:
+            fly.addStretch(1)
 
-        arriba = QHBoxLayout()
-        cuando = ""
-        try:
-            cuando = creado.astimezone().strftime("%d/%m %H:%M") if creado is not None else ""
-        except Exception:  # noqa: BLE001
-            cuando = ""
-        quien = QLabel(f"<b>{'Tú' if mio else de}</b> → {para or 'todas'}  ·  {cuando}")
-        quien.setStyleSheet("font-size: 12px; color: #73341c;")
-        arriba.addWidget(quien, 1)
-        copiar = QPushButton("📋 Copiar")
+        burbuja = QFrame()
+        burbuja.setObjectName("mia" if mio else "otra")
+        burbuja.setMaximumWidth(ANCHO_BURBUJA)
+        bly = QVBoxLayout(burbuja)
+        bly.setContentsMargins(10, 6, 10, 4)
+        bly.setSpacing(2)
+        if not mio and self._abierto == bz.GRUPO:
+            quien = QLabel(de)
+            quien.setStyleSheet("font-size: 12px; font-weight: 700; color: #1f7aec;")
+            bly.addWidget(quien)
+
+        cuerpo = QLabel(texto)
+        cuerpo.setObjectName("cuerpo")
+        cuerpo.setTextFormat(Qt.TextFormat.PlainText)
+        cuerpo.setWordWrap(True)
+        cuerpo.setTextInteractionFlags(Qt.TextInteractionFlag.TextSelectableByMouse)
+        if bz.parece_codigo(texto):
+            cuerpo.setFont(_mono())
+        else:
+            # Con setFont y no con hoja de estilo: el ancho de abajo se mide
+            # con esta letra, y la de la hoja aún no aplica a esta altura.
+            letra = cuerpo.font()
+            letra.setPixelSize(14)
+            cuerpo.setFont(letra)
+        # Con wordWrap, QLabel se encoge al mínimo y parte hasta lo que cabía.
+        # Se le pide el ancho de su renglón más largo, sin pasar del de la burbuja.
+        largo = max((cuerpo.fontMetrics().horizontalAdvance(r) for r in texto.splitlines() or [""]), default=0)
+        cuerpo.setMinimumWidth(min(largo + 4, ANCHO_BURBUJA - 24))
+        bly.addWidget(cuerpo)
+
+        pie = QHBoxLayout()
+        copiar = QToolButton()
+        copiar.setObjectName("copiar")
+        copiar.setText("📋 Copiar")
+        copiar.setCursor(Qt.CursorShape.PointingHandCursor)
         copiar.clicked.connect(lambda _=False, t=texto, b=copiar: self._copiar(t, b))
-        arriba.addWidget(copiar)
-        ly.addLayout(arriba)
+        pie.addWidget(copiar)
+        pie.addStretch(1)
+        hora = QLabel(_hora(creado))
+        hora.setStyleSheet("font-size: 11px; color: #667781;")
+        pie.addWidget(hora)
+        bly.addLayout(pie)
 
-        cuerpo = QPlainTextEdit()
-        cuerpo.setReadOnly(True)
-        cuerpo.setFont(_mono())
-        cuerpo.setWordWrapMode(QTextOption.WrapMode.WrapAnywhere)
-        cuerpo.setPlainText(texto)
-        renglones = min(max(texto.count("\n") + 1, 1), RENGLONES_VISIBLES)
-        # Renglones + el aire del cuadro (márgenes del documento, relleno y
-        # borde). Corto, y aparece la barra aunque el texto quepa.
-        margen = int(cuerpo.document().documentMargin() * 2) + 16
-        alto = cuerpo.fontMetrics().lineSpacing() * renglones + margen
-        cuerpo.setFixedHeight(alto)
-        if texto.count("\n") + 1 <= RENGLONES_VISIBLES:
-            cuerpo.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        ly.addWidget(cuerpo)
-        return tarjeta
+        fly.addWidget(burbuja)
+        if not mio:
+            fly.addStretch(1)
+        return fila
 
     @staticmethod
-    def _copiar(texto: str, boton: QPushButton) -> None:
+    def _copiar(texto: str, boton: QToolButton) -> None:
         QApplication.clipboard().setText(texto)
         boton.setText("✅ Copiado")
 

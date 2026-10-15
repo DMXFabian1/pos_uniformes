@@ -1,4 +1,5 @@
-"""La ventana del buzón: se manda, se ve en la otra PC y se copia."""
+"""La ventana del buzón, como WhatsApp: chats a la izquierda, lo escrito va al
+chat abierto, Enter manda y cada mensaje se copia con un toque."""
 
 from __future__ import annotations
 
@@ -8,14 +9,18 @@ from contextlib import contextmanager
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt6.QtWidgets import QApplication, QPlainTextEdit, QPushButton  # noqa: E402
-from sqlalchemy import create_engine  # noqa: E402
+from PyQt6.QtCore import Qt  # noqa: E402
+from PyQt6.QtGui import QKeyEvent, QTextCursor  # noqa: E402
+from PyQt6.QtCore import QEvent  # noqa: E402
+from PyQt6.QtWidgets import QApplication, QLabel, QToolButton  # noqa: E402
+from sqlalchemy import create_engine, select  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
 from pos_uniformes.database.connection import Base  # noqa: E402
+from pos_uniformes.database.models import BuzonMensaje  # noqa: E402
 from pos_uniformes.services import buzon_service as bz  # noqa: E402
-from pos_uniformes.ui.dialogs.buzon_dialog import TODAS, BuzonDialog  # noqa: E402
+from pos_uniformes.ui.dialogs.buzon_dialog import BuzonDialog  # noqa: E402
 
 _app = QApplication.instance() or QApplication([])
 
@@ -27,6 +32,7 @@ class _ConBase(unittest.TestCase):
         )
         Base.metadata.create_all(self.engine)
         self.abiertas: list[BuzonDialog] = []
+        self.leidos: dict[str, dict[str, int]] = {}
 
     def tearDown(self) -> None:
         for d in self.abiertas:
@@ -41,49 +47,111 @@ class _ConBase(unittest.TestCase):
         finally:
             s.close()
 
+    def _mandar(self, texto: str, de: str, para: str | None = None) -> None:
+        with self._sesion() as s:
+            bz.enviar(s, texto, de=de, para=para)
+            s.commit()
+
     def _ventana(self, yo: str) -> BuzonDialog:
-        d = BuzonDialog(session_factory=self._sesion, yo=yo)
+        propios = self.leidos.setdefault(yo, {})
+        d = BuzonDialog(
+            session_factory=self._sesion, yo=yo,
+            leer_leidos=lambda: dict(propios),
+            guardar_leido=lambda clave, i: propios.__setitem__(clave, i),
+        )
         d._timer.stop()             # nada de esperas: se refresca a mano
         self.abiertas.append(d)
         return d
 
     @staticmethod
     def _textos(d: BuzonDialog) -> list[str]:
-        return [w.toPlainText() for w in d._lista.findChildren(QPlainTextEdit)]
+        return [w.text() for w in d._mensajes.findChildren(QLabel, "cuerpo") if w.isVisibleTo(d._mensajes)]
+
+    @staticmethod
+    def _claves(d: BuzonDialog) -> list[str]:
+        return [c.clave for c in d._chats]
 
 
-class BuzonTests(_ConBase):
-    def test_lo_que_manda_la_principal_lo_ve_entrada(self) -> None:
+class ChatsTests(_ConBase):
+    def test_abre_en_el_grupo_y_el_grupo_va_arriba(self) -> None:
+        self._mandar("hola", de="Claude", para="Entrada")
+        d = self._ventana("Entrada")
+        self.assertEqual(self._claves(d), [bz.GRUPO, "Claude"])
+        self.assertEqual(d._abierto, bz.GRUPO)
+
+    def test_lo_escrito_va_al_chat_abierto(self) -> None:
+        # Era el tropiezo de la versión con «Para:»: aquí no hay que escoger nada.
+        self._mandar("hola", de="Claude", para="Entrada")
+        d = self._ventana("Entrada")
+        d.abrir_chat("Claude")
+        d.editor.setPlainText("PC: DESKTOP-AT4V4QO\nTotal en cola: 2")
+        d.enviar()
+        with self._sesion() as s:
+            ultimo = s.scalars(select(BuzonMensaje).order_by(BuzonMensaje.id.desc())).first()
+        self.assertEqual((ultimo.de, ultimo.para), ("Entrada", "Claude"))
+        self.assertEqual(d.editor.toPlainText(), "")
+
+    def test_enter_manda_y_shift_enter_hace_otro_renglon(self) -> None:
+        d = self._ventana("Entrada")
+        d.editor.setPlainText("uno")
+        d.editor.moveCursor(QTextCursor.MoveOperation.End)   # donde va escribiendo
+        shift = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Return, Qt.KeyboardModifier.ShiftModifier)
+        d.editor.keyPressEvent(shift)
+        self.assertEqual(d.editor.toPlainText(), "uno\n")    # salto normal, no U+2028
+        enter = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Return, Qt.KeyboardModifier.NoModifier)
+        d.editor.keyPressEvent(enter)
+        self.assertEqual(d.editor.toPlainText(), "")
+        self.assertEqual(self._textos(d), ["uno"])     # al grupo, que era el abierto
+
+    def test_lo_que_manda_una_pc_le_llega_a_la_otra(self) -> None:
         principal, entrada = self._ventana("Principal"), self._ventana("Entrada")
-        principal.editor.setPlainText('Get-Content "$env:APPDATA\\x.json"')
+        principal.editor.setPlainText("ya actualicé")
         principal.enviar()
         entrada.refrescar()
-        self.assertEqual(self._textos(entrada), ['Get-Content "$env:APPDATA\\x.json"'])
-        self.assertEqual(principal.editor.toPlainText(), "")   # se vació al mandar
+        self.assertEqual(self._textos(entrada), ["ya actualicé"])
 
-    def test_un_mensaje_para_otra_pc_no_le_llega_a_esta(self) -> None:
-        with self._sesion() as s:
-            bz.enviar(s, "solo para caja", de="Claude", para="Caja")
-            s.commit()
-        self.assertEqual(self._textos(self._ventana("Entrada")), [])
-
-    def test_copiar_deja_el_texto_exacto_en_el_portapapeles(self) -> None:
-        with self._sesion() as s:
-            bz.enviar(s, "linea 1\n    linea 2", de="Claude")
-            s.commit()
+    def test_un_chat_privado_no_se_ve_desde_otra_pc(self) -> None:
+        self._mandar("solo para caja", de="Claude", para="Caja")
         d = self._ventana("Entrada")
-        boton = next(b for b in d._lista.findChildren(QPushButton) if "Copiar" in b.text())
+        d.abrir_chat("Claude")
+        self.assertEqual(d._abierto, "Claude")
+        self.assertEqual(self._textos(d), [])
+
+
+class NoLeidosTests(_ConBase):
+    def test_cuenta_lo_que_no_ha_visto_y_se_apaga_al_abrirlo(self) -> None:
+        self._mandar("uno", de="Claude", para="Entrada")
+        self._mandar("dos", de="Claude", para="Entrada")
+        d = self._ventana("Entrada")
+        claude = next(c for c in d._chats if c.clave == "Claude")
+        self.assertEqual(claude.no_leidos, 2)
+        d.abrir_chat("Claude")
+        d.refrescar()
+        claude = next(c for c in d._chats if c.clave == "Claude")
+        self.assertEqual(claude.no_leidos, 0)
+
+    def test_lo_que_mando_yo_no_cuenta_como_no_leido(self) -> None:
+        self._mandar("mio", de="Entrada", para="Claude")
+        d = self._ventana("Entrada")
+        self.assertEqual(next(c for c in d._chats if c.clave == "Claude").no_leidos, 0)
+
+
+class CopiarYNombreTests(_ConBase):
+    def test_copiar_deja_el_texto_exacto(self) -> None:
+        self._mandar("linea 1\n    linea 2", de="Claude")
+        d = self._ventana("Entrada")
+        boton = next(b for b in d._mensajes.findChildren(QToolButton) if "Copiar" in b.text())
         boton.click()
         self.assertEqual(QApplication.clipboard().text(), "linea 1\n    linea 2")
         self.assertIn("Copiado", boton.text())
 
-    def test_se_puede_escoger_a_quien(self) -> None:
-        with self._sesion() as s:
-            bz.enviar(s, "hola", de="Claude")
-            s.commit()
-        d = self._ventana("Entrada")
-        opciones = [d.destino.itemText(i) for i in range(d.destino.count())]
-        self.assertEqual(opciones, [TODAS, "Claude"])
+    def test_cambiar_el_nombre_se_lleva_el_historial(self) -> None:
+        self._mandar("hola", de="Claude", para="DESKTOP-AT4V4QO")
+        d = self._ventana("DESKTOP-AT4V4QO")
+        d.renombrar("Entrada")
+        d.abrir_chat("Claude")
+        self.assertEqual(self._textos(d), ["hola"])
+        self.assertIn("Entrada", d.yo_label.text())
 
     def test_sin_conexion_se_dice_y_lo_escrito_no_se_pierde(self) -> None:
         d = self._ventana("Entrada")
@@ -98,12 +166,6 @@ class BuzonTests(_ConBase):
         d.enviar()
         self.assertFalse(d.estado.isHidden())
         self.assertEqual(d.editor.toPlainText(), "algo importante")
-
-    def test_vacio_no_se_manda(self) -> None:
-        d = self._ventana("Entrada")
-        d.editor.setPlainText("   ")
-        d.enviar()
-        self.assertIn("vacío", d.estado.text())
 
 
 if __name__ == "__main__":
