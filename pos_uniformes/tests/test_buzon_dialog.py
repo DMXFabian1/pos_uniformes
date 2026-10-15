@@ -52,12 +52,14 @@ class _ConBase(unittest.TestCase):
             bz.enviar(s, texto, de=de, para=para)
             s.commit()
 
-    def _ventana(self, yo: str) -> BuzonDialog:
+    def _ventana(self, yo: str, **extra) -> BuzonDialog:
         propios = self.leidos.setdefault(yo, {})
         d = BuzonDialog(
             session_factory=self._sesion, yo=yo,
             leer_leidos=lambda: dict(propios),
             guardar_leido=lambda clave, i: propios.__setitem__(clave, i),
+            en_hilo=False,
+            **extra,
         )
         d._timer.stop()             # nada de esperas: se refresca a mano
         self.abiertas.append(d)
@@ -166,6 +168,121 @@ class CopiarYNombreTests(_ConBase):
         d.enviar()
         self.assertFalse(d.estado.isHidden())
         self.assertEqual(d.editor.toPlainText(), "algo importante")
+
+
+
+class EjecutarTests(_ConBase):
+    def _botones(self, d: BuzonDialog, texto: str) -> list[QToolButton]:
+        return [b for b in d._mensajes.findChildren(QToolButton) if texto in b.text()]
+
+    def test_el_boton_sale_solo_en_lo_que_manda_alguien_de_confianza(self) -> None:
+        self._mandar("Get-ChildItem $env:APPDATA", de="Claude", para="Entrada")
+        self._mandar("Get-ChildItem $env:APPDATA", de="Caja", para="Entrada")
+        d = self._ventana("Entrada")
+        d.abrir_chat("Claude")
+        self.assertEqual(len(self._botones(d, "Ejecutar")), 1)
+        d.abrir_chat("Caja")
+        self.assertEqual(self._botones(d, "Ejecutar"), [])
+
+    def test_un_mensaje_de_texto_normal_no_se_ofrece_para_ejecutar(self) -> None:
+        self._mandar("Dale Ejecutar al de abajo, por favor.", de="Claude", para="Entrada")
+        d = self._ventana("Entrada")
+        d.abrir_chat("Claude")
+        self.assertEqual(self._botones(d, "Ejecutar"), [])
+
+    def test_con_pin_corre_y_el_resultado_regresa_a_quien_lo_pidio(self) -> None:
+        from pos_uniformes.services.buzon_ejecutar_service import Resultado
+
+        corridos = []
+        self._mandar("Get-Date | Out-String", de="Claude", para="Entrada")
+        d = self._ventana(
+            "Entrada",
+            confirmar=lambda *_: True,
+            ejecutar=lambda t: corridos.append(t) or Resultado("15/10/2026\n", 0, 0.4),
+        )
+        d.abrir_chat("Claude")
+        self._botones(d, "Ejecutar")[0].click()
+        self.assertEqual(corridos, ["Get-Date | Out-String"])
+        with self._sesion() as s:
+            ultimo = s.scalars(select(BuzonMensaje).order_by(BuzonMensaje.id.desc())).first()
+        self.assertEqual((ultimo.de, ultimo.para), ("Entrada", "Claude"))
+        self.assertIn("15/10/2026", ultimo.texto)
+
+    def test_con_pin_equivocado_no_corre_nada(self) -> None:
+        corridos = []
+        self._mandar("Get-Date | Out-String", de="Claude", para="Entrada")
+        d = self._ventana("Entrada", confirmar=lambda *_: False, ejecutar=corridos.append)
+        d.abrir_chat("Claude")
+        self._botones(d, "Ejecutar")[0].click()
+        self.assertEqual(corridos, [])
+        self.assertIn("PIN", d.estado.text())
+
+    def test_si_se_arrepiente_no_pasa_nada(self) -> None:
+        corridos = []
+        self._mandar("Get-Date | Out-String", de="Claude", para="Entrada")
+        d = self._ventana("Entrada", confirmar=lambda *_: None, ejecutar=corridos.append)
+        d.abrir_chat("Claude")
+        self._botones(d, "Ejecutar")[0].click()
+        self.assertEqual(corridos, [])
+        self.assertTrue(d.estado.isHidden())
+
+
+class AvisoTests(unittest.TestCase):
+    def setUp(self) -> None:
+        from PyQt6.QtWidgets import QWidget
+
+        from pos_uniformes.ui.helpers.buzon_aviso import BuzonAviso
+
+        self.ventana = QWidget()
+        self.ventana.resize(800, 600)
+        self.n = 0
+        self.abiertos = []
+        self.aviso = BuzonAviso(
+            self.ventana, contar=lambda: self.n,
+            abrir=lambda v: self.abiertos.append(v), en_hilo=False,
+        )
+        self.aviso._timer.stop()
+        self.aviso._primera.stop()
+
+    def tearDown(self) -> None:
+        self.ventana.deleteLater()
+
+    def test_sin_mensajes_no_se_ve(self) -> None:
+        self.aviso.revisar()
+        self.assertTrue(self.aviso.isHidden())
+
+    def test_con_mensajes_dice_cuantos(self) -> None:
+        self.n = 2
+        self.aviso.revisar()
+        self.assertFalse(self.aviso.isHidden())
+        self.assertIn("2 mensajes nuevos", self.aviso.text())
+
+    def test_uno_en_singular(self) -> None:
+        self.n = 1
+        self.aviso.revisar()
+        self.assertIn("1 mensaje nuevo", self.aviso.text())
+
+    def test_tocarlo_abre_el_buzon_y_vuelve_a_contar(self) -> None:
+        self.n = 3
+        self.aviso.revisar()
+        self.n = 0                      # lo leyó en el buzón
+        self.aviso.click()
+        self.assertEqual(self.abiertos, [self.ventana])
+        self.assertTrue(self.aviso.isHidden())
+
+    def test_va_en_la_esquina_de_abajo_a_la_derecha(self) -> None:
+        self.n = 1
+        self.aviso.revisar()
+        self.assertGreater(self.aviso.x(), 800 / 2)
+        self.assertGreater(self.aviso.y(), 600 / 2)
+
+    def test_si_no_se_puede_contar_no_truena(self) -> None:
+        def _falla():
+            raise OSError("sin red")
+
+        self.aviso._contar = _falla
+        self.aviso.revisar()
+        self.assertTrue(self.aviso.isHidden())
 
 
 if __name__ == "__main__":

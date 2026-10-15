@@ -1922,6 +1922,12 @@ class MainWindow(QMainWindow):
         header_menu.addSeparator()
         self.buzon_action = header_menu.addAction("Buzón entre PCs")
         self.buzon_action.triggered.connect(self._handle_open_buzon)
+        try:
+            from pos_uniformes.ui.helpers.buzon_aviso import BuzonAviso
+
+            self._buzon_aviso = BuzonAviso(self)
+        except Exception:  # noqa: BLE001 — un aviso nunca impide abrir el POS
+            pass
         self.header_more_button = QToolButton()
         self.header_more_button.setText("Mas")
         self.header_more_button.setObjectName("toolbarSoftButton")

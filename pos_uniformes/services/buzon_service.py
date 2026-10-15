@@ -257,3 +257,8 @@ def renombrar(session: Session, viejo: str, nuevo: str) -> int:
         pass
     session.flush()
     return int(a.rowcount or 0) + int(b.rowcount or 0)
+
+
+def no_leidos_total(session: Session, *, yo: str, leidos: dict[str, int] | None = None) -> int:
+    """Cuántos mensajes le esperan a esta PC en todos sus chats (para el aviso)."""
+    return sum(c.no_leidos for c in chats(session, yo=yo, leidos=leidos))

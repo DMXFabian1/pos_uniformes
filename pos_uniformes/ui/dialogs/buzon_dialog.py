@@ -20,10 +20,12 @@ from PyQt6.QtGui import QFont, QFontDatabase
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
+    QDialogButtonBox,
     QFrame,
     QHBoxLayout,
     QInputDialog,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QPlainTextEdit,
@@ -67,6 +69,8 @@ QPushButton#suave {{ background: transparent; color: #54656f; border: none; font
 QPushButton#suave:hover {{ color: {_VERDE}; }}
 QToolButton#copiar {{ background: transparent; color: #027eb5; border: none; font-size: 12px;
                      padding: 0 2px; }}
+QToolButton#ejecutar {{ background: transparent; color: {_VERDE}; border: none; font-size: 12px;
+                       font-weight: 700; padding: 0 6px; }}
 """
 
 
@@ -224,8 +228,58 @@ class _ItemChat(QWidget):
         ly.addLayout(columna, 1)
 
 
+class _ConfirmarEjecucion(QDialog):
+    """Antes de correr: el comando completo a la vista y el PIN de admin."""
+
+    def __init__(self, parent: QWidget, texto: str, de: str) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Ejecutar en esta PC")
+        self.setMinimumWidth(560)
+        ly = QVBoxLayout(self)
+        aviso = QLabel(
+            f"<b>{de}</b> pide correr esto en esta PC. Revísalo: lo que salga "
+            f"se le manda de regreso."
+        )
+        aviso.setWordWrap(True)
+        ly.addWidget(aviso)
+        vista = QPlainTextEdit(texto)
+        vista.setReadOnly(True)
+        vista.setFont(_mono())
+        vista.setMinimumHeight(160)
+        ly.addWidget(vista)
+        self.pin = QLineEdit()
+        self.pin.setEchoMode(QLineEdit.EchoMode.Password)
+        self.pin.setPlaceholderText("PIN de administrador")
+        self.pin.returnPressed.connect(self.accept)
+        ly.addWidget(self.pin)
+        self.pin.setFocus()
+        botones = QDialogButtonBox()
+        botones.addButton("Cancelar", QDialogButtonBox.ButtonRole.RejectRole)
+        botones.addButton("▶ Ejecutar en esta PC", QDialogButtonBox.ButtonRole.AcceptRole)
+        botones.accepted.connect(self.accept)
+        botones.rejected.connect(self.reject)
+        ly.addWidget(botones)
+
+
+def _pin_correcto(pin: str) -> bool:
+    from pos_uniformes.ui.dialogs.satellite_admin_dialog import _ADMIN_PIN
+
+    return (pin or "").strip() == _ADMIN_PIN
+
+
+def _confirmar_con_pin(parent: QWidget, texto: str, de: str) -> bool | None:
+    """True = adelante; False = PIN equivocado; None = se arrepintió."""
+    dlg = _ConfirmarEjecucion(parent, texto, de)
+    if dlg.exec() != QDialog.DialogCode.Accepted:
+        return None
+    return _pin_correcto(dlg.pin.text())
+
+
 class BuzonDialog(QDialog):
     """El chat. Los parámetros con nombre son para las pruebas."""
+
+    #: Terminó de correr un comando (desde el hilo que lo corrió).
+    _ejecucion_terminada = pyqtSignal()
 
     def __init__(
         self,
@@ -235,6 +289,9 @@ class BuzonDialog(QDialog):
         yo: str | None = None,
         leer_leidos=None,
         guardar_leido=None,
+        confirmar=None,
+        ejecutar=None,
+        en_hilo: bool = True,
     ) -> None:
         super().__init__(parent)
         from pos_uniformes.services import buzon_service as bz
@@ -247,6 +304,12 @@ class BuzonDialog(QDialog):
         self._yo = yo or bz.mi_nombre()
         self._leer_leidos = leer_leidos or bz.leidos
         self._guardar_leido = guardar_leido or bz.marcar_leido
+        self._confirmar = confirmar or _confirmar_con_pin
+        if ejecutar is None:
+            from pos_uniformes.services.buzon_ejecutar_service import ejecutar
+        self._ejecutar = ejecutar
+        self._en_hilo = en_hilo
+        self._ejecucion_terminada.connect(self._al_terminar_ejecucion)
         self._abierto: str = bz.GRUPO
         self._chats: list = []
         self._ultimo_pintado: tuple[str, int] | None = None
@@ -593,6 +656,17 @@ class BuzonDialog(QDialog):
         copiar.setCursor(Qt.CursorShape.PointingHandCursor)
         copiar.clicked.connect(lambda _=False, t=texto, b=copiar: self._copiar(t, b))
         pie.addWidget(copiar)
+        from pos_uniformes.services.buzon_ejecutar_service import puede_ejecutarse
+
+        # Solo en un comando: «dale Ejecutar al de abajo» no se corre.
+        if not mio and puede_ejecutarse(de) and bz.parece_codigo(texto):
+            correr = QToolButton()
+            correr.setObjectName("ejecutar")
+            correr.setText("▶ Ejecutar")
+            correr.setToolTip("Correr esto en esta PC y mandar de regreso lo que salga")
+            correr.setCursor(Qt.CursorShape.PointingHandCursor)
+            correr.clicked.connect(lambda _=False, t=texto, d=de, b=correr: self.pedir_ejecucion(t, d, b))
+            pie.addWidget(correr)
         pie.addStretch(1)
         hora = QLabel(_hora(creado))
         hora.setStyleSheet("font-size: 11px; color: #667781;")
@@ -603,6 +677,55 @@ class BuzonDialog(QDialog):
         if not mio:
             fly.addStretch(1)
         return fila
+
+    # ── Ejecutar ────────────────────────────────────────────────────────
+
+    def pedir_ejecucion(self, texto: str, de: str, boton: QToolButton | None = None) -> None:
+        """Confirma con PIN y corre el comando; lo que sale regresa a `de`."""
+        respuesta = self._confirmar(self, texto, de)
+        if respuesta is None:
+            return
+        if not respuesta:
+            self._avisar("PIN incorrecto: no se ejecutó nada.")
+            return
+        if boton is not None:
+            boton.setText("⏳ Ejecutando…")
+            boton.setEnabled(False)
+        self._avisar(f"Ejecutando… lo que salga se le manda a {de}.")
+        if self._en_hilo:
+            import threading
+
+            threading.Thread(
+                target=self._correr_y_contestar, args=(texto, de), daemon=True, name="buzon-ejecutar"
+            ).start()
+        else:
+            self._correr_y_contestar(texto, de)
+
+    def _correr_y_contestar(self, texto: str, de: str) -> None:
+        """Corre y manda el resultado. Va en su hilo: el kiosko no se congela.
+
+        El resultado se manda DESDE AQUÍ y no desde la ventana: si alguien la
+        cierra mientras corre, la respuesta igual llega."""
+        from pos_uniformes.services import buzon_service as bz
+        from pos_uniformes.services.buzon_ejecutar_service import texto_de_resultado
+
+        resultado = self._ejecutar(texto)
+        mensaje = texto_de_resultado(resultado, pc=self._yo, maximo=bz.MAXIMO_CARACTERES)
+        try:
+            with self._session_factory() as session:
+                bz.enviar(session, mensaje, de=self._yo, para=de)
+                session.commit()
+        except Exception:  # noqa: BLE001
+            logger.exception("Buzón: no se pudo mandar el resultado")
+        try:
+            self._ejecucion_terminada.emit()
+        except RuntimeError:  # la ventana ya se cerró
+            pass
+
+    def _al_terminar_ejecucion(self) -> None:
+        self._avisar("")
+        self._ultimo_pintado = None
+        self.refrescar()
 
     @staticmethod
     def _copiar(texto: str, boton: QToolButton) -> None:

@@ -471,6 +471,13 @@ class QuoteSatelliteWindow(QMainWindow):
         self._heartbeat_timer.setInterval(60_000)
         self._heartbeat_timer.timeout.connect(self._enviar_heartbeat)
         self._heartbeat_timer.start()
+        # Aviso de mensajes nuevos del buzón entre PCs (2026-10-15).
+        try:
+            from pos_uniformes.ui.helpers.buzon_aviso import BuzonAviso
+
+            self._buzon_aviso = BuzonAviso(self)
+        except Exception:  # noqa: BLE001 — un aviso nunca impide abrir el kiosko
+            logger.exception("No se pudo poner el aviso del buzón")
         QTimer.singleShot(3_000, self._enviar_heartbeat)  # primer latido pronto
 
         # Despachador de trabajos: si esta PC imprime local (es el satélite
