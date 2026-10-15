@@ -71,10 +71,10 @@ class AdminDialogTabsTests(unittest.TestCase):
         tabs = dialog.findChild(QTabWidget)
         self.assertIsNotNone(tabs)
         labels = [tabs.tabText(i) for i in range(tabs.count())]
-        self.assertEqual(len(labels), 8)
+        self.assertEqual(len(labels), 9)
         joined = " ".join(labels)
         for esperado in ("Conexión", "Impresoras", "Búsqueda", "Conteos", "Anuncios",
-                         "Temporada", "Precios", "Cámaras"):
+                         "Temporada", "Precios", "Cámaras", "Buzón"):
             self.assertIn(esperado, joined)
 
     def test_all_sections_survive_the_redesign(self) -> None:

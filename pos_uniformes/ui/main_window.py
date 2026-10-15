@@ -1919,6 +1919,9 @@ class MainWindow(QMainWindow):
         self.conteo_calendario_action.triggered.connect(self._handle_open_conteo_calendario)
         self.uniformes_escuela_action = header_menu.addAction("Uniformes por escuela")
         self.uniformes_escuela_action.triggered.connect(self._handle_open_uniformes_escuela)
+        header_menu.addSeparator()
+        self.buzon_action = header_menu.addAction("Buzón entre PCs")
+        self.buzon_action.triggered.connect(self._handle_open_buzon)
         self.header_more_button = QToolButton()
         self.header_more_button.setText("Mas")
         self.header_more_button.setObjectName("toolbarSoftButton")
@@ -8786,6 +8789,12 @@ class MainWindow(QMainWindow):
         from pos_uniformes.ui.dialogs.conteo_calendario_dialog import ConteoCalendarioDialog
 
         ConteoCalendarioDialog(self).exec()
+
+    def _handle_open_buzon(self) -> None:
+        """Chat de texto con los kioskos y con Claude (2026-10-15)."""
+        from pos_uniformes.ui.dialogs.buzon_dialog import abrir_buzon
+
+        abrir_buzon(self)
 
     def _handle_open_uniformes_escuela(self) -> None:
         if self.current_role != RolUsuario.ADMIN:

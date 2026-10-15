@@ -1774,6 +1774,29 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     update_layout.addStretch()
     update_box.setLayout(update_layout)
 
+    # — Buzón entre PCs (mandar y copiar comandos sin WhatsApp) —
+    buzon_box = QGroupBox("Buzón entre PCs")
+    buzon_layout = QVBoxLayout()
+    buzon_hint = QLabel(
+        "Un chat de texto entre la PC principal, los kioskos y Claude. Sirve para "
+        "pasar un comando de PowerShell y mandar de regreso lo que salió. Cada "
+        "mensaje trae su botón «Copiar». Nada se ejecuta solo."
+    )
+    buzon_hint.setWordWrap(True)
+    abrir_buzon_btn = QPushButton("💬 Abrir buzón")
+    abrir_buzon_btn.setObjectName("primaryButton")
+
+    def _abrir_buzon() -> None:
+        from pos_uniformes.ui.dialogs.buzon_dialog import abrir_buzon
+
+        abrir_buzon(dialog)
+
+    abrir_buzon_btn.clicked.connect(_abrir_buzon)
+    buzon_layout.addWidget(buzon_hint)
+    buzon_layout.addWidget(abrir_buzon_btn)
+    buzon_layout.addStretch()
+    buzon_box.setLayout(buzon_layout)
+
     tabs = QTabWidget()
     tabs.addTab(_make_tab(status_box, config_box, update_box), "🔌  Conexión")
     tabs.addTab(
@@ -1787,6 +1810,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     tabs.addTab(_make_tab(_build_temporada_box(dialog), _build_fechas_box(dialog)), "🎃  Temporada")
     tabs.addTab(_make_tab(_build_precios_box(dialog)), "💲  Precios")
     tabs.addTab(_make_tab(_build_camaras_box(dialog)), "📹  Cámaras")
+    tabs.addTab(_make_tab(buzon_box), "💬  Buzón")
 
     outer = QVBoxLayout()
     outer.setContentsMargins(12, 12, 12, 12)

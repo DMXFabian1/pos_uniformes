@@ -2682,3 +2682,21 @@ class DemandaNoAtendida(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
+
+
+class BuzonMensaje(Base):
+    """Un mensaje del buzón entre las PCs (Mac, PC principal, kioskos).
+
+    Sirve para pasar comandos y respuestas sin WhatsApp: se escribe en una
+    pantalla, se copia en otra. `para` vacío = a todas (2026-10-15).
+    """
+
+    __tablename__ = "buzon_mensaje"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    de: Mapped[str] = mapped_column(String(60), nullable=False)
+    para: Mapped[str | None] = mapped_column(String(60), index=True)
+    texto: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
