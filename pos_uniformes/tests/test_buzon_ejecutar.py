@@ -104,6 +104,22 @@ class TextoDeResultadoTests(unittest.TestCase):
         self.assertTrue(texto.startswith("▶ Resultado en Entrada (terminó bien"))
         self.assertIn("ok", texto)
 
+    def test_el_xml_de_powershell_no_llega_al_chat(self) -> None:
+        # Lo que salió en la primera prueba de verdad (2026-10-15).
+        salida = (
+            "#< CLIXML\nPC: DESKTOP-0DVVFV8   Usuario: Pc\n\n"
+            '<Objs Version="1.1.0.1" xmlns="x"><Obj S="progress">'
+            "<AV>Preparando módulos para el primer uso.</AV></Obj></Objs>"
+        )
+        texto = ej.texto_de_resultado(ej.Resultado(salida, 0, 0.9), pc="E", maximo=1000)
+        self.assertIn("PC: DESKTOP-0DVVFV8", texto)
+        self.assertNotIn("CLIXML", texto)
+        self.assertNotIn("Objs", texto)
+
+    def test_sin_barra_de_progreso(self) -> None:
+        decodificado = base64.b64decode(ej.armar_comando("x")[-1]).decode("utf-16-le")
+        self.assertIn("$ProgressPreference = 'SilentlyContinue'", decodificado)
+
     def test_lo_muy_largo_se_corta_y_se_avisa(self) -> None:
         texto = ej.texto_de_resultado(ej.Resultado("x" * 5000, 0, 1), pc="E", maximo=500)
         self.assertLessEqual(len(texto), 500)

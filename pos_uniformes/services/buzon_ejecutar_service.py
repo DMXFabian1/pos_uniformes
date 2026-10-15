@@ -61,6 +61,9 @@ def armar_comando(script: str, ejecutable: str = "powershell") -> list[str]:
     que escriba (también los errores) sale en UTF-8 y a lo ancho."""
     envuelto = (
         "try { $OutputEncoding = [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}\n"
+        # Sin barra de progreso: redirigida, PowerShell la escribe como XML
+        # («#< CLIXML … Preparando módulos para el primer uso») al final.
+        "$ProgressPreference = 'SilentlyContinue'\n"
         "& {\n" + script + "\n} *>&1 | Out-String -Width " + str(ANCHO_SALIDA)
     )
     codificado = base64.b64encode(envuelto.encode("utf-16-le")).decode("ascii")
@@ -143,6 +146,15 @@ def ejecutar(script: str, *, tiempo_limite: int = TIEMPO_LIMITE) -> Resultado:
     return Resultado(salida, None if error else codigo, time.monotonic() - inicio, error=error)
 
 
+def _sin_clixml(texto: str) -> str:
+    """Quita lo que PowerShell escribe en XML para otras máquinas, no para gente."""
+    import re
+
+    texto = texto.replace("#< CLIXML", "")
+    texto = re.sub(r"<Objs Version=.*?</Objs>", "", texto, flags=re.DOTALL)
+    return re.sub(r"\n{3,}", "\n\n", texto)
+
+
 def texto_de_resultado(resultado: Resultado, *, pc: str, maximo: int) -> str:
     """El mensaje que regresa al chat: de qué PC, cómo le fue y lo que salió."""
     if resultado.error:
@@ -151,7 +163,7 @@ def texto_de_resultado(resultado: Resultado, *, pc: str, maximo: int) -> str:
         cabeza = f"▶ Resultado en {pc} (terminó bien, {resultado.segundos:.1f} s)"
     else:
         cabeza = f"⚠️ Resultado en {pc} (terminó con código {resultado.codigo}, {resultado.segundos:.1f} s)"
-    cuerpo = (resultado.salida or "").strip() or "(no escribió nada)"
+    cuerpo = _sin_clixml(resultado.salida or "").strip() or "(no escribió nada)"
     texto = f"{cabeza}\n\n{cuerpo}"
     if len(texto) > maximo:
         aviso = "\n\n[…se cortó: era más largo de lo que cabe en un mensaje]"
