@@ -25,8 +25,33 @@ _FILENAME = "satellite_identity.json"
 _DATA_SUBDIR = "data"
 
 
+def _es_windows() -> bool:
+    import sys
+
+    return sys.platform.startswith("win")
+
+
+def _ruta_de_la_maquina() -> Path | None:
+    """Donde guarda su identidad el kiosko instalado en Windows."""
+    appdata = os.environ.get("APPDATA")
+    if not _es_windows() or not appdata:
+        return None
+    return Path(appdata) / "PresupuestosSatelite" / _DATA_SUBDIR / _FILENAME
+
+
 def _path() -> Path:
-    return satellite_data_dir() / _DATA_SUBDIR / _FILENAME
+    """Una identidad por PC, no por programa.
+
+    En la PC principal corren el POS (desde el código) y el kiosko (instalado),
+    y cada uno guardaba su identidad en su carpeta: el buzón abierto desde el
+    POS firmaba «DESKTOP-0DVVFV8» y el del kiosko «PC principal» — dos chats en
+    la misma máquina, y lo del POS no se ofrecía para Ejecutar (2026-10-15).
+    Si en esta PC ya hay un kiosko instalado, todos usan su identidad."""
+    propia = satellite_data_dir() / _DATA_SUBDIR / _FILENAME
+    maquina = _ruta_de_la_maquina()
+    if maquina is not None and maquina != propia and maquina.exists():
+        return maquina
+    return propia
 
 
 def _load() -> dict:

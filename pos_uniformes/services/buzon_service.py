@@ -249,12 +249,6 @@ def renombrar(session: Session, viejo: str, nuevo: str) -> int:
         return 0
     a = session.execute(update(BuzonMensaje).where(BuzonMensaje.de == viejo).values(de=nuevo))
     b = session.execute(update(BuzonMensaje).where(BuzonMensaje.para == viejo).values(para=nuevo))
-    try:
-        from pos_uniformes.database.models import Satelite
-
-        session.execute(update(Satelite).where(Satelite.nombre == viejo).values(nombre=nuevo))
-    except Exception:  # noqa: BLE001 — sin registro de pantallas, solo el buzón
-        pass
     session.flush()
     return int(a.rowcount or 0) + int(b.rowcount or 0)
 
@@ -262,3 +256,58 @@ def renombrar(session: Session, viejo: str, nuevo: str) -> int:
 def no_leidos_total(session: Session, *, yo: str, leidos: dict[str, int] | None = None) -> int:
     """Cuántos mensajes le esperan a esta PC en todos sus chats (para el aviso)."""
     return sum(c.no_leidos for c in chats(session, yo=yo, leidos=leidos))
+
+
+# ── Nombre de esta PC ────────────────────────────────────────────────────────
+
+#: Nombres que no puede tomar una PC: son de otro, o son el grupo.
+RESERVADOS = ("Claude", NOMBRE_GRUPO, GRUPO, "Todas")
+
+
+def validar_nombre(session: Session, nuevo: str, *, identificador: str | None = None) -> str:
+    """El nombre limpio, o `NoSePuede` con el porqué.
+
+    Dos PCs con el mismo nombre juntarían sus chats, y una que se llamara
+    «Claude» mandaría mensajes que se ofrecen para Ejecutar en las demás."""
+    limpio = " ".join((nuevo or "").split())
+    if not limpio:
+        raise NoSePuede("Escribe un nombre.")
+    if len(limpio) > 60:
+        raise NoSePuede("Es muy largo: máximo 60 letras.")
+    if limpio.casefold() in {r.casefold() for r in RESERVADOS}:
+        raise NoSePuede(f"«{limpio}» está reservado. Escoge otro.")
+    try:
+        from pos_uniformes.database.models import Satelite
+
+        otras = session.scalars(select(Satelite)).all()
+        for sat in otras:
+            if sat.identificador != identificador and (sat.nombre or "").casefold() == limpio.casefold():
+                raise NoSePuede(f"Ya hay otra PC que se llama «{sat.nombre}».")
+    except NoSePuede:
+        raise
+    except Exception:  # noqa: BLE001 — sin registro de pantallas no hay con qué comparar
+        pass
+    return limpio
+
+
+def renombrar_esta_pc(session: Session, nuevo: str, *, viejo: str, identificador: str | None) -> str:
+    """Valida, se lleva el historial y deja el registro al día. No hace commit.
+
+    El nombre local (el archivo de la PC) lo cambia quien llama, DESPUÉS del
+    commit: si la base falla, la PC no queda con un nombre que nadie conoce."""
+    from sqlalchemy import update
+
+    limpio = validar_nombre(session, nuevo, identificador=identificador)
+    renombrar(session, viejo, limpio)
+    if identificador:
+        # Por identificador, nunca por nombre: el nombre viejo podía repetirse.
+        try:
+            from pos_uniformes.database.models import Satelite
+
+            with session.begin_nested():
+                session.execute(
+                    update(Satelite).where(Satelite.identificador == identificador).values(nombre=limpio)
+                )
+        except Exception:  # noqa: BLE001 — sin registro de pantallas, solo el buzón
+            pass
+    return limpio

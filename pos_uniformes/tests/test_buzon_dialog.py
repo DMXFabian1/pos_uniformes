@@ -59,6 +59,8 @@ class _ConBase(unittest.TestCase):
             leer_leidos=lambda: dict(propios),
             guardar_leido=lambda clave, i: propios.__setitem__(clave, i),
             en_hilo=False,
+            guardar_nombre_local=extra.pop("guardar_nombre_local", lambda n: None),
+            identificador=extra.pop("identificador", "id-" + yo),
             **extra,
         )
         d._timer.stop()             # nada de esperas: se refresca a mano
@@ -298,6 +300,45 @@ class AvisoTests(unittest.TestCase):
         self.aviso._contar = _falla
         self.aviso.revisar()
         self.assertTrue(self.aviso.isHidden())
+
+
+
+class NombreDeLaPcTests(_ConBase):
+    def _pc(self, ident: str, nombre: str) -> None:
+        from pos_uniformes.database.models import Satelite
+
+        with self._sesion() as s:
+            s.add(Satelite(identificador=ident, nombre=nombre))
+            s.commit()
+
+    def test_no_se_puede_llamar_igual_que_otra_pc(self) -> None:
+        self._pc("id-caja", "Caja")
+        guardados = []
+        d = self._ventana("DESKTOP-AT4V4QO", identificador="id-entrada",
+                          guardar_nombre_local=guardados.append)
+        d.renombrar("caja")
+        self.assertIn("otra PC", d.estado.text())
+        self.assertEqual(guardados, [])                      # no cambió nada
+        self.assertEqual(d._yo, "DESKTOP-AT4V4QO")
+
+    def test_claude_y_el_grupo_estan_reservados(self) -> None:
+        d = self._ventana("Entrada")
+        for nombre in ("Claude", "todas las pcs"):
+            d.renombrar(nombre)
+            self.assertIn("reservado", d.estado.text())
+        self.assertEqual(d._yo, "Entrada")
+
+    def test_renombrar_guarda_el_nombre_local_y_el_registro_por_identificador(self) -> None:
+        from pos_uniformes.database.models import Satelite
+
+        self._pc("id-entrada", "DESKTOP-AT4V4QO")
+        guardados = []
+        d = self._ventana("DESKTOP-AT4V4QO", identificador="id-entrada",
+                          guardar_nombre_local=guardados.append)
+        d.renombrar("  Entrada  ")
+        self.assertEqual(guardados, ["Entrada"])
+        with self._sesion() as s:
+            self.assertEqual(s.get(Satelite, 1).nombre, "Entrada")
 
 
 if __name__ == "__main__":

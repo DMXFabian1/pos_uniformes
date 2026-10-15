@@ -71,11 +71,31 @@ def registrar(
         )
         session.add(sat)
     else:
-        if nombre:
+        if nombre and sat.nombre != nombre[:60]:
+            _llevar_el_buzon(session, sat.nombre, nombre[:60])
             sat.nombre = nombre[:60]
         sat.ultimo_visto = momento
     session.flush()
     return sat
+
+
+def _llevar_el_buzon(session: Session, viejo: str, nuevo: str) -> None:
+    """La PC cambió de nombre: sus mensajes del buzón se van con ella.
+
+    Aquí y no en cada pantalla que renombra: así da igual si se cambió desde
+    el buzón, desde el menú admin o sin conexión — al siguiente latido queda
+    todo alineado (2026-10-15). En su propio savepoint: una base sin la tabla
+    del buzón no tumba el latido."""
+    try:
+        from sqlalchemy import update
+
+        from pos_uniformes.database.models import BuzonMensaje
+
+        with session.begin_nested():
+            session.execute(update(BuzonMensaje).where(BuzonMensaje.de == viejo).values(de=nuevo))
+            session.execute(update(BuzonMensaje).where(BuzonMensaje.para == viejo).values(para=nuevo))
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def listar(session: Session) -> list[Satelite]:

@@ -232,18 +232,42 @@ def _build_anuncios_boxes(dialog: QWidget) -> list[QGroupBox]:
             destinos_list.addItem(item)
 
     def _guardar_nombre() -> None:
-        try:
-            from pos_uniformes.services.satellite_identity_service import set_satellite_name
+        """Mismas reglas que el ✏️ Cambiar del buzón: un solo camino (2026-10-15)."""
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.services import buzon_service as bz
+        from pos_uniformes.services.satellite_identity_service import (
+            get_satellite_id,
+            get_satellite_name,
+            set_satellite_name,
+        )
 
-            efectivo = set_satellite_name(nombre_in.text())
-            nombre_in.setText(efectivo)
-            QMessageBox.information(
-                dialog,
-                "Nombre guardado",
-                f"Este satélite se llamará «{efectivo}». Se actualiza en la red en ~1 min.",
-            )
+        viejo = get_satellite_name()
+        try:
+            with get_session() as session:
+                limpio = bz.renombrar_esta_pc(
+                    session, nombre_in.text(), viejo=viejo, identificador=get_satellite_id()
+                )
+                session.commit()
+        except bz.NoSePuede as exc:
+            QMessageBox.warning(dialog, "Ese nombre no", str(exc))
+            return
+        except Exception:  # noqa: BLE001 — sin red: el latido lo alinea después
+            limpio = " ".join(nombre_in.text().split())[:60]
+            if not limpio or limpio.casefold() in {r.casefold() for r in bz.RESERVADOS}:
+                QMessageBox.warning(dialog, "Ese nombre no", "Escoge otro nombre.")
+                return
+        try:
+            efectivo = set_satellite_name(limpio)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(dialog, "No se pudo guardar", str(exc))
+            return
+        nombre_in.setText(efectivo)
+        QMessageBox.information(
+            dialog,
+            "Nombre guardado",
+            f"Esta PC se llamará «{efectivo}», también en el buzón. "
+            "En las demás pantallas se ve en ~1 min.",
+        )
 
     def _destinos_elegidos() -> list[str] | None:
         """None = todos; si no, los identificadores marcados."""

@@ -102,5 +102,49 @@ class ConversacionTests(_Base):
         self.assertFalse(bz.parece_codigo("Ya actualicé, revisen sus kioskos."))
 
 
+
+class ValidarNombreTests(_Base):
+    def test_limpia_espacios(self) -> None:
+        self.assertEqual(bz.validar_nombre(self.s, "  Caja   dos "), "Caja dos")
+
+    def test_reservados(self) -> None:
+        for nombre in ("Claude", "CLAUDE", "Todas las PCs", "*", ""):
+            with self.assertRaises(bz.NoSePuede):
+                bz.validar_nombre(self.s, nombre)
+
+    def test_el_mismo_nombre_de_otra_pc_no_pero_el_propio_si(self) -> None:
+        self.s.add(Satelite(identificador="a", nombre="Entrada"))
+        self.s.flush()
+        with self.assertRaises(bz.NoSePuede):
+            bz.validar_nombre(self.s, "entrada", identificador="b")
+        self.assertEqual(bz.validar_nombre(self.s, "Entrada", identificador="a"), "Entrada")
+
+
+class ElLatidoSeLlevaElHistorialTests(_Base):
+    """Renombrar desde el menú admin (o sin red) también se lleva el chat."""
+
+    def test_al_latir_con_otro_nombre_los_mensajes_se_van_con_la_pc(self) -> None:
+        from unittest.mock import patch
+
+        from pos_uniformes.services import satelite_registry_service as reg
+
+        self.s.add(Satelite(identificador="a", nombre="DESKTOP-AT4V4QO"))
+        bz.enviar(self.s, "hola", de="Claude", para="DESKTOP-AT4V4QO")
+        bz.enviar(self.s, "resultado", de="DESKTOP-AT4V4QO", para="Claude")
+        self.s.flush()
+        with patch.object(reg, "es_de_desarrollo", return_value=False):
+            reg.registrar(self.s, "a", "Entrada")
+        textos = [m.texto for m in bz.conversacion(self.s, yo="Entrada", con="Claude")]
+        self.assertEqual(textos, ["hola", "resultado"])
+
+    def test_renombrar_esta_pc_no_toca_a_otra_que_se_llamaba_igual(self) -> None:
+        self.s.add_all([Satelite(identificador="a", nombre="Kiosko"),
+                        Satelite(identificador="b", nombre="Kiosko")])
+        self.s.flush()
+        bz.renombrar_esta_pc(self.s, "Entrada", viejo="Kiosko", identificador="a")
+        nombres = {x.identificador: x.nombre for x in self.s.query(Satelite).all()}
+        self.assertEqual(nombres, {"a": "Entrada", "b": "Kiosko"})
+
+
 if __name__ == "__main__":
     unittest.main()

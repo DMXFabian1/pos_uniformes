@@ -325,6 +325,27 @@ def _desviar_copia_local_de_nombres() -> None:
 _desviar_copia_local_de_nombres()
 
 
+# La identidad de la PC (nombre e id) y lo leído del buzón también van a un
+# temporal: una prueba de renombrar le cambió el nombre a la Mac de verdad
+# (quedó «Entrada», 2026-10-15). Las pruebas que necesitan su propia carpeta
+# la parchan encima, y al terminar vuelve a este temporal, nunca a data/.
+def _desviar_identidad_y_buzon() -> None:
+    import atexit
+    import tempfile
+    from pathlib import Path
+
+    from pos_uniformes.services import buzon_service as bz
+    from pos_uniformes.services import satellite_identity_service as ident
+
+    d = Path(tempfile.mkdtemp(prefix="identidad_pc_"))
+    ident.satellite_data_dir = lambda: d
+    bz._ruta_leidos = lambda: d / "buzon_leidos.json"
+    atexit.register(lambda: __import__("shutil").rmtree(d, ignore_errors=True))
+
+
+_desviar_identidad_y_buzon()
+
+
 @pytest.fixture(autouse=True)
 def _nombres_empleadas_limpios():
     """La caché de nombres (VEND-1 → Daniel) es global: cada test arranca sin ella."""

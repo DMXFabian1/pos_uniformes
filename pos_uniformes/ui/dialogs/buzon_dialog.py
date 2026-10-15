@@ -292,6 +292,8 @@ class BuzonDialog(QDialog):
         confirmar=None,
         ejecutar=None,
         en_hilo: bool = True,
+        guardar_nombre_local=...,
+        identificador=...,
     ) -> None:
         super().__init__(parent)
         from pos_uniformes.services import buzon_service as bz
@@ -309,6 +311,12 @@ class BuzonDialog(QDialog):
             from pos_uniformes.services.buzon_ejecutar_service import ejecutar
         self._ejecutar = ejecutar
         self._en_hilo = en_hilo
+        if guardar_nombre_local is ...:
+            from pos_uniformes.services.satellite_identity_service import set_satellite_name
+
+            guardar_nombre_local = set_satellite_name
+        self._guardar_nombre_local = guardar_nombre_local
+        self._id_fijo = identificador
         self._ejecucion_terminada.connect(self._al_terminar_ejecucion)
         self._abierto: str = bz.GRUPO
         self._chats: list = []
@@ -500,22 +508,34 @@ class BuzonDialog(QDialog):
         viejo = self._yo
         try:
             with self._session_factory() as session:
-                bz.renombrar(session, viejo, nuevo)
+                limpio = bz.renombrar_esta_pc(
+                    session, nuevo, viejo=viejo,
+                    identificador=self._identificador() if self._id_fijo is ... else self._id_fijo,
+                )
                 session.commit()
+        except bz.NoSePuede as exc:
+            self._avisar(str(exc))
+            return
         except Exception:  # noqa: BLE001
             logger.exception("Buzón: no se pudo renombrar")
             self._avisar("Sin conexión con la PC principal: el nombre no se cambió.")
             return
-        try:
-            from pos_uniformes.services.satellite_identity_service import set_satellite_name
-
-            set_satellite_name(nuevo)
-        except Exception:  # noqa: BLE001 — sin identidad local, solo el buzón
-            pass
-        self._yo = nuevo
+        if self._guardar_nombre_local is not None:
+            self._guardar_nombre_local(limpio)
+        self._yo = limpio
         self._ultimo_pintado = None
+        self._avisar("")
         self._pintar_yo()
         self.refrescar()
+
+    @staticmethod
+    def _identificador() -> str | None:
+        try:
+            from pos_uniformes.services.satellite_identity_service import get_satellite_id
+
+            return get_satellite_id()
+        except Exception:  # noqa: BLE001
+            return None
 
     # ── Pintar ──────────────────────────────────────────────────────────
 
