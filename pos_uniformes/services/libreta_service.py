@@ -622,6 +622,43 @@ def filtrar_de_hoy(rows: list, reference: date | None = None) -> list:
     return result
 
 
+def hora_local(momento: datetime | None) -> datetime | None:
+    """La hora en zona local y CON zona: se puede comparar con cualquier otra."""
+    return momento.astimezone() if momento is not None else None
+
+
+def desde_el_corte(rows: list, inicio_corte: datetime | None, reference: date | None = None) -> list:
+    """El «Hoy» de la Libreta: lo vendido DESDE EL ÚLTIMO CORTE, no desde medianoche.
+
+    Lo que importa es el dinero por entregar, y ese no se corta a medianoche
+    sino en el corte. El 14/10 Daniel hizo el corte a las 16:56, después se
+    vendieron $190 y $942, y al día siguiente no aparecían en «Hoy» aunque ese
+    dinero se entregaba ese día (2026-10-15). Es la misma regla del corte
+    (`corte_caja_service.inicio_periodo`): así la Libreta y el corte dan el
+    mismo número.
+
+    Sin ningún corte hecho, se queda como antes: el día de calendario."""
+    if inicio_corte is None:
+        return filtrar_de_hoy(rows, reference)
+    inicio = hora_local(inicio_corte)
+    return [r for r in rows if r.created_at is not None and hora_local(r.created_at) > inicio]
+
+
+def etiqueta_desde_el_corte(inicio_corte: datetime | None, reference: date | None = None) -> str:
+    """Cómo se dice el periodo: «desde el corte de ayer a las 16:56»."""
+    if inicio_corte is None:
+        return "hoy"
+    inicio = hora_local(inicio_corte)
+    hoy = reference or date.today()
+    if inicio.date() == hoy:
+        cuando = "de hoy"
+    elif inicio.date() == hoy - timedelta(days=1):
+        cuando = "de ayer"
+    else:
+        cuando = f"del {inicio:%d/%m}"
+    return f"desde el corte {cuando} a las {inicio:%H:%M}"
+
+
 def describir_detalle(detalle: list[dict]) -> str:
     """'Pants T:6 x2 · Playera T:M x1' — resumen legible de las líneas."""
     parts = []

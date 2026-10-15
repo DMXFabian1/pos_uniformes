@@ -1154,7 +1154,9 @@ function pintarDueno(data) {
   // cajón, lo que llega por la terminal (neto del 4.5%), los abonos y las
   // comisiones. Nada de "vendido en total".
   $("d-venta").textContent = pesos(d.hoy.en_caja != null ? d.hoy.en_caja : d.hoy.venta);
-  $("d-detalle").textContent = "ventas + abonos en efectivo · es la cifra del corte";
+  // «Hoy» empieza en el último corte: así sale lo vendido después del corte
+  // de ayer, que es dinero de hoy (2026-10-15).
+  $("d-detalle").textContent = "ventas + abonos en efectivo " + (d.hoy.periodo || "de hoy") + " · es la cifra del corte";
   const tarjeta = Number(d.hoy.tarjeta || 0);
   $("d-dinero").innerHTML =
     `<div class="tarjetas">` +

@@ -1994,6 +1994,9 @@ class QuoteSatelliteWindow(QMainWindow):
         layout.addWidget(self.libreta_view, 1)
 
         self._libreta_code: str | None = None
+        # Momento del último corte: «Hoy» de la Libreta empieza ahí, no a
+        # medianoche (2026-10-15). Se recuerda para cuando no hay conexión.
+        self._libreta_inicio_corte = None
         self._libreta_is_owner = False
         # Periodo: "hoy" | "semana" | "semana_pasada" | "rango"
         self._libreta_periodo = "hoy"
@@ -2285,6 +2288,10 @@ class QuoteSatelliteWindow(QMainWindow):
         if self._libreta_periodo == "hoy":
             from datetime import datetime as _dt, time as _t, timedelta as _td
 
+            if getattr(self, "_libreta_inicio_corte", None) is not None:
+                # Justo DESPUÉS del corte: el ajuste de ese corte es del
+                # periodo que cerró, no del que se está viendo.
+                return self._libreta_inicio_corte + _td(microseconds=1), _dt.now().astimezone() + _td(days=1)
             inicio = _dt.combine(_dt.now().date(), _t.min).astimezone()
             return inicio, inicio + _td(days=1)
         return self._libreta_ventana_actual()
@@ -2326,7 +2333,9 @@ class QuoteSatelliteWindow(QMainWindow):
             desde = self.libreta_rango_desde.date().toPyDate().strftime("%d/%m")
             hasta = self.libreta_rango_hasta.date().toPyDate().strftime("%d/%m")
             return f"del {desde} al {hasta}"
-        return "hoy"
+        from pos_uniformes.services.libreta_service import etiqueta_desde_el_corte
+
+        return etiqueta_desde_el_corte(getattr(self, "_libreta_inicio_corte", None))
 
     def _refresh_libreta_view(self) -> None:
         if not self._libreta_code:
@@ -2337,7 +2346,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self._libreta_descanso_refrescar()
         from pos_uniformes.services import libreta_local_queue_service as libreta_cola
         from pos_uniformes.services.libreta_service import (
-            filtrar_de_hoy,
+            desde_el_corte,
             filtrar_operaciones,
             listar_operaciones,
         )
@@ -2371,8 +2380,22 @@ class QuoteSatelliteWindow(QMainWindow):
                         demanda_service.drenar(session)
                     except Exception:  # noqa: BLE001
                         session.rollback()
+                    consulta_desde = desde
+                    if self._libreta_periodo == "hoy":
+                        try:
+                            from pos_uniformes.services.corte_caja_service import inicio_periodo
+
+                            from pos_uniformes.services.libreta_service import hora_local
+
+                            self._libreta_inicio_corte = hora_local(inicio_periodo(session))
+                        except Exception:  # noqa: BLE001 — sin el dato, el día de calendario
+                            session.rollback()
+                        # Un corte del domingo deja ventas en la semana pasada:
+                        # la consulta tiene que alcanzarlas.
+                        if getattr(self, "_libreta_inicio_corte", None) is not None and self._libreta_inicio_corte < desde:
+                            consulta_desde = self._libreta_inicio_corte
                     week_rows = listar_operaciones(
-                        session, desde=desde, hasta=hasta, employee_code=employee_filter
+                        session, desde=consulta_desde, hasta=hasta, employee_code=employee_filter
                     )
                     if not self._libreta_is_owner:
                         ciclo_texto = self._datos_ciclo_libreta(session)
@@ -2413,11 +2436,19 @@ class QuoteSatelliteWindow(QMainWindow):
 
         # La meta semanal solo aplica viendo la semana en curso.
         if self._libreta_periodo in ("hoy", "semana"):
-            self._actualizar_meta_libreta(week_rows)
+            # Solo esta semana: la consulta de «Hoy» pudo traer lo de antes del
+            # lunes (un corte del domingo), y eso no cuenta para la meta.
+            self._actualizar_meta_libreta([
+                r for r in week_rows if r.created_at is None or r.created_at.astimezone() >= desde
+            ])
         else:
             self.libreta_meta_bar.setVisible(False)
 
-        rows = filtrar_de_hoy(week_rows) if self._libreta_periodo == "hoy" else week_rows
+        rows = (
+            desde_el_corte(week_rows, getattr(self, "_libreta_inicio_corte", None))
+            if self._libreta_periodo == "hoy"
+            else week_rows
+        )
 
         # Filtros del dueño: tipo/tarjeta afectan todo; el ranking se pinta
         # SIN el filtro de empleada (funciona como selector).

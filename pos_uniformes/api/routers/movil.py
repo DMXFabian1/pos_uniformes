@@ -166,7 +166,19 @@ def _payload_dueno(db: Session) -> dict:
 
     hoy = date.today()
     desde, hasta = ventana_hoy()
-    rows = listar_operaciones(db, desde=desde, hasta=hasta)
+    # «Hoy» es desde el último corte, como en la Libreta del kiosko: lo vendido
+    # después del corte de ayer es dinero que se entrega hoy (2026-10-15).
+    from pos_uniformes.services.libreta_service import desde_el_corte, etiqueta_desde_el_corte, hora_local
+
+    try:
+        from pos_uniformes.services.corte_caja_service import inicio_periodo
+
+        inicio_corte = hora_local(inicio_periodo(db))
+    except Exception:  # noqa: BLE001 — sin el dato, el día de calendario
+        db.rollback()
+        inicio_corte = None
+    consulta_desde = inicio_corte if inicio_corte is not None and inicio_corte < desde else desde
+    rows = desde_el_corte(listar_operaciones(db, desde=consulta_desde, hasta=hasta), inicio_corte)
     cortes_hoy = resumir_por_dia(rows)
     nombres = {
         str(e.codigo).upper(): (e.nombre_completo or e.codigo)
@@ -220,6 +232,7 @@ def _payload_dueno(db: Session) -> dict:
             "piezas": sum(c.piezas for c in cortes_hoy),
             # Compatibilidad con la PWA anterior (era la cifra del cajón).
             "venta": str(en_caja),
+            "periodo": etiqueta_desde_el_corte(inicio_corte),
         },
         "ranking": [
             {

@@ -85,6 +85,10 @@ class ApiMovilTests(unittest.TestCase):
             LibretaCorte(
                 fecha=date.today(), monto_final=Decimal("17180.00"),
                 operaciones=29, piezas=76, creado_por="VEND-1",
+                # El corte de AYER: «Hoy» empieza ahí (2026-10-15). Sin hora,
+                # la base le ponía la de ahora y dejaba fuera la venta de arriba.
+                created_at=datetime.now() - timedelta(days=1),
+                hasta=datetime.now() - timedelta(days=1),
             )
         )
         s.commit()
@@ -141,6 +145,25 @@ class ApiMovilTests(unittest.TestCase):
         self.assertEqual(d["ranking"][0]["codigo"], "VEND-4")
         self.assertEqual(d["ciclos"][0]["nombre"], "Fanny Ortiz")
         self.assertEqual(len(d["cortes"]), 1)
+
+    def test_hoy_empieza_en_el_corte_y_no_a_medianoche(self) -> None:
+        """Lo vendido después del corte de ayer es dinero de hoy (2026-10-15)."""
+        s = self.session
+        corte = s.query(LibretaCorte).first()
+        corte.hasta = datetime.now() - timedelta(hours=2)        # corte de hace 2 h
+        s.add_all([
+            LibretaVenta(  # antes del corte: ya se entregó
+                employee_code="VEND-4", employee_name="Fanny", tipo="venta",
+                piezas=1, comisiones=1, monto_total=Decimal("299.00"),
+                monto_neto=Decimal("299.00"), detalle=[],
+                created_at=datetime.now() - timedelta(hours=3),
+            ),
+        ])
+        s.commit()
+        self._como("VEND-1")
+        hoy = self.client.get("/api/v1/movil/inicio").json()["dueno"]["hoy"]
+        self.assertEqual(hoy["venta"], "500.00")                  # solo la de después
+        self.assertTrue(hoy["periodo"].startswith("desde el corte"))
 
     def test_dueno_solo_ve_dinero_real(self) -> None:
         """Cajón, tarjeta (neto 4.5%), abonos y comisiones — sin 'vendido en
