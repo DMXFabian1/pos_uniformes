@@ -204,9 +204,24 @@ class EjecutarTests(_ConBase):
         self._botones(d, "Ejecutar")[0].click()
         self.assertEqual(corridos, ["Get-Date | Out-String"])
         with self._sesion() as s:
+            ultimos = s.scalars(select(BuzonMensaje).order_by(BuzonMensaje.id.desc()).limit(2)).all()
+        resultado, recibido = ultimos
+        self.assertEqual((resultado.de, resultado.para), ("Entrada", "Claude"))
+        self.assertIn("15/10/2026", resultado.texto)
+        # Antes de correr avisa que lo recibió: si se traba, se sabe que arrancó.
+        self.assertIn("Recibido", recibido.texto)
+
+    def test_si_la_ejecucion_truena_igual_llega_el_error(self) -> None:
+        def _truena(_):
+            raise RuntimeError("se cayó")
+
+        self._mandar("Get-Date | Out-String", de="Claude", para="Entrada")
+        d = self._ventana("Entrada", confirmar=lambda *_: True, ejecutar=_truena)
+        d.abrir_chat("Claude")
+        self._botones(d, "Ejecutar")[0].click()
+        with self._sesion() as s:
             ultimo = s.scalars(select(BuzonMensaje).order_by(BuzonMensaje.id.desc())).first()
-        self.assertEqual((ultimo.de, ultimo.para), ("Entrada", "Claude"))
-        self.assertIn("15/10/2026", ultimo.texto)
+        self.assertIn("se cayó", ultimo.texto)
 
     def test_con_pin_equivocado_no_corre_nada(self) -> None:
         corridos = []

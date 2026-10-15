@@ -705,22 +705,35 @@ class BuzonDialog(QDialog):
         """Corre y manda el resultado. Va en su hilo: el kiosko no se congela.
 
         El resultado se manda DESDE AQUÍ y no desde la ventana: si alguien la
-        cierra mientras corre, la respuesta igual llega."""
+        cierra mientras corre, la respuesta igual llega. Y pase lo que pase
+        algo llega: primero «recibido», al final el resultado o el error.
+        En la primera prueba el botón se quedó en «Ejecutando…» y del otro lado
+        no llegó nada; no se sabía ni si había arrancado (2026-10-15)."""
         from pos_uniformes.services import buzon_service as bz
-        from pos_uniformes.services.buzon_ejecutar_service import texto_de_resultado
+        from pos_uniformes.services.buzon_ejecutar_service import Resultado, texto_de_resultado
 
-        resultado = self._ejecutar(texto)
-        mensaje = texto_de_resultado(resultado, pc=self._yo, maximo=bz.MAXIMO_CARACTERES)
+        self._mandar_desde_hilo(f"⏳ Recibido en {self._yo}: ejecutando…", de)
         try:
-            with self._session_factory() as session:
-                bz.enviar(session, mensaje, de=self._yo, para=de)
-                session.commit()
-        except Exception:  # noqa: BLE001
-            logger.exception("Buzón: no se pudo mandar el resultado")
+            resultado = self._ejecutar(texto)
+        except Exception as exc:  # noqa: BLE001 — un tropiezo también se reporta
+            logger.exception("Buzón: falló la ejecución")
+            resultado = Resultado("", None, 0.0, error=f"Falló antes de terminar: {exc}")
+        mensaje = texto_de_resultado(resultado, pc=self._yo, maximo=bz.MAXIMO_CARACTERES)
+        self._mandar_desde_hilo(mensaje, de)
         try:
             self._ejecucion_terminada.emit()
         except RuntimeError:  # la ventana ya se cerró
             pass
+
+    def _mandar_desde_hilo(self, texto: str, para: str) -> None:
+        from pos_uniformes.services import buzon_service as bz
+
+        try:
+            with self._session_factory() as session:
+                bz.enviar(session, texto, de=self._yo, para=para)
+                session.commit()
+        except Exception:  # noqa: BLE001
+            logger.exception("Buzón: no se pudo mandar desde el hilo")
 
     def _al_terminar_ejecucion(self) -> None:
         self._avisar("")
