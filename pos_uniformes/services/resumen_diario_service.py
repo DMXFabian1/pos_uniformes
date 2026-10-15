@@ -58,6 +58,16 @@ class DatosResumen:
     horas_sin_corte: float | None = None  # desde el último corte (None = nunca)
     pagos: list[PagoResumen] = field(default_factory=list)
     faltaron: list[str] = field(default_factory=list)
+    #: Desde dónde se cuenta el dinero: el último corte (None = el día de
+    #: calendario, sin ningún corte o al mirar un día que no es hoy).
+    inicio_corte: datetime | None = None
+
+    @property
+    def periodo(self) -> str:
+        """«desde el corte de ayer a las 16:56», o «hoy»."""
+        from pos_uniformes.services.libreta_service import etiqueta_desde_el_corte
+
+        return etiqueta_desde_el_corte(self.inicio_corte, self.fecha)
     afluencia_entradas: int | None = None
     afluencia_pasan: int | None = None
     afluencia_ventas: int | None = None
@@ -76,7 +86,7 @@ def formatear(d: DatosResumen) -> str:
     fecha = f"{_DIAS[d.fecha.weekday()]} {d.fecha:%d/%m/%Y}"
     lineas = [f"📒 RESUMEN DEL DÍA · {fecha}", ""]
 
-    lineas.append("💰 VENTAS")
+    lineas.append("💰 VENTAS" + (f" ({d.periodo})" if d.inicio_corte is not None else ""))
     if d.operaciones:
         lineas.append(f"• {d.operaciones} operaciones · {d.piezas} piezas")
         lineas.append(f"• Ventas: {_pesos(d.ventas)}")
@@ -88,7 +98,10 @@ def formatear(d: DatosResumen) -> str:
         if d.por_empleada:
             lineas.append("• Por empleada: " + ", ".join(f"{n} {o} ops/{c} com." for n, o, c in d.por_empleada))
     else:
-        lineas.append("• Sin operaciones registradas hoy.")
+        lineas.append(
+            f"• Sin operaciones {d.periodo}." if d.inicio_corte is not None
+            else "• Sin operaciones registradas hoy."
+        )
     lineas.append("")
 
     lineas.append("🧾 CORTES")
@@ -174,10 +187,16 @@ def texto_hoy(d: DatosResumen, *, quien_esta: list[str] | None = None, ahora=Non
     from datetime import datetime
 
     momento = ahora or datetime.now()
-    lineas = [f"📅 Hoy · {_DIAS[d.fecha.weekday()]} {d.fecha:%d/%m}, {momento:%H:%M}", ""]
+    lineas = [f"📅 Hoy · {_DIAS[d.fecha.weekday()]} {d.fecha:%d/%m}, {momento:%H:%M}"]
+    if d.inicio_corte is not None:
+        lineas.append(f"(dinero {d.periodo})")
+    lineas.append("")
 
     if not d.operaciones:
-        lineas.append("Todavía no se registra ninguna venta.")
+        lineas.append(
+            f"Ninguna venta {d.periodo}." if d.inicio_corte is not None
+            else "Todavía no se registra ninguna venta."
+        )
     else:
         entro = d.efectivo + d.tarjeta + d.abonos
         lineas.append(f"💵 Entró: {_pesos(entro)}")
@@ -213,10 +232,27 @@ def recolectar(session, hoy: date | None = None) -> DatosResumen:
     nombres_por_codigo(session)   # los códigos salen como nombres en todo el resumen
 
     hoy = hoy or date.today()
-    desde, hasta = ventana_hoy(hoy)
+    dia_desde, dia_hasta = ventana_hoy(hoy)
     d = DatosResumen(fecha=hoy)
 
-    rows = listar_operaciones(session, desde=desde, hasta=hasta)
+    # El dinero cuenta DESDE EL ÚLTIMO CORTE, como la Libreta y el corte: lo
+    # vendido después del corte de ayer es dinero de hoy (Daniel, 2026-10-15).
+    # Solo al mirar el día de hoy; un día pasado se lee por calendario.
+    desde, hasta = dia_desde, dia_hasta
+    if hoy == date.today():
+        try:
+            from pos_uniformes.services.corte_caja_service import inicio_periodo
+            from pos_uniformes.services.libreta_service import hora_local
+
+            d.inicio_corte = hora_local(inicio_periodo(session))
+        except Exception:  # noqa: BLE001 — sin el dato, el día de calendario
+            session.rollback()
+        if d.inicio_corte is not None:
+            desde = d.inicio_corte
+
+    from pos_uniformes.services.libreta_service import desde_el_corte
+
+    rows = desde_el_corte(listar_operaciones(session, desde=desde, hasta=hasta), d.inicio_corte, hoy)
     r = resumir_periodo(rows)
     d.operaciones, d.piezas = r.operaciones, r.piezas
     d.ventas, d.abonos, d.apartados, d.efectivo, d.tarjeta = r.ventas, r.abonos, r.apartados, r.efectivo, r.tarjeta
@@ -228,7 +264,8 @@ def recolectar(session, hoy: date | None = None) -> DatosResumen:
     _bloque(session, lambda: _cortes(session, d, hoy))
     _bloque(session, lambda: _pagos(session, d, desde, hasta))
     _bloque(session, lambda: _faltas(session, d, hoy))
-    _bloque(session, lambda: _afluencia(session, d, desde, hasta))
+    # Las cámaras sí van por día: cuenta gente que entró hoy, no dinero.
+    _bloque(session, lambda: _afluencia(session, d, dia_desde, dia_hasta))
     _bloque(session, lambda: _manana(session, d, hoy))
     _bloque(session, lambda: _pendientes(session, d, hoy))
     _bloque(session, lambda: _retiros(session, d, desde, hasta))
