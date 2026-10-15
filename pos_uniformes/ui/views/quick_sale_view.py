@@ -1195,7 +1195,9 @@ class QuickSaleWidget(QWidget):
                     cola.drenar_pendientes(session)
                     demanda_service.drenar(session)
             except Exception:  # noqa: BLE001
-                _logger.debug("Drenado de libreta pospuesto", exc_info=True)
+                # Advertencia y no depuración: un drenado que falla callado fue
+                # justo lo que escondió un día de ventas de Entrada (2026-10-15).
+                _logger.warning("Drenado de libreta pospuesto", exc_info=True)
 
         threading.Thread(target=_worker, daemon=True, name="libreta-drain").start()
 

@@ -2399,10 +2399,17 @@ class QuoteSatelliteWindow(QMainWindow):
         )
 
         pendientes = len(libreta_cola.pendientes())
+        atoradas = len(libreta_cola.atoradas())
         self.libreta_pendientes_label.setVisible(pendientes > 0)
-        self.libreta_pendientes_label.setText(
-            f"{pendientes} registro(s) de esta terminal aun sin subir al servidor."
-        )
+        texto_pendientes = f"{pendientes} registro(s) de esta terminal aun sin subir al servidor."
+        if atoradas:
+            # Ya no se calla: una venta que no sube tras varios intentos se dice
+            # aquí y a Daniel le llega por Telegram (2026-10-15).
+            texto_pendientes += (
+                f" ⚠️ {atoradas} no se ha(n) podido subir después de varios intentos; "
+                "ya se le avisó a Daniel. Siguen guardadas aquí."
+            )
+        self.libreta_pendientes_label.setText(texto_pendientes)
 
         # La meta semanal solo aplica viendo la semana en curso.
         if self._libreta_periodo in ("hoy", "semana"):
