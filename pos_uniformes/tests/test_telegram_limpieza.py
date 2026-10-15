@@ -1,10 +1,11 @@
-"""El chat se limpia solo: un menú fijado arriba y lo demás se va a las 24 h.
+"""El chat se limpia solo: cada mañana, con un menú nuevo fijado.
 
 Daniel (2026-10-08): «me gustaría que quede un menú fijado, y lo demás lo borre
-24 horas después».
+24 horas después». Desde el 2026-10-15: una limpieza al día a la hora de
+apertura, con menú nuevo; alertas, cortes y resúmenes se quedan dos días.
 
-Dos límites de Telegram mandan sobre el diseño, y los dos están probados aquí:
-el bot solo borra lo suyo, y pasadas 48 horas ya no borra nada.
+El límite de Telegram que manda sobre el diseño: pasadas 48 horas ya no se
+puede borrar nada.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ from __future__ import annotations
 import tempfile
 import time
 import unittest
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
@@ -20,7 +22,13 @@ from pos_uniformes.services import telegram_limpieza_service as limpieza
 HORA = 3600.0
 
 
-class LaListaDeMensajesTests(unittest.TestCase):
+class LaLimpiezaDeLaMananaTests(unittest.TestCase):
+    """Una vez al día, a la hora de apertura (Daniel, 2026-10-15): lo de antes
+    de abrir se va; alertas, cortes y resúmenes se quedan dos días."""
+
+    #: Miércoles 15/10/2026, 9:05 (abre a las 9:00).
+    HOY = datetime(2026, 10, 15, 9, 5)
+
     def setUp(self) -> None:
         self._dir = tempfile.TemporaryDirectory()
         self.addCleanup(self._dir.cleanup)
@@ -31,74 +39,65 @@ class LaListaDeMensajesTests(unittest.TestCase):
         parche.start()
         self.addCleanup(parche.stop)
 
-    def _anotar(self, mid: int, horas: float) -> None:
-        with patch.object(time, "time", return_value=time.time() - horas * HORA):
-            limpieza.anotar(mid)
+    def _anotar(self, mid: int, cuando: datetime, *, conservar: bool = False) -> None:
+        limpieza.anotar(mid, conservar=conservar, ts=cuando.timestamp())
 
-    def test_un_mensaje_de_hoy_no_se_toca(self) -> None:
-        self._anotar(10, horas=3)
-        borrados = []
-        self.assertEqual(limpieza.barrer(borrar=lambda m: borrados.append(m) or True), 0)
-        self.assertEqual(borrados, [])
+    def _limpiar(self, ahora=None, borrar=None) -> list[int]:
+        borrados: list[int] = []
+        limpieza.limpiar_del_dia(
+            borrar=borrar or (lambda m: borrados.append(m) or True), ahora=ahora or self.HOY,
+        )
+        return borrados
 
-    def test_a_las_24_horas_se_borra(self) -> None:
-        self._anotar(10, horas=25)
-        borrados = []
-        self.assertEqual(limpieza.barrer(borrar=lambda m: borrados.append(m) or True), 1)
-        self.assertEqual(borrados, [10])
+    def test_lo_de_ayer_se_va_en_la_manana(self) -> None:
+        self._anotar(10, datetime(2026, 10, 14, 17, 30))
+        self.assertEqual(self._limpiar(), [10])
 
-    def test_lo_borrado_no_se_vuelve_a_pedir(self) -> None:
-        self._anotar(10, horas=25)
-        limpieza.barrer(borrar=lambda m: True)
-        borrados = []
-        limpieza.barrer(borrar=lambda m: borrados.append(m) or True)
-        self.assertEqual(borrados, [])
+    def test_lo_de_hoy_despues_de_abrir_se_queda(self) -> None:
+        self._anotar(10, datetime(2026, 10, 15, 9, 1))
+        self.assertEqual(self._limpiar(), [])
+
+    def test_lo_conservado_se_queda_dos_dias_y_se_va_al_tercero(self) -> None:
+        # Una alerta del lunes se ve lunes y martes; se va el miércoles.
+        self._anotar(1, datetime(2026, 10, 13, 18, 0), conservar=True)   # lunes
+        self._anotar(2, datetime(2026, 10, 14, 11, 0), conservar=True)   # martes
+        self.assertEqual(self._limpiar(), [1])
+        self.assertEqual([m["id"] for m in limpieza._leer()["mensajes"]], [2])
 
     def test_pasadas_48_horas_se_olvida_en_vez_de_insistir(self) -> None:
-        """Telegram ya no deja borrarlo. Reintentar cada 15 minutos hasta el
-        fin de los tiempos sería gastar una llamada para que diga que no."""
-        self._anotar(10, horas=50)
-        borrados = []
-        limpieza.barrer(borrar=lambda m: borrados.append(m) or True)
-        self.assertEqual(borrados, [])
+        """Telegram ya no deja borrarlo: se olvida, no se reintenta cada día."""
+        self._anotar(10, datetime(2026, 10, 13, 8, 0))     # 49 h antes
+        self.assertEqual(self._limpiar(), [])
         self.assertEqual(limpieza._leer()["mensajes"], [])
 
     def test_si_el_borrado_falla_se_reintenta_luego(self) -> None:
-        self._anotar(10, horas=25)
-        limpieza.barrer(borrar=lambda m: False)
+        self._anotar(10, datetime(2026, 10, 14, 17, 30))
+        self._limpiar(borrar=lambda m: False)
         self.assertEqual([m["id"] for m in limpieza._leer()["mensajes"]], [10])
 
     def test_un_error_de_red_tampoco_pierde_el_mensaje(self) -> None:
-        self._anotar(10, horas=25)
+        self._anotar(10, datetime(2026, 10, 14, 17, 30))
 
         def truena(_):
             raise OSError("sin red")
 
-        limpieza.barrer(borrar=truena)
+        self._limpiar(borrar=truena)
         self.assertEqual([m["id"] for m in limpieza._leer()["mensajes"]], [10])
 
-    def test_el_menu_fijado_no_se_barre_nunca(self) -> None:
-        """Es lo único que debe seguir ahí mañana.
+    def test_el_menu_fijado_no_se_borra_aqui(self) -> None:
+        """El menú lo renueva el bot después; aquí nunca se borra.
 
-        Se arma el archivo a mano con el menú TAMBIÉN en la lista de mensajes.
-        Es el caso que de verdad puede pasar —un archivo escrito antes de que
-        existiera el menú fijado, o editado a mano— y es el único que ejercita
-        el guardia del barrido: por el camino normal, `recordar_menu` ya lo
-        saca de la lista, así que probarlo por ahí no probaba nada.
-        """
+        Se arma el archivo a mano con el menú TAMBIÉN en la lista: es el caso
+        que de verdad puede pasar (un archivo viejo o editado a mano)."""
         import json
 
+        viejo = datetime(2026, 10, 14, 17, 0).timestamp()
         limpieza.ruta_estado().parent.mkdir(parents=True, exist_ok=True)
         limpieza.ruta_estado().write_text(json.dumps({
             "menu_id": 10,
-            "mensajes": [{"id": 10, "ts": time.time() - 30 * HORA},
-                         {"id": 11, "ts": time.time() - 30 * HORA}],
-            "ultimo_barrido": 0.0,
+            "mensajes": [{"id": 10, "ts": viejo}, {"id": 11, "ts": viejo}],
         }), encoding="utf-8")
-
-        borrados = []
-        limpieza.barrer(borrar=lambda m: borrados.append(m) or True)
-        self.assertEqual(borrados, [11])          # el otro sí, el menú no
+        self.assertEqual(self._limpiar(), [11])
         self.assertEqual(limpieza.menu_fijado(), 10)
 
     def test_el_menu_no_se_apunta_aunque_pase_por_el_mismo_camino(self) -> None:
@@ -106,12 +105,20 @@ class LaListaDeMensajesTests(unittest.TestCase):
         limpieza.anotar(10)
         self.assertEqual(limpieza._leer()["mensajes"], [])
 
-    def test_no_se_barre_en_cada_vuelta_del_bot(self) -> None:
-        """La vuelta es de 25 s y borrar es una llamada por mensaje."""
-        self.assertTrue(limpieza.toca_barrer())
-        limpieza.barrer(borrar=lambda m: True)
-        self.assertFalse(limpieza.toca_barrer())
-        self.assertTrue(limpieza.toca_barrer(ahora=time.time() + 16 * 60))
+    def test_el_mismo_mensaje_no_se_apunta_dos_veces(self) -> None:
+        limpieza.anotar(7)
+        limpieza.anotar(7)
+        self.assertEqual(len(limpieza._leer()["mensajes"]), 1)
+
+    def test_una_vez_al_dia_y_desde_la_apertura(self) -> None:
+        self.assertFalse(limpieza.toca_limpiar(datetime(2026, 10, 15, 8, 59)))   # aún no abre
+        self.assertTrue(limpieza.toca_limpiar(self.HOY))
+        self._limpiar()
+        self.assertFalse(limpieza.toca_limpiar(datetime(2026, 10, 15, 17, 0)))   # ya se hizo hoy
+        self.assertTrue(limpieza.toca_limpiar(datetime(2026, 10, 16, 9, 0)))     # mañana sí
+
+    def test_si_la_pc_prende_tarde_limpia_en_cuanto_prende(self) -> None:
+        self.assertTrue(limpieza.toca_limpiar(datetime(2026, 10, 15, 13, 40)))
 
     def test_un_archivo_roto_no_deja_mudo_al_bot(self) -> None:
         limpieza.ruta_estado().parent.mkdir(parents=True, exist_ok=True)
@@ -119,6 +126,54 @@ class LaListaDeMensajesTests(unittest.TestCase):
         self.assertEqual(limpieza.menu_fijado(), 0)
         limpieza.anotar(7)
         self.assertEqual([m["id"] for m in limpieza._leer()["mensajes"]], [7])
+
+
+class ElMenuSeRenuevaCadaMananaTests(unittest.TestCase):
+    HOY = datetime(2026, 10, 15, 9, 5)
+
+    def setUp(self) -> None:
+        self._dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._dir.cleanup)
+        parche = patch.object(
+            limpieza, "ruta_estado",
+            return_value=Path(self._dir.name) / "bot_mensajes.json",
+        )
+        parche.start()
+        self.addCleanup(parche.stop)
+
+    def _limpiar(self, *, nuevo: int, borra_viejo: bool = True):
+        from pos_uniformes.services import telegram_bot_service as bot
+        from pos_uniformes.services import telegram_service as ts
+
+        with patch.object(bot, "asegurar_menu_fijado", return_value=nuevo) as asegurar, \
+                patch.object(ts, "borrar_mensaje", return_value=borra_viejo) as borrar, \
+                patch.object(ts, "desfijar_mensaje") as desfijar:
+            bot.limpiar_si_toca(session_factory=None, token="t", chat_id="c", ahora=self.HOY)
+        return asegurar, borrar, desfijar
+
+    def test_manda_uno_nuevo_y_borra_el_de_ayer(self) -> None:
+        limpieza.recordar_menu(50)
+        asegurar, borrar, desfijar = self._limpiar(nuevo=60)
+        asegurar.assert_called_once()
+        borrar.assert_any_call(50, token="t", chat_id="c")
+        desfijar.assert_not_called()
+
+    def test_si_el_de_ayer_ya_no_se_puede_borrar_se_desfija(self) -> None:
+        limpieza.recordar_menu(50)
+        _, _, desfijar = self._limpiar(nuevo=60, borra_viejo=False)
+        desfijar.assert_called_once_with(50, token="t", chat_id="c")
+
+    def test_sin_red_se_queda_el_menu_de_ayer(self) -> None:
+        limpieza.recordar_menu(50)
+        _, borrar, _ = self._limpiar(nuevo=0)
+        self.assertEqual(limpieza.menu_fijado(), 50)
+        self.assertNotIn(50, [c.args[0] for c in borrar.call_args_list])
+
+    def test_no_se_renueva_dos_veces_el_mismo_dia(self) -> None:
+        limpieza.recordar_menu(50)
+        self._limpiar(nuevo=60)
+        asegurar, _, _ = self._limpiar(nuevo=70)
+        asegurar.assert_not_called()
 
 
 class ElMenuSeFijaUnaSolaVezTests(unittest.TestCase):
@@ -306,10 +361,10 @@ class ElMenuFijadoNoSeQuedaConLaHoraDeAyerTests(unittest.TestCase):
         editar.assert_called_once()
 
 
-class LoImportanteNoSeBarreTests(unittest.TestCase):
-    def test_con_conservar_el_mensaje_no_se_apunta(self) -> None:
-        """Alertas, cortes y resúmenes se quedan: Daniel de viaje dos días
-        abría el chat y las alertas de anteayer ya no existían (2026-10-10)."""
+class LoImportanteSeQuedaDosDiasTests(unittest.TestCase):
+    def test_con_conservar_se_apunta_marcado(self) -> None:
+        """Alertas, cortes y resúmenes: antes no se apuntaban y no se borraban
+        nunca; ahora se quedan dos días (Daniel, 2026-10-15)."""
         from unittest.mock import patch
 
         from pos_uniformes.services import telegram_limpieza_service as limpieza
@@ -317,6 +372,9 @@ class LoImportanteNoSeBarreTests(unittest.TestCase):
 
         with patch.object(limpieza, "anotar") as anotar:
             ts._anotar_para_barrer({"result": {"message_id": 5}}, conservar=True)
-            anotar.assert_not_called()
             ts._anotar_para_barrer({"result": {"message_id": 6}})
-            anotar.assert_called_once_with(6)
+        self.assertEqual(
+            [c.args + tuple(sorted(c.kwargs.items())) for c in anotar.call_args_list],
+            [(5, ("conservar", True)), (6, ("conservar", False))],
+        )
+

@@ -838,7 +838,7 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
         if alertas:
             procesar(session_factory, _mandar, vigilante)
         try:
-            barrer_si_toca(token=token, chat_id=chat_id)
+            limpiar_si_toca(session_factory=session_factory, token=token, chat_id=chat_id)
             refrescar_menu_si_toca(
                 session_factory=session_factory, token=token, chat_id=chat_id
             )
@@ -915,6 +915,14 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
             if chat != str(chat_id):
                 logger.info("Mensaje ignorado de chat %s", chat)
                 continue
+            # Lo que escribe Daniel también se limpia en la mañana: el bot sí
+            # puede borrarlo en un chat privado (2026-10-15).
+            try:
+                from pos_uniformes.services import telegram_limpieza_service as limpieza
+
+                limpieza.anotar(int(msg.get("message_id") or 0), ts=float(msg.get("date") or 0) or None)
+            except Exception:  # noqa: BLE001 — no anotarlo no impide contestar
+                pass
             trae_foto = bool(telegram_service.foto_mas_grande(msg))
             botones = ""
             if _es_viejo(msg):
@@ -1090,19 +1098,29 @@ def refrescar_menu_si_toca(*, session_factory, token: str, chat_id: str) -> bool
     return True
 
 
-def barrer_si_toca(*, token: str, chat_id: str) -> int:
-    """Borra los mensajes del bot que ya cumplieron 24 horas.
+def limpiar_si_toca(*, session_factory, token: str, chat_id: str, ahora=None) -> int:
+    """La limpieza de la mañana: lo de ayer se va y el día arranca con un menú
+    nuevo fijado (Daniel, 2026-10-15).
 
-    Se llama en cada vuelta del long-polling, pero el servicio decide cuándo
-    de verdad toca: barrer cada 25 segundos sería una llamada por mensaje para
-    nada."""
+    Una vez al día, desde la hora de apertura; si la PC prende más tarde, en
+    cuanto prenda. El menú nuevo se manda ANTES de quitar el viejo: nunca se
+    queda el chat sin menú."""
     from pos_uniformes.services import telegram_limpieza_service as limpieza
     from pos_uniformes.services import telegram_service
 
-    if not limpieza.toca_barrer():
+    if not limpieza.toca_limpiar(ahora):
         return 0
-    return limpieza.barrer(
-        borrar=lambda mid: telegram_service.borrar_mensaje(
-            mid, token=token, chat_id=chat_id
-        )
+    borrados = limpieza.limpiar_del_dia(
+        borrar=lambda mid: telegram_service.borrar_mensaje(mid, token=token, chat_id=chat_id),
+        ahora=ahora,
     )
+    viejo = limpieza.menu_fijado()
+    limpieza.recordar_menu(0)                 # que asegurar_menu_fijado mande uno nuevo
+    nuevo = asegurar_menu_fijado(session_factory=session_factory, token=token, chat_id=chat_id)
+    if not nuevo:
+        limpieza.recordar_menu(viejo)         # sin red: se queda el de ayer
+        return borrados
+    if viejo and viejo != nuevo:
+        if not telegram_service.borrar_mensaje(viejo, token=token, chat_id=chat_id):
+            telegram_service.desfijar_mensaje(viejo, token=token, chat_id=chat_id)
+    return borrados

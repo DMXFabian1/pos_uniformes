@@ -337,9 +337,13 @@ def _desviar_identidad_y_buzon() -> None:
     from pos_uniformes.services import buzon_service as bz
     from pos_uniformes.services import satellite_identity_service as ident
 
+    from pos_uniformes.services import telegram_limpieza_service as limpieza
+
     d = Path(tempfile.mkdtemp(prefix="identidad_pc_"))
     ident.satellite_data_dir = lambda: d
     bz._ruta_leidos = lambda: d / "buzon_leidos.json"
+    # La lista de mensajes del bot: el ciclo de escucha la escribía en data/.
+    limpieza.ruta_estado = lambda: d / "bot_mensajes.json"
     atexit.register(lambda: __import__("shutil").rmtree(d, ignore_errors=True))
 
 

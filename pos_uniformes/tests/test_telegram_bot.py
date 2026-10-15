@@ -95,6 +95,25 @@ class EscucharTests(unittest.TestCase):
         enviar.assert_called_once()
         self.assertEqual(enviar.call_args.kwargs["chat_id"], "123")
 
+    def test_lo_que_escribe_daniel_se_anota_para_la_limpieza(self) -> None:
+        """El bot SÍ puede borrar lo que le escriben en un chat privado: los
+        comandos de Daniel ya no se quedan para siempre (2026-10-15)."""
+        import time
+
+        from pos_uniformes.services import telegram_limpieza_service as limpieza
+
+        cuando = int(time.time())
+        updates = {"result": [
+            {"update_id": 1, "message": {"chat": {"id": 999}, "text": "/x", "message_id": 40, "date": cuando}},
+            {"update_id": 2, "message": {"chat": {"id": 123}, "text": "/ayuda", "message_id": 41, "date": cuando}},
+        ]}
+        with patch("pos_uniformes.services.telegram_service._llamar", return_value=updates), \
+                patch("pos_uniformes.services.telegram_service.enviar_mensaje"), \
+                patch.object(limpieza, "anotar") as anotar, \
+                patch.object(bot, "limpiar_si_toca"):
+            bot.escuchar(session_factory=_sesion, token="t", chat_id="123", una_vez=True, alertas=False)
+        anotar.assert_called_once_with(41, ts=float(cuando))     # el del intruso no
+
     def test_mensajes_viejos_no_se_ejecutan(self) -> None:
         import time
 

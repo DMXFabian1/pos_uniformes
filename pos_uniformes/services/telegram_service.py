@@ -305,17 +305,16 @@ def enviar_mensaje(
 
 
 def _anotar_para_barrer(respuesta: dict, *, conservar: bool = False) -> None:
-    """Apunta el mensaje recién mandado para que el barrido lo borre mañana.
+    """Apunta el mensaje recién mandado para la limpieza de la mañana.
 
-    Con `conservar` no se apunta: lo que no está en la lista no se barre."""
-    if conservar:
-        return
+    Con `conservar` también se apunta, marcado: se queda dos días y no uno
+    (antes no se apuntaba y no se borraba nunca; 2026-10-15)."""
     try:
         mid = int(((respuesta or {}).get("result") or {}).get("message_id") or 0)
         if mid:
             from pos_uniformes.services import telegram_limpieza_service as limpieza
 
-            limpieza.anotar(mid)
+            limpieza.anotar(mid, conservar=conservar)
     except Exception:  # noqa: BLE001 — no poder apuntarlo no impide mandarlo
         pass
 
@@ -342,6 +341,16 @@ def fijar_mensaje(message_id: int, *, token: str | None = None, chat_id: str | N
         })
         return True
     except Exception:  # noqa: BLE001 — sin fijar, el menú sigue sirviendo
+        return False
+
+
+def desfijar_mensaje(message_id: int, *, token: str | None = None, chat_id: str | None = None) -> bool:
+    """Quita un mensaje de los fijados (el menú de ayer, si no se pudo borrar)."""
+    token, chat_id = _credenciales(token, chat_id)
+    try:
+        _llamar(token, "unpinChatMessage", {"chat_id": chat_id, "message_id": str(int(message_id))})
+        return True
+    except Exception:  # noqa: BLE001
         return False
 
 
