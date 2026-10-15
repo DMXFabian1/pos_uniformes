@@ -95,6 +95,7 @@ class EjecutarTests(unittest.TestCase):
     def test_solo_de_remitentes_de_confianza(self) -> None:
         self.assertTrue(ej.puede_ejecutarse("Claude"))
         self.assertTrue(ej.puede_ejecutarse("PC principal"))
+        self.assertTrue(ej.puede_ejecutarse("PC Principal"))   # como la nombró Daniel
         self.assertFalse(ej.puede_ejecutarse("Entrada"))
 
 

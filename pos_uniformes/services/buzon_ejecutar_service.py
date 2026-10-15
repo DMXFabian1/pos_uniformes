@@ -42,7 +42,8 @@ class Resultado:
 
 
 def puede_ejecutarse(de: str) -> bool:
-    return (de or "").strip() in REMITENTES_DE_CONFIANZA
+    # Sin distinguir mayúsculas: «PC Principal» y «PC principal» son la misma.
+    return (de or "").strip().casefold() in {r.casefold() for r in REMITENTES_DE_CONFIANZA}
 
 
 def _powershell() -> str | None:
