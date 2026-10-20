@@ -1289,8 +1289,11 @@ class Compra(Base):
     )
     subtotal: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
-    descuento_porcentaje: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("0.00"), nullable=False)
-    descuento_monto: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
+    # Sin descuento: esas dos columnas se copiaron de Venta en marzo, pero la
+    # migración (d91f3a7c2b44) solo las creó en `venta`. Ningún código las usa
+    # y la tabla `compra` nunca las tuvo: cualquier consulta de compras tronaba
+    # («no existe la columna compra.descuento_porcentaje»). Se vio el 2026-10-20
+    # al simular la primera nota de compra; en producción hay 0 compras.
     observacion: Mapped[str | None] = mapped_column(Text())
     confirmada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
