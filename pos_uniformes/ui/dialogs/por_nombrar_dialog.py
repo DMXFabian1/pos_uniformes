@@ -106,10 +106,24 @@ class PorNombrarDialog(QDialog):
         f = QVBoxLayout(ficha)
         f.setContentsMargins(16, 14, 16, 14)
         f.setSpacing(8)
+        cabeza = QHBoxLayout()
+        self.foto = QLabel("Sin foto")
+        self.foto.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.foto.setFixedSize(96, 128)
+        self.foto.setStyleSheet("background: #f4ede2; border: 1px dashed #ddd0c0; border-radius: 10px; color: #8a8177; font-size: 11px;")
+        cabeza.addWidget(self.foto, 0, Qt.AlignmentFlag.AlignTop)
+        lado = QVBoxLayout()
         self.datos = QLabel("")
         self.datos.setWordWrap(True)
         self.datos.setStyleSheet("font-size: 13px; color: #5a534b;")
-        f.addWidget(self.datos)
+        lado.addWidget(self.datos)
+        self.foto_btn = QPushButton("📷 Tomar foto")
+        self.foto_btn.setToolTip("Con la webcam de esta PC, o un archivo")
+        self.foto_btn.clicked.connect(self._foto)
+        lado.addWidget(self.foto_btn, 0, Qt.AlignmentFlag.AlignLeft)
+        lado.addStretch(1)
+        cabeza.addLayout(lado, 1)
+        f.addLayout(cabeza)
 
         def _campo(texto: str, widget) -> None:
             lbl = QLabel(texto)
@@ -218,8 +232,9 @@ class PorNombrarDialog(QDialog):
     def _pintar_ficha(self) -> None:
         p = self._actual
         hay = p is not None
-        for w in (self.nombre, self.pieza, self.detalle, self.color, self.genero, self.listo_btn, self.medias_btn):
+        for w in (self.nombre, self.pieza, self.detalle, self.color, self.genero, self.listo_btn, self.medias_btn, self.foto_btn):
             w.setEnabled(hay)
+        self._pintar_foto()
         self.etiquetas_btn.setEnabled(hay and self._on_print_labels is not None)
         if not hay:
             self.datos.setText("")
@@ -296,6 +311,44 @@ class PorNombrarDialog(QDialog):
             QMessageBox.information(self, "Sin tallas", "Ese producto no tiene tallas activas.")
             return
         self._on_print_labels(ids)
+
+    def _pintar_foto(self) -> None:
+        from PyQt6.QtGui import QPixmap
+
+        from pos_uniformes.services import producto_foto_service as fotos
+
+        datos = None
+        if self._actual is not None:
+            try:
+                with self._session_factory() as session:
+                    datos = fotos.miniatura(session, self._actual.producto_id)
+            except Exception:  # noqa: BLE001
+                datos = None
+        if not datos:
+            self.foto.setPixmap(QPixmap())
+            self.foto.setText("Sin foto")
+            return
+        pixmap = QPixmap()
+        pixmap.loadFromData(datos)
+        self.foto.setText("")
+        self.foto.setPixmap(pixmap.scaled(self.foto.size(), Qt.AspectRatioMode.KeepAspectRatio,
+                                          Qt.TransformationMode.SmoothTransformation))
+
+    def _foto(self) -> None:
+        if self._actual is None:
+            return
+        from pos_uniformes.ui.dialogs.foto_producto_dialog import FotoProductoDialog
+
+        d = FotoProductoDialog(self, producto_id=self._actual.producto_id, titulo=self._actual.nombre,
+                               session_factory=self._session_factory)
+        d.exec()
+        if d.cambio:
+            self._pintar_foto()
+            if self._on_changed is not None:
+                try:
+                    self._on_changed()
+                except Exception:  # noqa: BLE001
+                    logger.exception("Por nombrar: falló el refresco tras la foto")
 
     def _avisar(self, texto: str) -> None:
         self.estado.setText(texto)

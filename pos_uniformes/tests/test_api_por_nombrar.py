@@ -92,6 +92,33 @@ class ApiPorNombrarTests(unittest.TestCase):
         self.assertEqual(r.status_code, 422)
         self.assertIn("pieza", r.json()["detail"]["error"]["message"])
 
+    def test_la_foto_del_celular_sube_en_base64_y_se_lee_de_regreso(self) -> None:
+        import base64
+        import io
+
+        from PIL import Image
+
+        buf = io.BytesIO()
+        Image.new("RGB", (900, 1200), (10, 80, 10)).save(buf, format="JPEG")
+        b64 = "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+        self._como("VEND-1")
+        with patch("pos_uniformes.services.producto_foto_service._avisar_catalogo"):
+            r = self.client.post("/api/v1/movil/dueno/producto_foto", json={"producto_id": self.p.id, "imagen_b64": b64}).json()
+        self.assertTrue(r["ok"])
+        self.assertEqual((r["ancho"], r["alto"]), (750, 1000))
+        mini = self.client.get(f"/api/v1/movil/producto/{self.p.id}/foto?tam=mini")
+        self.assertEqual(mini.status_code, 200)
+        self.assertEqual(mini.headers["content-type"], "image/jpeg")
+        self.assertLess(len(mini.content), 40_000)
+        media = self.client.get(f"/api/v1/movil/producto/{self.p.id}/foto?tam=media")
+        self.assertGreater(len(media.content), len(mini.content))
+
+    def test_sin_foto_es_404_y_basura_es_422(self) -> None:
+        self._como("VEND-1")
+        self.assertEqual(self.client.get(f"/api/v1/movil/producto/{self.p.id}/foto").status_code, 404)
+        r = self.client.post("/api/v1/movil/dueno/producto_foto", json={"producto_id": self.p.id, "imagen_b64": "bm8gZXMgZm90bw=="})
+        self.assertEqual(r.status_code, 422)
+
 
 if __name__ == "__main__":
     unittest.main()

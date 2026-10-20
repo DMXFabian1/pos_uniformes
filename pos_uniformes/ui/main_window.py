@@ -6761,6 +6761,28 @@ class MainWindow(QMainWindow):
         )
         self.products_selection_label.setText(selection_view.selection_label)
 
+    def _handle_product_photo(self) -> None:
+        """La foto del modelo seleccionado, con la webcam o un archivo (2026-10-20)."""
+        selected = self._selected_catalog_row()
+        feedback = build_catalog_action_guard_feedback(
+            action_key="update_product",
+            has_selection=selected is not None,
+            is_admin=self.current_role == RolUsuario.ADMIN,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
+            return
+        assert selected is not None
+        from pos_uniformes.ui.dialogs.foto_producto_dialog import abrir_foto_producto
+
+        cambio = abrir_foto_producto(
+            self,
+            producto_id=int(selected["producto_id"]),
+            titulo=str(selected.get("producto_nombre_base") or selected.get("producto_nombre") or ""),
+        )
+        if cambio:
+            self._refresh_catalog()
+
     def _handle_update_product(self) -> None:
         selected = self._selected_catalog_row()
         feedback = build_catalog_action_guard_feedback(

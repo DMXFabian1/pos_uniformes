@@ -935,3 +935,57 @@ def dueno_nombrar(
         )
         db.commit()
     return {"ok": True, "nombre": producto.nombre, "quedan": pn.cuantos(db), "etiquetas": etiquetas}
+
+
+# ── La foto del modelo, desde el celular ────────────────────────────────────
+# Base64 dentro del JSON y no multipart: el servidor no trae python-multipart
+# y una foto de celular ya recortada aquí no pasa de unos cientos de KB.
+
+class FotoRequest(BaseModel):
+    producto_id: int
+    imagen_b64: str = Field(min_length=1)
+
+
+@router.post("/dueno/producto_foto")
+def dueno_producto_foto(
+    body: FotoRequest,
+    current: tuple = Depends(get_current_employee),
+    db: Session = Depends(get_db),
+) -> dict:
+    import base64
+
+    from pos_uniformes.services import producto_foto_service as fotos
+
+    empleada, _p = current
+    _solo_dueno(empleada)
+    _solo_tienda()
+    crudo = body.imagen_b64.split(",", 1)[-1]          # tolera «data:image/jpeg;base64,…»
+    try:
+        datos = base64.b64decode(crudo, validate=False)
+    except Exception:  # noqa: BLE001
+        raise HTTPException(status_code=422, detail={"error": {"code": "imagen", "message": "La imagen no se pudo leer."}})
+    try:
+        foto = fotos.guardar(db, body.producto_id, datos)
+    except fotos.NoSePuede as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail={"error": {"code": "imagen", "message": str(exc)}})
+    db.commit()
+    return {"ok": True, "hash": foto.hash, "ancho": foto.ancho, "alto": foto.alto}
+
+
+@router.get("/producto/{producto_id}/foto")
+def producto_foto(
+    producto_id: int,
+    tam: str = "mini",
+    current: tuple = Depends(get_current_employee),
+    db: Session = Depends(get_db),
+):
+    """La foto del modelo (mini para listas, media para la ficha). 404 si no hay."""
+    from fastapi import Response
+
+    from pos_uniformes.services import producto_foto_service as fotos
+
+    datos = fotos.mediana(db, producto_id) if tam == "media" else fotos.miniatura(db, producto_id)
+    if not datos:
+        raise HTTPException(status_code=404, detail={"error": {"code": "sin_foto", "message": "Ese modelo no tiene foto."}})
+    return Response(content=datos, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=86400"})

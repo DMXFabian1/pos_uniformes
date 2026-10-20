@@ -356,7 +356,7 @@ body.con-topbar .app{padding-top:calc(58px + env(safe-area-inset-top))}
 const $ = id => document.getElementById(id);
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const DIAS = ["lun","mar","mié","jue","vie","sáb","dom"];
-const PWA_VERSION = "v26";
+const PWA_VERSION = "v27";
 let token = localStorage.getItem("pos_token") || "";
 let calY = 0, calM = 0;
 let rolActual = "", vistaInicio = "", modoServidor = "casa";
@@ -1403,10 +1403,63 @@ function pnEditar(id) {
         <input type="checkbox" id="pn-etiquetas" style="width:22px;height:22px;margin:0"> 🏷 Mandar etiquetas a la impresora de la tienda (una por pieza)
       </label>
     </div>
+    <div class="card">
+      <div class="sub">Foto del modelo (una por producto; se recorta sola)</div>
+      <div style="display:flex;gap:12px;align-items:center;margin-top:6px">
+        <img id="pn-foto" alt="" style="width:96px;height:128px;object-fit:cover;border-radius:10px;background:#eee;display:none">
+        <div id="pn-foto-nada" class="sub">Sin foto</div>
+        <label class="btn-grande" style="flex:1;margin:0;text-align:center">📷 Tomar foto
+          <input type="file" id="pn-foto-input" accept="image/*" capture="environment" style="display:none" onchange="pnFotoElegida(this)">
+        </label>
+      </div>
+      <div id="pn-foto-estado" class="sub"></div>
+    </div>
     <button class="btn-grande btn-acento" onclick="pnGuardar(true)">✅  Guardar y listo</button>
     <button class="btn-grande" onclick="pnGuardar(false)">Guardar a medias (se queda en la lista)</button>
     <button class="btn-suave salir" onclick="duenoPorNombrar()">← Lista</button>`);
   $("pn-nombre").focus();
+  pnFotoMostrar(p.producto_id);
+}
+
+// La foto actual, si hay; 404 = sin foto, y no es error.
+async function pnFotoMostrar(id) {
+  const img = $("pn-foto"), nada = $("pn-foto-nada");
+  if (!img) return;
+  try {
+    const r = await fetch(`/api/v1/movil/producto/${id}/foto?tam=mini&h=${Date.now()}`, {headers: {"Authorization": "Bearer " + token}});
+    if (!r.ok) { img.style.display = "none"; nada.style.display = ""; return; }
+    img.src = URL.createObjectURL(await r.blob()); img.style.display = ""; nada.style.display = "none";
+  } catch (e) { img.style.display = "none"; nada.style.display = ""; }
+}
+
+// Se achica en el celular ANTES de mandarla: una foto de 12 MP son 5 MB y
+// el servidor igual la va a dejar en 1000 px.
+async function pnFotoElegida(input) {
+  const archivo = input.files && input.files[0];
+  if (!archivo || !pnActual) return;
+  $("pn-foto-estado").textContent = "Subiendo…";
+  try {
+    const b64 = await pnAchicar(archivo, 1400);
+    const r = await contPost("/api/v1/movil/dueno/producto_foto", {producto_id: pnActual.producto_id, imagen_b64: b64});
+    $("pn-foto-estado").textContent = `✓ Foto guardada (${r.ancho}×${r.alto}).`;
+    pnFotoMostrar(pnActual.producto_id);
+  } catch (e) { $("pn-foto-estado").textContent = "No se pudo: " + e.message; }
+  input.value = "";
+}
+
+function pnAchicar(archivo, lado) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => {
+      const esc = Math.min(1, lado / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * esc); c.height = Math.round(img.height * esc);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      resolve(c.toDataURL("image/jpeg", 0.9));
+    };
+    img.onerror = () => reject(new Error("no se pudo leer la foto"));
+    img.src = URL.createObjectURL(archivo);
+  });
 }
 
 async function pnGuardar(listo) {
