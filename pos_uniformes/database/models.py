@@ -8,6 +8,7 @@ from enum import Enum
 
 from sqlalchemy import CheckConstraint, DateTime, Enum as SqlEnum
 from sqlalchemy import Date, JSON, Boolean, ForeignKey, Integer, LargeBinary, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import false as sa_false
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -727,6 +728,12 @@ class Producto(Base):
     escudo: Mapped[str | None] = mapped_column(String(120))
     ubicacion: Mapped[str | None] = mapped_column(String(120))
     descripcion: Mapped[str | None] = mapped_column(Text())
+    # Ropa normal que entró con el código del proveedor como nombre y todavía
+    # no se identifica (Daniel la va nombrando conforme saca la mercancía,
+    # 2026-10-20). La bandeja «Por nombrar» del POS y del celular lista esto.
+    por_identificar: Mapped[bool] = mapped_column(
+        Boolean(), default=False, nullable=False, server_default=sa_false(), index=True
+    )
     activo: Mapped[bool] = mapped_column(default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

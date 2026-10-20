@@ -224,9 +224,11 @@ def _resolver_variante(session, usuario: Usuario, linea: LineaNota, actualizar_p
             atributo=_get_or_create_por_nombre(session, AtributoProducto, linea.detalle),
             genero=linea.genero or None,
         )
-        # crear_producto aplica title case; conservamos el codigo del proveedor en mayusculas.
-        producto.nombre = producto.nombre_base = linea.nombre
-        estado = "nuevo"
+        # Sin pieza es un código que todavía no se sabe qué es: va a la bandeja
+        # «Por nombrar» del POS y del celular (2026-10-20).
+        if not linea.pieza.strip():
+            producto.por_identificar = True
+        estado = "nuevo" if linea.pieza.strip() else "nuevo, por nombrar"
 
     variante = session.scalar(
         select(Variante).where(

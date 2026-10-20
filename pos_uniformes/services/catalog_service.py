@@ -89,10 +89,18 @@ class CatalogService:
     def _title_case(text: str) -> str:
         _LOWERCASE = {"de", "del", "la", "las", "los", "el", "en", "y", "a", "con", "por", "para"}
         words = text.split()
+        # «PLAYERA DEPORTIVA» tecleado con bloq mayús no son siglas: si TODO
+        # viene en mayúsculas, se pasa a título como siempre.
+        todo_mayusculas = text.isupper()
         result = []
         for i, w in enumerate(words):
             if i > 0 and w.lower() in _LOWERCASE:
                 result.append(w.lower())
+            elif any(ch.isdigit() for ch in w) or (len(w) > 1 and w.isupper() and not todo_mayusculas):
+                # Un código de proveedor («KY357H», «S01») o unas siglas
+                # («CBTIS», «SABES») se quedan como vienen: `capitalize()`
+                # los volvía «Ky357h» y «Cbtis» (auditoría del 2026-10-12).
+                result.append(w)
             else:
                 result.append(w.capitalize())
         return " ".join(result)
