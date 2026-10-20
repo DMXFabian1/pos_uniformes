@@ -1,14 +1,14 @@
 # proveedor: Mios
 # documento: MIOS-0008952
 # observacion: Nota 0008952 Mios Uriangato, 19/oct/2026
-nombre,marca,cantidad,costo,precio,color,linea,pieza,detalle,genero
-Leggings S01,Showey,288,34,89,Surtido,Casual,Leggings,,Mujer
-Sudadera KY357H,Yamo,40,55,99,Surtido,Casual,Sudadera,Invierno,Mujer
-Blusa Cuello SY100,Mios,40,29,69,Surtido,Casual,Blusa,,Mujer
-Blusa Térmica SY101,Mios,40,29,69,Surtido,Casual,Blusa,Invierno,Mujer
-Sudadera QS227,Yamo,50,71,139,Surtido,Casual,Sudadera,Invierno,Mujer
-YT0572,Darong,30,59,99,Surtido,Casual,,,Mujer
-Sudadera MO194,Mios,24,75,149,Surtido,Casual,Sudadera,Invierno,Mujer
-Sudadera C07,Showey,10,86,159,Surtido,Casual,Sudadera,Invierno,Mujer
-Leggings MPP94,Bethel,40,49,99,Surtido,Casual,Leggings,,Mujer
-Pants J969R,ABC,8,109,199,Surtido,Casual,Pants,,Mujer
+nombre,marca,cantidad,costo,precio,color,linea,pieza,detalle,genero,categoria
+Leggings S01,Showey,288,34,89,Surtido,Casual,Leggings,,Mujer,
+Sudadera KY357H,Yamo,40,55,99,Surtido,Casual,Sudadera,Invierno,Mujer,
+Blusa Cuello SY100,Mios,40,29,69,Surtido,Casual,Blusa,,Mujer,
+Blusa Térmica SY101,Mios,40,29,69,Surtido,Casual,Blusa,Invierno,Mujer,
+Sudadera QS227,Yamo,50,71,139,Surtido,Casual,Sudadera,Invierno,Mujer,
+YT0572,Darong,30,59,99,Surtido,Casual,,,Mujer,
+Sudadera MO194,Mios,24,75,149,Surtido,Casual,Sudadera,Invierno,Mujer,
+Sudadera C07,Showey,10,86,159,Surtido,Casual,Sudadera,Invierno,Mujer,
+Pijama CN,Bethel,40,49,99,Surtido,Temporada,Pijama,Invierno,Mujer,Temporada
+Pants J969R,ABC,8,109,199,Surtido,Casual,Pants,,Mujer,
