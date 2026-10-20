@@ -114,6 +114,28 @@ class EscucharTests(unittest.TestCase):
             bot.escuchar(session_factory=_sesion, token="t", chat_id="123", una_vez=True, alertas=False)
         anotar.assert_called_once_with(41, ts=float(cuando))     # el del intruso no
 
+    def test_el_aviso_de_mensaje_fijado_no_recibe_no_entendi(self) -> None:
+        """Cada mañana el bot fija el menú y Telegram le manda su propio aviso
+        «V.I.K.Y fijó…» como mensaje sin texto; contestaba «No entendí» (2026-10-20)."""
+        import time
+
+        ahora = int(time.time())
+        updates = {"result": [
+            {"update_id": 1, "message": {"chat": {"id": 123}, "message_id": 50, "date": ahora,
+                                         "from": {"id": 7, "is_bot": True, "first_name": "V.I.K.Y"},
+                                         "pinned_message": {"message_id": 49, "text": "📅 Hoy"}}},
+            {"update_id": 2, "message": {"chat": {"id": 123}, "message_id": 51, "date": ahora, "sticker": {}}},
+            {"update_id": 3, "message": {"chat": {"id": 123}, "message_id": 52, "date": ahora, "text": "/ayuda"}},
+        ]}
+        with patch("pos_uniformes.services.telegram_service._llamar", return_value=updates), patch(
+            "pos_uniformes.services.telegram_service.enviar_mensaje"
+        ) as enviar, patch.object(bot, "limpiar_si_toca"):
+            bot.escuchar(session_factory=_sesion, token="t", chat_id="123", una_vez=True, alertas=False)
+        textos = [c.args[0] for c in enviar.call_args_list]
+        self.assertEqual(len(textos), 2)                      # el sticker sí, el fijado no
+        self.assertIn("No entendí", textos[0])
+        self.assertIn("/corte", textos[1])
+
     def test_mensajes_viejos_no_se_ejecutan(self) -> None:
         import time
 

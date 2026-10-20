@@ -920,6 +920,11 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
             if chat != str(chat_id):
                 logger.info("Mensaje ignorado de chat %s", chat)
                 continue
+            if _es_de_servicio(msg):
+                # «V.I.K.Y fijó "📅 Hoy…"»: cuando el bot fija el menú de la
+                # mañana, Telegram le entrega su propio aviso de servicio como
+                # un mensaje sin texto, y contestaba «No entendí» (2026-10-20).
+                continue
             # Lo que escribe Daniel también se limpia en la mañana: el bot sí
             # puede borrarlo en un chat privado (2026-10-15).
             try:
@@ -969,6 +974,20 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
                 _guardar_offset(offset)
         if una_vez:
             return
+
+
+_LLAVES_DE_SERVICIO = (
+    "pinned_message", "new_chat_members", "left_chat_member", "new_chat_title",
+    "new_chat_photo", "delete_chat_photo", "message_auto_delete_timer_changed",
+)
+
+
+def _es_de_servicio(msg: dict) -> bool:
+    """Un aviso del chat (mensaje fijado, etc.) o algo que mandó el propio bot:
+    no es algo que Daniel haya escrito, no se contesta."""
+    if any(llave in msg for llave in _LLAVES_DE_SERVICIO):
+        return True
+    return bool((msg.get("from") or {}).get("is_bot"))
 
 
 def _atender_toque(toque: dict, *, session_factory, token: str, chat_id: str) -> None:
