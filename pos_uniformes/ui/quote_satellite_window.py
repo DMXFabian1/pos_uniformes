@@ -8692,14 +8692,26 @@ QLabel#favDialogPriceLabel {
         self.guided_detail_scroll.setVisible(True)
         segmento = _guided_segment_label(row)
         color_label = _guided_display_color_label(row.get("color"))
-        detail_parts = [
-            f"Nivel {row['nivel_educativo_nombre']}",
-            f"Escuela {row['escuela_nombre']}",
-            f"Linea {segmento}",
-            f"{row['tipo_prenda_nombre']}",
-            f"{row['tipo_pieza_nombre']}",
-            f"Talla {row['talla']}",
-        ]
+        if self._gfs.mode == "ropa":
+            # Ropa: ni nivel ni escuela ni «línea oficial»; lo que importa es
+            # marca, sección y prenda (2026-10-20).
+            detail_parts = [
+                p for p in (
+                    str(row.get("marca_nombre") or ""),
+                    str(row.get("categoria_nombre") or ""),
+                    "" if str(row.get("tipo_pieza_nombre") or "-") == "-" else str(row["tipo_pieza_nombre"]),
+                    f"Talla {row['talla']}",
+                ) if p
+            ]
+        else:
+            detail_parts = [
+                f"Nivel {row['nivel_educativo_nombre']}",
+                f"Escuela {row['escuela_nombre']}",
+                f"Linea {segmento}",
+                f"{row['tipo_prenda_nombre']}",
+                f"{row['tipo_pieza_nombre']}",
+                f"Talla {row['talla']}",
+            ]
         if color_label:
             detail_parts.append(f"Color {color_label}")
         detail_parts.append(f"Precio ${Decimal(str(row['precio_venta'])).quantize(Decimal('0.01'))}")
