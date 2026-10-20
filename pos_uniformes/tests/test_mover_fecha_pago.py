@@ -10,7 +10,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from pos_uniformes.database.connection import Base
-from pos_uniformes.database.models import EmpleadaEvento, EmpleadaHorario, EmpleadaPago
+from pos_uniformes.database.models import EmpleadaEvento, EmpleadaHorario, EmpleadaPago, LibretaVenta
 from pos_uniformes.services import nomina_service as nom
 from pos_uniformes.services.calendario_empleadas_service import PAGO
 
@@ -25,12 +25,20 @@ class MoverFechaPagoTests(unittest.TestCase):
         self.s.add(EmpleadaHorario(employee_code="VEND-4", descanso_weekday=5, fecha_ultimo_pago=LUNES))
         self.pago = EmpleadaPago(
             employee_code="VEND-4", employee_name="Stayce", fecha=LUNES, desde=date(2026, 10, 12), hasta=LUNES,
-            total=Decimal("1476.00"), comisiones=103, creado_por="VEND-1",
+            total=Decimal("1476.00"), comisiones=103, tarifa_comision=Decimal("2.00"),
+            monto_comisiones=Decimal("206.00"), creado_por="VEND-1",
             created_at=datetime(2026, 10, 19, 17, 14, tzinfo=timezone(timedelta(hours=-6))),
         )
         self.s.add(self.pago)
         self.s.add(EmpleadaEvento(employee_code="VEND-4", fecha=LUNES, tipo=PAGO))
+        # Lo que vendió: 83 piezas en la semana y 20 el lunes antes de capturar el pago.
+        self._vende(datetime(2026, 10, 14, 12, 0), 83)
+        self._vende(datetime(2026, 10, 19, 11, 0), 20)
         self.s.flush()
+
+    def _vende(self, cuando: datetime, piezas: int) -> None:
+        self.s.add(LibretaVenta(employee_code="VEND-4", employee_name="Stayce", piezas=piezas, comisiones=piezas,
+                                created_at=cuando.astimezone()))
 
     def _marcas(self) -> list[date]:
         return sorted(e.fecha for e in self.s.query(EmpleadaEvento).filter_by(employee_code="VEND-4", tipo=PAGO).all())
@@ -42,17 +50,25 @@ class MoverFechaPagoTests(unittest.TestCase):
         self.assertEqual(self._marcas(), [DOMINGO])                              # la marca verde se movió
         self.assertEqual(self.s.get(EmpleadaHorario, "VEND-4").fecha_ultimo_pago, DOMINGO)
         self.assertEqual(self.pago.created_at.hour, 17)                          # cuándo se capturó, intacto
-        self.assertEqual(self.pago.total, Decimal("1476.00"))                    # el dinero no cambia
+        self.assertEqual(self.pago.hasta, DOMINGO)
+        # Las 20 del lunes se le quitan al pago: el domingo no existían.
+        self.assertEqual((r["comisiones_de"], r["comisiones_a"]), (103, 83))
+        self.assertEqual((self.pago.comisiones, self.pago.monto_comisiones, self.pago.total),
+                         (83, Decimal("166.00"), Decimal("1436.00")))
 
     def test_las_comisiones_ya_pagadas_no_se_vuelven_a_contar(self) -> None:
-        # `_corte_de_comisiones` arranca en created_at (lunes 17:14) solo si la
-        # fecha del pago coincide con fecha_ultimo_pago: por eso se mueven juntas.
-        from pos_uniformes.services.calendario_empleadas_service import _corte_de_comisiones, cargar_horario
+        # El siguiente ciclo arranca el lunes a las 00:00: las 20 del lunes se
+        # cuentan ahí (y ya no en el pago), ni perdidas ni dobles.
+        from pos_uniformes.services.calendario_empleadas_service import (
+            _corte_de_comisiones, cargar_horario, comisiones_desde_ultimo_pago,
+        )
 
         nom.mover_fecha_pago(self.s, self.pago.id, DOMINGO, creado_por="VEND-1")
         horario = cargar_horario(self.s, "VEND-4")
         corte = _corte_de_comisiones(self.s, "VEND-4", horario)
-        self.assertEqual((corte.date(), corte.hour), (LUNES, 17))
+        self.assertEqual((corte.date(), corte.hour), (LUNES, 0))
+        self.assertEqual(comisiones_desde_ultimo_pago(self.s, "VEND-4", horario), 20)
+        self.assertEqual(self.pago.comisiones, 83)
 
     def test_si_no_era_el_ultimo_pago_el_ciclo_no_se_toca(self) -> None:
         self.s.get(EmpleadaHorario, "VEND-4").fecha_ultimo_pago = date(2026, 10, 25)

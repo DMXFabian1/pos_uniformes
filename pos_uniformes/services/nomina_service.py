@@ -296,10 +296,13 @@ def mover_fecha_pago(session, pago_id: int, nueva_fecha: date, *, creado_por: st
     lunes desde el bot; el calendario pintaba el pago en lunes y el siguiente
     ciclo arrancaba un día corrido. Mover la fecha deja:
 
-    - `empleada_pago.fecha` en el día real; `created_at` NO se toca: es cuándo
-      se capturó, y es lo que decide desde qué hora cuentan las comisiones del
-      siguiente pago (`_corte_de_comisiones`). Así lo que ya se pagó no se
-      vuelve a pagar.
+    - `empleada_pago.fecha` en el día real; `created_at` NO se toca (es cuándo
+      se capturó).
+    - las comisiones del pago se vuelven a contar hasta el FIN del día nuevo:
+      el pago de Stayce traía las 20 piezas del lunes porque se capturó el
+      lunes a las 17:14, pero el domingo que le pagó esas piezas no existían.
+      Se le quitan al pago (y el total baja), y el siguiente ciclo las cuenta
+      desde el día siguiente (`_corte_de_comisiones`): ni perdidas ni dobles.
     - la marca 💵 del calendario en el día nuevo (y fuera del viejo, si no
       hay otro pago ahí);
     - `fecha_ultimo_pago` de la empleada en el día nuevo, si ese pago era el
@@ -358,11 +361,54 @@ def mover_fecha_pago(session, pago_id: int, nueva_fecha: date, *, creado_por: st
     if horario is not None and horario.fecha_ultimo_pago == vieja:
         horario.fecha_ultimo_pago = nueva_fecha
         ciclo_movido = True
+    if pago.hasta == vieja:
+        pago.hasta = nueva_fecha
+    comisiones_de, total_de = int(pago.comisiones or 0), pago.total
+    recontar_comisiones_de_pago(session, pago)
     session.flush()
     return {
         "employee_code": code, "employee_name": pago.employee_name, "de": vieja, "a": nueva_fecha,
         "total": pago.total, "ciclo_movido": ciclo_movido,
+        "comisiones_de": comisiones_de, "comisiones_a": int(pago.comisiones or 0),
+        "total_de": total_de, "total_a": pago.total,
     }
+
+
+def recontar_comisiones_de_pago(session, pago) -> int:
+    """Vuelve a contar las comisiones de un pago hasta el FIN del día de su
+    `fecha` (desde el corte del pago anterior), y ajusta monto y total.
+    Devuelve cuántas quedaron."""
+    from datetime import datetime, time
+    from decimal import Decimal
+
+    from sqlalchemy import func as sa_func
+
+    from pos_uniformes.database.models import EmpleadaPago, LibretaVenta
+
+    code = str(pago.employee_code).upper()
+    anterior = (
+        session.query(EmpleadaPago)
+        .filter(EmpleadaPago.employee_code == code, EmpleadaPago.id != pago.id,
+                EmpleadaPago.created_at < pago.created_at)
+        .order_by(EmpleadaPago.created_at.desc())
+        .first()
+    )
+    if anterior is not None and anterior.created_at is not None:
+        tope = datetime.combine(anterior.fecha + timedelta(days=1), time.min).astimezone()
+        inicio = min(anterior.created_at.astimezone(), tope)
+    else:
+        inicio = datetime.combine(pago.desde or pago.fecha, time.min).astimezone()
+    fin = datetime.combine(pago.fecha + timedelta(days=1), time.min).astimezone()
+    comisiones = int(session.query(sa_func.coalesce(sa_func.sum(LibretaVenta.comisiones), 0)).filter(
+        LibretaVenta.employee_code == code,
+        LibretaVenta.created_at >= inicio, LibretaVenta.created_at < fin,
+    ).scalar() or 0)
+    monto_viejo = Decimal(pago.monto_comisiones or 0)
+    monto_nuevo = Decimal(comisiones) * Decimal(pago.tarifa_comision)
+    pago.comisiones = comisiones
+    pago.monto_comisiones = monto_nuevo
+    pago.total = Decimal(pago.total or 0) - monto_viejo + monto_nuevo
+    return comisiones
 
 
 def ultimo_pago_registrado(session, employee_code: str):

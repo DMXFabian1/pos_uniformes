@@ -268,6 +268,17 @@ def deshacer_pago(session: Session, *, quien: str, hoy: date | None = None) -> s
     return f"↩️ Deshecho el pago a {nombre} de ${monto:,.2f}."
 
 
+def _ajuste_comisiones(r: dict) -> str:
+    """«Le quedaron 83 comisiones ($1,436.00); las 20 del 19/10 pasan al siguiente pago.»"""
+    de, a = int(r.get("comisiones_de") or 0), int(r.get("comisiones_a") or 0)
+    if de == a:
+        return ""
+    if a < de:
+        return (f" Le quedaron {a} comisiones (${r['total_a']:,.2f}); las {de - a} de después del"
+                f" {r['a']:%d/%m} pasan al siguiente pago.")
+    return f" Ahora cubre {a} comisiones (${r['total_a']:,.2f}), {a - de} más."
+
+
 def fecha_pago(session: Session, argumento: str, *, quien: str, hoy: date | None = None) -> str:
     """«/fechapago Stayce 18/10»: el último pago de esa persona pasa a ese día.
 
@@ -313,6 +324,7 @@ def fecha_pago(session: Session, argumento: str, *, quien: str, hoy: date | None
         return f"No se pudo: {exc}"
     session.commit()
     extra = " Su siguiente pago también se recorrió." if r["ciclo_movido"] else ""
+    extra += _ajuste_comisiones(r)
     return (
         f"📅 El pago a {nombre} de ${r['total']:,.2f} pasó del {r['de']:%d/%m} al {r['a']:%d/%m}.{extra}"
     )

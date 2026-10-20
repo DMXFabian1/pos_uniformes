@@ -508,6 +508,9 @@ class CalendarioEmpleadasDialog(QDialog):
             QMessageBox.warning(self, "Sin conexión", "No se pudo guardar. Revisa la conexión.")
             return
         extra = " Su siguiente pago también se recorrió." if r["ciclo_movido"] else ""
+        from pos_uniformes.services.telegram_pagos_service import _ajuste_comisiones
+
+        extra += _ajuste_comisiones(r)
         QMessageBox.information(
             self, "Pago movido",
             f"El pago de ${r['total']:,.2f} pasó del {fecha_vieja:%d/%m} al {nueva:%d/%m}.{extra}",
