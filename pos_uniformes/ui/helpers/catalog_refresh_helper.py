@@ -47,6 +47,7 @@ def build_catalog_snapshot_rows(rows: list[tuple[object, ...]]) -> list[dict[str
                 "fallback_text": "fallback" if bool(normalized_row["fallback_importacion"]) else "",
                 "stock_minimo": normalized_row.get("stock_minimo"),
                 "por_identificar": bool(normalized_row.get("por_identificar", False)),
+                "foto_hash": str(normalized_row.get("foto_hash") or ""),
             },
             alias_map=CATALOG_SEARCH_ALIAS_MAP,
             general_fields=CATALOG_SEARCH_GENERAL_FIELDS,
@@ -56,6 +57,11 @@ def build_catalog_snapshot_rows(rows: list[tuple[object, ...]]) -> list[dict[str
 
 
 def _normalize_catalog_snapshot_row(row: tuple[object, ...]) -> dict[str, object]:
+    if len(row) == 30:
+        # Desde el 2026-10-20: la última es el hash de la foto del modelo (o None).
+        base = _normalize_catalog_snapshot_row(tuple(row[:29]))
+        base["foto_hash"] = str(row[29]) if row[29] else ""
+        return base
     if len(row) == 29:
         # Desde el 2026-10-20: la última es `producto.por_identificar`.
         base = _normalize_catalog_snapshot_row(tuple(row[:28]))

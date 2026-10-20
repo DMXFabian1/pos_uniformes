@@ -709,6 +709,15 @@ class QuoteSatelliteWindow(QMainWindow):
                 if probe_database_host():
                     with get_session() as session:
                         rows = load_catalog_snapshot_rows(session)
+                        # Las fotos de los modelos, al disco de este kiosko:
+                        # solo las que falten (por hash), en este mismo hilo
+                        # de fondo. La cuadrícula las lee de ahí (2026-10-20).
+                        try:
+                            from pos_uniformes.services import foto_local_cache_service as foto_cache
+
+                            foto_cache.sincronizar(session, rows)
+                        except Exception:  # noqa: BLE001 — sin fotos, el catálogo sigue
+                            logger.debug("No se pudieron sincronizar las fotos", exc_info=True)
                         try:
                             nombres_por_codigo(session)   # y su copia local, para sin red
                         except Exception:  # noqa: BLE001
@@ -6723,6 +6732,12 @@ class QuoteSatelliteWindow(QMainWindow):
     def _refresh_catalog_snapshot(self, session) -> None:
         self.catalog_snapshot_rows = load_catalog_snapshot_rows(session)
         self._rebuild_sku_index()
+        try:
+            from pos_uniformes.services import foto_local_cache_service as foto_cache
+
+            foto_cache.sincronizar(session, self.catalog_snapshot_rows)
+        except Exception:  # noqa: BLE001
+            logger.debug("No se pudieron sincronizar las fotos", exc_info=True)
         try:
             save_catalog_cache(self.catalog_snapshot_rows)
         except Exception:  # noqa: BLE001

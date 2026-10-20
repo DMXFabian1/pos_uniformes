@@ -852,6 +852,28 @@ class Variante(Base):
     )
 
 
+class ProductoFoto(Base):
+    """La foto del modelo (una por producto), en dos tamaños ya listos.
+
+    `miniatura` (~400 px) para la cuadrícula del kiosko, `mediana` (~1000 px)
+    para la ficha. El original no se guarda. `hash` es de la miniatura: es lo
+    único que viaja en el catálogo a los kioskos, y con eso saben si ya la
+    tienen en su disco (2026-10-20).
+    """
+
+    __tablename__ = "producto_foto"
+
+    producto_id: Mapped[int] = mapped_column(ForeignKey("producto.id", ondelete="CASCADE"), primary_key=True)
+    hash: Mapped[str] = mapped_column(String(32), nullable=False, index=True)
+    miniatura: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    mediana: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+    ancho: Mapped[int] = mapped_column(Integer, nullable=False)
+    alto: Mapped[int] = mapped_column(Integer, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
 class ProductoAsset(Base):
     __tablename__ = "producto_asset"
     __table_args__ = (

@@ -22,6 +22,7 @@ def _execute_catalog_snapshot_query(session) -> list[tuple[object, ...]]:
         Marca,
         NivelEducativo,
         Producto,
+    ProductoFoto,
         TipoPieza,
         TipoPrenda,
         Variante,
@@ -70,6 +71,7 @@ def _execute_catalog_snapshot_query(session) -> list[tuple[object, ...]]:
                 func.coalesce(ImportacionCatalogoFila.producto_fallback, False),
                 Variante.stock_minimo,
                 Producto.por_identificar,
+                ProductoFoto.hash,
             )
             .join(Variante.producto)
             .join(Producto.categoria)
@@ -79,6 +81,7 @@ def _execute_catalog_snapshot_query(session) -> list[tuple[object, ...]]:
             .outerjoin(Producto.tipo_prenda)
             .outerjoin(Producto.tipo_pieza)
             .outerjoin(ImportacionCatalogoFila, ImportacionCatalogoFila.variante_id == Variante.id)
+            .outerjoin(ProductoFoto, ProductoFoto.producto_id == Producto.id)
             .outerjoin(layaway_reserved_subquery, layaway_reserved_subquery.c.variante_id == Variante.id)
             .order_by(
                 Categoria.nombre.asc(),
