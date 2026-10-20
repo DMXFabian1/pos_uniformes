@@ -11,7 +11,11 @@ empiezan con `#` son datos de la nota; el resto es una tabla de productos:
     Sudadera KY357H,Yamo,40,55,99
 
 Columnas opcionales: `categoria` (default "Ropa casual"), `talla` (default
-"Unitalla") y `color` (default "Sin color").
+"Unitalla"), `color` (default "Surtido"), y las de la ficha de ropa normal
+acordada el 2026-10-13: `linea` (tipo_prenda), `pieza` (tipo_pieza),
+`detalle` (atributo) y `genero`. Una línea, pieza o detalle que no exista se
+crea una sola vez; se busca sin importar mayúsculas ni acentos, para no
+repetir lo de «Basico» y «Básico».
 
 Si el producto (nombre + marca) y la talla/color ya existen, no se duplica:
 solo entra el stock de la compra. Su precio de venta se respeta salvo que se
@@ -32,13 +36,25 @@ from pathlib import Path
 from sqlalchemy import select
 
 from pos_uniformes.database.connection import get_session
-from pos_uniformes.database.models import Categoria, Compra, Marca, Producto, Proveedor, Usuario, Variante
+from pos_uniformes.database.models import (
+    AtributoProducto,
+    Categoria,
+    Compra,
+    Marca,
+    Producto,
+    Proveedor,
+    TipoPieza,
+    TipoPrenda,
+    Usuario,
+    Variante,
+)
 from pos_uniformes.services.catalog_service import CatalogService
 from pos_uniformes.services.compra_service import CompraItemInput, CompraService
 
 DEFAULT_CATEGORIA = "Ropa casual"
 DEFAULT_TALLA = "Unitalla"
-DEFAULT_COLOR = "Sin color"
+#: Ropa normal: nunca «Sin color» (2026-10-13). Lo que llega revuelto es «Surtido».
+DEFAULT_COLOR = "Surtido"
 COLUMNAS_REQUERIDAS = ("nombre", "marca", "cantidad", "costo", "precio")
 
 
@@ -52,6 +68,10 @@ class LineaNota:
     categoria: str = DEFAULT_CATEGORIA
     talla: str = DEFAULT_TALLA
     color: str = DEFAULT_COLOR
+    linea: str = ""
+    pieza: str = ""
+    detalle: str = ""
+    genero: str = ""
 
 
 @dataclass(frozen=True)
@@ -119,6 +139,10 @@ def parsear_nota(texto: str) -> NotaCompra:
             categoria=row.get("categoria") or DEFAULT_CATEGORIA,
             talla=row.get("talla") or DEFAULT_TALLA,
             color=row.get("color") or DEFAULT_COLOR,
+            linea=row.get("linea", ""),
+            pieza=row.get("pieza", ""),
+            detalle=row.get("detalle", ""),
+            genero=row.get("genero", ""),
         )
         clave = (linea.nombre.lower(), linea.marca.lower(), linea.talla.lower(), linea.color.lower())
         if clave in vistos:
@@ -139,6 +163,38 @@ def _get_or_create_categoria(session, usuario: Usuario, nombre: str) -> Categori
 def _get_or_create_marca(session, usuario: Usuario, nombre: str) -> Marca:
     marca = session.scalar(select(Marca).where(Marca.nombre == nombre))
     return marca or CatalogService.crear_marca(session, usuario, nombre)
+
+
+def _sin_acentos(texto: str) -> str:
+    import unicodedata
+
+    return "".join(
+        c for c in unicodedata.normalize("NFD", texto.casefold()) if unicodedata.category(c) != "Mn"
+    ).strip()
+
+
+def _get_or_create_por_nombre(session, modelo, nombre: str):
+    """La fila con ese nombre (sin importar mayúsculas ni acentos), o una nueva.
+
+    Si ya hay una con acento y otra sin él, gana la que tiene acento: así se
+    va dejando de usar la mal escrita."""
+    nombre = " ".join((nombre or "").split())
+    if not nombre:
+        return None
+    buscado = _sin_acentos(nombre)
+    parecidas = [f for f in session.scalars(select(modelo)).all() if _sin_acentos(f.nombre) == buscado]
+    if parecidas:
+        import unicodedata
+
+        def _lleva_acento(texto: str) -> bool:
+            return any(unicodedata.category(c) == "Mn" for c in unicodedata.normalize("NFD", texto))
+
+        parecidas.sort(key=lambda f: (not _lleva_acento(f.nombre), f.id))
+        return parecidas[0]
+    nueva = modelo(nombre=nombre)
+    session.add(nueva)
+    session.flush()
+    return nueva
 
 
 def _get_or_create_proveedor(session, nombre: str) -> Proveedor:
@@ -163,6 +219,10 @@ def _resolver_variante(session, usuario: Usuario, linea: LineaNota, actualizar_p
             categoria=_get_or_create_categoria(session, usuario, linea.categoria),
             marca=marca,
             nombre=linea.nombre,
+            tipo_prenda=_get_or_create_por_nombre(session, TipoPrenda, linea.linea),
+            tipo_pieza=_get_or_create_por_nombre(session, TipoPieza, linea.pieza),
+            atributo=_get_or_create_por_nombre(session, AtributoProducto, linea.detalle),
+            genero=linea.genero or None,
         )
         # crear_producto aplica title case; conservamos el codigo del proveedor en mayusculas.
         producto.nombre = producto.nombre_base = linea.nombre
