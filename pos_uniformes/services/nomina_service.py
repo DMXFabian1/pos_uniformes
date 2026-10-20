@@ -289,6 +289,82 @@ def deshacer_pago(session, pago_id: int, *, creado_por: str) -> dict:
     return resumen
 
 
+def mover_fecha_pago(session, pago_id: int, nueva_fecha: date, *, creado_por: str) -> dict:
+    """Corrige el DÍA de un pago que se registró tarde (SOLO Daniel, VEND-1).
+
+    El caso (2026-10-20): a Stayce se le pagó el domingo y se registró el
+    lunes desde el bot; el calendario pintaba el pago en lunes y el siguiente
+    ciclo arrancaba un día corrido. Mover la fecha deja:
+
+    - `empleada_pago.fecha` en el día real; `created_at` NO se toca: es cuándo
+      se capturó, y es lo que decide desde qué hora cuentan las comisiones del
+      siguiente pago (`_corte_de_comisiones`). Así lo que ya se pagó no se
+      vuelve a pagar.
+    - la marca 💵 del calendario en el día nuevo (y fuera del viejo, si no
+      hay otro pago ahí);
+    - `fecha_ultimo_pago` de la empleada en el día nuevo, si ese pago era el
+      último: de ahí sale cuándo le toca el siguiente.
+
+    No se puede mover a un día en que ya tiene otro pago, ni a un día que
+    todavía no llega, ni antes del periodo que cubrió.
+    """
+    from pos_uniformes.database.models import EmpleadaEvento, EmpleadaHorario, EmpleadaPago
+    from pos_uniformes.services.calendario_empleadas_service import PAGO
+
+    if str(creado_por or "").strip().upper() != "VEND-1":
+        raise PermissionError("Solo Daniel puede cambiar la fecha de un pago.")
+    pago = session.get(EmpleadaPago, int(pago_id))
+    if pago is None:
+        raise ValueError("Ese pago ya no existe.")
+    vieja = pago.fecha
+    if nueva_fecha == vieja:
+        raise ValueError(f"Ese pago ya está en el {vieja:%d/%m}.")
+    if nueva_fecha > date.today():
+        raise ValueError("No se puede poner un pago en un día que todavía no llega.")
+    if pago.desde and nueva_fecha < pago.desde:
+        raise ValueError(
+            f"Ese pago cubre desde el {pago.desde:%d/%m}; no puede quedar antes de eso."
+        )
+    code = str(pago.employee_code).upper()
+    otro = (
+        session.query(EmpleadaPago)
+        .filter(EmpleadaPago.employee_code == code, EmpleadaPago.fecha == nueva_fecha, EmpleadaPago.id != pago.id)
+        .first()
+    )
+    if otro is not None:
+        raise ValueError(f"Ya hay otro pago el {nueva_fecha:%d/%m} (${otro.total:,.2f}).")
+
+    pago.fecha = nueva_fecha
+    # La marca del calendario: se va del día viejo si ahí no queda otro pago.
+    queda_otro = (
+        session.query(EmpleadaPago)
+        .filter(EmpleadaPago.employee_code == code, EmpleadaPago.fecha == vieja, EmpleadaPago.id != pago.id)
+        .first()
+    )
+    if queda_otro is None:
+        for ev in session.query(EmpleadaEvento).filter(
+            EmpleadaEvento.employee_code == code, EmpleadaEvento.fecha == vieja, EmpleadaEvento.tipo == PAGO
+        ).all():
+            session.delete(ev)
+    ya_marcado = (
+        session.query(EmpleadaEvento)
+        .filter(EmpleadaEvento.employee_code == code, EmpleadaEvento.fecha == nueva_fecha, EmpleadaEvento.tipo == PAGO)
+        .first()
+    )
+    if ya_marcado is None:
+        session.add(EmpleadaEvento(employee_code=code, fecha=nueva_fecha, tipo=PAGO))
+    horario = session.get(EmpleadaHorario, code)
+    ciclo_movido = False
+    if horario is not None and horario.fecha_ultimo_pago == vieja:
+        horario.fecha_ultimo_pago = nueva_fecha
+        ciclo_movido = True
+    session.flush()
+    return {
+        "employee_code": code, "employee_name": pago.employee_name, "de": vieja, "a": nueva_fecha,
+        "total": pago.total, "ciclo_movido": ciclo_movido,
+    }
+
+
 def ultimo_pago_registrado(session, employee_code: str):
     from pos_uniformes.database.models import EmpleadaPago
 

@@ -12,7 +12,7 @@ resbalar que un clic en la caja.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 
 from sqlalchemy.orm import Session
@@ -266,3 +266,53 @@ def deshacer_pago(session: Session, *, quien: str, hoy: date | None = None) -> s
         return f"No se pudo: {exc}"
     session.commit()
     return f"↩️ Deshecho el pago a {nombre} de ${monto:,.2f}."
+
+
+def fecha_pago(session: Session, argumento: str, *, quien: str, hoy: date | None = None) -> str:
+    """«/fechapago Stayce 18/10»: el último pago de esa persona pasa a ese día.
+
+    Para cuando se le pagó un día y se registró al siguiente (Stayce,
+    2026-10-20). No deshace nada: mueve la fecha, la marca del calendario y el
+    arranque de su siguiente ciclo. También vale «ayer» y «antier»."""
+    import re
+
+    from pos_uniformes.services import asistencia_service as asis
+    from pos_uniformes.services import nomina_service as nom
+
+    hoy = hoy or date.today()
+    partes = (argumento or "").strip().split()
+    if len(partes) < 2:
+        return "¿De quién y qué día? Por ejemplo:\n/fechapago Stayce 18/10\n/fechapago Stayce ayer"
+    cuando = partes[-1].lower()
+    nombre_buscado = " ".join(partes[:-1])
+    if cuando == "ayer":
+        nueva = hoy - timedelta(days=1)
+    elif cuando in ("antier", "anteayer"):
+        nueva = hoy - timedelta(days=2)
+    else:
+        m = re.fullmatch(r"(\d{1,2})[/-](\d{1,2})(?:[/-](\d{2,4}))?", cuando)
+        if not m:
+            return f"No entendí «{cuando}» como fecha. Escríbela como 18/10, o «ayer»."
+        anio = int(m.group(3)) if m.group(3) else hoy.year
+        if anio < 100:
+            anio += 2000
+        try:
+            nueva = date(anio, int(m.group(2)), int(m.group(1)))
+        except ValueError:
+            return f"«{cuando}» no es un día que exista."
+    code = asis.buscar_code(session, nombre_buscado)
+    if not code or not existe_y_trabaja(session, code):
+        return f"¿Quién es «{nombre_buscado}»? Escríbelo como aparece en /asistencia."
+    nombre = _nombre(session, code)
+    ultimo = nom.ultimo_pago_registrado(session, code)
+    if ultimo is None:
+        return f"{nombre} no tiene ningún pago registrado."
+    try:
+        r = nom.mover_fecha_pago(session, int(ultimo.id), nueva, creado_por=quien)
+    except (ValueError, PermissionError) as exc:
+        return f"No se pudo: {exc}"
+    session.commit()
+    extra = " Su siguiente pago también se recorrió." if r["ciclo_movido"] else ""
+    return (
+        f"📅 El pago a {nombre} de ${r['total']:,.2f} pasó del {r['de']:%d/%m} al {r['a']:%d/%m}.{extra}"
+    )

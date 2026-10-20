@@ -601,9 +601,12 @@ def _corte_de_comisiones(session, employee_code: str, horario: HorarioEmpleada):
         return del_dia_siguiente
     momento = pago.created_at
     momento = momento.astimezone() if momento.tzinfo else momento.astimezone()
-    # Nunca más tarde que el día siguiente: si el pago se capturó de noche,
-    # el corte natural ya es mejor y evita depender de la hora exacta.
-    return min(momento, del_dia_siguiente)
+    # El momento de captura, siempre: las comisiones de ese pago se contaron
+    # hasta esa hora. Antes se topaba al día siguiente de la fecha del pago, y
+    # un pago registrado TARDE (se pagó el domingo, se capturó el lunes a las
+    # 17:14 y luego se le corrigió la fecha) volvía a contar las comisiones
+    # del lunes en el siguiente pago (2026-10-20).
+    return momento
 
 
 def chips_calendario_mes(session, year: int, month: int, hoy: date) -> dict[date, list[tuple[str, str]]]:

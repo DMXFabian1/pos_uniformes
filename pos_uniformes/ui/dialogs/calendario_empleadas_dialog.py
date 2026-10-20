@@ -12,7 +12,7 @@ y el banner de comisiones).
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import date, timedelta
 from decimal import Decimal
 
 from PyQt6.QtCore import QDate, Qt
@@ -262,6 +262,11 @@ class CalendarioEmpleadasDialog(QDialog):
             )
             self.btn_pago.clicked.connect(self._pagar)
             fila_pago.addWidget(self.btn_pago)
+            # Un pago que se registró otro día (desde el bot, al día siguiente):
+            # se corrige aquí sin deshacerlo (Stayce, 2026-10-20).
+            self.btn_mover_pago = QPushButton("📅 Cambiar la fecha de un pago")
+            self.btn_mover_pago.clicked.connect(self._mover_fecha_pago)
+            fila_pago.addWidget(self.btn_mover_pago)
             fila_pago.addStretch()
             ly.addLayout(fila_pago)
 
@@ -442,6 +447,72 @@ class CalendarioEmpleadasDialog(QDialog):
         )
         if pago is not None:
             self._recargar()
+
+    def _mover_fecha_pago(self) -> None:
+        """Elige uno de los últimos pagos de la empleada y le cambia el día."""
+        from PyQt6.QtCore import QDate
+        from PyQt6.QtWidgets import QCalendarWidget, QDialog, QDialogButtonBox, QListWidget, QVBoxLayout
+
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.services import nomina_service as nom
+
+        code = self._codigo_activo()
+        try:
+            with get_session() as session:
+                pagos = nom.listar_pagos(
+                    session, desde=date.today() - timedelta(days=60), hasta=date.today(), employee_code=code,
+                )
+                pagos = [(int(p.id), p.fecha, p.total) for p in pagos]
+        except Exception:  # noqa: BLE001
+            logger.exception("Calendario: no se pudieron leer los pagos")
+            QMessageBox.warning(self, "Sin conexión", "No se pudieron leer los pagos.")
+            return
+        if not pagos:
+            QMessageBox.information(self, "Sin pagos", "No hay pagos de los últimos 60 días para esta persona.")
+            return
+        pagos.sort(key=lambda x: x[1], reverse=True)
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Cambiar la fecha de un pago")
+        dlg.setMinimumWidth(420)
+        ly = QVBoxLayout(dlg)
+        ly.addWidget(QLabel("¿Cuál pago?"))
+        lista = QListWidget()
+        for pid, fecha, total in pagos:
+            lista.addItem(f"{WEEKDAY_NAMES[fecha.weekday()]} {fecha:%d/%m}  ·  ${total:,.2f}")
+        lista.setCurrentRow(0)
+        ly.addWidget(lista)
+        ly.addWidget(QLabel("¿Qué día fue en realidad?"))
+        cal = QCalendarWidget()
+        cal.setMaximumDate(QDate.currentDate())
+        sel = self._fecha_seleccionada()
+        cal.setSelectedDate(QDate(sel.year, sel.month, sel.day))
+        ly.addWidget(cal)
+        botones = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        botones.accepted.connect(dlg.accept)
+        botones.rejected.connect(dlg.reject)
+        ly.addWidget(botones)
+        if dlg.exec() != QDialog.DialogCode.Accepted or lista.currentRow() < 0:
+            return
+        pago_id, fecha_vieja, _total = pagos[lista.currentRow()]
+        nueva = cal.selectedDate().toPyDate()
+        try:
+            with get_session() as session:
+                r = nom.mover_fecha_pago(session, pago_id, nueva, creado_por="VEND-1")
+                session.commit()
+        except (ValueError, PermissionError) as exc:
+            QMessageBox.warning(self, "No se pudo", str(exc))
+            return
+        except Exception:  # noqa: BLE001
+            logger.exception("Calendario: no se pudo mover el pago")
+            QMessageBox.warning(self, "Sin conexión", "No se pudo guardar. Revisa la conexión.")
+            return
+        extra = " Su siguiente pago también se recorrió." if r["ciclo_movido"] else ""
+        QMessageBox.information(
+            self, "Pago movido",
+            f"El pago de ${r['total']:,.2f} pasó del {fecha_vieja:%d/%m} al {nueva:%d/%m}.{extra}",
+        )
+        self._recargar()
 
     # ── Autoservicio (empleada) ──────────────────────────────────────────
 

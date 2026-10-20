@@ -10,7 +10,7 @@ from __future__ import annotations
 import unittest
 from datetime import date
 from decimal import Decimal
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from pos_uniformes.services import telegram_pagos_service as pg
 
@@ -227,3 +227,58 @@ class RetiroRepetidoTests(unittest.TestCase):
                 retiros_service.registrar_retiro(s, monto=Decimal("500"), motivo="gasolina", creado_por="VEND-1")
             retiros_service.registrar_retiro(s, monto=Decimal("500"), motivo="hielo", creado_por="VEND-1")
             self.assertEqual(s.query(CajaRetiro).count(), 2)
+
+
+class FechaPagoTest(unittest.TestCase):
+    """«/fechapago Stayce 18/10»: el último pago de esa persona pasa a ese día."""
+
+    def _correr(self, argumento, *, mover=None, ultimo=object()):
+        from types import SimpleNamespace
+
+        from pos_uniformes.services import asistencia_service as asis
+        from pos_uniformes.services import nomina_service as nom
+
+        resultado = mover or {"employee_code": "VEND-4", "employee_name": "Stayce", "de": date(2026, 10, 19),
+                              "a": date(2026, 10, 18), "total": Decimal("1476.00"), "ciclo_movido": True}
+        with patch.object(asis, "buscar_code", return_value="VEND-4"), \
+                patch.object(pg, "existe_y_trabaja", return_value=True), \
+                patch.object(pg, "_nombre", return_value="Stayce"), \
+                patch.object(nom, "ultimo_pago_registrado", return_value=SimpleNamespace(id=27) if ultimo is not None else None), \
+                patch.object(nom, "mover_fecha_pago", return_value=resultado) as mover_mock:
+            texto = pg.fecha_pago(MagicMock(), argumento, quien="VEND-1", hoy=date(2026, 10, 20))
+        return texto, mover_mock
+
+    def test_el_caso_de_stayce(self) -> None:
+        texto, mover = self._correr("Stayce 18/10")
+        mover.assert_called_once()
+        self.assertEqual(mover.call_args.args[1:], (27, date(2026, 10, 18)))
+        self.assertIn("pasó del 19/10 al 18/10", texto)
+        self.assertIn("siguiente pago también se recorrió", texto)
+
+    def test_ayer_y_antier(self) -> None:
+        _, mover = self._correr("Stayce ayer")
+        self.assertEqual(mover.call_args.args[2], date(2026, 10, 19))
+        _, mover = self._correr("Stayce antier")
+        self.assertEqual(mover.call_args.args[2], date(2026, 10, 18))
+
+    def test_sin_fecha_o_fecha_rara_explica(self) -> None:
+        self.assertIn("Por ejemplo", self._correr("Stayce")[0])
+        self.assertIn("No entendí", self._correr("Stayce lunes")[0])
+        self.assertIn("no es un día", self._correr("Stayce 31/02")[0])
+
+    def test_sin_pagos_lo_dice(self) -> None:
+        texto, _ = self._correr("Stayce 18/10", ultimo=None)
+        self.assertIn("ningún pago", texto)
+
+    def test_lo_que_el_servicio_rechaza_se_dice_tal_cual(self) -> None:
+        from pos_uniformes.services import asistencia_service as asis
+        from pos_uniformes.services import nomina_service as nom
+        from types import SimpleNamespace
+
+        with patch.object(asis, "buscar_code", return_value="VEND-4"), \
+                patch.object(pg, "existe_y_trabaja", return_value=True), \
+                patch.object(pg, "_nombre", return_value="Stayce"), \
+                patch.object(nom, "ultimo_pago_registrado", return_value=SimpleNamespace(id=27)), \
+                patch.object(nom, "mover_fecha_pago", side_effect=ValueError("Ya hay otro pago el 18/10")):
+            texto = pg.fecha_pago(MagicMock(), "Stayce 18/10", quien="VEND-1", hoy=date(2026, 10, 20))
+        self.assertIn("No se pudo: Ya hay otro pago", texto)
