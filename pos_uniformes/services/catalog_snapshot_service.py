@@ -69,6 +69,7 @@ def _execute_catalog_snapshot_query(session) -> list[tuple[object, ...]]:
                 Variante.activo,
                 func.coalesce(ImportacionCatalogoFila.producto_fallback, False),
                 Variante.stock_minimo,
+                Producto.por_identificar,
             )
             .join(Variante.producto)
             .join(Producto.categoria)

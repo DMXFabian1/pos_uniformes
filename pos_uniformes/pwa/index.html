@@ -273,6 +273,7 @@ body.con-topbar .app{padding-top:calc(58px + env(safe-area-inset-top))}
     <button class="btn-grande btn-acento oculto" id="d-btn-corte" onclick="duenoCorte()">🧾  Hacer corte</button>
     <button class="btn-grande oculto" id="d-btn-bodega" onclick="duenoBodega()">📦  Bodega: llegó mercancía / pasar al piso</button>
     <button class="btn-grande oculto" id="d-btn-asistencia" onclick="duenoAsistencia()">👥  Asistencia: faltó / descanso / quitar marca</button>
+    <button class="btn-grande oculto" id="d-btn-nombrar" onclick="duenoPorNombrar()">🏷  Mercancía por nombrar</button>
     <button class="btn-grande" id="d-btn-mapa" onclick="mapaConteos()">🗺  Mapa de conteos: qué está contado y qué no</button>
     <button class="btn-grande" id="d-btn-escuelas" onclick="escuelasEstado()">🏫  Escuelas: cómo va cada una</button>
     <div class="card">
@@ -355,7 +356,7 @@ body.con-topbar .app{padding-top:calc(58px + env(safe-area-inset-top))}
 const $ = id => document.getElementById(id);
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const DIAS = ["lun","mar","mié","jue","vie","sáb","dom"];
-const PWA_VERSION = "v25";
+const PWA_VERSION = "v26";
 let token = localStorage.getItem("pos_token") || "";
 let calY = 0, calM = 0;
 let rolActual = "", vistaInicio = "", modoServidor = "casa";
@@ -1190,6 +1191,7 @@ function pintarDueno(data) {
   $("d-btn-corte").classList.toggle("oculto", modoServidor !== "tienda");
   $("d-btn-bodega").classList.toggle("oculto", modoServidor !== "tienda");
   $("d-btn-asistencia").classList.toggle("oculto", modoServidor !== "tienda");
+  $("d-btn-nombrar").classList.toggle("oculto", modoServidor !== "tienda");
   mostrar("dueno");
 }
 
@@ -1356,6 +1358,70 @@ async function bodLlegoGuardar() {
       <p class="sub">Ya cuentan en el inventario.</p>${etq}</div>
       <button class="btn-grande btn-acento" onclick="bodLlegoInicio()">📥  Llegó otra prenda</button>
       <button class="btn-suave salir" onclick="duenoBodega()">← Bodega</button>`);
+  } catch (e) { alert(e.message); }
+}
+
+// ── Mercancía por nombrar (solo el dueño) ─────────────────────────────────
+// La ropa normal entra el día que llega con el código del proveedor y Daniel
+// la nombra con la prenda en la mano (2026-10-20). Mismo servicio que la
+// ventana del POS: nombre con código, pieza, detalle, color, género.
+let pnDatos = null, pnActual = null;
+
+async function duenoPorNombrar() {
+  duenoSub(`<h1>🏷 Por nombrar</h1><p class="sub">Cargando...</p>`);
+  try { pnDatos = await api("/api/v1/movil/dueno/por_nombrar"); }
+  catch (e) { duenoSub(`<h1>🏷 Por nombrar</h1><p class="error">${e.message}</p><button class="btn-suave salir" onclick="duenoMenu()">← Regresar</button>`); return; }
+  const lista = pnDatos.pendientes;
+  const filas = lista.map(p => `<div class="fila" onclick="pnEditar(${p.producto_id})" style="cursor:pointer">
+      <span><b>${p.nombre}</b><br><small>${p.marca} · ${p.existencia} pzas · $${p.precio} · desde ${p.desde}</small></span><span class="monto">›</span></div>`).join("");
+  duenoSub(`<h1>🏷 Por nombrar</h1>
+    <p class="sub">${lista.length ? `${lista.length} producto${lista.length === 1 ? "" : "s"} esperando nombre. Toca uno con la prenda en la mano.` : "No hay nada por nombrar. ✅"}</p>
+    <div class="card">${filas || "<div class='fila'>Todo tiene nombre.</div>"}</div>
+    <button class="btn-suave salir" onclick="duenoMenu()">← Regresar</button>`);
+}
+
+function pnEditar(id) {
+  pnActual = (pnDatos.pendientes || []).find(p => p.producto_id === id);
+  if (!pnActual) { duenoPorNombrar(); return; }
+  const p = pnActual;
+  const opciones = (lista) => lista.map(x => `<option value="${x}">`).join("");
+  const generos = ["Mujer", "Hombre", "Unisex", "Niña", "Niño"].map(g => `<option ${g === (p.genero || "Mujer") ? "selected" : ""}>${g}</option>`).join("");
+  duenoSub(`<h1>🏷 ${p.nombre}</h1>
+    <p class="sub">${p.marca} · ${p.categoria} · ${p.existencia} pzas · $${p.precio} · ${p.skus.join(", ")}</p>
+    <div class="card">
+      <div class="sub">Nombre (conserva el código)</div>
+      <input id="pn-nombre" value="${p.nombre.replace(/"/g, "&quot;")}" placeholder="Chamarra YT0572">
+      <div class="sub" style="margin-top:8px">Pieza (qué prenda es)</div>
+      <input id="pn-pieza" list="pn-piezas" value="${p.pieza || ""}" placeholder="Sudadera, Leggings…"><datalist id="pn-piezas">${opciones(pnDatos.piezas)}</datalist>
+      <div class="sub" style="margin-top:8px">Detalle (opcional)</div>
+      <input id="pn-detalle" list="pn-detalles" value="${p.detalle || ""}" placeholder="Invierno, Estampado…"><datalist id="pn-detalles">${opciones(pnDatos.detalles)}</datalist>
+      <div class="sub" style="margin-top:8px">Color</div>
+      <input id="pn-color" value="${p.color === "Surtido" ? "" : (p.color || "")}" placeholder="Surtido si viene revuelto">
+      <div class="sub" style="margin-top:8px">Género</div>
+      <select id="pn-genero">${generos}</select>
+      <label style="display:flex;align-items:center;gap:8px;margin-top:10px">
+        <input type="checkbox" id="pn-etiquetas" style="width:22px;height:22px;margin:0"> 🏷 Mandar etiquetas a la impresora de la tienda (una por pieza)
+      </label>
+    </div>
+    <button class="btn-grande btn-acento" onclick="pnGuardar(true)">✅  Guardar y listo</button>
+    <button class="btn-grande" onclick="pnGuardar(false)">Guardar a medias (se queda en la lista)</button>
+    <button class="btn-suave salir" onclick="duenoPorNombrar()">← Lista</button>`);
+  $("pn-nombre").focus();
+}
+
+async function pnGuardar(listo) {
+  if (!pnActual) return;
+  try {
+    const r = await contPost("/api/v1/movil/dueno/nombrar", {
+      producto_id: pnActual.producto_id, nombre: $("pn-nombre").value.trim(), pieza: $("pn-pieza").value.trim(),
+      detalle: $("pn-detalle").value.trim(), color: $("pn-color").value.trim(), genero: $("pn-genero").value,
+      listo, imprimir_etiquetas: $("pn-etiquetas").checked,
+    });
+    const etq = r.etiquetas ? `<p class="sub">🏷 ${r.etiquetas} etiqueta${r.etiquetas === 1 ? "" : "s"} en cola en la impresora de la tienda.</p>` : "";
+    duenoSub(`<h1>✓ ${listo ? "Nombrado" : "Guardado a medias"}</h1>
+      <div class="card"><strong>${r.nombre}</strong>${etq}<p class="sub">${r.quedan ? `Faltan ${r.quedan}.` : "Ya no falta ninguno. ✅"}</p></div>
+      <button class="btn-grande btn-acento" onclick="duenoPorNombrar()">🏷  Siguiente</button>
+      <button class="btn-suave salir" onclick="duenoMenu()">← Menú</button>`);
   } catch (e) { alert(e.message); }
 }
 
@@ -1598,9 +1664,9 @@ async function duenoGuardarCorte() {
 const NAV_RAICES = new Set(["pintarEmpleada", "pintarEncargado", "pintarDueno", "irBuscar", "contCargarLista"]);
 const NAV_PANTALLAS = ["pintarEmpleada", "pintarEncargado", "pintarDueno", "irBuscar", "contCargarLista", "contPintarHoja",
   "encMenu", "encVerCortes", "encApuntar", "encElegir", "encTipo", "encCorteHoy", "encRetiro", "encPagar", "encPagarA",
-  "duenoMenu", "duenoBodega", "duenoAsistencia", "mapaConteos", "mapaEscuela", "mapaBasicos", "bodLlegadas", "bodCorregirInicio", "bodCorregirCaja", "bodLlegoInicio", "bodElegirPrenda", "bodPisoInicio", "bodElegirCaja", "duenoCorte"];
+  "duenoMenu", "duenoBodega", "duenoAsistencia", "duenoPorNombrar", "pnEditar", "mapaConteos", "mapaEscuela", "mapaBasicos", "bodLlegadas", "bodCorregirInicio", "bodCorregirCaja", "bodLlegoInicio", "bodElegirPrenda", "bodPisoInicio", "bodElegirCaja", "duenoCorte"];
 const NAV_ACCIONES = ["encMarcar", "encDeshacer", "encHacerCorte", "encGuardarRetiro", "encConfirmarPago",
-  "bodCorregirGuardar", "bodLlegoGuardar", "bodPisoGuardar", "duenoGuardarCorte", "encRequiereTienda"];
+  "bodCorregirGuardar", "bodLlegoGuardar", "bodPisoGuardar", "duenoGuardarCorte", "pnGuardar", "encRequiereTienda"];
 let navPila = [];            // [{nombre, args}]
 let navRestaurando = false;
 let navRefrescando = false;

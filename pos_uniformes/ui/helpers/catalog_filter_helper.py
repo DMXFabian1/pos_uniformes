@@ -57,7 +57,10 @@ def catalog_row_matches_visible_filters(
     search_matcher: Callable[[dict[str, object], str], bool],
 ) -> bool:
     return (
-        _matches_catalog_school_scope(str(row["categoria_nombre"]), filters.school_scope_filter)
+        _matches_catalog_school_scope(
+            str(row["categoria_nombre"]), filters.school_scope_filter,
+            por_identificar=bool(row.get("por_identificar", False)),
+        )
         and matches_selected_values(row["categoria_nombre"], filters.category_filters)
         and matches_selected_values(row["marca_nombre"], filters.brand_filters)
         and matches_selected_values(row["escuela_nombre"], filters.school_filters, fallback="General")
@@ -104,12 +107,16 @@ def _matches_catalog_layaway_filter(*, apartado_cantidad: int, layaway_filter: s
     )
 
 
-def _matches_catalog_school_scope(categoria_nombre: str, school_scope_filter: str) -> bool:
+def _matches_catalog_school_scope(
+    categoria_nombre: str, school_scope_filter: str, *, por_identificar: bool = False
+) -> bool:
     normalized_category = _normalize_text(categoria_nombre)
     is_uniform_category = normalized_category in UNIFORM_CATEGORIES
     return (
         not school_scope_filter
         or (school_scope_filter == "school_only" and is_uniform_category)
         or (school_scope_filter == "general_only" and normalized_category and not is_uniform_category)
+        # Ropa normal que entró con el código del proveedor y falta nombrar (2026-10-20).
+        or (school_scope_filter == "unidentified" and por_identificar)
     )
 

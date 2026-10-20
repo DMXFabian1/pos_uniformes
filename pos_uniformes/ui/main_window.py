@@ -1922,6 +1922,10 @@ class MainWindow(QMainWindow):
         header_menu.addSeparator()
         self.buzon_action = header_menu.addAction("Buzón entre PCs")
         self.buzon_action.triggered.connect(self._handle_open_buzon)
+        self.por_nombrar_action = header_menu.addAction("Mercancía por nombrar")
+        self.por_nombrar_action.triggered.connect(self._handle_open_por_nombrar)
+        # El texto dice cuántas faltan; se cuenta al abrir el menú, no antes.
+        header_menu.aboutToShow.connect(self._refrescar_por_nombrar_action)
         try:
             from pos_uniformes.ui.helpers.buzon_aviso import BuzonAviso
 
@@ -8796,6 +8800,29 @@ class MainWindow(QMainWindow):
 
         ConteoCalendarioDialog(self).exec()
 
+    def _refrescar_por_nombrar_action(self) -> None:
+        try:
+            from pos_uniformes.services import por_nombrar_service as pn
+
+            with get_session() as session:
+                n = pn.cuantos(session)
+        except Exception:  # noqa: BLE001 — sin base, el texto pelón
+            n = 0
+        self.por_nombrar_action.setText(f"Mercancía por nombrar ({n})" if n else "Mercancía por nombrar")
+
+    def _handle_open_por_nombrar(self) -> None:
+        """Ropa normal que entró con el código del proveedor (2026-10-20)."""
+        if self.current_role != RolUsuario.ADMIN:
+            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede nombrar productos.")
+            return
+        from pos_uniformes.ui.dialogs.por_nombrar_dialog import abrir_por_nombrar
+
+        abrir_por_nombrar(
+            self, user_id=self.user_id,
+            on_print_labels=self._handle_inventory_count_print_labels,
+            on_changed=self._refresh_catalog,
+        )
+
     def _handle_open_buzon(self) -> None:
         """Chat de texto con los kioskos y con Claude (2026-10-15)."""
         from pos_uniformes.ui.dialogs.buzon_dialog import abrir_buzon
@@ -11082,7 +11109,7 @@ class MainWindow(QMainWindow):
             button.style().polish(button)
 
     def _refresh_catalog_section_controls(self) -> None:
-        is_general_only = str(self.catalog_school_scope_filter_combo.currentData() or "") == "general_only"
+        is_general_only = str(self.catalog_school_scope_filter_combo.currentData() or "") in ("general_only", "unidentified")
         if is_general_only and self.catalog_school_filter_combo.selected_values():
             self.catalog_school_filter_combo.clear_selection()
         self.catalog_school_filter_combo.setEnabled(not is_general_only)

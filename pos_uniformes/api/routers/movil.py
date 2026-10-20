@@ -863,3 +863,75 @@ def dueno_hacer_corte(
         "ticket_encolado": ticket_encolado,
         "ocultos": ocultos,
     }
+
+
+# ── Por nombrar: ropa normal que entró con el código del proveedor ───────────
+# Daniel la nombra con la prenda en la mano (2026-10-20). Mismo servicio que
+# la pantalla del POS, para que el celular y el POS nunca difieran.
+
+class NombrarRequest(BaseModel):
+    producto_id: int
+    nombre: str = Field(min_length=1, max_length=150)
+    pieza: str = Field(default="", max_length=80)
+    detalle: str = Field(default="", max_length=80)
+    color: str = Field(default="", max_length=50)
+    genero: str = Field(default="", max_length=50)
+    listo: bool = True
+    imprimir_etiquetas: bool = False
+
+
+def _usuario_admin(db: Session):
+    from pos_uniformes.database.models import RolUsuario, Usuario
+
+    u = db.query(Usuario).filter(Usuario.rol == RolUsuario.ADMIN, Usuario.activo.is_(True)).order_by(Usuario.id).first()
+    if u is None:
+        raise HTTPException(status_code=409, detail={"error": {
+            "code": "sin_admin", "message": "No hay un usuario ADMIN para firmar el cambio."}})
+    return u
+
+
+@router.get("/dueno/por_nombrar")
+def dueno_por_nombrar(
+    current: tuple = Depends(get_current_employee),
+    db: Session = Depends(get_db),
+) -> dict:
+    from pos_uniformes.database.models import AtributoProducto, TipoPieza
+    from pos_uniformes.services import por_nombrar_service as pn
+
+    empleada, _p = current
+    _solo_dueno(empleada)
+    return {
+        "pendientes": [p.__dict__ for p in pn.listar(db)],
+        "piezas": [t.nombre for t in db.query(TipoPieza).order_by(TipoPieza.nombre).all()],
+        "detalles": [a.nombre for a in db.query(AtributoProducto).order_by(AtributoProducto.nombre).all()],
+    }
+
+
+@router.post("/dueno/nombrar")
+def dueno_nombrar(
+    body: NombrarRequest,
+    current: tuple = Depends(get_current_employee),
+    db: Session = Depends(get_db),
+) -> dict:
+    from pos_uniformes.services import por_nombrar_service as pn
+
+    empleada, _p = current
+    _solo_dueno(empleada)
+    _solo_tienda()
+    try:
+        producto = pn.nombrar(
+            db, _usuario_admin(db), body.producto_id,
+            nombre=body.nombre, pieza=body.pieza, detalle=body.detalle,
+            color=body.color, genero=body.genero, listo=body.listo,
+        )
+    except pn.NoSePuede as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail={"error": {"code": "no_se_puede", "message": str(exc)}})
+    db.commit()
+    etiquetas = 0
+    if body.imprimir_etiquetas:
+        etiquetas = pn.encolar_etiquetas(
+            db, pn.skus_de(db, [producto.id]), origen="pwa", creado_por=str(empleada.codigo),
+        )
+        db.commit()
+    return {"ok": True, "nombre": producto.nombre, "quedan": pn.cuantos(db), "etiquetas": etiquetas}

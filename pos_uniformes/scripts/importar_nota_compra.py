@@ -296,6 +296,11 @@ def main() -> None:
     parser.add_argument("--usuario", required=True, help="username ADMIN que registra la compra")
     parser.add_argument("--aplicar", action="store_true", help="guardar cambios (sin esto solo simula)")
     parser.add_argument(
+        "--etiquetas",
+        action="store_true",
+        help="al guardar, mandar a la impresora de la tienda una etiqueta por pieza que entró",
+    )
+    parser.add_argument(
         "--actualizar-precios",
         action="store_true",
         help="en resurtidos, subir el precio de venta al del CSV (nunca lo baja)",
@@ -324,6 +329,13 @@ def main() -> None:
         if args.aplicar:
             session.commit()
             print("Listo: cambios guardados.")
+            if args.etiquetas:
+                from pos_uniformes.services.por_nombrar_service import encolar_etiquetas
+
+                ids = [int(d.variante_id) for d in compra.detalles]
+                n = encolar_etiquetas(session, ids, origen="importador", creado_por=args.usuario)
+                session.commit()
+                print(f"Etiquetas: {n} en cola en la impresora de la tienda.")
         else:
             session.rollback()
             print("Simulacion: no se guardo nada. Agrega --aplicar para guardar.")

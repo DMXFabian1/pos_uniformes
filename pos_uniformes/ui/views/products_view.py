@@ -116,6 +116,7 @@ def build_products_tab(window: "MainWindow") -> QWidget:
     window.catalog_school_scope_filter_combo.addItem("Seccion: todas", "")
     window.catalog_school_scope_filter_combo.addItem("Solo uniforme escolar", "school_only")
     window.catalog_school_scope_filter_combo.addItem("Solo ropa normal", "general_only")
+    window.catalog_school_scope_filter_combo.addItem("Por nombrar (entró con código)", "unidentified")
 
     search_title = QLabel("Busqueda rapida")
     search_title.setObjectName("catalogSectionTitle")

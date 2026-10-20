@@ -192,3 +192,36 @@ def skus_de(session: Session, producto_ids: list[int]) -> list[int]:
         select(Variante.id).where(Variante.producto_id.in_(producto_ids), Variante.activo.is_(True))
         .order_by(Variante.producto_id, Variante.id)
     ).all())
+
+
+def encolar_etiquetas(
+    session: Session, variante_ids: list[int], *, origen: str, creado_por: str, por_existencia: bool = True
+) -> int:
+    """Manda a la impresora de la tienda una etiqueta por pieza (o una por talla).
+
+    Mismo camino que «Llegó mercancía» del celular: se dibuja aquí (solo PIL y
+    la base) y va por la cola `trabajo`, así que se puede pedir desde la Mac o
+    el celular y la imprime la PC que tenga la Brother. Devuelve cuántas se
+    encolaron; lo que falle no detiene a las demás."""
+    from pathlib import Path
+
+    from pos_uniformes.services import trabajos_service
+    from pos_uniformes.services.inventory_label_service import render_inventory_label
+
+    total = 0
+    for vid in variante_ids:
+        v = session.get(Variante, int(vid))
+        if v is None:
+            continue
+        copias = max(1, int(v.stock_actual or 0)) if por_existencia else 1
+        try:
+            with session.begin_nested():
+                r = render_inventory_label(session, int(vid), mode="standard", requested_copies=copias)
+                trabajos_service.enviar_etiqueta(
+                    session, Path(r.image_path).read_bytes(), sku=str(v.sku), copies=r.effective_copies,
+                    paper_mode=r.mode, origen=origen, creado_por=creado_por,
+                )
+                total += r.effective_copies
+        except Exception:  # noqa: BLE001 — una etiqueta que no sale no frena a las demás
+            continue
+    return total
