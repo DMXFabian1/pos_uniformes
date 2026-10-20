@@ -104,12 +104,20 @@ def build_guided_catalog_view(
     school_links: list[dict] | None = None,
 ) -> GuidedCatalogView:
     active_rows = [row for row in snapshot_rows if _is_active_row(row)]
-    normalized_mode = "basics" if mode_key == "basics" else "school"
+    # Tres puertas: uniformes por escuela, básicos del estante y, desde el
+    # 2026-10-20, la ropa normal (casual, temporada, interior…), que no tenía
+    # por dónde entrar al guiado.
+    normalized_mode = {"basics": "basics", "ropa": "ropa"}.get(mode_key, "school")
     normalized_level = level_filter.strip()
     normalized_school = school_filter.strip()
-    normalized_gender = _normalize_segment_filter(gender_filter)
+    if normalized_mode == "ropa":
+        normalized_gender = _normalize_ropa_genero(gender_filter)
+        # En ropa el «grupo» es la categoría (Ropa casual, Temporada…), tal cual.
+        normalized_bucket = bucket_filter.strip() or "TODOS"
+    else:
+        normalized_gender = _normalize_segment_filter(gender_filter)
+        normalized_bucket = _normalize_bucket_filter(bucket_filter)
     normalized_profile = _normalize_school_profile_filter(profile_filter)
-    normalized_bucket = _normalize_bucket_filter(bucket_filter)
     normalized_piece = piece_filter.strip()
 
     mode_rows = [
@@ -128,22 +136,32 @@ def build_guided_catalog_view(
         level_filter=normalized_level,
         school_filter=normalized_school,
     )
-    gender_options = (
-        _build_school_line_options(gender_source_rows)
-        if normalized_mode == "school"
-        else _build_segment_options(gender_source_rows)
-    )
+    if normalized_mode == "school":
+        gender_options = _build_school_line_options(gender_source_rows)
+    elif normalized_mode == "ropa":
+        gender_options = _build_ropa_genero_options(gender_source_rows)
+    else:
+        gender_options = _build_segment_options(gender_source_rows)
     profile_options = (
         _build_school_profile_options(gender_source_rows)
         if normalized_mode == "school" and normalized_gender == "OFICIAL"
         else tuple()
     )
-    bucket_source_rows = [row for row in gender_source_rows if _matches_segment_filter(normalized_gender, row)]
+    bucket_source_rows = [
+        row for row in gender_source_rows if _matches_segment_for_mode(normalized_mode, normalized_gender, row)
+    ]
     if normalized_mode == "school" and normalized_gender == "OFICIAL" and normalized_profile != "TODOS":
         bucket_source_rows = [row for row in bucket_source_rows if _matches_school_profile_filter(normalized_profile, row)]
-    bucket_options = _build_bucket_options(bucket_source_rows) if normalized_mode == "basics" else tuple()
-    piece_source_rows = [row for row in bucket_source_rows if _matches_bucket_filter(normalized_bucket, row)]
-    piece_options = _build_piece_options(piece_source_rows) if normalized_mode == "basics" else tuple()
+    if normalized_mode == "basics":
+        bucket_options = _build_bucket_options(bucket_source_rows)
+    elif normalized_mode == "ropa":
+        bucket_options = _build_ropa_categoria_options(bucket_source_rows)
+    else:
+        bucket_options = tuple()
+    piece_source_rows = [
+        row for row in bucket_source_rows if _matches_bucket_for_mode(normalized_mode, normalized_bucket, row)
+    ]
+    piece_options = _build_piece_options(piece_source_rows) if normalized_mode in {"basics", "ropa"} else tuple()
 
     product_rows, empty_label = _filter_product_rows(
         rows=mode_rows,
@@ -209,6 +227,10 @@ def _matches_mode(*, row: dict[str, object], mode_key: str) -> bool:
     if mode_key == "basics":
         normalized_category_name = _normalize_text(row.get("categoria_nombre"))
         return school_name == "General" and normalized_category_name not in REGULAR_CATEGORY_EXCLUSION_SET
+    if mode_key == "ropa":
+        # Lo que básicos deja fuera: lo que no es uniforme.
+        normalized_category_name = _normalize_text(row.get("categoria_nombre"))
+        return school_name == "General" and normalized_category_name in REGULAR_CATEGORY_EXCLUSION_SET
     return school_name != "General" and _classify_line_type(row) in {"DEPORTIVO", "OFICIAL"}
 
 
@@ -308,12 +330,14 @@ def _filter_product_rows(
         level_filter=level_filter,
         school_filter=school_filter,
     )
-    filtered_rows = [row for row in filtered_rows if _matches_segment_filter(gender_filter, row)]
+    filtered_rows = [row for row in filtered_rows if _matches_segment_for_mode(mode_key, gender_filter, row)]
     if mode_key == "school" and gender_filter == "OFICIAL" and profile_filter != "TODOS":
         filtered_rows = [row for row in filtered_rows if _matches_school_profile_filter(profile_filter, row)]
-    filtered_rows = [row for row in filtered_rows if _matches_bucket_filter(bucket_filter, row)]
+    filtered_rows = [row for row in filtered_rows if _matches_bucket_for_mode(mode_key, bucket_filter, row)]
     if mode_key == "basics" and not piece_filter:
         return [], "Selecciona un tipo de pieza para ver modelos."
+    if mode_key == "ropa" and not piece_filter:
+        return [], "Elige qué prenda buscan para ver los modelos."
     if piece_filter:
         filtered_rows = [row for row in filtered_rows if _piece_label(row) == piece_filter]
     filtered_rows.sort(key=lambda row: _product_sort_key(row, prefer_deportivo=gender_filter == "DEPORTIVO"))
@@ -322,6 +346,8 @@ def _filter_product_rows(
     if mode_key == "basics":
         bucket_label = _bucket_label(bucket_filter)
         return [], f"No hay {bucket_label.lower()} disponibles para ese filtro."
+    if mode_key == "ropa":
+        return [], "No hay ropa con ese filtro."
     return [], "No hay productos disponibles para esa combinacion."
 
 
@@ -408,7 +434,7 @@ def _build_product_cards(rows: list[dict[str, object]], *, mode_key: str) -> tup
     cards: list[GuidedCatalogProductCard] = []
     for key, family_rows in grouped.items():
         representative = family_rows[0]
-        cards.append(_to_grouped_product_card(key, family_rows, representative))
+        cards.append(_to_grouped_product_card(key, family_rows, representative, mode_key=mode_key))
     from pos_uniformes.services.school_tariff_service import _tariff_product_sort_key
     cards.sort(key=lambda card: (*_tariff_product_sort_key(card.tipo_pieza), card.title.lower()))
     return tuple(cards)
@@ -418,6 +444,8 @@ def _to_grouped_product_card(
     key: str,
     family_rows: list[dict[str, object]],
     representative: dict[str, object],
+    *,
+    mode_key: str = "school",
 ) -> GuidedCatalogProductCard:
     price = Decimal(str(representative.get("precio_venta") or "0")).quantize(Decimal("0.01"))
     unique_sizes = []
@@ -434,6 +462,13 @@ def _to_grouped_product_card(
         subtitle = "Tallas: " + ", ".join(unique_sizes)
     else:
         subtitle = f"{len(unique_sizes)} tallas disponibles"
+    if mode_key == "ropa":
+        # En ropa la marca y el color dicen más que «Tallas: Unitalla».
+        colores = sorted({str(r.get("color") or "").strip() for r in family_rows if str(r.get("color") or "").strip()})
+        partes = [str(representative.get("marca_nombre") or "").strip(), ", ".join(colores)]
+        if unique_sizes and unique_sizes != ["Unitalla"]:
+            partes.append(subtitle)
+        subtitle = " · ".join(p for p in partes if p)
     return GuidedCatalogProductCard(
         key=key,
         sku=str(representative.get("sku") or ""),
@@ -536,7 +571,7 @@ def _build_status_label(
     piece_filter: str,
 ) -> str:
     parts = [f"{visible_count} producto(s) sugeridos"]
-    parts.append("Modo: Basicos" if mode_key == "basics" else "Modo: Uniformes")
+    parts.append({"basics": "Modo: Basicos", "ropa": "Modo: Ropa"}.get(mode_key, "Modo: Uniformes"))
     if level_filter:
         parts.append(f"Nivel: {level_filter}")
     if school_filter:
@@ -547,7 +582,9 @@ def _build_status_label(
         parts.append(f"Perfil: {_school_profile_label(profile_filter)}")
     if mode_key == "basics" and bucket_filter != "TODOS":
         parts.append(f"Grupo: {_bucket_label(bucket_filter)}")
-    if mode_key == "basics" and piece_filter:
+    if mode_key == "ropa" and bucket_filter != "TODOS":
+        parts.append(f"Seccion: {bucket_filter}")
+    if mode_key in {"basics", "ropa"} and piece_filter:
         parts.append(f"Pieza: {piece_filter}")
     return " | ".join(parts)
 
@@ -562,6 +599,15 @@ def _build_path_label(
     bucket_filter: str,
     piece_filter: str,
 ) -> str:
+    if mode_key == "ropa":
+        path_parts = ["Ropa"]
+        if bucket_filter != "TODOS":
+            path_parts.append(bucket_filter)
+        if gender_filter != "TODOS":
+            path_parts.append(_ropa_genero_label(gender_filter))
+        if piece_filter:
+            path_parts.append(piece_filter)
+        return " > ".join(path_parts)
     if mode_key == "basics":
         path_parts = ["Basicos"]
     else:
@@ -642,6 +688,87 @@ def _matches_bucket_filter(bucket_key: str, row: dict[str, object]) -> bool:
     if bucket_key == "TODOS":
         return True
     return _classify_basics_bucket(row) == bucket_key
+
+
+# ── Ropa normal: género y categoría como pasos ───────────────────────────────
+
+_ROPA_GENEROS = (
+    ("MUJER", "Mujer"),
+    ("HOMBRE", "Hombre"),
+    ("UNISEX", "Unisex"),
+    ("NINA", "Niña"),
+    ("NINO", "Niño"),
+    ("TODOS", "Todos"),
+)
+
+
+def _normalize_ropa_genero(value: str) -> str:
+    compact = _normalize_text(value).replace(" ", "")
+    for key, _label in _ROPA_GENEROS:
+        if compact == key.lower():
+            return key
+    return {"dama": "MUJER", "femenino": "MUJER", "caballero": "HOMBRE", "masculino": "HOMBRE"}.get(compact, "TODOS")
+
+
+def _ropa_genero_label(key: str) -> str:
+    return dict(_ROPA_GENEROS).get(key, "Todos")
+
+
+def _ropa_genero_de(row: dict[str, object]) -> str:
+    """El género de la ficha, tal cual se capturó (no el adivinado del uniforme)."""
+    compact = _normalize_text(row.get("producto_genero")).replace(" ", "")
+    if compact in {"mujer", "dama", "femenino"}:
+        return "MUJER"
+    if compact in {"hombre", "caballero", "masculino"}:
+        return "HOMBRE"
+    if compact in {"nina"}:
+        return "NINA"
+    if compact in {"nino"}:
+        return "NINO"
+    return "UNISEX"
+
+
+def _matches_ropa_genero(filter_key: str, row: dict[str, object]) -> bool:
+    return filter_key == "TODOS" or _ropa_genero_de(row) == filter_key
+
+
+def _build_ropa_genero_options(rows: list[dict[str, object]]) -> tuple[GuidedCatalogOption, ...]:
+    built: list[GuidedCatalogOption] = []
+    for key, label in _ROPA_GENEROS:
+        count = sum(1 for row in rows if _matches_ropa_genero(key, row))
+        if count or key == "TODOS":
+            built.append(GuidedCatalogOption(key=key, label=label, count=count, enabled=count > 0))
+    return tuple(built)
+
+
+def _build_ropa_categoria_options(rows: list[dict[str, object]]) -> tuple[GuidedCatalogOption, ...]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        nombre = str(row.get("categoria_nombre") or "").strip()
+        if nombre:
+            counts[nombre] = counts.get(nombre, 0) + 1
+    built = [
+        GuidedCatalogOption(key=nombre, label=nombre, count=counts[nombre], enabled=counts[nombre] > 0)
+        for nombre in sorted(counts)
+    ]
+    built.append(GuidedCatalogOption(key="TODOS", label="Todas", count=len(rows), enabled=len(rows) > 0))
+    return tuple(built)
+
+
+def _matches_ropa_categoria(bucket_key: str, row: dict[str, object]) -> bool:
+    return bucket_key == "TODOS" or _normalize_text(row.get("categoria_nombre")) == _normalize_text(bucket_key)
+
+
+def _matches_segment_for_mode(mode_key: str, filter_key: str, row: dict[str, object]) -> bool:
+    if mode_key == "ropa":
+        return _matches_ropa_genero(filter_key, row)
+    return _matches_segment_filter(filter_key, row)
+
+
+def _matches_bucket_for_mode(mode_key: str, bucket_key: str, row: dict[str, object]) -> bool:
+    if mode_key == "ropa":
+        return _matches_ropa_categoria(bucket_key, row)
+    return _matches_bucket_filter(bucket_key, row)
 
 
 def _matches_segment_filter(filter_key: str, row: dict[str, object]) -> bool:

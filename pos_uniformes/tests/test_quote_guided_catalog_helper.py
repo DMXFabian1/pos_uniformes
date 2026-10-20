@@ -711,3 +711,59 @@ class FavoritesVariantSortKeyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RopaModeTests(unittest.TestCase):
+    """La tercera puerta del guiado: la ropa normal (2026-10-20)."""
+
+    def _filas(self):
+        return [
+            _row("SKU-1", "", "General", "Mujer", "Casual", producto="Leggings S01", pieza="Leggings", talla="Unitalla", categoria="Ropa casual"),
+            _row("SKU-2", "", "General", "Mujer", "Casual", producto="Sudadera KY357H", pieza="Sudadera", talla="Unitalla", categoria="Ropa casual"),
+            _row("SKU-3", "", "General", "Mujer", "Casual", producto="YT0572", pieza="-", talla="Unitalla", categoria="Ropa casual"),
+            _row("SKU-4", "", "General", "Unisex", "Temporada", producto="Pijama de Cuadros", pieza="Pijama", talla="Infantil", categoria="Temporada"),
+            _row("SKU-5", "", "General", "Hombre", "Interior", producto="Boxer", pieza="Boxer", talla="Adulto", categoria="Ropa interior"),
+            _row("SKU-6", "", "General", "", "Oficial", producto="Calceta Blanca", pieza="Calceta"),        # basico: NO es ropa
+            _row("SKU-7", "Primaria", "Colegio Mexico", "Niño", "Oficial", producto="Camisa", pieza="Camisa"),  # escuela: NO
+        ]
+
+    def _vista(self, **kw):
+        base = dict(snapshot_rows=self._filas(), mode_key="ropa", level_filter="", school_filter="",
+                    gender_filter="TODOS", bucket_filter="TODOS", piece_filter="")
+        base.update(kw)
+        return build_guided_catalog_view(**base)
+
+    def test_solo_entra_lo_que_no_es_uniforme(self) -> None:
+        view = self._vista()
+        self.assertEqual([o.label for o in view.bucket_options], ["Ropa casual", "Ropa interior", "Temporada", "Todas"])
+        self.assertEqual(view.bucket_options[-1].count, 5)                     # ni la calceta ni la camisa
+
+    def test_el_genero_es_el_de_la_ficha(self) -> None:
+        view = self._vista()
+        self.assertEqual({(o.label, o.count) for o in view.gender_options},
+                         {("Mujer", 3), ("Hombre", 1), ("Unisex", 1), ("Todos", 5)})
+
+    def test_las_piezas_siguen_a_la_seccion_y_lo_sin_nombre_sale_con_su_codigo(self) -> None:
+        view = self._vista(bucket_filter="Ropa casual")
+        self.assertEqual([o.label for o in view.piece_options], sorted(["Leggings", "Sudadera", "YT0572"], key=lambda x: [o.label for o in view.piece_options].index(x)))
+        self.assertIn("YT0572", [o.label for o in view.piece_options])
+        self.assertEqual(view.empty_label, "Elige qué prenda buscan para ver los modelos.")
+
+    def test_con_la_prenda_salen_los_modelos_con_marca_y_color(self) -> None:
+        filas = self._filas()
+        filas[0]["marca_nombre"], filas[0]["color"] = "Showey", "Surtido"
+        view = build_guided_catalog_view(snapshot_rows=filas, mode_key="ropa", level_filter="", school_filter="",
+                                         gender_filter="Mujer", bucket_filter="Ropa casual", piece_filter="Leggings")
+        self.assertEqual([c.title for c in view.product_cards], ["Leggings S01"])
+        self.assertEqual(view.product_cards[0].subtitle, "Showey · Surtido")
+        self.assertEqual(view.path_label, "Ropa > Ropa casual > Mujer > Leggings")
+        self.assertIn("Modo: Ropa", view.status_label)
+
+    def test_el_genero_filtra(self) -> None:
+        view = self._vista(gender_filter="Hombre")
+        self.assertEqual([o.label for o in view.bucket_options if o.enabled], ["Ropa interior", "Todas"])
+
+    def test_basicos_y_escuela_no_se_enteran(self) -> None:
+        basics = build_guided_catalog_view(snapshot_rows=self._filas(), mode_key="basics", level_filter="",
+                                           school_filter="", gender_filter="Todos", bucket_filter="Todos")
+        self.assertEqual([o.label for o in basics.piece_options], ["Calceta"])

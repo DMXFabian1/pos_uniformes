@@ -311,7 +311,7 @@ class GuidedFlowState:
     sku: str = ""
 
     def reset(self, mode_key: str) -> None:
-        self.mode = "basics" if mode_key == "basics" else "school"
+        self.mode = {"basics": "basics", "ropa": "ropa"}.get(mode_key, "school")
         self.level = ""
         self.school = ""
         self.gender = "TODOS"
@@ -7306,8 +7306,8 @@ class QuoteSatelliteWindow(QMainWindow):
             self.tariff_print_button.setEnabled(False)
             return
         # Resetear flujo guiado completo
-        if self._gfs.mode == "basics":
-            self._reset_guided_route(mode_key="basics")
+        if self._gfs.mode in ("basics", "ropa"):
+            self._reset_guided_route(mode_key=self._gfs.mode)
         else:
             self._reset_guided_route(mode_key="school")
 
@@ -7427,7 +7427,7 @@ class QuoteSatelliteWindow(QMainWindow):
             corrected = True
 
         available_buckets = {opt.key for opt in view.bucket_options}
-        if self._gfs.mode == "basics" and self._gfs.bucket and self._gfs.bucket not in available_buckets:
+        if self._gfs.mode in ("basics", "ropa") and self._gfs.bucket and self._gfs.bucket not in available_buckets:
             self._gfs.bucket = "BASICO" if "BASICO" in available_buckets else "TODOS"
             self._gfs.piece = ""
             self._gfs.product_key = ""
@@ -7435,7 +7435,7 @@ class QuoteSatelliteWindow(QMainWindow):
             corrected = True
 
         available_pieces = {opt.key for opt in view.piece_options}
-        if self._gfs.mode == "basics" and self._gfs.piece and self._gfs.piece not in available_pieces:
+        if self._gfs.mode in ("basics", "ropa") and self._gfs.piece and self._gfs.piece not in available_pieces:
             self._gfs.piece = ""
             self._gfs.product_key = ""
             self._gfs.sku = ""
@@ -7480,11 +7480,11 @@ class QuoteSatelliteWindow(QMainWindow):
         mode = self._gfs.mode
         show_level = mode == "school"
         show_school = mode == "school" and bool(self._gfs.level)
-        show_gender = mode == "basics" or bool(self._gfs.school)
+        show_gender = mode in ("basics", "ropa") or bool(self._gfs.school)
         show_profile = mode == "school" and self._gfs.gender == "OFICIAL" and bool(view.profile_options)
-        show_bucket = mode == "basics" and bool(view.bucket_options)
-        show_piece = mode == "basics" and bool(view.piece_options)
-        show_products = (mode == "basics" and bool(self._gfs.piece)) or (mode == "school" and bool(self._gfs.school))
+        show_bucket = mode in ("basics", "ropa") and bool(view.bucket_options)
+        show_piece = mode in ("basics", "ropa") and bool(view.piece_options)
+        show_products = (mode in ("basics", "ropa") and bool(self._gfs.piece)) or (mode == "school" and bool(self._gfs.school))
 
         self.guided_level_section.setVisible(show_level)
         self.guided_school_section.setVisible(show_school)
@@ -7497,17 +7497,33 @@ class QuoteSatelliteWindow(QMainWindow):
         if mode == "school":
             self.guided_gender_title_label.setText("4. Elige linea")
             self.guided_gender_hint_label.setText("Primero separa deportivo de oficial.")
+        elif mode == "ropa":
+            self.guided_gender_title_label.setText("2. Para quien")
+            self.guided_gender_hint_label.setText("Mujer, hombre, unisex o ninos. Todos si no importa.")
         else:
             self.guided_gender_title_label.setText("4. Elige tipo de uniforme")
             self.guided_gender_hint_label.setText("Elige la linea mas cercana a lo que buscan.")
+        if mode == "ropa":
+            self.guided_bucket_title_label.setText("3. Elige seccion")
+            self.guided_bucket_hint_label.setText("Casual, temporada, interior... o todas.")
+            self.guided_piece_title_label.setText("4. Elige la prenda")
+            self.guided_piece_hint_label.setText("Lo que entro con codigo sale con su codigo hasta que se nombre.")
+        else:
+            self.guided_bucket_title_label.setText("5. Elige grupo")
+            self.guided_bucket_hint_label.setText("Separa basicos y extras para reducir la lista.")
+            self.guided_piece_title_label.setText("6. Elige tipo de pieza")
+            self.guided_piece_hint_label.setText("Primero elige la familia de prenda que buscan.")
 
     def _apply_guided_product_section_labels(self, view) -> None:
         """Actualiza el título y hint de la sección de modelos según el paso activo."""
         mode = self._gfs.mode
         show_profile = mode == "school" and self._gfs.gender == "OFICIAL" and bool(view.profile_options)
-        show_bucket = mode == "basics" and bool(view.bucket_options)
-        show_piece = mode == "basics" and bool(view.piece_options)
-        if show_piece:
+        show_bucket = mode in ("basics", "ropa") and bool(view.bucket_options)
+        show_piece = mode in ("basics", "ropa") and bool(view.piece_options)
+        if mode == "ropa":
+            self.guided_products_title_label.setText("5. Modelos")
+            self.guided_products_hint_label.setText("Toca un modelo; luego la talla y el color.")
+        elif show_piece:
             self.guided_products_title_label.setText("7. Modelos sugeridos")
             self.guided_products_hint_label.setText("Primero elige el tipo de pieza; luego toca un modelo.")
         elif show_bucket:
@@ -7524,6 +7540,7 @@ class QuoteSatelliteWindow(QMainWindow):
         definitions = (
             ("school", "Uniformes por escuela\nNivel > Escuela > Genero"),
             ("basics", "Basicos y extras\nSolo piezas generales"),
+            ("ropa", "Ropa\nCasual, temporada, interior"),
         )
         if not self.guided_mode_buttons:
             for key, label in definitions:
@@ -8584,7 +8601,7 @@ QLabel#favDialogPriceLabel {
         button = QPushButton("\n".join(button_lines))
         button.setObjectName("guidedProductButton")
         button.setCheckable(True)
-        compact_card = (self._gfs.mode == "basics" and bool(self._gfs.piece)) or (
+        compact_card = (self._gfs.mode in ("basics", "ropa") and bool(self._gfs.piece)) or (
             self._gfs.mode == "school" and bool(self._gfs.school)
         )
         button.setProperty("compactCard", compact_card)
@@ -8639,7 +8656,7 @@ QLabel#favDialogPriceLabel {
             detail_parts.append(f"Color {color_label}")
         detail_parts.append(f"Precio ${Decimal(str(row['precio_venta'])).quantize(Decimal('0.01'))}")
         title = str(row["producto_nombre_base"])
-        if self._gfs.mode != "basics":
+        if self._gfs.mode not in ("basics", "ropa"):
             title = f"{row['sku']} | {title}"
         self.guided_detail_title_label.setText(title)
         self.guided_detail_meta_label.setText(" | ".join(detail_parts))
