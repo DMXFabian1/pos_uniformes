@@ -98,6 +98,16 @@ def texto_y_botones(session) -> tuple[str, str]:
 
     fuera = [f for f in filas if not f.en_cajon]
     lineas = ["💵 Lo apuntado desde el último corte:", ""]
+    try:
+        from datetime import datetime
+
+        from pos_uniformes.services.corte_caja_service import inicio_periodo
+        from pos_uniformes.services.entradas_service import entradas_del_periodo
+
+        for e in entradas_del_periodo(session, inicio_periodo(session), datetime.now().astimezone()):
+            lineas.append(f"➕ Entró ({e.motivo}) — ${Decimal(str(e.monto)):,.2f} · {_cuando(e.created_at)}")
+    except Exception:  # noqa: BLE001 — base sin la tabla todavía
+        session.rollback()
     for f in filas:
         marca = "✅" if f.en_cajon else "⬜"
         lineas.append(f"{marca} {f.quien} — ${f.monto:,.2f} · {f.cuando}")

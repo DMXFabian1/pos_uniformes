@@ -356,7 +356,7 @@ body.con-topbar .app{padding-top:calc(58px + env(safe-area-inset-top))}
 const $ = id => document.getElementById(id);
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const DIAS = ["lun","mar","mié","jue","vie","sáb","dom"];
-const PWA_VERSION = "v27";
+const PWA_VERSION = "v28";
 let token = localStorage.getItem("pos_token") || "";
 let calY = 0, calM = 0;
 let rolActual = "", vistaInicio = "", modoServidor = "casa";
@@ -1055,6 +1055,7 @@ async function encCorteHoy() {
     `<div class="card">` +
     `<div class="fila"><strong>VENTA</strong><strong>${pesos(datos.efectivo)}</strong></div>` +
     pagos +
+    (Number(datos.entradas) > 0 ? `<div class="fila"><span>Entró sin ser venta</span><span>+${pesos(datos.entradas)}</span></div>` : "") +
     (Number(datos.retiros_apuntados) > 0 ? `<div class="fila"><span>Ya salió del cajón</span><span>-${pesos(datos.retiros_apuntados)}</span></div>` : "") +
     `<div class="fila"><strong>SE RETIRA</strong><strong>${pesos(datos.retiro)}</strong></div>` +
     `<div class="fila"><span>Se queda de fondo</span><span>${pesos(datos.reactivo)}</span></div>` +
@@ -1659,6 +1660,7 @@ async function duenoCorte() {
       fila("Fondo con que abrió", pesos(e.reactivo)) +
       fila("Venta en efectivo", pesos(e.efectivo)) +
       (Number(e.tarjeta) ? fila("Con tarjeta (no está en el cajón)", pesos(e.tarjeta)) : "") +
+      (Number(e.entradas) ? fila("Entró sin ser venta (fondo de papá...)", "+" + pesos(e.entradas)) : "") +
       (Number(e.pagos) ? fila("Pagos a empleadas", "-" + pesos(e.pagos)) : "") +
       (Number(e.retiros_apuntados) ? fila("Ya salió del cajón", "-" + pesos(e.retiros_apuntados)) : "") +
       `<div class="fila"><strong>DEBE HABER</strong><strong>${pesos(e.esperado)}</strong></div>` +

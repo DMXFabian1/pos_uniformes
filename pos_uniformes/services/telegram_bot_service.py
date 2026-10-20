@@ -20,6 +20,7 @@ Comandos:
     /pagos        a quién le toca cobrar y cuánto
     /pagar X si   registra el pago (sin el "si" solo enseña el desglose)
     /retiro N X   saca del cajón dejando dicho para qué
+    /entrada N X  dinero que entró al cajón sin ser venta (fondo de papá)
     /cajon        corrige lo que NO salió del cajón, antes del corte
     /prestamos    aprobar o rechazar lo que pidieron
     /aviso X      pone X a pantalla completa en las pantallas de la tienda
@@ -63,6 +64,8 @@ AYUDA = (
     "/sintarjeta 12 — esconde los cobros con tarjeta de un corte ya hecho\n"
     "/contarjeta 12 — los vuelve a enseñar (si fue un error)\n"
     "/retiro 500 gasolina — saca del cajón, con su motivo\n"
+    "/entrada 1750 papá — dinero que entró al cajón sin ser venta (para la\n"
+    "   nómina); los pagos salen del cajón normal y el corte lo suma\n"
     "/cajon — desmarca lo que NO salió del cajón (una transferencia,\n"
     "   algo ya contado). Antes del corte\n"
     "\nPAGOS\n"
@@ -457,6 +460,11 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
 
         with session_factory() as session:
             return pg.retiro(session, cmd.argumento, quien=CODIGO_REMOTO)
+    if cmd.nombre in ("entrada", "entro", "entró", "fondo"):
+        from pos_uniformes.services import telegram_pagos_service as pg
+
+        with session_factory() as session:
+            return pg.entrada(session, cmd.argumento, quien=CODIGO_REMOTO)
     if cmd.nombre in ("deshacerpago", "deshacer_pago"):
         from pos_uniformes.services import telegram_pagos_service as pg
 

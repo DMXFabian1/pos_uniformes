@@ -595,8 +595,9 @@ def encargado_corte_hoy(
             {"codigo": a.employee_code, "nombre": a.employee_name, "total": str(a.total_estimado), "comisiones": a.comisiones}
             for a in avisos
         ],
-        "retiro": str((r.efectivo - estado.pagos - total_pagos - estado.total_retiros).quantize(Decimal("0.01"))),
+        "retiro": str((r.efectivo + estado.entradas - estado.pagos - total_pagos - estado.total_retiros).quantize(Decimal("0.01"))),
         "retiros_apuntados": str(estado.total_retiros),
+        "entradas": str(estado.entradas),
         "desde": estado.desde.isoformat() if estado.desde else None,
         "hasta": estado.hasta.isoformat(),
         "reactivo": str(estado.reactivo),
@@ -764,6 +765,7 @@ def dueno_corte_estado(
         "tarjeta": str(r.tarjeta),
         "pagos": str(estado.pagos),
         "retiros_apuntados": str(estado.total_retiros),
+        "entradas": str(estado.entradas),
         "esperado": str(estado.esperado),
         "operaciones": r.operaciones,
         "piezas": r.piezas,

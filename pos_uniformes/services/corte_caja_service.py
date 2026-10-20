@@ -60,6 +60,7 @@ class EstadoCaja:
     pagos: Decimal           # pagos a empleadas registrados en el periodo
     otros_retiros: Decimal = Decimal("0.00")   # capturado a mano al cerrar (dueño)
     retiros: Decimal = Decimal("0.00")         # apuntados con motivo (caja_retiro)
+    entradas: Decimal = Decimal("0.00")        # entró y no es venta (caja_entrada: el fondo de papá)
 
     @property
     def total_retiros(self) -> Decimal:
@@ -67,7 +68,7 @@ class EstadoCaja:
 
     @property
     def esperado(self) -> Decimal:
-        return (self.reactivo + self.resumen.efectivo - self.pagos - self.total_retiros).quantize(_CENT)
+        return (self.reactivo + self.resumen.efectivo + self.entradas - self.pagos - self.total_retiros).quantize(_CENT)
 
 
 # ─── Lógica pura ─────────────────────────────────────────────────────────
@@ -230,6 +231,13 @@ def estado_caja(session, ahora: datetime | None = None, otros_retiros=Decimal("0
     except Exception:  # noqa: BLE001 — base sin la tabla todavía
         session.rollback()
         retiros = Decimal("0.00")
+    try:
+        from pos_uniformes.services.entradas_service import total_entradas
+
+        entradas = total_entradas(session, desde, ahora)
+    except Exception:  # noqa: BLE001 — base sin la tabla todavía
+        session.rollback()
+        entradas = Decimal("0.00")
     return EstadoCaja(
         desde=desde,
         hasta=ahora,
@@ -238,6 +246,7 @@ def estado_caja(session, ahora: datetime | None = None, otros_retiros=Decimal("0
         pagos=pagos_del_periodo(session, desde, ahora),
         otros_retiros=_d(otros_retiros),
         retiros=retiros,
+        entradas=entradas,
     )
 
 

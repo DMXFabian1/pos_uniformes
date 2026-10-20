@@ -2667,6 +2667,25 @@ class MovimientoVacaciones(Base):
     )
 
 
+class CajaEntrada(Base):
+    """Dinero que ENTRÓ al cajón y no es venta: el fondo que deja el papá de
+    Daniel para cubrir la nómina (2026-10-20: «este domingo me dejó 1750»).
+    Antes se resolvía desmarcando pagos como «no salió del cajón», y se
+    perdía el desglose. Ahora los pagos siempre salen del cajón y esto entra;
+    el corte lo suma al esperado y el ticket lo dice. Lo que sobre se queda
+    en el cajón como dinero normal."""
+
+    __tablename__ = "caja_entrada"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    monto: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    motivo: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    creado_por: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+
+
 class CajaRetiro(Base):
     """Dinero que salió del cajón por algo que no es pago a empleada
     (proveedor, renta, cambio, comida...). Lo apuntan Daniel o León; el corte

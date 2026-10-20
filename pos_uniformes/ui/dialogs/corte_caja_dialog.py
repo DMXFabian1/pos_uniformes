@@ -79,7 +79,7 @@ def _nombre_pila(p) -> str:
     return (getattr(p, "employee_name", "") or getattr(p, "employee_code", "") or "?").split()[0]
 
 
-def _bloque_cuenta(lines, *, corte, venta, tarjeta, tarjeta_ops, pagos_restar, retiros, sacar, tarjeta_neto=None) -> None:
+def _bloque_cuenta(lines, *, corte, venta, tarjeta, tarjeta_ops, pagos_restar, retiros, sacar, tarjeta_neto=None, entradas=None) -> None:
     """La cuenta de un corte, de arriba abajo (pedido de Daniel 2026-09-09):
 
         Reactivo en caja        (primera línea; se queda igual)
@@ -111,10 +111,16 @@ def _bloque_cuenta(lines, *, corte, venta, tarjeta, tarjeta_ops, pagos_restar, r
         lines.append(tk_row(f"Tarjeta, llega{cuantas}:", f"${llega:,.2f}"))
         lines.append(tk_row("VENTA TOTAL:", f"${(venta + llega):,.2f}"))
         lines.append(tk_line("  (la tarjeta no esta en el cajon)"))
-    restas = list(pagos_restar or []) or list(retiros or [])
+    entradas = list(entradas or [])
+    restas = list(pagos_restar or []) or list(retiros or []) or entradas
     if restas:
         lines.append(tk_mid())
         lines.append(tk_row("Venta en efectivo:", f"${venta:,.2f}"))
+        # Lo que entró sin ser venta (el fondo de papá para la nómina) se
+        # suma antes de restar los pagos: los pagos salen completos del cajón
+        # y aquí se ve de dónde salieron (2026-10-20).
+        for e in entradas:
+            lines.append(tk_row(f"Entro ({str(e.motivo)[: _TW - 24]}):", f"+${Decimal(e.monto):,.2f}"))
         for p in pagos_restar or []:
             lines.append(tk_row(f"Pago a {_nombre_pila(p)}:"[: _TW - 14], f"-${Decimal(p.total):,.2f}"))
         for r in retiros or []:
@@ -122,6 +128,13 @@ def _bloque_cuenta(lines, *, corte, venta, tarjeta, tarjeta_ops, pagos_restar, r
     if con_reactivo:
         lines.append(tk_dbl())
         lines.append(tk_row("SACAR DE LA VENTA:", f"${Decimal(sacar):,.2f}"))
+    if entradas and pagos_restar:
+        entro = sum((Decimal(e.monto) for e in entradas), Decimal("0.00"))
+        pagos_total = sum((Decimal(p.total) for p in pagos_restar), Decimal("0.00"))
+        cubierto = min(entro, pagos_total)
+        if cubierto > 0:
+            lines.append(tk_line(f"  (de los pagos, ${cubierto:,.2f} salio"))
+            lines.append(tk_line("   de lo que entro, no de la venta)"))
     lines.append(tk_bot())
     if con_reactivo:
         if reactivo_fin < reactivo_ini:
@@ -166,7 +179,7 @@ def _bloque_pagos(lines, pagos: list, ya_pagados: list, *, total: bool, titulo: 
     lines.append(tk_bot())
 
 
-def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list | None = None, venta_efectivo=None, retiros: list | None = None, reimpresion: bool = False, tarjeta=None, tarjeta_ops: int | None = None, tarjeta_neto=None) -> str:
+def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list | None = None, venta_efectivo=None, retiros: list | None = None, reimpresion: bool = False, tarjeta=None, tarjeta_ops: int | None = None, tarjeta_neto=None, entradas: list | None = None) -> str:
     """Ticket del dueño (CORTE DE CAJA): misma cuenta simple que el del
     encargado + POR EMPLEADA con operaciones. Sin esperado ni diferencia.
 
@@ -207,7 +220,7 @@ def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list |
     # Sin las listas (p.ej. corte viejo o ticket rápido) las restas salen como totales.
     pagos_restar = pagos or ([SimpleNamespace(employee_name="empleadas", total=total_pagos)] if total_pagos > 0 else [])
     gastos_restar = retiros or ([SimpleNamespace(motivo="otros", monto=total_gastos)] if total_gastos > 0 else [])
-    _bloque_cuenta(lines, corte=corte, venta=venta, tarjeta=tarjeta, tarjeta_ops=tarjeta_ops, pagos_restar=pagos_restar, retiros=gastos_restar, sacar=sacar, tarjeta_neto=tarjeta_neto)
+    _bloque_cuenta(lines, corte=corte, venta=venta, tarjeta=tarjeta, tarjeta_ops=tarjeta_ops, pagos_restar=pagos_restar, retiros=gastos_restar, sacar=sacar, tarjeta_neto=tarjeta_neto, entradas=entradas)
     if not con_reactivo:
         lines.append(tk_row("Total del dia:", f"${Decimal(corte.monto_final):,.2f}"))
     if pagos:
@@ -251,11 +264,12 @@ def pagos_previos_del_periodo(session, resultado) -> list:
 def contado_desde_venta(estado: EstadoCaja, venta: Decimal, otros_retiros: Decimal) -> Decimal:
     """Lo que debe quedar en el cajón si la venta en efectivo fue `venta`.
 
-    reactivo + venta − pagos ya hechos − retiros apuntados − otros retiros.
-    (Puro para poder probarlo.)"""
+    reactivo + venta + entradas (no venta) − pagos ya hechos − retiros
+    apuntados − otros retiros. (Puro para poder probarlo.)"""
     total = (
         Decimal(estado.reactivo)
         + Decimal(venta)
+        + Decimal(getattr(estado, "entradas", 0) or 0)
         - Decimal(estado.pagos)
         - Decimal(estado.retiros)
         - Decimal(otros_retiros or 0)
@@ -297,6 +311,8 @@ def texto_estado_caja(estado: EstadoCaja) -> str:
     ]
     if r.tarjeta:
         partes.append(f"Con tarjeta llega ${r.tarjeta_neto:,.2f} (cobrado ${r.tarjeta:,.2f}; no está en el cajón)")
+    if estado.entradas:
+        partes.append(f"Entró al cajón sin ser venta (fondo de papá...): +${estado.entradas:,.2f}")
     if estado.pagos:
         partes.append(f"Pagos a empleadas ya hechos: -${estado.pagos:,.2f}")
     if estado.retiros:
@@ -315,6 +331,8 @@ def texto_estado_caja_sin_totales(estado: EstadoCaja) -> str:
     ]
     if r.tarjeta:
         partes.append(f"Con tarjeta llega ${r.tarjeta_neto:,.2f} (cobrado ${r.tarjeta:,.2f}; no está en el cajón)")
+    if estado.entradas:
+        partes.append(f"Entró al cajón sin ser venta (fondo de papá...): +${estado.entradas:,.2f}")
     return "\n".join(partes)
 
 
@@ -370,6 +388,16 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
             except Exception:  # noqa: BLE001
                 session.rollback()
                 retiros_hechos = []
+            try:
+                from pos_uniformes.services.entradas_service import entradas_del_periodo
+
+                entradas_hechas = [
+                    (str(e.motivo or "Entrada"), Decimal(e.monto), _cuando(e.created_at))
+                    for e in entradas_del_periodo(session, estado.desde, estado.hasta)
+                ]
+            except Exception:  # noqa: BLE001 — base sin la tabla todavía
+                session.rollback()
+                entradas_hechas = []
             # Los pagos que caen hoy y nadie ha registrado: se ofrecen aquí
             # mismo (Daniel 2026-09-13: "al hacer corte no me descontó los pagos").
             try:
@@ -412,6 +440,15 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
                 cb.setStyleSheet("font-size: 17px;")
             ly.addWidget(cb)
             casillas_hechos.append((cb, tipo, rid, monto))
+    if entradas_hechas:
+        t = QLabel("Entró al cajón sin ser venta en este periodo:")
+        t.setStyleSheet("font-weight: 700;")
+        ly.addWidget(t)
+        for motivo_e, monto_e, cuando_e in entradas_hechas:
+            lbl_e = QLabel(f"➕ {motivo_e}  ·  ${monto_e:,.2f}  ·  {cuando_e}")
+            if grande:
+                lbl_e.setStyleSheet("font-size: 17px;")
+            ly.addWidget(lbl_e)
     if pagos_hechos or retiros_hechos:
         esperado_lbl = QLabel("")
         esperado_lbl.setWordWrap(True)
@@ -428,6 +465,15 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
     form.addRow("¿Cuánto se queda de fondo?", fondo)
     otros = _spin(Decimal("0.00"), grande)
     form.addRow("Otros retiros (opcional):", otros)
+    # Lo que papá dejó para la nómina: entra al cajón, los pagos salen
+    # completos y el sobrante se queda (Daniel, 2026-10-20).
+    from pos_uniformes.services.entradas_service import MOTIVO_POR_DEFECTO
+
+    entro = _spin(Decimal("0.00"), grande)
+    form.addRow("Entró dinero que no es venta (opcional):", entro)
+    entro_motivo = QLineEdit()
+    entro_motivo.setPlaceholderText(MOTIVO_POR_DEFECTO)
+    form.addRow("¿De dónde?", entro_motivo)
     nota = QLineEdit()
     nota.setPlaceholderText("Nota (opcional)")
     form.addRow("", nota)
@@ -487,6 +533,7 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
             estado, Decimal(str(venta.value())), Decimal(str(otros.value()))
         )
         pagos_nuevos = sum((Decimal(a.total_estimado) for a in _pagos_marcados()), Decimal("0.00"))
+        base += Decimal(str(entro.value()))
         # `estado` ya viene con lo guardado en la base; aquí solo se corrige lo
         # que Daniel cambió en las casillas: lo que desmarcó nunca salió de
         # aquí (se regresa) y lo que volvió a marcar sí salió (se resta).
@@ -500,10 +547,12 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
         if esperado_lbl is not None:
             _p, _r, no_salio = _fuera_del_cajon()
             marcados = sum((m for cb, _t, _i, m in casillas_hechos if cb.isChecked()), Decimal("0.00"))
+            entradas_total = Decimal(getattr(estado, "entradas", 0) or 0) + Decimal(str(entro.value()))
             esperado_lbl.setText(
-                f"Salió del cajón en este periodo: -${marcados:,.2f}"
+                (f"Entró sin ser venta: +${entradas_total:,.2f}\n" if entradas_total else "")
+                + f"Salió del cajón en este periodo: -${marcados:,.2f}"
                 + (f"  (no se resta ${no_salio:,.2f} que no salió de aquí)" if no_salio else "")
-                + f"\nEn el cajón debe haber: ${(estado.reactivo + estado.resumen.efectivo - marcados):,.2f}"
+                + f"\nEn el cajón debe haber: ${(estado.reactivo + estado.resumen.efectivo + entradas_total - marcados):,.2f}"
             )
         detalle = f"En el cajón quedan ${_contado():,.2f}."
         if d == 0:
@@ -515,6 +564,7 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
 
     venta.valueChanged.connect(lambda _v: _refrescar_dif())
     otros.valueChanged.connect(lambda _v: _refrescar_dif())
+    entro.valueChanged.connect(lambda _v: _refrescar_dif())
     for cb, _a in casillas_pago:
         cb.toggled.connect(lambda _v: _refrescar_dif())
     for cb, _t, _i, _m in casillas_hechos:
@@ -547,6 +597,13 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
                 registrar_pago_con_monto(
                     session, aviso.employee_code, creado_por=creado_por,
                     fecha=estado.hasta.date(), momento=estado.hasta,
+                )
+            if Decimal(str(entro.value())) > 0:
+                from pos_uniformes.services.entradas_service import registrar_entrada
+
+                registrar_entrada(
+                    session, monto=Decimal(str(entro.value())), motivo=entro_motivo.text(),
+                    creado_por=creado_por, momento=estado.hasta,
                 )
             # Lo que Daniel desmarcó no salió del cajón: queda anotado y el
             # esperado del corte se calcula sin eso (y al revés si volvió a marcar).
@@ -582,6 +639,13 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
             from pos_uniformes.services.retiros_service import retiros_del_periodo
 
             retiros_periodo = retiros_del_periodo(session, estado.desde, estado.hasta)
+            try:
+                from pos_uniformes.services.entradas_service import entradas_del_periodo
+
+                entradas_periodo = entradas_del_periodo(session, estado.desde, estado.hasta)
+            except Exception:  # noqa: BLE001
+                session.rollback()
+                entradas_periodo = []
             # Formato por defecto: el ticket SIMPLE (Daniel 2026-09-10), el
             # mismo que sale del encargado y de /corte. El completo (con
             # operaciones por empleada) se saca desde 🧾 Cortes.
@@ -595,6 +659,7 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
                 tarjeta_ops=None if sin_tarjeta.isChecked() else contar_tarjeta(rows),
                 tarjeta_neto=None if sin_tarjeta.isChecked() else estado.resumen.tarjeta_neto,
                 ya_pagados=pagos_periodo,              # los del periodo ya salieron del cajón
+                entradas=entradas_periodo,
             )
     except ValueError as exc:
         QMessageBox.warning(parent, "Corte", str(exc))
@@ -749,8 +814,11 @@ def confirmar_pago(parent: QWidget | None, *, employee_code: str, employee_name:
 def texto_previa_corte_encargado(estado: EstadoCaja, avisos: list) -> str:
     """Lo que ve el encargado antes de imprimir: venta, a quién pagar, retiro."""
     total_pagos = sum((a.total_estimado for a in avisos), Decimal("0.00"))
-    retiro = (estado.resumen.efectivo - estado.pagos - total_pagos - estado.total_retiros).quantize(Decimal("0.01"))
+    entradas = Decimal(getattr(estado, "entradas", 0) or 0)
+    retiro = (estado.resumen.efectivo + entradas - estado.pagos - total_pagos - estado.total_retiros).quantize(Decimal("0.01"))
     lineas = [f"VENTA: ${estado.resumen.efectivo:,.2f}"]
+    if entradas:
+        lineas.append(f"Entró sin ser venta: +${entradas:,.2f}")
     if avisos:
         lineas.append("")
         lineas.append("PAGAR HOY:")
@@ -805,6 +873,7 @@ def hacer_corte_automatico(parent: QWidget | None, *, creado_por: str):
 def texto_ticket_corte_encargado(
     corte, venta_efectivo, pagos: list, por_empleada: list | None = None, retiros: list | None = None,
     reimpresion: bool = False, tarjeta=None, tarjeta_ops: int | None = None, ya_pagados: list | None = None, tarjeta_neto=None,
+    entradas: list | None = None,
 ) -> str:
     """Ticket simple para el encargado: la cuenta (reactivo · venta · restas ·
     SACAR), a quién pagar con desglose y las comisiones.
@@ -828,7 +897,7 @@ def texto_ticket_corte_encargado(
     lines.append(datetime.now().strftime("%d/%m/%Y %H:%M").center(_TW))
     lines.append("")
     _bloque_cuenta(lines, corte=corte, venta=venta_efectivo, tarjeta=tarjeta, tarjeta_ops=tarjeta_ops, tarjeta_neto=tarjeta_neto,
-                   pagos_restar=pagos + ya_pagados, retiros=retiros, sacar=sacar)
+                   pagos_restar=pagos + ya_pagados, retiros=retiros, sacar=sacar, entradas=entradas)
     _bloque_pagos(lines, pagos, ya_pagados, total=False)
     if por_empleada:
         lines.append("")

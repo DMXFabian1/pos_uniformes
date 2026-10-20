@@ -234,6 +234,37 @@ def retiro(session: Session, argumento: str, *, quien: str) -> str:
     return f"✅ Retirado del cajón: ${monto:,.2f} para {motivo}.\n\nEl corte de hoy ya lo toma en cuenta."
 
 
+def entrada(session: Session, argumento: str, *, quien: str) -> str:
+    """Dinero que entró al cajón sin ser venta: `/entrada 1750 papá`.
+
+    El fondo que deja el papá de Daniel para la nómina (2026-10-20). Los pagos
+    siguen saliendo del cajón completos; el corte suma esto al esperado."""
+    from pos_uniformes.services import entradas_service
+
+    partes = (argumento or "").split()
+    if not partes:
+        return "¿Cuánto entró y de dónde? Por ejemplo:\n/entrada 1750 papá"
+
+    from pos_uniformes.services.telegram_bot_service import leer_cifra
+
+    monto = leer_cifra(partes[0])
+    if monto is None:
+        return f"No entendí «{partes[0]}» como cantidad. Por ejemplo:\n/entrada 1750 papá"
+    if monto <= 0:
+        return "La entrada tiene que ser mayor a cero."
+    motivo = " ".join(partes[1:]).strip() or entradas_service.MOTIVO_POR_DEFECTO
+    if motivo.lower() in ("papá", "papa", "mi papá", "mi papa"):
+        motivo = entradas_service.MOTIVO_POR_DEFECTO
+    try:
+        entradas_service.registrar_entrada(session, monto=monto, motivo=motivo, creado_por=quien)
+    except ValueError as exc:
+        session.rollback()
+        return f"No lo apunté: {exc}"
+    session.commit()
+    return (f"✅ Entró al cajón: ${monto:,.2f} ({motivo}).\n\n"
+            "Los pagos salen del cajón como siempre; el corte ya suma esto y lo que sobre se queda.")
+
+
 # ------------------------------------------------------------ /deshacerpago
 
 def deshacer_pago(session: Session, *, quien: str, hoy: date | None = None) -> str:
