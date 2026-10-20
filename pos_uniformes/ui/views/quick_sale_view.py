@@ -2500,6 +2500,10 @@ class QuickSaleWidget(QWidget):
         parte del año no agrega nada — y eso está bien, porque un adorno que
         sale siempre deja de notarse.
         """
+        # Se arma aparte y se agrega solo si salió completo: el dibujo de ASCII
+        # se armaba FUERA de la red, y si tronaba se llevaba el ticket entero
+        # (se vio el 20/10, primer día de Halloween, porque la prueba que lo
+        # cuidaba nunca llegaba a esa línea).
         try:
             from pos_uniformes.services.temporada_service import (
                 actual,
@@ -2508,20 +2512,18 @@ class QuickSaleWidget(QWidget):
             )
 
             temporada = actual()
+            if temporada is None:
+                return
             marcador = marcador_de_ticket()
+            if marcador:
+                # El dibujo de verdad. Quien no sepa imprimir puntos lo cambia
+                # por el de ASCII (`sin_marcadores`), que para eso sigue existiendo.
+                adorno = ["", marcador, temporada.saludo.center(_TW)]
+            else:
+                adorno = [""] + [renglon.center(_TW) for renglon in renglones_de_ticket()]
         except Exception:  # noqa: BLE001 — un adorno jamás detiene un ticket
             return
-        if temporada is None:
-            return
-        lines.append("")
-        if marcador:
-            # El dibujo de verdad. Quien no sepa imprimir puntos lo cambia por
-            # el de ASCII (`sin_marcadores`), que para eso sigue existiendo.
-            lines.append(marcador)
-            lines.append(temporada.saludo.center(_TW))
-            return
-        for renglon in renglones_de_ticket():
-            lines.append(renglon.center(_TW))
+        lines.extend(adorno)
 
     def _build_apartado_text(
         self,

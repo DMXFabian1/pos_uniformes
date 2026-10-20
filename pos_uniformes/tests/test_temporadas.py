@@ -129,10 +129,26 @@ class NuncaDetieneUnTicketTests(unittest.TestCase):
 
         from pos_uniformes.ui.views.quick_sale_view import QuickSaleWidget
 
+        # En temporada y SIN el PNG, que es el único camino que llega al dibujo
+        # de ASCII. Antes no fijaba nada: fuera de temporada salía antes de
+        # llegar, y en Halloween (20/10) había PNG — nunca probó lo que decía.
         lineas = ["TOTAL", "Gracias por su compra."]
-        with patch.object(t, "renglones_de_ticket", side_effect=RuntimeError("boom")):
+        with patch.object(t, "actual", return_value=t.TEMPORADAS[2]), \
+                patch.object(t, "marcador_de_ticket", return_value=""), \
+                patch.object(t, "renglones_de_ticket", side_effect=RuntimeError("boom")):
             QuickSaleWidget._append_temporada(lineas)
         self.assertEqual(lineas, ["TOTAL", "Gracias por su compra."])
+
+    def test_si_el_marcador_truena_el_ticket_sale_igual(self) -> None:
+        from unittest.mock import patch
+
+        from pos_uniformes.ui.views.quick_sale_view import QuickSaleWidget
+
+        lineas = ["TOTAL"]
+        with patch.object(t, "actual", return_value=t.TEMPORADAS[2]), \
+                patch.object(t, "marcador_de_ticket", side_effect=OSError("sin disco")):
+            QuickSaleWidget._append_temporada(lineas)
+        self.assertEqual(lineas, ["TOTAL"])
 
     def test_va_despues_del_gracias(self) -> None:
         # Ahora se emite el marcador del PNG; el saludo va debajo.
