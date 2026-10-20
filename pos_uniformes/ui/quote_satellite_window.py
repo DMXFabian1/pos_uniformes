@@ -5442,6 +5442,19 @@ class QuoteSatelliteWindow(QMainWindow):
         steps_layout.addWidget(mode_title)
         steps_layout.addWidget(mode_hint)
         steps_layout.addLayout(self.guided_mode_row)
+        # La puerta «Ropa» no va por pasos: fichas y cuadrícula con fotos,
+        # como una tienda en línea (Daniel, 2026-10-20). Las secciones de
+        # pasos se esconden cuando está activa; la ficha de abajo (tallas,
+        # agregar) es la misma de siempre.
+        from pos_uniformes.ui.helpers.ropa_grid_widget import RopaGridWidget
+
+        self.guided_ropa_widget = RopaGridWidget()
+        self.guided_ropa_widget.setVisible(False)
+        self.guided_ropa_widget.genero_elegido.connect(self._handle_guided_gender_selected)
+        self.guided_ropa_widget.seccion_elegida.connect(self._handle_guided_bucket_selected)
+        self.guided_ropa_widget.prenda_elegida.connect(self._handle_guided_piece_selected)
+        self.guided_ropa_widget.modelo_elegido.connect(self._handle_guided_product_selected)
+        steps_layout.addWidget(self.guided_ropa_widget)
 
         # Paso 2 — Nivel
         self.guided_level_section = QWidget()
@@ -7480,6 +7493,10 @@ class QuoteSatelliteWindow(QMainWindow):
 
         self._apply_guided_section_visibility(view)
         self._apply_guided_product_section_labels(view)
+        if self._gfs.mode == "ropa":
+            self.guided_ropa_widget.aplicar(
+                view, genero=self._gfs.gender, seccion=self._gfs.bucket, prenda=self._gfs.piece
+            )
 
         if self._gfs.sku:
             row = self._find_row_by_sku(self._gfs.sku)
@@ -7495,11 +7512,14 @@ class QuoteSatelliteWindow(QMainWindow):
         mode = self._gfs.mode
         show_level = mode == "school"
         show_school = mode == "school" and bool(self._gfs.level)
-        show_gender = mode in ("basics", "ropa") or bool(self._gfs.school)
+        es_ropa = mode == "ropa"
+        # En Ropa las fichas y la cuadrícula hacen el trabajo de estos pasos.
+        show_gender = (mode == "basics" or bool(self._gfs.school)) and not es_ropa
         show_profile = mode == "school" and self._gfs.gender == "OFICIAL" and bool(view.profile_options)
-        show_bucket = mode in ("basics", "ropa") and bool(view.bucket_options)
-        show_piece = mode in ("basics", "ropa") and bool(view.piece_options)
-        show_products = (mode in ("basics", "ropa") and bool(self._gfs.piece)) or (mode == "school" and bool(self._gfs.school))
+        show_bucket = mode == "basics" and bool(view.bucket_options)
+        show_piece = mode == "basics" and bool(view.piece_options)
+        show_products = (mode == "basics" and bool(self._gfs.piece)) or (mode == "school" and bool(self._gfs.school))
+        self.guided_ropa_widget.setVisible(es_ropa)
 
         self.guided_level_section.setVisible(show_level)
         self.guided_school_section.setVisible(show_school)
@@ -8652,8 +8672,21 @@ QLabel#favDialogPriceLabel {
             self.guided_detail_notes_label.setVisible(False)
             self.guided_detail_scroll.setVisible(False)
             return
-        self.guided_visual_icon_label.setFixedSize(72, 72)
-        self.guided_visual_icon_label.setPixmap(_catalog_row_icon(row))
+        # Con foto del modelo, la ficha la enseña en grande (del disco del
+        # kiosko, al instante); sin foto, el icono de siempre.
+        foto = None
+        try:
+            from pos_uniformes.ui.helpers.ropa_grid_widget import pixmap_de_miniatura
+
+            foto = pixmap_de_miniatura(str(row.get("foto_hash") or ""), 150, 200)
+        except Exception:  # noqa: BLE001 — una foto jamás rompe la ficha
+            foto = None
+        if foto is not None:
+            self.guided_visual_icon_label.setFixedSize(150, 200)
+            self.guided_visual_icon_label.setPixmap(foto)
+        else:
+            self.guided_visual_icon_label.setFixedSize(72, 72)
+            self.guided_visual_icon_label.setPixmap(_catalog_row_icon(row))
         self.guided_detail_meta_label.setVisible(True)
         self.guided_detail_notes_label.setVisible(False)
         self.guided_detail_scroll.setVisible(True)

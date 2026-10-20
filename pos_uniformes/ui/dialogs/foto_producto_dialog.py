@@ -34,6 +34,7 @@ QPushButton { background: #f8f2e9; color: #73341c; font-weight: 700; border: 1px
               border-radius: 10px; min-height: 40px; padding: 0 16px; }
 QPushButton#primario { background: #a84f2d; color: #ffffff; border: none; }
 QPushButton:disabled { color: #b5aa9c; }
+QPushButton#primario:disabled { background: #d9c7bb; color: #f8f2e9; }
 """
 
 

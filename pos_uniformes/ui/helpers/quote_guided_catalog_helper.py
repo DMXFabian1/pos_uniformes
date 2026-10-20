@@ -29,6 +29,9 @@ class GuidedCatalogProductCard:
     price_label: str
     gender_key: str
     tipo_pieza: str = ""
+    producto_id: int = 0
+    foto_hash: str = ""        # la miniatura en el disco del kiosko se llama así
+    marca: str = ""
 
 
 @dataclass(frozen=True)
@@ -336,8 +339,6 @@ def _filter_product_rows(
     filtered_rows = [row for row in filtered_rows if _matches_bucket_for_mode(mode_key, bucket_filter, row)]
     if mode_key == "basics" and not piece_filter:
         return [], "Selecciona un tipo de pieza para ver modelos."
-    if mode_key == "ropa" and not piece_filter:
-        return [], "Elige qué prenda buscan para ver los modelos."
     if piece_filter:
         filtered_rows = [row for row in filtered_rows if _piece_label(row) == piece_filter]
     filtered_rows.sort(key=lambda row: _product_sort_key(row, prefer_deportivo=gender_filter == "DEPORTIVO"))
@@ -478,6 +479,9 @@ def _to_grouped_product_card(
         price_label=f"${price}",
         gender_key=_classify_gender(representative.get("producto_genero")),
         tipo_pieza=str(representative.get("tipo_pieza_nombre") or ""),
+        producto_id=int(representative.get("producto_id") or 0),
+        foto_hash=str(representative.get("foto_hash") or ""),
+        marca=str(representative.get("marca_nombre") or ""),
     )
 
 

@@ -747,7 +747,9 @@ class RopaModeTests(unittest.TestCase):
         view = self._vista(bucket_filter="Ropa casual")
         self.assertEqual([o.label for o in view.piece_options], sorted(["Leggings", "Sudadera", "YT0572"], key=lambda x: [o.label for o in view.piece_options].index(x)))
         self.assertIn("YT0572", [o.label for o in view.piece_options])
-        self.assertEqual(view.empty_label, "Elige qué prenda buscan para ver los modelos.")
+        # Sin prenda elegida la cuadrícula ya enseña los modelos de la sección.
+        self.assertEqual(len(view.product_cards), 3)
+        self.assertEqual(view.empty_label, "")
 
     def test_con_la_prenda_salen_los_modelos_con_marca_y_color(self) -> None:
         filas = self._filas()
