@@ -2,6 +2,19 @@
 
 ## Pants 2pz Liso (genérico)
 
+Azul Marino, Azul Rey, Rojo, Verde, Vino
+
+| Tallas | Precio |
+|---|---:|
+| `2, 4, 6, 8, 10, 12` | 175 |
+| `14, 16` | 190 |
+| `28, CH` | 315 |
+| `MD` | 325 |
+| `GD` | 335 |
+| `EXG` | 345 |
+
+### Liso Doble Raya
+
 | Tallas | Precio |
 |---|---:|
 | `2, 4, 6, 8` | 250 |
@@ -10,8 +23,6 @@
 | `MD` | 325 |
 | `GD` | 335 |
 | `EXG` | 345 |
-
-Colores: Azul Marino, Azul Rey, Bicolor, Blanco, Doble Raya, Gris, Raya Roja, Rojo, Verde, Vino
 
 ## Pants 2pz Punto (genérico)
 
@@ -42,15 +53,16 @@ Colores: Azul Marino, Azul Rey, Bicolor, Doble Raya, Gris, Raya Roja, Rojo, Verd
 
 | Tallas | 2 piezas | 3 piezas |
 |---|---:|---:|
-| `2, 4, 6, 8, 10` | 445 | 545 |
+| `2, 4, 6, 8, 10` | 415 | 515 |
 
 ### Primaria
 
 | Tallas | 2 piezas | 3 piezas |
 |---|---:|---:|
 | `4, 6, 8, 10, 12` | 485 | 585 |
-| `14, 16` | 495 | 595 |
-| `CH, MD, GD` | 585 | 685 |
+| `14, 16, 18` | 495 | 595 |
+| `CH, MD` | 585 | 685 |
+| `GD` | 595 | 695 |
 
 ### Secundaria
 
@@ -69,17 +81,10 @@ Colores: Azul Marino, Azul Rey, Bicolor, Doble Raya, Gris, Raya Roja, Rojo, Verd
 
 ## Excepciones activas
 
-### Preescolar
-
-| Escuela | 2 piezas | 3 piezas |
-|---|---:|---:|
-| `Sor Juana Inés de la Cruz` | 515 | - |
-
 ### Primaria
 
 | Escuela | 2 piezas | 3 piezas |
 |---|---:|---:|
-| `Adolfo Lopez Mateo` | 575 / 585 / 595 | - |
 | `Colegio Motolinea` | 595 / 630 / 640 / 650 | 695 / 730 / 740 / 750 |
 
 ### Secundaria
@@ -95,7 +100,14 @@ Colores: Azul Marino, Azul Rey, Bicolor, Doble Raya, Gris, Raya Roja, Rojo, Verd
 |---|---:|---:|
 | `CECYTE` | 650 | 750 |
 | `Conalep` | 650 | 750 |
-| `UVEG` | 650 | 750 |
+| `UVEG` | 690 | 790 |
+
+## Precios especiales en caja
+
+| Escuela | Tallas | 2 piezas |
+|---|---|---:|
+| `CBTIS 148` | línea completa | 300 |
+| `Vicente Guerrero` | `4, 6, 8` | 89 |
 
 ## Nota
 

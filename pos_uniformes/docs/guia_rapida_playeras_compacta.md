@@ -1,6 +1,6 @@
 # Tarifario Rapido
 
-## Playeras Deportivas
+## Playeras Deportivas y Polos por escuela
 
 ### Preescolar
 
@@ -16,7 +16,9 @@
 |---|---:|
 | `4, 6, 8, 10` | 199 |
 | `12, 14, 16` | 209 |
-| `CH, MD, GD, EXG` | 219 |
+| `CH` | 219 |
+| `MD` | 225 |
+| `GD, EXG` | 235 |
 
 ### Secundaria
 
@@ -34,7 +36,18 @@
 
 ## Excepciones activas
 
-- Ninguna aprobada por ahora.
+| Escuela | Tallas | Precio |
+|---|---|---:|
+| `Conalep` · `SABES` (Polo Bachillerato) | línea completa | 239 |
+
+## Precios especiales en caja
+
+| Escuela | Tallas | Precio |
+|---|---|---:|
+| `CBTIS 148` Playera Deportiva Ad hoc | línea completa | 150 |
+| `Vicente Guerrero` Playera Blanca | `4` | 89 |
+| `José María Morelos y Pavón` Polo | `18` | 199 |
+| `ESTV 663` Polo | `32` | 219 |
 
 ## Nota
 

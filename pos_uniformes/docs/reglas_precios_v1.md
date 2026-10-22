@@ -2,6 +2,12 @@
 
 Usa este documento como especificacion operativa para una app que actualiza precios en `data/productos.db`.
 
+> **Fuente de verdad (desde 2026-10-22):** los precios validos son los del PostgreSQL de la caja (PC de la tienda).
+> `productos.db` y este documento se corrigen para igualar a la caja, nunca al reves.
+> Toda subida nueva se aplica primero en la caja (con auditoria en `cambio_catalogo`) y despues se refleja aqui.
+>
+> Ultima actualizacion: 2026-10-22 — escaleras tomadas de la caja tras igualar 866 SKUs.
+
 ## Objetivo
 
 Aplicar precios objetivo por categoria, nivel, familia y talla.
@@ -21,6 +27,8 @@ precio_nuevo = MAX(precio_actual, precio_objetivo)
 - Si una linea dice `linea completa`, aplica a todas las tallas de esa familia.
 - Si una familia o producto esta marcado como `excluido`, no se toca.
 - Si un registro no coincide con ninguna regla, conservar el precio actual.
+- Las lineas marcadas `precio especial en caja` son precios puestos a mano en el POS (ofertas o liquidaciones).
+  Se respetan tal cual y no se heredan a otras escuelas ni tallas. Confirmar con Daniel antes de normalizarlos.
 
 ## Bandas de talla
 
@@ -42,7 +50,9 @@ precio_nuevo = MAX(precio_actual, precio_objetivo)
 
 ## 1. Playeras
 
-Aplicar por `tipo_pieza='Playera'`, `nivel_educativo` y talla exacta.
+### 1.1 Playera Deportiva
+
+Aplicar por `tipo_pieza='Playera'`, `tipo_prenda='Deportivo'`, `nivel_educativo` y talla exacta.
 
 | Nivel | Tallas | Precio objetivo |
 |---|---|---:|
@@ -51,11 +61,37 @@ Aplicar por `tipo_pieza='Playera'`, `nivel_educativo` y talla exacta.
 | Preescolar | `CH, MD, GD, EXG` | 219 |
 | Primaria | `4, 6, 8, 10` | 199 |
 | Primaria | `12, 14, 16` | 209 |
-| Primaria | `CH, MD, GD, EXG` | 219 |
+| Primaria | `CH` | 219 |
+| Primaria | `MD` | 225 |
+| Primaria | `GD, EXG` | 235 |
 | Secundaria | `12, 14, 16` | 229 |
 | Secundaria | `CH, MD, GD, EXG` | 239 |
 | Bachillerato | `12, 14, 16` | 229 |
 | Bachillerato | `CH, MD, GD, EXG` | 239 |
+
+### 1.2 Playera Polo por escuela (Oficial)
+
+Aplicar por `tipo_pieza='Playera'`, `tipo_prenda='Oficial'`, `nivel_educativo` y talla. Misma escalera que la deportiva de su nivel.
+
+| Nivel | Tallas | Precio objetivo |
+|---|---|---:|
+| Primaria | `4, 6, 8, 10` | 199 |
+| Primaria | `12, 14, 16` | 209 |
+| Primaria | `CH` | 219 |
+| Primaria | `MD` | 225 |
+| Primaria | `GD, EXG` | 235 |
+| Secundaria | `12, 14, 16` | 229 |
+| Secundaria | `CH, MD, GD, EXG` | 239 |
+| Bachillerato | `14, 16` | 229 |
+| Bachillerato | `CH, MD, GD, EXG` | 239 |
+
+Excepciones activas:
+
+- `Conalep` y `SABES` en Bachillerato manejan `239` en linea completa (incluye 14 y 16).
+- `CBTIS 148` Playera Deportiva Ad hoc: `150` linea completa — precio especial en caja.
+- `Vicente Guerrero` Playera Blanca talla `4`: `89` — precio especial en caja (6 y 8 van a 175).
+- `Jose Maria Morelos y Pavon` Polo talla `18`: `199` — precio especial en caja.
+- `ESTV 663` Polo talla `32`: `219` — precio especial en caja.
 
 ## 2. Sueter Basico
 
@@ -71,7 +107,7 @@ Tabla:
 |---|---:|
 | `4, 6, 8` | 289 |
 | `10, 12, 14, 16` | 299 |
-| `30, 32, 34` | 309 |
+| `28, 30, 32, 34` | 309 |
 | `36, 38, 40, 42` | 315 |
 | `44, 46` | 325 |
 
@@ -81,21 +117,23 @@ Aplicar por `tipo_pieza='Suéter'`, `tipo_prenda='Oficial'`, `nivel_educativo` y
 
 | Nivel | Tallas | Precio objetivo |
 |---|---|---:|
-| Preescolar | `4, 6, 8, 10` | 290 |
-| Primaria | `4, 6, 8, 10` | 290 |
+| Preescolar | `4, 6, 8, 10` | 299 |
+| Primaria | `4, 6, 8, 10` | 299 |
 | Primaria | `12, 14, 16` | 315 |
-| Primaria | `30, 32, 34, 36, 38` | 325 |
+| Primaria | `18, 30, 32, 34, 36, 38` | 325 |
 | Primaria | `40, 42` | 335 |
-| Secundaria | `12, 14, 16` | 325 |
-| Secundaria | `30, 32, 34, 36, 38, 40, 42, 44` | 345 |
+| Secundaria | `12, 14, 16, 18` | 325 |
+| Secundaria | `30, 32, 34, 36, 38` | 345 |
+| Secundaria | `40, 42, 44` | 355 |
 | Bachillerato | `14, 16` | 325 |
-| Bachillerato | `32, 34` | 335 |
-| Bachillerato | `36, 38` | 345 |
+| Bachillerato | `32, 34, 36, 38` | 345 |
 | Bachillerato | `40, 42, 44` | 355 |
 
-Excepcion activa:
+Excepciones activas:
 
-- `UVEG` en `Bachillerato` maneja `355` para `14, 16`; `365` para `32, 34, 36, 38`; `375` para `40, 42`.
+- `UVEG` en `Bachillerato` maneja `355` para `14, 16`; `365` para `32, 34, 36, 38`; `375` para `40, 42` (subida 2026-10-22 por costo Martell).
+- `Margarita Paz Paredes` en `Preescolar` maneja `315` para `4, 6, 8, 10`.
+- `CBTIS 148` (Botones M y Cuello V H) maneja `200` en linea completa — precio especial en caja.
 
 ## 4. Camisas
 
@@ -169,7 +207,8 @@ Nota:
 
 - Si aparece `Camisa Manga Larga Blanca` en `265` sin `nivel_educativo`, conservar en `265`.
 - Las `Camisas Oficiales` ligadas a una escuela especifica se consideran excepciones operativas y deben respetarse como linea escolar.
-- Excepciones activas detectadas: `Francisco Villa`, `Bicentenario`, `CBTIS 148` y `Conalep`.
+- Excepciones activas detectadas: `Francisco Villa`, `Bicentenario` y `Conalep`.
+- `CBTIS 148` Camisa Manga Corta Blanca: `200` linea completa — precio especial en caja.
 
 ## 5. Chalecos
 
@@ -182,7 +221,8 @@ Aplicar por `tipo_pieza='Chaleco'`, `tipo_prenda='Básico'`.
 | `4, 6, 8` | 229 |
 | `10, 12, 14, 16` | 239 |
 | `28, 30, 32, 34` | 259 |
-| `36, 38, 40, 42, 44, 46` | 269 |
+| `36, 38, 40` | 269 |
+| `42, 44, 46` | 289 |
 
 ### 5.2 Chaleco Oficial
 
@@ -190,25 +230,28 @@ Aplicar por `tipo_pieza='Chaleco'`, `tipo_prenda='Oficial'`, `nivel_educativo` y
 
 | Nivel | Tallas | Precio objetivo |
 |---|---|---:|
-| Primaria | `2, 4, 6, 8` | 240 |
-| Primaria | `10, 12` | 250 |
-| Primaria | `14, 16` | 260 |
-| Primaria | `32` | 270 |
-| Primaria | `34, 36` | 290 |
-| Primaria | `38, 40` | 300 |
-| Primaria | `42, CH, MD, GD, EXG` | 290 |
-| Secundaria | `12, 14, 16` | 245 |
-| Secundaria | `30, 32, 34` | 265 |
-| Secundaria | `36, 38, 40, 42, 44` | 275 |
-| Bachillerato | `14, 16` | 265 |
-| Bachillerato | `32, 34` | 275 |
-| Bachillerato | `36, 38, 40, 42` | 285 |
-| Bachillerato | `44` | 295 |
+| Primaria | `2, 4, 6, 8` | 249 |
+| Primaria | `10, 12, 14, 16` | 269 |
+| Primaria | `32, 34` | 289 |
+| Primaria | `36, 38, 40` | 299 |
+| Primaria | `42` | 309 |
+| Primaria | `CH, MD` | 299 |
+| Primaria | `GD, EXG` | 309 |
+| Secundaria | `12, 14, 16` | 269 |
+| Secundaria | `30, 32, 34` | 289 |
+| Secundaria | `36, 38, 40` | 299 |
+| Secundaria | `42, 44` | 309 |
+| Bachillerato | `14, 16` | 269 |
+| Bachillerato | `32, 34` | 289 |
+| Bachillerato | `36, 38, 40` | 299 |
+| Bachillerato | `42, 44` | 309 |
 
 Nota:
 
-- `Huizache` se maneja como escuela con precios propios (no es excepción): `6, 8` → 240; `10, 12` → 245; `14, 16` → 250; `34, 36` → 270.
-- Excepciones activas detectadas en `Primaria`: `Albino García Ramos`, `Francisco Villa`, `Justo Sierra`, `Miguel Campuzano` y `Miguel Hidalgo`.
+- `Huizache` (sin `nivel_educativo`) sigue la escalera de `Chaleco Oficial Primaria`: `6, 8` → 249; `10, 12, 14, 16` → 269; `34` → 289; `36` → 299. Ya no es excepcion.
+- Las tallas `CH, MD, GD, EXG` de Primaria existen solo en `Colegio Motolinea`.
+- Escuelas en Primaria con esta escalera: `Albino García Ramos`, `Colegio Motolinea`, `Francisco Villa`, `Himno Nacional`, `Ignacio Allende`, `Ignacio Zaragoza`, `Justo Sierra`, `Miguel Campuzano`, `Miguel Hidalgo`.
+- Secundaria: `Práxedis Guerrero`, `Telesecundaria 512`. Bachillerato: `SABES`.
 
 ## 6. Faldas
 
@@ -216,24 +259,38 @@ Nota:
 
 Aplicar por `tipo_pieza='Falda'`, `tipo_prenda='Básico'` y familia detectada desde `nombre`.
 
-#### Linea estandar
+#### Linea Gales
 
 Aplica a:
 
-- `Falda Escolar Azul Marino`
 - `Falda Gales azul`
 - `Falda Gales rojo`
 - `Falda Gales verde`
-- `Falda Cuatro tablas ...`
-- `Falda Vino`
 
 | Tallas | Precio objetivo |
 |---|---:|
 | `2, 4, 6, 8` | 195 |
-| `10, 12, 14, 16` | 205 |
-| `18, 20, 28, 30, 32, 34` | 225 |
+| `10, 12` | 205 |
+| `14, 16` | 215 |
+| `28, 30, 32, 34` | 225 |
 | `36, 38, 40, 42` | 235 |
 | `44` | 245 |
+
+#### Linea Escolar
+
+Aplica a:
+
+- `Falda Escolar Azul Marino`
+- `Falda Cuatro tablas ...` (Azul Rey, Blanca, Café, Verde)
+- `Falda Vino`
+
+| Tallas | Precio objetivo |
+|---|---:|
+| `2, 4, 6, 8, 10, 12, 14` | 195 |
+| `16, 18, 20, 28, 30` | 205 |
+| `32, 34` | 215 |
+| `36, 38` | 225 |
+| `40, 42` | 235 |
 
 #### Falda Escoces
 
@@ -266,45 +323,68 @@ Aplicar por `tipo_pieza='Falda'`, `tipo_prenda='Oficial'` y familia/nivel.
 | Familia o nivel | Tallas | Precio objetivo |
 |---|---|---:|
 | `Preescolar Falda Azul` | linea completa | 239 |
-| `Bachillerato SABES` | `10, 12, 14, 16` | 270 |
-| `Bachillerato SABES` | `28, 30, 32, 34` | 275 |
-| `Bachillerato SABES` | `36, 38` | 285 |
-| `Bachillerato SABES` | `40, 42` | 295 |
-| `Bachillerato Conalep` | `14, 16` | 280 |
-| `Bachillerato Conalep` | `28, 30, 32, 34` | 285 |
+| `Bachillerato SABES` | `10, 12, 14, 16, 28, 30, 32, 34` | 285 |
+| `Bachillerato SABES` | `36, 38, 40, 42` | 295 |
+| `Bachillerato Conalep` | `14, 16, 28, 30, 32, 34` | 285 |
 | `Bachillerato Conalep` | `36, 38, 40, 42` | 295 |
-| `Sin nivel Pata de gallo` | `4, 6, 8` | 205 |
-| `Sin nivel Pata de gallo` | `10, 12` | 215 |
-| `Sin nivel Pata de gallo` | `14, 16` | 225 |
-| `Sin nivel Pata de gallo` | `28, 30, 32, 34, 36, 38` | 245 |
-| `Sin nivel Pgallo cafe` | `12` | 205 |
-| `Sin nivel Pgallo cafe` | `14, 16` | 215 |
-| `Sin nivel Pgallo cafe` | `28, 30, 32, 34` | 245 |
-| `Sin nivel Pgallo cafe` | `36, 38, 40, 42` | 255 |
+| `Pata de gallo (Colegio Motolinea)` | `4, 6, 8` | 209 |
+| `Pata de gallo (Colegio Motolinea)` | `10, 12` | 219 |
+| `Pata de gallo (Colegio Motolinea)` | `14, 16` | 229 |
+| `Pata de gallo (Colegio Motolinea)` | `28, 30, 32, 34` | 249 |
+| `Pata de gallo (Colegio Motolinea)` | `36, 38` | 259 |
+| `Sin nivel Pgallo cafe` | `12` | 219 |
+| `Sin nivel Pgallo cafe` | `14, 16` | 229 |
+| `Sin nivel Pgallo cafe` | `28, 30, 32, 34` | 249 |
+| `Sin nivel Pgallo cafe` | `36, 38, 40, 42` | 259 |
 
 Excepcion activa:
 
-- `Margarita Paz Paredes` maneja `Falda Oficial Preescolar` tallas `4, 6, 8` a `239`.
+- `Margarita Paz Paredes` Falda Azul Preescolar tallas `4, 6, 8`: `89` en caja — precio especial en caja (la regla de linea es 239).
 
 ## 7. Pantalon Basico
 
 Aplicar por `tipo_pieza='Pantalón'`, `tipo_prenda='Básico'` y familia detectada desde `nombre`.
 
-### 7.1 Vestir / Gales
+### 7.1 Vestir
 
-Aplica a:
-
-- `Pantalón Vestir ...`
-- `Pantalón Gales ...`
+Aplica a `Pantalón Vestir ...` en Azul Marino, Azul Rey, Blanco, Café, Caqui, Gris, Negro, Verde, Verde olivo y Vino.
 
 | Tallas | Precio objetivo |
 |---|---:|
 | `2, 4, 6, 8` | 235 |
+| `10, 12` | 245 |
+| `14, 16` | 255 |
+| `18, 20` | 265 |
+| `28, 30` | 275 |
+| `32, 34` | 285 |
+| `36, 38` | 295 |
+| `40, 42, 44` | 315 |
+
+#### Vestir Gris claro / Gris obscuro
+
+Misma escalera mas 14.
+
+| Tallas | Precio objetivo |
+|---|---:|
+| `4, 6, 8` | 249 |
+| `10, 12` | 259 |
+| `14, 16` | 269 |
+| `18, 20` | 279 |
+| `28, 30` | 289 |
+| `32, 34` | 299 |
+| `36, 38` | 309 |
+| `40, 42, 44` | 329 |
+
+#### Gales (azul, rojo, verde)
+
+| Tallas | Precio objetivo |
+|---|---:|
+| `2, 4, 5, 6, 8` | 235 |
 | `10, 12, 14, 16` | 245 |
 | `18, 20, 28, 30` | 265 |
 | `32, 34` | 285 |
-| `36, 38, 40, 42` | 295 |
-| `44` | 315 |
+| `36, 38` | 295 |
+| `40, 42, 44` | 315 |
 
 ### 7.2 Escoces / Gabardina
 
@@ -312,9 +392,9 @@ Aplica a:
 
 | Tallas | Precio objetivo |
 |---|---:|
-| `3, 4, 6, 8` | 199 |
-| `10, 12, 14, 16` | 235 |
-| `28, 30, 32` | 265 |
+| `2, 3, 4, 6, 8` | 199 |
+| `10, 12, 14, 16` | 239 |
+| `28, 30, 32` | 269 |
 
 #### Gabardina Negro
 
@@ -322,13 +402,16 @@ Aplica a:
 |---|---:|
 | `2, 4, 6, 8, 10, 12, 14, 16` | 219 |
 
-### 7.3 Pata de gallo
+### 7.3 Vestir Pata de gallo
 
 | Tallas | Precio objetivo |
 |---|---:|
-| `4, 6, 8, 10, 12, 14, 16` | 235 |
-| `20, 28, 30, 32` | 245 |
-| `34, 36, 38, 40, 42` | 255 |
+| `4, 6, 8` | 235 |
+| `10, 12, 14, 16` | 245 |
+| `20, 28, 30` | 265 |
+| `32, 34` | 285 |
+| `36, 38` | 295 |
+| `40, 42` | 315 |
 
 ## 7B. Pantalon Oficial
 
@@ -405,9 +488,7 @@ Aplica a:
 | `2, 4, 6, 8` | 275 |
 | `10, 12, 14, 16` | 295 |
 | `28, CH` | 385 |
-| `MD` | 395 |
-| `GD` | 405 |
-| `EXG` | 415 |
+| `MD, GD, EXG` | 395 |
 
 Notas:
 
@@ -463,23 +544,24 @@ Escuelas que hoy no tienen `Chamarra Deportiva` y pueden heredarse desde plantil
 - `Primaria`: `Adolfo Lopez Mateo`, `Alvaro Obregon`, `Colegio Motolinea`, `Huizache`, `Ignacio Zaragoza`, `Narciso Mendoza`, `Palacio`, `Vicente Guerrero`
 - `Secundaria`: `ESTV 663`, `Santa Rosa 238`, `Telesecundaria 600`
 
-## 9. Pants 2pz y 3pz
+## 9. Pants 2pz y 3pz Deportivo
 
-Aplicar por `tipo_pieza IN ('Pants 2pz','Pants 3pz')`, `nivel_educativo` y talla exacta.
+Aplicar por `tipo_pieza IN ('Pants 2pz','Pants 3pz')`, `tipo_prenda='Deportivo'`, `nivel_educativo` y talla exacta.
 
 ### Preescolar
 
 | Tallas | 2 piezas | 3 piezas |
 |---|---:|---:|
-| `2, 4, 6, 8, 10` | 445 | 545 |
+| `2, 4, 6, 8, 10` | 415 | 515 |
 
 ### Primaria
 
 | Tallas | 2 piezas | 3 piezas |
 |---|---:|---:|
 | `4, 6, 8, 10, 12` | 485 | 585 |
-| `14, 16` | 495 | 595 |
-| `CH, MD, GD` | 585 | 685 |
+| `14, 16, 18` | 495 | 595 |
+| `CH, MD` | 585 | 685 |
+| `GD` | 595 | 695 |
 
 ### Secundaria
 
@@ -495,6 +577,43 @@ Aplicar por `tipo_pieza IN ('Pants 2pz','Pants 3pz')`, `nivel_educativo` y talla
 |---|---:|---:|
 | `16` | 615 | 715 |
 | `CH, MD, GD, EXG` | 615 | 715 |
+
+Excepciones activas:
+
+- `UVEG` Bachillerato: 2pz `690`, 3pz `790` en linea completa.
+- `CBTIS 148` Bachillerato 2pz: `300` linea completa — precio especial en caja.
+- `Vicente Guerrero` Preescolar 2pz tallas `4, 6, 8`: `89` — precio especial en caja.
+
+## 9B. Pants 2pz Basico (Liso)
+
+Aplicar por `tipo_pieza='Pants 2pz'`, `tipo_prenda='Básico'` y familia desde `nombre`.
+
+#### Liso (Azul Marino, Azul Rey, Rojo, Verde, Vino)
+
+| Tallas | Precio objetivo |
+|---|---:|
+| `2, 4, 6, 8, 10, 12` | 175 |
+| `14, 16` | 190 |
+| `28, CH` | 315 |
+| `MD` | 325 |
+| `GD` | 335 |
+| `EXG` | 345 |
+
+#### Liso Doble raya
+
+| Tallas | Precio objetivo |
+|---|---:|
+| `2, 4, 6, 8` | 250 |
+| `10, 12, 14, 16` | 265 |
+| `28, CH` | 315 |
+| `MD` | 325 |
+| `GD` | 335 |
+| `EXG` | 345 |
+
+Nota:
+
+- Los 175/190 infantiles y juveniles del Liso vienen asi de la caja (antes 250/265 en SQLite). Quedan apenas arriba del
+  `Pants Suelto Liso` (165/180). Revisar si es intencional.
 
 ## 10. Pants Suelto Basico
 
@@ -521,6 +640,17 @@ Aplicar por `tipo_pieza='Pants Suelto'`, `tipo_prenda='Básico'` y `atributo`.
 | `MD, GD` | 319 |
 | `EXG` | 339 |
 
+## 10B. Pants Suelto por escuela (Deportivo)
+
+Aplicar por `tipo_pieza='Pants Suelto'`, `tipo_prenda='Deportivo'` y `nivel_educativo`.
+
+| Nivel | Tallas | Precio objetivo |
+|---|---|---:|
+| Preescolar | linea completa | 239 |
+| Bachillerato | linea completa | 289 |
+
+Escuelas: Preescolar `Frida Kahlo`, `Margarita Paz Paredes`, `Patria`, `Álvaro Obregón`; Bachillerato `CBTIS 148`, `Conalep`, `SABES`, `UVEG`.
+
 ## 11. Malla Escolar
 
 Aplicar por `tipo_pieza='Malla'`, `atributo='Escolar'`.
@@ -542,7 +672,7 @@ Aplicar por `tipo_pieza` y `escuela_id IS NULL`.
 | `Corbata` | — | 70 |
 | `Corbatín` | — | 70 |
 | `Moño` | — | 70 |
-| `Boina` | `Escolta` | 80 |
+| `Boina` | `Escolta` | 85 |
 
 ### Playera Polo Blanca
 
@@ -566,18 +696,35 @@ Aplicar por `tipo_pieza='Bata'`.
 |---|---|---:|
 | Infantil | Uni | 65 |
 | Manga Corta | `12 – 46` | 395 |
-| Manga Larga | `12 – 46` | 439 |
+| Manga Larga | `12 – 46` | 365 |
 
 Notas:
 
 - La Bata Infantil es talla única; no aplicar escalera adicional.
 - No heredar precios de Bata a otras prendas.
+- La Manga Larga esta en 365 en la caja (SQLite traia 439). Si debe quedar arriba de la Manga Corta, subirla primero en la caja.
 
 ## Excepciones y conservaciones explicitas
 
 - `Suéter Oferta Ad hoc Talla Uni` se conserva en `199`.
 - Si una app no puede detectar con certeza la familia desde `nombre`, no debe actualizar ese registro.
 - Todo registro sin coincidencia exacta con las reglas debe conservar su precio actual.
+
+## Precios especiales en caja (resumen)
+
+Precios puestos a mano en el POS que no siguen la escalera de su familia. Se respetan y no se heredan.
+
+| Escuela / prenda | Tallas | Precio en caja | Regla de linea |
+|---|---|---:|---:|
+| `CBTIS 148` Suéter B y V | linea completa | 200 | 325–355 |
+| `CBTIS 148` Camisa Manga Corta | linea completa | 200 | 265 |
+| `CBTIS 148` Playera Deportiva Ad hoc | linea completa | 150 | 229–239 |
+| `CBTIS 148` Pants 2pz Deportivo | linea completa | 300 | 615 |
+| `Vicente Guerrero` Pants 2pz | `4, 6, 8` | 89 | 415 |
+| `Vicente Guerrero` Playera Blanca | `4` | 89 | 175 |
+| `Margarita Paz Paredes` Falda Azul | `4, 6, 8` | 89 | 239 |
+| `Jose Maria Morelos y Pavon` Polo | `18` | 199 | 209 |
+| `ESTV 663` Polo | `32` | 219 | 239 |
 
 ## Instruccion final para la app
 

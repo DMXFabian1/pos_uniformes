@@ -6,7 +6,7 @@
 
 | Nivel | Tallas | Precio |
 |---|---|---:|
-| Preescolar | `4, 6, 8` | 315 |
+| Preescolar | `4, 6, 8, 10` | 315 |
 | Primaria | `4, 6, 8, 10, 12, 14, 16, CH, MD, GD` | 335 |
 | Secundaria | `12, 14, 16, CH, MD, GD, EXG` | 385 |
 | Bachillerato | `12, 14, 16, CH, MD, GD, EXG` | 385 |
@@ -27,9 +27,7 @@
 | `2, 4, 6, 8` | 275 |
 | `10, 12, 14, 16` | 295 |
 | `28, CH` | 385 |
-| `MD` | 395 |
-| `GD` | 405 |
-| `EXG` | 415 |
+| `MD, GD, EXG` | 395 |
 
 ## Nota
 

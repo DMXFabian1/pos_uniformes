@@ -78,7 +78,7 @@
 |---|---|---:|
 | `Francisco Villa` | `Camisa Oficial Primaria` | 215 / 225 / 245 |
 | `Bicentenario` | `Camisa Oficial Secundaria` | 265 |
-| `CBTIS 148` | `Camisa Oficial Bachillerato` | 265 |
+| `CBTIS 148` | `Camisa Oficial Bachillerato` | 200 (precio especial en caja) |
 | `Conalep` | `Camisa Oficial Escolar` | 265 |
 
 ## Nota

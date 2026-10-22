@@ -2,17 +2,26 @@
 
 ## Faldas
 
-### Linea estandar
-
-Aplica a: `Falda Escolar Azul Marino`, `Falda Gales (Azul, Rojo, Verde)`, `Falda Cuatro Tablas`, `Falda Vino`
+### Gales (Azul, Rojo, Verde)
 
 | Tallas | Precio |
 |---|---:|
 | `2, 4, 6, 8` | 195 |
-| `10, 12, 14, 16` | 205 |
-| `18, 20, 28, 30, 32, 34` | 225 |
+| `10, 12` | 205 |
+| `14, 16` | 215 |
+| `28, 30, 32, 34` | 225 |
 | `36, 38, 40, 42` | 235 |
 | `44` | 245 |
+
+### Escolar Azul Marino · Cuatro Tablas · Vino
+
+| Tallas | Precio |
+|---|---:|
+| `2, 4, 6, 8, 10, 12, 14` | 195 |
+| `16, 18, 20, 28, 30` | 205 |
+| `32, 34` | 215 |
+| `36, 38` | 225 |
+| `40, 42` | 235 |
 
 ### Escoces
 
@@ -37,18 +46,10 @@ Aplica a: `Falda Escolar Azul Marino`, `Falda Gales (Azul, Rojo, Verde)`, `Falda
 
 | Tallas | Precio |
 |---|---:|
-| `12, 14, 16` | 205 |
-| `28, 30, 32, 34` | 245 |
-| `36, 38, 40, 42` | 255 |
-
-### Oficial Escolar (generica)
-
-| Tallas | Precio |
-|---|---:|
-| `12` | 205 |
-| `14, 16` | 215 |
-| `28, 30, 32, 34` | 245 |
-| `36, 38, 40, 42` | 255 |
+| `12` | 219 |
+| `14, 16` | 229 |
+| `28, 30, 32, 34` | 249 |
+| `36, 38, 40, 42` | 259 |
 
 ### Oficial Preescolar Azul
 
@@ -56,14 +57,19 @@ Aplica a: `Falda Escolar Azul Marino`, `Falda Gales (Azul, Rojo, Verde)`, `Falda
 |---|---:|
 | Línea completa | 239 |
 
-## Excepciones activas
+## Por escuela
 
 | Escuela | Tallas | Precio |
 |---|---|---:|
-| Colegio Motolinea | `4–8` / `10–12` / `14–16` / `28–34` / `36–38` | 205 / 215 / 225 / 245 / 255 |
-| SABES | `10–16` / `28–34` / `36–38` / `40–42` | 270 / 275 / 285 / 295 |
-| Conalep | `14–16` / `28–34` / `36–42` | 280 / 285 / 295 |
-| Margarita Paz Paredes | `4, 6, 8` Preescolar | 239 |
+| Colegio Motolinea (Pata de gallo) | `4–8` / `10–12` / `14–16` / `28–34` / `36–38` | 209 / 219 / 229 / 249 / 259 |
+| SABES | `10–34` / `36–42` | 285 / 295 |
+| Conalep (Escoces) | `14–34` / `36–42` | 285 / 295 |
+
+## Precios especiales en caja
+
+| Escuela | Tallas | Precio |
+|---|---|---:|
+| Margarita Paz Paredes (Falda Azul Preescolar) | `4, 6, 8` | 89 |
 
 ## Nota
 

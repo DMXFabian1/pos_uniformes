@@ -9,7 +9,7 @@
 | Corbata | 70 |
 | Corbatín | 70 |
 | Moño | 70 |
-| Boina Escolta | 80 |
+| Boina Escolta | 85 |
 
 ## Playera Polo Blanca
 

@@ -23,6 +23,13 @@
 | `MD, GD` | 319 |
 | `EXG` | 339 |
 
+## Pants Suelto por escuela
+
+| Nivel | Escuelas | Tallas | Precio |
+|---|---|---|---:|
+| Preescolar | Frida Kahlo, Margarita Paz Paredes, Patria, Álvaro Obregón | línea completa | 239 |
+| Bachillerato | CBTIS 148, Conalep, SABES, UVEG | línea completa | 289 |
+
 ## Nota
 
 - Si una pieza ya tiene precio mayor marcado, se respeta.

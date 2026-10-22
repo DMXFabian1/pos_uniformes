@@ -25,8 +25,9 @@
 |---|---|---:|
 | Infantil | `Uni` | 65 |
 | Manga Corta | `12–46` | 395 |
-| Manga Larga | `12–46` | 439 |
+| Manga Larga | `12–46` | 365 |
 
 ## Nota
 
 - Si una pieza ya tiene precio mayor marcado, se respeta.
+- La Manga Larga quedó en 365 en la caja (antes 439 en SQLite). Revisar si debe ir arriba de la Manga Corta.
