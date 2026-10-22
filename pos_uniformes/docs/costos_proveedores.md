@@ -56,3 +56,23 @@ Precios de venta tomados de `Gestor_de_Inventarios/data/productos.db`.
 
 - **22-oct-2026 · UVEG:** 14, 16 → 355 (antes 345) · 32–38 → 365 (antes 345) · 40, 42 → 375 (antes 355).
   El costo sube por talla (174 → 184 → 197) y la venta estaba casi plana.
+
+## Alineación de precios SQLite ↔ caja (22-oct-2026)
+
+Decisión: **los precios válidos son los de la caja (PostgreSQL de la tienda).** `productos.db` y los documentos se corrigen para igualarla, no al revés.
+
+Al comparar las dos bases había 866 SKUs distintos (SQLite se había quedado atrás desde abril y además traía subidas que nunca llegaron a la caja). Detalle en `discrepancias_precios_2026-10-22.md` y su CSV.
+
+| Qué se hizo | Dónde |
+|---|---|
+| 866 SKUs de `productos.db` igualados a la caja (579 suben, 287 bajan); 4,005 SKUs comunes idénticos | `Gestor_de_Inventarios/data/productos.db` |
+| Reglas reescritas con las escaleras reales (tres copias iguales) | `reglas_precios_v1.md` |
+| 11 guías rápidas alineadas, iguales en ambas carpetas | `guia_rapida_*_compacta.md` |
+| Generadores de tarifarios y tarifarios docx/html regenerados | `generar_tarifarios*.py`, `generar_tarifario_escuelas.py` |
+| Script de revisión con reglas nuevas; omite precios especiales en caja; 0 inconsistencias | `revisar_precios_postgres.py` |
+
+Cambios de escalera más relevantes: suéter oficial (299 / 315 / 325 / 335 en primaria; 355 en tallas 40–44), chalecos oficiales 249–309, pantalones de vestir con escalón cada dos tallas (gris claro/obscuro +14), faldas básicas divididas en Gales y Escolar, pants 2pz deportivo preescolar 415/515, chamarra punto adulto plana en 395, boina 85, bata manga larga 365.
+
+**Precios especiales en caja (confirmar si son intencionales):** CBTIS 148 en 200 (suéter y camisa), 150 (playera) y 300 (pants 2pz); Vicente Guerrero y Margarita Paz Paredes en 89; pants 2pz liso infantil 175/190; bata manga larga 365 por debajo de la manga corta 395.
+
+Quedan 27 SKUs en `productos.db` sin SKU en la caja (casi todos chamarras deportivas talla 4 y 6 a 335): decidir si se dan de alta en el POS o se retiran del Gestor.
