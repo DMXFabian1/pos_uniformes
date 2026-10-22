@@ -300,12 +300,24 @@ def page_playeras(doc: Document) -> None:
         ("Preescolar", ["Tallas", "Precio"],
          [["2, 4, 6, 8, 10", "$175"], ["12, 14, 16", "$199"], ["CH, MD, GD, EXG", "$219"]]),
         ("Primaria", ["Tallas", "Precio"],
-         [["4, 6, 8, 10", "$199"], ["12, 14, 16", "$209"], ["CH, MD, GD, EXG", "$219"]]),
+         [["4, 6, 8, 10", "$199"], ["12, 14, 16", "$209"], ["CH", "$219"], ["MD", "$225"], ["GD, EXG", "$235"]]),
         ("Secundaria", ["Tallas", "Precio"],
          [["12, 14, 16", "$229"], ["CH, MD, GD, EXG", "$239"]]),
         ("Bachillerato", ["Tallas", "Precio"],
          [["12, 14, 16", "$229"], ["CH, MD, GD, EXG", "$239"]]),
     ], n_cols=4)
+
+    columns_layout(doc, [
+        ("Polos por escuela", ["Escuela", "Tallas", "Precio"],
+         [["Conalep · SABES (Bachillerato)", "Línea completa", "$239"]]),
+        ("Precios especiales en caja", ["Escuela", "Tallas", "Precio"],
+         [["CBTIS 148 · Deportiva Ad hoc", "Línea completa", "$150"],
+          ["Vicente Guerrero · Playera Blanca", "4", "$89"],
+          ["José María Morelos y Pavón · Polo", "18", "$199"],
+          ["ESTV 663 · Polo", "32", "$219"]]),
+    ], n_cols=2, exception=True)
+
+    note_line(doc, "Los polos por escuela siguen la escalera de su nivel.")
     note_line(doc, "Si una playera ya tiene precio mayor marcado, se respeta.")
 
 
@@ -314,26 +326,24 @@ def page_sueteres(doc: Document) -> None:
     columns_layout(doc, [
         ("Básico", ["Tallas", "Precio"],
          [["4, 6, 8", "$289"], ["10, 12, 14, 16", "$299"],
-          ["30, 32, 34", "$309"], ["36, 38, 40, 42", "$315"], ["44, 46", "$325"]]),
+          ["28, 30, 32, 34", "$309"], ["36, 38, 40, 42", "$315"], ["44, 46", "$325"]]),
         ("Oficial Preescolar", ["Tallas", "Precio"],
-         [["4, 6, 8, 10", "$290"]]),
+         [["4, 6, 8, 10", "$299"]]),
         ("Oficial Primaria", ["Tallas", "Precio"],
-         [["4, 6, 8, 10", "$290"], ["12, 14, 16", "$315"], ["30–42", "$325"]]),
+         [["4, 6, 8, 10", "$299"], ["12, 14, 16", "$315"], ["18, 30–38", "$325"], ["40, 42", "$335"]]),
         ("Oficial Secundaria", ["Tallas", "Precio"],
-         [["12, 14, 16", "$325"], ["30–44", "$345"]]),
+         [["12, 14, 16, 18", "$325"], ["30–38", "$345"], ["40, 42, 44", "$355"]]),
         ("Oficial Bachillerato", ["Tallas", "Precio"],
-         [["14, 16", "$325"], ["32, 34", "$335"], ["36, 38", "$345"], ["40, 42, 44", "$355"]]),
+         [["14, 16", "$325"], ["32–38", "$345"], ["40, 42, 44", "$355"]]),
     ], n_cols=3)
 
     columns_layout(doc, [
         ("Excepciones — Preescolar", ["Escuela", "Tallas", "Precio"],
          [["Margarita Paz Paredes", "4, 6, 8, 10", "$315"]]),
-        ("Excepciones — Primaria", ["Escuela", "Tallas", "Precio"],
-         [["Benito Juárez", "40, 42", "$335"], ["Colegio Motolinea", "40", "$335"],
-          ["Francisco Villa", "40", "$335"], ["Ignacio Allende", "40", "$335"],
-          ["Miguel Hidalgo", "40, 42", "$335"]]),
         ("Excepciones — Bachillerato", ["Escuela", "Tallas", "Precio"],
          [["UVEG", "14, 16", "$355"], ["UVEG", "32–38", "$365"], ["UVEG", "40, 42", "$375"]]),
+        ("Precios especiales en caja", ["Escuela", "Tallas", "Precio"],
+         [["CBTIS 148 (B y V)", "Línea completa", "$200"]]),
     ], n_cols=3, exception=True)
 
     note_line(doc, "Suéter Oferta Ad hoc Talla Uni se maneja aparte a $199.")
@@ -353,7 +363,7 @@ def page_chamarras(doc: Document) -> None:
           ["14, 16", "$215"], ["28, CH, MD, GD, EXG", "$235"]]),
         ("Básica Punto", ["Tallas", "Precio"],
          [["2, 4, 6, 8", "$275"], ["10, 12, 14, 16", "$295"],
-          ["28, CH", "$385"], ["MD", "$395"], ["GD", "$405"], ["EXG", "$415"]]),
+          ["28, CH", "$385"], ["MD, GD, EXG", "$395"]]),
     ], n_cols=3)
     note_line(doc, "No heredar precios de Chamarra Básica a Chamarra Deportiva.")
     note_line(doc, "Si una prenda ya tiene precio mayor marcado, se respeta.")
@@ -364,30 +374,26 @@ def page_chalecos(doc: Document) -> None:
     columns_layout(doc, [
         ("Básico", ["Tallas", "Precio"],
          [["4, 6, 8", "$229"], ["10, 12, 14, 16", "$239"],
-          ["28, 30, 32, 34", "$259"], ["36–46", "$269"]]),
+          ["28, 30, 32, 34", "$259"], ["36, 38, 40", "$269"], ["42, 44, 46", "$289"]]),
         ("Oficial Primaria", ["Tallas", "Precio"],
-         [["2, 4, 6, 8", "$240"], ["10, 12", "$245"], ["14, 16", "$250"],
-          ["32–42, CH–EXG", "$270"]]),
+         [["2, 4, 6, 8", "$249"], ["10, 12, 14, 16", "$269"], ["32, 34", "$289"],
+          ["36, 38, 40", "$299"], ["42", "$309"]]),
         ("Oficial Secundaria", ["Tallas", "Precio"],
-         [["12, 14, 16", "$245"], ["30, 32, 34", "$265"], ["36–44", "$275"]]),
+         [["12, 14, 16", "$269"], ["30, 32, 34", "$289"], ["36, 38, 40", "$299"], ["42, 44", "$309"]]),
         ("Oficial Bachillerato", ["Tallas", "Precio"],
-         [["14, 16", "$265"], ["32, 34", "$275"], ["36–42", "$285"], ["44", "$295"]]),
+         [["14, 16", "$269"], ["32, 34", "$289"], ["36, 38, 40", "$299"], ["42, 44", "$309"]]),
     ], n_cols=4)
 
     columns_layout(doc, [
-        ("Excepciones — Primaria (1/2)", ["Escuela", "Tallas", "Precio"],
-         [["Huizache", "6, 8", "$240"], ["Huizache", "10, 12", "$245"],
-          ["Huizache", "14, 16", "$250"], ["Huizache", "34, 36", "$270"],
-          ["Albino García Ramos", "36–42", "$290"]]),
-        ("Excepciones — Primaria (2/2)", ["Escuela", "Tallas", "Precio"],
-         [["Francisco Villa", "10, 12", "$250"], ["Francisco Villa", "14, 16", "$260"],
-          ["Francisco Villa", "34, 36", "$290"], ["Francisco Villa", "38, 40", "$300"],
-          ["Justo Sierra", "36", "$275"], ["Justo Sierra", "38", "$280"],
-          ["Miguel Campuzano", "34", "$280"], ["Miguel Hidalgo", "36, 38", "$275"],
-          ["Miguel Hidalgo", "40, 42", "$285"]]),
+        ("Colegio Motolinea", ["Tallas", "Precio"],
+         [["4, 6, 8", "$249"], ["10, 12, 14, 16", "$269"],
+          ["CH, MD", "$299"], ["GD, EXG", "$309"]]),
+        ("Huizache", ["Tallas", "Precio"],
+         [["6, 8", "$249"], ["10, 12, 14, 16", "$269"], ["34", "$289"], ["36", "$299"]]),
     ], n_cols=2, exception=True)
 
-    note_line(doc, "Huizache se normaliza con la escalera de Chaleco Oficial Primaria.")
+    note_line(doc, "Primaria estándar: Albino García Ramos, Francisco Villa, Himno Nacional, Ignacio Allende, "
+                   "Ignacio Zaragoza, Justo Sierra, Miguel Campuzano, Miguel Hidalgo.")
 
 
 def page_camisas(doc: Document) -> None:
@@ -419,7 +425,7 @@ def page_camisas(doc: Document) -> None:
         ("Excepciones por escuela", ["Escuela", "Línea", "Precio"],
          [["Francisco Villa", "Oficial Primaria", "215 / 225 / 245"],
           ["Bicentenario", "Oficial Secundaria", "$265"],
-          ["CBTIS 148", "Oficial Bachillerato", "$265"],
+          ["CBTIS 148", "Oficial Bachillerato", "$200 · especial en caja"],
           ["Conalep", "Oficial Escolar", "$265"]]),
     ], n_cols=1, exception=True)
 
@@ -429,30 +435,44 @@ def page_camisas(doc: Document) -> None:
 def page_pants_2pz(doc: Document) -> None:
     page_banner(doc, "Pants 2 Piezas y 3 Piezas")
     columns_layout(doc, [
-        ("Preescolar", ["Tallas", "2 pzas", "3 pzas"],
-         [["2, 4, 6, 8, 10", "$445", "$545"]]),
-        ("Primaria", ["Tallas", "2 pzas", "3 pzas"],
+        ("Liso · Az. Marino, Az. Rey, Rojo, Verde, Vino", ["Tallas", "Precio"],
+         [["2–12", "$175"], ["14, 16", "$190"], ["28, CH", "$315"],
+          ["MD", "$325"], ["GD", "$335"], ["EXG", "$345"]]),
+        ("Liso · Doble Raya", ["Tallas", "Precio"],
+         [["2, 4, 6, 8", "$250"], ["10, 12, 14, 16", "$265"], ["28, CH", "$315"],
+          ["MD", "$325"], ["GD", "$335"], ["EXG", "$345"]]),
+        ("Punto · todos los colores", ["Tallas", "Precio"],
+         [["2, 4, 6, 8", "$475"], ["10, 12, 14, 16", "$495"], ["28, CH", "$525"],
+          ["MD", "$535"], ["GD", "$545"], ["EXG", "$555"]]),
+        ("Algodón Azul Marino", ["Tallas", "Precio"],
+         [["4, 6, 8", "$260"], ["10, 12", "$265"], ["14, 16", "$275"]]),
+    ], n_cols=4)
+
+    columns_layout(doc, [
+        ("Deportivo Preescolar", ["Tallas", "2 pzas", "3 pzas"],
+         [["2, 4, 6, 8, 10", "$415", "$515"]]),
+        ("Deportivo Primaria", ["Tallas", "2 pzas", "3 pzas"],
          [["4, 6, 8, 10, 12", "$485", "$585"],
-          ["14, 16", "$495", "$595"],
-          ["CH, MD, GD", "$585", "$685"]]),
-        ("Secundaria", ["Tallas", "2 pzas", "3 pzas"],
+          ["14, 16, 18", "$495", "$595"],
+          ["CH, MD", "$585", "$685"], ["GD", "$595", "$695"]]),
+        ("Deportivo Secundaria", ["Tallas", "2 pzas", "3 pzas"],
          [["10, 12", "$595", "$695"], ["14, 16", "$605", "$705"],
           ["CH, MD, GD, EXG", "$615", "$715"]]),
-        ("Bachillerato", ["Tallas", "2 pzas", "3 pzas"],
+        ("Deportivo Bachillerato", ["Tallas", "2 pzas", "3 pzas"],
          [["16", "$615", "$715"], ["CH, MD, GD, EXG", "$615", "$715"]]),
     ], n_cols=4)
 
     columns_layout(doc, [
-        ("Excepciones — Preescolar", ["Escuela", "2 pzas", "3 pzas"],
-         [["Sor Juana Inés de la Cruz", "$515", "—"]]),
         ("Excepciones — Primaria", ["Escuela", "2 pzas", "3 pzas"],
-         [["Adolfo Lopez Mateo", "575/585/595", "—"],
-          ["Colegio Motolinea", "595/630/640/650", "695/730/740/750"]]),
+         [["Colegio Motolinea", "595/630/640/650", "695/730/740/750"]]),
         ("Excepciones — Sec. / Bach.", ["Escuela", "2 pzas", "3 pzas"],
          [["Telesecundaria 454", "$650", "$750"],
           ["Telesecundaria 512", "$650", "$750"],
           ["CECYTE", "$650", "$750"], ["Conalep", "$650", "$750"],
-          ["UVEG", "$650", "$750"]]),
+          ["UVEG", "$690", "$790"]]),
+        ("Precios especiales en caja", ["Escuela", "Tallas", "2 pzas"],
+         [["CBTIS 148", "Línea completa", "$300"],
+          ["Vicente Guerrero", "4, 6, 8", "$89"]]),
     ], n_cols=3, exception=True)
 
 
@@ -465,7 +485,10 @@ def page_pants_suelto(doc: Document) -> None:
         ("Punto", ["Tallas", "Precio"],
          [["2, 4, 6, 8", "$249"], ["10, 12, 14, 16", "$269"],
           ["28, CH", "$309"], ["MD, GD", "$319"], ["EXG", "$339"]]),
-    ], n_cols=2)
+        ("Por escuela (Deportivo)", ["Nivel", "Escuelas", "Precio"],
+         [["Preescolar", "Frida Kahlo, Margarita Paz Paredes, Patria, Álvaro Obregón", "$239"],
+          ["Bachillerato", "CBTIS 148, Conalep, SABES, UVEG", "$289"]]),
+    ], n_cols=3)
     note_line(doc, "Liso y Punto son familias distintas — no mezclar escaleras.")
 
 
@@ -475,34 +498,28 @@ def page_faldas(doc: Document) -> None:
         ("Gales (Azul, Rojo, Verde)", ["Tallas", "Precio"],
          [["2, 4, 6, 8", "$195"], ["10, 12", "$205"], ["14, 16", "$215"],
           ["28, 30, 32, 34", "$225"], ["36, 38, 40, 42", "$235"], ["44", "$245"]]),
-        ("Vino", ["Tallas", "Precio"],
-         [["4, 6, 8", "$199"], ["10, 12", "$205"], ["14, 16", "$215"],
-          ["28, 30, 32, 34", "$225"], ["36", "$235"]]),
+        ("Escolar Azul Marino · Cuatro Tablas · Vino", ["Tallas", "Precio"],
+         [["2–14", "$195"], ["16, 18, 20, 28, 30", "$205"],
+          ["32, 34", "$215"], ["36, 38", "$225"], ["40, 42", "$235"]]),
         ("Escocés", ["Tallas", "Precio"],
-         [["2, 4, 6, 8", "$205"], ["10, 12, 14, 16", "$215"],
+         [["2, 4, 6, 8", "$215"], ["10, 12, 14, 16", "$235"],
           ["28, 30, 32, 34", "$245"], ["36, 38", "$255"], ["40, 42", "$265"]]),
         ("Gris (Claro y Obscuro)", ["Tallas", "Precio"],
          [["4–16", "$265"], ["28, 30, 32, 34", "$275"],
           ["36, 38", "$285"], ["40, 42", "$295"]]),
-        ("Cuatro Tablas", ["Tallas", "Precio"],
-         [["2, 4, 6, 8", "$195"], ["10, 12, 14, 16", "$205"],
-          ["28, 30, 32, 34", "$225"], ["36, 38, 40, 42", "$235"]]),
-        ("Escolar Azul Marino", ["Tallas", "Precio"],
-         [["2–16", "$195"], ["18, 20, 28, 30", "$205"],
-          ["32, 34", "$215"], ["36, 38", "$225"], ["40, 42", "$235"]]),
         ("Pgallo Café", ["Tallas", "Precio"],
-         [["12, 14, 16", "$205"], ["28–34", "$245"], ["36–42", "$255"]]),
-        ("Oficial Escolar (genérica)", ["Tallas", "Precio"],
-         [["12", "$205"], ["14, 16", "$215"], ["28–34", "$245"], ["36–42", "$255"]]),
-    ], n_cols=4)
+         [["12", "$219"], ["14, 16", "$229"], ["28–34", "$249"], ["36–42", "$259"]]),
+        ("Oficial Preescolar Azul", ["Tallas", "Precio"],
+         [["Línea completa", "$239"]]),
+    ], n_cols=3)
 
     columns_layout(doc, [
-        ("Excepciones por escuela", ["Escuela", "Tallas", "Precio"],
-         [["Colegio Motolinea", "4–8 / 10–12 / 14–16 / 28–34 / 36–38",
-           "205/215/225/245/255"],
-          ["SABES", "10–16 / 28–34 / 36–38 / 40–42", "270/275/285/295"],
-          ["Conalep", "14–16 / 28–34 / 36–42", "280/285/295"],
-          ["Margarita Paz Paredes", "4, 6, 8 Preescolar", "$239"]]),
+        ("Por escuela", ["Escuela", "Tallas", "Precio"],
+         [["Colegio Motolinea · Pata de gallo", "4–8 / 10–12 / 14–16 / 28–34 / 36–38",
+           "209/219/229/249/259"],
+          ["SABES", "10–34 / 36–42", "285/295"],
+          ["Conalep · Escocés", "14–34 / 36–42", "285/295"],
+          ["Margarita Paz Paredes · Preescolar (especial en caja)", "4, 6, 8", "$89"]]),
     ], n_cols=1, exception=True)
 
     note_line(doc, "Las faldas por escuela siempre deben estar por encima de la línea genérica.")
@@ -522,7 +539,7 @@ def page_jumper_malla_bata(doc: Document) -> None:
         ("Bata", ["Tipo", "Tallas", "Precio"],
          [["Infantil", "Uni", "$65"],
           ["Manga Corta", "12–46", "$395"],
-          ["Manga Larga", "12–46", "$439"]]),
+          ["Manga Larga", "12–46", "$365"]]),
     ], n_cols=3)
     note_line(doc, "Si una pieza ya tiene precio mayor marcado, se respeta.")
 
@@ -533,7 +550,7 @@ def page_accesorios(doc: Document) -> None:
         ("Accesorios", ["Pieza", "Precio"],
          [["Calceta Escolar", "$49"], ["Guante Escolta", "$49"],
           ["Corbata", "$70"], ["Corbatín", "$70"],
-          ["Moño", "$70"], ["Boina Escolta", "$80"]]),
+          ["Moño", "$70"], ["Boina Escolta", "$85"]]),
         ("Playera Polo Blanca", ["Tallas", "Precio"],
          [["2, 4, 6, 8", "$135"], ["10, 12", "$145"],
           ["14, 16, 18", "$155"], ["28, 30, 32, 34, 36, 38", "$170"],

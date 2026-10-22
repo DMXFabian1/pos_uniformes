@@ -82,7 +82,9 @@ for _nivel, _grupos in [
     ("Primaria", [
         (["4","6","8","10"], 199),
         (["12","14","16"], 209),
-        (["CH","MD","GD","EXG"], 219),
+        (["CH"], 219),
+        (["MD"], 225),
+        (["GD","EXG"], 235),
     ]),
     ("Secundaria", [
         (["12","14","16"], 229),
@@ -114,7 +116,7 @@ class _SueterBasicoRegla(Regla):
 REGLAS_SUETER_BASICO = [
     _SueterBasicoRegla(["4","6","8"], 289),
     _SueterBasicoRegla(["10","12","14","16"], 299),
-    _SueterBasicoRegla(["30","32","34"], 309),
+    _SueterBasicoRegla(["28","30","32","34"], 309),
     _SueterBasicoRegla(["36","38","40","42"], 315),
     _SueterBasicoRegla(["44","46"], 325),
 ]
@@ -141,21 +143,24 @@ class _SueterOficialRegla(Regla):
         return r.talla in self._tallas
 
 REGLAS_SUETER_OFICIAL = [
-    _SueterOficialRegla("Preescolar", ["4","6","8","10"], 290),
-    _SueterOficialRegla("Primaria",   ["4","6","8","10"], 290),
+    _SueterOficialRegla("Preescolar", ["4","6","8","10"], 299),
+    _SueterOficialRegla("Primaria",   ["4","6","8","10"], 299),
     _SueterOficialRegla("Primaria",   ["12","14","16"], 315),
-    _SueterOficialRegla("Primaria",   ["30","32","34","36","38","40","42"], 325),
-    _SueterOficialRegla("Secundaria", ["12","14","16"], 325),
-    _SueterOficialRegla("Secundaria", ["30","32","34","36","38","40","42","44"], 345),
+    _SueterOficialRegla("Primaria",   ["18","30","32","34","36","38"], 325),
+    _SueterOficialRegla("Primaria",   ["40","42"], 335),
+    _SueterOficialRegla("Secundaria", ["12","14","16","18"], 325),
+    _SueterOficialRegla("Secundaria", ["30","32","34","36","38"], 345),
+    _SueterOficialRegla("Secundaria", ["40","42","44"], 355),
     _SueterOficialRegla("Bachillerato", ["14","16"], 325),
-    _SueterOficialRegla("Bachillerato", ["32","34"], 335),
-    _SueterOficialRegla("Bachillerato", ["36","38"], 345),
+    _SueterOficialRegla("Bachillerato", ["32","34","36","38"], 345),
     _SueterOficialRegla("Bachillerato", ["40","42","44"], 355),
-    # UVEG excepción
+    # Excepciones
+    _SueterOficialRegla("Preescolar", ["4","6","8","10"], 315, "Margarita Paz Paredes"),
     _SueterOficialRegla("Bachillerato", ["14","16"], 355, "UVEG"),
     _SueterOficialRegla("Bachillerato", ["32","34","36","38"], 365, "UVEG"),
     _SueterOficialRegla("Bachillerato", ["40","42"], 375, "UVEG"),
 ]
+
 
 
 # ── 4. Camisas Básicas ───────────────────────────────────────────────────────
@@ -239,7 +244,8 @@ REGLAS_CHALECO_BASICO = [
     _ChalecoBasicoRegla(["4","6","8"], 229),
     _ChalecoBasicoRegla(["10","12","14","16"], 239),
     _ChalecoBasicoRegla(["28","30","32","34"], 259),
-    _ChalecoBasicoRegla(["36","38","40","42","44","46"], 269),
+    _ChalecoBasicoRegla(["36","38","40"], 269),
+    _ChalecoBasicoRegla(["42","44","46"], 289),
 ]
 
 class _ChalecoOficialRegla(Regla):
@@ -256,21 +262,21 @@ class _ChalecoOficialRegla(Regla):
         )
 
 REGLAS_CHALECO_OFICIAL = [
-    _ChalecoOficialRegla("Primaria", ["2","4","6","8"], 240),
-    _ChalecoOficialRegla("Primaria", ["10","12"], 250),
-    _ChalecoOficialRegla("Primaria", ["14","16"], 260),
-    _ChalecoOficialRegla("Primaria", ["32"], 270),
-    _ChalecoOficialRegla("Primaria", ["34","36"], 290),
-    _ChalecoOficialRegla("Primaria", ["38","40"], 300),
-    _ChalecoOficialRegla("Primaria", ["42","CH","MD","GD","EXG"], 290),
-    _ChalecoOficialRegla("Secundaria", ["12","14","16"], 245),
-    _ChalecoOficialRegla("Secundaria", ["30","32","34"], 265),
-    _ChalecoOficialRegla("Secundaria", ["36","38","40","42","44"], 275),
-    _ChalecoOficialRegla("Bachillerato", ["14","16"], 265),
-    _ChalecoOficialRegla("Bachillerato", ["32","34"], 275),
-    _ChalecoOficialRegla("Bachillerato", ["36","38","40","42"], 285),
-    _ChalecoOficialRegla("Bachillerato", ["44"], 295),
+    _ChalecoOficialRegla("Primaria", ["2","4","6","8"], 249),
+    _ChalecoOficialRegla("Primaria", ["10","12","14","16"], 269),
+    _ChalecoOficialRegla("Primaria", ["32","34"], 289),
+    _ChalecoOficialRegla("Primaria", ["36","38","40","CH","MD"], 299),
+    _ChalecoOficialRegla("Primaria", ["42","GD","EXG"], 309),
+    _ChalecoOficialRegla("Secundaria", ["12","14","16"], 269),
+    _ChalecoOficialRegla("Secundaria", ["30","32","34"], 289),
+    _ChalecoOficialRegla("Secundaria", ["36","38","40"], 299),
+    _ChalecoOficialRegla("Secundaria", ["42","44"], 309),
+    _ChalecoOficialRegla("Bachillerato", ["14","16"], 269),
+    _ChalecoOficialRegla("Bachillerato", ["32","34"], 289),
+    _ChalecoOficialRegla("Bachillerato", ["36","38","40"], 299),
+    _ChalecoOficialRegla("Bachillerato", ["42","44"], 309),
 ]
+
 
 
 # ── 6. Faldas ────────────────────────────────────────────────────────────────
@@ -286,16 +292,22 @@ class _FaldaBasicaRegla(Regla):
         nombre = (r.nombre_prod or "").lower()
         return any(f in nombre for f in self._frags) and r.talla in self._tallas
 
-_FALDAS_ESTANDAR_FRAGS = [
-    "falda escolar azul marino", "falda gales azul", "falda gales rojo",
-    "falda gales verde", "falda cuatro tablas", "falda vino",
-]
+_FALDAS_GALES_FRAGS = ["falda gales azul", "falda gales rojo", "falda gales verde"]
+_FALDAS_ESCOLAR_FRAGS = ["falda escolar azul marino", "falda cuatro tablas", "falda vino"]
 REGLAS_FALDA_BASICA = [
-    _FaldaBasicaRegla(_FALDAS_ESTANDAR_FRAGS, ["2","4","6","8"], 195),
-    _FaldaBasicaRegla(_FALDAS_ESTANDAR_FRAGS, ["10","12","14","16"], 205),
-    _FaldaBasicaRegla(_FALDAS_ESTANDAR_FRAGS, ["18","20","28","30","32","34"], 225),
-    _FaldaBasicaRegla(_FALDAS_ESTANDAR_FRAGS, ["36","38","40","42"], 235),
-    _FaldaBasicaRegla(_FALDAS_ESTANDAR_FRAGS, ["44"], 245),
+    # Línea Gales
+    _FaldaBasicaRegla(_FALDAS_GALES_FRAGS, ["2","4","6","8"], 195),
+    _FaldaBasicaRegla(_FALDAS_GALES_FRAGS, ["10","12"], 205),
+    _FaldaBasicaRegla(_FALDAS_GALES_FRAGS, ["14","16"], 215),
+    _FaldaBasicaRegla(_FALDAS_GALES_FRAGS, ["28","30","32","34"], 225),
+    _FaldaBasicaRegla(_FALDAS_GALES_FRAGS, ["36","38","40","42"], 235),
+    _FaldaBasicaRegla(_FALDAS_GALES_FRAGS, ["44"], 245),
+    # Línea Escolar (Azul Marino, Cuatro tablas, Vino)
+    _FaldaBasicaRegla(_FALDAS_ESCOLAR_FRAGS, ["2","4","6","8","10","12","14"], 195),
+    _FaldaBasicaRegla(_FALDAS_ESCOLAR_FRAGS, ["16","18","20","28","30"], 205),
+    _FaldaBasicaRegla(_FALDAS_ESCOLAR_FRAGS, ["32","34"], 215),
+    _FaldaBasicaRegla(_FALDAS_ESCOLAR_FRAGS, ["36","38"], 225),
+    _FaldaBasicaRegla(_FALDAS_ESCOLAR_FRAGS, ["40","42"], 235),
     _FaldaBasicaRegla(["falda escoces"], ["2","4","6","8"], 215),
     _FaldaBasicaRegla(["falda escoces"], ["10","12","14","16"], 235),
     _FaldaBasicaRegla(["falda escoces"], ["28","30","32","34"], 245),
@@ -308,45 +320,69 @@ REGLAS_FALDA_BASICA = [
 ]
 
 
+
 # ── 7. Pantalón Básico ───────────────────────────────────────────────────────
 
 class _PantalonBasicoRegla(Regla):
-    def __init__(self, familia_frags, tallas, precio):
+    def __init__(self, familia_frags, tallas, precio, excluir=()):
         super().__init__(f"Pantalón Básico {familia_frags} {tallas}", precio)
         self._frags = [f.lower() for f in familia_frags]
+        self._excluir = [f.lower() for f in excluir]
         self._tallas = set(tallas)
     def aplica(self, r):
         if r.tipo_pieza != "Pantalón" or r.tipo_prenda != "Básico":
             return False
         nombre = (r.nombre_prod or "").lower()
+        if any(f in nombre for f in self._excluir):
+            return False
         return any(f in nombre for f in self._frags) and r.talla in self._tallas
 
+_VESTIR = ["pantalón vestir", "pantalon vestir"]
+_VESTIR_EXCL = ["gris claro", "gris obscuro", "pata de gallo"]
+_VESTIR_GRIS = ["vestir gris claro", "vestir gris obscuro"]
+_GALES = ["pantalón gales", "pantalon gales"]
 REGLAS_PANTALON_BASICO = [
-    # Vestir / Gales
-    _PantalonBasicoRegla(["pantalón vestir","pantalon vestir","pantalón gales","pantalon gales"],
-        ["2","4","6","8"], 235),
-    _PantalonBasicoRegla(["pantalón vestir","pantalon vestir","pantalón gales","pantalon gales"],
-        ["10","12","14","16"], 245),
-    _PantalonBasicoRegla(["pantalón vestir","pantalon vestir","pantalón gales","pantalon gales"],
-        ["18","20","28","30"], 265),
-    _PantalonBasicoRegla(["pantalón vestir","pantalon vestir","pantalón gales","pantalon gales"],
-        ["32","34"], 285),
-    _PantalonBasicoRegla(["pantalón vestir","pantalon vestir","pantalón gales","pantalon gales"],
-        ["36","38","40","42"], 295),
-    _PantalonBasicoRegla(["pantalón vestir","pantalon vestir","pantalón gales","pantalon gales"],
-        ["44"], 315),
+    # Vestir colores estándar
+    _PantalonBasicoRegla(_VESTIR, ["2","4","6","8"], 235, _VESTIR_EXCL),
+    _PantalonBasicoRegla(_VESTIR, ["10","12"], 245, _VESTIR_EXCL),
+    _PantalonBasicoRegla(_VESTIR, ["14","16"], 255, _VESTIR_EXCL),
+    _PantalonBasicoRegla(_VESTIR, ["18","20"], 265, _VESTIR_EXCL),
+    _PantalonBasicoRegla(_VESTIR, ["28","30"], 275, _VESTIR_EXCL),
+    _PantalonBasicoRegla(_VESTIR, ["32","34"], 285, _VESTIR_EXCL),
+    _PantalonBasicoRegla(_VESTIR, ["36","38"], 295, _VESTIR_EXCL),
+    _PantalonBasicoRegla(_VESTIR, ["40","42","44"], 315, _VESTIR_EXCL),
+    # Vestir Gris claro / obscuro (+14)
+    _PantalonBasicoRegla(_VESTIR_GRIS, ["4","6","8"], 249),
+    _PantalonBasicoRegla(_VESTIR_GRIS, ["10","12"], 259),
+    _PantalonBasicoRegla(_VESTIR_GRIS, ["14","16"], 269),
+    _PantalonBasicoRegla(_VESTIR_GRIS, ["18","20"], 279),
+    _PantalonBasicoRegla(_VESTIR_GRIS, ["28","30"], 289),
+    _PantalonBasicoRegla(_VESTIR_GRIS, ["32","34"], 299),
+    _PantalonBasicoRegla(_VESTIR_GRIS, ["36","38"], 309),
+    _PantalonBasicoRegla(_VESTIR_GRIS, ["40","42","44"], 329),
+    # Gales
+    _PantalonBasicoRegla(_GALES, ["2","4","5","6","8"], 235),
+    _PantalonBasicoRegla(_GALES, ["10","12","14","16"], 245),
+    _PantalonBasicoRegla(_GALES, ["18","20","28","30"], 265),
+    _PantalonBasicoRegla(_GALES, ["32","34"], 285),
+    _PantalonBasicoRegla(_GALES, ["36","38"], 295),
+    _PantalonBasicoRegla(_GALES, ["40","42","44"], 315),
     # Escoces
-    _PantalonBasicoRegla(["escoces"], ["3","4","6","8"], 199),
-    _PantalonBasicoRegla(["escoces"], ["10","12","14","16"], 235),
-    _PantalonBasicoRegla(["escoces"], ["28","30","32"], 265),
+    _PantalonBasicoRegla(["escoces"], ["2","3","4","6","8"], 199),
+    _PantalonBasicoRegla(["escoces"], ["10","12","14","16"], 239),
+    _PantalonBasicoRegla(["escoces"], ["28","30","32"], 269),
     # Gabardina
     _PantalonBasicoRegla(["gabardina negro"],
         ["2","4","6","8","10","12","14","16"], 219),
-    # Pata de gallo
-    _PantalonBasicoRegla(["pata de gallo"], ["4","6","8","10","12","14","16"], 235),
-    _PantalonBasicoRegla(["pata de gallo"], ["20","28","30","32"], 245),
-    _PantalonBasicoRegla(["pata de gallo"], ["34","36","38","40","42"], 255),
+    # Vestir Pata de gallo
+    _PantalonBasicoRegla(["pata de gallo"], ["4","6","8"], 235),
+    _PantalonBasicoRegla(["pata de gallo"], ["10","12","14","16"], 245),
+    _PantalonBasicoRegla(["pata de gallo"], ["20","28","30"], 265),
+    _PantalonBasicoRegla(["pata de gallo"], ["32","34"], 285),
+    _PantalonBasicoRegla(["pata de gallo"], ["36","38"], 295),
+    _PantalonBasicoRegla(["pata de gallo"], ["40","42"], 315),
 ]
+
 
 
 # ── 7B. Pantalón Oficial ─────────────────────────────────────────────────────
@@ -410,9 +446,7 @@ REGLAS_CHAMARRA_BASICA = [
     _ChamarraBasicaRegla("chamarra punto", ["2","4","6","8"], 275),
     _ChamarraBasicaRegla("chamarra punto", ["10","12","14","16"], 295),
     _ChamarraBasicaRegla("chamarra punto", ["28","CH"], 385),
-    _ChamarraBasicaRegla("chamarra punto", ["MD"], 395),
-    _ChamarraBasicaRegla("chamarra punto", ["GD"], 405),
-    _ChamarraBasicaRegla("chamarra punto", ["EXG"], 415),
+    _ChamarraBasicaRegla("chamarra punto", ["MD","GD","EXG"], 395),
 ]
 
 class _ChamarraDeportivaRegla(Regla):
@@ -452,11 +486,12 @@ class _PantsRegla(Regla):
 
 REGLAS_PANTS = []
 for _nivel, _grupos in [
-    ("Preescolar", [(["2","4","6","8","10"], 445, 545)]),
+    ("Preescolar", [(["2","4","6","8","10"], 415, 515)]),
     ("Primaria", [
         (["4","6","8","10","12"], 485, 585),
-        (["14","16"], 495, 595),
-        (["CH","MD","GD"], 585, 685),
+        (["14","16","18"], 495, 595),
+        (["CH","MD"], 585, 685),
+        (["GD"], 595, 695),
     ]),
     ("Secundaria", [
         (["10","12"], 595, 695),
@@ -555,7 +590,7 @@ REGLAS_ACCESORIOS = [
     _AccesorioRegla("Corbata", "", 70),
     _AccesorioRegla("Corbatín","", 70),
     _AccesorioRegla("Moño",    "", 70),
-    _AccesorioRegla("Boina",   "escolta", 80),
+    _AccesorioRegla("Boina",   "escolta", 85),
     _PlayeraPoloRegla(["2","4","6","8"], 135),
     _PlayeraPoloRegla(["10","12"], 145),
     _PlayeraPoloRegla(["14","16","18"], 155),
@@ -564,6 +599,31 @@ REGLAS_ACCESORIOS = [
     _PlayeraPoloRegla(["CH","MD"], 185),
     _PlayeraPoloRegla(["GD","EXG"], 195),
 ]
+
+
+# ── Precios especiales en caja ───────────────────────────────────────────────
+# Precios puestos a mano en el POS (ofertas / liquidación). No siguen la escalera
+# de su familia y se omiten de la revisión. Ver reglas_precios_v1.md.
+
+_ESPECIALES = [
+    # (fragmento del nombre, tipo_pieza, tallas o None = todas)
+    ("cbtis 148", "Suéter", None),
+    ("cbtis 148", "Camisa", None),
+    ("cbtis 148", "Playera", None),
+    ("cbtis 148", "Pants 2pz", None),
+    ("vicente guerrero", "Pants 2pz", {"4","6","8"}),
+    ("vicente guerrero", "Playera", {"4"}),
+    ("margarita paz paredes", "Falda", {"4","6","8"}),
+    ("morelos", "Playera", {"18"}),
+    ("estv 663", "Playera", {"32"}),
+]
+
+def es_precio_especial(row) -> bool:
+    nombre = (row.nombre_prod or "").lower()
+    for frag, pieza, tallas in _ESPECIALES:
+        if frag in nombre and row.tipo_pieza == pieza and (tallas is None or row.talla in tallas):
+            return True
+    return False
 
 
 # ── Todas las reglas ─────────────────────────────────────────────────────────
@@ -623,7 +683,9 @@ def main():
         print(f"ERROR conectando a Postgres: {e}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Variantes cargadas: {len(rows)}\n")
+    especiales = [r for r in rows if es_precio_especial(r)]
+    rows = [r for r in rows if not es_precio_especial(r)]
+    print(f"Variantes cargadas: {len(rows)} (+{len(especiales)} con precio especial en caja, omitidas)\n")
 
     inconsistencias = []
 
@@ -692,6 +754,8 @@ def aplicar_correcciones():
 
     inconsistencias = []
     for row in rows:
+        if es_precio_especial(row):
+            continue
         mejor_regla = None
         mejor_objetivo = 0
         for regla in TODAS_LAS_REGLAS:
