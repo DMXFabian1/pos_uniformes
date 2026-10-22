@@ -333,7 +333,7 @@ def page_sueteres(doc: Document) -> None:
           ["Francisco Villa", "40", "$335"], ["Ignacio Allende", "40", "$335"],
           ["Miguel Hidalgo", "40, 42", "$335"]]),
         ("Excepciones — Bachillerato", ["Escuela", "Tallas", "Precio"],
-         [["UVEG", "14, 16, 32–42", "$355"]]),
+         [["UVEG", "14, 16", "$355"], ["UVEG", "32–38", "$365"], ["UVEG", "40, 42", "$375"]]),
     ], n_cols=3, exception=True)
 
     note_line(doc, "Suéter Oferta Ad hoc Talla Uni se maneja aparte a $199.")

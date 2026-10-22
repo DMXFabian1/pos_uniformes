@@ -95,7 +95,7 @@ Aplicar por `tipo_pieza='Suéter'`, `tipo_prenda='Oficial'`, `nivel_educativo` y
 
 Excepcion activa:
 
-- `UVEG` en `Bachillerato` maneja `355` para `14, 16, 32, 34, 36, 38, 40, 42`.
+- `UVEG` en `Bachillerato` maneja `355` para `14, 16`; `365` para `32, 34, 36, 38`; `375` para `40, 42`.
 
 ## 4. Camisas
 

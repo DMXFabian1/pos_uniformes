@@ -45,9 +45,14 @@ Convenciones de las notas:
 | Ignacio Allende B | 12, 14, 16 | 161 | 315 | 49% |
 | Bicentenario V | 14, 16 | 157 | 325 | 52% |
 | Bicentenario B | 14, 16 | 165 | 325 | 49% |
-| UVEG B | 16 | 174 | 345 | 50% |
-| UVEG B | 34, 36, 38 | 184 | 345 | 47% |
-| UVEG B | 40, 42 | 197 | 355 | 45% |
+| UVEG B | 16 | 174 | 355 | 51% |
+| UVEG B | 34, 36, 38 | 184 | 365 | 50% |
+| UVEG B | 40, 42 | 197 | 375 | 47% |
 | Chaleco | 40 | 167 | 269–300 | 38–44% |
 
 Precios de venta tomados de `Gestor_de_Inventarios/data/productos.db`.
+
+### Cambios de precio derivados
+
+- **22-oct-2026 · UVEG:** 14, 16 → 355 (antes 345) · 32–38 → 365 (antes 345) · 40, 42 → 375 (antes 355).
+  El costo sube por talla (174 → 184 → 197) y la venta estaba casi plana.

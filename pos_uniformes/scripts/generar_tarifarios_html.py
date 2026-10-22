@@ -332,7 +332,7 @@ def build_sueteres():
               [["14, 16","$325"],["32, 34","$335"],["36, 38","$345"],["40, 42, 44","$355"]]),
     ) + divider("Excepciones activas") + grid(1,
         block("Bachillerato", ["Escuela", "Tallas", "Precio"],
-              [["UVEG","14, 16, 32–42","$355"]], exc=True),
+              [["UVEG","14, 16","$355"],["UVEG","32–38","$365"],["UVEG","40, 42","$375"]], exc=True),
     ) + notes(
         "Suéter Oferta Ad hoc Talla Uni se maneja aparte a $199.",
         "Oficial Primaria 40-42 aplica a toda escuela salvo excepción registrada.",

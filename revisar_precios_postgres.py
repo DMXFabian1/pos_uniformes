@@ -152,7 +152,9 @@ REGLAS_SUETER_OFICIAL = [
     _SueterOficialRegla("Bachillerato", ["36","38"], 345),
     _SueterOficialRegla("Bachillerato", ["40","42","44"], 355),
     # UVEG excepción
-    _SueterOficialRegla("Bachillerato", ["14","16","32","34","36","38","40","42"], 355, "UVEG"),
+    _SueterOficialRegla("Bachillerato", ["14","16"], 355, "UVEG"),
+    _SueterOficialRegla("Bachillerato", ["32","34","36","38"], 365, "UVEG"),
+    _SueterOficialRegla("Bachillerato", ["40","42"], 375, "UVEG"),
 ]
 
 
