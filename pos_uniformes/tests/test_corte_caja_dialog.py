@@ -184,7 +184,17 @@ class TicketPagarHoyTests(unittest.TestCase):
         self.assertIn("1 falta(s):", texto)
         self.assertIn("-$216.67", texto)
         self.assertIn("TOTAL PAGOS:", texto)
+        self.assertNotIn("Prestamo:", texto)                 # sin préstamo, sin línea
         self.assertIn("$2,511.33", texto)
+
+    def test_el_prestamo_descontado_sale_en_el_ticket(self) -> None:
+        """Stayce, 2026-10-18: 1300 + 166 − 30 = 1436; el −30 no se imprimía."""
+        pagos = [SimpleNamespace(employee_name="Stayce Chavarria", employee_code="VEND-4", total=Decimal("1436.00"), comisiones=83, faltas=0,
+                                 sueldo_base=Decimal("1300.00"), tarifa_comision=Decimal("2.00"), monto_comisiones=Decimal("166.00"),
+                                 descuento_faltas=Decimal("0.00"), descuento_prestamos=Decimal("30.00"))]
+        texto = texto_ticket_corte(_corte(retiros_pagos=Decimal("1436.00")), pagos=pagos, venta_efectivo=Decimal("6660.00"))
+        self.assertIn("Prestamo:", texto)
+        self.assertIn("-$30.00", texto)
 
     def test_previa_encargado(self) -> None:
         estado = EstadoCaja(

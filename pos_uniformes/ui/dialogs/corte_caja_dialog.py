@@ -300,6 +300,11 @@ def _desglose_pago(p, lines: list[str], tk_row) -> None:
     faltas = int(p.faltas or 0)
     if faltas:
         lines.append(tk_row(f"  {faltas} falta(s):", f"-${Decimal(p.descuento_faltas):,.2f}"))
+    # El préstamo sí se restaba del total pero no salía en el papel: la cuenta
+    # del ticket no cerraba a simple vista (Daniel, 2026-10-26).
+    prestamo = Decimal(getattr(p, "descuento_prestamos", 0) or 0)
+    if prestamo:
+        lines.append(tk_row("  Prestamo:", f"-${prestamo:,.2f}"))
 
 
 def texto_estado_caja(estado: EstadoCaja) -> str:
