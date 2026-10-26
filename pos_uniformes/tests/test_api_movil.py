@@ -34,7 +34,7 @@ from pos_uniformes.database.models import (
 )
 
 _TABLAS = (Empleada, EmpleadaHorario, EmpleadaEvento, _m.SolicitudDescanso, _m.AuditoriaAusencias, LibretaCorte, LibretaVenta, CajaParametros, EmpleadaPago, CajaRetiro,
-    PrestamoEmpleada,
+    PrestamoEmpleada, _m.CajaEntrada,
 )
 
 
@@ -776,3 +776,71 @@ class EncargadoMovilTests(unittest.TestCase):
         app.dependency_overrides[get_current_employee] = lambda: (fanny, None)
         r = self.client.get("/api/v1/movil/encargado")
         self.assertEqual(r.status_code, 403)
+
+
+class CorteDelDuenoComoEnLaPCTests(unittest.TestCase):
+    """El corte del celular con el detalle de la PC (2026-10-26): venta en vez
+    de contado, casillas de lo que salió, entrada de papá y pagos de hoy."""
+
+    def setUp(self) -> None:
+        self._base = EncargadoMovilTests()
+        self._base.setUp()
+        self.session, self.client = self._base.session, self._base.client
+
+    def tearDown(self) -> None:
+        self._base.tearDown()
+
+    def test_estado_y_corte_con_todo(self) -> None:
+        from datetime import date, timedelta
+
+        from pos_uniformes.database.models import CajaEntrada, EmpleadaHorario, EmpleadaPago, LibretaCorte
+        from pos_uniformes.services.nomina_service import registrar_pago_con_monto
+        from pos_uniformes.services.retiros_service import registrar_retiro
+
+        self.session.add(CajaParametros(id=1, reactivo_actual=Decimal("1000.00")))
+        # Un pago ya hecho en el periodo (Fanny, VEND-4) y un retiro.
+        pagado = registrar_pago_con_monto(self.session, "VEND-4", creado_por="VEND-1")
+        retiro = registrar_retiro(self.session, monto="100", motivo="Comida", creado_por="VEND-1")
+        # Y a Stayce (VEND-2) le toca cobrar hoy (último pago hace 7 días).
+        self.session.add(Empleada(codigo="VEND-2", nombre_completo="Stayce Chavarria", activo=True))
+        self.session.add(EmpleadaHorario(employee_code="VEND-2", descanso_weekday=1,
+                                         fecha_ultimo_pago=date.today() - timedelta(days=7)))
+        self.session.commit()
+        self._base._como_dueno()
+        with patch("pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"):
+            e = self.client.get("/api/v1/movil/dueno/corte_estado").json()
+            self.assertEqual([p["quien"] for p in e["pagos_hechos"]], ["Fanny"])
+            self.assertTrue(e["pagos_hechos"][0]["en_cajon"])
+            self.assertEqual(e["retiros_hechos"][0]["motivo"], "Comida")
+            self.assertIn("VEND-2", [a["codigo"] for a in e["pagos_hoy"]])
+            fanny = next(a for a in e["pagos_hoy"] if a["codigo"] == "VEND-2")
+            r = self.client.post("/api/v1/movil/dueno/corte", json={
+                "venta": "500", "reactivo_final": "1000", "otros_retiros": "0",
+                "entro": "1750", "entro_motivo": "",
+                "fuera_pagos": [pagado.id],              # a Fanny se le pagó con otro dinero
+                "pagar_hoy": ["VEND-2"],                 # Stayce cobra en este corte
+            })
+        self.assertEqual(r.status_code, 200, r.text)
+        j = r.json()
+        self.assertEqual(j["venta"], "500.00")
+        # 1000 + 500 + 1750 − 100 (retiro) − pago de Stayce (del cajón); el de Fanny no se resta.
+        esperado = Decimal("1000") + Decimal("500") + Decimal("1750") - Decimal("100") - Decimal(fanny["total"])
+        self.assertEqual(Decimal(j["monto"]), esperado.quantize(Decimal("0.01")))
+        self.assertTrue(j["ticket_encolado"])
+        self.session.expire_all()
+        self.assertFalse(self.session.get(EmpleadaPago, pagado.id).en_cajon)
+        entrada = self.session.query(CajaEntrada).one()
+        self.assertEqual((entrada.motivo, entrada.monto), ("Fondo de papá", Decimal("1750.00")))
+        nuevo = self.session.query(EmpleadaPago).filter(EmpleadaPago.employee_code == "VEND-2").one()
+        corte = self.session.query(LibretaCorte).one()
+        self.assertLessEqual(nuevo.created_at.replace(tzinfo=None), corte.hasta.replace(tzinfo=None))  # dentro del periodo
+        self.assertEqual(self.session.get(type(retiro), retiro.id).en_cajon, True)
+
+    def test_sin_venta_ni_contado_lo_dice(self) -> None:
+        self.session.add(CajaParametros(id=1, reactivo_actual=Decimal("1000.00")))
+        self.session.commit()
+        self._base._como_dueno()
+        with patch("pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"):
+            r = self.client.post("/api/v1/movil/dueno/corte", json={"reactivo_final": "1000"})
+        self.assertEqual(r.status_code, 422)
+        self.assertIn("Falta la venta", r.text)

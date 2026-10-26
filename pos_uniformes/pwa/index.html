@@ -356,7 +356,7 @@ body.con-topbar .app{padding-top:calc(58px + env(safe-area-inset-top))}
 const $ = id => document.getElementById(id);
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const DIAS = ["lun","mar","mié","jue","vie","sáb","dom"];
-const PWA_VERSION = "v29";
+const PWA_VERSION = "v30";
 let token = localStorage.getItem("pos_token") || "";
 let calY = 0, calM = 0;
 let rolActual = "", vistaInicio = "", modoServidor = "casa";
@@ -1005,7 +1005,13 @@ async function encPost(ruta, body) {
   const r = await fetch(ruta, {method: "POST",
     headers: {"Content-Type": "application/json", "Authorization": "Bearer " + token},
     body: JSON.stringify(body)});
-  if (!r.ok) throw new Error("post");
+  if (!r.ok) {
+    // Lo que el servidor diga (por ejemplo «el fondo no puede ser mayor…») se
+    // enseña tal cual en vez de un «no se pudo» genérico (2026-10-26).
+    let msg = "";
+    try { const j = await r.json(); msg = (j.detail && j.detail.error && j.detail.error.message) || ""; } catch (_e) {}
+    throw new Error(msg || "post");
+  }
   return r.json();
 }
 
@@ -1656,55 +1662,106 @@ async function duenoCorte() {
   let e;
   try { e = await api("/api/v1/movil/dueno/corte_estado"); }
   catch (err) { duenoMenu(); return; }
+  window._corteEstado = e;
   const fila = (t, v) => `<div class="fila"><span>${t}</span><span>${v}</span></div>`;
+  const casilla = (id, texto, marcada) =>
+    `<label class="casilla"><input type="checkbox" id="${id}"${marcada ? " checked" : ""} onchange="duenoCorteRefrescar()"><span>${texto}</span></label>`;
+  // Igual que la ventana de la PC: lo que ya salió, uno por uno, con su casilla.
+  const hechos =
+    (e.pagos_hechos.length ? `<div class="card"><div><strong>Pagos a empleadas en este periodo</strong><br><span class="sub">desmarca el que NO salió del cajón</span></div>` +
+      e.pagos_hechos.map(p => casilla(`cj-pago-${p.id}`, `${p.quien} · ${pesos(p.monto)} · ${p.cuando}`, p.en_cajon)).join("") + `</div>` : "") +
+    (e.retiros_hechos.length ? `<div class="card"><div><strong>Retiros apuntados en este periodo</strong><br><span class="sub">desmarca el que NO salió del cajón</span></div>` +
+      e.retiros_hechos.map(r => casilla(`cj-retiro-${r.id}`, `${r.motivo} · ${pesos(r.monto)} · ${r.cuando}`, r.en_cajon)).join("") + `</div>` : "") +
+    (e.entradas_hechas.length ? `<div class="card"><div><strong>Entró al cajón sin ser venta</strong></div>` +
+      e.entradas_hechas.map(x => `<div class="fila"><span>➕ ${x.motivo} · ${x.cuando}</span><span>+${pesos(x.monto)}</span></div>`).join("") + `</div>` : "") +
+    (e.pagos_hoy.length ? `<div class="card"><div><strong>Pagos que tocan hoy</strong><br><span class="sub">marca los que salen del cajón en este corte</span></div>` +
+      e.pagos_hoy.map(a => casilla(`cj-hoy-${a.codigo}`, `${a.nombre} · ${pesos(a.total)} (${a.comisiones} comisiones${Number(a.prestamos) ? ", préstamo −" + pesos(a.prestamos) : ""})`, true)).join("") + `</div>` : "");
   duenoSub(`<h1>Hacer corte</h1><p class="sub">${e.periodo}</p>` +
     `<div class="card">` +
-      fila("Fondo con que abrió", pesos(e.reactivo)) +
-      fila("Venta en efectivo", pesos(e.efectivo)) +
-      (Number(e.tarjeta) ? fila("Con tarjeta (no está en el cajón)", pesos(e.tarjeta)) : "") +
-      (Number(e.entradas) ? fila("Entró sin ser venta (fondo de papá...)", "+" + pesos(e.entradas)) : "") +
-      (Number(e.pagos) ? fila("Pagos a empleadas", "-" + pesos(e.pagos)) : "") +
-      (Number(e.retiros_apuntados) ? fila("Ya salió del cajón", "-" + pesos(e.retiros_apuntados)) : "") +
-      `<div class="fila"><strong>DEBE HABER</strong><strong>${pesos(e.esperado)}</strong></div>` +
+      fila("Fondo (reactivo) con que abrió", pesos(e.reactivo)) +
+      fila(`Venta en efectivo (${e.operaciones} op.)`, pesos(e.efectivo)) +
+      (Number(e.tarjeta) ? fila("Con tarjeta llega (no está en el cajón)", pesos(e.tarjeta_neto || e.tarjeta)) : "") +
     `</div>` +
+    hechos +
     `<div class="card">` +
-      `<div>Cuenta el cajón. ¿Cuánto hay?</div>` +
-      `<input id="corte-contado" type="number" inputmode="decimal" step="0.01" class="input-grande" value="${e.esperado}">` +
+      `<div>¿Cuánto se vendió? (efectivo)</div>` +
+      `<input id="corte-venta" type="number" inputmode="decimal" step="0.01" class="input-grande" value="${e.efectivo}" oninput="duenoCorteRefrescar()">` +
       `<div>¿Cuánto se queda de fondo?</div>` +
-      `<input id="corte-fondo" type="number" inputmode="decimal" step="0.01" class="input-grande" value="${e.reactivo}">` +
+      `<input id="corte-fondo" type="number" inputmode="decimal" step="0.01" class="input-grande" value="${e.reactivo}" oninput="duenoCorteRefrescar()">` +
       `<div>Otros retiros (opcional)</div>` +
-      `<input id="corte-otros" type="number" inputmode="decimal" step="0.01" class="input-grande" value="0">` +
+      `<input id="corte-otros" type="number" inputmode="decimal" step="0.01" class="input-grande" value="0" oninput="duenoCorteRefrescar()">` +
+      `<div>Entró dinero que no es venta (opcional)</div>` +
+      `<input id="corte-entro" type="number" inputmode="decimal" step="0.01" class="input-grande" value="0" oninput="duenoCorteRefrescar()">` +
+      `<input id="corte-entro-motivo" type="text" class="input-grande" placeholder="¿De dónde? (vacío = Fondo de papá)">` +
       `<input id="corte-nota" type="text" class="input-grande" placeholder="Nota (opcional)">` +
       `<label class="casilla"><input type="checkbox" id="corte-sin-tarjeta"${e.ocultar_tarjeta ? " checked" : ""}>` +
       `<span>Ocultar los cobros con tarjeta (no salen en el ticket)</span></label>` +
     `</div>` +
+    `<div id="corte-vivo" class="card"></div>` +
     `<div id="corte-error" class="error oculto"></div>` +
     `<button class="btn-grande btn-acento" onclick="duenoGuardarCorte()">🖨  Guardar e imprimir corte</button>` +
     `<button class="btn-suave" onclick="duenoMenu()">← Regresar</button>`);
+  duenoCorteRefrescar();
+}
+
+// La cuenta en vivo, la misma que la PC: reactivo + venta + entradas − lo que
+// salió (marcado) − otros retiros − pagos de hoy marcados.
+function duenoCorteCuenta() {
+  const e = window._corteEstado; if (!e) return null;
+  const num = id => Number(($(id) || {}).value || 0);
+  const marcados = (lista, pref, clave) => lista.filter(x => ($(`${pref}${x[clave]}`) || {}).checked);
+  const salio = marcados(e.pagos_hechos, "cj-pago-", "id").reduce((s, p) => s + Number(p.monto), 0) +
+                marcados(e.retiros_hechos, "cj-retiro-", "id").reduce((s, r) => s + Number(r.monto), 0);
+  const noSalio = (e.pagos_hechos.filter(p => !($(`cj-pago-${p.id}`) || {}).checked).reduce((s, p) => s + Number(p.monto), 0)) +
+                  (e.retiros_hechos.filter(r => !($(`cj-retiro-${r.id}`) || {}).checked).reduce((s, r) => s + Number(r.monto), 0));
+  const hoy = marcados(e.pagos_hoy, "cj-hoy-", "codigo").reduce((s, a) => s + Number(a.total), 0);
+  const entradas = Number(e.entradas) + num("corte-entro");
+  const venta = num("corte-venta");
+  const quedan = Math.max(0, Number(e.reactivo) + venta + entradas - salio - num("corte-otros") - hoy);
+  return { venta, entradas, salio, noSalio, hoy, quedan, dif: venta - Number(e.efectivo) };
+}
+
+function duenoCorteRefrescar() {
+  const c = duenoCorteCuenta(); if (!c) return;
+  const r2 = n => n.toFixed(2);
+  const lineas = [];
+  if (c.entradas) lineas.push(`Entró sin ser venta: +${pesos(r2(c.entradas))}`);
+  if (c.salio || c.noSalio) lineas.push(`Salió del cajón en este periodo: −${pesos(r2(c.salio))}` + (c.noSalio ? ` <span class="sub">(no se resta ${pesos(r2(c.noSalio))} que no salió de aquí)</span>` : ""));
+  if (c.hoy) lineas.push(`Pagos de hoy que salen en este corte: −${pesos(r2(c.hoy))}`);
+  const d = c.dif;
+  const estado = d === 0 ? "✅ Es la venta registrada." : (d > 0 ? `${pesos(r2(d))} más que lo registrado.` : `${pesos(r2(-d))} menos que lo registrado.`);
+  $("corte-vivo").innerHTML = lineas.map(l => `<div>${l}</div>`).join("") +
+    `<div style="margin-top:8px"><strong>${estado} En el cajón quedan ${pesos(r2(c.quedan))}.</strong></div>`;
 }
 
 async function duenoGuardarCorte() {
+  const e = window._corteEstado;
   const num = id => Number($(id).value || 0);
   const err = $("corte-error");
-  if (num("corte-fondo") > num("corte-contado")) {
-    err.textContent = "El fondo que se queda no puede ser mayor a lo contado.";
+  const c = duenoCorteCuenta();
+  if (num("corte-fondo") > c.quedan) {
+    err.textContent = "El fondo que se queda no puede ser mayor a lo que queda en el cajón.";
     err.classList.remove("oculto");
     return;
   }
   err.classList.add("oculto");
+  const ids = (lista, pref, clave, marcada) => lista.filter(x => (($(`${pref}${x[clave]}`) || {}).checked === marcada) && (x.en_cajon !== marcada)).map(x => x[clave]);
   let r;
   try {
     r = await encPost("/api/v1/movil/dueno/corte", {
-      contado: num("corte-contado"), reactivo_final: num("corte-fondo"),
-      otros_retiros: num("corte-otros"), nota: $("corte-nota").value || "",
-      ocultar_tarjeta: $("corte-sin-tarjeta").checked,
+      venta: num("corte-venta"), reactivo_final: num("corte-fondo"),
+      otros_retiros: num("corte-otros"), entro: num("corte-entro"), entro_motivo: $("corte-entro-motivo").value || "",
+      nota: $("corte-nota").value || "", ocultar_tarjeta: $("corte-sin-tarjeta").checked,
+      fuera_pagos: ids(e.pagos_hechos, "cj-pago-", "id", false), dentro_pagos: ids(e.pagos_hechos, "cj-pago-", "id", true),
+      fuera_retiros: ids(e.retiros_hechos, "cj-retiro-", "id", false), dentro_retiros: ids(e.retiros_hechos, "cj-retiro-", "id", true),
+      pagar_hoy: e.pagos_hoy.filter(a => ($(`cj-hoy-${a.codigo}`) || {}).checked).map(a => a.codigo),
     });
-  } catch (e) {
-    err.textContent = "No se pudo hacer el corte. Inténtalo otra vez.";
+  } catch (ex) {
+    err.textContent = (ex && ex.message) ? ex.message : "No se pudo hacer el corte. Inténtalo otra vez.";
     err.classList.remove("oculto");
     return;
   }
-  duenoSub(`<div class="listo-texto">✅ Corte hecho:<br><br>En caja ${pesos(r.monto)}` +
+  duenoSub(`<div class="listo-texto">✅ Corte hecho:<br><br>Venta ${pesos(r.venta)}<br>En caja ${pesos(r.monto)}` +
     `<br>Se retira ${pesos(r.retiro)}<br>Se queda de fondo ${pesos(r.reactivo_final)}` +
     (r.ocultos ? `<br><br>🔒 ${r.ocultos} cobro(s) con tarjeta no salieron en el ticket` +
       `<br><span class="sub">Las comisiones de la empleada sí siguen contando: su pago no cambia.</span>` : "") +

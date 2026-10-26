@@ -749,13 +749,61 @@ def dueno_corte_estado(
     current: tuple = Depends(get_current_employee),
     db: Session = Depends(get_db),
 ) -> dict:
-    """Lo que debe haber en el cajón antes de contarlo."""
-    from pos_uniformes.services.corte_caja_service import _etiqueta_periodo, cargar_parametros, estado_caja
+    """Lo que debe haber en el cajón antes de contarlo, con el mismo detalle
+    que la ventana del corte en la PC (Daniel, 2026-10-26: «algo así como lo
+    hago ahora desde PC»): cada pago y retiro del periodo con su casilla de
+    «salió del cajón», lo que entró sin ser venta, y los pagos que tocan hoy."""
+    from pos_uniformes.services.corte_caja_service import (
+        _etiqueta_periodo, cargar_parametros, estado_caja, pagos_que_tocan_hoy, pagos_registrados_del_periodo,
+    )
 
     empleada, _p = current
     _solo_dueno(empleada)
     estado = estado_caja(db)
     r = estado.resumen
+    nombres = nombres_por_codigo(db)
+
+    def _cuando(m) -> str:
+        try:
+            return (m.astimezone() if m.tzinfo else m).strftime("%d/%m %H:%M")
+        except Exception:  # noqa: BLE001
+            return ""
+
+    pagos_hechos = [
+        {"id": p.id, "quien": str(mostrar(p.employee_name or p.employee_code, nombres)).split()[0],
+         "monto": str(Decimal(p.total)), "cuando": _cuando(p.created_at), "en_cajon": bool(p.en_cajon)}
+        for p in pagos_registrados_del_periodo(db, estado.desde, estado.hasta, solo_en_cajon=False)
+    ]
+    try:
+        from pos_uniformes.services.retiros_service import retiros_del_periodo
+
+        retiros_hechos = [
+            {"id": x.id, "motivo": str(x.motivo or "Retiro"), "monto": str(Decimal(x.monto)),
+             "cuando": _cuando(x.created_at), "en_cajon": bool(x.en_cajon)}
+            for x in retiros_del_periodo(db, estado.desde, estado.hasta, solo_en_cajon=False)
+        ]
+    except Exception:  # noqa: BLE001 — base sin la tabla todavía
+        db.rollback()
+        retiros_hechos = []
+    try:
+        from pos_uniformes.services.entradas_service import entradas_del_periodo
+
+        entradas_hechas = [
+            {"motivo": str(x.motivo or "Entrada"), "monto": str(Decimal(x.monto)), "cuando": _cuando(x.created_at)}
+            for x in entradas_del_periodo(db, estado.desde, estado.hasta)
+        ]
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        entradas_hechas = []
+    try:
+        pagos_hoy = [
+            {"codigo": a.employee_code, "nombre": str(mostrar(a.employee_name or a.employee_code, nombres)).split()[0],
+             "total": str(Decimal(a.total_estimado)), "comisiones": int(a.comisiones), "prestamos": str(Decimal(a.prestamos or 0))}
+            for a in pagos_que_tocan_hoy(db, estado.hasta.date())
+        ]
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        pagos_hoy = []
     return {
         # Cómo dejó el dueño la casilla la última vez (kiosko o celular).
         "ocultar_tarjeta": bool(getattr(cargar_parametros(db), "ocultar_tarjeta", False)),
@@ -765,22 +813,39 @@ def dueno_corte_estado(
         "reactivo": str(estado.reactivo),
         "efectivo": str(r.efectivo),
         "tarjeta": str(r.tarjeta),
+        "tarjeta_neto": str(r.tarjeta_neto),
         "pagos": str(estado.pagos),
         "retiros_apuntados": str(estado.total_retiros),
         "entradas": str(estado.entradas),
         "esperado": str(estado.esperado),
         "operaciones": r.operaciones,
         "piezas": r.piezas,
+        "pagos_hechos": pagos_hechos,
+        "retiros_hechos": retiros_hechos,
+        "entradas_hechas": entradas_hechas,
+        "pagos_hoy": pagos_hoy,
     }
 
 
 class CorteDuenoRequest(BaseModel):
-    contado: Decimal = Field(ge=0)
+    # Camino viejo: él cuenta el cajón y manda la cifra.
+    contado: Decimal | None = Field(default=None, ge=0)
+    # Camino de la PC (2026-10-26): se razona con la VENTA y el cajón se calcula.
+    venta: Decimal | None = Field(default=None, ge=0)
     reactivo_final: Decimal = Field(ge=0)
     otros_retiros: Decimal = Field(default=Decimal("0"), ge=0)
+    entro: Decimal = Field(default=Decimal("0"), ge=0)          # entró sin ser venta (fondo de papá)
+    entro_motivo: str = Field(default="", max_length=120)
     nota: str = Field(default="", max_length=200)
     # Solo el papel: la línea "Con tarjeta" no sale en este ticket.
     ocultar_tarjeta: bool = False
+    # Casillas de lo que ya salió: desmarcado = NO salió del cajón en este periodo.
+    fuera_pagos: list[int] = Field(default_factory=list)
+    fuera_retiros: list[int] = Field(default_factory=list)
+    dentro_pagos: list[int] = Field(default_factory=list)
+    dentro_retiros: list[int] = Field(default_factory=list)
+    # Pagos que tocan hoy y se pagan del cajón en este corte (códigos).
+    pagar_hoy: list[str] = Field(default_factory=list)
 
 
 @router.post("/dueno/corte")
@@ -789,34 +854,66 @@ def dueno_hacer_corte(
     current: tuple = Depends(get_current_employee),
     db: Session = Depends(get_db),
 ) -> dict:
+    """El corte del dueño, en el mismo orden que `hacer_corte_caja` de la PC:
+    pagos de hoy marcados → entrada → casillas de lo que salió → cerrar →
+    ticket simple a la impresora de la tienda."""
     from pos_uniformes.services import trabajos_service
     from pos_uniformes.services.corte_caja_service import (
         cerrar_corte,
         estado_caja,
+        marcar_fuera_del_cajon,
         operaciones_del_periodo,
         pagos_registrados_del_periodo,
     )
     from pos_uniformes.services.libreta_service import resumir_por_empleada
-    from pos_uniformes.ui.dialogs.corte_caja_dialog import contar_tarjeta, texto_ticket_corte
+    from pos_uniformes.ui.dialogs.corte_caja_dialog import contar_tarjeta, texto_ticket_corte_encargado
 
     empleada, _p = current
     _solo_dueno(empleada)
     _solo_tienda()
     quien = str(empleada.codigo).upper()
+    if body.contado is None and body.venta is None:
+        raise HTTPException(status_code=422, detail={"error": {"code": "corte_invalido", "message": "Falta la venta."}})
     estado = estado_caja(db)
     rows_periodo = operaciones_del_periodo(db, estado.desde, estado.hasta)
     por_empleada = resumir_por_empleada(rows_periodo)
     try:
+        if body.pagar_hoy:
+            from pos_uniformes.services.nomina_service import registrar_pago_con_monto
+
+            for code in body.pagar_hoy:
+                registrar_pago_con_monto(
+                    db, code, creado_por=quien, fecha=estado.hasta.date(), momento=estado.hasta,
+                )
+        if body.entro > 0:
+            from pos_uniformes.services.entradas_service import registrar_entrada
+
+            registrar_entrada(db, monto=body.entro, motivo=body.entro_motivo, creado_por=quien, momento=estado.hasta)
+        marcar_fuera_del_cajon(db, pagos_ids=body.fuera_pagos, retiros_ids=body.fuera_retiros, en_cajon=False)
+        marcar_fuera_del_cajon(db, pagos_ids=body.dentro_pagos, retiros_ids=body.dentro_retiros, en_cajon=True)
+        if body.venta is not None:
+            # Lo que debe quedar si la venta en efectivo fue esa: la misma cuenta
+            # que la PC, con todo lo de arriba ya aplicado.
+            despues = estado_caja(db, estado.hasta, otros_retiros=body.otros_retiros)
+            contado = max(
+                despues.reactivo + Decimal(body.venta) + despues.entradas - despues.pagos - despues.total_retiros,
+                Decimal("0.00"),
+            ).quantize(Decimal("0.01"))
+            venta = Decimal(body.venta).quantize(Decimal("0.01"))
+        else:
+            contado = Decimal(body.contado)
+            venta = estado.resumen.efectivo
         corte = cerrar_corte(
             db,
-            contado=body.contado,
+            contado=contado,
             reactivo_final=body.reactivo_final,
             otros_retiros=body.otros_retiros,
             nota=body.nota,
             creado_por=quien,
             ahora=estado.hasta,
         )
-    except ValueError as exc:
+    except (ValueError, PermissionError) as exc:
+        db.rollback()
         raise HTTPException(status_code=422, detail={"error": {
             "code": "corte_invalido", "message": str(exc)}})
 
@@ -842,14 +939,25 @@ def dueno_hacer_corte(
         except Exception:  # noqa: BLE001 — base sin la tabla todavía
             db.rollback()
             retiros = []
-        texto = texto_ticket_corte(
+        try:
+            from pos_uniformes.services.entradas_service import entradas_del_periodo
+
+            entradas = entradas_del_periodo(db, estado.desde, estado.hasta)
+        except Exception:  # noqa: BLE001
+            db.rollback()
+            entradas = []
+        # El ticket SIMPLE, el mismo que imprime la PC (2026-09-10).
+        texto = texto_ticket_corte_encargado(
             corte,
+            venta,
+            [],
             por_empleada,
-            pagos=pagos_registrados_del_periodo(db, estado.desde, estado.hasta),
-            venta_efectivo=estado.resumen.efectivo,
             retiros=retiros,
             tarjeta=None if body.ocultar_tarjeta else estado.resumen.tarjeta,
             tarjeta_ops=None if body.ocultar_tarjeta else contar_tarjeta(rows_periodo),
+            tarjeta_neto=None if body.ocultar_tarjeta else estado.resumen.tarjeta_neto,
+            ya_pagados=pagos_registrados_del_periodo(db, estado.desde, estado.hasta),
+            entradas=entradas,
         )
         trabajos_service.enviar_ticket(db, texto, origen="pwa", creado_por=quien)
         ticket_encolado = True
@@ -864,6 +972,7 @@ def dueno_hacer_corte(
         "monto": str(corte.monto_final),
         "retiro": str(retiro),
         "reactivo_final": str(corte.reactivo_final),
+        "venta": str(venta),
         "ticket_encolado": ticket_encolado,
         "ocultos": ocultos,
     }

@@ -134,7 +134,7 @@ def _bloque_cuenta(lines, *, corte, venta, tarjeta, tarjeta_ops, pagos_restar, r
         cubierto = min(entro, pagos_total)
         if cubierto > 0:
             lines.append(tk_line(f"  (de los pagos, ${cubierto:,.2f} salio"))
-            lines.append(tk_line("   de lo que entro, no de la venta)"))
+            lines.append(tk_line("   de lo que entro, no de venta)"))
     lines.append(tk_bot())
     if con_reactivo:
         if reactivo_fin < reactivo_ini:
