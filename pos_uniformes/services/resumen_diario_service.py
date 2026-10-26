@@ -41,6 +41,7 @@ class PagoResumen:
     total: Decimal
     comisiones: int
     faltas: int
+    prestamo: Decimal = Decimal("0.00")
 
 
 @dataclass
@@ -149,6 +150,8 @@ def formatear(d: DatosResumen) -> str:
             detalle = f"{p.comisiones} com."
             if p.faltas:
                 detalle += f", {p.faltas} falta(s) descontada(s)"
+            if p.prestamo:
+                detalle += f", préstamo −{_pesos(p.prestamo)}"
             lineas.append(f"• Pagado a {p.nombre}: {_pesos(p.total)} ({detalle})")
         if d.faltaron:
             lineas.append("• Faltaron hoy: " + ", ".join(d.faltaron))
@@ -351,6 +354,7 @@ def _pagos(session, d: DatosResumen, desde: datetime, hasta: datetime) -> None:
             total=Decimal(p.total),
             comisiones=int(p.comisiones or 0),
             faltas=int(p.faltas or 0),
+            prestamo=Decimal(str(getattr(p, "descuento_prestamos", 0) or 0)),
         )
         for p in filas
     ]

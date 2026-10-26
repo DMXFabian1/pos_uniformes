@@ -356,7 +356,7 @@ body.con-topbar .app{padding-top:calc(58px + env(safe-area-inset-top))}
 const $ = id => document.getElementById(id);
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const DIAS = ["lun","mar","mié","jue","vie","sáb","dom"];
-const PWA_VERSION = "v28";
+const PWA_VERSION = "v29";
 let token = localStorage.getItem("pos_token") || "";
 let calY = 0, calM = 0;
 let rolActual = "", vistaInicio = "", modoServidor = "casa";
@@ -1132,7 +1132,9 @@ async function encPagarA(codigo, nombre) {
     `<div class="fila"><span>Sueldo base</span><span>${pesos(d.sueldo_base)}</span></div>` +
     `<div class="fila"><span>${d.comisiones} comisiones × ${pesos(d.tarifa_comision)}</span><span>+${pesos(d.monto_comisiones)}</span></div>` +
     (d.faltas ? `<div class="fila"><span>${d.faltas} falta(s)</span><span>-${pesos(d.descuento_faltas)}</span></div>` : "") +
+    (Number(d.prestamo) > 0 ? `<div class="fila"><span>Préstamo</span><span>-${pesos(d.prestamo)}</span></div>` : "") +
     `<div class="fila"><strong>A PAGAR</strong><strong>${pesos(d.total)}</strong></div>` +
+    (Number(d.prestamo_sin_cubrir) > 0 ? `<p class="sub">Del préstamo le siguen quedando ${pesos(d.prestamo_sin_cubrir)}.</p>` : "") +
     `</div>` +
     `<button class="btn-grande" style="background:var(--acento);color:#fff;border:none" onclick="encConfirmarPago('${codigo}', '${nombre}')">💵  Ya le pagué</button>` +
     `<button class="btn-suave" onclick="encPagar()">← Regresar</button>`);

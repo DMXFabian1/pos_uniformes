@@ -172,6 +172,20 @@ class LineasPagoTests(unittest.TestCase):
         self.assertEqual(lineas[3], "TOTAL HOY: $1,173.33")
         self.assertEqual(lineas[4], "Te toca cobrar el viernes 11 de septiembre.")
 
+    def test_el_prestamo_sale_en_cuanto_llevas(self) -> None:
+        from dataclasses import replace
+
+        det = replace(_detalle("VEND-4", com=83), prestamos=Decimal("30.00"))
+        p = svc.PagoVista("VEND-4", "Stayce", det, date(2026, 9, 11), True)
+        lineas = svc.lineas_pago(p, HOY)
+        self.assertIn("Préstamo: −$30.00", lineas)
+        self.assertIn("TOTAL HOY: $1,436.00", lineas)
+        self.assertFalse(any("siguen quedando" in l for l in lineas))
+        grande = replace(_detalle("VEND-4", com=0), prestamos=Decimal("2000.00"))
+        lineas = svc.lineas_pago(svc.PagoVista("VEND-4", "Stayce", grande, date(2026, 9, 11), True), HOY)
+        self.assertIn("Préstamo: −$1,300.00", lineas)
+        self.assertIn("Del préstamo te siguen quedando $700.00.", lineas)
+
     def test_por_dia_y_atrasado(self) -> None:
         p = svc.PagoVista("VEND-6", "Nayeli", _detalle("VEND-6", "433.34", com=3, por_dia=True), date(2026, 9, 6), False)
         lineas = svc.lineas_pago(p, HOY)

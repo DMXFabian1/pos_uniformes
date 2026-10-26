@@ -30,7 +30,7 @@ from pos_uniformes.services.nombres_empleadas_service import nombres_por_codigo
 logger = logging.getLogger(__name__)
 
 _MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre")
-COLUMNAS = ("Fecha", "Empleada", "Periodo", "Base", "Comisiones", "Faltas", "Total", "Registró")
+COLUMNAS = ("Fecha", "Empleada", "Periodo", "Base", "Comisiones", "Faltas", "Préstamo", "Total", "Registró")
 
 
 def _item(texto: str, centrado: bool = True, negrita: bool = False) -> QTableWidgetItem:
@@ -56,6 +56,7 @@ def filas_tabla(pagos: list) -> list[tuple[str, ...]]:
             f"${Decimal(p.sueldo_base):,.2f}",
             f"{int(p.comisiones or 0)} × ${Decimal(p.tarifa_comision):,.2f} = ${Decimal(p.monto_comisiones):,.2f}",
             f"{int(p.faltas or 0)} (−${Decimal(p.descuento_faltas):,.2f})" if int(p.faltas or 0) else "0",
+            f"−${Decimal(p.descuento_prestamos):,.2f}" if Decimal(getattr(p, "descuento_prestamos", 0) or 0) else "—",
             f"${Decimal(p.total):,.2f}",
             _nombre_de(p.creado_por),
         ))
@@ -107,7 +108,7 @@ class HistorialPagosDialog(QDialog):
 
         self.resumen_tabla = QTableWidget(0, 5)
         self.resumen_tabla.setObjectName("libretaTabla")
-        self.resumen_tabla.setHorizontalHeaderLabels(["Empleada", "Pagos", "Comisiones", "Faltas", "Total pagado"])
+        self.resumen_tabla.setHorizontalHeaderLabels(["Empleada", "Pagos", "Comisiones", "Faltas", "Préstamos", "Total pagado"])
         self.resumen_tabla.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         self.resumen_tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.resumen_tabla.verticalHeader().setVisible(False)
@@ -223,7 +224,7 @@ class HistorialPagosDialog(QDialog):
         self.tabla.setRowCount(len(filas))
         for i, fila in enumerate(filas):
             for j, texto in enumerate(fila):
-                self.tabla.setItem(i, j, _item(texto, centrado=j not in (1, 2), negrita=(j == 6)))
+                self.tabla.setItem(i, j, _item(texto, centrado=j not in (1, 2), negrita=(j == 7)))
         totales = resumir_pagos_por_empleada(pagos)
         self.resumen_tabla.setRowCount(len(totales))
         for i, t in enumerate(totales):
@@ -231,7 +232,8 @@ class HistorialPagosDialog(QDialog):
             self.resumen_tabla.setItem(i, 1, _item(str(t.pagos)))
             self.resumen_tabla.setItem(i, 2, _item(f"{t.comisiones} (${t.monto_comisiones:,.2f})"))
             self.resumen_tabla.setItem(i, 3, _item(f"{t.faltas} (−${t.descuento_faltas:,.2f})" if t.faltas else "0"))
-            self.resumen_tabla.setItem(i, 4, _item(f"${t.total:,.2f}", negrita=True))
+            self.resumen_tabla.setItem(i, 4, _item(f"−${t.descuento_prestamos:,.2f}" if t.descuento_prestamos else "—"))
+            self.resumen_tabla.setItem(i, 5, _item(f"${t.total:,.2f}", negrita=True))
         total = sum((t.total for t in totales), Decimal("0.00"))
         if pagos:
             self.totales_label.setText(

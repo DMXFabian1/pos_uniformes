@@ -153,7 +153,13 @@ def lineas_pago(p: PagoVista, hoy: date | None = None) -> list[str]:
     lineas.append(f"{d.comisiones} comisiones × ${Decimal(d.tarifa_comision):,.2f} = ${Decimal(d.monto_comisiones):,.2f}")
     if int(d.faltas or 0):
         lineas.append(f"{d.faltas} falta(s): −${Decimal(d.descuento_faltas):,.2f}")
+    cubierto = Decimal(getattr(d, "prestamo_cubierto", 0) or 0)
+    if cubierto:
+        lineas.append(f"Préstamo: −${cubierto:,.2f}")
     lineas.append(f"TOTAL HOY: ${Decimal(d.total):,.2f}")
+    sin_cubrir = Decimal(getattr(d, "prestamo_sin_cubrir", 0) or 0)
+    if sin_cubrir:
+        lineas.append(f"Del préstamo te siguen quedando ${sin_cubrir:,.2f}.")
     if p.proximo_pago is not None:
         if p.proximo_pago == hoy:
             cuando = "hoy"

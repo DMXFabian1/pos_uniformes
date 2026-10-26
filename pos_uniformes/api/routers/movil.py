@@ -683,6 +683,8 @@ def encargado_pago_pendiente(
         "monto_comisiones": str(d.monto_comisiones),
         "faltas": d.faltas,
         "descuento_faltas": str(d.descuento_faltas),
+        "prestamo": str(getattr(d, "prestamo_cubierto", Decimal("0.00"))),
+        "prestamo_sin_cubrir": str(getattr(d, "prestamo_sin_cubrir", Decimal("0.00"))),
         "total": str(d.total),
     }
 

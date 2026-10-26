@@ -19,7 +19,7 @@ class FormatearTests(unittest.TestCase):
             efectivo=Decimal("8400.00"), tarjeta=Decimal("2600.00"),
             por_empleada=[("Ana", 9, 40), ("Bety", 5, 12)],
             cortes=[CorteResumen("20:15", "ENC-1", Decimal("19540.00"), Decimal("19560.00"), Decimal("11160.00"), Decimal("1390.00"), Decimal("0"))],
-            pagos=[PagoResumen("Ana", Decimal("1390.00"), 45, 0), PagoResumen("Bety", Decimal("1103.33"), 10, 1)],
+            pagos=[PagoResumen("Ana", Decimal("1390.00"), 45, 0), PagoResumen("Bety", Decimal("1103.33"), 10, 1, Decimal("30.00"))],
             faltaron=["Caro"],
             afluencia_entradas=120, afluencia_pasan=640, afluencia_ventas=14,
             descansan_manana=["Bety"],
@@ -32,7 +32,7 @@ class FormatearTests(unittest.TestCase):
         self.assertIn("Ana 9 ops/40 com.", t)
         self.assertIn("20:15 por ENC-1: en caja $19,540.00 · FALTARON $20.00", t)
         self.assertIn("fondo que queda $11,160.00 · pagos $1,390.00", t)
-        self.assertIn("Pagado a Bety: $1,103.33 (10 com., 1 falta(s) descontada(s))", t)
+        self.assertIn("Pagado a Bety: $1,103.33 (10 com., 1 falta(s) descontada(s), préstamo −$30.00)", t)
         self.assertIn("Faltaron hoy: Caro", t)
         self.assertIn("Entraron 120 personas · pasaron por fuera 640", t)
         self.assertIn("conversión 12%", t)

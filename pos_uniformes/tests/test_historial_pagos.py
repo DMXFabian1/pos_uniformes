@@ -16,14 +16,31 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from pos_uniformes.services.nomina_service import rango_mes, resumir_pagos_por_empleada
 
 
-def _pago(code, nombre, fecha, total, comisiones=0, faltas=0, desde=None):
+def _pago(code, nombre, fecha, total, comisiones=0, faltas=0, desde=None, prestamo="0"):
     return SimpleNamespace(
         employee_code=code, employee_name=nombre, fecha=fecha, desde=desde, hasta=fecha,
         comisiones=comisiones, sueldo_base=Decimal("1300.00"), tarifa_comision=Decimal("2.00"),
         monto_comisiones=Decimal(2 * comisiones), faltas=faltas,
         descuento_faltas=(Decimal("216.67") * faltas).quantize(Decimal("0.01")),
+        descuento_prestamos=Decimal(prestamo),
         total=Decimal(total), creado_por="ENC-1",
     )
+
+
+class PrestamoEnLaTablaTests(unittest.TestCase):
+    """El préstamo descontado se ve en 💵 Pagos: por pago y en el total por empleada (2026-10-26)."""
+
+    def test_columna_prestamo(self) -> None:
+        from pos_uniformes.services.nomina_service import resumir_pagos_por_empleada
+        from pos_uniformes.ui.dialogs.historial_pagos_dialog import COLUMNAS, filas_tabla
+
+        pagos = [_pago("VEND-4", "Stayce", date(2026, 10, 18), "1436.00", 83, prestamo="30"),
+                 _pago("VEND-4", "Stayce", date(2026, 10, 11), "1490.00", 95)]
+        filas = filas_tabla(pagos)
+        self.assertEqual(COLUMNAS.index("Préstamo"), 6)
+        self.assertEqual(filas[0][6], "−$30.00")
+        self.assertEqual(filas[1][6], "—")
+        self.assertEqual(resumir_pagos_por_empleada(pagos)[0].descuento_prestamos, Decimal("30.00"))
 
 
 class ResumirPagosTests(unittest.TestCase):
@@ -114,7 +131,8 @@ class HistorialDialogTests(unittest.TestCase):
         self.assertEqual(dlg.tabla.item(0, 2).text(), "02/09 → 08/09")
         self.assertEqual(dlg.tabla.item(0, 4).text(), "45 × $2.00 = $90.00")
         self.assertEqual(dlg.tabla.item(1, 5).text(), "1 (−$216.67)")
-        self.assertEqual(dlg.tabla.item(0, 6).text(), "$1,390.00")
+        self.assertEqual(dlg.tabla.item(0, 6).text(), "—")
+        self.assertEqual(dlg.tabla.item(0, 7).text(), "$1,390.00")
         self.assertEqual(dlg.resumen_tabla.rowCount(), 2)
         self.assertIn("Total pagado: $2,493.33", dlg.totales_label.text())
         self.assertEqual(filas_tabla([])[:0], [])

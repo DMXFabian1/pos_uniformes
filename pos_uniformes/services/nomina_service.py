@@ -542,6 +542,7 @@ class TotalEmpleada:
     monto_comisiones: Decimal
     descuento_faltas: Decimal
     total: Decimal
+    descuento_prestamos: Decimal = Decimal("0.00")
 
 
 def listar_pagos(session, *, desde: date, hasta: date, employee_code: str | None = None) -> list:
@@ -563,12 +564,14 @@ def resumir_pagos_por_empleada(pagos: list) -> list[TotalEmpleada]:
         a = acc.setdefault(code, {
             "nombre": p.employee_name or code, "pagos": 0, "comisiones": 0, "faltas": 0,
             "monto_comisiones": Decimal("0.00"), "descuento_faltas": Decimal("0.00"), "total": Decimal("0.00"),
+            "descuento_prestamos": Decimal("0.00"),
         })
         a["pagos"] += 1
         a["comisiones"] += int(p.comisiones or 0)
         a["faltas"] += int(p.faltas or 0)
         a["monto_comisiones"] += Decimal(str(p.monto_comisiones or 0))
         a["descuento_faltas"] += Decimal(str(p.descuento_faltas or 0))
+        a["descuento_prestamos"] += Decimal(str(getattr(p, "descuento_prestamos", 0) or 0))
         a["total"] += Decimal(str(p.total or 0))
     filas = [
         TotalEmpleada(
@@ -580,6 +583,7 @@ def resumir_pagos_por_empleada(pagos: list) -> list[TotalEmpleada]:
             monto_comisiones=a["monto_comisiones"].quantize(_CENT),
             descuento_faltas=a["descuento_faltas"].quantize(_CENT),
             total=a["total"].quantize(_CENT),
+            descuento_prestamos=a["descuento_prestamos"].quantize(_CENT),
         )
         for code, a in acc.items()
     ]
