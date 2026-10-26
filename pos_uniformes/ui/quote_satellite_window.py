@@ -2644,29 +2644,26 @@ class QuoteSatelliteWindow(QMainWindow):
             with get_session() as session:
                 pendiente = pr.pendiente_de(session, code)
                 por_cobrar = pr.total_por_cobrar(session, code)
+                disponible = pr.disponible_para(session, code)
         except Exception:  # noqa: BLE001 — sin servidor, mejor no ofrecerlo
             logger.exception("Libreta: no se pudo leer el préstamo")
             boton.setVisible(False)
             aviso.setVisible(False)
             return
 
+        # Puede tener varios (2026-10-26): se le dice en qué van y, si todavía
+        # le cabe otro en el 70% de lo ganado, el botón se queda.
+        partes = []
         if pendiente is not None:
-            boton.setVisible(False)
-            aviso.setText(
+            partes.append(
                 f"💵 Pediste ${float(pendiente.monto):,.2f} para «{pendiente.motivo}». "
                 "Daniel todavía no responde."
             )
-            aviso.setVisible(True)
-            return
         if por_cobrar:
-            boton.setVisible(False)
-            aviso.setText(
-                f"💵 Se te descontarán ${float(por_cobrar):,.2f} de tu siguiente pago."
-            )
-            aviso.setVisible(True)
-            return
-        boton.setVisible(True)
-        aviso.setVisible(False)
+            partes.append(f"💵 Se te descontarán ${float(por_cobrar):,.2f} de tu siguiente pago.")
+        aviso.setText("\n".join(partes))
+        aviso.setVisible(bool(partes))
+        boton.setVisible(disponible > 0 or not partes)
 
     def _libreta_pedir_prestamo(self) -> None:
         from pos_uniformes.services import prestamos_service as pr
@@ -2674,6 +2671,7 @@ class QuoteSatelliteWindow(QMainWindow):
         try:
             with get_session() as session:
                 tope = pr.tope_para(session, self._libreta_code)
+                disponible = pr.disponible_para(session, self._libreta_code)
         except Exception:  # noqa: BLE001
             logger.exception("Libreta: no se pudo calcular el tope del préstamo")
             QMessageBox.warning(
@@ -2689,8 +2687,15 @@ class QuoteSatelliteWindow(QMainWindow):
                 "descontarlo. Inténtalo más adelante.",
             )
             return
+        if disponible <= 0:
+            QMessageBox.information(
+                self, "Préstamo",
+                f"Con lo que ya tienes pedido o por descontar llegas al tope de hoy (${tope:,.2f}, "
+                "el 70% de lo que llevas ganado). Cuando te paguen vuelve a subir.",
+            )
+            return
 
-        datos = self._ask_prestamo(tope)
+        datos = self._ask_prestamo(disponible)
         if datos is None:
             return
 
@@ -3064,7 +3069,7 @@ class QuoteSatelliteWindow(QMainWindow):
         titulo.setStyleSheet("font-size: 19px; font-weight: 800; color: #73341c;")
         ly.addWidget(titulo)
         pista = QLabel(
-            f"Puedes pedir hasta ${tope:,.2f} (el 70% de lo que llevas ganado).\n"
+            f"Puedes pedir hasta ${tope:,.2f} (el 70% de lo que llevas ganado, menos lo que ya tengas pedido o por descontar).\n"
             "Daniel lo aprueba desde su celular y se te descuenta completo de tu siguiente pago."
         )
         pista.setWordWrap(True)

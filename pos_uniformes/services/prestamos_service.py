@@ -6,6 +6,9 @@ que se descuente en su sueldo"*. Las tres decisiones que lo definen:
 - **Ella pide, tú apruebas.** Mientras no apruebes, no existe para la nómina.
 - **Se descuenta completo en el siguiente pago.** Sin abonos ni saldos: un
   préstamo vive poco y se cobra de una vez.
+- **Puede haber varios a la vez** (Daniel, 2026-10-26: «solo les permite un
+  préstamo»): lo que importa es que la SUMA de lo pedido, lo que ya debe y lo
+  nuevo quepa en el tope. Antes se rechazaba el segundo aunque cupiera.
 - **El efectivo sale del cajón** y queda anotado solo como retiro, para que el
   corte de esa noche cuadre sin que nadie se acuerde de apuntarlo.
 """
@@ -58,6 +61,22 @@ def tope_para(session: Session, employee_code: str, hoy=None) -> Decimal:
     return (ganado_hasta_hoy(session, employee_code, hoy) * PORCENTAJE_TOPE).quantize(_CENT)
 
 
+def comprometido(session: Session, employee_code: str) -> Decimal:
+    """Lo que ya pidió (sin respuesta) más lo aprobado que todavía debe."""
+    pendientes_ = session.scalars(
+        select(PrestamoEmpleada).where(
+            PrestamoEmpleada.employee_code == str(employee_code),
+            PrestamoEmpleada.estado.in_((PEDIDO, APROBADO)),
+        )
+    ).all()
+    return sum((Decimal(str(p.monto)) for p in pendientes_), Decimal("0.00")).quantize(_CENT)
+
+
+def disponible_para(session: Session, employee_code: str, hoy=None) -> Decimal:
+    """Lo que todavía puede pedir hoy: el tope menos lo que ya tiene encima."""
+    return max(tope_para(session, employee_code, hoy) - comprometido(session, employee_code), Decimal("0.00")).quantize(_CENT)
+
+
 def pedir(session: Session, *, employee_code: str, nombre: str, monto, motivo: str) -> PrestamoEmpleada:
     """La empleada lo pide desde la Libreta. Queda esperando tu respuesta."""
     monto = Decimal(str(monto))
@@ -69,7 +88,15 @@ def pedir(session: Session, *, employee_code: str, nombre: str, monto, motivo: s
             "Todavía no llevas nada ganado en este ciclo, así que no hay de dónde "
             "descontarlo. Inténtalo más adelante."
         )
-    if monto > tope:
+    encima = comprometido(session, employee_code)
+    disponible = max(tope - encima, Decimal("0.00")).quantize(_CENT)
+    if monto > disponible:
+        if encima:
+            raise NoSePuede(
+                f"Lo más que puedes pedir hoy son ${disponible:,.2f}: el 70% de lo que llevas "
+                f"ganado (${tope:,.2f}) menos los ${encima:,.2f} que ya tienes pedidos o por "
+                "descontar. Si necesitas más, háblalo con Daniel."
+            )
         raise NoSePuede(
             f"Lo más que puedes pedir hoy son ${tope:,.2f} — el 70% de lo que llevas "
             "ganado. Si necesitas más, háblalo con Daniel."
@@ -77,11 +104,6 @@ def pedir(session: Session, *, employee_code: str, nombre: str, monto, motivo: s
     motivo = (motivo or "").strip()
     if not motivo:
         raise NoSePuede("Escribe para qué es: sin motivo no se puede autorizar.")
-
-    if pendiente_de(session, employee_code) is not None:
-        raise NoSePuede("Ya tienes un préstamo esperando respuesta.")
-    if por_cobrar(session, employee_code):
-        raise NoSePuede("Ya tienes un préstamo que se te va a descontar en el siguiente pago.")
 
     prestamo = PrestamoEmpleada(
         employee_code=str(employee_code), employee_name=str(nombre or ""),

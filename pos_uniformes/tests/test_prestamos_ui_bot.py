@@ -71,12 +71,19 @@ class ElAvisoTest(_Base):
         self.assertIn("sale del cajón", texto)
         self.assertIn("siguiente pago", texto)
 
-    def test_no_habla_de_deudas_porque_no_puede_haberlas(self):
-        # `pedir` no la deja pedir si ya tiene algo por cobrar, así que al
-        # llegar este aviso siempre debe cero. Decir "Ya debe: $0.00" sería
-        # ruido que invita a dudar de una cifra que no puede ser otra.
+    def test_sin_deudas_no_habla_de_deudas(self):
+        # Decir "Ya debe: $0.00" sería ruido que invita a dudar de la cifra.
         texto = prs.aviso_de_solicitud(self._pedir(), session=self.s)
         self.assertNotIn("Ya debe", texto)
+
+    def test_con_otro_prestamo_encima_lo_dice(self):
+        # Puede haber varios (2026-10-26): Daniel decide viendo lo que ya tiene.
+        primero = self._pedir(monto="1000", motivo="renta")
+        pr.aprobar(self.s, primero.id, quien="VEND-1")
+        segundo = self._pedir(monto="500", motivo="escuela")
+        texto = prs.aviso_de_solicitud(segundo, session=self.s)
+        self.assertIn("Ya debe o tiene pedido: $1,000.00 (aparte de este)", texto)
+        self.assertIn("Le quedarían: $8,500.00", texto)          # 10000 − 500 − 1000
 
     def test_sin_sesion_el_aviso_sale_igual(self):
         # El adorno no puede impedir que el recado llegue.

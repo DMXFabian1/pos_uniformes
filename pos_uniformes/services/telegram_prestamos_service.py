@@ -153,13 +153,18 @@ def _contexto(prestamo, session: Session | None) -> list[str]:
         monto = Decimal(str(prestamo.monto))
         ganado = pr.ganado_hasta_hoy(session, code)
         tope = pr.tope_para(session, code)
+        # Lo demás que ya tiene encima (otro pedido sin responder o uno
+        # aprobado por descontar), sin contar este mismo.
+        encima = (pr.comprometido(session, code) - monto).quantize(Decimal("0.01"))
+        debe = pr.total_por_cobrar(session, code)
     except Exception:  # noqa: BLE001 — el aviso vale más que su adorno
         return []
 
-    # No se consulta lo que ya debe: `pedir` no la deja pedir si tiene algo por
-    # cobrar, así que aquí siempre sería cero.
-    return [
+    lineas = [
         f"Lleva ganado: ${ganado:,.2f}",
         f"Puede pedir hasta: ${tope:,.2f}",
-        f"Le quedarían: ${ganado - monto:,.2f} de su próximo pago",
     ]
+    if encima > 0:
+        lineas.append(f"Ya debe o tiene pedido: ${encima:,.2f} (aparte de este)")
+    lineas.append(f"Le quedarían: ${ganado - monto - debe:,.2f} de su próximo pago")
+    return lineas

@@ -76,16 +76,29 @@ class PedirTest(_Base):
             self._pedir(monto="100")
         self.assertIn("no llevas nada ganado", str(caso.exception))
 
-    def test_no_se_amontonan_las_solicitudes(self):
-        self._pedir()
-        with self.assertRaises(pr.NoSePuede):
-            self._pedir()
+    def test_puede_pedir_varios_mientras_la_suma_quepa(self):
+        """Daniel, 2026-10-26: «solo les permite un préstamo». Ahora el tope
+        es sobre la suma: lo pedido + lo que debe + lo nuevo ≤ 70% de lo ganado."""
+        with self._ganado("1000"):                      # tope 700
+            self._pedir(monto="400")                    # pedido, sin responder
+            self.assertEqual(pr.disponible_para(self.s, "VEND-5"), Decimal("300.00"))
+            self._pedir(monto="300")                    # cabe justo
+            with self.assertRaises(pr.NoSePuede) as caso:
+                self._pedir(monto="1")
+        self.assertIn("ya tienes pedidos o por descontar", str(caso.exception))
+        self.assertIn("$700.00", str(caso.exception))
 
-    def test_no_pide_otro_si_todavia_le_deben_descontar_uno(self):
-        p = self._pedir()
-        pr.aprobar(self.s, p.id, quien="VEND-1")
-        with self.assertRaises(pr.NoSePuede):
-            self._pedir()
+    def test_lo_aprobado_por_descontar_tambien_cuenta_en_el_tope(self):
+        with self._ganado("1000"):
+            p = self._pedir(monto="500")
+            pr.aprobar(self.s, p.id, quien="VEND-1")
+            self.assertEqual(pr.comprometido(self.s, "VEND-5"), Decimal("500.00"))
+            self._pedir(monto="200")                    # 500 + 200 = 700, pasa
+            with self.assertRaises(pr.NoSePuede):
+                self._pedir(monto="1")
+        # Al cobrarlos el tope vuelve a estar libre.
+        pr.marcar_cobrados(self.s, "VEND-5")
+        self.assertEqual(pr.comprometido(self.s, "VEND-5"), Decimal("200.00"))   # el pedido sigue ahí
 
 
 class AprobarTest(_Base):
