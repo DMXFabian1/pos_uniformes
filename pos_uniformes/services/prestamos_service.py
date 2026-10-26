@@ -91,6 +91,11 @@ def pedir(session: Session, *, employee_code: str, nombre: str, monto, motivo: s
     encima = comprometido(session, employee_code)
     disponible = max(tope - encima, Decimal("0.00")).quantize(_CENT)
     if monto > disponible:
+        if disponible <= 0:
+            raise NoSePuede(
+                f"Con los ${encima:,.2f} que ya tienes pedidos o por descontar llegas al tope de hoy "
+                f"(${tope:,.2f}, el 70% de lo que llevas ganado). Cuando te paguen vuelve a subir."
+            )
         if encima:
             raise NoSePuede(
                 f"Lo más que puedes pedir hoy son ${disponible:,.2f}: el 70% de lo que llevas "
@@ -122,6 +127,16 @@ def pendiente_de(session: Session, employee_code: str) -> PrestamoEmpleada | Non
             PrestamoEmpleada.estado == PEDIDO,
         ).order_by(PrestamoEmpleada.id)
     ).first()
+
+
+def pendientes_de(session: Session, employee_code: str) -> list[PrestamoEmpleada]:
+    """Todas sus solicitudes sin responder (puede tener varias, 2026-10-26)."""
+    return list(session.scalars(
+        select(PrestamoEmpleada).where(
+            PrestamoEmpleada.employee_code == str(employee_code),
+            PrestamoEmpleada.estado == PEDIDO,
+        ).order_by(PrestamoEmpleada.id)
+    ).all())
 
 
 def pendientes(session: Session) -> list[PrestamoEmpleada]:

@@ -85,8 +85,17 @@ class PedirTest(_Base):
             self._pedir(monto="300")                    # cabe justo
             with self.assertRaises(pr.NoSePuede) as caso:
                 self._pedir(monto="1")
-        self.assertIn("ya tienes pedidos o por descontar", str(caso.exception))
+        self.assertIn("llegas al tope de hoy", str(caso.exception))
         self.assertIn("$700.00", str(caso.exception))
+        self.assertEqual([float(p.monto) for p in pr.pendientes_de(self.s, "VEND-5")], [400.0, 300.0])
+
+    def test_si_le_cabe_algo_pero_pide_de_mas_le_dice_cuanto_le_cabe(self):
+        with self._ganado("1000"):
+            self._pedir(monto="400")
+            with self.assertRaises(pr.NoSePuede) as caso:
+                self._pedir(monto="301")
+        self.assertIn("$300.00", str(caso.exception))
+        self.assertIn("$400.00 que ya tienes pedidos o por descontar", str(caso.exception))
 
     def test_lo_aprobado_por_descontar_tambien_cuenta_en_el_tope(self):
         with self._ganado("1000"):

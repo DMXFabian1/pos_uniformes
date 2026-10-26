@@ -2642,7 +2642,7 @@ class QuoteSatelliteWindow(QMainWindow):
             from pos_uniformes.services import prestamos_service as pr
 
             with get_session() as session:
-                pendiente = pr.pendiente_de(session, code)
+                pendientes = [(float(p.monto), str(p.motivo)) for p in pr.pendientes_de(session, code)]
                 por_cobrar = pr.total_por_cobrar(session, code)
                 disponible = pr.disponible_para(session, code)
         except Exception:  # noqa: BLE001 — sin servidor, mejor no ofrecerlo
@@ -2654,11 +2654,8 @@ class QuoteSatelliteWindow(QMainWindow):
         # Puede tener varios (2026-10-26): se le dice en qué van y, si todavía
         # le cabe otro en el 70% de lo ganado, el botón se queda.
         partes = []
-        if pendiente is not None:
-            partes.append(
-                f"💵 Pediste ${float(pendiente.monto):,.2f} para «{pendiente.motivo}». "
-                "Daniel todavía no responde."
-            )
+        for monto_p, motivo_p in pendientes:
+            partes.append(f"💵 Pediste ${monto_p:,.2f} para «{motivo_p}». Daniel todavía no responde.")
         if por_cobrar:
             partes.append(f"💵 Se te descontarán ${float(por_cobrar):,.2f} de tu siguiente pago.")
         aviso.setText("\n".join(partes))
