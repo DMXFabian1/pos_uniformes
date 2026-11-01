@@ -44,11 +44,23 @@
   .tnum{font-variant-numeric:tabular-nums}
 
   .app{max-width:480px;margin:0 auto;min-height:100dvh;display:flex;flex-direction:column;position:relative;overflow:hidden}
-  .screen{flex:1 1 auto;overflow-y:auto;padding-bottom:96px;animation:fade .3s ease}
+  .screen{flex:1 1 auto;overflow-y:auto;padding-bottom:96px;animation:fade .3s ease;overscroll-behavior-y:contain}
+
+   
+  .ptr{position:absolute;top:0;left:0;right:0;display:flex;justify-content:center;z-index:20;pointer-events:none}
+  .ptr .disc{width:38px;height:38px;border-radius:50%;background:var(--surface);box-shadow:var(--shadow-lg);display:flex;align-items:center;justify-content:center;color:var(--accent);margin-top:12px;transform:translateY(-64px);opacity:0;transition:transform .25s cubic-bezier(.2,1,.32,1),opacity .25s ease}
+  .ptr.pulling .disc{transition:none}
+  .ptr.loading .disc .msr{animation:spin360 .8s linear infinite}
+  @keyframes spin360{to{transform:rotate(360deg)}}
   .hidden{display:none!important}
   @keyframes fade{from{opacity:0}to{opacity:1}}
   @keyframes up{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
   @keyframes sheet{from{transform:translateY(101%)}to{transform:translateY(0)}}
+  @keyframes sheetout{from{transform:translateY(0)}to{transform:translateY(101%)}}
+  @keyframes fadeout{from{opacity:1}to{opacity:0}}
+  .closing{pointer-events:none}
+  .closing .sheet{animation:sheetout .28s cubic-bezier(.55,0,.8,.4) forwards}
+  .closing .backdrop{animation:fadeout .28s ease forwards}
   @keyframes toastin{from{opacity:0;transform:translateY(16px) scale(.96)}to{opacity:1;transform:none}}
 
    
@@ -99,7 +111,7 @@
   .row .amt small{font-size:10.5px;font-weight:600;color:var(--text-3)}
   .chip{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px}
   .chip.ok{color:var(--ok);background:var(--ok-bg)} .chip.warn{color:var(--warn);background:var(--warn-bg)}
-  .chip.bad{color:var(--bad);background:var(--bad-bg)}
+  .chip.bad{color:var(--bad);background:var(--bad-bg)} .chip.mut{color:var(--text-3);background:var(--surface-2)}
 
    
   .pcard{margin:8px 18px 0;background:var(--surface);border:1px solid var(--border);border-radius:22px;padding:16px;box-shadow:var(--shadow);animation:up .3s ease}
@@ -109,6 +121,8 @@
   .btn{flex:1;padding:12px;border-radius:14px;font-weight:800;font-size:14px;display:flex;align-items:center;justify-content:center;gap:6px}
   .btn.reject{background:var(--bad-bg);color:var(--bad)} .btn.accept{background:var(--accent);color:var(--on-accent)}
   .btn:active{transform:scale(.97)}
+  .btn[disabled]{opacity:.6;pointer-events:none}
+  .spin-ico{animation:spin360 .8s linear infinite}
   .empty{margin:16px 18px;padding:40px 24px;border-radius:24px;background:var(--surface);text-align:center;box-shadow:var(--shadow)}
   .empty .big{width:64px;height:64px;border-radius:50%;background:var(--ok-bg);display:inline-flex;align-items:center;justify-content:center;color:var(--ok)}
 
@@ -147,6 +161,9 @@
   .cta:disabled{opacity:.5}
 
    
+  .wdots{display:flex;gap:6px;padding:4px 20px 6px}
+  .wdots span{flex:1;height:4px;border-radius:999px;background:var(--surface-2);transition:background .25s ease}
+  .wdots span.on{background:var(--accent)}
   .amount{text-align:center;font-size:44px;font-weight:800;letter-spacing:-1.5px;line-height:1.05}
   .amount.zero{color:var(--text-3)}
   .amount-lab{text-align:center;font-size:11.5px;font-weight:800;color:var(--text-3);letter-spacing:.4px;text-transform:uppercase}
@@ -204,6 +221,9 @@
   <div class="app" id="app">
 
     
+    <div class="ptr" id="ptr"><div class="disc"><span class="msr" style="font-size:20px">refresh</span></div></div>
+
+    
     <div class="loader" id="loader"><div class="spin"><span class="msr" style="font-size:34px">sync_alt</span></div></div>
 
     
@@ -220,8 +240,8 @@
         <span class="blob" style="top:-46px;right:-34px;width:172px;height:172px"></span>
         <span class="blob" style="bottom:-64px;left:-26px;width:158px;height:158px;background:rgba(255,255,255,.09)"></span>
         <div class="hero-row">
-          <span style="font-size:13px;font-weight:700;opacity:.92" id="hero-pair"></span>
-          <span class="pill"><span class="msr" style="font-size:14px">menu_book</span><span id="hero-app"></span></span>
+          <span style="font-size:13px;font-weight:700;opacity:.92">Daniel &#8596; Coraima</span>
+          <span class="pill"><span class="msr" style="font-size:14px">menu_book</span>Libro mayor</span>
         </div>
         <div class="hero-title" id="hero-title">Saldo actual</div>
         <div class="hero-amount tnum" id="hero-amount">$0.00</div>
@@ -232,7 +252,7 @@
       <div class="actions">
         <button class="action-main" id="btn-registrar">
           <span class="action-ico"><span class="msr" style="font-size:26px">add</span></span>
-          <span><b style="font-size:15.5px">Registrar movimiento</b><br><span style="font-size:12px;opacity:.85">Préstamo, pago o ajuste</span></span>
+          <span><b style="font-size:15.5px">Registrar movimiento</b><br><span style="font-size:12px;opacity:.85">Envío, pago o ajuste</span></span>
           <span class="msr" style="margin-left:auto;opacity:.8">chevron_right</span>
         </button>
         <button class="tile" id="tile-pend">
@@ -253,6 +273,12 @@
     
     <section class="screen hidden" id="scr-historial">
       <div class="page-h"><h1>Historial</h1><p>Cada hecho financiero queda registrado</p></div>
+      <div style="padding:0 18px 2px">
+        <input class="input" id="f-q" placeholder="Buscar por concepto…">
+        <div class="chips" id="f-estado"></div>
+        <div class="chips" id="f-persona" style="padding-top:2px"></div>
+        <div class="chips" id="f-mes" style="padding-top:2px"></div>
+      </div>
       <div id="history-list"></div>
     </section>
 
@@ -265,11 +291,21 @@
     
     <section class="screen hidden" id="scr-stats">
       <div class="page-h"><h1>Estadísticas</h1><p>Solo cuenta lo confirmado</p></div>
+      <div class="chips" id="s-period" style="padding:6px 18px 2px"></div>
+      <div id="s-resumen"></div>
       <div class="card chartcard">
-        <div style="display:flex;align-items:baseline;justify-content:space-between"><b style="font-size:13.5px">Saldo a fin de mes</b><span style="font-size:11.5px;font-weight:600;color:var(--text-2)">MXN</span></div>
-        <div class="bars" id="chart-bars"></div>
+        <div style="display:flex;align-items:baseline;justify-content:space-between"><b style="font-size:13.5px">Evolución del saldo</b><span style="font-size:11.5px;font-weight:600;color:var(--text-2)">MXN</span></div>
+        <div id="chart-line" style="margin-top:12px"></div>
+      </div>
+      <div class="card chartcard">
+        <div style="display:flex;align-items:baseline;justify-content:space-between"><b style="font-size:13.5px">Flujo mensual</b><span style="font-size:11.5px;font-weight:600;color:var(--text-2)">ida y vuelta</span></div>
+        <div id="chart-flow"></div>
       </div>
       <div class="stats" id="stats-grid"></div>
+      <div class="card chartcard" style="margin-bottom:8px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between"><b style="font-size:13.5px">Top conceptos</b><span style="font-size:11.5px;font-weight:600;color:var(--text-2)">en el periodo</span></div>
+        <div id="top-conceptos" style="margin-top:4px"></div>
+      </div>
     </section>
 
     
@@ -290,9 +326,6 @@
 (function () {
   'use strict';
 
-  var CFG = <?!= clientConfigJson() ?>;
-  var APP_TITLE = CFG.titulo;
-
    
   var $ = function (s, r) { return (r || document).querySelector(s); };
   var MONEY = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'MXN', minimumFractionDigits: 2 });
@@ -301,32 +334,28 @@
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
   function el(html) { var t = document.createElement('template'); t.innerHTML = html.trim(); return t.content.firstChild; }
 
-  var PERSONAS = CFG.personas;
-  var P1 = PERSONAS[0], P2 = PERSONAS[1];
-  var TIPOS = [P1 + ' prestó dinero', P2 + ' prestó dinero', P1 + ' recibió un pago', P2 + ' recibió un pago', 'Ajuste'];
+  var PERSONAS = ['Daniel', 'Coraima'];
+  var TIPOS = ['Daniel envió dinero', 'Coraima envió dinero', 'Daniel recibió dinero', 'Coraima recibió dinero', 'Ajuste de saldo'];
   var METODOS = ['Transferencia', 'Tarjeta', 'Efectivo'];
-  var CHIPS = ['Renta', 'Súper', 'Gasolina', 'Comida', 'Efectivo', 'Transferencia', 'Servicios', 'Préstamo'];
+  var CHIPS = ['Venta Cori', 'Pago', 'Abono', 'Súper', 'Gasolina', 'Comida', 'Servicios', 'Préstamo'];
 
-  function personColor(n) { return n === P1 ? CFG.colores[0] : CFG.colores[1]; }
-  function other(n) { return n === P1 ? P2 : P1; }
-  function signForType(t) { if (t === P1 + ' prestó dinero' || t === P2 + ' recibió un pago') return 1; if (t === P2 + ' prestó dinero' || t === P1 + ' recibió un pago') return -1; return 1; }
-  function signed(m) { return m.tipo === 'Ajuste' ? Number(m.monto) : signForType(m.tipo) * Math.abs(Number(m.monto)); }
-  // Convención única de signo: todo se muestra desde el punto de vista del
-  // usuario activo (positivo = a su favor). Los datos se guardan siempre
-  // desde el punto de vista de P1; aquí solo se traducen al mostrar.
-  function relativo(n) { return ST.identity === P2 ? -Number(n || 0) : Number(n || 0); }
-  function etiquetaSaldo(v) {
-    var rel = relativo(v);
-    if (Math.abs(rel) < 0.005) return 'A mano';
-    return rel > 0 ? 'A tu favor ' + money(rel) : 'Debes ' + money(-rel);
-  }
+  function personColor(n) { return n === 'Daniel' ? '#a5673a' : '#c25d84'; }
+  function other(n) { return n === 'Daniel' ? 'Coraima' : 'Daniel'; }
+  function signForType(t) { if (t === 'Daniel envió dinero' || t === 'Coraima recibió dinero') return 1; if (t === 'Coraima envió dinero' || t === 'Daniel recibió dinero') return -1; return 1; }
+  function signed(m) { return m.tipo === 'Ajuste de saldo' ? Number(m.monto) : signForType(m.tipo) * Math.abs(Number(m.monto)); }
+  
+  
+  function vSign() { return ST.identity === 'Coraima' ? -1 : 1; }
+  function signedView(m) { return signed(m) * vSign(); }
 
   function typeMeta(t) {
-    if (t === P1 + ' prestó dinero') return { icon: 'north_east', short: 'Préstamo de ' + P1, hint: P1 + ' le da dinero a ' + P2 };
-    if (t === P2 + ' prestó dinero') return { icon: 'south_west', short: 'Préstamo de ' + P2, hint: P2 + ' le da dinero a ' + P1 };
-    if (t === P1 + ' recibió un pago') return { icon: 'savings', short: 'Pago a ' + P1, hint: P2 + ' le paga a ' + P1 };
-    if (t === P2 + ' recibió un pago') return { icon: 'account_balance_wallet', short: 'Pago a ' + P2, hint: P1 + ' le paga a ' + P2 };
-    if (t === 'Ajuste') return { icon: 'tune', short: 'Ajuste', hint: 'Corrección manual del saldo' };
+    switch (t) {
+      case 'Daniel envió dinero': return { icon: 'north_east', short: 'Envío de Daniel', hint: 'Daniel le da dinero a Coraima' };
+      case 'Coraima envió dinero': return { icon: 'south_west', short: 'Envío de Coraima', hint: 'Coraima le da dinero a Daniel' };
+      case 'Daniel recibió dinero': return { icon: 'savings', short: 'Pago a Daniel', hint: 'Daniel recibe transferencia / Coraima le paga a Daniel' };
+      case 'Coraima recibió dinero': return { icon: 'account_balance_wallet', short: 'Pago a Coraima', hint: 'Daniel le paga a Coraima' };
+      case 'Ajuste de saldo': return { icon: 'tune', short: 'Ajuste de saldo', hint: 'Corrección manual del saldo' };
+    }
     return { icon: 'receipt_long', short: t, hint: '' };
   }
   function statusMeta(s) {
@@ -334,6 +363,8 @@
       case 'Confirmado': return { cls: 'ok', icon: 'check_circle', label: 'Confirmado' };
       case 'Pendiente': return { cls: 'warn', icon: 'schedule', label: 'Pendiente' };
       case 'Rechazado': return { cls: 'bad', icon: 'cancel', label: 'Rechazado' };
+      case 'Corregido': return { cls: 'mut', icon: 'edit', label: 'Corregido' };
+      case 'Cancelado': return { cls: 'mut', icon: 'block', label: 'Cancelado' };
       default: return { cls: 'warn', icon: 'history', label: s };
     }
   }
@@ -349,15 +380,17 @@
   function fmtStamp(iso) { if (!iso) return '—'; try { return new Date(iso).toLocaleString('es-MX', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); } catch (e) { return String(iso); } }
   function effectFor(t, amount, dir) {
     var a = Math.abs(Number(amount) || 0); if (!a) return '';
-    if (t === 'Ajuste') return 'Ajuste a favor de ' + ((dir || 1) > 0 ? P1 : P2) + ' · ' + money(a);
-    return signForType(t) > 0 ? P1 + ' le da ' + money(a) + ' a ' + P2 : P2 + ' le da ' + money(a) + ' a ' + P1;
+    if (t === 'Ajuste de saldo') return 'Ajuste a favor de ' + ((dir || 1) > 0 ? 'Daniel' : 'Coraima') + ' · ' + money(a);
+    return signForType(t) > 0 ? 'Daniel le da ' + money(a) + ' a Coraima' : 'Coraima le da ' + money(a) + ' a Daniel';
   }
   function todayStr() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
   function chrono(a, b) { var fa = String(a.fecha), fb = String(b.fecha); if (fa < fb) return -1; if (fa > fb) return 1; return String(a.creadoEn) < String(b.creadoEn) ? -1 : 1; }
 
    
-  var ST = { identity: null, tab: 'inicio', movements: [], saldo: 0, pendienteNeto: 0, busy: false };
+  var ST = { identity: null, tab: 'inicio', movements: [], saldo: 0, busy: false };
   var REG = null;
+  var FIL = { estado: '', persona: '', mes: '', q: '' };
+  var STATS_PERIOD = 'mes';
   var KEY_ID = 'lm_identity';
 
   function hasBackend() { return typeof google !== 'undefined' && google.script && google.script.run; }
@@ -366,20 +399,42 @@
     if (!hasBackend()) { onState(DEMO_STATE()); return; }
     google.script.run.withSuccessHandler(onState).withFailureHandler(onErr).api_getEstado();
   }
+  
+  var TIPOS_LEGADO = {
+    'Daniel prestó dinero': 'Daniel envió dinero',
+    'Coraima prestó dinero': 'Coraima envió dinero',
+    'Daniel recibió un pago': 'Daniel recibió dinero',
+    'Coraima recibió un pago': 'Coraima recibió dinero',
+    'Ajuste': 'Ajuste de saldo'
+  };
+  function normalizarMovs(list) {
+    return (list || []).map(function (m) { m.tipo = TIPOS_LEGADO[m.tipo] || m.tipo; return m; });
+  }
+  function procesarEstado(s) {
+    ST.movements = normalizarMovs(s && s.movimientos);
+    // El saldo y el saldo acumulado por fila se recalculan aquí, SOLO con
+    // confirmados (el saldoDespues del servidor viene con otra convención).
+    var run = 0;
+    ST.movements.slice().sort(chrono).forEach(function (m) {
+      if (m.estado === 'Confirmado') { run += signed(m); m.saldoReal = Math.round(run * 100) / 100; }
+      else { m.saldoReal = null; }
+    });
+    ST.saldo = Math.round(run * 100) / 100;
+    ST.pendienteNeto = ST.movements.filter(function (m) { return m.estado === 'Pendiente'; })
+      .reduce(function (a, m) { return a + signed(m); }, 0);
+  }
   function onState(s) {
-    ST.movements = (s && s.movimientos) || [];
-    ST.saldo = (s && s.saldo) || 0;
-    ST.pendienteNeto = (s && s.pendienteNeto) || 0;
+    procesarEstado(s);
     ST.busy = false;
     $('#loader').classList.add('hidden');
     renderAll();
   }
   function onErr(e) { ST.busy = false; toast('Error de conexión', 'error', 'var(--bad)'); if (window.console) console.error(e); }
-  function onErrServidor(e) {
-    ST.busy = false;
-    var msg = (e && e.message) ? String(e.message).replace(/^Error:\s*/, '') : 'Error de conexión';
-    toast(msg, 'error', 'var(--bad)');
-    if (window.console) console.error(e);
+  function onErrMsg(e) { ST.busy = false; var msg = (e && e.message) ? String(e.message).replace(/^Error:\s*/, '') : 'Error de conexión'; toast(msg, 'error', 'var(--bad)'); if (window.console) console.error(e); }
+  function etiquetaSaldo(v) {
+    var rel = v * vSign();
+    if (Math.abs(rel) < 0.005) return 'A mano';
+    return rel > 0 ? 'A tu favor ' + money(rel) : 'Debes ' + money(-rel);
   }
 
    
@@ -389,14 +444,57 @@
   function fetchSilent() {
     if (!hasBackend() || overlayOpen()) return;
     google.script.run.withSuccessHandler(function (s) {
-      if (overlayOpen()) return;
-      ST.movements = (s && s.movimientos) || []; ST.saldo = (s && s.saldo) || 0; ST.pendienteNeto = (s && s.pendienteNeto) || 0; renderAll();
+      if (overlayOpen()) return; 
+      procesarEstado(s); renderAll();
     }).withFailureHandler(function () {}).api_getEstado();
   }
   function startSync() {
     setInterval(fetchSilent, 15000);
     document.addEventListener('visibilitychange', function () { if (!document.hidden) fetchSilent(); });
     window.addEventListener('focus', fetchSilent);
+  }
+
+   
+  function setupPullToRefresh() {
+    var ptr = $('#ptr'), disc = ptr.querySelector('.disc');
+    var THRESH = 70, MAXP = 110;
+    var startY = 0, pulling = false, dist = 0, refreshing = false;
+    function activeScreen() { return $('#scr-' + ST.tab); }
+    function resetDisc() { disc.style.transform = ''; disc.style.opacity = ''; }
+    function doRefresh(done) {
+      if (!hasBackend()) { setTimeout(function () { onState(DEMO_STATE()); toast('Actualizado', 'check_circle', 'var(--ok)'); done(); }, 700); return; }
+      google.script.run.withSuccessHandler(function (s) {
+        onState(s); toast('Actualizado', 'check_circle', 'var(--ok)'); done();
+      }).withFailureHandler(function (e) { onErr(e); done(); }).api_getEstado();
+    }
+    document.addEventListener('touchstart', function (e) {
+      if (refreshing || overlayOpen()) return;
+      var sc = activeScreen();
+      if (!sc || sc.scrollTop > 0) return;
+      startY = e.touches[0].clientY; pulling = true; dist = 0;
+    }, { passive: true });
+    document.addEventListener('touchmove', function (e) {
+      if (!pulling || refreshing) return;
+      var sc = activeScreen();
+      var dy = e.touches[0].clientY - startY;
+      if (dy <= 0 || (sc && sc.scrollTop > 0)) { dist = 0; ptr.classList.remove('pulling'); resetDisc(); return; }
+      dist = Math.min(MAXP, dy * 0.5); 
+      ptr.classList.add('pulling');
+      disc.style.opacity = Math.min(1, dist / THRESH);
+      disc.style.transform = 'translateY(' + (dist - 64) + 'px) rotate(' + Math.round(dist * 3) + 'deg)';
+      if (e.cancelable) e.preventDefault(); 
+    }, { passive: false });
+    document.addEventListener('touchend', function () {
+      if (!pulling) return;
+      pulling = false; ptr.classList.remove('pulling');
+      if (dist >= THRESH && !refreshing) {
+        refreshing = true;
+        ptr.classList.add('loading');
+        disc.style.transform = 'translateY(0)'; disc.style.opacity = '1';
+        doRefresh(function () { refreshing = false; ptr.classList.remove('loading'); resetDisc(); });
+      } else { resetDisc(); }
+      dist = 0;
+    });
   }
 
    
@@ -411,11 +509,11 @@
     $('#me-name').textContent = ST.identity;
   }
   function renderHero() {
-    var bal = relativo(ST.saldo);
+    var bal = ST.saldo * vSign();
     $('#hero-title').textContent = 'Saldo actual';
     $('#hero-amount').textContent = money(Math.abs(bal));
     $('#hero-sub').textContent = Math.abs(bal) < 0.005 ? 'Están a mano' : (bal > 0 ? 'A tu favor' : 'Le debes a ' + other(ST.identity));
-    var pend = relativo(ST.pendienteNeto);
+    var pend = (ST.pendienteNeto || 0) * vSign();
     var hp = $('#hero-pend');
     if (Math.abs(pend) >= 0.005) {
       hp.textContent = (pend >= 0 ? '+' : '−') + money(Math.abs(pend)) + ' por aprobar';
@@ -425,23 +523,19 @@
     }
   }
   function rowHtml(m) {
-    var meta = typeMeta(m.tipo), st = statusMeta(m.estado), s = relativo(signed(m)), pos = s >= 0;
+    var meta = typeMeta(m.tipo), st = statusMeta(m.estado), s = signedView(m), pos = s >= 0;
     var concept = (m.concepto && m.concepto.trim()) ? m.concepto : meta.short;
     var by = m.registradoPor === ST.identity ? 'Tú' : m.registradoPor;
     var amt = (pos ? '+' : '−') + money(Math.abs(m.monto));
     var bal = '';
-    if (m.saldoDespues != null) {
-      var rel = relativo(m.saldoDespues);
-      bal = Math.abs(rel) < 0.005 ? '<small>A mano</small>'
-        : rel > 0 ? '<small style="color:var(--ok)">A tu favor ' + money(rel) + '</small>'
-          : '<small style="color:var(--bad)">Debes ' + money(-rel) + '</small>';
+    if (m.saldoReal != null) {
+      var relS = m.saldoReal * vSign();
+      var colS = Math.abs(relS) < 0.005 ? 'var(--text-3)' : (relS > 0 ? 'var(--ok)' : 'var(--bad)');
+      bal = '<small style="color:' + colS + '">' + etiquetaSaldo(m.saldoReal) + '</small>';
     }
-    var orig = (m.monedaOriginal && m.montoOriginal)
-      ? '<span class="meta" style="color:var(--text-3)">' + esc(m.monedaOriginal) + ' ' + Number(m.montoOriginal).toLocaleString('es-MX') + '</span>'
-      : '';
     return '<button class="row" data-uuid="' + m.uuid + '">' +
       '<span class="ico"><span class="msr" style="font-size:23px">' + meta.icon + '</span></span>' +
-      '<span class="mid"><span class="concept">' + esc(concept) + '</span>' + orig +
+      '<span class="mid"><span class="concept">' + esc(concept) + '</span>' +
       '<span class="meta">' + esc(by) + ' · ' + '<span class="chip ' + st.cls + '"><span class="msr fill" style="font-size:12px">' + st.icon + '</span>' + st.label + '</span></span></span>' +
       '<span class="amt"><b class="tnum" style="color:' + (m.estado === 'Confirmado' ? 'var(--text)' : 'var(--text-3)') + '">' + amt + '</b>' + bal + '</span></button>';
   }
@@ -451,10 +545,33 @@
     if (!list.length) { box.innerHTML = '<div class="empty" style="padding:26px"><span class="msr" style="font-size:34px;color:var(--text-3)">receipt_long</span><div style="margin-top:8px;font-size:13.5px;font-weight:600;color:var(--text-2)">Aún no hay movimientos.<br>Toca <b style="color:var(--accent)">+</b> para registrar el primero.</div></div>'; return; }
     box.innerHTML = list.map(rowHtml).join('');
   }
+  function matchesFilters(m) {
+    if (FIL.estado && m.estado !== FIL.estado) return false;
+    if (FIL.persona && m.registradoPor !== FIL.persona) return false;
+    if (FIL.mes && String(m.fecha).slice(0, 7) !== FIL.mes) return false;
+    if (FIL.q) {
+      var hay = ((m.concepto || '') + ' ' + m.tipo + ' ' + (m.metodo || '')).toLowerCase();
+      if (hay.indexOf(FIL.q) === -1) return false;
+    }
+    return true;
+  }
+  function buildFilterChips() {
+    var estados = [['', 'Todos'], ['Pendiente', 'Pendientes'], ['Confirmado', 'Confirmados'], ['Rechazado', 'Rechazados'], ['Corregido', 'Corregidos'], ['Cancelado', 'Cancelados']];
+    $('#f-estado').innerHTML = estados.map(function (x) { return '<button class="cchip' + (FIL.estado === x[0] ? ' sel' : '') + '" data-f-estado="' + x[0] + '">' + x[1] + '</button>'; }).join('');
+    var personas = [['', 'Ambos'], ['Daniel', 'Registró Daniel'], ['Coraima', 'Registró Coraima']];
+    $('#f-persona').innerHTML = personas.map(function (x) { return '<button class="cchip' + (FIL.persona === x[0] ? ' sel' : '') + '" data-f-persona="' + x[0] + '">' + x[1] + '</button>'; }).join('');
+    var meses = {}; ST.movements.forEach(function (m) { var k = String(m.fecha).slice(0, 7); if (/^\d{4}-\d{2}$/.test(k)) meses[k] = true; });
+    var names = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+    var keys = Object.keys(meses).sort().reverse();
+    $('#f-mes').innerHTML = '<button class="cchip' + (FIL.mes === '' ? ' sel' : '') + '" data-f-mes="">Todo el tiempo</button>' + keys.map(function (k) {
+      return '<button class="cchip' + (FIL.mes === k ? ' sel' : '') + '" data-f-mes="' + k + '">' + names[+k.slice(5, 7) - 1] + ' ' + k.slice(0, 4) + '</button>';
+    }).join('');
+  }
   function renderHistory() {
+    buildFilterChips();
     var box = $('#history-list');
-    var list = ST.movements.slice().sort(chrono).reverse();
-    if (!list.length) { box.innerHTML = '<div class="empty">Sin movimientos todavía.</div>'; return; }
+    var list = ST.movements.filter(matchesFilters).sort(chrono).reverse();
+    if (!list.length) { box.innerHTML = '<div class="empty">' + (ST.movements.length ? 'Nada coincide con los filtros.' : 'Sin movimientos todavía.') + '</div>'; return; }
     var html = '', lastLabel = null;
     list.forEach(function (m) {
       var lab = fmtDate(m.fecha);
@@ -473,7 +590,7 @@
     if (actionable.length) {
       html += '<div class="subhead">Requieren tu aprobación</div>';
       actionable.forEach(function (m) {
-        var meta = typeMeta(m.tipo), s = relativo(signed(m)), amt = (s >= 0 ? '+' : '−') + money(Math.abs(m.monto));
+        var meta = typeMeta(m.tipo), s = signedView(m), amt = (s >= 0 ? '+' : '−') + money(Math.abs(m.monto));
         html += '<div class="pcard"><div class="head">' +
           '<span class="ico"><span class="msr" style="font-size:25px">' + meta.icon + '</span></span>' +
           '<span class="mid"><span class="concept" style="font-size:15px;font-weight:800">' + esc(m.concepto || meta.short) + '</span>' +
@@ -487,7 +604,7 @@
     if (waiting.length) {
       html += '<div class="subhead">Esperando aprobación</div>';
       waiting.forEach(function (m) {
-        var s = relativo(signed(m)), amt = (s >= 0 ? '+' : '−') + money(Math.abs(m.monto));
+        var s = signedView(m), amt = (s >= 0 ? '+' : '−') + money(Math.abs(m.monto));
         html += '<div class="pcard" style="display:flex;align-items:center;gap:12px;border:none"><span class="ico" style="color:var(--text-3)"><span class="msr" style="font-size:22px">schedule</span></span>' +
           '<span class="mid"><span class="concept">' + esc(m.concepto || typeMeta(m.tipo).short) + '</span><span class="meta" style="color:var(--warn)">Esperando a ' + other(m.registradoPor) + '</span></span>' +
           '<b class="tnum" style="font-size:15px">' + amt + '</b></div>';
@@ -497,34 +614,172 @@
       html = '<div class="empty"><span class="big"><span class="msr fill" style="font-size:36px">task_alt</span></span><div style="margin-top:14px;font-size:16px;font-weight:800">Todo al día</div><div style="margin-top:4px;font-size:13px;color:var(--text-2);font-weight:600">No hay movimientos por aprobar.</div></div>';
     }
     box.innerHTML = html;
+    
+    
+    Object.keys(PENDING_OPS).forEach(function (u) { setCardBusy(u, PENDING_OPS[u]); });
+  }
+  var MES_CORTO = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
+  function periodStart() {
+    var d = new Date();
+    if (STATS_PERIOD === 'mes') return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-01';
+    if (STATS_PERIOD === '3m') { var m = new Date(d.getFullYear(), d.getMonth() - 2, 1); return m.getFullYear() + '-' + String(m.getMonth() + 1).padStart(2, '0') + '-01'; }
+    if (STATS_PERIOD === 'anio') return d.getFullYear() + '-01-01';
+    return '';
+  }
+  function buildSeries(confAll, start) {
+    var run = 0, all = [];
+    confAll.forEach(function (m) { run += signed(m); all.push({ fecha: String(m.fecha).slice(0, 10), bal: run }); });
+    if (!start) return all;
+    var out = all.filter(function (p) { return p.fecha >= start; });
+    var before = all.filter(function (p) { return p.fecha < start; });
+    if (before.length) out.unshift({ fecha: start, bal: before[before.length - 1].bal }); 
+    return out;
   }
   function renderStats() {
-    var conf = ST.movements.filter(function (m) { return m.estado === 'Confirmado'; });
+    var confAll = ST.movements.filter(function (m) { return m.estado === 'Confirmado'; }).sort(chrono);
+    var start = periodStart();
+    var conf = start ? confAll.filter(function (m) { return String(m.fecha).slice(0, 10) >= start; }) : confAll;
+
+    var periods = [['mes', 'Este mes'], ['3m', '3 meses'], ['anio', 'Este a\u00f1o'], ['todo', 'Todo']];
+    $('#s-period').innerHTML = periods.map(function (p) { return '<button class="cchip' + (STATS_PERIOD === p[0] ? ' sel' : '') + '" data-period="' + p[0] + '">' + p[1] + '</button>'; }).join('');
+
+    renderResumenMes(confAll);
+    
+    renderLineChart(buildSeries(confAll, start).map(function (p) { return { fecha: p.fecha, bal: p.bal * vSign() }; }));
+    renderFlowChart(conf);
+    renderGrid(conf);
+    renderTopConceptos(conf);
+  }
+  function renderResumenMes(confAll) {
+    var now = new Date();
+    var kNow = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+    var prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    var kPrev = prev.getFullYear() + '-' + String(prev.getMonth() + 1).padStart(2, '0');
+    var mesActual = confAll.filter(function (m) { return String(m.fecha).slice(0, 7) === kNow; });
+    var mesPrev = confAll.filter(function (m) { return String(m.fecha).slice(0, 7) === kPrev; });
+    var neto = mesActual.reduce(function (a, m) { return a + signed(m); }, 0);
+    
+    
+    var esDineroReal = function (m) { return m.tipo !== 'Ajuste de saldo'; };
+    var movido = mesActual.filter(esDineroReal).reduce(function (a, m) { return a + Math.abs(m.monto); }, 0);
+    var movidoPrev = mesPrev.filter(esDineroReal).reduce(function (a, m) { return a + Math.abs(m.monto); }, 0);
+    var comp = '';
+    if (!mesPrev.length) comp = 'Sin movimientos en ' + MES_CORTO[prev.getMonth()] + ' para comparar';
+    else if (movidoPrev > 0) {
+      var pct = Math.round((movido - movidoPrev) / movidoPrev * 100);
+      comp = pct === 0 ? 'Igual que en ' + MES_CORTO[prev.getMonth()] : Math.abs(pct) + '% ' + (pct > 0 ? 'm\u00e1s' : 'menos') + ' movido que en ' + MES_CORTO[prev.getMonth()];
+    }
+    var netoView = neto * vSign();
+    var sinCambio = Math.abs(neto) < 0.005;
+    var favorece = neto > 0 ? 'Daniel' : 'Coraima';
+    var dirTxt = sinCambio ? 'El saldo no se movi\u00f3 este mes' : 'El saldo se movi\u00f3 ' + (favorece === ST.identity ? 'a tu favor' : 'a favor de ' + favorece);
+    $('#s-resumen').innerHTML = '<div class="card chartcard">' +
+      '<div style="display:flex;align-items:baseline;justify-content:space-between"><b style="font-size:13.5px">Este mes</b><span style="font-size:11.5px;font-weight:600;color:var(--text-2)">' + MES_CORTO[now.getMonth()] + ' ' + now.getFullYear() + '</span></div>' +
+      '<div style="display:flex;align-items:center;gap:11px;margin-top:12px">' +
+      '<span class="tile-ico" style="background:' + (sinCambio ? 'var(--surface-2);color:var(--text-2)' : netoView > 0 ? 'var(--ok-bg);color:var(--ok)' : 'var(--bad-bg);color:var(--bad)') + '"><span class="msr" style="font-size:22px">' + (sinCambio ? 'remove' : netoView > 0 ? 'trending_up' : 'trending_down') + '</span></span>' +
+      '<span style="flex:1;min-width:0"><span style="font-size:12px;font-weight:600;color:var(--text-2)">' + dirTxt + '</span><br><b class="tnum" style="font-size:22px;letter-spacing:-.5px">' + (netoView >= 0 ? '+' : '\u2212') + money(Math.abs(netoView)) + '</b></span>' +
+      '</div>' +
+      '<div style="display:flex;gap:10px;margin-top:14px">' +
+      '<span style="flex:1;background:var(--inset);border-radius:12px;padding:9px 12px"><span style="font-size:10.5px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.3px">Total movido</span><br><b class="tnum" style="font-size:14.5px">' + money(movido) + '</b></span>' +
+      '<span style="flex:1;background:var(--inset);border-radius:12px;padding:9px 12px"><span style="font-size:10.5px;font-weight:700;color:var(--text-3);text-transform:uppercase;letter-spacing:.3px">Movimientos</span><br><b class="tnum" style="font-size:14.5px">' + mesActual.length + '</b></span>' +
+      '</div>' +
+      (comp ? '<div style="margin-top:11px;font-size:11.5px;font-weight:600;color:var(--text-2);display:flex;align-items:center;gap:6px"><span class="msr" style="font-size:15px;color:var(--accent)">compare_arrows</span>' + comp + '</div>' : '') +
+      '</div>';
+  }
+  function renderFlowChart(conf) {
+    var box = $('#chart-flow');
+    var map = {};
+    conf.forEach(function (m) {
+      var k = String(m.fecha).slice(0, 7);
+      if (!map[k]) map[k] = { ida: 0, vuelta: 0 };
+      var s = signed(m);
+      if (s >= 0) map[k].ida += s; else map[k].vuelta += -s;
+    });
+    var keys = Object.keys(map).sort().slice(-6);
+    if (!keys.length) { box.innerHTML = '<div style="padding:24px 0;text-align:center;font-size:12.5px;color:var(--text-3);font-weight:600">Sin movimientos confirmados en este periodo.</div>'; return; }
+    var mx = 1;
+    keys.forEach(function (k) { mx = Math.max(mx, map[k].ida, map[k].vuelta); });
+    box.innerHTML = '<div class="bars" style="margin-top:14px">' + keys.map(function (k) {
+      var hi = Math.max(4, Math.round(map[k].ida / mx * 100)), hv = Math.max(4, Math.round(map[k].vuelta / mx * 100));
+      return '<button class="bar" data-flowmes="' + k + '">' +
+        '<div style="display:flex;gap:3px;align-items:flex-end;height:100%;width:100%;justify-content:center">' +
+        '<div style="width:14px;height:' + hi + '%;border-radius:6px 6px 3px 3px;background:' + personColor('Daniel') + '"></div>' +
+        '<div style="width:14px;height:' + hv + '%;border-radius:6px 6px 3px 3px;background:' + personColor('Coraima') + '"></div></div>' +
+        '<span class="l">' + MES_CORTO[+k.slice(5, 7) - 1] + '</span></button>';
+    }).join('') + '</div>' +
+      '<div style="display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:12px;font-size:11px;font-weight:700;color:var(--text-2)">' +
+      '<span style="display:inline-flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:3px;background:' + personColor('Daniel') + '"></span>Daniel \u2192 Coraima</span>' +
+      '<span style="display:inline-flex;align-items:center;gap:5px"><span style="width:9px;height:9px;border-radius:3px;background:' + personColor('Coraima') + '"></span>Coraima \u2192 Daniel</span></div>' +
+      '<div style="margin-top:7px;font-size:10.5px;font-weight:600;color:var(--text-3)">Toca un mes para ver sus movimientos</div>';
+  }
+  function renderGrid(conf) {
     var sum = function (p) { return conf.filter(p).reduce(function (a, m) { return a + Math.abs(m.monto); }, 0); };
-    var asc = conf.slice().sort(chrono), run = 0, series = [];
-    asc.forEach(function (m) { run += signed(m); series.push({ fecha: m.fecha, bal: relativo(run) }); });
-    var bals = series.map(function (x) { return x.bal; });
     var pend = ST.movements.filter(function (m) { return m.estado === 'Pendiente'; }).length;
-
-    var mmap = {}; series.forEach(function (p) { mmap[p.fecha.slice(0, 7)] = p.bal; });
-    var mkeys = Object.keys(mmap).sort();
-    var names = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'];
-    var mmax = Math.max.apply(null, mkeys.map(function (k) { return Math.abs(mmap[k]); }).concat([1]));
-    $('#chart-bars').innerHTML = mkeys.length ? mkeys.map(function (k) {
-      var v = mmap[k], h = Math.max(6, Math.round(Math.abs(v) / mmax * 100));
-      return '<div class="bar"><span class="v tnum">' + moneyShort(v) + '</span><div class="fill2" style="height:' + h + '%"></div><span class="l">' + names[+k.slice(5, 7) - 1] + '</span></div>';
-    }).join('') : '<div style="padding:26px 0;text-align:center;width:100%;font-size:12.5px;color:var(--text-3);font-weight:600">Sin datos confirmados aún.</div>';
-
+    var movido = conf.filter(function (m) { return m.tipo !== 'Ajuste de saldo'; }).reduce(function (a, m) { return a + Math.abs(m.monto); }, 0);
+    var mesesSet = {};
+    conf.forEach(function (m) { mesesSet[String(m.fecha).slice(0, 7)] = 1; });
+    var nMeses = Math.max(1, Object.keys(mesesSet).length);
+    var esperas = [];
+    conf.forEach(function (m) {
+      var fin = Math.max(Date.parse(m.fechaAprobDaniel) || 0, Date.parse(m.fechaAprobCoraima) || 0);
+      var ini = Date.parse(m.creadoEn) || 0;
+      if (fin && ini && fin >= ini) esperas.push(fin - ini);
+    });
+    var espera = '\u2014';
+    if (esperas.length) {
+      var prom = esperas.reduce(function (a, b) { return a + b; }, 0) / esperas.length;
+      var h = prom / 3600000;
+      espera = h < 1 ? Math.max(1, Math.round(prom / 60000)) + ' min' : h < 48 ? (Math.round(h * 10) / 10) + ' h' : (Math.round(h / 24 * 10) / 10) + ' d\u00edas';
+    }
     var g = [
-      stat('Prestó ' + P1, money(sum(function (m) { return m.tipo === P1 + ' prestó dinero'; }))),
-      stat('Prestó ' + P2, money(sum(function (m) { return m.tipo === P2 + ' prestó dinero'; }))),
-      '<div class="stat full"><span class="tile-ico" style="background:var(--ok-bg);color:var(--ok)"><span class="msr fill" style="font-size:22px">payments</span></span><span><span class="k">Pagos realizados</span><div class="val tnum">' + money(sum(function (m) { return m.tipo.indexOf('recibió un pago') > -1; })) + '</div></span></div>',
-      stat('Confirmados', conf.length),
+      stat('Envi\u00f3 Daniel', money(sum(function (m) { return m.tipo === 'Daniel envi\u00f3 dinero'; }))),
+      stat('Envi\u00f3 Coraima', money(sum(function (m) { return m.tipo === 'Coraima envi\u00f3 dinero'; }))),
+      '<div class="stat full"><span class="tile-ico" style="background:var(--ok-bg);color:var(--ok)"><span class="msr fill" style="font-size:22px">payments</span></span><span><span class="k">Pagos realizados</span><div class="val tnum">' + money(sum(function (m) { return m.tipo.indexOf('recibi\u00f3 dinero') > -1; })) + '</div></span></div>',
+      stat('Movimientos', conf.length),
       stat('Pendientes', pend, 'var(--warn)'),
-      stat('Saldo máximo', money(bals.length ? Math.max.apply(null, bals) : 0), null, 17),
-      stat('Saldo mínimo', money(bals.length ? Math.min.apply(null, bals) : 0), null, 17)
+      stat('Promedio por mes', money(movido / nMeses), null, 17),
+      stat('Aprobaci\u00f3n promedio', espera, null, 17)
     ];
     $('#stats-grid').innerHTML = g.join('');
+  }
+  function renderLineChart(series) {
+    var box = $('#chart-line');
+    if (series.length < 2) { box.innerHTML = '<div style="padding:20px 0;text-align:center;font-size:12.5px;color:var(--text-3);font-weight:600">Se necesitan al menos 2 movimientos confirmados en el periodo.</div>'; return; }
+    var W = 320, H = 110, PAD = 6;
+    var vals = series.map(function (p) { return p.bal; });
+    var min = Math.min.apply(null, vals.concat([0])), max = Math.max.apply(null, vals.concat([0]));
+    if (max === min) max = min + 1;
+    var x = function (i) { return +(PAD + i * (W - 2 * PAD) / (series.length - 1)).toFixed(1); };
+    var y = function (v) { return +(PAD + (max - v) * (H - 2 * PAD) / (max - min)).toFixed(1); };
+    var pts = series.map(function (p, i) { return x(i) + ',' + y(p.bal); }).join(' ');
+    var zeroY = y(0);
+    var area = 'M' + x(0) + ',' + zeroY + ' L' + pts.split(' ').join(' L') + ' L' + x(series.length - 1) + ',' + zeroY + ' Z';
+    var last = series[series.length - 1];
+    box.innerHTML =
+      '<svg viewBox="0 0 ' + W + ' ' + (H + 6) + '" style="width:100%;display:block" preserveAspectRatio="none">' +
+      '<defs><linearGradient id="lg-saldo" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--accent)" stop-opacity=".28"/><stop offset="1" stop-color="var(--accent)" stop-opacity="0"/></linearGradient></defs>' +
+      '<line x1="' + PAD + '" y1="' + zeroY + '" x2="' + (W - PAD) + '" y2="' + zeroY + '" stroke="var(--border-2)" stroke-width="1" stroke-dasharray="4 4"/>' +
+      '<path d="' + area + '" fill="url(#lg-saldo)"/>' +
+      '<polyline points="' + pts + '" fill="none" stroke="var(--accent)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>' +
+      '<circle cx="' + x(series.length - 1) + '" cy="' + y(last.bal) + '" r="3.5" fill="var(--accent)"/>' +
+      '</svg>' +
+      '<div style="display:flex;justify-content:space-between;font-size:10.5px;font-weight:700;color:var(--text-3);margin-top:6px"><span>' + fmtDate(series[0].fecha) + '</span><span>\u00daltimo: <b class="tnum" style="color:var(--text)">' + money(last.bal) + '</b></span></div>';
+  }
+  function renderTopConceptos(conf) {
+    var box = $('#top-conceptos');
+    var tot = {};
+    conf.forEach(function (m) {
+      var k = (m.concepto && String(m.concepto).trim()) ? String(m.concepto).trim() : typeMeta(m.tipo).short;
+      tot[k] = (tot[k] || 0) + Math.abs(m.monto);
+    });
+    var top = Object.keys(tot).map(function (k) { return [k, tot[k]]; }).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 5);
+    if (!top.length) { box.innerHTML = '<div style="padding:16px 0;text-align:center;font-size:12.5px;color:var(--text-3);font-weight:600">Sin datos en este periodo.</div>'; return; }
+    var max = top[0][1];
+    box.innerHTML = top.map(function (t) {
+      var w = Math.max(4, Math.round(t[1] / max * 100));
+      return '<div style="margin-top:12px"><div style="display:flex;justify-content:space-between;gap:12px;font-size:12px;font-weight:700"><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(t[0]) + '</span><span class="tnum">' + money(t[1]) + '</span></div>' +
+        '<div style="height:7px;border-radius:99px;background:var(--surface-2);margin-top:5px"><div style="height:100%;width:' + w + '%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent-2))"></div></div></div>';
+    }).join('');
   }
   function stat(k, v, color, size) { return '<div class="stat"><div class="k">' + k + '</div><div class="val tnum" style="' + (color ? 'color:' + color + ';' : '') + (size ? 'font-size:' + size + 'px;' : '') + '">' + v + '</div></div>'; }
   function renderBadges() {
@@ -553,91 +808,150 @@
    
   function clearOverlays() { $('#overlays').innerHTML = ''; }
 
-  function openRegister(mantener, editarMov) {
-    if (editarMov) {
-      REG = {
-        type: editarMov.tipo, amount: montoEditable(editarMov.monto), concept: editarMov.concepto || '',
-        date: editarMov.fecha, dir: Number(editarMov.monto) < 0 ? -1 : 1,
-        method: editarMov.metodo || 'Transferencia',
-        monedaOriginal: editarMov.monedaOriginal || '',
-        montoOriginal: editarMov.montoOriginal ? montoEditable(editarMov.montoOriginal) : '',
-        editUuid: editarMov.uuid
-      };
+  function openRegister(correctOf, mantener, editarMov) {
+    if (correctOf) {
+      REG = { correctOf: correctOf.uuid, correctId: correctOf.id, type: correctOf.tipo, amount: String(Math.abs(Number(correctOf.monto)) || ''), concept: (correctOf.concepto ? String(correctOf.concepto).trim() : ''), date: String(correctOf.fecha).slice(0, 10), dir: Number(correctOf.monto) < 0 ? -1 : 1, method: correctOf.metodo || 'Transferencia', step: 0 };
+    } else if (editarMov) {
+      REG = { editOf: editarMov.uuid, editId: editarMov.id, type: editarMov.tipo, amount: String(Math.abs(Number(editarMov.monto)) || ''), concept: (editarMov.concepto ? String(editarMov.concepto).trim() : ''), date: String(editarMov.fecha).slice(0, 10), dir: Number(editarMov.monto) < 0 ? -1 : 1, method: editarMov.metodo || 'Transferencia', step: 0 };
+    } else if (mantener) {
+      // "Registrar y agregar otro": conserva tipo, método y fecha; entra directo al monto
+      REG = { type: mantener.type, amount: '', concept: '', date: mantener.date, dir: 1, method: mantener.method, step: 1 };
     } else {
-      REG = {
-        type: (mantener && mantener.type) || (ST.identity + ' recibió un pago'),
-        amount: '', concept: '',
-        date: (mantener && mantener.date) || todayStr(),
-        dir: 1,
-        method: (mantener && mantener.method) || 'Transferencia',
-        monedaOriginal: '', montoOriginal: '', editUuid: null
-      };
+      REG = { type: '', amount: '', concept: '', date: todayStr(), dir: 1, method: 'Transferencia', step: 0 };
     }
-    var editando = !!REG.editUuid;
     var html = '<div class="backdrop" data-close></div><div class="sheet" style="height:94%"><div class="grab"></div>' +
-      '<div class="sheet-h"><b>' + (editando ? 'Editar movimiento' : 'Registrar movimiento') + '</b><button class="x" data-close><span class="msr" style="font-size:20px">close</span></button></div>' +
-      '<div class="sheet-body">' +
-      '<div class="amount-lab">Monto</div><div class="amount zero" id="r-amount">$0</div><div class="effect" id="r-effect">Ingresa el monto con el teclado</div>' +
-      '<div class="keypad" id="r-keypad"></div>' +
-      '<div class="flabel">Tipo de movimiento</div><div class="types" id="r-types"></div>' +
-      '<div id="r-dir"></div>' +
-      '<div id="r-method-wrap"><div class="flabel">¿Cómo se movió el dinero?</div><div class="methods" id="r-methods"></div></div>' +
-      '<div class="flabel">Concepto <span style="font-weight:600;text-transform:none;letter-spacing:0">(opcional)</span></div>' +
-      '<input class="input" id="r-concept" placeholder="Ej. Renta, súper, gasolina…" value="' + esc(REG.concept) + '">' +
-      '<div class="chips" id="r-chips"></div>' +
-      '<div class="flabel">Moneda original <span style="font-weight:600;text-transform:none;letter-spacing:0">(opcional)</span></div>' +
-      '<div style="display:flex;gap:8px">' +
-      '<input class="input" id="r-moneda" placeholder="COP, USD…" maxlength="6" autocapitalize="characters" style="flex:1;text-transform:uppercase" value="' + esc(REG.monedaOriginal) + '">' +
-      '<input class="input" id="r-monto-orig" inputmode="decimal" placeholder="Monto en esa moneda" style="flex:1.7" value="' + esc(REG.montoOriginal) + '">' +
-      '</div>' +
-      '<div class="flabel">Fecha del movimiento</div>' +
-      '<label class="daterow"><span class="msr" style="font-size:22px;color:var(--accent)">calendar_today</span><span id="r-datelabel" style="flex:1;font-size:14.5px;font-weight:700"></span><span class="msr" style="color:var(--text-3)">expand_more</span><input type="date" id="r-date" value="' + REG.date + '"></label>' +
-      '</div>' +
-      '<div class="sheet-foot" style="display:flex;flex-direction:column;gap:8px">' +
-      '<button class="cta" id="r-submit" disabled><span class="msr" style="font-size:20px">check_circle</span>' + (editando ? 'Guardar cambios' : 'Registrar movimiento') + '</button>' +
-      (editando ? '' : '<button class="cta" id="r-submit-otro" disabled style="background:var(--surface-2);color:var(--text-2);padding:12px;font-size:13.5px"><span class="msr" style="font-size:18px">repeat</span>Registrar y agregar otro</button>') +
-      '</div></div>';
+      '<div class="sheet-h"><button class="x" id="w-back" style="visibility:hidden" aria-label="Atr\u00e1s"><span class="msr" style="font-size:20px">arrow_back</span></button><b style="font-size:16.5px">' + (REG.correctOf ? 'Corregir movimiento' : (REG.editOf ? 'Editar movimiento' : 'Registrar movimiento')) + '</b><button class="x" data-close><span class="msr" style="font-size:20px">close</span></button></div>' +
+      '<div class="wdots" id="w-dots"><span></span><span></span><span></span><span></span></div>' +
+      (REG.correctOf ? '<div style="display:flex;align-items:center;gap:9px;margin:6px 18px 0;padding:10px 13px;border-radius:14px;background:var(--warn-bg);font-size:12px;font-weight:600;color:var(--text-2)"><span class="msr" style="font-size:18px;color:var(--warn)">edit</span><span>Corrigiendo el movimiento <b>#' + REG.correctId + '</b>. El original quedar\u00e1 como Corregido cuando ' + other(ST.identity) + ' apruebe.</span></div>' : '') +
+      (REG.editOf ? '<div style="display:flex;align-items:center;gap:9px;margin:6px 18px 0;padding:10px 13px;border-radius:14px;background:var(--warn-bg);font-size:12px;font-weight:600;color:var(--text-2)"><span class="msr" style="font-size:18px;color:var(--warn)">edit_note</span><span>Editando el pendiente <b>#' + REG.editId + '</b>. El anterior quedará Cancelado y este lo sustituye.</span></div>' : '') +
+      '<div class="sheet-body" id="w-body" style="display:flex;flex-direction:column"></div>' +
+      '<div class="sheet-foot" style="display:flex;flex-direction:column;gap:8px"><button class="cta" id="w-next"></button>' +
+      '<button class="cta" id="w-otro" style="display:none;background:var(--surface-2);color:var(--text-2);padding:12px;font-size:13.5px"><span class="msr" style="font-size:18px">repeat</span>Registrar y agregar otro</button></div></div>';
     var ov = el('<div>' + html + '</div>');
     $('#overlays').appendChild(ov);
-    buildKeypad(); buildTypes(); buildMethods(); buildChips(); updateDir();
-    $('#r-datelabel').textContent = fmtDateLong(REG.date);
     ov.addEventListener('click', function (e) { if (e.target.closest('[data-close]')) closeOverlay(ov); });
-    $('#r-concept', ov).addEventListener('input', function (e) { REG.concept = e.target.value; syncChips(); });
-    $('#r-moneda', ov).addEventListener('input', function (e) { REG.monedaOriginal = e.target.value.toUpperCase(); });
-    $('#r-monto-orig', ov).addEventListener('input', function (e) { REG.montoOriginal = e.target.value; });
-    $('#r-date', ov).addEventListener('change', function (e) { if (e.target.value) { REG.date = e.target.value; $('#r-datelabel').textContent = fmtDateLong(REG.date); } });
-    $('#r-submit', ov).addEventListener('click', function () { submitRegister(false); });
-    var otroBtn = $('#r-submit-otro', ov);
-    if (otroBtn) otroBtn.addEventListener('click', function () { submitRegister(true); });
+    $('#w-back', ov).addEventListener('click', function () { if (REG.step > 0) { REG.step--; renderStep(); } });
+    $('#w-next', ov).addEventListener('click', function () {
+      if (REG.step < 3) { REG.step++; renderStep(); } else { submitRegister(false); }
+    });
+    $('#w-otro', ov).addEventListener('click', function () { submitRegister(true); });
     document.removeEventListener('keydown', regKeydown);
     document.addEventListener('keydown', regKeydown);
-    refreshAmount();
+    
+    $('#w-body', ov).addEventListener('click', function (e) {
+      var b;
+      if ((b = e.target.closest('[data-type]'))) {
+        REG.type = b.getAttribute('data-type'); REG.dir = 1;
+        buildTypes(); $('#w-next').disabled = false;
+        setTimeout(function () { if (REG.step === 0) { REG.step = 1; renderStep(); } }, 220); 
+        return;
+      }
+      if ((b = e.target.closest('[data-k]'))) { keyPress(b.getAttribute('data-k')); return; }
+      if ((b = e.target.closest('[data-m]'))) { REG.method = b.getAttribute('data-m'); buildMethods(); return; }
+      if ((b = e.target.closest('[data-c]'))) { REG.concept = b.getAttribute('data-c'); var ci = $('#r-concept'); if (ci) ci.value = REG.concept; syncChips(); return; }
+      if ((b = e.target.closest('[data-dir]'))) { REG.dir = +b.getAttribute('data-dir'); updateDir(); refreshAmount(); return; }
+    });
+    renderStep();
   }
-  function montoEditable(n) {
-    var a = Math.abs(Number(n) || 0);
-    return a % 1 === 0 ? String(a) : a.toFixed(2);
-  }
-  // Teclado físico en el registro: dígitos/punto/Backspace capturan el monto,
-  // Enter registra. Dentro de un campo de texto solo Enter (para salir de él).
+  // Teclado físico en el asistente: en el paso del monto los dígitos, el punto
+  // y Backspace escriben; Enter avanza (o registra en el último paso).
   function regKeydown(e) {
-    if (!document.getElementById('r-keypad')) { document.removeEventListener('keydown', regKeydown); return; }
-    var enCampo = e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.tagName === 'SELECT');
+    if (!document.getElementById('w-next')) { document.removeEventListener('keydown', regKeydown); return; }
+    var enCampo = e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA');
     if (enCampo) { if (e.key === 'Enter') e.target.blur(); return; }
-    if (e.key >= '0' && e.key <= '9') { keyPress(e.key); e.preventDefault(); return; }
-    if (e.key === '.' || e.key === ',') { keyPress('.'); e.preventDefault(); return; }
-    if (e.key === 'Backspace') { keyPress('back'); e.preventDefault(); return; }
+    if (REG && REG.step === 1) {
+      if (e.key >= '0' && e.key <= '9') { keyPress(e.key); e.preventDefault(); return; }
+      if (e.key === '.' || e.key === ',') { keyPress('.'); e.preventDefault(); return; }
+      if (e.key === 'Backspace') { keyPress('back'); e.preventDefault(); return; }
+    }
     if (e.key === 'Enter') {
-      var b = document.getElementById('r-submit');
-      if (b && !b.disabled) submitRegister(false);
+      var n = document.getElementById('w-next');
+      if (n && !n.disabled) n.click();
       e.preventDefault();
     }
   }
-  function closeOverlay(ov) { if (ov && ov.parentNode) ov.parentNode.removeChild(ov); }
+  function closeOverlay(ov) {
+    if (!ov || !ov.parentNode) return;
+    
+    if (!ov.querySelector('.sheet') ) { ov.parentNode.removeChild(ov); return; }
+    if (ov.__closing) return;
+    ov.__closing = true;
+    ov.classList.add('closing');
+    setTimeout(function () { if (ov.parentNode) ov.parentNode.removeChild(ov); }, 300);
+  }
+
+   
+  function wStepTitle(t, sub) {
+    return '<div style="font-size:21px;font-weight:800;letter-spacing:-.5px;margin:4px 2px 0">' + t + '</div>' +
+      '<div style="font-size:12.5px;color:var(--text-2);font-weight:600;margin:3px 2px 14px">' + sub + '</div>';
+  }
+  function nextLabel(txt) { return txt + '<span class="msr" style="font-size:20px">arrow_forward</span>'; }
+  function renderStep() {
+    var body = $('#w-body'), next = $('#w-next');
+    if (!body || !next) return;
+    [].forEach.call(document.querySelectorAll('#w-dots span'), function (d, i) { d.classList.toggle('on', i <= REG.step); });
+    $('#w-back').style.visibility = REG.step > 0 ? 'visible' : 'hidden';
+
+    if (REG.step === 0) {
+      body.innerHTML = wStepTitle('\u00bfQu\u00e9 pas\u00f3?', 'Elige el tipo de movimiento') + '<div class="types" id="r-types"></div>';
+      buildTypes();
+      next.innerHTML = nextLabel('Continuar');
+      next.disabled = !REG.type;
+
+    } else if (REG.step === 1) {
+      body.innerHTML = wStepTitle('\u00bfDe cu\u00e1nto fue?', typeMeta(REG.type).hint || 'Escribe el monto') +
+        '<div class="amount zero" id="r-amount" style="margin-top:6px">$0</div><div class="effect" id="r-effect"></div>' +
+        (REG.type === 'Ajuste de saldo' ? '<div id="r-dir"></div>' : '') +
+        '<div class="keypad" id="r-keypad" style="margin-top:auto;padding-top:12px"></div>';
+      buildKeypad();
+      if (REG.type === 'Ajuste de saldo') updateDir();
+      next.innerHTML = nextLabel('Continuar');
+      refreshAmount();
+
+    } else if (REG.step === 2) {
+      body.innerHTML = wStepTitle('Los detalles', 'Puedes dejar lo que ya est\u00e1 y continuar') +
+        (REG.type !== 'Ajuste de saldo' ? '<div class="flabel" style="margin-top:2px">\u00bfC\u00f3mo se movi\u00f3 el dinero?</div><div class="methods" id="r-methods"></div>' : '') +
+        '<div class="flabel">Concepto <span style="font-weight:600;text-transform:none;letter-spacing:0">(opcional)</span></div>' +
+        '<input class="input" id="r-concept" placeholder="Ej. Venta Cori, pago, abono\u2026">' +
+        '<div class="chips" id="r-chips"></div>' +
+        '<div class="flabel">Fecha del movimiento</div>' +
+        '<label class="daterow"><span class="msr" style="font-size:22px;color:var(--accent)">calendar_today</span><span id="r-datelabel" style="flex:1;font-size:14.5px;font-weight:700"></span><span class="msr" style="color:var(--text-3)">expand_more</span><input type="date" id="r-date"></label>';
+      if (REG.type !== 'Ajuste de saldo') buildMethods();
+      buildChips();
+      var ci = $('#r-concept'); ci.value = REG.concept; syncChips();
+      ci.addEventListener('input', function (e) { REG.concept = e.target.value; syncChips(); });
+      var di = $('#r-date'); di.value = REG.date;
+      $('#r-datelabel').textContent = fmtDateLong(REG.date);
+      di.addEventListener('change', function (e) { if (e.target.value) { REG.date = e.target.value; $('#r-datelabel').textContent = fmtDateLong(REG.date); } });
+      next.innerHTML = nextLabel('Continuar');
+      next.disabled = false;
+
+    } else {
+      var amt = parseFloat(REG.amount) || 0;
+      var rows = [
+        ['Tipo', REG.type],
+        ['Monto', money(amt)],
+        ['En resumen', effectFor(REG.type, amt, REG.dir)]
+      ];
+      if (REG.type !== 'Ajuste de saldo') rows.push(['M\u00e9todo', REG.method]);
+      rows.push(['Concepto', REG.concept || '\u2014']);
+      rows.push(['Fecha', fmtDateLong(REG.date)]);
+      body.innerHTML = wStepTitle('\u00bfTodo correcto?', 'Revisa antes de enviar') +
+        '<div class="card" style="overflow:hidden">' + rows.map(function (r) { return '<div class="drow"><span class="dk">' + r[0] + '</span><span class="dv">' + esc(r[1]) + '</span></div>'; }).join('') + '</div>' +
+        '<div style="margin-top:14px;font-size:11.5px;color:var(--text-3);text-align:center;line-height:1.5;font-weight:600">Quedar\u00e1 <b>Pendiente</b> hasta que ' + other(ST.identity) + ' lo apruebe.</div>';
+      next.innerHTML = '<span class="msr" style="font-size:20px">check_circle</span>' + (REG.correctOf ? 'Guardar correcci\u00f3n' : (REG.editOf ? 'Guardar cambios' : 'Registrar movimiento'));
+      next.disabled = !(amt > 0);
+    }
+    var otro = document.getElementById('w-otro');
+    if (otro) {
+      otro.style.display = (REG.step === 3 && !REG.correctOf && !REG.editOf) ? '' : 'none';
+      otro.disabled = !(parseFloat(REG.amount) > 0);
+    }
+  }
 
   function buildKeypad() {
     var keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'back'];
     $('#r-keypad').innerHTML = keys.map(function (k) { return '<button class="key" data-k="' + k + '">' + (k === 'back' ? '<span class="msr" style="font-size:24px;color:var(--text-2)">backspace</span>' : k) + '</button>'; }).join('');
-    $('#r-keypad').addEventListener('click', function (e) { var b = e.target.closest('[data-k]'); if (b) keyPress(b.getAttribute('data-k')); });
   }
   function keyPress(k) {
     var a = REG.amount;
@@ -647,38 +961,35 @@
     REG.amount = a; refreshAmount();
   }
   function refreshAmount() {
+    var amtEl = $('#r-amount');
+    if (!amtEl) return;
     var a = REG.amount, disp = '$0';
     if (a) { var p = a.split('.'); p[0] = p[0].replace(/\B(?=(\d{3})+(?!\d))/g, ','); disp = '$' + (p.length > 1 ? p[0] + '.' + p[1] : p[0]); }
-    var amtEl = $('#r-amount'); amtEl.textContent = disp; amtEl.classList.toggle('zero', !(parseFloat(a) > 0));
+    amtEl.textContent = disp; amtEl.classList.toggle('zero', !(parseFloat(a) > 0));
     var val = parseFloat(a) || 0;
     $('#r-effect').textContent = val > 0 ? effectFor(REG.type, val, REG.dir) : 'Ingresa el monto con el teclado';
-    $('#r-submit').disabled = !(val > 0);
-    var otro = document.getElementById('r-submit-otro');
-    if (otro) otro.disabled = !(val > 0);
+    var next = $('#w-next');
+    if (next && REG.step === 1) next.disabled = !(val > 0);
   }
   function buildTypes() {
     var me = ST.identity;
-    var order = [me + ' recibió un pago', me + ' prestó dinero', other(me) + ' recibió un pago', other(me) + ' prestó dinero', 'Ajuste'];
+    var order = [me + ' recibi\u00f3 dinero', me + ' envi\u00f3 dinero', other(me) + ' recibi\u00f3 dinero', other(me) + ' envi\u00f3 dinero', 'Ajuste de saldo'];
     $('#r-types').innerHTML = order.map(function (t) {
       var meta = typeMeta(t), sel = REG.type === t;
       return '<button class="type' + (sel ? ' sel' : '') + '" data-type="' + esc(t) + '"><span class="tico"><span class="msr" style="font-size:21px">' + meta.icon + '</span></span><span style="flex:1;min-width:0"><span class="tt">' + esc(t) + '</span><br><span class="th">' + meta.hint + '</span></span>' + (sel ? '<span class="msr fill" style="font-size:22px;color:var(--accent)">check_circle</span>' : '') + '</button>';
     }).join('');
-    $('#r-types').addEventListener('click', function (e) { var b = e.target.closest('[data-type]'); if (b) { REG.type = b.getAttribute('data-type'); REG.dir = 1; buildTypes(); updateDir(); toggleMethod(); refreshAmount(); } });
   }
-  function toggleMethod() { $('#r-method-wrap').style.display = REG.type === 'Ajuste' ? 'none' : ''; }
   function updateDir() {
     var wrap = $('#r-dir');
-    if (REG.type !== 'Ajuste') { wrap.innerHTML = ''; toggleMethod(); return; }
-    wrap.innerHTML = '<div class="dirs" style="margin-top:10px"><button class="dir' + (REG.dir > 0 ? ' sel' : '') + '" data-dir="1">Aumenta el saldo</button><button class="dir' + (REG.dir < 0 ? ' sel' : '') + '" data-dir="-1">Disminuye el saldo</button></div>';
-    wrap.querySelector('.dirs').addEventListener('click', function (e) { var b = e.target.closest('[data-dir]'); if (b) { REG.dir = +b.getAttribute('data-dir'); updateDir(); refreshAmount(); } });
-    toggleMethod();
+    if (!wrap) return;
+    wrap.innerHTML = '<div class="dirs" style="margin-top:6px"><button class="dir' + (REG.dir > 0 ? ' sel' : '') + '" data-dir="1">A favor de Daniel</button><button class="dir' + (REG.dir < 0 ? ' sel' : '') + '" data-dir="-1">A favor de Coraima</button></div>';
   }
   function buildMethods() {
+    var box = $('#r-methods');
+    if (!box) return;
     var ic = { Transferencia: 'sync_alt', Tarjeta: 'credit_card', Efectivo: 'payments' };
-    $('#r-methods').innerHTML = METODOS.map(function (m) { return '<button class="method' + (REG.method === m ? ' sel' : '') + '" data-m="' + m + '"><span class="msr" style="font-size:18px">' + ic[m] + '</span>' + m + '</button>'; }).join('');
-    $('#r-methods').addEventListener('click', function (e) { var b = e.target.closest('[data-m]'); if (b) { REG.method = b.getAttribute('data-m'); buildMethods(); } });
+    box.innerHTML = METODOS.map(function (m) { return '<button class="method' + (REG.method === m ? ' sel' : '') + '" data-m="' + m + '"><span class="msr" style="font-size:18px">' + ic[m] + '</span>' + m + '</button>'; }).join('');
   }
-  // Últimos 6 conceptos usados por el usuario activo (los fijos solo de arranque).
   function conceptosRecientes() {
     var vistos = {}, propios = [];
     ST.movements.slice()
@@ -696,119 +1007,140 @@
   }
   function buildChips() {
     $('#r-chips').innerHTML = conceptosRecientes().map(function (c) { return '<button class="cchip' + (REG.concept === c ? ' sel' : '') + '" data-c="' + esc(c) + '">' + esc(c) + '</button>'; }).join('');
-    $('#r-chips').addEventListener('click', function (e) { var b = e.target.closest('[data-c]'); if (b) { REG.concept = b.getAttribute('data-c'); $('#r-concept').value = REG.concept; syncChips(); } });
   }
   function syncChips() { [].forEach.call(document.querySelectorAll('#r-chips .cchip'), function (b) { b.classList.toggle('sel', b.getAttribute('data-c') === REG.concept); }); }
 
   function submitRegister(yOtro) {
     var amt = parseFloat(REG.amount);
     if (!amt || amt <= 0) { toast('Ingresa un monto válido', 'error', 'var(--bad)'); return; }
-    var moneda = (REG.monedaOriginal || '').trim().toUpperCase();
-    var montoOrig = parseFloat(String(REG.montoOriginal || '').replace(/,/g, '')) || 0;
-    if (moneda && !montoOrig) { toast('Falta el monto en ' + moneda, 'error', 'var(--bad)'); return; }
-    if (!moneda && montoOrig) { toast('Falta la moneda original (COP, USD…)', 'error', 'var(--bad)'); return; }
-    var payload = {
-      registradoPor: ST.identity, tipo: REG.type, monto: amt, concepto: REG.concept,
-      metodo: REG.method, fecha: REG.date, dir: REG.dir,
-      monedaOriginal: moneda, montoOriginal: montoOrig || ''
-    };
-    var editUuid = REG.editUuid;
+    var payload = { registradoPor: ST.identity, tipo: REG.type, monto: amt, concepto: REG.concept, metodo: REG.method, fecha: REG.date, dir: REG.dir };
+    var correctOf = REG.correctOf, editOf = REG.editOf;
     var mantener = { type: REG.type, method: REG.method, date: REG.date };
     clearOverlays();
     document.removeEventListener('keydown', regKeydown);
 
-    if (editUuid) {
-      toast('Guardando cambios…', 'schedule', 'var(--accent)');
-      if (!hasBackend()) { toast('(demo) Editado', 'check_circle', 'var(--ok)'); return; }
-      google.script.run
-        .withSuccessHandler(function (s) { onState(s); toast('Cambios guardados', 'check_circle', 'var(--ok)'); })
-        .withFailureHandler(onErrServidor)
-        .api_editarMovimiento(editUuid, ST.identity, payload);
+    if (correctOf) {
+      toast('Corrección registrada — falta que ' + other(ST.identity) + ' apruebe', 'schedule', 'var(--warn)');
+      if (!hasBackend()) { demoRegister(payload); return; }
+      google.script.run.withSuccessHandler(onState).withFailureHandler(onErrMsg).api_corregirMovimiento(correctOf, ST.identity, payload);
       return;
     }
 
-    // Inserción optimista: el pendiente aparece al instante y la respuesta
-    // del servidor lo sustituye por el definitivo (o lo quita si falló).
+    if (editOf) {
+      // Editar un pendiente propio = cancelar el anterior y registrar el nuevo.
+      toast('Guardando cambios…', 'schedule', 'var(--accent)');
+      if (!hasBackend()) { toast('(demo) Editado', 'check_circle', 'var(--ok)'); return; }
+      google.script.run.withSuccessHandler(function () {
+        google.script.run.withSuccessHandler(function (s) {
+          onState(s);
+          toast('Movimiento actualizado — falta que ' + other(ST.identity) + ' apruebe', 'check_circle', 'var(--ok)');
+        }).withFailureHandler(onErrMsg).api_registrarMovimiento(payload);
+      }).withFailureHandler(onErrMsg).api_cancelarMovimiento(editOf, ST.identity);
+      return;
+    }
+
+    // Registro normal: el pendiente aparece al instante (optimista) y la
+    // respuesta del servidor lo sustituye (o lo quita, si algo falló).
     var tmp = {
       id: '…', uuid: 'tmp-' + Date.now(), creadoEn: new Date().toISOString(), fecha: REG.date, hora: '',
       registradoPor: ST.identity, tipo: REG.type,
-      monto: REG.type === 'Ajuste' ? REG.dir * amt : amt,
-      concepto: REG.concept, metodo: REG.type === 'Ajuste' ? '' : REG.method, estado: 'Pendiente',
-      aprobado1: ST.identity === P1, fechaAprob1: '', aprobado2: ST.identity === P2, fechaAprob2: '',
-      saldoDespues: null, monedaOriginal: moneda, montoOriginal: montoOrig
+      monto: REG.type === 'Ajuste de saldo' ? REG.dir * amt : amt,
+      concepto: REG.concept, metodo: REG.type === 'Ajuste de saldo' ? '' : REG.method, estado: 'Pendiente',
+      aprobadoDaniel: ST.identity === 'Daniel', fechaAprobDaniel: '',
+      aprobadoCoraima: ST.identity === 'Coraima', fechaAprobCoraima: '', saldoReal: null
     };
     ST.movements.push(tmp);
-    ST.pendienteNeto += signed(tmp);
+    ST.pendienteNeto = (ST.pendienteNeto || 0) + signed(tmp);
     renderAll();
     toast('Registrado — falta que ' + other(ST.identity) + ' apruebe', 'schedule', 'var(--warn)');
-    if (yOtro) openRegister(mantener);
+    if (yOtro) openRegister(null, mantener);
     if (!hasBackend()) { demoRegister(payload); return; }
-    google.script.run
-      .withSuccessHandler(onState)
-      .withFailureHandler(function (e) {
-        ST.movements = ST.movements.filter(function (m) { return m.uuid !== tmp.uuid; });
-        ST.pendienteNeto -= signed(tmp);
-        renderAll();
-        onErrServidor(e);
-      })
-      .api_registrarMovimiento(payload);
+    google.script.run.withSuccessHandler(onState).withFailureHandler(function (e) {
+      ST.movements = ST.movements.filter(function (m) { return m.uuid !== tmp.uuid; });
+      ST.pendienteNeto -= signed(tmp);
+      renderAll();
+      onErrMsg(e);
+    }).api_registrarMovimiento(payload);
+  }
+  function cancelMove(uuid) {
+    if (!hasBackend()) { toast('(demo) Cancelado', 'block', 'var(--bad)'); return; }
+    google.script.run.withSuccessHandler(function (s) { onState(s); toast('Movimiento cancelado', 'block', 'var(--bad)'); }).withFailureHandler(onErr).api_cancelarMovimiento(uuid, ST.identity);
+  }
+  
+
+  var PENDING_OPS = {};
+  function setCardBusy(uuid, action) {
+    var btnA = document.querySelector('[data-approve="' + uuid + '"]');
+    var btnR = document.querySelector('[data-reject="' + uuid + '"]');
+    [btnA, btnR].forEach(function (b) { if (b) b.disabled = true; });
+    var target = action === 'approve' ? btnA : btnR;
+    if (target) target.innerHTML = '<span class="msr spin-ico" style="font-size:18px">progress_activity</span>' + (action === 'approve' ? 'Confirmando…' : 'Rechazando…');
   }
   function approve(uuid) {
-    toast('Confirmando…', 'schedule', 'var(--accent)');
-    if (!hasBackend()) { demoApprove(uuid); return; }
-    google.script.run.withSuccessHandler(function (s) { onState(s); toast('Movimiento confirmado', 'check_circle', 'var(--ok)'); }).withFailureHandler(onErr).api_aprobarMovimiento(uuid, ST.identity);
+    if (PENDING_OPS[uuid]) return;
+    PENDING_OPS[uuid] = 'approve';
+    setCardBusy(uuid, 'approve');
+    if (!hasBackend()) { setTimeout(function () { delete PENDING_OPS[uuid]; demoApprove(uuid); renderPending(); }, 1500); return; }
+    google.script.run.withSuccessHandler(function (s) {
+      delete PENDING_OPS[uuid]; onState(s); toast('Movimiento confirmado', 'check_circle', 'var(--ok)');
+    }).withFailureHandler(function (e) {
+      delete PENDING_OPS[uuid]; onErr(e); renderPending(); renderBadges();
+    }).api_aprobarMovimiento(uuid, ST.identity);
   }
   function reject(uuid) {
-    if (!hasBackend()) { demoReject(uuid); toast('Movimiento rechazado', 'cancel', 'var(--bad)'); return; }
-    google.script.run.withSuccessHandler(function (s) { onState(s); toast('Movimiento rechazado', 'cancel', 'var(--bad)'); }).withFailureHandler(onErr).api_rechazarMovimiento(uuid, ST.identity);
+    if (PENDING_OPS[uuid]) return;
+    PENDING_OPS[uuid] = 'reject';
+    setCardBusy(uuid, 'reject');
+    if (!hasBackend()) { setTimeout(function () { delete PENDING_OPS[uuid]; demoReject(uuid); toast('Movimiento rechazado', 'cancel', 'var(--bad)'); renderPending(); }, 1500); return; }
+    google.script.run.withSuccessHandler(function (s) {
+      delete PENDING_OPS[uuid]; onState(s); toast('Movimiento rechazado', 'cancel', 'var(--bad)');
+    }).withFailureHandler(function (e) {
+      delete PENDING_OPS[uuid]; onErr(e); renderPending(); renderBadges();
+    }).api_rechazarMovimiento(uuid, ST.identity);
   }
 
    
   function openDetail(uuid) {
     var m = ST.movements.filter(function (x) { return x.uuid === uuid; })[0]; if (!m) return;
-    var meta = typeMeta(m.tipo), st = statusMeta(m.estado), s = relativo(signed(m));
-    var puedeEditar = m.estado === 'Pendiente' && m.registradoPor === ST.identity && String(m.uuid).indexOf('tmp-') !== 0;
+    var meta = typeMeta(m.tipo), st = statusMeta(m.estado), s = signedView(m);
     var rows = [
-      ['Tipo', m.tipo], ['Método', m.metodo || '—'], ['Concepto', (m.concepto && m.concepto.trim()) ? m.concepto : '—']
-    ];
-    if (m.monedaOriginal && m.montoOriginal) {
-      rows.push(['Moneda original', m.monedaOriginal + ' ' + Number(m.montoOriginal).toLocaleString('es-MX')]);
-    }
-    rows = rows.concat([
+      ['Tipo', m.tipo], ['Método', m.metodo || '—'], ['Concepto', (m.concepto && m.concepto.trim()) ? m.concepto : '—'],
       ['Registrado por', m.registradoPor], ['Fecha del movimiento', fmtDateLong(m.fecha)], ['Registrado el', fmtStamp(m.creadoEn)],
-      ['Aprobado por ' + P1, m.aprobado1 ? fmtStamp(m.fechaAprob1) : 'Pendiente'],
-      ['Aprobado por ' + P2, m.aprobado2 ? fmtStamp(m.fechaAprob2) : 'Pendiente'],
-      ['Saldo después', m.saldoDespues != null ? etiquetaSaldo(m.saldoDespues) : '— (no confirmado)'],
+      ['Aprobado por Daniel', m.aprobadoDaniel ? fmtStamp(m.fechaAprobDaniel) : 'Pendiente'],
+      ['Aprobado por Coraima', m.aprobadoCoraima ? fmtStamp(m.fechaAprobCoraima) : 'Pendiente'],
+      ['Saldo después', m.saldoReal != null ? etiquetaSaldo(m.saldoReal) : '— (no confirmado)'],
       ['ID', '#' + m.id]
-    ]);
+    ];
+    if (m.corrigeA) {
+      var orig = ST.movements.filter(function (x) { return x.uuid === m.corrigeA; })[0];
+      rows.push(['Corrige a', orig ? '#' + orig.id + ' · ' + (orig.concepto || typeMeta(orig.tipo).short) : '(no encontrado)']);
+    }
+    var fix = ST.movements.filter(function (x) { return x.corrigeA === m.uuid && x.estado !== 'Rechazado' && x.estado !== 'Cancelado'; })[0];
+    if (fix) rows.push(['Corregido por', '#' + fix.id + ' (' + fix.estado + ')']);
+    var esTmp = String(m.uuid).indexOf('tmp-') === 0;
+    var canCorrect = m.estado === 'Confirmado' && !fix;
+    var canCancel = m.estado === 'Pendiente' && m.registradoPor === ST.identity && !esTmp;
+    var canEdit = canCancel;
     var html = '<div class="backdrop" data-close></div><div class="sheet" style="max-height:90%"><div class="grab"></div><div class="sheet-body">' +
       '<div class="detail-top"><span class="detail-ico"><span class="msr" style="font-size:32px">' + meta.icon + '</span></span>' +
       '<span class="tnum" style="font-size:32px;font-weight:800;letter-spacing:-1px">' + (s >= 0 ? '+' : '−') + money(Math.abs(m.monto)) + '</span>' +
       '<span style="font-size:14px;font-weight:700">' + esc(m.concepto || meta.short) + '</span>' +
       '<span class="chip ' + st.cls + '" style="font-size:12px;padding:5px 12px"><span class="msr fill" style="font-size:15px">' + st.icon + '</span>' + st.label + '</span></div>' +
       '<div class="card" style="margin-top:20px;overflow:hidden">' + rows.map(function (r) { return '<div class="drow"><span class="dk">' + r[0] + '</span><span class="dv">' + esc(r[1]) + '</span></div>'; }).join('') + '</div>' +
-      (puedeEditar
-        ? '<div class="btns" style="margin-top:16px"><button class="btn reject" id="d-del"><span class="msr" style="font-size:18px">delete</span>Eliminar</button>' +
-          '<button class="btn accept" id="d-edit"><span class="msr" style="font-size:18px">edit</span>Editar</button></div>' +
-          '<div style="margin-top:12px;font-size:11px;color:var(--text-3);text-align:center;line-height:1.5;font-weight:600">Puedes editarlo o eliminarlo mientras ' + esc(other(ST.identity)) + ' no lo apruebe.</div>'
-        : '<div style="margin-top:14px;font-size:11px;color:var(--text-3);text-align:center;line-height:1.5;font-weight:600">Los movimientos confirmados no se editan ni se eliminan.<br>Un error se corrige con un movimiento de <b>Ajuste</b>.</div>') +
+      ((canCorrect || canCancel || canEdit) ? '<div style="display:flex;gap:10px;margin-top:14px">' +
+        (canCancel ? '<button class="btn reject" data-cancel="' + m.uuid + '"><span class="msr" style="font-size:18px">block</span>Cancelar</button>' : '') +
+        (canEdit ? '<button class="btn accept" data-editp="' + m.uuid + '"><span class="msr" style="font-size:18px">edit_note</span>Editar</button>' : '') +
+        (canCorrect ? '<button class="btn accept" data-correct="' + m.uuid + '"><span class="msr" style="font-size:18px">edit</span>Corregir</button>' : '') +
+        '</div>' : '') +
+      '<div style="margin-top:14px;font-size:11px;color:var(--text-3);text-align:center;line-height:1.5;font-weight:600">Un pendiente lo puede editar o cancelar quien lo registró.<br>Lo confirmado se arregla con una <b>corrección</b> que el otro aprueba.</div>' +
       '</div></div>';
     var ov = el('<div>' + html + '</div>'); $('#overlays').appendChild(ov);
-    ov.addEventListener('click', function (e) { if (e.target.closest('[data-close]')) closeOverlay(ov); });
-    if (puedeEditar) {
-      $('#d-edit', ov).addEventListener('click', function () { closeOverlay(ov); openRegister(null, m); });
-      var confirmado = false;
-      $('#d-del', ov).addEventListener('click', function () {
-        if (!confirmado) { confirmado = true; $('#d-del', ov).innerHTML = '<span class="msr" style="font-size:18px">warning</span>¿Seguro? Toca otra vez'; return; }
-        closeOverlay(ov);
-        toast('Eliminando…', 'schedule', 'var(--accent)');
-        if (!hasBackend()) { toast('(demo) Eliminado', 'delete', 'var(--bad)'); return; }
-        google.script.run
-          .withSuccessHandler(function (s2) { onState(s2); toast('Movimiento eliminado', 'delete', 'var(--bad)'); })
-          .withFailureHandler(onErrServidor)
-          .api_eliminarMovimiento(uuid, ST.identity);
-      });
-    }
+    ov.addEventListener('click', function (e) {
+      if (e.target.closest('[data-close]')) { closeOverlay(ov); return; }
+      if (e.target.closest('[data-correct]')) { closeOverlay(ov); openRegister(m); return; }
+      if (e.target.closest('[data-editp]')) { closeOverlay(ov); openRegister(null, null, m); return; }
+      if (e.target.closest('[data-cancel]')) { closeOverlay(ov); toast('Cancelando…', 'schedule', 'var(--accent)'); cancelMove(m.uuid); return; }
+    });
   }
 
    
@@ -829,8 +1161,8 @@
   function showIdentity() {
     clearOverlays();
     var html = '<div class="identity"><div class="logo"><span class="msr" style="font-size:36px">sync_alt</span></div>' +
-      '<div style="margin-top:22px;font-size:28px;font-weight:800;letter-spacing:-.8px">' + esc(APP_TITLE) + '</div>' +
-      '<div style="margin-top:6px;font-size:14.5px;color:var(--text-2);font-weight:600;line-height:1.5">Un registro compartido y transparente<br>entre ' + esc(P1) + ' y ' + esc(P2) + '.</div>' +
+      '<div style="margin-top:22px;font-size:28px;font-weight:800;letter-spacing:-.8px">Libro Mayor</div>' +
+      '<div style="margin-top:6px;font-size:14.5px;color:var(--text-2);font-weight:600;line-height:1.5">Un registro compartido y transparente<br>entre Daniel y Coraima.</div>' +
       '<div style="margin-top:34px;font-size:13px;font-weight:800;color:var(--text-3);letter-spacing:.4px;text-transform:uppercase">¿Quién eres?</div>' +
       '<div style="display:flex;flex-direction:column;gap:12px;margin-top:14px">' +
       PERSONAS.map(function (p) { return '<button class="pick" data-person="' + p + '"><span class="pav" style="background:' + personColor(p) + '">' + p.charAt(0) + '</span><span style="flex:1;font-size:17px;font-weight:800">' + p + '</span><span class="msr" style="color:var(--text-3)">arrow_forward</span></button>'; }).join('') +
@@ -851,15 +1183,19 @@
    
   function DEMO_STATE() {
     var d = [
-      mk(1, '2026-07-03', P1 + ' recibió un pago', 2000, 'Pago de quincena', 'Transferencia', 'Confirmado'),
-      mk(2, '2026-07-01', P1 + ' prestó dinero', 500, 'Comida', 'Efectivo', 'Confirmado'),
-      mk(3, '2026-07-04', P2 + ' prestó dinero', 300, 'Farmacia', 'Efectivo', 'Pendiente', P2)
+      mk(1, '2026-05-20', 'Daniel envió dinero', 1500, 'Renta', 'Transferencia', 'Confirmado'),
+      mk(2, '2026-06-10', 'Daniel envió dinero', 800, 'Súper', 'Tarjeta', 'Confirmado'),
+      mk(3, '2026-06-25', 'Daniel recibió dinero', 1000, 'Abono', 'Transferencia', 'Confirmado'),
+      mk(4, '2026-07-03', 'Daniel recibió dinero', 2000, 'Pago de quincena', 'Transferencia', 'Confirmado'),
+      mk(5, '2026-07-01', 'Daniel envió dinero', 500, 'Comida', 'Efectivo', 'Confirmado'),
+      mk(6, '2026-07-04', 'Coraima envió dinero', 300, 'Farmacia', 'Efectivo', 'Pendiente', 'Coraima'),
+      mk(7, '2026-07-05', 'Daniel envió dinero', 450, 'Gasolina', 'Efectivo', 'Pendiente', 'Daniel')
     ];
     var saldo = d.filter(function (m) { return m.estado === 'Confirmado'; }).reduce(function (a, m) { return a + signed(m); }, 0) + 1000;
-    return { saldo: 1250, pendienteNeto: -300, movimientos: d };
+    return { saldo: 1250, movimientos: d };
   }
   function mk(id, fecha, tipo, monto, concepto, metodo, estado, reg) {
-    return { id: id, uuid: 'demo-' + id, creadoEn: fecha + 'T10:00:00Z', fecha: fecha, hora: '10:00', registradoPor: reg || (tipo.indexOf(P2) === 0 ? P2 : P1), tipo: tipo, monto: monto, concepto: concepto, metodo: metodo, estado: estado, aprobado1: estado === 'Confirmado' || reg !== P2, fechaAprob1: '', aprobado2: estado === 'Confirmado' || reg === P2, fechaAprob2: '', saldoDespues: estado === 'Confirmado' ? null : null };
+    return { id: id, uuid: 'demo-' + id, creadoEn: fecha + 'T10:00:00Z', fecha: fecha, hora: '10:00', registradoPor: reg || (tipo.indexOf('Coraima') === 0 ? 'Coraima' : 'Daniel'), tipo: tipo, monto: monto, concepto: concepto, metodo: metodo, estado: estado, aprobadoDaniel: estado === 'Confirmado' || reg !== 'Coraima', fechaAprobDaniel: '', aprobadoCoraima: estado === 'Confirmado' || reg === 'Coraima', fechaAprobCoraima: '', saldoDespues: estado === 'Confirmado' ? null : null };
   }
   var _demo = null;
   function demoRegister(p) { if (!_demo) _demo = DEMO_STATE().movimientos.slice(); toast('(demo) Registrado', 'schedule', 'var(--warn)'); }
@@ -876,6 +1212,11 @@
     if (t.closest && t.closest('#tile-pend')) { showTab('pendientes'); return; }
     if (t.closest && t.closest('#tile-stats')) { showTab('stats'); return; }
     if (t.closest && t.closest('#link-hist')) { showTab('historial'); return; }
+    var fe = t.closest && t.closest('[data-f-estado]'); if (fe) { FIL.estado = fe.getAttribute('data-f-estado'); renderHistory(); return; }
+    var fp = t.closest && t.closest('[data-f-persona]'); if (fp) { FIL.persona = fp.getAttribute('data-f-persona'); renderHistory(); return; }
+    var fm = t.closest && t.closest('[data-f-mes]'); if (fm) { FIL.mes = fm.getAttribute('data-f-mes'); renderHistory(); return; }
+    var sp = t.closest && t.closest('[data-period]'); if (sp) { STATS_PERIOD = sp.getAttribute('data-period'); renderStats(); return; }
+    var fw = t.closest && t.closest('[data-flowmes]'); if (fw) { FIL.mes = fw.getAttribute('data-flowmes'); FIL.estado = ''; FIL.persona = ''; FIL.q = ''; var fq = $('#f-q'); if (fq) fq.value = ''; showTab('historial'); renderHistory(); return; }
     var ap = t.closest && t.closest('[data-approve]'); if (ap) { approve(ap.getAttribute('data-approve')); return; }
     var rj = t.closest && t.closest('[data-reject]'); if (rj) { reject(rj.getAttribute('data-reject')); return; }
     var row = t.closest && t.closest('.row[data-uuid]'); if (row) { openDetail(row.getAttribute('data-uuid')); return; }
@@ -883,11 +1224,11 @@
 
    
   ST.identity = (function () { try { return localStorage.getItem(KEY_ID); } catch (e) { return null; } })();
-  $('#hero-pair').textContent = P1 + ' \u2194 ' + P2;
-  $('#hero-app').textContent = APP_TITLE;
+  $('#f-q').addEventListener('input', function (e) { FIL.q = e.target.value.trim().toLowerCase(); renderHistory(); });
   showTab('inicio');
   fetchState();
   startSync();
+  setupPullToRefresh();
   if (!ST.identity) showIdentity();
 })();
 </script>

@@ -1,63 +1,56 @@
-# Libro Mayor
+# Libro Mayor — interfaz adaptada a la versión en producción
 
-Registro compartido de préstamos y pagos entre dos personas, alojado como
-web app de Google Apps Script con los datos en una hoja de cálculo de Google.
+Registro compartido de préstamos y pagos entre Daniel y Coraima, como web
+app de Google Apps Script con los datos en una hoja de cálculo.
 
-Cada movimiento que registra una persona queda **Pendiente** hasta que la otra
-lo **aprueba** o **rechaza**. Solo lo confirmado cuenta para el saldo (lo
-pendiente se muestra aparte como "por aprobar"), y todo se lee desde el punto
-de vista del usuario activo: "a tu favor" / "le debes". Quien registró un
-movimiento puede editarlo o eliminarlo mientras siga Pendiente; una vez
-Confirmado ya no se toca: un error se corrige con un movimiento de **Ajuste**.
-Cada movimiento puede llevar opcionalmente su moneda y monto originales
-(p. ej. COP 212,511) además del monto en MXN.
+**Este repositorio contiene solo `Index.html`**: la interfaz, adaptada
+sobre el código real de la app desplegada (tipos "envió/recibió dinero",
+asistente por pasos, corrección y cancelación). El servidor (`Código.gs`)
+vive únicamente en el proyecto de Apps Script en producción y **no debe
+reemplazarse**: la interfaz usa su API tal cual
+(`api_getEstado`, `api_registrarMovimiento`, `api_aprobarMovimiento`,
+`api_rechazarMovimiento`, `api_corregirMovimiento`, `api_cancelarMovimiento`).
 
-## Archivos
+> Una reconstrucción antigua con otros nombres de tipos vivió aquí antes
+> (`Code.gs` de "prestó dinero / recibió un pago"). Se eliminó porque era
+> incompatible con los datos reales; está en el historial de git si se
+> necesitara como referencia.
 
-| Archivo | Qué es |
-|---|---|
-| `Code.gs` | Servidor: API, validaciones y almacenamiento en la hoja de cálculo |
-| `Index.html` | Toda la interfaz (pantallas, estilos y lógica del cliente) |
-| `appsscript.json` | Manifiesto del proyecto (opcional, ver paso 6) |
+## Mejoras de esta interfaz sobre la desplegada
 
-## Cómo publicarla (5–10 minutos)
+1. **Saldo a prueba de todo**: el saldo y el saldo acumulado por fila se
+   recalculan en el cliente solo con confirmados (el `saldoDespues` del
+   servidor venía con la convención invertida). Bajo el saldo de Inicio
+   aparece "+$X por aprobar" cuando hay pendientes.
+2. **Una sola convención de signo**, siempre desde el usuario activo:
+   "A tu favor" / "Le debes a X" en Inicio, y en el historial cada fila
+   dice "A tu favor $X" (verde) o "Debes $X" (rojo) en lugar de signos.
+3. **Captura rápida**: teclado físico en el asistente (dígitos, punto y
+   Backspace en el monto; Enter avanza y registra al final), botón
+   "Registrar y agregar otro" que conserva tipo/método/fecha y reabre
+   directo en el monto, y el pendiente aparece al instante en la lista
+   mientras el servidor responde (si falla, se quita y muestra el error real).
+4. **Editar pendientes propios**: botón "Editar" en el detalle (junto a
+   "Cancelar"); por dentro cancela el anterior y registra el sustituto,
+   usando solo la API existente del servidor.
+5. **Badge con el total de pendientes** (rojo si te tocan a ti, gris si
+   esperan a la otra persona) y **chips con los últimos 6 conceptos**
+   usados por el usuario activo.
 
-1. **Crea una hoja de cálculo nueva** en [sheets.google.com](https://sheets.google.com)
-   (por ejemplo llámala "Libro Mayor — datos"). Ahí vivirán los movimientos.
+Sin cambios en el flujo de aprobación ni en el diseño visual.
 
-2. En la hoja, abre **Extensiones → Apps Script**. Se abre el editor con un
-   archivo `Código.gs` vacío.
+## Cómo publicar la actualización
 
-3. **Pega el contenido de `Code.gs`** en ese archivo (borra lo que tenga).
+1. Abrir el proyecto de Apps Script de la app (desde la hoja de cálculo:
+   Extensiones → Apps Script).
+2. Abrir el archivo HTML de la interfaz (`Index`) y reemplazar TODO su
+   contenido por el de este `Index.html`. **No tocar `Código.gs`.**
+3. **Implementar → Administrar implementaciones → ✏️ → Versión: Nueva →
+   Implementar** (guardar no basta: sin versión nueva, la URL sigue
+   sirviendo la interfaz anterior).
 
-4. Crea el archivo de la interfaz: en el editor, **+ → HTML**, nómbralo
-   exactamente `Index`, y pega dentro el contenido de `Index.html` completo
-   (reemplaza la plantilla que trae).
+## Pendiente conocido
 
-5. *(Opcional)* Si la app es para otras personas o quieres otro título,
-   edita el bloque `CONFIG` al inicio de `Code.gs` — nombres, colores y
-   título salen todos de ahí. No hay que tocar nada más.
-
-6. *(Opcional)* En **Configuración del proyecto** (engrane) activa
-   "Mostrar el archivo de manifiesto appsscript.json" y pega el contenido de
-   `appsscript.json`. Esto deja fijados la zona horaria y el acceso.
-
-7. **Publica**: botón **Implementar → Nueva implementación → Aplicación web**:
-   - *Ejecutar como*: **Yo**
-   - *Quién tiene acceso*: **Cualquier usuario** (así funciona sin iniciar
-     sesión, igual que la original)
-   - Autoriza los permisos cuando lo pida.
-
-8. Copia la **URL** que termina en `/exec` — esa es la app. Ábrela en el
-   teléfono y usa **Añadir a pantalla de inicio** para instalarla con icono
-   propio, como la original.
-
-La primera vez que alguien la abra, el servidor crea solo la pestaña
-`Movimientos` con sus encabezados; no hay que preparar nada en la hoja.
-
-## Si luego cambias el código
-
-Para que los cambios lleguen a la URL publicada: **Implementar →
-Administrar implementaciones → ✏️ → Versión: Nueva → Implementar**.
-(Guardar el código no basta; hay que crear una versión nueva de la
-implementación existente para conservar la misma URL.)
+La **moneda original** (guardar "COP 212,511" junto al monto en MXN)
+requiere columnas nuevas y cambios en `Código.gs`; queda fuera de esta
+adaptación de solo-interfaz.
