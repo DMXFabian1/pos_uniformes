@@ -36,7 +36,14 @@ reemplazarse**: la interfaz usa su API tal cual
 5. **Badge con el total de pendientes** (rojo si te tocan a ti, gris si
    esperan a la otra persona) y **chips con los últimos 6 conceptos**
    usados por el usuario activo.
-6. **PIN por usuario** (Ajustes → "Poner PIN a mi sesión"): abrir la app
+6. **Pagos periódicos** (p. ej. el internet cada mes): al registrar, en
+   "Los detalles" se elige Repetir (semana/quincena/mes). Cuando llega la
+   fecha, Inicio muestra la tarjeta "Cobros programados" y un toque en
+   Registrar lo mete al flujo normal de aprobación (u Omitir lo salta);
+   se administran en Ajustes → Pagos periódicos. Viven en el dispositivo
+   del usuario (localStorage), así que requieren abrir la app para
+   dispararse — un recordatorio de un toque, no un robot del servidor.
+7. **PIN por usuario** (Ajustes → "Poner PIN a mi sesión"): abrir la app
    con esa identidad pide un PIN de 4 dígitos; "Cambiar de usuario" sigue
    disponible desde el candado para que la otra persona use su propia
    sesión. El PIN se guarda con hash y por dispositivo (localStorage):

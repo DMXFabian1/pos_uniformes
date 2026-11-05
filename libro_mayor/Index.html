@@ -270,6 +270,8 @@
         </button>
       </div>
 
+      <div id="rec-due"></div>
+
       <div class="section-h"><b>Movimientos recientes</b><button class="link" id="link-hist">Ver todo</button></div>
       <div class="list" id="recent-list"></div>
     </section>
@@ -409,6 +411,26 @@
     return h1.toString(36) + '.' + h2.toString(36);
   }
   function pinGuardado(who) { try { return localStorage.getItem('lm_pin_' + who) || ''; } catch (e) { return ''; } }
+
+  // ── Pagos periódicos (viven en este dispositivo, por usuario) ──
+  function recKey() { return 'lm_rec_' + (ST.identity || ''); }
+  function recCargar() { try { return JSON.parse(localStorage.getItem(recKey()) || '[]') || []; } catch (e) { return []; } }
+  function recGuardar(lista) { try { localStorage.setItem(recKey(), JSON.stringify(lista)); } catch (e) {} }
+  function agregarRecurrente(r) { var l = recCargar(); r.id = 'r' + Date.now() + Math.floor(Math.random() * 1000); l.push(r); recGuardar(l); }
+  function siguienteFecha(fecha, per) {
+    var p = String(fecha).slice(0, 10).split('-');
+    var d = new Date(+p[0], +p[1] - 1, +p[2]);
+    if (per === 'semana') d.setDate(d.getDate() + 7);
+    else if (per === 'quincena') d.setDate(d.getDate() + 15);
+    else {
+      var dia = d.getDate();
+      d.setDate(1); d.setMonth(d.getMonth() + 1);
+      var fin = new Date(d.getFullYear(), d.getMonth() + 1, 0).getDate();
+      d.setDate(Math.min(dia, fin)); // 31 ene → 28 feb, sin saltarse meses
+    }
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  }
+  function etiquetaPeriodo(per) { return per === 'semana' ? 'cada semana' : per === 'quincena' ? 'cada quincena' : 'cada mes'; }
   function guardarPin(who, pin) {
     try {
       if (pin) localStorage.setItem('lm_pin_' + who, hashPin(pin, who));
@@ -523,7 +545,7 @@
    
   function renderAll() {
     if (!ST.identity) return; 
-    renderHero(); renderRecent(); renderHistory(); renderPending(); renderStats(); renderBadges(); renderMe();
+    renderHero(); renderRecent(); renderRecurrentes(); renderHistory(); renderPending(); renderStats(); renderBadges(); renderMe();
   }
   function renderMe() {
     var a = $('#me-avatar'); a.textContent = ST.identity.charAt(0); a.style.background = personColor(ST.identity);
@@ -561,6 +583,89 @@
       '<span class="mid"><span class="concept">' + esc(concept) + '</span>' +
       '<span class="meta">' + esc(by) + ' · ' + '<span class="chip ' + st.cls + '"><span class="msr fill" style="font-size:12px">' + st.icon + '</span>' + st.label + '</span></span></span>' +
       '<span class="amt"><b class="tnum" style="color:' + (m.estado === 'Confirmado' ? 'var(--text)' : 'var(--text-3)') + '">' + amt + '</b>' + bal + '</span></button>';
+  }
+  function renderRecurrentes() {
+    var box = $('#rec-due');
+    if (!box) return;
+    var hoy = todayStr();
+    var vencidos = recCargar().filter(function (r) { return String(r.proxima) <= hoy; });
+    if (!vencidos.length) { box.innerHTML = ''; return; }
+    box.innerHTML = '<div class="section-h"><b>Cobros programados</b></div>' + vencidos.map(function (r) {
+      var meta = typeMeta(r.tipo);
+      return '<div class="pcard"><div class="head">' +
+        '<span class="ico"><span class="msr" style="font-size:25px">event_repeat</span></span>' +
+        '<span class="mid"><span class="concept" style="font-size:15px;font-weight:800">' + esc(r.concepto || meta.short) + '</span>' +
+        '<span class="meta">' + meta.short + ' · ' + etiquetaPeriodo(r.periodicidad) + ' · tocaba el ' + fmtDate(r.proxima) + '</span></span>' +
+        '<b class="tnum" style="font-size:18px">' + money(r.monto) + '</b></div>' +
+        '<div class="btns"><button class="btn reject" data-rec-skip="' + r.id + '"><span class="msr" style="font-size:18px">skip_next</span>Omitir</button>' +
+        '<button class="btn accept" data-rec-go="' + r.id + '"><span class="msr" style="font-size:18px">check</span>Registrar</button></div></div>';
+    }).join('');
+  }
+  function recRegistrar(id) {
+    var l = recCargar();
+    var r = l.filter(function (x) { return x.id === id; })[0]; if (!r) return;
+    var fechaCobro = String(r.proxima);
+    r.proxima = siguienteFecha(fechaCobro, r.periodicidad);
+    recGuardar(l);
+    var payload = { registradoPor: ST.identity, tipo: r.tipo, monto: r.monto, concepto: r.concepto, metodo: r.metodo || 'Transferencia', fecha: fechaCobro, dir: 1 };
+    var tmp = {
+      id: '…', uuid: 'tmp-' + Date.now(), creadoEn: new Date().toISOString(), fecha: fechaCobro, hora: '',
+      registradoPor: ST.identity, tipo: r.tipo, monto: r.monto, concepto: r.concepto, metodo: r.metodo || 'Transferencia', estado: 'Pendiente',
+      aprobadoDaniel: ST.identity === 'Daniel', fechaAprobDaniel: '',
+      aprobadoCoraima: ST.identity === 'Coraima', fechaAprobCoraima: '', saldoReal: null
+    };
+    ST.movements.push(tmp);
+    ST.pendienteNeto = (ST.pendienteNeto || 0) + signed(tmp);
+    renderAll();
+    toast('Registrado — falta que ' + other(ST.identity) + ' apruebe · próximo: ' + fmtDate(r.proxima), 'event_repeat', 'var(--warn)');
+    if (!hasBackend()) return;
+    google.script.run.withSuccessHandler(onState).withFailureHandler(function (e) {
+      ST.movements = ST.movements.filter(function (m) { return m.uuid !== tmp.uuid; });
+      ST.pendienteNeto -= signed(tmp);
+      var l2 = recCargar();
+      l2.forEach(function (x) { if (x.id === id) x.proxima = fechaCobro; });
+      recGuardar(l2);
+      renderAll();
+      onErrMsg(e);
+    }).api_registrarMovimiento(payload);
+  }
+  function recOmitir(id) {
+    var l = recCargar();
+    var r = l.filter(function (x) { return x.id === id; })[0]; if (!r) return;
+    r.proxima = siguienteFecha(String(r.proxima), r.periodicidad);
+    recGuardar(l);
+    renderAll();
+    toast('Omitido esta vez · próximo: ' + fmtDate(r.proxima), 'skip_next', 'var(--warn)');
+  }
+  function openRecurrentes() {
+    var l = recCargar();
+    var filas = l.length ? l.map(function (r) {
+      return '<div class="set-row" style="margin-bottom:10px"><span class="msr" style="color:var(--accent)">event_repeat</span>' +
+        '<span style="flex:1;min-width:0"><b style="font-size:14px">' + esc(r.concepto || typeMeta(r.tipo).short) + '</b><br>' +
+        '<span style="font-size:11.5px;font-weight:600;color:var(--text-2)">' + typeMeta(r.tipo).short + ' · ' + money(r.monto) + ' · ' + etiquetaPeriodo(r.periodicidad) + ' · próximo: ' + fmtDate(r.proxima) + '</span></span>' +
+        '<button class="x" data-rec-del="' + r.id + '"><span class="msr" style="font-size:17px">delete</span></button></div>';
+    }).join('') : '<div class="empty" style="margin:8px 0;padding:24px"><div style="font-size:13px;font-weight:600;color:var(--text-2)">No tienes pagos periódicos.<br>Al registrar un movimiento, en <b>Los detalles</b> elige Repetir: cada mes.</div></div>';
+    var html = '<div class="backdrop" data-close></div><div class="sheet" style="max-height:80%"><div class="grab"></div>' +
+      '<div class="sheet-h"><b>Pagos periódicos</b><button class="x" data-close><span class="msr" style="font-size:20px">close</span></button></div>' +
+      '<div class="sheet-body" style="padding-bottom:24px">' + filas +
+      '<div style="margin-top:8px;font-size:11px;color:var(--text-3);text-align:center;line-height:1.5;font-weight:600">Se guardan en este dispositivo, por usuario. Cuando llegue la fecha,<br>aparecen en Inicio para registrarlos con un toque.</div>' +
+      '</div></div>';
+    var ov = el('<div>' + html + '</div>'); $('#overlays').appendChild(ov);
+    ov.addEventListener('click', function (e) {
+      if (e.target.closest('[data-close]')) { closeOverlay(ov); return; }
+      var b = e.target.closest('[data-rec-del]');
+      if (!b) return;
+      if (b.getAttribute('data-conf')) {
+        recGuardar(recCargar().filter(function (x) { return x.id !== b.getAttribute('data-rec-del'); }));
+        closeOverlay(ov);
+        renderAll();
+        toast('Pago periódico eliminado', 'delete', 'var(--bad)');
+        setTimeout(openRecurrentes, 320);
+      } else {
+        b.setAttribute('data-conf', '1');
+        b.innerHTML = '<span class="msr" style="font-size:17px;color:var(--bad)">warning</span>';
+      }
+    });
   }
   function renderRecent() {
     var list = ST.movements.slice().sort(chrono).reverse().slice(0, 4);
@@ -823,6 +928,7 @@
    
   function showTab(tab) {
     ST.tab = tab;
+    if (tab === 'inicio') renderRecurrentes(); // la fecha puede vencer con la app abierta
     ['inicio', 'historial', 'pendientes', 'stats'].forEach(function (t) { $('#scr-' + t).classList.toggle('hidden', t !== tab); });
     [].forEach.call(document.querySelectorAll('#nav button[data-tab]'), function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === tab); });
     var sc = $('#scr-' + tab); if (sc) sc.scrollTop = 0;
@@ -871,6 +977,7 @@
       }
       if ((b = e.target.closest('[data-k]'))) { keyPress(b.getAttribute('data-k')); return; }
       if ((b = e.target.closest('[data-m]'))) { REG.method = b.getAttribute('data-m'); buildMethods(); return; }
+      if ((b = e.target.closest('[data-rep]'))) { REG.repetir = b.getAttribute('data-rep'); buildRepetir(); return; }
       if ((b = e.target.closest('[data-c]'))) { REG.concept = b.getAttribute('data-c'); var ci = $('#r-concept'); if (ci) ci.value = REG.concept; syncChips(); return; }
       if ((b = e.target.closest('[data-dir]'))) { REG.dir = +b.getAttribute('data-dir'); updateDir(); refreshAmount(); return; }
     });
@@ -938,7 +1045,8 @@
         '<input class="input" id="r-concept" placeholder="Ej. Venta Cori, pago, abono\u2026">' +
         '<div class="chips" id="r-chips"></div>' +
         '<div class="flabel">Fecha del movimiento</div>' +
-        '<label class="daterow"><span class="msr" style="font-size:22px;color:var(--accent)">calendar_today</span><span id="r-datelabel" style="flex:1;font-size:14.5px;font-weight:700"></span><span class="msr" style="color:var(--text-3)">expand_more</span><input type="date" id="r-date"></label>';
+        '<label class="daterow"><span class="msr" style="font-size:22px;color:var(--accent)">calendar_today</span><span id="r-datelabel" style="flex:1;font-size:14.5px;font-weight:700"></span><span class="msr" style="color:var(--text-3)">expand_more</span><input type="date" id="r-date"></label>' +
+        ((!REG.correctOf && !REG.editOf) ? '<div class="flabel">Repetir</div><div class="chips" id="r-repetir"></div>' : '');
       if (REG.type !== 'Ajuste de saldo') buildMethods();
       buildChips();
       var ci = $('#r-concept'); ci.value = REG.concept; syncChips();
@@ -946,6 +1054,7 @@
       var di = $('#r-date'); di.value = REG.date;
       $('#r-datelabel').textContent = fmtDateLong(REG.date);
       di.addEventListener('change', function (e) { if (e.target.value) { REG.date = e.target.value; $('#r-datelabel').textContent = fmtDateLong(REG.date); } });
+      buildRepetir();
       next.innerHTML = nextLabel('Continuar');
       next.disabled = false;
 
@@ -959,6 +1068,9 @@
       if (REG.type !== 'Ajuste de saldo') rows.push(['M\u00e9todo', REG.method]);
       rows.push(['Concepto', REG.concept || '\u2014']);
       rows.push(['Fecha', fmtDateLong(REG.date)]);
+      if (!REG.correctOf && !REG.editOf && REG.repetir && REG.repetir !== 'no') {
+        rows.push(['Se repetirá', etiquetaPeriodo(REG.repetir) + ' · próximo: ' + fmtDate(siguienteFecha(REG.date, REG.repetir))]);
+      }
       body.innerHTML = wStepTitle('\u00bfTodo correcto?', 'Revisa antes de enviar') +
         '<div class="card" style="overflow:hidden">' + rows.map(function (r) { return '<div class="drow"><span class="dk">' + r[0] + '</span><span class="dv">' + esc(r[1]) + '</span></div>'; }).join('') + '</div>' +
         '<div style="margin-top:14px;font-size:11.5px;color:var(--text-3);text-align:center;line-height:1.5;font-weight:600">Quedar\u00e1 <b>Pendiente</b> hasta que ' + other(ST.identity) + ' lo apruebe.</div>';
@@ -1006,6 +1118,12 @@
     var wrap = $('#r-dir');
     if (!wrap) return;
     wrap.innerHTML = '<div class="dirs" style="margin-top:6px"><button class="dir' + (REG.dir > 0 ? ' sel' : '') + '" data-dir="1">A favor de Daniel</button><button class="dir' + (REG.dir < 0 ? ' sel' : '') + '" data-dir="-1">A favor de Coraima</button></div>';
+  }
+  function buildRepetir() {
+    var box = $('#r-repetir');
+    if (!box) return;
+    var ops = [['no', 'Solo una vez'], ['semana', 'Cada semana'], ['quincena', 'Cada quincena'], ['mes', 'Cada mes']];
+    box.innerHTML = ops.map(function (o) { return '<button class="cchip' + ((REG.repetir || 'no') === o[0] ? ' sel' : '') + '" data-rep="' + o[0] + '">' + o[1] + '</button>'; }).join('');
   }
   function buildMethods() {
     var box = $('#r-methods');
@@ -1072,10 +1190,21 @@
       aprobadoDaniel: ST.identity === 'Daniel', fechaAprobDaniel: '',
       aprobadoCoraima: ST.identity === 'Coraima', fechaAprobCoraima: '', saldoReal: null
     };
+    var esRepetitivo = REG.repetir && REG.repetir !== 'no';
+    if (esRepetitivo) {
+      agregarRecurrente({
+        tipo: REG.type, monto: amt, concepto: REG.concept,
+        metodo: REG.type === 'Ajuste de saldo' ? '' : REG.method,
+        periodicidad: REG.repetir,
+        proxima: siguienteFecha(REG.date, REG.repetir)
+      });
+    }
     ST.movements.push(tmp);
     ST.pendienteNeto = (ST.pendienteNeto || 0) + signed(tmp);
     renderAll();
-    toast('Registrado — falta que ' + other(ST.identity) + ' apruebe', 'schedule', 'var(--warn)');
+    toast(esRepetitivo
+      ? 'Registrado y programado ' + etiquetaPeriodo(REG.repetir) + ' — falta que ' + other(ST.identity) + ' apruebe'
+      : 'Registrado — falta que ' + other(ST.identity) + ' apruebe', 'schedule', 'var(--warn)');
     if (yOtro) openRegister(null, mantener);
     if (!hasBackend()) { demoRegister(payload); return; }
     google.script.run.withSuccessHandler(onState).withFailureHandler(function (e) {
@@ -1171,6 +1300,7 @@
     var html = '<div class="backdrop" data-close></div><div class="sheet"><div class="grab"></div><div class="sheet-body" style="padding-bottom:24px">' +
       '<div style="display:flex;align-items:center;gap:13px;padding:2px 4px 16px"><span class="avatar" style="width:48px;height:48px;font-size:19px;background:' + personColor(ST.identity) + '">' + ST.identity.charAt(0) + '</span><span><span class="greet">Estás usando la app como</span><br><b style="font-size:18px">' + ST.identity + '</b></span></div>' +
       '<button class="set-row" id="s-switch"><span class="msr" style="color:var(--accent)">switch_account</span><span style="flex:1;font-size:14.5px;font-weight:700">Cambiar de usuario</span><span class="msr" style="color:var(--text-3)">chevron_right</span></button>' +
+      '<button class="set-row" id="s-rec"><span class="msr" style="color:var(--accent)">event_repeat</span><span style="flex:1;font-size:14.5px;font-weight:700">Pagos periódicos' + (recCargar().length ? ' (' + recCargar().length + ')' : '') + '</span><span class="msr" style="color:var(--text-3)">chevron_right</span></button>' +
       '<button class="set-row" id="s-pin"><span class="msr" style="color:var(--warn)">' + (pinGuardado(ST.identity) ? 'lock' : 'lock_open') + '</span><span style="flex:1;font-size:14.5px;font-weight:700">' + (pinGuardado(ST.identity) ? 'PIN de mi sesión' : 'Poner PIN a mi sesión') + '</span><span class="msr" style="color:var(--text-3)">chevron_right</span></button>' +
       '<button class="set-row" id="s-refresh"><span class="msr" style="color:var(--text-2)">refresh</span><span style="flex:1;font-size:14.5px;font-weight:700">Recargar datos</span></button>' +
       '<div style="margin-top:10px;font-size:11px;color:var(--text-3);text-align:center;line-height:1.5;font-weight:600">El tema (claro/oscuro) sigue la configuración de tu teléfono.</div>' +
@@ -1179,6 +1309,7 @@
     ov.addEventListener('click', function (e) { if (e.target.closest('[data-close]')) closeOverlay(ov); });
     $('#s-switch', ov).addEventListener('click', function () { try { localStorage.removeItem(KEY_ID); } catch (e) {} ST.identity = null; closeOverlay(ov); showIdentity(); });
     $('#s-refresh', ov).addEventListener('click', function () { closeOverlay(ov); $('#loader').classList.remove('hidden'); fetchState(); });
+    $('#s-rec', ov).addEventListener('click', function () { closeOverlay(ov); openRecurrentes(); });
     $('#s-pin', ov).addEventListener('click', function () {
       var who = ST.identity;
       closeOverlay(ov);
@@ -1329,6 +1460,8 @@
     var fm = t.closest && t.closest('[data-f-mes]'); if (fm) { FIL.mes = fm.getAttribute('data-f-mes'); renderHistory(); return; }
     var sp = t.closest && t.closest('[data-period]'); if (sp) { STATS_PERIOD = sp.getAttribute('data-period'); renderStats(); return; }
     var fw = t.closest && t.closest('[data-flowmes]'); if (fw) { FIL.mes = fw.getAttribute('data-flowmes'); FIL.estado = ''; FIL.persona = ''; FIL.q = ''; var fq = $('#f-q'); if (fq) fq.value = ''; showTab('historial'); renderHistory(); return; }
+    var rg = t.closest && t.closest('[data-rec-go]'); if (rg) { recRegistrar(rg.getAttribute('data-rec-go')); return; }
+    var rs = t.closest && t.closest('[data-rec-skip]'); if (rs) { recOmitir(rs.getAttribute('data-rec-skip')); return; }
     var ap = t.closest && t.closest('[data-approve]'); if (ap) { approve(ap.getAttribute('data-approve')); return; }
     var rj = t.closest && t.closest('[data-reject]'); if (rj) { reject(rj.getAttribute('data-reject')); return; }
     var row = t.closest && t.closest('.row[data-uuid]'); if (row) { openDetail(row.getAttribute('data-uuid')); return; }
