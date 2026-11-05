@@ -52,6 +52,15 @@ class EscPosSettings:
     #: Apagado: medido en un ticket de 25 productos ahorra solo 9% (casi todo el
     #: blanco es el aire entre renglones) y agrega 4 pausas (2026-10-13).
     saltar_filas_en_blanco: bool = False
+    #: Mandar el dibujo «por renglones», igual que el driver del fabricante:
+    #: tiras de 24 puntos con `ESC *` y un `ESC J` (imprime y avanza) después de
+    #: cada una, en vez de bloques `GS v 0`. Para la JM Thermal / EC-PM-80320
+    #: del Kiosko Principal: con `GS v 0` quema SIN avanzar el papel al arrancar
+    #: y cada vez que se detiene entre bloques, y los renglones salen encimados
+    #: («pierde líneas»). Medido en papel el 2026-11-05: con el formato del
+    #: driver el mismo ticket de 29 cm sale completo. Apagado por defecto: a la
+    #: impresora nueva no le hace falta.
+    imagen_por_renglones: bool = False
 
 
 def _cache_path() -> Path:
@@ -82,6 +91,9 @@ def load_escpos_settings() -> EscPosSettings:
             ))),
             saltar_filas_en_blanco=bool(
                 data.get("saltar_filas_en_blanco", d.saltar_filas_en_blanco)
+            ),
+            imagen_por_renglones=bool(
+                data.get("imagen_por_renglones", d.imagen_por_renglones)
             ),
         )
     except Exception:  # noqa: BLE001

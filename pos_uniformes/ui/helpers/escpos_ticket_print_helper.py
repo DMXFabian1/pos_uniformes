@@ -161,6 +161,93 @@ def raster_de_imagen(
     return bytes(salida)
 
 
+#: El arranque que manda el driver «JM Thermal Series Printer» antes de un
+#: dibujo, copiado byte por byte de una captura (2026-11-05): reset, impresora
+#: en línea, juego de caracteres, tabla 0, unidades de movimiento por defecto,
+#: interlineado por defecto, y un avance de 8 puntos para que el papel agarre.
+_CABECERA_RENGLONES = bytes([
+    _ESC, ord("@"), _ESC, ord("="), 1, _ESC, ord("R"), 0, _ESC, ord("t"), 0,
+    _GS, ord("P"), 0, 0, _ESC, ord("2"), 0, _ESC, ord("J"), 8,
+])
+#: Alto de cada tira de `ESC * 33`: 24 puntos (3 bytes por columna).
+ALTO_RENGLON = 24
+#: Ancho imprimible del cabezal en las térmicas de 80 mm.
+ANCHO_CABEZAL = 576
+
+
+def _avance(puntos: int) -> bytes:
+    """`ESC J n` las veces que haga falta: n va de 0 a 255."""
+    salida = bytearray()
+    while puntos > 0:
+        paso = min(255, puntos)
+        salida += bytes([_ESC, ord("J"), paso])
+        puntos -= paso
+    return bytes(salida)
+
+
+def renglones_de_imagen(ruta) -> bytes:
+    """El PNG como lo mandaría el driver del fabricante: tiras con `ESC *`.
+
+    Por cada tira de 24 filas va `ESC * 33 nL nH` con sus columnas (3 bytes
+    cada una, el bit más significativo arriba), un NUL y `ESC J 24`: «imprime
+    esto y avanza 24 puntos». Dos ahorros que también hace el driver: las
+    columnas en blanco de la derecha no se mandan, y una tira toda en blanco no
+    se manda — sus 24 puntos se suman al avance.
+
+    Por qué existe: con `GS v 0` la JM Thermal del Kiosko Principal quema los
+    primeros centímetros sin mover el papel, y otra vez en cada pausa entre
+    bloques; lo impreso queda encimado en una raya y el ticket «pierde líneas».
+    Con este formato el mismo ticket de 29 cm salió completo, dos veces
+    seguidas y con corte total (pruebas en papel, 2026-11-05).
+
+    Una imagen más angosta que el cabezal se centra con columnas en blanco a
+    la izquierda: aquí no se usa `ESC a`, que el driver tampoco manda.
+    """
+    from PIL import Image
+
+    img = Image.open(ruta).convert("L")
+    img = img.point(lambda v: 0 if v < 128 else 255, mode="1")
+    ancho, alto = img.size
+    margen = max(0, (ANCHO_CABEZAL - ancho) // 2)
+    pixeles = img.load()
+
+    salida = bytearray()
+    pendiente = 0                      # avance acumulado por tiras en blanco
+    for y0 in range(0, alto, ALTO_RENGLON):
+        filas = range(y0, min(y0 + ALTO_RENGLON, alto))
+        ultima = -1                    # última columna con tinta en esta tira
+        for x in range(ancho - 1, -1, -1):
+            if any(not pixeles[x, y] for y in filas):
+                ultima = x
+                break
+        if ultima < 0:
+            pendiente += ALTO_RENGLON
+            continue
+        salida += _avance(pendiente)
+        pendiente = 0
+        columnas = margen + ultima + 1
+        salida += bytes([_ESC, ord("*"), 33, columnas & 0xFF, (columnas >> 8) & 0xFF])
+        salida += bytes(3 * margen)
+        for x in range(ultima + 1):
+            for k in range(3):
+                b = 0
+                for bit in range(8):
+                    y = y0 + k * 8 + bit
+                    if y < alto and not pixeles[x, y]:
+                        b |= 0x80 >> bit
+                salida.append(b)
+        salida += bytes([0x00, _ESC, ord("J"), ALTO_RENGLON])
+    salida += _avance(pendiente)
+    return bytes(salida)
+
+
+def _imagen_en_el_texto(ruta, s: EscPosSettings) -> bytes:
+    """Un dibujo suelto dentro de un ticket de texto (logo, adorno del pie)."""
+    if getattr(s, "imagen_por_renglones", False):
+        return renglones_de_imagen(ruta)
+    return _ALINEAR_CENTRO + raster_de_imagen(ruta) + _ALINEAR_IZQ
+
+
 def _trozos_con_imagenes(text: str, s: EscPosSettings) -> bytes:
     """Codifica el texto y cambia cada marcador de imagen por sus puntos.
 
@@ -189,7 +276,7 @@ def _trozos_con_imagenes(text: str, s: EscPosSettings) -> bytes:
             puesto = False
             if ruta is not None:
                 try:
-                    salida += _ALINEAR_CENTRO + raster_de_imagen(ruta) + _ALINEAR_IZQ
+                    salida += _imagen_en_el_texto(ruta, s)
                     puesto = True
                 except Exception:  # noqa: BLE001 — sin dibujo, el ticket sigue
                     pass
@@ -226,6 +313,11 @@ def build_escpos_imagen(texto: str, settings: EscPosSettings | None = None) -> b
 
     s = settings or EscPosSettings()
     png = render_ticket_png(texto)
+    if getattr(s, "imagen_por_renglones", False):
+        # Como el driver del fabricante, de principio a fin: su cabecera, las
+        # tiras, `ESC J 0`, el corte y un reset para dejarla como estaba.
+        return (_CABECERA_RENGLONES + renglones_de_imagen(io.BytesIO(png))
+                + bytes([_ESC, ord("J"), 0]) + _corte(s) + _INIT)
     raster = raster_de_imagen(
         io.BytesIO(png),
         filas_por_franja=s.filas_por_franja,

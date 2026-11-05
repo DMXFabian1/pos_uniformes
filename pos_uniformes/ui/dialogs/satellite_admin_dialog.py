@@ -1356,6 +1356,15 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     )
     escpos_adornos_hint.setWordWrap(True)
     escpos_adornos_hint.setObjectName("satNota")
+    escpos_renglones = QCheckBox("Dibujar por renglones (para la impresora que pierde líneas o encima el principio)")
+    escpos_renglones.setChecked(getattr(_esc, "imagen_por_renglones", False))
+    escpos_renglones_hint = QLabel(
+        "Manda el ticket dibujado en tiras, como lo hace el driver del fabricante. "
+        "Enciéndelo SOLO en la PC cuya térmica imprime el principio encimado en una "
+        "raya o se come renglones; a las demás no les hace falta."
+    )
+    escpos_renglones_hint.setWordWrap(True)
+    escpos_renglones_hint.setObjectName("satNota")
     escpos_form = QFormLayout()
     escpos_codepage = QSpinBox()
     escpos_codepage.setRange(0, 255)
@@ -1380,6 +1389,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
             full_cut=escpos_fullcut.isChecked(),
             ticket_como_imagen=escpos_imagen.isChecked(),
             adornos_de_temporada=escpos_adornos.isChecked(),
+            imagen_por_renglones=escpos_renglones.isChecked(),
         )
 
     save_escpos_btn = QPushButton("Guardar ESC/POS")
@@ -1443,6 +1453,8 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     escpos_layout.addWidget(escpos_imagen_hint)
     escpos_layout.addWidget(escpos_adornos)
     escpos_layout.addWidget(escpos_adornos_hint)
+    escpos_layout.addWidget(escpos_renglones)
+    escpos_layout.addWidget(escpos_renglones_hint)
     escpos_layout.addLayout(escpos_form)
     escpos_btn_row = QHBoxLayout()
     escpos_btn_row.addWidget(save_escpos_btn)
