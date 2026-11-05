@@ -96,6 +96,34 @@ class LabelGeneratorTests(unittest.TestCase):
                 if tipo == "texto":
                     self.assertLessEqual(LabelGenerator._text_width(draw, texto, fuente), SPLIT_SECTION_WIDTH - 16, texto)
 
+    def test_la_cuadrada_de_23mm_qr_de_modulos_exactos_y_lo_que_decide_al_lado(self) -> None:
+        """La de todos los días (2026-11-05): QR a la izquierda, talla o precio
+        grande a su lado y el nombre en negrita abajo."""
+        import tempfile
+        from pathlib import Path
+
+        from PIL import Image
+
+        from pos_uniformes.utils.label_generator import QR_SIZE_DK1221
+
+        self.assertEqual(QR_SIZE_DK1221 % 27, 0)             # 27 módulos con borde: escala entera, módulos cuadrados
+        self.assertGreaterEqual(QR_SIZE_DK1221 // 27, 5)     # no menos de 0.42 mm por módulo a 300 dpi
+        uniforme = _con(_build_variant(product_name="Pants 3pz Deportivo Patria", talla="6", school_name="Patria", garment_type="Deportivo"))
+        ropa = _con(_build_variant(product_name="Conjunto Pijama de Niño", talla="Infantil", price="159.00"))
+        with tempfile.TemporaryDirectory() as tmp:
+            qr = Path(tmp) / "qr.png"
+            Image.new("1", (324, 324), 1).save(qr)            # QR en blanco: lo que se mide es el texto
+            for nombre, v in (("u", uniforme), ("r", ropa)):
+                salida = Path(tmp) / f"{nombre}.png"
+                LabelGenerator._render_dk1221(v, qr, salida)
+                img = Image.open(salida)
+                self.assertEqual(img.size, (202, 202))
+                columna = img.crop((QR_SIZE_DK1221 + 5, 2, 202, QR_SIZE_DK1221))
+                pie = img.crop((0, QR_SIZE_DK1221 + 5, 202, 202))
+                self.assertGreater(columna.histogram()[0], 250, nombre)     # talla / precio, grande
+                self.assertGreater(pie.histogram()[0], 600, nombre)         # el nombre en negrita
+                self.assertEqual(img.crop((0, 0, QR_SIZE_DK1221 + 2, QR_SIZE_DK1221 + 2)).histogram()[0], 0, nombre)  # nada pisa el QR
+
     def test_se_pintan_del_tamano_de_siempre(self) -> None:
         import tempfile
         from pathlib import Path

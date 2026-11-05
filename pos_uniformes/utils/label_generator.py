@@ -22,7 +22,7 @@ DK1221_SIZE = 202  # 23mm × 23mm area imprimible (brother_ql dots_printable)
 QR_SIZE_STANDARD = 231
 QR_SIZE_SPLIT = 160
 QR_SIZE_CONTINUOUS = 200
-QR_SIZE_DK1221 = 180
+QR_SIZE_DK1221 = 135  # 27 módulos × 5 puntos exactos (0.42 mm a 300 dpi)
 
 _CONTINUOUS_MODES = {"continuous"}
 _SPLIT_MODES = {"split"}
@@ -355,34 +355,81 @@ class LabelGenerator:
 
     @classmethod
     def _render_dk1221(cls, variante: Variante, qr_path: Path, output_path: Path, *, show_price: bool | None = None) -> None:
-        """La cuadrada de 23 mm: casi todo es QR. Abajo cabe UN renglón, y antes
-        era el nombre completo a 8 puntos, ilegible. Ahora va lo que decide en
-        negrita —la talla en uniformes, el precio en ropa— y el nombre al lado."""
+        """La cuadrada de 23 mm, que se volvió la de todos los días (2026-11-05).
+
+        Son 202 puntos por lado a 300 dpi: 17 mm imprimibles. Antes casi todo
+        era QR y el nombre iba abajo a 8 puntos, ilegible. Ahora:
+
+            ┌────────────┬───────┐
+            │            │ TALLA │   uniforme: la talla, enorme
+            │     QR     │   6   │   ropa: el precio ($ arriba, la cifra grande)
+            │            │       │         y la talla en caja si no es unitalla
+            ├────────────┴───────┤
+            │ Pants 3pz          │   el nombre en negrita, hasta dos renglones
+            │ Deportivo          │
+            └────────────────────┘
+
+        El QR baja de 180 a 135 puntos: es de 21 módulos (27 con su borde), así
+        que 135 son 5 puntos EXACTOS por módulo —0.42 mm, con corrección de
+        errores alta— y se escala sin suavizar para que cada módulo quede
+        cuadrado. Achicarlo «al tanteo» dejaba módulos disparejos.
+        """
         size = DK1221_SIZE
         label_image = Image.new("1", (size, size), 1)
         draw = ImageDraw.Draw(label_image)
-        qr_lado = QR_SIZE_DK1221 - 18          # 162: deja un renglón legible abajo
-        qr_image = Image.open(qr_path).convert("1").resize((qr_lado, qr_lado))
-        qr_y = 2
-        label_image.paste(qr_image, ((size - qr_lado) // 2, qr_y))
+        qr_lado = QR_SIZE_DK1221
+        qr_image = Image.open(qr_path).convert("1").resize((qr_lado, qr_lado), Image.Resampling.NEAREST)
+        qr_x, qr_y = 2, 2
+        label_image.paste(qr_image, (qr_x, qr_y))
 
         c = cls.small_content(variante, show_price=show_price)
-        y0, alto = qr_y + qr_lado + 1, size - (qr_y + qr_lado + 1) - 2
-        x, derecha = 6, size - 6
-        fuerte = c.precio or (f"T {c.talla}" if c.talla else "")
-        if fuerte:
-            f_fuerte = cls._fit_font(draw, fuerte, int((derecha - x) * 0.55), base_size=26, min_size=14, bold=True)
-            caja = draw.textbbox((0, 0), fuerte, font=f_fuerte)
-            draw.text((x - caja[0], y0 + (alto - (caja[3] - caja[1])) // 2 - caja[1]), fuerte, font=f_fuerte, fill=0)
-            x += (caja[2] - caja[0]) + 8
-        if c.nombre and derecha - x > 30:
-            # 13 puntos es lo mínimo que se lee en 23 mm: si no cabe, se recorta con «…».
-            f_nom = cls._fit_font(draw, c.nombre, derecha - x, base_size=18, min_size=13)
-            nombre = cls._recortar(draw, c.nombre, f_nom, derecha - x)
-            caja = draw.textbbox((0, 0), nombre, font=f_nom)
-            ancho_n = caja[2] - caja[0]
-            x_n = x if fuerte else (size - ancho_n) // 2
-            draw.text((x_n - caja[0], y0 + (alto - (caja[3] - caja[1])) // 2 - caja[1]), nombre, font=f_nom, fill=0)
+        col_x = qr_x + qr_lado + 3
+        col_w = size - col_x - 2
+        col_cx = col_x + col_w // 2
+        col_y0, col_y1 = qr_y + 2, qr_y + qr_lado - 2
+
+        def centrado(texto: str, fuente, y: int) -> int:
+            caja = draw.textbbox((0, 0), texto, font=fuente)
+            draw.text((col_cx - (caja[2] - caja[0]) // 2 - caja[0], y - caja[1]), texto, font=fuente, fill=0)
+            return caja[3] - caja[1]
+
+        talla_abajo = ""        # una talla que no cabe grande en la columna baja al pie
+        if c.precio:
+            cifra = c.precio.lstrip("$")
+            f_peso = cls._load_font(22, bold=True)
+            f_cifra = cls._fit_font(draw, cifra, col_w, base_size=44, min_size=16, bold=True)
+            alto_cifra = draw.textbbox((0, 0), cifra, font=f_cifra)
+            alto_bloque = 18 + 4 + (alto_cifra[3] - alto_cifra[1])
+            y = col_y0 + max(0, ((col_y1 - col_y0) - alto_bloque - (26 if c.talla else 0)) // 2)
+            y += centrado("$", f_peso, y) + 4
+            y += centrado(cifra, f_cifra, y) + 10
+            if c.talla:
+                # Sin caja: en 5 mm de ancho la caja se comía el margen del QR.
+                f_talla = cls._fit_font(draw, c.talla, col_w, base_size=22, min_size=11, bold=True)
+                centrado(cls._recortar(draw, c.talla, f_talla, col_w), f_talla, min(y, col_y1 - 18))
+        elif c.talla:
+            f_talla = cls._fit_font(draw, c.talla, col_w, base_size=68, min_size=10, bold=True)
+            if getattr(f_talla, "size", 10) >= 20:
+                f_rot = cls._fit_font(draw, "TALLA", col_w, base_size=16, min_size=10)
+                caja = draw.textbbox((0, 0), c.talla, font=f_talla)
+                alto_bloque = 14 + 6 + (caja[3] - caja[1])
+                y = col_y0 + max(0, ((col_y1 - col_y0) - alto_bloque) // 2)
+                y += centrado("TALLA", f_rot, y) + 6
+                centrado(c.talla, f_talla, y)
+            else:
+                talla_abajo = c.talla       # «Unitalla», «Infantil»… no caben grandes aquí
+
+        # El nombre, abajo, a todo lo ancho.
+        y0 = qr_y + qr_lado + 3
+        alto = size - y0 - 2
+        nombre = f"{c.nombre} · {talla_abajo}" if talla_abajo else c.nombre
+        f_nom, renglones = cls._fit_wrapped(draw, nombre, size - 8, alto, base_size=30, min_size=14, prefiere_uno_desde=26)
+        renglones = [cls._recortar(draw, r, f_nom, size - 8) for r in renglones]
+        paso = cls._alto_real(f_nom)
+        y = y0 + max(0, (alto - len(renglones) * paso) // 2)
+        for renglon in renglones:
+            draw.text((4, y), renglon, font=f_nom, fill=0)
+            y += paso
         output_path.parent.mkdir(parents=True, exist_ok=True)
         label_image.save(output_path, "PNG")
 
