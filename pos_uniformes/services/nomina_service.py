@@ -198,6 +198,17 @@ def registrar_pago_con_monto(session, employee_code: str, *, creado_por: str, fe
         raise PermissionError("Solo el dueño o el encargado registran pagos.")
     fecha = fecha or date.today()
     code = str(employee_code).strip().upper()
+    # Nunca en un día que todavía no llega. El 5 de noviembre, con el domingo 8
+    # seleccionado en el calendario, «Le pagué este día» registró un pago de
+    # $1,370 con las 35 comisiones de la semana en curso: el contador quedó en
+    # cero, el siguiente pago brincó una semana y el corte de esa tarde habría
+    # restado dinero que nadie entregó (Daniel, 2026-11-05). Pagar ANTES de
+    # tiempo es pagar HOY: la fecha del pago es el día en que se entregó.
+    if fecha > date.today():
+        raise ValueError(
+            f"El {fecha:%d/%m} todavía no llega: no se puede registrar un pago en ese día. "
+            "Si le pagas hoy por adelantado, elige el día de hoy."
+        )
     # Un pago por persona por día. Desde el celular, «/pagar X si» dos veces
     # o dos toques en «Sí, pagar» registraban dos pagos de $1,300 el mismo
     # día: el pendiente del sueldo semanal nunca baja a cero por sí solo

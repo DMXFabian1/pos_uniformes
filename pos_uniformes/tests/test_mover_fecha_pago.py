@@ -103,3 +103,23 @@ class MoverFechaPagoTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PagoEnElFuturoTests(unittest.TestCase):
+    """«Le pagué este día» con un domingo que todavía no llegaba registró el
+    pago de la semana en curso y dejó las comisiones en cero (2026-11-05)."""
+
+    def test_no_se_registra_un_pago_en_un_dia_que_no_ha_llegado(self) -> None:
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        s = Session(engine)
+        s.add(EmpleadaHorario(employee_code="VEND-4", descanso_weekday=5, fecha_ultimo_pago=date.today() - timedelta(days=4)))
+        s.flush()
+        en_tres_dias = date.today() + timedelta(days=3)
+        with self.assertRaisesRegex(ValueError, "todavía no llega"):
+            nom.registrar_pago_con_monto(s, "VEND-4", creado_por="VEND-1", fecha=en_tres_dias)
+        self.assertEqual(s.query(EmpleadaPago).count(), 0)                                  # no quedó nada
+        self.assertEqual(s.get(EmpleadaHorario, "VEND-4").fecha_ultimo_pago, date.today() - timedelta(days=4))
+        # Hoy y los días pasados sí: pagar antes de tiempo es pagar hoy.
+        pago = nom.registrar_pago_con_monto(s, "VEND-4", creado_por="VEND-1", fecha=date.today())
+        self.assertEqual(pago.fecha, date.today())
