@@ -54,22 +54,51 @@ def _powershell() -> str | None:
     return None
 
 
-def armar_comando(script: str, ejecutable: str = "powershell") -> list[str]:
-    """El comando listo para `subprocess`, sin problemas de comillas.
+#: Windows no acepta una línea de comandos de más de 32,767 caracteres, y el
+#: script va en base64 de UTF-16 (2.7 veces su tamaño): uno de ~12 mil
+#: caracteres ya no cabía y salía «[WinError 206] El nombre del archivo o la
+#: extensión es demasiado largo» (2026-11-05, la prueba de la impresora vieja).
+#: Lo que pase de aquí va en un archivo `.ps1` temporal.
+MAXIMO_EN_LINEA = 24_000
 
-    Va en `-EncodedCommand` (UTF-16 en base64): así las comillas, los `$` y los
-    saltos del script llegan tal cual, sin que nadie los reinterprete. Todo lo
-    que escriba (también los errores) sale en UTF-8 y a lo ancho."""
-    envuelto = (
+
+def _envuelto(script: str) -> str:
+    return (
         "try { $OutputEncoding = [Console]::OutputEncoding = [Text.Encoding]::UTF8 } catch {}\n"
         # Sin barra de progreso: redirigida, PowerShell la escribe como XML
         # («#< CLIXML … Preparando módulos para el primer uso») al final.
         "$ProgressPreference = 'SilentlyContinue'\n"
         "& {\n" + script + "\n} *>&1 | Out-String -Width " + str(ANCHO_SALIDA)
     )
-    codificado = base64.b64encode(envuelto.encode("utf-16-le")).decode("ascii")
+
+
+def armar_comando(script: str, ejecutable: str = "powershell") -> list[str]:
+    """El comando listo para `subprocess`, sin problemas de comillas.
+
+    Va en `-EncodedCommand` (UTF-16 en base64): así las comillas, los `$` y los
+    saltos del script llegan tal cual, sin que nadie los reinterprete. Todo lo
+    que escriba (también los errores) sale en UTF-8 y a lo ancho."""
+    codificado = base64.b64encode(_envuelto(script).encode("utf-16-le")).decode("ascii")
     return [ejecutable, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
             "-EncodedCommand", codificado]
+
+
+def comando_para(script: str, ejecutable: str = "powershell") -> tuple[list[str], str | None]:
+    """(comando, archivo temporal a borrar después o None).
+
+    Un script corto va en la línea de comandos, como siempre. Uno largo se
+    escribe a un `.ps1` temporal (UTF-8 con BOM, para que PowerShell 5 lea bien
+    los acentos) y se corre con `-File`."""
+    import os
+    import tempfile
+
+    comando = armar_comando(script, ejecutable)
+    if len(comando[-1]) <= MAXIMO_EN_LINEA:
+        return comando, None
+    fd, ruta = tempfile.mkstemp(prefix="buzon_", suffix=".ps1")
+    with os.fdopen(fd, "w", encoding="utf-8-sig", newline="\n") as archivo:
+        archivo.write(_envuelto(script))
+    return ([ejecutable, "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", ruta], ruta)
 
 
 def _matar_arbol(proc) -> None:
@@ -116,11 +145,13 @@ def ejecutar(script: str, *, tiempo_limite: int = TIEMPO_LIMITE) -> Resultado:
     fd, ruta = tempfile.mkstemp(prefix="buzon_", suffix=".txt")
     error = ""
     codigo: int | None = None
+    script_temporal: str | None = None
     try:
         with os.fdopen(fd, "wb") as archivo:
             try:
+                comando, script_temporal = comando_para(script, ejecutable)
                 proc = subprocess.Popen(
-                    armar_comando(script, ejecutable),
+                    comando,
                     stdin=subprocess.DEVNULL,
                     stdout=archivo,
                     stderr=subprocess.STDOUT,
@@ -140,10 +171,13 @@ def ejecutar(script: str, *, tiempo_limite: int = TIEMPO_LIMITE) -> Resultado:
         with open(ruta, "rb") as leido:
             salida = leido.read().decode("utf-8", errors="replace")
     finally:
-        try:
-            os.remove(ruta)
-        except Exception:  # noqa: BLE001
-            pass
+        for sobra in (ruta, script_temporal):
+            if not sobra:
+                continue
+            try:
+                os.remove(sobra)
+            except Exception:  # noqa: BLE001
+                pass
     return Resultado(salida, None if error else codigo, time.monotonic() - inicio, error=error)
 
 

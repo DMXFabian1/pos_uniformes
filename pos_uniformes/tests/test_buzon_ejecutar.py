@@ -138,7 +138,7 @@ class ConProcesoDeVerdadTests(unittest.TestCase):
         return patch.multiple(
             ej,
             _powershell=lambda: sys.executable,
-            armar_comando=lambda script, ejecutable="": [ejecutable, "-c", codigo_python],
+            comando_para=lambda script, ejecutable="": ([ejecutable, "-c", codigo_python], None),
         )
 
     def test_la_salida_se_lee_completa(self) -> None:
@@ -168,3 +168,50 @@ class ConProcesoDeVerdadTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ScriptLargoTests(unittest.TestCase):
+    """Un script largo ya no revienta la línea de comandos de Windows
+    (WinError 206, 2026-11-05): va en un archivo temporal."""
+
+    def test_uno_corto_sigue_en_la_linea_de_comandos(self) -> None:
+        comando, temporal = ej.comando_para("Get-Date")
+        self.assertIsNone(temporal)
+        self.assertEqual(comando[-2], "-EncodedCommand")
+
+    def test_uno_largo_va_en_un_archivo_y_trae_el_script_entero(self) -> None:
+        import os
+
+        script = "Write-Output 'á'\n" + "# relleno\n" * 2500 + "Write-Output 'fin'"
+        comando, temporal = ej.comando_para(script)
+        try:
+            self.assertIsNotNone(temporal)
+            self.assertEqual(comando[-2:], ["-File", temporal])
+            self.assertLess(sum(len(c) for c in comando), 1000)          # la línea ya es corta
+            crudo = open(temporal, "rb").read()
+            self.assertTrue(crudo.startswith(b"\xef\xbb\xbf"))           # BOM: PowerShell 5 lee los acentos
+            texto = crudo.decode("utf-8-sig")
+            self.assertIn(script, texto)
+            self.assertIn("Out-String -Width", texto)                    # la misma envoltura
+        finally:
+            if temporal:
+                os.remove(temporal)
+
+    def test_al_ejecutar_se_borra_el_archivo_temporal(self) -> None:
+        import os
+        import sys
+
+        creados: list[str] = []
+        real = ej.comando_para
+
+        def espia(script, ejecutable="powershell"):
+            _cmd, temporal = real(script, ejecutable)
+            creados.append(temporal)
+            return [sys.executable, "-c", "print('largo ok')"], temporal
+
+        with patch.object(ej, "_powershell", lambda: sys.executable), patch.object(ej, "comando_para", espia):
+            r = ej.ejecutar("# x\n" * 9000, tiempo_limite=20)
+        self.assertTrue(r.ok, r)
+        self.assertIn("largo ok", r.salida)
+        self.assertTrue(creados[0])
+        self.assertFalse(os.path.exists(creados[0]))
