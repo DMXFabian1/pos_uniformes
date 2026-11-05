@@ -444,9 +444,23 @@ class LabelGenerator:
             else:
                 talla_abajo = c.talla       # «Unitalla», «Infantil»… no caben grandes aquí
 
-        # El nombre, abajo, a todo lo ancho: la letra más grande que quepa en 1 a 3 renglones.
+        # Abajo, a todo lo ancho. En los uniformes va primero la ESCUELA, en
+        # chico: sin ella, dos pants iguales de escuelas distintas solo se
+        # distinguían escaneándolos (Daniel, 2026-11-05). El nombre de la prenda
+        # toma lo que quede, con la letra más grande que quepa.
         y0 = qr_lado + aire - 2
         alto = size - y0 - 1
+        escuela = getattr(getattr(variante.producto, "escuela", None), "nombre", "") or ""
+        if escuela and not c.precio:
+            f_esc, r_esc = cls._fit_lines(
+                draw, escuela, size - 4, int(alto * 0.46), base_size=21, min_size=13, max_renglones=2, bold=False,
+            )
+            paso_esc = cls._line_height(f_esc) + 4
+            for renglon in r_esc:
+                draw.text((2, y0), renglon, font=f_esc, fill=0)
+                y0 += paso_esc
+            y0 += 2
+            alto = size - y0 - 1
         nombre = f"{c.nombre} · {talla_abajo}" if talla_abajo else c.nombre
         f_nom, renglones = cls._fit_lines(draw, nombre, size - 4, alto, base_size=40, min_size=14, max_renglones=3)
         paso = cls._alto_real(f_nom)
@@ -460,13 +474,14 @@ class LabelGenerator:
     @classmethod
     def _fit_lines(
         cls, draw: ImageDraw.ImageDraw, text: str, max_width: int, max_height: int, *,
-        base_size: int, min_size: int, max_renglones: int,
+        base_size: int, min_size: int, max_renglones: int, bold: bool = True,
     ) -> tuple[ImageFont.ImageFont, list[str]]:
-        """La negrita más grande con la que `text` cabe partido por palabras en
+        """La letra más grande con la que `text` cabe partido por palabras en
         hasta `max_renglones`. Lo que ni así cabe se recorta con «…»."""
         palabras = str(text or "").split() or [""]
+        alto_de = cls._alto_real if bold else (lambda f: cls._line_height(f) + 4)
         for size in range(base_size, min_size - 1, -1):
-            fuente = cls._load_font(size, bold=True)
+            fuente = cls._load_font(size, bold=bold)
             renglones: list[str] = []
             actual = ""
             cabe = True
@@ -486,9 +501,9 @@ class LabelGenerator:
             if not cabe:
                 continue
             renglones.append(actual)
-            if len(renglones) <= max_renglones and len(renglones) * cls._alto_real(fuente) <= max_height:
+            if len(renglones) <= max_renglones and len(renglones) * alto_de(fuente) <= max_height:
                 return fuente, renglones
-        fuente = cls._load_font(min_size, bold=True)
+        fuente = cls._load_font(min_size, bold=bold)
         return fuente, [cls._recortar(draw, " ".join(palabras), fuente, max_width)]
 
     @staticmethod

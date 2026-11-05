@@ -135,6 +135,34 @@ class LabelGeneratorTests(unittest.TestCase):
                 self.assertGreater(columna.histogram()[0], 400, nombre)     # talla / precio, grande
                 self.assertGreater(pie.histogram()[0], 900, nombre)         # el nombre en negrita
 
+    def test_la_cuadrada_del_uniforme_dice_de_que_escuela_es(self) -> None:
+        """Sin la escuela, dos pants iguales de escuelas distintas solo se
+        distinguían escaneándolos (Daniel, 2026-11-05)."""
+        import tempfile
+        from pathlib import Path
+
+        from PIL import Image, ImageDraw
+
+        def pie(variante) -> Image.Image:
+            with tempfile.TemporaryDirectory() as tmp:
+                salida = Path(tmp) / "e.png"
+                LabelGenerator._render_dk1221(variante, Path(tmp) / "no_existe.png", salida)
+                return Image.open(salida).crop((0, 113, 202, 202)).copy()
+
+        con = pie(_con(_build_variant(product_name="Pants 3pz Deportivo", talla="4", school_name="Blanca Verónica Soto Martínez Príncipes")))
+        sin = pie(_con(_build_variant(product_name="Pants 3pz Deportivo", talla="4", garment_type="Deportivo")))
+        self.assertNotEqual(con.tobytes(), sin.tobytes())
+        self.assertGreater(con.crop((0, 0, 202, 36)).histogram()[0], 300)        # la escuela, arriba del nombre
+        self.assertGreater(con.crop((0, 44, 202, 89)).histogram()[0], 500)       # y el nombre sigue ahí, en negrita
+        # La escuela más larga del catálogo cabe en dos renglones sin salirse.
+        draw = ImageDraw.Draw(Image.new("1", (202, 202), 1))
+        fuente, renglones = LabelGenerator._fit_lines(
+            draw, "Blanca Verónica Soto Martínez Príncipes", 198, 40, base_size=21, min_size=13, max_renglones=2, bold=False)
+        self.assertEqual(len(renglones), 2)
+        self.assertFalse(any("…" in r for r in renglones))
+        for r in renglones:
+            self.assertLessEqual(LabelGenerator._text_width(draw, r, fuente), 198)
+
     def test_el_nombre_usa_hasta_tres_renglones_para_crecer(self) -> None:
         from PIL import Image, ImageDraw
 
