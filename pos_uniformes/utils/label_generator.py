@@ -5,15 +5,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 import math
-import textwrap
 
 from PIL import Image, ImageDraw, ImageFont
 
 from pos_uniformes.database.models import Variante
-from pos_uniformes.utils.inventory_label_content_helper import (
-    build_inventory_label_price_line,
-    resolve_inventory_label_profile,
-)
+from pos_uniformes.utils.inventory_label_content_helper import resolve_inventory_label_profile
 from pos_uniformes.utils.qr_generator import QrGenerator
 
 LABELS_OUTPUT_DIR = Path(__file__).resolve().parents[1] / "generated" / "labels"
@@ -55,11 +51,13 @@ class StandardLabelContent:
 
 
 @dataclass(frozen=True)
-class SplitLabelLine:
-    text: str
-    base_size: int
-    min_size: int
-    gap_after: int = 6
+class SmallLabelContent:
+    """Lo que dicen las etiquetas chicas (tira de 4, rollo continuo y cuadrada)."""
+
+    encabezado: str     # la escuela (y el color), en chico; vacío en ropa normal
+    nombre: str         # en negrita
+    talla: str          # en caja negra; vacío si es unitalla en ropa normal
+    precio: str         # "$179"; vacío en uniformes
 
 
 class LabelGenerator:
@@ -115,7 +113,7 @@ class LabelGenerator:
             cls._render_continuous(variante, qr_path, output_path, show_price=show_price)
             effective_copies = max(1, requested_copies)
         elif normalized_mode == "dk1221":
-            cls._render_dk1221(variante, qr_path, output_path)
+            cls._render_dk1221(variante, qr_path, output_path, show_price=show_price)
             effective_copies = max(1, requested_copies)
         else:
             cls._render_standard(variante, qr_path, output_path, show_price=show_price)
@@ -246,11 +244,16 @@ class LabelGenerator:
         return f"${precio:,.2f}"
 
     @classmethod
-    def _pastilla(cls, draw: ImageDraw.ImageDraw, texto: str, x: int, y: int, alto: int, *, max_width: int) -> int:
-        """Texto blanco en caja negra redondeada. Devuelve la x donde termina."""
-        fuente = cls._fit_font(draw, texto, max(40, max_width - 36), base_size=int(alto * 0.62), min_size=18, bold=True)
+    def _pastilla(
+        cls, draw: ImageDraw.ImageDraw, texto: str, x: int, y: int, alto: int, *, max_width: int, centro: int | None = None,
+    ) -> int:
+        """Texto blanco en caja negra redondeada. Devuelve la x donde termina.
+        Con `centro`, la caja se centra en esa x en vez de arrancar en `x`."""
+        fuente = cls._fit_font(draw, texto, max(40, max_width - 36), base_size=int(alto * 0.62), min_size=14, bold=True)
         caja = draw.textbbox((0, 0), texto, font=fuente)
         ancho = (caja[2] - caja[0]) + 36
+        if centro is not None:
+            x = centro - ancho // 2
         draw.rounded_rectangle((x, y, x + ancho, y + alto), radius=14, fill=0)
         draw.text((x + 18 - caja[0], y + (alto - (caja[3] - caja[1])) // 2 - caja[1]), texto, font=fuente, fill=1)
         return x + ancho
@@ -268,10 +271,11 @@ class LabelGenerator:
     @classmethod
     def _fit_wrapped(
         cls, draw: ImageDraw.ImageDraw, text: str, max_width: int, max_height: int, *, base_size: int, min_size: int,
+        prefiere_uno_desde: int = 44,
     ) -> tuple[ImageFont.ImageFont, list[str]]:
         """La negrita más grande con la que `text` cabe, en uno o dos renglones.
 
-        Un renglón se prefiere mientras la letra no baje de 44: un nombre partido
+        Un renglón se prefiere mientras la letra no baje de `prefiere_uno_desde`: un nombre partido
         en dos se lee peor que uno un poco más chico. Solo se parte cuando así
         la letra crece de verdad (un nombre largo que en un renglón quedaría
         chiquito)."""
@@ -303,7 +307,7 @@ class LabelGenerator:
             return None
 
         uno, dos = en_uno(), en_dos()
-        if uno is not None and (uno[0] >= 44 or dos is None or dos[0] < uno[0] * 1.25):
+        if uno is not None and (uno[0] >= prefiere_uno_desde or dos is None or dos[0] < uno[0] * 1.25):
             return uno[1], [entero]
         if dos is not None:
             return dos[1], dos[2]
@@ -311,111 +315,133 @@ class LabelGenerator:
 
     @classmethod
     def _render_split(cls, variante: Variante, qr_path: Path, output_path: Path, *, show_price: bool | None = None) -> None:
+        """La tira de 4: el mismo trato que la Label (2026-11-05). Antes era el
+        nombre con «T: 6» pegado, todo del mismo tamaño y partido cada 20 letras."""
         label_image = Image.new("1", SPLIT_SIZE, 1)
         draw = ImageDraw.Draw(label_image)
         qr_image = Image.open(qr_path).convert("1").resize((QR_SIZE_SPLIT, QR_SIZE_SPLIT))
-        label_lines = cls._split_label_lines(variante, show_price=show_price)
+        contenido = cls.small_content(variante, show_price=show_price)
+        qr_y = 6
+        texto_y = qr_y + QR_SIZE_SPLIT + 4
+        ancho_texto = SPLIT_SECTION_WIDTH - 16
+        piezas = cls._piezas_chicas(draw, contenido, ancho_texto, SPLIT_SIZE[1] - 6 - texto_y)
         for section in range(4):
             section_x = section * SPLIT_SECTION_WIDTH
-            qr_x = section_x + (SPLIT_SECTION_WIDTH - QR_SIZE_SPLIT) // 2
-            qr_y = 6
-            label_image.paste(qr_image, (qr_x, qr_y))
-            text_area_x = section_x + 10
-            text_area_width = SPLIT_SECTION_WIDTH - 20
-            text_area_y = qr_y + QR_SIZE_SPLIT + 2
-            text_y = text_area_y
-            for line in label_lines:
-                font = cls._fit_font(
-                    draw,
-                    line.text,
-                    text_area_width,
-                    base_size=line.base_size,
-                    min_size=line.min_size,
-                )
-                text_width = cls._text_width(draw, line.text, font)
-                text_x = text_area_x + (text_area_width - text_width) // 2
-                draw.text((text_x, text_y), line.text, font=font, fill=0)
-                text_y += cls._line_height(font) + line.gap_after
+            label_image.paste(qr_image, (section_x + (SPLIT_SECTION_WIDTH - QR_SIZE_SPLIT) // 2, qr_y))
+            cls._pintar_chicas(draw, piezas, section_x + SPLIT_SECTION_WIDTH // 2, texto_y)
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         label_image.save(output_path, "PNG")
 
     @classmethod
     def _render_continuous(cls, variante: Variante, qr_path: Path, output_path: Path, *, show_price: bool | None = None) -> None:
+        """Rollo continuo: el alto sale de lo que haya que decir."""
         draw_temp = ImageDraw.Draw(Image.new("1", (1, 1), 1))
-        label_lines = cls._split_label_lines(variante, show_price=show_price)
-        text_area_width = CONTINUOUS_SIZE[0] - 20
-        text_block_height = cls._measure_split_lines(draw_temp, label_lines, text_area_width)
-        margin = 5
-        gap = 6
-        label_height = margin + QR_SIZE_CONTINUOUS + gap + text_block_height + margin
+        contenido = cls.small_content(variante, show_price=show_price)
+        ancho_texto = CONTINUOUS_SIZE[0] - 16
+        piezas = cls._piezas_chicas(draw_temp, contenido, ancho_texto, 230)
+        margin, gap = 5, 6
+        label_height = margin + QR_SIZE_CONTINUOUS + gap + sum(alto for *_resto, alto in piezas) + margin
         size = (CONTINUOUS_SIZE[0], label_height)
 
         label_image = Image.new("1", size, 1)
         draw = ImageDraw.Draw(label_image)
         qr_image = Image.open(qr_path).convert("1").resize((QR_SIZE_CONTINUOUS, QR_SIZE_CONTINUOUS))
-        qr_x = (size[0] - QR_SIZE_CONTINUOUS) // 2
-        qr_y = margin
-        label_image.paste(qr_image, (qr_x, qr_y))
-
-        text_x_base = 10
-        text_y = qr_y + QR_SIZE_CONTINUOUS + gap
-        for line in label_lines:
-            font = cls._fit_font(
-                draw,
-                line.text,
-                text_area_width,
-                base_size=line.base_size,
-                min_size=line.min_size,
-            )
-            text_width = cls._text_width(draw, line.text, font)
-            text_x = text_x_base + (text_area_width - text_width) // 2
-            draw.text((text_x, text_y), line.text, font=font, fill=0)
-            text_y += cls._line_height(font) + line.gap_after
+        label_image.paste(qr_image, ((size[0] - QR_SIZE_CONTINUOUS) // 2, margin))
+        cls._pintar_chicas(draw, piezas, size[0] // 2, margin + QR_SIZE_CONTINUOUS + gap)
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         label_image.save(output_path, "PNG")
 
     @classmethod
-    def _render_dk1221(cls, variante: Variante, qr_path: Path, output_path: Path) -> None:
+    def _render_dk1221(cls, variante: Variante, qr_path: Path, output_path: Path, *, show_price: bool | None = None) -> None:
+        """La cuadrada de 23 mm: casi todo es QR. Abajo cabe UN renglón, y antes
+        era el nombre completo a 8 puntos, ilegible. Ahora va lo que decide en
+        negrita —la talla en uniformes, el precio en ropa— y el nombre al lado."""
         size = DK1221_SIZE
         label_image = Image.new("1", (size, size), 1)
         draw = ImageDraw.Draw(label_image)
-        qr_image = Image.open(qr_path).convert("1").resize((QR_SIZE_DK1221, QR_SIZE_DK1221))
-        qr_x = (size - QR_SIZE_DK1221) // 2
-        qr_y = 4
-        label_image.paste(qr_image, (qr_x, qr_y))
-        title = cls._label_title(variante)
-        text = cls._build_label_text(title, variante.talla)
-        if text:
-            font = cls._fit_font(draw, text, size - 12, base_size=18, min_size=8)
-            tw = cls._text_width(draw, text, font)
-            tx = (size - tw) // 2
-            ty = qr_y + QR_SIZE_DK1221 + 2
-            draw.text((tx, ty), text, font=font, fill=0)
+        qr_lado = QR_SIZE_DK1221 - 18          # 162: deja un renglón legible abajo
+        qr_image = Image.open(qr_path).convert("1").resize((qr_lado, qr_lado))
+        qr_y = 2
+        label_image.paste(qr_image, ((size - qr_lado) // 2, qr_y))
+
+        c = cls.small_content(variante, show_price=show_price)
+        y0, alto = qr_y + qr_lado + 1, size - (qr_y + qr_lado + 1) - 2
+        x, derecha = 6, size - 6
+        fuerte = c.precio or (f"T {c.talla}" if c.talla else "")
+        if fuerte:
+            f_fuerte = cls._fit_font(draw, fuerte, int((derecha - x) * 0.55), base_size=26, min_size=14, bold=True)
+            caja = draw.textbbox((0, 0), fuerte, font=f_fuerte)
+            draw.text((x - caja[0], y0 + (alto - (caja[3] - caja[1])) // 2 - caja[1]), fuerte, font=f_fuerte, fill=0)
+            x += (caja[2] - caja[0]) + 8
+        if c.nombre and derecha - x > 30:
+            # 13 puntos es lo mínimo que se lee en 23 mm: si no cabe, se recorta con «…».
+            f_nom = cls._fit_font(draw, c.nombre, derecha - x, base_size=18, min_size=13)
+            nombre = cls._recortar(draw, c.nombre, f_nom, derecha - x)
+            caja = draw.textbbox((0, 0), nombre, font=f_nom)
+            ancho_n = caja[2] - caja[0]
+            x_n = x if fuerte else (size - ancho_n) // 2
+            draw.text((x_n - caja[0], y0 + (alto - (caja[3] - caja[1])) // 2 - caja[1]), nombre, font=f_nom, fill=0)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         label_image.save(output_path, "PNG")
 
     @classmethod
-    def _split_label_lines(cls, variante: Variante, *, show_price: bool | None = None) -> list[SplitLabelLine]:
-        producto = variante.producto
-        profile = resolve_inventory_label_profile(variante)
-        price_visible = profile.show_price and (show_price is None or show_price)
-        title = cls._label_title(variante)
-        if profile.family == "ropa_normal" and price_visible:
-            return [
-                SplitLabelLine(text=title, base_size=30, min_size=14, gap_after=8),
-                SplitLabelLine(
-                    text=build_inventory_label_price_line(variante).replace("Precio: ", ""),
-                    base_size=38,
-                    min_size=24,
-                    gap_after=0,
-                ),
-            ]
-        lines = textwrap.wrap(cls._build_label_text(title, variante.talla), width=20) or [title]
-        if price_visible:
-            lines.append(build_inventory_label_price_line(variante))
-        return [SplitLabelLine(text=line, base_size=34, min_size=16, gap_after=6) for line in lines]
+    def small_content(cls, variante: Variante, *, show_price: bool | None = None) -> SmallLabelContent:
+        """Qué dicen las etiquetas chicas: lo mismo que la Label, con menos lugar."""
+        c = cls.standard_content(variante, show_price=show_price)
+        if c.familia == "uniforme":
+            escuela = getattr(getattr(variante.producto, "escuela", None), "nombre", "") or ""
+            encabezado = " · ".join(p for p in (escuela, c.color) if p).upper()
+            return SmallLabelContent(encabezado, c.nombre, c.talla, "")
+        return SmallLabelContent("", c.nombre, c.talla, c.precio)
+
+    @classmethod
+    def _recortar(cls, draw: ImageDraw.ImageDraw, texto: str, fuente: ImageFont.ImageFont, ancho: int) -> str:
+        """Si ni con la letra más chica cabe, se corta con «…»: nunca se sale ni se encima."""
+        if cls._text_width(draw, texto, fuente) <= ancho:
+            return texto
+        while len(texto) > 2 and cls._text_width(draw, texto.rstrip(" ·") + "…", fuente) > ancho:
+            texto = texto[:-1]
+        return texto.rstrip(" ·") + "…"
+
+    @classmethod
+    def _piezas_chicas(
+        cls, draw: ImageDraw.ImageDraw, c: SmallLabelContent, ancho: int, alto_max: int,
+    ) -> list[tuple[str, str, ImageFont.ImageFont | None, int]]:
+        """El bloque de texto de una etiqueta chica, de arriba abajo:
+        (tipo, texto, fuente, alto). El nombre toma lo que dejen los demás."""
+        piezas: list[tuple[str, str, ImageFont.ImageFont | None, int]] = []
+        fijo = 0
+        if c.encabezado:
+            f_enc = cls._fit_font(draw, c.encabezado, ancho, base_size=19, min_size=13)
+            piezas.append(("texto", cls._recortar(draw, c.encabezado, f_enc, ancho), f_enc, cls._line_height(f_enc) + 9))
+            fijo += piezas[-1][3]
+        abajo: list[tuple[str, str, ImageFont.ImageFont | None, int]] = []
+        if c.precio:
+            f_pre = cls._fit_font(draw, c.precio, ancho, base_size=56, min_size=30, bold=True)
+            abajo.append(("texto", c.precio, f_pre, cls._alto_real(f_pre) + (2 if c.talla else -4)))
+        if c.talla:
+            abajo.append(("pastilla", f"TALLA {c.talla}", None, (34 if c.precio else 46) + 6))
+        fijo += sum(alto for *_r, alto in abajo)
+        f_nom, renglones = cls._fit_wrapped(
+            draw, c.nombre, ancho, max(30, alto_max - fijo - 4), base_size=32, min_size=15, prefiere_uno_desde=26,
+        )
+        for renglon in renglones:
+            piezas.append(("texto", renglon, f_nom, cls._alto_real(f_nom)))
+        piezas[-1] = (*piezas[-1][:3], piezas[-1][3] + 4)
+        return piezas + abajo
+
+    @classmethod
+    def _pintar_chicas(cls, draw: ImageDraw.ImageDraw, piezas, centro_x: int, y: int) -> int:
+        for tipo, texto, fuente, alto in piezas:
+            if tipo == "pastilla":
+                cls._pastilla(draw, texto, 0, y, alto - 6, max_width=SPLIT_SECTION_WIDTH - 16, centro=centro_x)
+            else:
+                caja = draw.textbbox((0, 0), texto, font=fuente)
+                draw.text((centro_x - (caja[2] - caja[0]) // 2 - caja[0], y), texto, font=fuente, fill=0)
+            y += alto
+        return y
 
     @classmethod
     def _label_title(cls, variante: Variante) -> str:
@@ -446,15 +472,6 @@ class LabelGenerator:
                 if cleaned.endswith(suffix):
                     cleaned = cleaned[: -len(suffix)].strip(" |-")
         return cleaned or str(nombre or "").strip()
-
-    @staticmethod
-    def _build_label_text(nombre: str, talla: str) -> str:
-        size_value = str(talla or "").strip()
-        if size_value and size_value.casefold() not in {"sin talla", "unitalla"}:
-            return f"{nombre} T: {size_value}"
-        if size_value:
-            return f"{nombre} T: {size_value}"
-        return nombre
 
     @staticmethod
     def _font_candidates() -> list[Path]:
@@ -531,22 +548,3 @@ class LabelGenerator:
             font = cls._fit_font(draw, line, max_width, base_size=base_size, min_size=min_size)
             total += cls._line_height(font) + 10
         return max(total - 10, 0)
-
-    @classmethod
-    def _measure_split_lines(
-        cls,
-        draw: ImageDraw.ImageDraw,
-        lines: list[SplitLabelLine],
-        max_width: int,
-    ) -> int:
-        total = 0
-        for line in lines:
-            font = cls._fit_font(
-                draw,
-                line.text,
-                max_width,
-                base_size=line.base_size,
-                min_size=line.min_size,
-            )
-            total += cls._line_height(font) + line.gap_after
-        return max(total, 0)

@@ -39,53 +39,82 @@ def _build_variant(
 
 
 class LabelGeneratorTests(unittest.TestCase):
-    def test_split_label_for_ropa_normal_shows_only_name_and_price(self) -> None:
-        variante = _build_variant(
+    """Las etiquetas chicas (tira de 4, rollo continuo, cuadrada)."""
+
+    def test_ropa_normal_nombre_y_precio(self) -> None:
+        variante = _con(_build_variant(
             product_name="Categoria Sudadera Premium Talla Chica",
             product_base_name="Sudadera Premium",
             talla="CH",
             price="349.00",
             garment_type="Basico",
-        )
+        ))
+        c = LabelGenerator.small_content(variante)
+        self.assertEqual(c.nombre, "Sudadera Premium")
+        self.assertEqual(c.precio, "$349")                 # sin «Precio:» ni centavos en ceros
+        self.assertEqual(c.talla, "CH")                    # la talla va en su caja, no pegada al nombre
+        self.assertEqual(c.encabezado, "")
 
-        lines = LabelGenerator._split_label_lines(variante)
-
-        self.assertGreaterEqual(len(lines), 2)
-        self.assertEqual(lines[-1].text, "$349.00")
-        self.assertNotIn("Precio:", " ".join(line.text for line in lines))
-        self.assertNotIn("T:", " ".join(line.text for line in lines))
-        self.assertEqual(lines[0].text, "Sudadera Premium")
-
-    def test_split_label_for_uniform_keeps_name_and_size_without_price(self) -> None:
-        variante = _build_variant(
-            product_name="Pants Deportivo",
+    def test_uniforme_escuela_nombre_y_talla_sin_precio(self) -> None:
+        variante = _con(_build_variant(
+            product_name="Pants Deportivo Patria",
             talla="16",
             school_name="Patria",
             level_name="Primaria",
             garment_type="Deportivo",
-        )
+        ), color="Vino")
+        c = LabelGenerator.small_content(variante)
+        self.assertEqual((c.encabezado, c.nombre, c.talla, c.precio), ("PATRIA · VINO", "Pants Deportivo", "16", ""))
 
-        lines = LabelGenerator._split_label_lines(variante)
-
-        rendered = " ".join(line.text for line in lines)
-        self.assertIn("T: 16", rendered)
-        self.assertNotIn("$", rendered)
-
-    def test_split_label_hides_price_for_uniform_category_without_school_context(self) -> None:
-        variante = _build_variant(
+    def test_un_basico_sin_escuela_tampoco_ensena_precio(self) -> None:
+        variante = _con(_build_variant(
             product_name="Playera Basica",
             product_base_name="Playera Basica",
             talla="12",
             category_name="Básico",
             garment_type="Basico",
             price="199.00",
-        )
+        ))
+        c = LabelGenerator.small_content(variante)
+        self.assertEqual((c.talla, c.precio), ("12", ""))
 
-        lines = LabelGenerator._split_label_lines(variante)
+    def test_el_bloque_cabe_en_la_tira_aun_con_todo(self) -> None:
+        from PIL import Image, ImageDraw
 
-        rendered = " ".join(line.text for line in lines)
-        self.assertIn("T: 12", rendered)
-        self.assertNotIn("$", rendered)
+        from pos_uniformes.utils.label_generator import QR_SIZE_SPLIT, SPLIT_SECTION_WIDTH, SPLIT_SIZE, SmallLabelContent
+
+        draw = ImageDraw.Draw(Image.new("1", SPLIT_SIZE, 1))
+        libre = SPLIT_SIZE[1] - 6 - (6 + QR_SIZE_SPLIT + 4)
+        for c in (
+            SmallLabelContent("", "Conjunto Pijama de Niño", "Infantil", "$1,249.50"),
+            SmallLabelContent("BLANCA VERÓNICA SOTO MARTÍNEZ PRÍNCIPES · VINO", "Pants 3pz Deportivo", "16", ""),
+            SmallLabelContent("", "Suéter Claudia Cuello V H Azul Marino", "36", ""),
+        ):
+            piezas = LabelGenerator._piezas_chicas(draw, c, SPLIT_SECTION_WIDTH - 16, libre)
+            self.assertLessEqual(sum(alto for *_r, alto in piezas), libre, c.nombre)
+            for tipo, texto, fuente, _alto in piezas:
+                if tipo == "texto":
+                    self.assertLessEqual(LabelGenerator._text_width(draw, texto, fuente), SPLIT_SECTION_WIDTH - 16, texto)
+
+    def test_se_pintan_del_tamano_de_siempre(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        from PIL import Image
+
+        v = _con(_build_variant(product_name="Conjunto Pijama QS227", talla="Unitalla", price="179.00"), marca="Yamo")
+        with tempfile.TemporaryDirectory() as tmp:
+            qr = Path(tmp) / "qr.png"
+            Image.new("1", (300, 300), 0).save(qr)
+            LabelGenerator._render_split(v, qr, Path(tmp) / "s.png")
+            LabelGenerator._render_dk1221(v, qr, Path(tmp) / "d.png")
+            LabelGenerator._render_continuous(v, qr, Path(tmp) / "c.png")
+            self.assertEqual(Image.open(Path(tmp) / "s.png").size, (976, 342))
+            self.assertEqual(Image.open(Path(tmp) / "d.png").size, (202, 202))
+            self.assertEqual(Image.open(Path(tmp) / "c.png").size[0], 244)
+            # las cuatro secciones de la tira son idénticas
+            tira = Image.open(Path(tmp) / "s.png")
+            self.assertEqual(tira.crop((0, 0, 244, 342)).tobytes(), tira.crop((732, 0, 976, 342)).tobytes())
 
 
 if __name__ == "__main__":
