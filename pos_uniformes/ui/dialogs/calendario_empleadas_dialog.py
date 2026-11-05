@@ -15,13 +15,14 @@ import logging
 from datetime import date, timedelta
 from decimal import Decimal
 
-from PyQt6.QtCore import QDate, Qt
-from PyQt6.QtGui import QColor, QFont
+from PyQt6.QtCore import QDate, QRectF, Qt
+from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QTextCharFormat
 from PyQt6.QtWidgets import (
     QFrame,
     QCalendarWidget,
     QComboBox,
     QDialog,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -44,9 +45,12 @@ from pos_uniformes.services.calendario_empleadas_service import (
     cargar_horarios_todos,
     comisiones_desde_ultimo_pago,
     dias_libres_cercanos,
+    dias_para_pago,
     estado_del_dia,
+    fecha_proximo_pago,
     guardar_horario,
     marcar_dia,
+    proximo_descanso,
     quitar_marca,
     registrar_pago,
     resumen_empleada,
@@ -65,8 +69,50 @@ _COLORES_DIA = {
 }
 
 
+_ESTILO_DIALOGO = """
+QDialog { background: #f4ede2; }
+QLabel { color: #2c2a27; background: transparent; }
+QWidget#calTarjeta { background: #fdfaf6; border: 1px solid #ddd0c0; border-radius: 16px; }
+QLabel#calSeccion { color: #7b2d14; font-size: 12px; font-weight: 800; }
+QLabel#calDiaTitulo { color: #2c2a27; font-size: 21px; font-weight: 800; }
+QLabel#calDiaCuando { color: #a84f2d; background: #f7e3d8; border-radius: 9px; padding: 3px 9px;
+                      font-size: 12px; font-weight: 800; }
+QLabel#calOrigen { color: #5f564c; font-size: 13px; }
+QLabel#calNota { color: #8a8177; font-size: 12px; }
+QLabel#calFichaTitulo { color: #8a8177; font-size: 11px; font-weight: 800; }
+QLabel#calFichaValor { color: #2c2a27; font-size: 17px; font-weight: 800; }
+QLabel#calFichaPie { color: #8a8177; font-size: 11px; }
+QWidget#calFicha { background: #fdfaf6; border: 1px solid #ddd0c0; border-radius: 14px; }
+QWidget#calFichaFuerte { background: #a84f2d; border: none; border-radius: 14px; }
+QWidget#calFichaFuerte QLabel#calFichaTitulo, QWidget#calFichaFuerte QLabel#calFichaPie { color: #f7e3d8; }
+QWidget#calFichaFuerte QLabel#calFichaValor { color: #ffffff; font-size: 26px; }
+QComboBox, QSpinBox { background: #ffffff; color: #2c2a27; border: 1.5px solid #ddd0c0; border-radius: 10px;
+                      min-height: 38px; padding: 0 10px; font-size: 14px; font-weight: 600; }
+QComboBox#calEmpleada { min-height: 46px; font-size: 16px; font-weight: 800; color: #73341c; }
+QComboBox QAbstractItemView { background: #ffffff; color: #2c2a27; selection-background-color: #f7e3d8;
+                              selection-color: #73341c; }
+QPushButton { background: #ffffff; color: #2c2a27; border: 1.5px solid #ddd0c0; border-radius: 12px;
+              min-height: 46px; padding: 0 14px; font-size: 14px; font-weight: 700; }
+QPushButton:pressed { background: #f1e6d6; }
+QPushButton:disabled { color: #b5aa9c; background: #f4eee4; border-color: #e6dccd; }
+QPushButton#calFalta { border-left: 6px solid #c0533c; }
+QPushButton#calDescanso { border-left: 6px solid #4d83b8; }
+QPushButton#calTrabajo { border-left: 6px solid #8a8177; }
+QPushButton#calPago { background: #3d6b2f; color: #ffffff; border: none; min-height: 54px; font-size: 16px; font-weight: 800; }
+QPushButton#calPago:pressed { background: #325826; }
+QPushButton#calPago:disabled { background: #c9d6c2; color: #f4f7f2; }
+QPushButton#calPrimario { background: #a84f2d; color: #ffffff; border: none; font-weight: 800; }
+QPushButton#calPrimario:disabled { background: #d9c7bb; color: #f8f2e9; }
+QPushButton#calSuave { background: #f8f2e9; color: #73341c; border: 1px solid #ddd0c0; }
+"""
+
+
 class _CalendarioPintado(QCalendarWidget):
-    """Calendario que pinta cada día según el horario de la empleada."""
+    """Calendario que pinta cada día según el horario de la empleada.
+
+    Rediseñado el 2026-11-05: celdas redondeadas, HOY con un aro (antes solo
+    iba subrayado y se perdía), el día elegido relleno, y la barra del mes sin
+    los botones grises de fábrica."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -74,15 +120,25 @@ class _CalendarioPintado(QCalendarWidget):
         self.setVerticalHeaderFormat(
             QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader
         )
+        self.setHorizontalHeaderFormat(QCalendarWidget.HorizontalHeaderFormat.ShortDayNames)
         self.setFirstDayOfWeek(Qt.DayOfWeek.Monday)
         self.setGridVisible(False)
+        encabezado = QTextCharFormat()
+        encabezado.setForeground(QColor("#8a8177"))
+        encabezado.setFontWeight(QFont.Weight.Bold)
+        self.setHeaderTextFormat(encabezado)
+        for dia in (Qt.DayOfWeek.Saturday, Qt.DayOfWeek.Sunday):   # sin el rojo de fábrica
+            self.setWeekdayTextFormat(dia, encabezado)
         self.setStyleSheet(
-            "QCalendarWidget QWidget { background: #f9f4ea; color: #2c2a27; }"
-            "QCalendarWidget QToolButton { color: #2c2a27; background: #f4ede2;"
-            "  border-radius: 6px; padding: 4px 10px; font-weight: 600; }"
-            "QCalendarWidget QAbstractItemView { background: #ffffff;"
-            "  color: #2c2a27; selection-background-color: #a84f2d;"
-            "  selection-color: #ffffff; outline: none; }"
+            "QCalendarWidget QWidget { background: #fdfaf6; color: #2c2a27; alternate-background-color: #fdfaf6; }"
+            "QCalendarWidget QWidget#qt_calendar_navigationbar { background: #fdfaf6; }"
+            "QCalendarWidget QToolButton { color: #73341c; background: transparent; border: none;"
+            "  border-radius: 10px; padding: 6px 12px; font-size: 17px; font-weight: 800; min-height: 30px; }"
+            "QCalendarWidget QToolButton:hover { background: #f1e6d6; }"
+            "QCalendarWidget QToolButton::menu-indicator { image: none; width: 0; }"
+            "QCalendarWidget QSpinBox { min-height: 28px; font-size: 16px; font-weight: 800; color: #73341c; }"
+            "QCalendarWidget QAbstractItemView { background: #fdfaf6; color: #2c2a27; font-size: 15px;"
+            "  selection-background-color: transparent; selection-color: #2c2a27; outline: none; }"
         )
 
     def set_horario(self, horario: HorarioEmpleada | None) -> None:
@@ -96,27 +152,34 @@ class _CalendarioPintado(QCalendarWidget):
         )
         colores = _COLORES_DIA.get(estado)
         fuera_de_mes = qdate.month() != self.monthShown()
+        elegido = self.selectedDate() == qdate
+        hoy = dia == date.today()
+        caja = QRectF(rect).adjusted(3, 3, -3, -3)
         painter.save()
-        if self.selectedDate() == qdate:
-            # La vista pinta el fondo de selección terracota: encima va el
-            # número en blanco y negritas (si no, número invisible).
-            painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor("#a84f2d"))
-            painter.setPen(QColor("#ffffff"))
-            font = QFont(painter.font())
-            font.setBold(True)
-            painter.setFont(font)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setPen(Qt.PenStyle.NoPen)
+        fuente = QFont(painter.font())
+        fuente.setBold(elegido or hoy or bool(colores and not fuera_de_mes))
+        painter.setFont(fuente)
+        if elegido:
+            painter.setBrush(QColor("#a84f2d"))
+            painter.drawRoundedRect(caja, 10, 10)
+            tinta = QColor("#ffffff")
         elif colores and not fuera_de_mes:
             fondo, texto = colores
-            painter.fillRect(rect.adjusted(2, 2, -2, -2), QColor(fondo))
-            painter.setPen(QColor(texto))
+            painter.setBrush(QColor(fondo))
+            painter.drawRoundedRect(caja, 10, 10)
+            tinta = QColor(texto)
         elif fuera_de_mes:
-            painter.setPen(QColor("#b9b1a5"))
+            tinta = QColor("#c4bbae")
         else:
-            painter.setPen(QColor("#2c2a27"))
-        if dia == date.today():
-            font = QFont(painter.font())
-            font.setUnderline(True)
-            painter.setFont(font)
+            tinta = QColor("#2c2a27")
+        if hoy and not elegido:
+            # HOY: un aro terracota. Subrayado se perdía entre los números.
+            painter.setBrush(Qt.BrushStyle.NoBrush)
+            painter.setPen(QPen(QColor("#a84f2d"), 2))
+            painter.drawRoundedRect(caja, 10, 10)
+        painter.setPen(tinta)
         painter.drawText(rect, Qt.AlignmentFlag.AlignCenter, str(qdate.day()))
         painter.restore()
 
@@ -148,153 +211,204 @@ class CalendarioEmpleadasDialog(QDialog):
         else:
             titulo_ventana = "Calendario"
         self.setWindowTitle(titulo_ventana)
-        self.resize(560, 640 if self._gestiona else 540)
+        self.resize(940, 660)
         is_owner = self._is_owner  # el resto del constructor decide con esto
-        self.setStyleSheet(
-            "QDialog { background: #f4ede2; }"
-            "QLabel { color: #2c2a27; background: transparent; }"
-        )
+        self.setStyleSheet(_ESTILO_DIALOGO)
+
+        def seccion(texto: str) -> QLabel:
+            etiqueta = QLabel(texto)
+            etiqueta.setObjectName("calSeccion")
+            return etiqueta
+
+        def ficha(titulo: str, *, fuerte: bool = False) -> tuple[QWidget, QLabel, QLabel]:
+            """Una ficha de dato: título chico, valor grande y un pie."""
+            caja = QWidget()
+            caja.setObjectName("calFichaFuerte" if fuerte else "calFicha")
+            v = QVBoxLayout(caja)
+            v.setContentsMargins(14, 9, 14, 9)
+            v.setSpacing(1)
+            t_ = QLabel(titulo)
+            t_.setObjectName("calFichaTitulo")
+            valor = QLabel("—")
+            valor.setObjectName("calFichaValor")
+            pie = QLabel("")
+            pie.setObjectName("calFichaPie")
+            for w in (t_, valor, pie):
+                v.addWidget(w)
+            return caja, valor, pie
 
         ly = QVBoxLayout()
         ly.setContentsMargins(18, 16, 18, 16)
-        ly.setSpacing(10)
+        ly.setSpacing(12)
 
-        # ── Selector de empleada (dueño y encargado) ──
+        # ── Arriba: de quién es el calendario, y sus tres datos ──
+        cabecera = QHBoxLayout()
+        cabecera.setSpacing(10)
         self._combo: QComboBox | None = None
         if self._gestiona:
-            fila = QHBoxLayout()
-            fila.addWidget(QLabel("Empleada:"))
             self._combo = QComboBox()
-            self._combo.setMinimumWidth(240)
-            fila.addWidget(self._combo)
-            fila.addStretch()
-            ly.addLayout(fila)
+            self._combo.setObjectName("calEmpleada")
+            self._combo.setMinimumWidth(250)
+            cabecera.addWidget(self._combo, 0, Qt.AlignmentFlag.AlignVCenter)
+        # `banner` sigue siendo la etiqueta de las comisiones (lo usa la Libreta).
+        self._ficha_comisiones, self.banner, self._pie_comisiones = ficha("COMISIONES", fuerte=True)
+        self._pie_comisiones.setText("desde el último pago")
+        ficha_descanso, self._valor_descanso, self._pie_descanso = ficha("🛌 SIGUIENTE DESCANSO")
+        ficha_pago, self._valor_pago, self._pie_pago = ficha("💵 PRÓXIMO PAGO")
+        cabecera.addWidget(self._ficha_comisiones, 1)
+        cabecera.addWidget(ficha_descanso, 1)
+        cabecera.addWidget(ficha_pago, 1)
+        ly.addLayout(cabecera)
 
-        # ── Banner: comisiones desde el último pago ──
-        self.banner = QLabel("")
-        self.banner.setWordWrap(True)
-        self.banner.setStyleSheet(
-            "background: #a84f2d; color: #ffffff; border-radius: 10px;"
-            "padding: 10px 14px; font-size: 15px; font-weight: 700;"
-        )
-        ly.addWidget(self.banner)
-
+        # La línea de siempre; se conserva para quien la lea, pero ya no se enseña:
+        # lo que decía está en las fichas.
         self.resumen = QLabel("")
-        self.resumen.setWordWrap(True)
-        self.resumen.setStyleSheet("font-size: 13px; color: #5f594f;")
-        ly.addWidget(self.resumen)
+        self.resumen.setVisible(False)
 
         self.estado_conexion = QLabel(
             "Sin conexion con la PC principal: el calendario no esta disponible."
         )
-        self.estado_conexion.setStyleSheet("color: #a33b25; font-weight: 600;")
+        self.estado_conexion.setStyleSheet("color: #a33b25; font-weight: 700; font-size: 14px;")
         self.estado_conexion.setVisible(False)
         ly.addWidget(self.estado_conexion)
 
-        self.cal = _CalendarioPintado()
-        ly.addWidget(self.cal, 1)
+        cuerpo = QHBoxLayout()
+        cuerpo.setSpacing(12)
 
+        # ── Izquierda: el mes ──
+        tarjeta_cal = QWidget()
+        tarjeta_cal.setObjectName("calTarjeta")
+        v_cal = QVBoxLayout(tarjeta_cal)
+        v_cal.setContentsMargins(12, 10, 12, 12)
+        v_cal.setSpacing(8)
+        self.cal = _CalendarioPintado()
+        v_cal.addWidget(self.cal, 1)
         leyenda = QLabel(
-            '<span style="background:#dce8f7; color:#2b5c8a;">&nbsp;Descanso&nbsp;</span> '
-            '<span style="background:#f6d3cb; color:#a33b25;">&nbsp;Falta&nbsp;</span> '
-            '<span style="background:#d9ecd0; color:#3d6b2f;">&nbsp;Pago&nbsp;</span> '
-            '<span style="background:#efe2f7; color:#6b3d8a;">&nbsp;Vacaciones&nbsp;</span> '
-            "&nbsp;(hoy va subrayado)"
+            '<span style="background:#dce8f7; color:#2b5c8a;">&nbsp;Descanso&nbsp;</span>&nbsp; '
+            '<span style="background:#f6d3cb; color:#a33b25;">&nbsp;Falta&nbsp;</span>&nbsp; '
+            '<span style="background:#d9ecd0; color:#3d6b2f;">&nbsp;Pago&nbsp;</span>&nbsp; '
+            '<span style="background:#efe2f7; color:#6b3d8a;">&nbsp;Vacaciones&nbsp;</span>&nbsp; '
+            '<span style="color:#a84f2d;">◯</span> hoy'
         )
-        leyenda.setStyleSheet("font-size: 12px;")
-        ly.addWidget(leyenda)
-        # De dónde salió lo del día seleccionado (fijo, cambio, intercambio,
-        # vacaciones, marca de León...): se toca el día y se lee aquí.
+        leyenda.setStyleSheet("font-size: 12px; font-weight: 600;")
+        v_cal.addWidget(leyenda)
+        cuerpo.addWidget(tarjeta_cal, 5)
+
+        # ── Derecha: el día elegido y lo que se puede hacer con él ──
+        tarjeta_dia = QWidget()
+        tarjeta_dia.setObjectName("calTarjeta")
+        tarjeta_dia.setFixedWidth(372)
+        v_dia = QVBoxLayout(tarjeta_dia)
+        v_dia.setContentsMargins(16, 14, 16, 14)
+        v_dia.setSpacing(8)
+        v_dia.addWidget(seccion("DÍA ELEGIDO"))
+        fila_dia = QHBoxLayout()
+        fila_dia.setSpacing(8)
+        # El día con todas sus letras: los botones de abajo actúan sobre ÉL. Antes
+        # no se decía en ningún lado y «Le pagué este día» se fue a un domingo
+        # que todavía no llegaba (2026-11-05).
+        self.dia_titulo = QLabel("")
+        self.dia_titulo.setObjectName("calDiaTitulo")
+        self.dia_titulo.setWordWrap(True)
+        fila_dia.addWidget(self.dia_titulo, 1)
+        self.dia_cuando = QLabel("")
+        self.dia_cuando.setObjectName("calDiaCuando")
+        fila_dia.addWidget(self.dia_cuando, 0, Qt.AlignmentFlag.AlignTop)
+        v_dia.addLayout(fila_dia)
+        # De dónde salió lo de ese día (fijo, cambio, intercambio, vacaciones…).
         self.origen = QLabel("")
+        self.origen.setObjectName("calOrigen")
         self.origen.setWordWrap(True)
-        self.origen.setStyleSheet("font-size: 12px; color: #5f564c;")
-        ly.addWidget(self.origen)
+        v_dia.addWidget(self.origen)
         self.cal.selectionChanged.connect(self._mostrar_origen)
 
         # ── Autoservicio de la empleada: pedir/cambiar SIN pasar por Daniel.
         # Las reglas (cupo 1 por día, 7 días de anticipación) deciden solas.
         if not self._gestiona:
-            autoservicio = QHBoxLayout()
-            autoservicio.setSpacing(10)
+            v_dia.addSpacing(6)
+            v_dia.addWidget(seccion("TU DESCANSO"))
             self.btn_pedir = QPushButton("🙋 Pedir descanso este día")
-            self.btn_pedir.setStyleSheet(
-                "background: #a84f2d; color: #ffffff; font-weight: 700;"
-                "border-radius: 12px; min-height: 48px; font-size: 15px;"
-            )
+            self.btn_pedir.setObjectName("calPrimario")
             self.btn_pedir.clicked.connect(self._pedir_descanso)
-            autoservicio.addWidget(self.btn_pedir, 1)
+            v_dia.addWidget(self.btn_pedir)
             self.btn_cambiar = QPushButton("🔄 Cambiar con compañera")
-            self.btn_cambiar.setStyleSheet(
-                "background: #f8f2e9; color: #73341c; font-weight: 700;"
-                "border: 1px solid #ddd0c0;"
-                "border-radius: 12px; min-height: 48px; font-size: 15px;"
-            )
+            self.btn_cambiar.setObjectName("calSuave")
             self.btn_cambiar.clicked.connect(self._abrir_intercambio)
-            autoservicio.addWidget(self.btn_cambiar, 1)
-            ly.addLayout(autoservicio)
+            v_dia.addWidget(self.btn_cambiar)
 
         # ── Marcar días: dueño Y encargado ──
         if self._gestiona:
-            acciones = QHBoxLayout()
+            v_dia.addSpacing(6)
+            v_dia.addWidget(seccion("ASISTENCIA DE ESE DÍA"))
+            acciones = QGridLayout()
             acciones.setSpacing(8)
-            self.btn_falta = QPushButton("Marcar falta")
-            self.btn_descanso = QPushButton("Descanso ese día")
+            self.btn_falta = QPushButton("Faltó")
+            self.btn_falta.setObjectName("calFalta")
+            self.btn_descanso = QPushButton("Descansó")
+            self.btn_descanso.setObjectName("calDescanso")
             self.btn_trabajo = QPushButton("Sí trabajó")
+            self.btn_trabajo.setObjectName("calTrabajo")
             self.btn_quitar = QPushButton("Quitar marca")
-            for btn, tipo in (
+            self.btn_quitar.setObjectName("calSuave")
+            for k, (btn, tipo) in enumerate((
                 (self.btn_falta, FALTA),
                 (self.btn_descanso, DESCANSO),
                 (self.btn_trabajo, TRABAJO),
-            ):
+            )):
                 btn.clicked.connect(lambda _=False, t=tipo: self._marcar(t))
-                acciones.addWidget(btn)
+                acciones.addWidget(btn, k // 2, k % 2)
             self.btn_quitar.clicked.connect(self._quitar)
-            acciones.addWidget(self.btn_quitar)
-            ly.addLayout(acciones)
+            acciones.addWidget(self.btn_quitar, 1, 1)
+            v_dia.addLayout(acciones)
 
         # ── Pagos y configuración: SOLO dueño ──
         if is_owner:
-            fila_pago = QHBoxLayout()
+            v_dia.addSpacing(6)
+            v_dia.addWidget(seccion("PAGO"))
             self.btn_pago = QPushButton("💵 Le pagué este día")
-            self.btn_pago.setStyleSheet(
-                "background: #3d6b2f; color: #ffffff; font-weight: 700;"
-                "border-radius: 8px; padding: 8px 14px;"
-            )
+            self.btn_pago.setObjectName("calPago")
             self.btn_pago.clicked.connect(self._pagar)
-            fila_pago.addWidget(self.btn_pago)
+            v_dia.addWidget(self.btn_pago)
+            self.pago_nota = QLabel("")
+            self.pago_nota.setObjectName("calNota")
+            self.pago_nota.setWordWrap(True)
+            v_dia.addWidget(self.pago_nota)
             # Un pago que se registró otro día (desde el bot, al día siguiente):
             # se corrige aquí sin deshacerlo (Stayce, 2026-10-20).
             self.btn_mover_pago = QPushButton("📅 Cambiar la fecha de un pago")
+            self.btn_mover_pago.setObjectName("calSuave")
             self.btn_mover_pago.clicked.connect(self._mover_fecha_pago)
-            fila_pago.addWidget(self.btn_mover_pago)
-            fila_pago.addStretch()
-            ly.addLayout(fila_pago)
+            v_dia.addWidget(self.btn_mover_pago)
+        v_dia.addStretch(1)
+        cuerpo.addWidget(tarjeta_dia)
+        ly.addLayout(cuerpo, 1)
 
-            # ── Configuración del horario ──
-            config = QHBoxLayout()
-            config.setSpacing(8)
-            config.addWidget(QLabel("Descanso fijo:"))
+        # ── Abajo: el horario fijo (solo dueño) y cerrar ──
+        pie = QHBoxLayout()
+        pie.setSpacing(8)
+        if is_owner:
+            pie.addWidget(seccion("HORARIO FIJO"))
+            pie.addWidget(QLabel("Descansa el"))
             self.combo_descanso = QComboBox()
             self.combo_descanso.addItem("Sin descanso fijo", None)
             for idx, nombre in enumerate(WEEKDAY_NAMES):
                 self.combo_descanso.addItem(nombre.capitalize(), idx)
-            config.addWidget(self.combo_descanso)
-            config.addWidget(QLabel("Pago cada"))
+            pie.addWidget(self.combo_descanso)
+            pie.addWidget(QLabel("y cobra cada"))
             self.spin_ciclo = QSpinBox()
             self.spin_ciclo.setRange(1, 31)
             self.spin_ciclo.setValue(7)  # semanal: cobran el mismo día cada semana
             self.spin_ciclo.setSuffix(" días")
-            config.addWidget(self.spin_ciclo)
+            pie.addWidget(self.spin_ciclo)
             self.btn_guardar = QPushButton("Guardar horario")
+            self.btn_guardar.setObjectName("calSuave")
             self.btn_guardar.clicked.connect(self._guardar_config)
-            config.addWidget(self.btn_guardar)
-            config.addStretch()
-            ly.addLayout(config)
-
-        cerrar = QPushButton("Cerrar")
-        cerrar.clicked.connect(self.accept)
-        pie = QHBoxLayout()
+            pie.addWidget(self.btn_guardar)
         pie.addStretch()
+        cerrar = QPushButton("Cerrar")
+        cerrar.setObjectName("calSuave")
+        cerrar.setMinimumWidth(120)
+        cerrar.clicked.connect(self.accept)
         pie.addWidget(cerrar)
         ly.addLayout(pie)
         self.setLayout(ly)
@@ -338,8 +452,12 @@ class CalendarioEmpleadasDialog(QDialog):
         self.estado_conexion.setVisible(not self._online)
         if not self._online:
             self.cal.set_horario(None)
-            self.banner.setVisible(False)
+            self._ficha_comisiones.setVisible(False)
             self.resumen.setText("")
+            for etiqueta in (self._valor_descanso, self._valor_pago):
+                etiqueta.setText("—")
+            for etiqueta in (self._pie_descanso, self._pie_pago):
+                etiqueta.setText("")
             self._habilitar_acciones(False)
             return
         try:
@@ -357,10 +475,28 @@ class CalendarioEmpleadasDialog(QDialog):
             return
         self.cal.set_horario(self._horario)
         # El encargado gestiona días, no ve productividad ni pagos.
-        self.banner.setVisible(not self._es_encargado)
-        self.banner.setText(f"⭐ Comisiones desde el último pago: {comisiones}")
-        self.resumen.setText(resumen_empleada(self._horario, date.today()))
+        self._ficha_comisiones.setVisible(not self._es_encargado)
+        self.banner.setText(f"⭐ {comisiones}")
+        self.banner.setToolTip(f"Comisiones desde el último pago: {comisiones}")
+        hoy = date.today()
+        self.resumen.setText(resumen_empleada(self._horario, hoy))
+        descanso = proximo_descanso(self._horario, hoy)
+        if descanso is None:
+            self._valor_descanso.setText("Sin descanso fijo")
+            self._pie_descanso.setText("")
+        else:
+            self._valor_descanso.setText(_fecha_corta(descanso).capitalize())
+            self._pie_descanso.setText(_cuanto_falta(descanso, hoy))
+        proximo = fecha_proximo_pago(self._horario, hoy)
+        if proximo is None:
+            self._valor_pago.setText("Sin ciclo de pago")
+            self._pie_pago.setText("")
+        else:
+            faltan = dias_para_pago(self._horario, hoy) or 0
+            self._valor_pago.setText("¡Hoy!" if proximo <= hoy or faltan == 0 else _fecha_corta(proximo).capitalize())
+            self._pie_pago.setText("le toca cobrar" if proximo <= hoy or faltan == 0 else _cuanto_falta(proximo, hoy))
         self._habilitar_acciones(True)
+        self._mostrar_origen()
         if self._is_owner:
             self.combo_descanso.setCurrentIndex(
                 0
@@ -407,16 +543,44 @@ class CalendarioEmpleadasDialog(QDialog):
             return False
 
     def _mostrar_origen(self) -> None:
+        """El día elegido, dicho con todas sus letras, y lo que se puede hacer con él."""
         from pos_uniformes.services.calendario_empleadas_service import origen_del_dia
 
+        fecha, hoy = self._fecha_seleccionada(), date.today()
+        self.dia_titulo.setText(_fecha_en_palabras(fecha).capitalize())
+        self.dia_cuando.setText("HOY" if fecha == hoy else _cuanto_falta(fecha, hoy).upper())
         try:
             from pos_uniformes.database.connection import get_session
 
             with get_session() as session:
-                texto = origen_del_dia(session, self._codigo_activo(), self._fecha_seleccionada())
+                texto = origen_del_dia(session, self._codigo_activo(), fecha)
         except Exception:  # noqa: BLE001 — sin conexión no se dice nada
             texto = ""
         self.origen.setText(texto)
+        self._acomodar_pago(fecha, hoy)
+
+    def _acomodar_pago(self, fecha: date, hoy: date) -> None:
+        """El botón de pago dice a QUÉ día se refiere, y no se ofrece en uno que
+        todavía no llega ni en uno que ya tiene pago.
+
+        El 5 de noviembre «Le pagué este día», con el domingo 8 elegido, registró
+        el pago de la semana en curso y dejó las comisiones en cero: el botón no
+        decía el día y nada lo impedía."""
+        btn = getattr(self, "btn_pago", None)
+        if btn is None:
+            return
+        btn.setText(f"💵 Le pagué el {_fecha_corta(fecha)}")
+        ya_pagado = self._horario is not None and estado_del_dia(self._horario, fecha) == PAGO
+        if fecha > hoy:
+            btn.setEnabled(False)
+            self.pago_nota.setText("Ese día todavía no llega. Si le pagas hoy por adelantado, elige el día de hoy.")
+        elif ya_pagado:
+            btn.setEnabled(False)
+            self.pago_nota.setText("Ese día ya tiene un pago registrado.")
+        else:
+            btn.setEnabled(self._online)
+            self.pago_nota.setText("Registra el pago en ese día y arranca el siguiente ciclo." if fecha == hoy
+                                   else "Para apuntar un pago que se hizo ese día y no se registró.")
 
     def _marcar(self, tipo: str) -> None:
         fecha = self._fecha_seleccionada()
@@ -714,6 +878,23 @@ _MESES_ES = (
 
 def _fecha_en_palabras(fecha: date) -> str:
     return f"{WEEKDAY_NAMES[fecha.weekday()]} {fecha.day} de {_MESES_ES[fecha.month - 1]}"
+
+
+def _fecha_corta(fecha: date) -> str:
+    """«domingo 8 de nov»: para un botón o una ficha."""
+    return f"{WEEKDAY_NAMES[fecha.weekday()]} {fecha.day} de {_MESES_ES[fecha.month - 1][:3]}"
+
+
+def _cuanto_falta(fecha: date, hoy: date) -> str:
+    """«hoy», «mañana», «en 3 días», «ayer», «hace 4 días»."""
+    dias = (fecha - hoy).days
+    if dias == 0:
+        return "hoy"
+    if dias == 1:
+        return "mañana"
+    if dias == -1:
+        return "ayer"
+    return f"en {dias} días" if dias > 0 else f"hace {-dias} días"
 
 
 class CalendarioEncargadoDialog(QDialog):
