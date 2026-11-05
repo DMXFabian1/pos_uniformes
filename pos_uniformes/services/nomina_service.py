@@ -422,6 +422,105 @@ def recontar_comisiones_de_pago(session, pago) -> int:
     return comisiones
 
 
+_DIAS = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
+_MESES = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
+
+
+def _dia_corto(d: date) -> str:
+    return f"{_DIAS[d.weekday()]} {d.day} de {_MESES[d.month - 1]}"
+
+
+def desglose_de_pago(pago) -> str:
+    """«sueldo $1,300.00 + 83 comisiones $166.00 − 1 falta $200.00 − préstamo $300.00»"""
+    partes = [f"sueldo ${Decimal(pago.sueldo_base):,.2f}"]
+    if pago.comisiones:
+        partes.append(f"+ {pago.comisiones} comisiones ${Decimal(pago.monto_comisiones):,.2f}")
+    if pago.faltas:
+        partes.append(f"− {pago.faltas} falta{'s' if pago.faltas != 1 else ''} ${Decimal(pago.descuento_faltas):,.2f}")
+    prestamo = Decimal(getattr(pago, "descuento_prestamos", 0) or 0)
+    if prestamo:
+        partes.append(f"− préstamo ${prestamo:,.2f}")
+    return " ".join(partes)
+
+
+def detalle_del_dia(session, employee_code: str, fecha: date, hoy: date | None = None) -> list[str]:
+    """Lo que pasó (o va a pasar) ese día con el trabajo y el dinero de la
+    empleada, un renglón por dato.
+
+    El calendario solo decía «día normal de trabajo» en cualquier día que no
+    fuera hoy: no se veía cuánto vendió un día pasado, cuánto se le pagó ni en
+    qué pago entró, y de un día futuro no se sabía si tocaba cobrar
+    (Daniel, 2026-11-05)."""
+    from datetime import time
+
+    from sqlalchemy import func as sa_func
+
+    from pos_uniformes.database.models import EmpleadaPago, LibretaVenta
+
+    hoy = hoy or date.today()
+    code = str(employee_code).strip().upper()
+    lineas: list[str] = []
+    pagos = (
+        session.query(EmpleadaPago)
+        .filter(EmpleadaPago.employee_code == code, EmpleadaPago.fecha >= fecha)
+        .order_by(EmpleadaPago.fecha, EmpleadaPago.id)
+        .all()
+    )
+    if fecha <= hoy:
+        inicio = datetime.combine(fecha, time.min).astimezone()
+        comisiones, ventas = session.query(
+            sa_func.coalesce(sa_func.sum(LibretaVenta.comisiones), 0), sa_func.count(LibretaVenta.id)
+        ).filter(
+            LibretaVenta.employee_code == code,
+            LibretaVenta.created_at >= inicio,
+            LibretaVenta.created_at < inicio + timedelta(days=1),
+        ).one()
+        if ventas:
+            lineas.append(
+                f"⭐ {int(comisiones)} comisi{'ón' if int(comisiones) == 1 else 'ones'} "
+                f"en {ventas} venta{'s' if ventas != 1 else ''}"
+            )
+        else:
+            lineas.append("Sin ventas apuntadas ese día" if fecha < hoy else "Todavía sin ventas hoy")
+        del_dia = [p for p in pagos if p.fecha == fecha]
+        for pago in del_dia:
+            lineas.append(f"💵 Se le pagaron ${Decimal(pago.total):,.2f}")
+            lineas.append(f"    {desglose_de_pago(pago)}")
+            if pago.desde is not None:
+                lineas.append(f"    cubre del {_dia_corto(pago.desde)} al {_dia_corto(pago.hasta)}")
+        if not del_dia:
+            if pagos:
+                lineas.append(f"Entró en el pago del {_dia_corto(pagos[0].fecha)} (${Decimal(pagos[0].total):,.2f})")
+            else:
+                proximo = fecha_proximo_pago(cargar_horario(session, code), hoy)
+                lineas.append(
+                    "Todavía no se paga" + (f": va en el pago del {_dia_corto(proximo)}" if proximo else "")
+                )
+        return lineas
+
+    # ── Un día que todavía no llega ──────────────────────────────────────
+    horario = cargar_horario(session, code)
+    proximo = fecha_proximo_pago(horario, hoy)
+    if proximo is None:
+        return lineas
+    if proximo < hoy:
+        lineas.append(f"⚠ Tiene un pago atrasado desde el {_dia_corto(proximo)}")
+        return lineas
+    ciclo = horario.ciclo_dias_pago if (not horario.por_dia and horario.ciclo_dias_pago > 0) else 7
+    toca = proximo
+    while toca < fecha:
+        toca += timedelta(days=ciclo)
+    if toca == fecha:
+        lineas.append("💵 Ese día le toca cobrar")
+        if toca == proximo:
+            pendiente = pago_pendiente(session, code, hoy)
+            lineas.append(f"    hasta hoy lleva {pendiente.comisiones} comisi{'ón' if pendiente.comisiones == 1 else 'ones'}: "
+                f"serían ${pendiente.total:,.2f}")
+    else:
+        lineas.append(f"Lo de ese día se paga el {_dia_corto(toca)}")
+    return lineas
+
+
 def ultimo_pago_registrado(session, employee_code: str):
     from pos_uniformes.database.models import EmpleadaPago
 

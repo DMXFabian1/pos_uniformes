@@ -78,6 +78,7 @@ QLabel#calDiaTitulo { color: #2c2a27; font-size: 21px; font-weight: 800; }
 QLabel#calDiaCuando { color: #a84f2d; background: #f7e3d8; border-radius: 9px; padding: 3px 9px;
                       font-size: 12px; font-weight: 800; }
 QLabel#calOrigen { color: #5f564c; font-size: 13px; }
+QLabel#calDetalle { color: #2c2a27; font-size: 13px; background: #f7efe4; border-radius: 10px; padding: 8px 10px; }
 QLabel#calNota { color: #8a8177; font-size: 12px; }
 QLabel#calFichaTitulo { color: #8a8177; font-size: 11px; font-weight: 800; }
 QLabel#calFichaValor { color: #2c2a27; font-size: 17px; font-weight: 800; }
@@ -332,7 +333,7 @@ class CalendarioEmpleadasDialog(QDialog):
         else:
             titulo_ventana = "Calendario"
         self.setWindowTitle(titulo_ventana)
-        self.resize(940, 660)
+        self.resize(940, 720)
         is_owner = self._is_owner  # el resto del constructor decide con esto
         self.setStyleSheet(_ESTILO_DIALOGO)
 
@@ -441,6 +442,14 @@ class CalendarioEmpleadasDialog(QDialog):
         self.origen.setObjectName("calOrigen")
         self.origen.setWordWrap(True)
         v_dia.addWidget(self.origen)
+        # Lo que pasó ese día (comisiones, pago, en qué pago entró) o lo que
+        # viene (si toca cobrar). El encargado no ve productividad ni pagos.
+        self.detalle = QLabel("")
+        self.detalle.setObjectName("calDetalle")
+        self.detalle.setWordWrap(True)
+        self.detalle.setTextFormat(Qt.TextFormat.PlainText)
+        self.detalle.setVisible(False)
+        v_dia.addWidget(self.detalle)
         self.cal.selectionChanged.connect(self._mostrar_origen)
 
         # ── Autoservicio de la empleada: pedir/cambiar SIN pasar por Daniel.
@@ -672,6 +681,7 @@ class CalendarioEmpleadasDialog(QDialog):
     def _mostrar_origen(self) -> None:
         """El día elegido, dicho con todas sus letras, y lo que se puede hacer con él."""
         from pos_uniformes.services.calendario_empleadas_service import origen_del_dia
+        from pos_uniformes.services.nomina_service import detalle_del_dia
 
         fecha, hoy = self._fecha_seleccionada(), date.today()
         self.dia_titulo.setText(_fecha_en_palabras(fecha).capitalize())
@@ -681,9 +691,12 @@ class CalendarioEmpleadasDialog(QDialog):
 
             with get_session() as session:
                 texto = origen_del_dia(session, self._codigo_activo(), fecha)
+                detalle = [] if self._es_encargado else detalle_del_dia(session, self._codigo_activo(), fecha, hoy)
         except Exception:  # noqa: BLE001 — sin conexión no se dice nada
-            texto = ""
+            texto, detalle = "", []
         self.origen.setText(texto)
+        self.detalle.setText("\n".join(detalle))
+        self.detalle.setVisible(bool(detalle))
         self._acomodar_pago(fecha, hoy)
 
     def _acomodar_pago(self, fecha: date, hoy: date) -> None:
