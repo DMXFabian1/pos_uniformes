@@ -22,7 +22,8 @@ DK1221_SIZE = 202  # 23mm × 23mm area imprimible (brother_ql dots_printable)
 QR_SIZE_STANDARD = 231
 QR_SIZE_SPLIT = 160
 QR_SIZE_CONTINUOUS = 200
-QR_SIZE_DK1221 = 135  # 27 módulos × 5 puntos exactos (0.42 mm a 300 dpi)
+QR_MODULO_DK1221 = 5  # puntos por módulo en la cuadrada: 0.42 mm a 300 dpi (probado en la tienda)
+QR_SIZE_DK1221 = 21 * QR_MODULO_DK1221  # 105: un QR de 21 módulos, sin marco
 
 _CONTINUOUS_MODES = {"continuous"}
 _SPLIT_MODES = {"split"}
@@ -357,40 +358,39 @@ class LabelGenerator:
     def _render_dk1221(cls, variante: Variante, qr_path: Path, output_path: Path, *, show_price: bool | None = None) -> None:
         """La cuadrada de 23 mm, que se volvió la de todos los días (2026-11-05).
 
-        Son 202 puntos por lado a 300 dpi: 17 mm imprimibles. Antes casi todo
-        era QR y el nombre iba abajo a 8 puntos, ilegible. Ahora:
+        Son 202 puntos por lado a 300 dpi: 17 mm imprimibles, con ~3 mm de
+        orilla en blanco que la Brother no toca. Antes casi todo era QR y el
+        nombre iba abajo a 8 puntos, ilegible. Ahora:
 
-            ┌────────────┬───────┐
-            │            │ TALLA │   uniforme: la talla, enorme
-            │     QR     │   6   │   ropa: el precio ($ arriba, la cifra grande)
-            │            │       │         y la talla en caja si no es unitalla
-            ├────────────┴───────┤
-            │ Pants 3pz          │   el nombre en negrita, hasta dos renglones
+            ┌──────────┬─────────┐
+            │          │  TALLA  │   uniforme: la talla, enorme
+            │    QR    │    6    │   ropa: el precio ($ arriba, la cifra grande)
+            │          │         │         y la talla debajo si no es unitalla
+            ├──────────┴─────────┤
+            │ Pants 3pz          │   el nombre en negrita, hasta tres renglones
             │ Deportivo          │
             └────────────────────┘
 
-        El QR baja de 180 a 135 puntos: es de 21 módulos (27 con su borde), así
-        que 135 son 5 puntos EXACTOS por módulo —0.42 mm, con corrección de
-        errores alta— y se escala sin suavizar para que cada módulo quede
-        cuadrado. Achicarlo «al tanteo» dejaba módulos disparejos. Va SIN el
-        ícono del centro: toda la corrección de errores queda para el lector.
+        El QR va SIN su marco blanco y pegado a la esquina: arriba y a la
+        izquierda el marco ya lo pone la orilla de la etiqueta, y a la derecha
+        y abajo se dejan dos módulos antes del texto. Así los módulos miden lo
+        mismo que en la versión que se probó en la tienda (5 puntos, 0.42 mm) y
+        se gana un 30 % de lugar para letras. Tampoco lleva el ícono del
+        centro: a 2 mm no se distingue, y le quita corrección de errores al lector.
         """
         size = DK1221_SIZE
         label_image = Image.new("1", (size, size), 1)
         draw = ImageDraw.Draw(label_image)
-        qr_lado = QR_SIZE_DK1221
-        # Sin el ícono del centro (Daniel, 2026-11-05): aquí mide 2 mm y no se
-        # distingue, y sí le quita al lector la corrección de errores que hace
-        # falta para una etiqueta arrugada o rayada. La Label y la tira lo conservan.
-        qr_image = cls._qr_sin_icono(variante, qr_path).resize((qr_lado, qr_lado), Image.Resampling.NEAREST)
-        qr_x, qr_y = 2, 2
-        label_image.paste(qr_image, (qr_x, qr_y))
+        qr_image = cls._qr_sin_icono(variante, qr_path)
+        qr_lado = qr_image.size[0]
+        label_image.paste(qr_image, (0, 0))
+        aire = 2 * QR_MODULO_DK1221                     # dos módulos de blanco antes del texto
 
         c = cls.small_content(variante, show_price=show_price)
-        col_x = qr_x + qr_lado + 3
-        col_w = size - col_x - 2
+        col_x = qr_lado + aire
+        col_w = size - col_x - 1
         col_cx = col_x + col_w // 2
-        col_y0, col_y1 = qr_y + 2, qr_y + qr_lado - 2
+        col_y0, col_y1 = 2, qr_lado - 2
 
         def centrado(texto: str, fuente, y: int) -> int:
             caja = draw.textbbox((0, 0), texto, font=fuente)
@@ -400,21 +400,21 @@ class LabelGenerator:
         talla_abajo = ""        # una talla que no cabe grande en la columna baja al pie
         if c.precio:
             cifra = c.precio.lstrip("$")
-            f_peso = cls._load_font(22, bold=True)
-            f_cifra = cls._fit_font(draw, cifra, col_w, base_size=44, min_size=16, bold=True)
-            alto_cifra = draw.textbbox((0, 0), cifra, font=f_cifra)
-            alto_bloque = 18 + 4 + (alto_cifra[3] - alto_cifra[1])
-            y = col_y0 + max(0, ((col_y1 - col_y0) - alto_bloque - (26 if c.talla else 0)) // 2)
+            f_peso = cls._load_font(24, bold=True)
+            f_talla = cls._fit_font(draw, c.talla, col_w, base_size=24, min_size=12, bold=True) if c.talla else None
+            alto_talla = (cls._line_height(f_talla) + 8) if f_talla else 0
+            f_cifra = cls._fit_font(draw, cifra, col_w, base_size=62, min_size=16, bold=True)
+            caja_cifra = draw.textbbox((0, 0), cifra, font=f_cifra)
+            alto_bloque = 18 + 4 + (caja_cifra[3] - caja_cifra[1]) + alto_talla
+            y = col_y0 + max(0, ((col_y1 - col_y0) - alto_bloque) // 2)
             y += centrado("$", f_peso, y) + 4
-            y += centrado(cifra, f_cifra, y) + 10
-            if c.talla:
-                # Sin caja: en 5 mm de ancho la caja se comía el margen del QR.
-                f_talla = cls._fit_font(draw, c.talla, col_w, base_size=22, min_size=11, bold=True)
-                centrado(cls._recortar(draw, c.talla, f_talla, col_w), f_talla, min(y, col_y1 - 18))
+            y += centrado(cifra, f_cifra, y) + 8
+            if f_talla:
+                centrado(cls._recortar(draw, c.talla, f_talla, col_w), f_talla, y)
         elif c.talla:
-            f_talla = cls._fit_font(draw, c.talla, col_w, base_size=68, min_size=10, bold=True)
-            if getattr(f_talla, "size", 10) >= 20:
-                f_rot = cls._fit_font(draw, "TALLA", col_w, base_size=16, min_size=10)
+            f_talla = cls._fit_font(draw, c.talla, col_w, base_size=84, min_size=10, bold=True)
+            if getattr(f_talla, "size", 10) >= 22:
+                f_rot = cls._fit_font(draw, "TALLA", col_w, base_size=18, min_size=10)
                 caja = draw.textbbox((0, 0), c.talla, font=f_talla)
                 alto_bloque = 14 + 6 + (caja[3] - caja[1])
                 y = col_y0 + max(0, ((col_y1 - col_y0) - alto_bloque) // 2)
@@ -423,27 +423,67 @@ class LabelGenerator:
             else:
                 talla_abajo = c.talla       # «Unitalla», «Infantil»… no caben grandes aquí
 
-        # El nombre, abajo, a todo lo ancho.
-        y0 = qr_y + qr_lado + 3
-        alto = size - y0 - 2
+        # El nombre, abajo, a todo lo ancho: la letra más grande que quepa en 1 a 3 renglones.
+        y0 = qr_lado + aire - 2
+        alto = size - y0 - 1
         nombre = f"{c.nombre} · {talla_abajo}" if talla_abajo else c.nombre
-        f_nom, renglones = cls._fit_wrapped(draw, nombre, size - 8, alto, base_size=30, min_size=14, prefiere_uno_desde=26)
-        renglones = [cls._recortar(draw, r, f_nom, size - 8) for r in renglones]
+        f_nom, renglones = cls._fit_lines(draw, nombre, size - 4, alto, base_size=40, min_size=14, max_renglones=3)
         paso = cls._alto_real(f_nom)
         y = y0 + max(0, (alto - len(renglones) * paso) // 2)
         for renglon in renglones:
-            draw.text((4, y), renglon, font=f_nom, fill=0)
+            draw.text((2, y), renglon, font=f_nom, fill=0)
             y += paso
         output_path.parent.mkdir(parents=True, exist_ok=True)
         label_image.save(output_path, "PNG")
 
+    @classmethod
+    def _fit_lines(
+        cls, draw: ImageDraw.ImageDraw, text: str, max_width: int, max_height: int, *,
+        base_size: int, min_size: int, max_renglones: int,
+    ) -> tuple[ImageFont.ImageFont, list[str]]:
+        """La negrita más grande con la que `text` cabe partido por palabras en
+        hasta `max_renglones`. Lo que ni así cabe se recorta con «…»."""
+        palabras = str(text or "").split() or [""]
+        for size in range(base_size, min_size - 1, -1):
+            fuente = cls._load_font(size, bold=True)
+            renglones: list[str] = []
+            actual = ""
+            cabe = True
+            for palabra in palabras:
+                intento = f"{actual} {palabra}".strip()
+                if cls._text_width(draw, intento, fuente) <= max_width:
+                    actual = intento
+                    continue
+                if not actual:                      # una sola palabra más ancha que la etiqueta
+                    cabe = False
+                    break
+                renglones.append(actual)
+                actual = palabra
+                if cls._text_width(draw, actual, fuente) > max_width:
+                    cabe = False
+                    break
+            if not cabe:
+                continue
+            renglones.append(actual)
+            if len(renglones) <= max_renglones and len(renglones) * cls._alto_real(fuente) <= max_height:
+                return fuente, renglones
+        fuente = cls._load_font(min_size, bold=True)
+        return fuente, [cls._recortar(draw, " ".join(palabras), fuente, max_width)]
+
     @staticmethod
     def _qr_sin_icono(variante: Variante, qr_path: Path) -> Image.Image:
-        """El QR limpio del SKU. Si no se pudiera generar, el de archivo (con ícono)."""
+        """El QR del SKU, limpio: sin ícono, sin marco, 5 puntos exactos por módulo.
+        Si no se pudiera generar, el de archivo (con ícono), a su tamaño equivalente."""
         try:
-            return QrGenerator._build_qr_image(str(variante.sku)).convert("1")
+            import qrcode
+            from qrcode.constants import ERROR_CORRECT_H
+
+            qr = qrcode.QRCode(version=None, error_correction=ERROR_CORRECT_H, box_size=QR_MODULO_DK1221, border=0)
+            qr.add_data(str(variante.sku))
+            qr.make(fit=True)
+            return qr.make_image(fill_color="black", back_color="white").convert("1")
         except Exception:  # noqa: BLE001 — una etiqueta con ícono es mejor que ninguna
-            return Image.open(qr_path).convert("1")
+            return Image.open(qr_path).convert("1").resize((QR_SIZE_DK1221, QR_SIZE_DK1221), Image.Resampling.NEAREST)
 
     @classmethod
     def small_content(cls, variante: Variante, *, show_price: bool | None = None) -> SmallLabelContent:

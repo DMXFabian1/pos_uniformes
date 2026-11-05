@@ -96,18 +96,26 @@ class LabelGeneratorTests(unittest.TestCase):
                 if tipo == "texto":
                     self.assertLessEqual(LabelGenerator._text_width(draw, texto, fuente), SPLIT_SECTION_WIDTH - 16, texto)
 
-    def test_la_cuadrada_de_23mm_qr_de_modulos_exactos_y_lo_que_decide_al_lado(self) -> None:
-        """La de todos los días (2026-11-05): QR a la izquierda, talla o precio
-        grande a su lado y el nombre en negrita abajo."""
+    def test_la_cuadrada_de_23mm_qr_limpio_y_lo_que_decide_al_lado(self) -> None:
+        """La de todos los días (2026-11-05): QR en la esquina, sin marco ni
+        ícono; talla o precio grande a su lado y el nombre en negrita abajo."""
         import tempfile
         from pathlib import Path
 
+        import qrcode
         from PIL import Image
+        from qrcode.constants import ERROR_CORRECT_H
 
-        from pos_uniformes.utils.label_generator import QR_SIZE_DK1221
+        from pos_uniformes.utils.label_generator import QR_MODULO_DK1221, QR_SIZE_DK1221
 
-        self.assertEqual(QR_SIZE_DK1221 % 27, 0)             # 27 módulos con borde: escala entera, módulos cuadrados
-        self.assertGreaterEqual(QR_SIZE_DK1221 // 27, 5)     # no menos de 0.42 mm por módulo a 300 dpi
+        self.assertEqual(QR_MODULO_DK1221, 5)                # el tamaño de módulo que se probó escaneando
+        self.assertEqual(QR_SIZE_DK1221, 105)
+        esperado = qrcode.QRCode(error_correction=ERROR_CORRECT_H, box_size=5, border=0)
+        esperado.add_data("SKU000001")
+        esperado.make(fit=True)
+        limpio = esperado.make_image(fill_color="black", back_color="white").convert("1")
+        self.assertEqual(limpio.size, (105, 105))            # 21 módulos: el SKU cabe en el QR más chico
+
         uniforme = _con(_build_variant(product_name="Pants 3pz Deportivo Patria", talla="6", school_name="Patria", garment_type="Deportivo"))
         ropa = _con(_build_variant(product_name="Conjunto Pijama de Niño", talla="Infantil", price="159.00"))
         with tempfile.TemporaryDirectory() as tmp:
@@ -118,16 +126,28 @@ class LabelGeneratorTests(unittest.TestCase):
                 LabelGenerator._render_dk1221(v, qr, salida)
                 img = Image.open(salida)
                 self.assertEqual(img.size, (202, 202))
-                columna = img.crop((QR_SIZE_DK1221 + 5, 2, 202, QR_SIZE_DK1221))
-                pie = img.crop((0, QR_SIZE_DK1221 + 5, 202, 202))
-                self.assertGreater(columna.histogram()[0], 250, nombre)     # talla / precio, grande
-                self.assertGreater(pie.histogram()[0], 600, nombre)         # el nombre en negrita
-                # El QR es el del SKU, limpio: sin ícono al centro y sin que nada lo pise.
-                from pos_uniformes.utils.qr_generator import QrGenerator
+                # El QR, intacto en la esquina, y dos módulos de aire a su derecha y abajo.
+                self.assertEqual(img.crop((0, 0, 105, 105)).tobytes(), limpio.tobytes(), nombre)
+                self.assertEqual(img.crop((105, 0, 115, 105)).histogram()[0], 0, nombre)
+                self.assertEqual(img.crop((0, 105, 105, 113)).histogram()[0], 0, nombre)
+                columna = img.crop((115, 0, 202, 105))
+                pie = img.crop((0, 113, 202, 202))
+                self.assertGreater(columna.histogram()[0], 400, nombre)     # talla / precio, grande
+                self.assertGreater(pie.histogram()[0], 900, nombre)         # el nombre en negrita
 
-                limpio = QrGenerator._build_qr_image("SKU000001").convert("1").resize(
-                    (QR_SIZE_DK1221, QR_SIZE_DK1221), Image.Resampling.NEAREST)
-                self.assertEqual(img.crop((2, 2, 2 + QR_SIZE_DK1221, 2 + QR_SIZE_DK1221)).tobytes(), limpio.tobytes(), nombre)
+    def test_el_nombre_usa_hasta_tres_renglones_para_crecer(self) -> None:
+        from PIL import Image, ImageDraw
+
+        draw = ImageDraw.Draw(Image.new("1", (202, 202), 1))
+        fuente, renglones = LabelGenerator._fit_lines(draw, "Suéter Navideño YMS226T", 198, 88, base_size=40, min_size=14, max_renglones=3)
+        self.assertEqual(" ".join(renglones), "Suéter Navideño YMS226T")
+        self.assertLessEqual(len(renglones), 3)
+        self.assertGreaterEqual(fuente.size, 24)                              # antes salía a ~17
+        for r in renglones:
+            self.assertLessEqual(LabelGenerator._text_width(draw, r, fuente), 198)
+        # Una palabra imposible no se sale: se recorta.
+        _f, uno = LabelGenerator._fit_lines(draw, "Supercalifragilisticoespialidoso", 198, 88, base_size=40, min_size=14, max_renglones=3)
+        self.assertEqual(len(uno), 1)
 
     def test_se_pintan_del_tamano_de_siempre(self) -> None:
         import tempfile
