@@ -207,6 +207,10 @@
   .pick .pav{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:19px}
 
    
+  .pindots{display:flex;gap:14px;justify-content:center;margin-top:24px}
+  .pindots span{width:14px;height:14px;border-radius:50%;background:var(--surface-2);border:1.5px solid var(--border-2);transition:background .15s ease,transform .15s ease}
+  .pindots span.on{background:var(--accent);border-color:var(--accent);transform:scale(1.12)}
+
   .toast{position:fixed;left:0;right:0;bottom:100px;z-index:50;display:flex;justify-content:center;pointer-events:none}
   .toast .bubble{display:inline-flex;align-items:center;gap:9px;padding:12px 18px;border-radius:999px;background:var(--text);color:var(--bg);font-size:13px;font-weight:700;box-shadow:var(--shadow-lg);animation:toastin .3s cubic-bezier(.2,1,.32,1);max-width:88%}
 
@@ -392,6 +396,25 @@
   var FIL = { estado: '', persona: '', mes: '', q: '' };
   var STATS_PERIOD = 'mes';
   var KEY_ID = 'lm_identity';
+
+  // ── PIN por usuario (se guarda con hash en este dispositivo) ──
+  function hashPin(pin, who) {
+    var str = 'LM1|' + who + '|' + pin;
+    var h1 = 5381, h2 = 52711;
+    for (var i = 0; i < str.length; i++) {
+      var c = str.charCodeAt(i);
+      h1 = (h1 * 33 + c) >>> 0;
+      h2 = (h2 * 31 + c) >>> 0;
+    }
+    return h1.toString(36) + '.' + h2.toString(36);
+  }
+  function pinGuardado(who) { try { return localStorage.getItem('lm_pin_' + who) || ''; } catch (e) { return ''; } }
+  function guardarPin(who, pin) {
+    try {
+      if (pin) localStorage.setItem('lm_pin_' + who, hashPin(pin, who));
+      else localStorage.removeItem('lm_pin_' + who);
+    } catch (e) {}
+  }
 
   function hasBackend() { return typeof google !== 'undefined' && google.script && google.script.run; }
 
@@ -1148,6 +1171,7 @@
     var html = '<div class="backdrop" data-close></div><div class="sheet"><div class="grab"></div><div class="sheet-body" style="padding-bottom:24px">' +
       '<div style="display:flex;align-items:center;gap:13px;padding:2px 4px 16px"><span class="avatar" style="width:48px;height:48px;font-size:19px;background:' + personColor(ST.identity) + '">' + ST.identity.charAt(0) + '</span><span><span class="greet">Estás usando la app como</span><br><b style="font-size:18px">' + ST.identity + '</b></span></div>' +
       '<button class="set-row" id="s-switch"><span class="msr" style="color:var(--accent)">switch_account</span><span style="flex:1;font-size:14.5px;font-weight:700">Cambiar de usuario</span><span class="msr" style="color:var(--text-3)">chevron_right</span></button>' +
+      '<button class="set-row" id="s-pin"><span class="msr" style="color:var(--warn)">' + (pinGuardado(ST.identity) ? 'lock' : 'lock_open') + '</span><span style="flex:1;font-size:14.5px;font-weight:700">' + (pinGuardado(ST.identity) ? 'PIN de mi sesión' : 'Poner PIN a mi sesión') + '</span><span class="msr" style="color:var(--text-3)">chevron_right</span></button>' +
       '<button class="set-row" id="s-refresh"><span class="msr" style="color:var(--text-2)">refresh</span><span style="flex:1;font-size:14.5px;font-weight:700">Recargar datos</span></button>' +
       '<div style="margin-top:10px;font-size:11px;color:var(--text-3);text-align:center;line-height:1.5;font-weight:600">El tema (claro/oscuro) sigue la configuración de tu teléfono.</div>' +
       '</div></div>';
@@ -1155,6 +1179,13 @@
     ov.addEventListener('click', function (e) { if (e.target.closest('[data-close]')) closeOverlay(ov); });
     $('#s-switch', ov).addEventListener('click', function () { try { localStorage.removeItem(KEY_ID); } catch (e) {} ST.identity = null; closeOverlay(ov); showIdentity(); });
     $('#s-refresh', ov).addEventListener('click', function () { closeOverlay(ov); $('#loader').classList.remove('hidden'); fetchState(); });
+    $('#s-pin', ov).addEventListener('click', function () {
+      var who = ST.identity;
+      closeOverlay(ov);
+      if (!pinGuardado(who)) { crearPin(who); return; }
+      // con PIN existente: primero verificar, luego cambiar o quitar
+      showPinLock(who, function () { openPinOpciones(who); });
+    });
   }
 
    
@@ -1168,10 +1199,91 @@
       PERSONAS.map(function (p) { return '<button class="pick" data-person="' + p + '"><span class="pav" style="background:' + personColor(p) + '">' + p.charAt(0) + '</span><span style="flex:1;font-size:17px;font-weight:800">' + p + '</span><span class="msr" style="color:var(--text-3)">arrow_forward</span></button>'; }).join('') +
       '</div><div style="margin-top:20px;font-size:11.5px;color:var(--text-3);text-align:center;font-weight:600">Se recordará en este dispositivo. Podrás cambiarlo en Ajustes.</div></div>';
     var ov = el('<div>' + html + '</div>'); $('#overlays').appendChild(ov);
-    ov.addEventListener('click', function (e) { var b = e.target.closest('[data-person]'); if (b) { var p = b.getAttribute('data-person'); try { localStorage.setItem(KEY_ID, p); } catch (err) {} ST.identity = p; closeOverlay(ov); renderAll(); } });
+    ov.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-person]'); if (!b) return;
+      var p = b.getAttribute('data-person');
+      var entrar = function () { try { localStorage.setItem(KEY_ID, p); } catch (err) {} ST.identity = p; renderAll(); };
+      closeOverlay(ov);
+      if (pinGuardado(p)) showPinLock(p, entrar); else entrar();
+    });
   }
 
    
+  function pinPad(opts) {
+    clearOverlays();
+    var html = '<div class="identity" style="justify-content:center;text-align:center">' +
+      '<div style="display:flex;flex-direction:column;align-items:center">' +
+      '<span style="width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:22px;background:' + personColor(opts.who) + '">' + esc(opts.who.charAt(0)) + '</span>' +
+      '<div style="margin-top:14px;font-size:20px;font-weight:800">' + esc(opts.titulo) + '</div>' +
+      '<div style="margin-top:4px;font-size:12.5px;color:var(--text-2);font-weight:600;min-height:16px" id="pin-sub">' + esc(opts.subtitulo || '') + '</div>' +
+      '<div class="pindots" id="pin-dots"><span></span><span></span><span></span><span></span></div>' +
+      '<div class="keypad" id="pin-pad" style="width:100%;max-width:260px;margin-top:22px"></div>' +
+      (opts.conCambiarUsuario
+        ? '<button class="link" id="pin-switch" style="margin-top:22px">Cambiar de usuario</button>'
+        : '<button class="link" id="pin-cancel" style="margin-top:22px;color:var(--text-3)">Cancelar</button>') +
+      '</div></div>';
+    var ov = el(html);
+    $('#overlays').appendChild(ov);
+    var keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'back'];
+    $('#pin-pad', ov).innerHTML = keys.map(function (k) {
+      return k === '' ? '<span></span>' : '<button class="key" data-pk="' + k + '">' + (k === 'back' ? '<span class="msr" style="font-size:24px;color:var(--text-2)">backspace</span>' : k) + '</button>';
+    }).join('');
+    var entrada = '';
+    function pintar() { [].forEach.call(ov.querySelectorAll('#pin-dots span'), function (d, i) { d.classList.toggle('on', i < entrada.length); }); }
+    function reset(msg) { entrada = ''; pintar(); if (msg) { var s2 = $('#pin-sub', ov); if (s2) s2.textContent = msg; } }
+    function tecla(k) {
+      if (k === 'back') { entrada = entrada.slice(0, -1); pintar(); return; }
+      if (entrada.length >= 4) return;
+      entrada += k; pintar();
+      if (entrada.length === 4) setTimeout(function () { opts.alCompleto(entrada, ov, reset); }, 120);
+    }
+    ov.addEventListener('click', function (e) {
+      var b = e.target.closest('[data-pk]'); if (b) { tecla(b.getAttribute('data-pk')); return; }
+      if (e.target.closest('#pin-switch')) { cerrarPinPad(ov); try { localStorage.removeItem(KEY_ID); } catch (e2) {} ST.identity = null; showIdentity(); return; }
+      if (e.target.closest('#pin-cancel')) { cerrarPinPad(ov); if (opts.alCancelar) opts.alCancelar(); return; }
+    });
+    function keyH(e) {
+      if (!ov.parentNode) { document.removeEventListener('keydown', keyH); return; }
+      if (e.key >= '0' && e.key <= '9') { tecla(e.key); e.preventDefault(); }
+      else if (e.key === 'Backspace') { tecla('back'); e.preventDefault(); }
+    }
+    document.addEventListener('keydown', keyH);
+    return ov;
+  }
+  function cerrarPinPad(ov) { if (ov && ov.parentNode) ov.parentNode.removeChild(ov); }
+
+  function showPinLock(who, alOk) {
+    pinPad({
+      who: who, titulo: 'Hola, ' + who, subtitulo: 'Escribe tu PIN para entrar', conCambiarUsuario: true,
+      alCompleto: function (pin, ov, reset) {
+        if (hashPin(pin, who) === pinGuardado(who)) { cerrarPinPad(ov); if (alOk) alOk(); }
+        else { toast('PIN incorrecto', 'error', 'var(--bad)'); reset('Inténtalo de nuevo'); }
+      }
+    });
+  }
+  function crearPin(who) {
+    var primero = '';
+    pinPad({
+      who: who, titulo: 'Crea tu PIN', subtitulo: 'Elige 4 dígitos para proteger tu sesión', conCambiarUsuario: false,
+      alCompleto: function (pin, ov, reset) {
+        if (!primero) { primero = pin; reset('Repite el PIN para confirmar'); return; }
+        if (pin === primero) { guardarPin(who, pin); cerrarPinPad(ov); toast('PIN activado para ' + who + ' en este dispositivo', 'lock', 'var(--ok)'); }
+        else { primero = ''; reset('No coincidieron — empieza de nuevo'); toast('Los PIN no coinciden', 'error', 'var(--bad)'); }
+      }
+    });
+  }
+  function openPinOpciones(who) {
+    var html = '<div class="backdrop" data-close></div><div class="sheet"><div class="grab"></div><div class="sheet-body" style="padding-bottom:24px">' +
+      '<div style="padding:2px 4px 14px;font-size:15px;font-weight:800">PIN de tu sesión</div>' +
+      '<button class="set-row" id="pin-cambiar"><span class="msr" style="color:var(--accent)">password</span><span style="flex:1;font-size:14.5px;font-weight:700">Cambiar PIN</span><span class="msr" style="color:var(--text-3)">chevron_right</span></button>' +
+      '<button class="set-row" id="pin-quitar"><span class="msr" style="color:var(--bad)">lock_open</span><span style="flex:1;font-size:14.5px;font-weight:700">Quitar PIN</span></button>' +
+      '</div></div>';
+    var ov = el('<div>' + html + '</div>'); $('#overlays').appendChild(ov);
+    ov.addEventListener('click', function (e) { if (e.target.closest('[data-close]')) closeOverlay(ov); });
+    $('#pin-cambiar', ov).addEventListener('click', function () { closeOverlay(ov); crearPin(who); });
+    $('#pin-quitar', ov).addEventListener('click', function () { closeOverlay(ov); guardarPin(who, ''); toast('PIN eliminado', 'lock_open', 'var(--warn)'); });
+  }
+
   var toastTimer;
   function toast(text, icon, color) {
     var old = $('#toast-c'); if (old) old.parentNode.removeChild(old);
@@ -1230,6 +1342,7 @@
   startSync();
   setupPullToRefresh();
   if (!ST.identity) showIdentity();
+  else if (pinGuardado(ST.identity)) showPinLock(ST.identity);
 })();
 </script>
 

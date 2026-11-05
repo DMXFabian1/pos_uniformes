@@ -36,6 +36,12 @@ reemplazarse**: la interfaz usa su API tal cual
 5. **Badge con el total de pendientes** (rojo si te tocan a ti, gris si
    esperan a la otra persona) y **chips con los últimos 6 conceptos**
    usados por el usuario activo.
+6. **PIN por usuario** (Ajustes → "Poner PIN a mi sesión"): abrir la app
+   con esa identidad pide un PIN de 4 dígitos; "Cambiar de usuario" sigue
+   disponible desde el candado para que la otra persona use su propia
+   sesión. El PIN se guarda con hash y por dispositivo (localStorage):
+   es un candado familiar contra registros con la identidad equivocada,
+   no seguridad bancaria — borrar los datos del navegador lo elimina.
 
 Sin cambios en el flujo de aprobación ni en el diseño visual.
 
