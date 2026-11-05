@@ -38,8 +38,10 @@ reemplazarse**: la interfaz usa su API tal cual
    usados por el usuario activo.
 6. **Pagos periódicos** (p. ej. el internet cada mes): al registrar, en
    "Los detalles" se elige Repetir (semana/quincena/mes). Cuando llega la
-   fecha, Inicio muestra la tarjeta "Cobros programados" y un toque en
-   Registrar lo mete al flujo normal de aprobación (u Omitir lo salta);
+   fecha, Inicio muestra la tarjeta "Cobros programados"; Registrar abre
+   el monto prellenado y editable (con opción de guardar el nuevo monto
+   para los siguientes) y lo mete al flujo normal de aprobación, u
+   Omitir lo salta;
    se administran en Ajustes → Pagos periódicos. Viven en el dispositivo
    del usuario (localStorage), así que requieren abrir la app para
    dispararse — un recordatorio de un toque, no un robot del servidor.
