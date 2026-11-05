@@ -925,7 +925,8 @@
     var g = [
       stat('Envi\u00f3 Daniel', money(sum(function (m) { return m.tipo === 'Daniel envi\u00f3 dinero'; }))),
       stat('Envi\u00f3 Coraima', money(sum(function (m) { return m.tipo === 'Coraima envi\u00f3 dinero'; }))),
-      '<div class="stat full"><span class="tile-ico" style="background:var(--ok-bg);color:var(--ok)"><span class="msr fill" style="font-size:22px">payments</span></span><span><span class="k">Pagos realizados</span><div class="val tnum">' + money(sum(function (m) { return m.tipo.indexOf('recibi\u00f3 dinero') > -1; })) + '</div></span></div>',
+      stat('Recibió Daniel', money(sum(function (m) { return m.tipo === 'Daniel recibió dinero'; }))),
+      stat('Recibió Coraima', money(sum(function (m) { return m.tipo === 'Coraima recibió dinero'; }))),
       stat('Movimientos', conf.length),
       stat('Pendientes', pend, 'var(--warn)'),
       stat('Promedio por mes', money(movido / nMeses), null, 17),
