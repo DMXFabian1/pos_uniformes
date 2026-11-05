@@ -139,6 +139,21 @@ def vista_de_pagos(session, raw_scan: str, hoy: date | None = None) -> VistaPago
     return VistaPagos(todas=False, quien=_nombre_corto(quien.nombre_completo, code), pagos=[_pago_vista(session, quien, hoy)])
 
 
+def lineas_de_ese_dia(session, vista: VistaPagos, fecha: date, hoy: date | None = None) -> list[tuple[str, list[str]]]:
+    """Lo que pasó (o viene) ESE día para quien puede verlo: [(nombre, renglones)].
+
+    La consulta con gafete solo decía lo que se lleva HOY, sin importar qué día
+    se hubiera tocado: de un día pasado no se veía cuánto se vendió ni cuánto se
+    pagó, y de uno futuro nada (Daniel, 2026-11-05)."""
+    from pos_uniformes.services.nomina_service import detalle_del_dia
+
+    hoy = hoy or date.today()
+    return [
+        (_nombre_corto(p.employee_name, p.employee_code), detalle_del_dia(session, p.employee_code, fecha, hoy))
+        for p in vista.pagos
+    ]
+
+
 def lineas_pago(p: PagoVista, hoy: date | None = None) -> list[str]:
     """Desglose en palabras llanas (mismo criterio que el ticket de pago)."""
     hoy = hoy or date.today()

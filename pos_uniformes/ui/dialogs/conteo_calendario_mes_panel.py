@@ -184,7 +184,26 @@ class ConteoCalendarioMesPanel(QWidget):
             mes = 1
             anio += 1
         self._mes, self._anio = mes, anio
+        # Descansos, pagos y faltas se cargan POR MES: sin esto, al pasar a
+        # octubre o a diciembre el calendario salía sin nada de las empleadas
+        # (se quedaba con lo del mes en que se abrió). Daniel, 2026-11-05.
+        try:
+            session = self._session_factory()
+            try:
+                self._emp_chips = self._chips_de_empleadas(session)
+            finally:
+                session.close()
+        except Exception:  # noqa: BLE001 — sin conexión: el mes sale sin ellas
+            self._emp_chips = {}
         self._render()
+
+    def _chips_de_empleadas(self, session) -> dict:
+        try:
+            from pos_uniformes.services.calendario_empleadas_service import chips_calendario_mes
+
+            return chips_calendario_mes(session, self._anio, self._mes, self._hoy)
+        except Exception:  # noqa: BLE001
+            return {}
 
     def refresh(self) -> None:
         if not self._hoy_fijo:
@@ -198,16 +217,7 @@ class ConteoCalendarioMesPanel(QWidget):
                 self._completados = set()
                 # Sincronía con el calendario de la Libreta: descansos,
                 # pagos y faltas de las empleadas se pintan aquí solos.
-                try:
-                    from pos_uniformes.services.calendario_empleadas_service import (
-                        chips_calendario_mes,
-                    )
-
-                    self._emp_chips = chips_calendario_mes(
-                        session, self._anio, self._mes, self._hoy
-                    )
-                except Exception:  # noqa: BLE001
-                    self._emp_chips = {}
+                self._emp_chips = self._chips_de_empleadas(session)
             finally:
                 session.close()
         except Exception:  # noqa: BLE001 — sin conexión: calendario vacío, no crashear

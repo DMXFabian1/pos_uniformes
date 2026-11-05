@@ -270,5 +270,78 @@ class PanelClickTests(unittest.TestCase):
         self.assertEqual(abiertos, [date(2026, 9, 8)])
 
 
+class OtrosMesesTests(unittest.TestCase):
+    """Daniel, 2026-11-05: «no puedo ver los detalles de pasado, ni los del futuro».
+
+    El calendario del kiosko cargaba lo de las empleadas solo para el mes en que
+    se abría; al pasar de mes se quedaba vacío. Y de los pagos solo pintaba el
+    próximo, así que un mes futuro no traía ninguno."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        from PyQt6.QtWidgets import QApplication
+
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_un_mes_futuro_trae_sus_dias_de_pago(self) -> None:
+        with _factory()() as s:
+            _seed(s)
+            octubre = chips_calendario_mes(s, 2026, 10, HOY)
+        # Fanny cobra cada 7 días desde el viernes 4 de sep: todos los viernes de octubre.
+        viernes = [d for d, chips in sorted(octubre.items()) if (PAGO, "Fanny") in chips]
+        self.assertEqual(viernes, [date(2026, 10, d) for d in (2, 9, 16, 23, 30)])
+
+    def test_una_empleada_de_baja_no_sale_cobrando_cada_semana(self) -> None:
+        with _factory()() as s:
+            _seed(s)
+            guardar_horario(s, "VEND-9", descanso_weekday=2, ciclo_dias_pago=7, fecha_ultimo_pago=date(2026, 6, 1), actualizar_ultimo_pago=True)
+            octubre = chips_calendario_mes(s, 2026, 10, HOY)
+        self.assertFalse([d for d, chips in octubre.items() if (PAGO, "VEND-9") in chips])
+
+    def test_los_pagos_proyectados_no_ensucian_el_pasado(self) -> None:
+        with _factory()() as s:
+            _seed(s)
+            septiembre = chips_calendario_mes(s, 2026, 9, HOY)
+        pagos = [d for d, chips in sorted(septiembre.items()) if (PAGO, "Fanny") in chips]
+        self.assertEqual(pagos, [date(2026, 9, d) for d in (11, 18, 25)])   # nada antes de hoy (miércoles 9)
+
+    def test_al_cambiar_de_mes_se_cargan_las_empleadas_de_ese_mes(self) -> None:
+        from pos_uniformes.ui.dialogs.conteo_calendario_mes_panel import ConteoCalendarioMesPanel
+
+        fabrica = _factory()
+        with fabrica() as s:
+            _seed(s)
+        panel = ConteoCalendarioMesPanel(None, session_factory=fabrica, hoy=HOY, refresh_on_init=False)
+        panel._emp_chips, panel._estados, panel._recordatorios, panel._completados = {}, [], [], set()
+        panel._cambiar_mes(+1)
+        self.assertIn((DESCANSO, "Fanny"), panel._emp_chips.get(date(2026, 10, 6), []))   # martes
+        panel._cambiar_mes(-2)
+        self.assertIn((DESCANSO, "Fanny"), panel._emp_chips.get(date(2026, 8, 4), []))
+        self.assertTrue(all(d.month == 8 for d in panel._emp_chips))
+
+    def test_con_gafete_se_ve_lo_de_ese_dia(self) -> None:
+        from PyQt6.QtWidgets import QLabel
+
+        from pos_uniformes.ui.dialogs.dia_calendario_dialog import DiaCalendarioDialog
+
+        resumen = svc.ResumenDia(date(2026, 9, 2))
+        with patch.object(DiaCalendarioDialog, "_cargar_resumen", return_value=resumen):
+            dlg = DiaCalendarioDialog(None, date(2026, 9, 2), session_factory=lambda: SimpleNamespace(close=lambda: None), hoy=HOY)
+        vista = svc.VistaPagos(False, "Fanny", [svc.PagoVista("VEND-2", "Fanny López", _detalle("VEND-2"), date(2026, 9, 11), True)])
+        with patch.object(svc, "vista_de_pagos", return_value=vista), patch(
+            "pos_uniformes.services.nomina_service.detalle_del_dia",
+            return_value=["⭐ 12 comisiones en 5 ventas", "Entró en el pago del viernes 4 de sep ($1,324.00)"],
+        ) as detalle:
+            dlg.scan_input.setText("EMP:VEND-2")
+            dlg.scan_input.returnPressed.emit()
+        detalle.assert_called_once()
+        self.assertEqual(detalle.call_args.args[1:], ("VEND-2", date(2026, 9, 2), HOY))
+        textos = "\n".join(w.text() for w in dlg.pago_box.findChildren(QLabel))
+        self.assertIn("El miércoles 2 de septiembre", textos)
+        self.assertIn("12 comisiones en 5 ventas", textos)
+        self.assertIn("TOTAL HOY", textos)     # lo de hoy sigue saliendo
+        dlg._timer_ocultar.stop()
+
+
 if __name__ == "__main__":
     unittest.main()

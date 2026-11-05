@@ -725,6 +725,18 @@ def chips_calendario_mes(session, year: int, month: int, hoy: date) -> dict[date
         proximo = fecha_proximo_pago(horario, hoy)
         if proximo is not None and proximo not in horario.eventos:
             _agregar(proximo, PAGO, code)
+        # Y los que siguen: antes solo se pintaba el PRÓXIMO, así que un mes
+        # futuro salía sin un solo día de pago (Daniel, 2026-11-05).
+        # Solo de quien sigue en la tienda: una empleada de baja conserva su
+        # horario y saldría cobrando cada semana para siempre.
+        if proximo is not None and (not nombres or str(code).upper() in nombres):
+            ciclo = horario.ciclo_dias_pago if (not horario.por_dia and horario.ciclo_dias_pago > 0) else 7
+            fin_de_mes = date(year + (month == 12), month % 12 + 1, 1) - timedelta(days=1)
+            siguiente = proximo + timedelta(days=ciclo)
+            while siguiente <= fin_de_mes:
+                if siguiente > hoy and siguiente not in horario.eventos:
+                    _agregar(siguiente, PAGO, code)
+                siguiente += timedelta(days=ciclo)
     return resultado
 
 

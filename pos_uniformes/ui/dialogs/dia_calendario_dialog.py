@@ -29,7 +29,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from pos_uniformes.services.dia_calendario_service import fecha_en_palabras, lineas_pago
+from pos_uniformes.services.dia_calendario_service import DIAS_ES, MESES_ES, fecha_en_palabras, lineas_pago
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +125,10 @@ class DiaCalendarioDialog(QDialog):
         ly.addLayout(fila)
 
         # ── Consulta de pago con gafete ──────────────────────────────────
-        pago_titulo = QLabel("¿Cuánto llevas?  Escanea tu gafete para ver tu pago.")
+        pago_titulo = QLabel(
+            "¿Cuánto llevas?  Escanea tu gafete para ver tu pago." if fecha == self._hoy
+            else "Escanea tu gafete para ver lo de ese día y lo que llevas hoy."
+        )
         pago_titulo.setObjectName("pagoTitulo")
         ly.addWidget(pago_titulo)
         self.scan_input = QLineEdit()
@@ -190,11 +193,16 @@ class DiaCalendarioDialog(QDialog):
             return ResumenDia(fecha=self._fecha)
 
     def _consultar_pagos(self, raw: str):
-        from pos_uniformes.services.dia_calendario_service import vista_de_pagos
+        from pos_uniformes.services.dia_calendario_service import lineas_de_ese_dia, vista_de_pagos
 
         session = self._sesion()
         try:
-            return vista_de_pagos(session, raw, self._hoy)
+            vista = vista_de_pagos(session, raw, self._hoy)
+            # Lo de ESE día va en la misma consulta (misma sesión, mismo gafete).
+            self._de_ese_dia = (
+                lineas_de_ese_dia(session, vista, self._fecha, self._hoy) if vista is not None else []
+            )
+            return vista
         finally:
             session.close()
 
@@ -228,9 +236,33 @@ class DiaCalendarioDialog(QDialog):
                 w.setParent(None)  # desaparece ya, no hasta el siguiente ciclo
                 w.deleteLater()
 
+    def _pintar_ese_dia(self, vista) -> None:
+        """Arriba de «lo que llevas hoy»: lo que pasó o viene el día que se tocó."""
+        de_ese_dia = [(n, ls) for n, ls in getattr(self, "_de_ese_dia", []) if ls]
+        if not de_ese_dia:
+            return
+        if self._fecha == self._hoy:
+            cuando = "Hoy"
+        else:
+            cuando = f"El {DIAS_ES[self._fecha.weekday()]} {self._fecha.day} de {MESES_ES[self._fecha.month - 1]}"
+        enc = QLabel(cuando)
+        enc.setObjectName("pagoTitulo")
+        self.pago_ly.addWidget(enc)
+        for nombre, lineas in de_ese_dia:
+            texto = "\n".join(lineas)
+            if vista.todas:
+                texto = f"{nombre}: " + texto.replace("\n", "\n      ")
+            lab = QLabel(texto)
+            lab.setObjectName("pagoLinea")
+            lab.setWordWrap(True)
+            lab.setTextFormat(Qt.TextFormat.PlainText)
+            self.pago_ly.addWidget(lab)
+        self.ese_dia_texto = "\n".join(f"{n}: " + " | ".join(ls) for n, ls in de_ese_dia)   # para las pruebas
+
     def mostrar_pagos(self, vista) -> None:
         self.error_label.setVisible(False)
         self._limpiar_pago_box()
+        self._pintar_ese_dia(vista)
         if vista.todas:
             enc = QLabel(f"Pagos pendientes de todas (gafete de {vista.quien})")
             enc.setObjectName("pagoTitulo")
