@@ -112,7 +112,7 @@ class LabelGeneratorTests(unittest.TestCase):
         ropa = _con(_build_variant(product_name="Conjunto Pijama de Niño", talla="Infantil", price="159.00"))
         with tempfile.TemporaryDirectory() as tmp:
             qr = Path(tmp) / "qr.png"
-            Image.new("1", (324, 324), 1).save(qr)            # QR en blanco: lo que se mide es el texto
+            Image.new("1", (324, 324), 0).save(qr)            # el de archivo (todo negro) NO debe usarse aquí
             for nombre, v in (("u", uniforme), ("r", ropa)):
                 salida = Path(tmp) / f"{nombre}.png"
                 LabelGenerator._render_dk1221(v, qr, salida)
@@ -122,7 +122,12 @@ class LabelGeneratorTests(unittest.TestCase):
                 pie = img.crop((0, QR_SIZE_DK1221 + 5, 202, 202))
                 self.assertGreater(columna.histogram()[0], 250, nombre)     # talla / precio, grande
                 self.assertGreater(pie.histogram()[0], 600, nombre)         # el nombre en negrita
-                self.assertEqual(img.crop((0, 0, QR_SIZE_DK1221 + 2, QR_SIZE_DK1221 + 2)).histogram()[0], 0, nombre)  # nada pisa el QR
+                # El QR es el del SKU, limpio: sin ícono al centro y sin que nada lo pise.
+                from pos_uniformes.utils.qr_generator import QrGenerator
+
+                limpio = QrGenerator._build_qr_image("SKU000001").convert("1").resize(
+                    (QR_SIZE_DK1221, QR_SIZE_DK1221), Image.Resampling.NEAREST)
+                self.assertEqual(img.crop((2, 2, 2 + QR_SIZE_DK1221, 2 + QR_SIZE_DK1221)).tobytes(), limpio.tobytes(), nombre)
 
     def test_se_pintan_del_tamano_de_siempre(self) -> None:
         import tempfile

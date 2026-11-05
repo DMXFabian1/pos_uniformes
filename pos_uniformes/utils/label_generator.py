@@ -372,13 +372,17 @@ class LabelGenerator:
         El QR baja de 180 a 135 puntos: es de 21 módulos (27 con su borde), así
         que 135 son 5 puntos EXACTOS por módulo —0.42 mm, con corrección de
         errores alta— y se escala sin suavizar para que cada módulo quede
-        cuadrado. Achicarlo «al tanteo» dejaba módulos disparejos.
+        cuadrado. Achicarlo «al tanteo» dejaba módulos disparejos. Va SIN el
+        ícono del centro: toda la corrección de errores queda para el lector.
         """
         size = DK1221_SIZE
         label_image = Image.new("1", (size, size), 1)
         draw = ImageDraw.Draw(label_image)
         qr_lado = QR_SIZE_DK1221
-        qr_image = Image.open(qr_path).convert("1").resize((qr_lado, qr_lado), Image.Resampling.NEAREST)
+        # Sin el ícono del centro (Daniel, 2026-11-05): aquí mide 2 mm y no se
+        # distingue, y sí le quita al lector la corrección de errores que hace
+        # falta para una etiqueta arrugada o rayada. La Label y la tira lo conservan.
+        qr_image = cls._qr_sin_icono(variante, qr_path).resize((qr_lado, qr_lado), Image.Resampling.NEAREST)
         qr_x, qr_y = 2, 2
         label_image.paste(qr_image, (qr_x, qr_y))
 
@@ -432,6 +436,14 @@ class LabelGenerator:
             y += paso
         output_path.parent.mkdir(parents=True, exist_ok=True)
         label_image.save(output_path, "PNG")
+
+    @staticmethod
+    def _qr_sin_icono(variante: Variante, qr_path: Path) -> Image.Image:
+        """El QR limpio del SKU. Si no se pudiera generar, el de archivo (con ícono)."""
+        try:
+            return QrGenerator._build_qr_image(str(variante.sku)).convert("1")
+        except Exception:  # noqa: BLE001 — una etiqueta con ícono es mejor que ninguna
+            return Image.open(qr_path).convert("1")
 
     @classmethod
     def small_content(cls, variante: Variante, *, show_price: bool | None = None) -> SmallLabelContent:
