@@ -7,7 +7,7 @@ y último movimiento; un botón por fila cambia el estado. Nada se borra.
 from __future__ import annotations
 
 import logging
-from datetime import date
+from datetime import date, timedelta
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
@@ -175,6 +175,8 @@ class HorarioDialog(QDialog):
                 horario = cargar_horario(session, codigo)
         except Exception:  # noqa: BLE001
             logger.exception("Horario: no se pudo cargar")
+        self._horario_cargado = horario
+        self._nombre = nombre
 
         self.modo = QComboBox()
         self.modo.addItem("Semana completa (sueldo fijo, un descanso)", MODO_SEMANA)
@@ -268,22 +270,25 @@ class HorarioDialog(QDialog):
             return
         q = self.ultimo_pago.date()
         fecha = None if self.sin_pago.isChecked() else _date(q.year(), q.month(), q.day())
-        try:
-            from pos_uniformes.database.connection import get_session
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.ui.dialogs.calendario_empleadas_dialog import guardar_cambio_de_descanso
 
-            with get_session() as session:
-                guardar_horario(
-                    session,
-                    self._codigo,
-                    descanso_weekday=self.descanso.currentData(),
-                    ciclo_dias_pago=7,
-                    modo_pago=modo,
-                    dias_trabajo=dias,
-                    fecha_ultimo_pago=fecha,
-                    actualizar_ultimo_pago=True,
-                )
-        except Exception:  # noqa: BLE001
-            logger.exception("Horario: no se pudo guardar")
-            QMessageBox.warning(self, "No se guardó", "Inténtalo otra vez.")
+        # Si cambió el día fijo, pregunta desde cuándo: los días de antes no se
+        # tocan (2026-11-05).
+        antes = self._horario_cargado
+        if not guardar_cambio_de_descanso(
+            self, get_session,
+            code=self._codigo,
+            nombre=self._nombre,
+            viejo=antes.descanso_weekday if antes is not None else None,
+            nuevo=self.descanso.currentData(),
+            minimo=(antes.descanso_desde + timedelta(days=1)) if (antes is not None and antes.descanso_desde) else None,
+            creado_por="VEND-1",
+            ciclo_dias_pago=7,
+            modo_pago=modo,
+            dias_trabajo=dias,
+            fecha_ultimo_pago=fecha,
+            actualizar_ultimo_pago=True,
+        ):
             return
         self.accept()

@@ -184,6 +184,127 @@ class _CalendarioPintado(QCalendarWidget):
         painter.restore()
 
 
+SIEMPRE = "siempre"     # respuesta de `preguntar_desde_cuando`: corregir toda la historia
+
+
+def texto_del_cambio(viejo: int | None, nuevo: int | None, desde: date) -> str:
+    """«Hasta el domingo 8 de nov sigue descansando en sábado. Desde el lunes 9 de nov descansa en lunes.»"""
+    def dia(w: int | None) -> str:
+        return "sin descanso fijo" if w is None else f"descansando en {WEEKDAY_NAMES[w]}"
+
+    def desde_txt(w: int | None) -> str:
+        return "ya no tiene descanso fijo" if w is None else f"descansa en {WEEKDAY_NAMES[w]}"
+
+    vispera = desde - timedelta(days=1)
+    return (f"Hasta el {_fecha_corta(vispera)} sigue {dia(viejo)}.\n"
+            f"Desde el {_fecha_corta(desde)} {desde_txt(nuevo)}.")
+
+
+def lunes_siguiente(hoy: date) -> date:
+    """El lunes de la semana que viene: un cambio de descanso se acomoda mejor
+    con la semana entera que partiéndola a la mitad."""
+    return hoy + timedelta(days=7 - hoy.weekday())
+
+
+def preguntar_desde_cuando(
+    parent: QWidget | None, *, nombre: str, viejo: int | None, nuevo: int | None,
+    minimo: date | None = None, hoy: date | None = None,
+):
+    """¿Desde qué día vale el descanso nuevo? Devuelve la fecha, `SIEMPRE` si
+    fue un error de captura (se corrige toda la historia) o None si canceló.
+
+    Antes el cambio no preguntaba nada y repintaba el pasado: los sábados que
+    Stayce sí descansó se habrían vuelto días trabajados (2026-11-05)."""
+    from PyQt6.QtWidgets import QCheckBox, QDialogButtonBox
+
+    hoy = hoy or date.today()
+    propuesta = lunes_siguiente(hoy)
+    if minimo is not None and propuesta < minimo:
+        propuesta = minimo
+    dlg = QDialog(parent)
+    dlg.setWindowTitle("Cambiar el descanso fijo")
+    dlg.setStyleSheet(_ESTILO_DIALOGO)
+    dlg.resize(460, 560)
+    ly = QVBoxLayout(dlg)
+    ly.setContentsMargins(18, 16, 18, 16)
+    ly.setSpacing(10)
+    titulo = QLabel(f"¿Desde qué día cambia el descanso de {nombre}?")
+    titulo.setObjectName("calDiaTitulo")
+    titulo.setWordWrap(True)
+    ly.addWidget(titulo)
+    nota = QLabel("Los días de antes se quedan como estaban; solo cambia de ese día en adelante.")
+    nota.setObjectName("calNota")
+    nota.setWordWrap(True)
+    ly.addWidget(nota)
+    cal = _CalendarioPintado()
+    if minimo is not None:
+        cal.setMinimumDate(QDate(minimo.year, minimo.month, minimo.day))
+    cal.setSelectedDate(QDate(propuesta.year, propuesta.month, propuesta.day))
+    ly.addWidget(cal, 1)
+    resumen = QLabel("")
+    resumen.setObjectName("calOrigen")
+    resumen.setWordWrap(True)
+    resumen.setStyleSheet("font-size: 14px; font-weight: 700; color: #2c2a27;")
+    ly.addWidget(resumen)
+    error = QCheckBox("Fue un error de captura: siempre debió ser así (cambia también el pasado)")
+    error.setStyleSheet("color: #5f564c; font-size: 12px;")
+    ly.addWidget(error)
+
+    def elegida() -> date:
+        q = cal.selectedDate()
+        return date(q.year(), q.month(), q.day())
+
+    def pintar() -> None:
+        cal.setEnabled(not error.isChecked())
+        if error.isChecked():
+            resumen.setText("Se cambia en toda su historia, como si siempre hubiera descansado así.")
+        else:
+            resumen.setText(texto_del_cambio(viejo, nuevo, elegida()))
+
+    cal.selectionChanged.connect(pintar)
+    error.toggled.connect(lambda _v: pintar())
+    pintar()
+    botones = QDialogButtonBox()
+    aceptar = botones.addButton("Cambiar el descanso", QDialogButtonBox.ButtonRole.AcceptRole)
+    aceptar.setObjectName("calPrimario")
+    cancelar = botones.addButton("Cancelar", QDialogButtonBox.ButtonRole.RejectRole)
+    cancelar.setObjectName("calSuave")
+    botones.accepted.connect(dlg.accept)
+    botones.rejected.connect(dlg.reject)
+    ly.addWidget(botones)
+    dlg.resumen = resumen          # para las pruebas
+    dlg.calendario = cal
+    dlg.error_de_captura = error
+    if dlg.exec() != QDialog.DialogCode.Accepted:
+        return None
+    return SIEMPRE if error.isChecked() else elegida()
+
+
+def guardar_cambio_de_descanso(
+    parent: QWidget | None, session_factory, *, code: str, nombre: str, viejo: int | None, nuevo: int | None,
+    minimo: date | None, creado_por: str, **otros,
+) -> bool:
+    """Guarda el horario; si el descanso fijo cambió, primero pregunta desde
+    cuándo. False si canceló o no se pudo. `otros` va tal cual a `guardar_horario`."""
+    desde = None
+    if viejo is not None and nuevo != viejo:
+        respuesta = preguntar_desde_cuando(parent, nombre=nombre, viejo=viejo, nuevo=nuevo, minimo=minimo)
+        if respuesta is None:
+            return False
+        desde = None if respuesta == SIEMPRE else respuesta
+    try:
+        with session_factory() as session:
+            guardar_horario(session, code, descanso_weekday=nuevo, descanso_desde=desde, creado_por=creado_por, **otros)
+        return True
+    except ValueError as exc:
+        QMessageBox.warning(parent, "Descanso fijo", str(exc))
+        return False
+    except Exception:  # noqa: BLE001
+        logger.exception("Horario: no se pudo guardar")
+        QMessageBox.warning(parent, "Sin conexión", "No se pudo guardar. Revisa la conexión.")
+        return False
+
+
 class CalendarioEmpleadasDialog(QDialog):
     def __init__(
         self,
@@ -504,6 +625,12 @@ class CalendarioEmpleadasDialog(QDialog):
                 else self._horario.descanso_weekday + 1
             )
             self.spin_ciclo.setValue(self._horario.ciclo_dias_pago)
+            desde = self._horario.descanso_desde
+            self.combo_descanso.setToolTip(
+                "" if desde is None else
+                f"Desde el {_fecha_corta(desde)}. Antes descansaba en "
+                f"{'ningún día fijo' if self._horario.descansos_anteriores[-1][1] is None else WEEKDAY_NAMES[self._horario.descansos_anteriores[-1][1]]}."
+            )
 
     def _habilitar_acciones(self, on: bool) -> None:
         # Cada modo (empleada/encargado/dueño) tiene su propio juego de
@@ -857,17 +984,23 @@ class CalendarioEmpleadasDialog(QDialog):
         dlg.exec()
 
     def _guardar_config(self) -> None:
-        descanso = self.combo_descanso.currentData()
-        ciclo = int(self.spin_ciclo.value())
-        if self._con_sesion(
-            lambda s: guardar_horario(
-                s,
-                self._codigo_activo(),
-                descanso_weekday=descanso,
-                ciclo_dias_pago=ciclo,
-            )
+        from pos_uniformes.database.connection import get_session
+
+        h = self._horario
+        if guardar_cambio_de_descanso(
+            self, get_session,
+            code=self._codigo_activo(),
+            nombre=_nombre_de(self._codigo_activo(), corto=True),
+            viejo=h.descanso_weekday if h is not None else None,
+            nuevo=self.combo_descanso.currentData(),
+            minimo=(h.descanso_desde + timedelta(days=1)) if (h is not None and h.descanso_desde) else None,
+            creado_por=self._code,
+            ciclo_dias_pago=int(self.spin_ciclo.value()),
         ):
             self._recargar()
+        elif h is not None:
+            # Canceló: el combo vuelve a decir lo que de verdad está guardado.
+            self.combo_descanso.setCurrentIndex(0 if h.descanso_weekday is None else h.descanso_weekday + 1)
 
 
 _MESES_ES = (

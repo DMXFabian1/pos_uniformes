@@ -49,6 +49,27 @@ class HorarioEmpleada:
     # puede tener pago Y otra marca (le pagaron el día que descansó): en un
     # solo dict uno pisaba al otro según el orden en que llegaran de la base.
     pagos: set[date] = field(default_factory=set)
+    # Descansos fijos que tuvo antes: [(hasta, weekday)], del más viejo al más
+    # nuevo. `descanso_weekday` es el de ahora y vale desde el día siguiente al
+    # último `hasta`. Vacío = siempre ha sido el de ahora.
+    descansos_anteriores: list[tuple[date, int | None]] = field(default_factory=list)
+
+    def descanso_fijo_en(self, dia: date) -> int | None:
+        """Qué día de la semana descansaba fijo EN ESA FECHA.
+
+        Cambiar el descanso de sábado a lunes solo afecta de ahí en adelante:
+        los sábados de antes siguen siendo descansos (Daniel, 2026-11-05)."""
+        for hasta, weekday in self.descansos_anteriores:
+            if dia <= hasta:
+                return weekday
+        return self.descanso_weekday
+
+    @property
+    def descanso_desde(self) -> date | None:
+        """Desde qué día vale el descanso fijo de ahora (None = desde siempre)."""
+        if not self.descansos_anteriores:
+            return None
+        return self.descansos_anteriores[-1][0] + timedelta(days=1)
 
     @property
     def por_dia(self) -> bool:
@@ -87,7 +108,8 @@ def estado_del_dia(horario: HorarioEmpleada, dia: date) -> str:
         return PAGO if dia in horario.pagos else TRABAJO
     if horario.por_dia:
         return TRABAJO if dia.weekday() in horario.dias_trabajo else DESCANSO
-    if horario.descanso_weekday is not None and dia.weekday() == horario.descanso_weekday:
+    fijo = horario.descanso_fijo_en(dia)
+    if fijo is not None and dia.weekday() == fijo:
         return DESCANSO
     return TRABAJO
 
@@ -101,7 +123,8 @@ def es_descanso_efectivo(horario: HorarioEmpleada, dia: date) -> bool:
     if estado == DESCANSO:
         return True
     if estado == PAGO and horario.eventos.get(dia) == PAGO and not horario.por_dia:
-        return horario.descanso_weekday is not None and dia.weekday() == horario.descanso_weekday
+        fijo = horario.descanso_fijo_en(dia)
+        return fijo is not None and dia.weekday() == fijo
     return False
 
 
@@ -176,16 +199,19 @@ def dias_extra_en_rango(horario: HorarioEmpleada, desde: date, hasta: date) -> i
     """Días que trabajó DE MÁS: vino en su descanso fijo sin haber descansado
     otro día de esa semana. Si el descanso se movió (martes descanso, sábado
     trabaja), ese sábado no es de más: solo compensa el martes."""
-    if horario.por_dia or horario.descanso_weekday is None:
+    if horario.por_dia or (horario.descanso_weekday is None and not horario.descansos_anteriores):
         return 0
     por_semana: dict[date, list[int]] = defaultdict(lambda: [0, 0])   # [trabajó el fijo, descansó otro día]
     for f, t in horario.eventos.items():
         if not desde <= f <= hasta:
             continue
+        fijo = horario.descanso_fijo_en(f)          # el de ESA fecha, no el de hoy
+        if fijo is None:
+            continue
         semana = _semana_de(f)[0]
-        if t == TRABAJO and f.weekday() == horario.descanso_weekday:
+        if t == TRABAJO and f.weekday() == fijo:
             por_semana[semana][0] += 1
-        elif t == DESCANSO and f.weekday() != horario.descanso_weekday:
+        elif t == DESCANSO and f.weekday() != fijo:
             por_semana[semana][1] += 1
     return sum(max(0, fijo - movidos) for fijo, movidos in por_semana.values())
 
@@ -258,7 +284,26 @@ def cargar_horario(session, employee_code: str) -> HorarioEmpleada:
             horario.eventos.setdefault(ev.fecha, PAGO)
         else:
             horario.eventos[ev.fecha] = ev.tipo
+    horario.descansos_anteriores = _descansos_anteriores(session, code)
     return horario
+
+
+def _descansos_anteriores(session, code: str) -> list[tuple[date, int | None]]:
+    """[(hasta, weekday)] del más viejo al más nuevo. Vacío si la base todavía
+    no tiene la tabla (un kiosko que abrió antes de la migración)."""
+    from pos_uniformes.database.models import EmpleadaDescansoAnterior
+
+    try:
+        with session.begin_nested():
+            filas = (
+                session.query(EmpleadaDescansoAnterior)
+                .filter(EmpleadaDescansoAnterior.employee_code == code)
+                .order_by(EmpleadaDescansoAnterior.hasta)
+                .all()
+            )
+        return [(f.hasta, f.weekday) for f in filas]
+    except Exception:  # noqa: BLE001 — sin la tabla, como antes
+        return []
 
 
 def guardar_horario(
@@ -271,16 +316,39 @@ def guardar_horario(
     dias_trabajo: list[int] | None = None,
     fecha_ultimo_pago: date | None = None,
     actualizar_ultimo_pago: bool = False,
+    descanso_desde: date | None = None,
+    creado_por: str = "",
 ) -> None:
     """Guarda el patrón. `modo_pago`/`dias_trabajo` solo cambian si se pasan;
-    `fecha_ultimo_pago` solo si `actualizar_ultimo_pago=True` (puede ser None)."""
-    from pos_uniformes.database.models import EmpleadaHorario
+    `fecha_ultimo_pago` solo si `actualizar_ultimo_pago=True` (puede ser None).
+
+    `descanso_desde`: si el descanso fijo CAMBIA, desde qué día vale el nuevo.
+    El anterior queda guardado hasta la víspera y los días de antes no se
+    tocan. Sin él, el cambio vale para toda la historia (es lo que hacía
+    siempre, y sirve para corregir uno mal capturado)."""
+    from pos_uniformes.database.models import EmpleadaDescansoAnterior, EmpleadaHorario
 
     code = str(employee_code).strip().upper()
     fila = session.get(EmpleadaHorario, code)
     if fila is None:
         fila = EmpleadaHorario(employee_code=code)
         session.add(fila)
+    elif descanso_desde is not None and fila.descanso_weekday != descanso_weekday:
+        ultimo = (
+            session.query(EmpleadaDescansoAnterior)
+            .filter(EmpleadaDescansoAnterior.employee_code == code)
+            .order_by(EmpleadaDescansoAnterior.hasta.desc())
+            .first()
+        )
+        if ultimo is not None and descanso_desde <= ultimo.hasta + timedelta(days=1):
+            raise ValueError(
+                f"Su descanso ya cambió el {ultimo.hasta + timedelta(days=1):%d/%m/%Y}; "
+                "el cambio nuevo tiene que empezar después de ese día."
+            )
+        session.add(EmpleadaDescansoAnterior(
+            employee_code=code, weekday=fila.descanso_weekday,
+            hasta=descanso_desde - timedelta(days=1), creado_por=str(creado_por or "")[:40],
+        ))
     fila.descanso_weekday = descanso_weekday
     fila.ciclo_dias_pago = int(ciclo_dias_pago)
     if modo_pago is not None:

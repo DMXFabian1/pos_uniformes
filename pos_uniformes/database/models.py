@@ -2238,6 +2238,28 @@ class EmpleadaHorario(Base):
     )
 
 
+class EmpleadaDescansoAnterior(Base):
+    """El descanso fijo que una empleada TENÍA, y hasta qué día.
+
+    `empleada_horario.descanso_weekday` es el de ahora. Cuando cambia (Stayce
+    pasó de sábado a lunes, 2026-11-05), sin esto el cambio repintaba toda su
+    historia: cada sábado pasado se volvía día trabajado y cada lunes pasado,
+    descanso. Aquí queda «hasta el día `hasta` descansaba en `weekday`», y cada
+    fecha consulta cuál le tocaba. Sin filas, todo es como antes.
+    """
+
+    __tablename__ = "empleada_descanso_anterior"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_code: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    weekday: Mapped[int | None] = mapped_column(Integer)        # 0=lunes .. 6=domingo; None = sin descanso fijo
+    hasta: Mapped[date] = mapped_column(Date, nullable=False)   # último día en que valió
+    creado_por: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class EmpleadaEvento(Base):
     """Excepciones y hechos del calendario de empleadas.
 
