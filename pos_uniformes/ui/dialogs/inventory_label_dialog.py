@@ -341,19 +341,17 @@ def build_inventory_label_dialog(
         header.setText(
             f"{context.sku} | {context.product_name} | talla {context.talla} | color {context.color}"
         )
-        # El botón arranca diciendo lo que de verdad va a salir: prendido en la
-        # ropa normal, apagado en un uniforme (que no lleva precio). Prenderlo
-        # en un uniforme sí lo pone (2026-11-05: antes salía marcado y no hacía nada).
-        con_precio = bool(getattr(context, "precio_por_defecto", True))
-        estado["price"] = con_precio
+        # En un uniforme el precio no va en la etiqueta (cambia; para eso está
+        # el QR), así que la opción ni aparece. Antes salía marcada y no hacía
+        # nada (Daniel, 2026-11-05). En la ropa normal vuelve, prendida.
+        lleva_precio = bool(getattr(context, "precio_por_defecto", True))
+        estado["price"] = lleva_precio
         price_button.blockSignals(True)
-        price_button.setChecked(con_precio)
+        price_button.setChecked(lleva_precio)
         price_button.blockSignals(False)
-        price_button.setText("✓  💲 Mostrar precio" if con_precio else "💲 Mostrar precio")
-        price_button.setToolTip(
-            "Incluir o quitar el precio de venta en la etiqueta impresa" if con_precio
-            else "Los uniformes salen sin precio. Márcalo si quieres que ESTA etiqueta sí lo lleve."
-        )
+        price_button.setText("✓  💲 Mostrar precio" if lleva_precio else "💲 Mostrar precio")
+        price_button.setVisible(lleva_precio)
+        precio_title.setVisible(lleva_precio)
 
     def refresh_navigation_buttons() -> None:
         current_position = int(dialog_state["current_index"])

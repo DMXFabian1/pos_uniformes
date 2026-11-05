@@ -120,8 +120,9 @@ class InventoryLabelDialogTouchTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
 
-    def test_en_un_uniforme_el_precio_arranca_apagado_y_prenderlo_si_lo_pone(self) -> None:
-        """El botón salía marcado en los uniformes y no hacía nada (2026-11-05)."""
+    def test_en_un_uniforme_ni_aparece_la_opcion_de_precio(self) -> None:
+        """El precio de un uniforme cambia; para eso está el QR. El botón salía
+        marcado y no hacía nada: ahora no se ofrece (Daniel, 2026-11-05)."""
         host = _DialogHost()
         render_calls: list[tuple[str, int, bool | None]] = []
         captured: dict[str, QDialog] = {}
@@ -148,16 +149,14 @@ class InventoryLabelDialogTouchTests(unittest.TestCase):
                 )
             dialog = captured["dialog"]
             precio = next(b for b in dialog.findChildren(QPushButton) if "Mostrar precio" in b.text())
-            self.assertFalse(precio.isChecked())                       # dice la verdad: sin precio
-            self.assertEqual(precio.text(), "💲 Mostrar precio")
-            self.assertIn("uniformes", precio.toolTip())
+            titulo = next(lbl for lbl in dialog.findChildren(QLabel) if lbl.text() == "Precio en la etiqueta")
+            self.assertTrue(precio.isHidden())                         # ni el botón…
+            self.assertTrue(titulo.isHidden())                         # …ni su título
             self.assertEqual(render_calls[-1], ("standard", 1, False))
-            precio.click()                                             # y prenderlo SÍ lo pide
-            self.assertEqual(render_calls[-1], ("standard", 1, True))
-            self.assertEqual(precio.text(), "✓  💲 Mostrar precio")
-            # Al pasar a una prenda de ropa normal, el botón vuelve a lo suyo: prendido.
-            siguiente = next(b for b in dialog.findChildren(QPushButton) if b.text() == "Siguiente")
-            siguiente.click()
+            # Al pasar a una prenda de ropa normal vuelve, prendido.
+            next(b for b in dialog.findChildren(QPushButton) if b.text() == "Siguiente").click()
+            self.assertFalse(precio.isHidden())
+            self.assertFalse(titulo.isHidden())
             self.assertTrue(precio.isChecked())
             self.assertEqual(render_calls[-1], ("standard", 1, True))
 

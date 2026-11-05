@@ -18,10 +18,10 @@ class InventoryLabelContext:
     product_name: str
     talla: str
     color: str
-    #: Si la etiqueta de esta prenda lleva precio sin que nadie lo pida: la
-    #: ropa normal sí, los uniformes no. Con esto el botón «Mostrar precio»
-    #: arranca diciendo la verdad (antes salía marcado en un uniforme y no
-    #: hacía nada, 2026-11-05).
+    #: Si la etiqueta de esta prenda puede llevar precio: la ropa normal sí,
+    #: los uniformes nunca (su precio cambia; para eso está el QR). Con esto la
+    #: ventana ni siquiera ofrece «Mostrar precio» en un uniforme — antes salía
+    #: marcado y no hacía nada (Daniel, 2026-11-05).
     precio_por_defecto: bool = True
 
 

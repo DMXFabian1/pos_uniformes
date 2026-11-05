@@ -58,7 +58,7 @@ class SmallLabelContent:
     encabezado: str     # la escuela (y el color), en chico; vacío en ropa normal
     nombre: str         # en negrita
     talla: str          # en caja negra; vacío si es unitalla en ropa normal
-    precio: str         # "$179"; vacío en uniformes, salvo que se pida
+    precio: str         # "$179"; siempre vacío en uniformes
     familia: str = "ropa_normal"
 
 
@@ -198,10 +198,10 @@ class LabelGenerator:
         """Qué dice la etiqueta Label, separado de cómo se pinta (para probarlo)."""
         producto = variante.producto
         profile = resolve_inventory_label_profile(variante)
-        # None = lo de siempre (la ropa normal lleva precio, el uniforme no).
-        # True o False = lo que se pidió, también en un uniforme: antes el
-        # botón «Mostrar precio» no hacía nada ahí (2026-11-05).
-        price_visible = profile.show_price if show_price is None else bool(show_price)
+        # Un uniforme NUNCA lleva precio en la etiqueta, ni pidiéndolo: su
+        # precio cambia y la etiqueta se queda pegada; para eso está el QR
+        # (Daniel, 2026-11-05). En la ropa normal sí, salvo que se apague.
+        price_visible = profile.show_price and (show_price is None or show_price)
         escuela = getattr(getattr(producto, "escuela", None), "nombre", "") or ""
         nivel = getattr(getattr(producto, "nivel_educativo", None), "nombre", "") or ""
         marca = getattr(getattr(producto, "marca", None), "nombre", "") or ""
@@ -218,8 +218,7 @@ class LabelGenerator:
             encabezado = " · ".join(p for p in (nivel, escuela) if p).upper()
             # La escuela ya está arriba: «Pants 3pz Deportivo Vicente Guerrero» → «Pants 3pz Deportivo».
             nombre = cls._sin_escuela(titulo, escuela)
-            precio = cls._precio_corto(variante) if price_visible else ""
-            return StandardLabelContent("uniforme", encabezado, nombre, talla, color, precio, str(variante.sku))
+            return StandardLabelContent("uniforme", encabezado, nombre, talla, color, "", str(variante.sku))
 
         sin_talla = talla.casefold() in {"", "unitalla", "sin talla", "única", "unica"}
         partes = [marca if marca.casefold() not in {"", "sin marca"} else "", color, "Unitalla" if talla and sin_talla else ""]
@@ -427,8 +426,7 @@ class LabelGenerator:
         if c.precio:
             cifra = c.precio.lstrip("$")
             f_peso = cls._load_font(24, bold=True)
-            talla_txt = f"Talla {c.talla}" if (c.talla and c.familia == "uniforme") else c.talla
-            f_talla = cls._fit_font(draw, talla_txt, col_w, base_size=24, min_size=12, bold=True) if c.talla else None
+            f_talla = cls._fit_font(draw, c.talla, col_w, base_size=24, min_size=12, bold=True) if c.talla else None
             alto_talla = (cls._line_height(f_talla) + 8) if f_talla else 0
             f_cifra = cls._fit_font(draw, cifra, col_w, base_size=62, min_size=16, bold=True)
             caja_cifra = draw.textbbox((0, 0), cifra, font=f_cifra)
@@ -437,7 +435,7 @@ class LabelGenerator:
             y += centrado("$", f_peso, y) + 4
             y += centrado(cifra, f_cifra, y) + 8
             if f_talla:
-                centrado(cls._recortar(draw, talla_txt, f_talla, col_w), f_talla, y)
+                centrado(cls._recortar(draw, c.talla, f_talla, col_w), f_talla, y)
         elif c.talla:
             f_talla = cls._fit_font(draw, c.talla, col_w, base_size=84, min_size=10, bold=True)
             if getattr(f_talla, "size", 10) >= 22:
