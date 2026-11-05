@@ -199,6 +199,25 @@ class EtiquetaLabelTests(unittest.TestCase):
         self.assertEqual(c.nombre, "Pants 3pz Deportivo")          # la escuela ya va arriba
         self.assertEqual((c.talla, c.color, c.precio), ("6", "Vino", ""))
 
+    def test_la_escuela_se_quita_del_nombre_aunque_venga_con_parentesis_o_acentos(self) -> None:
+        """«Álvaro Obregón (El Carretón)» está en sus prendas sin paréntesis: la
+        primera etiqueta de prueba salió con la escuela repetida (2026-11-05)."""
+        v = _con(_build_variant(
+            product_name="Suéter Cuello V H Azul Marino Álvaro Obregón El Carretón", talla="4",
+            school_name="Álvaro Obregón (El Carretón)", level_name="Primaria",
+        ), color="Azul Marino")
+        c = LabelGenerator.standard_content(v)
+        self.assertEqual(c.encabezado, "PRIMARIA · ÁLVARO OBREGÓN (EL CARRETÓN)")
+        self.assertEqual(c.nombre, "Suéter Cuello V H Azul Marino")
+        self.assertEqual(LabelGenerator._sin_escuela("Falda BENITO JUAREZ Escocesa", "Benito Juárez"), "Falda Escocesa")
+        self.assertEqual(LabelGenerator._sin_escuela("Benito Juárez", "Benito Juárez"), "Benito Juárez")   # nunca queda vacío
+        self.assertEqual(LabelGenerator._sin_escuela("Playera Polo", "Patria"), "Playera Polo")
+        # La talla no se confunde con el final del número de la escuela.
+        self.assertEqual(LabelGenerator._clean_name("Pants 2pz Deportivo Telesecundaria 512", "12"), "Pants 2pz Deportivo Telesecundaria 512")
+        self.assertEqual(LabelGenerator._clean_name("Playera Polo 12", "12"), "Playera Polo")
+        # Hay prendas con la escuela escrita dos veces.
+        self.assertEqual(LabelGenerator._sin_escuela("Pants 2pz Deportivo Estv 154 ESTV 154", "ESTV 154"), "Pants 2pz Deportivo")
+
     def test_uniforme_nunca_ensena_precio_aunque_se_pida(self) -> None:
         v = _con(_build_variant(product_name="Falda Escocesa", talla="10", school_name="Benito Juárez"))
         self.assertEqual(LabelGenerator.standard_content(v, show_price=True).precio, "")

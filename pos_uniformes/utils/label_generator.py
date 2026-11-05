@@ -224,14 +224,35 @@ class LabelGenerator:
 
     @staticmethod
     def _sin_escuela(titulo: str, escuela: str) -> str:
-        escuela = " ".join(str(escuela or "").split())
-        if not escuela:
+        """Quita del nombre de la prenda el nombre de su escuela, que ya va arriba.
+
+        Se compara palabra por palabra, sin acentos, mayúsculas ni signos: la
+        escuela «Álvaro Obregón (El Carretón)» aparece en sus prendas como
+        «…Álvaro Obregón El Carretón», sin paréntesis, y comparando el texto
+        tal cual no se encontraba — la etiqueta repetía la escuela (2026-11-05).
+        """
+        import re
+        import unicodedata
+
+        def llave(palabra: str) -> str:
+            sin = unicodedata.normalize("NFKD", palabra)
+            return re.sub(r"[^a-z0-9]", "", "".join(c for c in sin if not unicodedata.combining(c)).casefold())
+
+        palabras = str(titulo or "").split()
+        llaves = [llave(p) for p in palabras]
+        buscadas = [k for k in (llave(p) for p in str(escuela or "").split()) if k]
+        if not buscadas or len(buscadas) > len(palabras):
             return titulo
-        bajo = titulo.casefold()
-        i = bajo.find(escuela.casefold())
-        if i < 0:
-            return titulo
-        limpio = " ".join((titulo[:i] + titulo[i + len(escuela):]).split()).strip(" -|·")
+        # Todas las apariciones: hay prendas con la escuela escrita dos veces
+        # («Pants 2pz Deportivo Estv 154 ESTV 154»).
+        i = len(palabras) - len(buscadas)
+        while i >= 0:
+            if llaves[i:i + len(buscadas)] == buscadas:
+                del palabras[i:i + len(buscadas)], llaves[i:i + len(buscadas)]
+                i = min(i, len(palabras) - len(buscadas))
+            else:
+                i -= 1
+        limpio = " ".join(palabras).strip(" -|·")
         return limpio or titulo
 
     @staticmethod
@@ -562,10 +583,12 @@ class LabelGenerator:
             cleaned = cleaned[: lowered.index("talla")].strip()
         size_value = str(talla or "").strip()
         if size_value:
+            # La talla solo se quita si es una palabra aparte: «Telesecundaria
+            # 512» en talla 12 quedaba «Telesecundaria 5» (2026-11-05).
             suffixes = [
                 f"| {size_value}",
                 f"- {size_value}",
-                size_value,
+                f" {size_value}",
             ]
             for suffix in suffixes:
                 if cleaned.endswith(suffix):
