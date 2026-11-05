@@ -246,9 +246,36 @@ class EtiquetaLabelTests(unittest.TestCase):
         # Hay prendas con la escuela escrita dos veces.
         self.assertEqual(LabelGenerator._sin_escuela("Pants 2pz Deportivo Estv 154 ESTV 154", "ESTV 154"), "Pants 2pz Deportivo")
 
-    def test_uniforme_nunca_ensena_precio_aunque_se_pida(self) -> None:
-        v = _con(_build_variant(product_name="Falda Escocesa", talla="10", school_name="Benito Juárez"))
-        self.assertEqual(LabelGenerator.standard_content(v, show_price=True).precio, "")
+    def test_uniforme_sin_precio_salvo_que_se_pida(self) -> None:
+        """«Mostrar precio» en un uniforme no hacía nada (2026-11-05). Sin
+        pedirlo sigue sin precio; pidiéndolo, lo lleva en los tres tamaños."""
+        v = _con(_build_variant(product_name="Falda Escocesa Benito Juárez", talla="10", school_name="Benito Juárez", price="585.00"))
+        self.assertEqual(LabelGenerator.standard_content(v).precio, "")                       # lo de siempre
+        self.assertEqual(LabelGenerator.standard_content(v, show_price=False).precio, "")
+        pedido = LabelGenerator.standard_content(v, show_price=True)
+        self.assertEqual((pedido.precio, pedido.talla, pedido.nombre), ("$585", "10", "Falda Escocesa"))
+        chica = LabelGenerator.small_content(v, show_price=True)
+        self.assertEqual((chica.precio, chica.talla, chica.familia, chica.encabezado), ("$585", "10", "uniforme", "BENITO JUÁREZ"))
+
+    def test_el_uniforme_con_precio_cabe_en_las_tres_etiquetas(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        from PIL import Image
+
+        v = _con(_build_variant(product_name="Pants 3pz Deportivo", talla="16", school_name="Blanca Verónica Soto Martínez Príncipes", price="1249.50"))
+        with tempfile.TemporaryDirectory() as tmp:
+            qr = Path(tmp) / "qr.png"
+            Image.new("1", (324, 324), 1).save(qr)
+            for modo, pinta, tam in (("standard", LabelGenerator._render_standard, (992, 271)),
+                                     ("split", LabelGenerator._render_split, (976, 342)),
+                                     ("dk1221", LabelGenerator._render_dk1221, (202, 202))):
+                salida = Path(tmp) / f"{modo}.png"
+                pinta(v, qr, salida, show_price=True)
+                sin = Path(tmp) / f"{modo}_sin.png"
+                pinta(v, qr, sin)
+                self.assertEqual(Image.open(salida).size, tam, modo)
+                self.assertNotEqual(Image.open(salida).tobytes(), Image.open(sin).tobytes(), modo)   # el precio sí se pintó
 
     def test_ropa_normal_precio_claro_y_marca_arriba(self) -> None:
         v = _con(_build_variant(product_name="Conjunto Pijama QS227", talla="Unitalla", price="179.00"),

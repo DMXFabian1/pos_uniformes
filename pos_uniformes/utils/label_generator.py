@@ -58,7 +58,8 @@ class SmallLabelContent:
     encabezado: str     # la escuela (y el color), en chico; vacío en ropa normal
     nombre: str         # en negrita
     talla: str          # en caja negra; vacío si es unitalla en ropa normal
-    precio: str         # "$179"; vacío en uniformes
+    precio: str         # "$179"; vacío en uniformes, salvo que se pida
+    familia: str = "ropa_normal"
 
 
 class LabelGenerator:
@@ -197,7 +198,10 @@ class LabelGenerator:
         """Qué dice la etiqueta Label, separado de cómo se pinta (para probarlo)."""
         producto = variante.producto
         profile = resolve_inventory_label_profile(variante)
-        price_visible = profile.show_price and (show_price is None or show_price)
+        # None = lo de siempre (la ropa normal lleva precio, el uniforme no).
+        # True o False = lo que se pidió, también en un uniforme: antes el
+        # botón «Mostrar precio» no hacía nada ahí (2026-11-05).
+        price_visible = profile.show_price if show_price is None else bool(show_price)
         escuela = getattr(getattr(producto, "escuela", None), "nombre", "") or ""
         nivel = getattr(getattr(producto, "nivel_educativo", None), "nombre", "") or ""
         marca = getattr(getattr(producto, "marca", None), "nombre", "") or ""
@@ -214,7 +218,8 @@ class LabelGenerator:
             encabezado = " · ".join(p for p in (nivel, escuela) if p).upper()
             # La escuela ya está arriba: «Pants 3pz Deportivo Vicente Guerrero» → «Pants 3pz Deportivo».
             nombre = cls._sin_escuela(titulo, escuela)
-            return StandardLabelContent("uniforme", encabezado, nombre, talla, color, "", str(variante.sku))
+            precio = cls._precio_corto(variante) if price_visible else ""
+            return StandardLabelContent("uniforme", encabezado, nombre, talla, color, precio, str(variante.sku))
 
         sin_talla = talla.casefold() in {"", "unitalla", "sin talla", "única", "unica"}
         partes = [marca if marca.casefold() not in {"", "sin marca"} else "", color, "Unitalla" if talla and sin_talla else ""]
@@ -422,7 +427,8 @@ class LabelGenerator:
         if c.precio:
             cifra = c.precio.lstrip("$")
             f_peso = cls._load_font(24, bold=True)
-            f_talla = cls._fit_font(draw, c.talla, col_w, base_size=24, min_size=12, bold=True) if c.talla else None
+            talla_txt = f"Talla {c.talla}" if (c.talla and c.familia == "uniforme") else c.talla
+            f_talla = cls._fit_font(draw, talla_txt, col_w, base_size=24, min_size=12, bold=True) if c.talla else None
             alto_talla = (cls._line_height(f_talla) + 8) if f_talla else 0
             f_cifra = cls._fit_font(draw, cifra, col_w, base_size=62, min_size=16, bold=True)
             caja_cifra = draw.textbbox((0, 0), cifra, font=f_cifra)
@@ -431,7 +437,7 @@ class LabelGenerator:
             y += centrado("$", f_peso, y) + 4
             y += centrado(cifra, f_cifra, y) + 8
             if f_talla:
-                centrado(cls._recortar(draw, c.talla, f_talla, col_w), f_talla, y)
+                centrado(cls._recortar(draw, talla_txt, f_talla, col_w), f_talla, y)
         elif c.talla:
             f_talla = cls._fit_font(draw, c.talla, col_w, base_size=84, min_size=10, bold=True)
             if getattr(f_talla, "size", 10) >= 22:
@@ -451,7 +457,7 @@ class LabelGenerator:
         y0 = qr_lado + aire - 2
         alto = size - y0 - 1
         escuela = getattr(getattr(variante.producto, "escuela", None), "nombre", "") or ""
-        if escuela and not c.precio:
+        if escuela and c.familia == "uniforme":
             f_esc, r_esc = cls._fit_lines(
                 draw, escuela, size - 4, int(alto * 0.46), base_size=21, min_size=13, max_renglones=2, bold=False,
             )
@@ -528,7 +534,7 @@ class LabelGenerator:
         if c.familia == "uniforme":
             escuela = getattr(getattr(variante.producto, "escuela", None), "nombre", "") or ""
             encabezado = " · ".join(p for p in (escuela, c.color) if p).upper()
-            return SmallLabelContent(encabezado, c.nombre, c.talla, "")
+            return SmallLabelContent(encabezado, c.nombre, c.talla, c.precio, "uniforme")
         return SmallLabelContent("", c.nombre, c.talla, c.precio)
 
     @classmethod

@@ -120,6 +120,47 @@ class InventoryLabelDialogTouchTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
 
+    def test_en_un_uniforme_el_precio_arranca_apagado_y_prenderlo_si_lo_pone(self) -> None:
+        """El botón salía marcado en los uniformes y no hacía nada (2026-11-05)."""
+        host = _DialogHost()
+        render_calls: list[tuple[str, int, bool | None]] = []
+        captured: dict[str, QDialog] = {}
+        uniforme = SimpleNamespace(variant_id=1, sku="SKU-001", product_name="Pants", talla="14", color="Azul", precio_por_defecto=False)
+        ropa = SimpleNamespace(variant_id=2, sku="SKU-002", product_name="Pijama", talla="Unitalla", color="Surtido", precio_por_defecto=True)
+        with tempfile.TemporaryDirectory() as temp_dir:
+            image_path = Path(temp_dir) / "label.png"
+            image_path.write_bytes(b"x")
+
+            def render_label(mode, copies, show_price=None):
+                render_calls.append((mode, copies, show_price))
+                return LabelRenderResult(mode=mode, image_path=image_path,
+                                         effective_copies=copies, requested_copies=copies)
+
+            def fake_exec(dialog):
+                captured["dialog"] = dialog
+                return int(QDialog.DialogCode.Rejected)
+
+            with patch("pos_uniformes.ui.dialogs.inventory_label_dialog.QDialog.exec", new=fake_exec):
+                build_inventory_label_dialog(
+                    host, initial_context=uniforme, variant_ids=[1, 2], current_index=0,
+                    load_context=lambda i: ropa if int(i) == 2 else uniforme, render_label=render_label,
+                    print_label=lambda *_a: True,
+                )
+            dialog = captured["dialog"]
+            precio = next(b for b in dialog.findChildren(QPushButton) if "Mostrar precio" in b.text())
+            self.assertFalse(precio.isChecked())                       # dice la verdad: sin precio
+            self.assertEqual(precio.text(), "💲 Mostrar precio")
+            self.assertIn("uniformes", precio.toolTip())
+            self.assertEqual(render_calls[-1], ("standard", 1, False))
+            precio.click()                                             # y prenderlo SÍ lo pide
+            self.assertEqual(render_calls[-1], ("standard", 1, True))
+            self.assertEqual(precio.text(), "✓  💲 Mostrar precio")
+            # Al pasar a una prenda de ropa normal, el botón vuelve a lo suyo: prendido.
+            siguiente = next(b for b in dialog.findChildren(QPushButton) if b.text() == "Siguiente")
+            siguiente.click()
+            self.assertTrue(precio.isChecked())
+            self.assertEqual(render_calls[-1], ("standard", 1, True))
+
     def test_toggles_alimentan_el_render(self) -> None:
         host = _DialogHost()
         render_calls: list[tuple[str, int, bool | None]] = []

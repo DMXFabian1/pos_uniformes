@@ -130,9 +130,9 @@ def build_inventory_label_batch_dialog(
     mode_hint = QLabel(build_inventory_label_mode_hint("standard"))
     mode_hint.setWordWrap(True)
     mode_hint.setObjectName("subtleLine")
-    price_check = QCheckBox("Mostrar precio")
+    price_check = QCheckBox("Mostrar precio (en la ropa normal)")
     price_check.setChecked(True)
-    price_check.setToolTip("Incluir o quitar el precio de venta en las etiquetas impresas")
+    price_check.setToolTip("Marcado: la ropa normal lleva precio y los uniformes no. Desmarcado: ninguna etiqueta lleva precio.")
     controls_layout.addWidget(QLabel("Modo de impresion"), 0, 0)
     controls_layout.addWidget(mode_combo, 0, 1)
     controls_layout.addWidget(price_check, 0, 2)
@@ -214,7 +214,9 @@ def build_inventory_label_batch_dialog(
         success_lines: list[str] = []
         failed_lines: list[str] = []
         selected_mode = str(mode_combo.currentData() or "standard")
-        show_price = True if price_check.isChecked() else False
+        # None = lo de cada prenda (ropa con precio, uniforme sin él); en un
+        # lote no se le pone precio a los uniformes por accidente.
+        show_price = None if price_check.isChecked() else False
         for context, requested_copies in jobs:
             try:
                 result = render_label(int(context.variant_id), selected_mode, requested_copies, show_price)

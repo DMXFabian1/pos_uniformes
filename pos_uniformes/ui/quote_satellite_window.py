@@ -133,6 +133,7 @@ from pos_uniformes.ui.dialogs.inventory_label_dialog import build_inventory_labe
 from pos_uniformes.services.inventory_label_service import (
     InventoryLabelContext,
     load_inventory_label_context,
+    precio_por_defecto_de_fila,
     render_inventory_label,
     render_inventory_label_from_cache_row,
 )
@@ -10944,6 +10945,7 @@ QLabel#favDialogPriceLabel {
                     product_name=str(row.get("producto_nombre_base") or row.get("producto_nombre") or ""),
                     talla=str(row.get("talla") or ""),
                     color=str(row.get("color") or ""),
+                    precio_por_defecto=precio_por_defecto_de_fila(row),
                 )
 
             offline_render_state: dict[str, object] = {"row": selected_row}

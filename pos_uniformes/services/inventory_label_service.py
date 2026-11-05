@@ -18,6 +18,28 @@ class InventoryLabelContext:
     product_name: str
     talla: str
     color: str
+    #: Si la etiqueta de esta prenda lleva precio sin que nadie lo pida: la
+    #: ropa normal sí, los uniformes no. Con esto el botón «Mostrar precio»
+    #: arranca diciendo la verdad (antes salía marcado en un uniforme y no
+    #: hacía nada, 2026-11-05).
+    precio_por_defecto: bool = True
+
+
+def precio_por_defecto_de(variante) -> bool:
+    from pos_uniformes.utils.inventory_label_content_helper import resolve_inventory_label_profile
+
+    try:
+        return bool(resolve_inventory_label_profile(variante).show_price)
+    except Exception:  # noqa: BLE001 — ante la duda, como siempre
+        return True
+
+
+def precio_por_defecto_de_fila(row: dict) -> bool:
+    """Lo mismo, desde una fila del catálogo en disco (kiosko sin conexión)."""
+    try:
+        return precio_por_defecto_de(_build_fake_variante_from_cache_row(row))
+    except Exception:  # noqa: BLE001
+        return True
 
 
 def load_inventory_label_context(session, variant_id: int) -> InventoryLabelContext:
@@ -33,6 +55,7 @@ def load_inventory_label_context(session, variant_id: int) -> InventoryLabelCont
         ),
         talla=str(variante.talla),
         color=str(variante.color),
+        precio_por_defecto=precio_por_defecto_de(variante),
     )
 
 
