@@ -1,4 +1,12 @@
-"""Dialogo reutilizable para vista previa e impresion de etiquetas de inventario."""
+"""Dialogo reutilizable para vista previa e impresion de etiquetas de inventario.
+
+Rediseñado el 2026-11-05 (Daniel: «está bien pero le falta para verse mejor»):
+el producto arriba como encabezado y no como una línea con barras; los tamaños
+con su dibujito y su medida en vez de «Normal / Split / Label»; la etiqueta
+mostrada como la calcomanía que va a salir, con su orilla en blanco; y el botón
+diciendo cuántas va a imprimir. La lógica (render, copias, precio, navegación)
+es la de antes.
+"""
 
 from __future__ import annotations
 
@@ -6,11 +14,10 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QPixmap
+from PyQt6.QtCore import QEvent, QObject, QRectF, QSize, Qt
+from PyQt6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PyQt6.QtWidgets import (
     QDialog,
-    QGridLayout,
     QHBoxLayout,
     QLabel,
     QMessageBox,
@@ -21,10 +28,12 @@ from PyQt6.QtWidgets import (
 )
 
 from pos_uniformes.ui.helpers.inventory_label_preview_helper import (
+    NOMBRES_DE_MODO,
     build_error_inventory_label_preview_view,
     build_inventory_label_mode_hint,
     build_inventory_label_preview_view,
     build_inventory_label_print_confirmation,
+    texto_boton_imprimir,
 )
 from pos_uniformes.ui.helpers.scanner_enter_guard import ScannerEnterGuard
 
@@ -33,62 +42,208 @@ if TYPE_CHECKING:
     from pos_uniformes.services.inventory_label_service import InventoryLabelContext
     from pos_uniformes.utils.label_generator import LabelRenderResult
 
+#: Los tamaños, en el orden en que se ofrecen. La cuadrada va primero y es la
+#: que sale marcada: se volvió la de todos los días (Daniel, 2026-11-05).
+MODOS: tuple[str, ...] = ("dk1221", "standard", "split")
+MODO_INICIAL = "dk1221"
+
+#: Cuánto de orilla en blanco tiene la etiqueta física alrededor de lo
+#: impreso, como fracción del lado corto de la imagen. La cuadrada mide 23 mm
+#: y solo se imprimen 17: 3 mm por lado.
+_ORILLA = {"dk1221": 3 / 17, "standard": 0.07, "split": 0.03, "continuous": 0.05}
+
+
+def icono_de_modo(modo: str, lado: int = 44) -> QIcon:
+    """Un dibujito de la etiqueta: su forma, el QR y los renglones de texto."""
+    pm = QPixmap(lado, lado)
+    pm.fill(Qt.GlobalColor.transparent)
+    p = QPainter(pm)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    papel, tinta = QColor("#ffffff"), QColor("#73341c")
+    p.setPen(QPen(QColor("#c9b8a4"), 1.4))
+    p.setBrush(papel)
+
+    def qr(x: float, y: float, s: float) -> None:
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(tinta)
+        c = s / 3
+        for fx, fy in ((0, 0), (2, 0), (0, 2), (1, 1), (2, 2)):
+            p.drawRect(QRectF(x + fx * c, y + fy * c, c - 0.6, c - 0.6))
+
+    def renglon(x: float, y: float, w: float, h: float = 2.6) -> None:
+        p.setPen(Qt.PenStyle.NoPen)
+        p.setBrush(tinta)
+        p.drawRoundedRect(QRectF(x, y, w, h), 1.2, 1.2)
+
+    if modo == "dk1221":
+        m = lado * 0.16
+        p.drawRoundedRect(QRectF(m, m, lado - 2 * m, lado - 2 * m), 5, 5)
+        qr(m + 4, m + 4, lado * 0.26)
+        renglon(m + 4 + lado * 0.32, m + 7, lado * 0.16, 5)
+        renglon(m + 4, lado - m - 11, lado - 2 * m - 8)
+        renglon(m + 4, lado - m - 6.5, (lado - 2 * m - 8) * 0.6)
+    elif modo == "split":
+        w = (lado - 6) / 4
+        for k in range(4):
+            x = 3 + k * w
+            p.setPen(QPen(QColor("#c9b8a4"), 1.2))
+            p.setBrush(papel)
+            p.drawRoundedRect(QRectF(x + 0.6, lado * 0.2, w - 1.2, lado * 0.6), 2.5, 2.5)
+            qr(x + 2, lado * 0.26, w - 4)
+            renglon(x + 2, lado * 0.62, w - 4, 2.2)
+    else:
+        alto = lado * 0.42
+        y = (lado - alto) / 2
+        p.drawRoundedRect(QRectF(1.5, y, lado - 3, alto), 4, 4)
+        renglon(5, y + 4.5, lado * 0.42, 3.4)
+        renglon(5, y + alto - 7.5, lado * 0.26)
+        qr(lado - 5 - alto * 0.62, y + alto * 0.19, alto * 0.62)
+    p.end()
+    return QIcon(pm)
+
+
+class _AlCambiarDeTamano(QObject):
+    """Avisa cuando el widget cambia de tamaño. La calcomanía se dibuja a la
+    medida del hueco, y el hueco solo se conoce cuando la ventana ya se acomodó:
+    dibujada antes, salía recortada."""
+
+    def __init__(self, vigilado: QWidget, al_cambiar: Callable[[], None]) -> None:
+        super().__init__(vigilado)
+        self._al_cambiar = al_cambiar
+        vigilado.installEventFilter(self)
+
+    def eventFilter(self, _obj, evento) -> bool:  # noqa: N802 — nombre de Qt
+        if evento.type() == QEvent.Type.Resize:
+            self._al_cambiar()
+        return False
+
+
+def calcomania(etiqueta: QPixmap, modo: str, espacio: QSize) -> QPixmap:
+    """La etiqueta como va a quedar en la mano: sobre su papel, con la orilla en
+    blanco que la impresora no toca, esquinas redondeadas y una sombra suave."""
+    ancho, alto = max(1, etiqueta.width()), max(1, etiqueta.height())
+    orilla = _ORILLA.get(modo, 0.05) * min(ancho, alto)
+    papel_w, papel_h = ancho + 2 * orilla, alto + 2 * orilla
+    libre_w, libre_h = max(40, espacio.width() - 36), max(40, espacio.height() - 36)
+    # No se agranda de más: una cuadrada de 23 mm a pantalla completa engaña.
+    escala = min(libre_w / papel_w, libre_h / papel_h, 2.4 if modo == "dk1221" else 1.6)
+    w, h = papel_w * escala, papel_h * escala
+    lienzo = QPixmap(max(1, espacio.width()), max(1, espacio.height()))
+    lienzo.fill(Qt.GlobalColor.transparent)
+    p = QPainter(lienzo)
+    p.setRenderHint(QPainter.RenderHint.Antialiasing)
+    p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, escala < 1)
+    x, y = (espacio.width() - w) / 2, (espacio.height() - h) / 2
+    radio = min(w, h) * (0.09 if modo == "dk1221" else 0.07)
+    p.setPen(Qt.PenStyle.NoPen)
+    for k, alfa in enumerate((10, 14, 20)):                     # sombra en tres capas
+        p.setBrush(QColor(70, 45, 20, alfa))
+        p.drawRoundedRect(QRectF(x - 3 + k, y + 5 - k, w + 6 - 2 * k, h + 6 - 2 * k), radio + 3 - k, radio + 3 - k)
+    p.setBrush(QColor("#ffffff"))
+    p.setPen(QPen(QColor("#e2d6c5"), 1))
+    p.drawRoundedRect(QRectF(x, y, w, h), radio, radio)
+    p.drawPixmap(QRectF(x + orilla * escala, y + orilla * escala, ancho * escala, alto * escala), etiqueta, QRectF(0, 0, ancho, alto))
+    p.end()
+    return lienzo
+
 
 def _build_inventory_label_dialog_styles() -> str:
     return """
-        QWidget#inventoryLabelControlsCard, QWidget#inventoryLabelPreviewCard {
+        QWidget#inventoryLabelHeaderCard, QWidget#inventoryLabelControlsCard, QWidget#inventoryLabelPreviewCard {
             background: #fdfaf6;
             border: 1px solid #ddd0c0;
             border-radius: 18px;
         }
+        QLabel#inventoryLabelNombre {
+            color: #2c2a27;
+            font-size: 22px;
+            font-weight: 800;
+            background: transparent;
+            border: none;
+        }
+        QLabel#inventoryMetaCard {
+            color: #7a6d60;
+            font-size: 14px;
+            font-weight: 600;
+            background: transparent;
+            border: none;
+            padding: 0;
+        }
+        QLabel#inventoryLabelPosicion {
+            color: #a84f2d;
+            font-size: 13px;
+            font-weight: 800;
+            background: #f7e3d8;
+            border: none;
+            border-radius: 10px;
+            padding: 4px 10px;
+        }
         QLabel#inventoryLabelSectionTitle {
             color: #7b2d14;
-            font-size: 15px;
+            font-size: 13px;
             font-weight: 800;
             background: transparent;
             border: none;
             padding: 0;
         }
-        QLabel#inventoryLabelPreviewCaption, QLabel#inventoryLabelModeHint {
+        QLabel#inventoryLabelModeHint {
             color: #7a6d60;
             font-size: 12px;
             background: transparent;
             border: none;
             padding: 0;
         }
+        /* El fondo donde se ve la calcomanía: un tono más oscuro que la tarjeta,
+           para que el papel blanco de la etiqueta resalte. */
         QLabel#inventoryLabelPreviewImage {
-            background: #fffdf8;
-            border: 1px dashed #d5c9b9;
-            border-radius: 18px;
+            background: #efe6d8;
+            border: none;
+            border-radius: 16px;
             color: #7a6d60;
-            padding: 18px;
+            font-size: 14px;
+            padding: 0;
         }
         QLabel#inventoryLabelSummaryCard {
-            background: #fdf5ee;
-            border: 1px solid #ddd0c0;
-            border-radius: 16px;
-            color: #5a4a3f;
-            padding: 12px 14px;
-            font-size: 13px;
-            font-weight: 600;
-        }
-        QPushButton#inventoryLabelNavButton {
-            min-width: 130px;
-            min-height: 52px;
-            border-radius: 14px;
-            padding: 6px 16px;
+            background: transparent;
+            border: none;
+            color: #2c2a27;
+            padding: 0;
             font-size: 16px;
             font-weight: 800;
         }
-        /* Toggles de modo / precio: seleccionado = tinte claro + borde grueso */
+        QPushButton#inventoryLabelNavButton {
+            min-width: 124px;
+            min-height: 50px;
+            border-radius: 14px;
+            padding: 6px 14px;
+            font-size: 15px;
+            font-weight: 800;
+        }
+        /* Tamaño de etiqueta: dibujito + nombre + medida. Marcado = tinte + borde grueso */
+        QPushButton#inventoryLabelModo {
+            background: #ffffff;
+            color: #2c2a27;
+            border: 2px solid #ddd0c0;
+            border-radius: 14px;
+            min-height: 56px;
+            padding: 4px 14px;
+            font-size: 15px;
+            font-weight: 700;
+            text-align: left;
+        }
+        QPushButton#inventoryLabelModo:checked {
+            background: #f7e3d8;
+            color: #73341c;
+            border: 3px solid #a84f2d;
+        }
         QPushButton#inventoryLabelToggle {
             background: #ffffff;
             color: #2c2a27;
             border: 2px solid #ddd0c0;
             border-radius: 14px;
-            min-height: 54px;
+            min-height: 52px;
             padding: 0 18px;
-            font-size: 16px;
+            font-size: 15px;
             font-weight: 700;
         }
         QPushButton#inventoryLabelToggle:checked {
@@ -113,8 +268,6 @@ def _build_inventory_label_dialog_styles() -> str:
             color: #73341c;
             border: 1.5px solid #ddd0c0;
             border-radius: 12px;
-            min-width: 44px;
-            max-width: 44px;
             min-height: 40px;
             font-size: 15px;
             font-weight: 800;
@@ -124,29 +277,22 @@ def _build_inventory_label_dialog_styles() -> str:
             border: 2px solid #a84f2d;
         }
         QLabel#inventoryLabelCopies {
-            font-size: 28px;
+            font-size: 30px;
             font-weight: 800;
             color: #73341c;
-            min-width: 64px;
-            background: transparent;
-            border: none;
-        }
-        QLabel#inventoryLabelFieldTitle {
-            color: #7a6d60;
-            font-size: 13px;
-            font-weight: 700;
+            min-width: 70px;
             background: transparent;
             border: none;
         }
         QPushButton#primaryButton, QPushButton#secondaryButton {
-            min-height: 60px;
+            min-height: 58px;
             font-size: 17px;
             font-weight: 800;
             border-radius: 14px;
             padding: 0 26px;
         }
         /* Colores explícitos (a prueba de modo oscuro y de hojas de estilo ajenas) */
-        QPushButton#primaryButton { background: #a84f2d; color: #ffffff; border: none; }
+        QPushButton#primaryButton { background: #a84f2d; color: #ffffff; border: none; min-width: 250px; }
         QPushButton#primaryButton:pressed { background: #8a4326; }
         QPushButton#primaryButton:disabled { background: #c9a996; color: #f4ede2; }
         QPushButton#secondaryButton, QPushButton#inventoryLabelNavButton {
@@ -171,20 +317,34 @@ def build_inventory_label_dialog(
 ) -> None:
     dialog, layout = window._create_modal_dialog(
         "Imprimir etiqueta",
-        "Prepara la vista previa de la etiqueta y confirma la impresion cuando el formato se vea correcto.",
-        width=860,
+        None,
+        width=980,
     )
-    dialog.resize(860, 680)
+    dialog.resize(1000, 730)
     dialog.setStyleSheet(_build_inventory_label_dialog_styles())
     ScannerEnterGuard(dialog)
-    layout.setSpacing(14)
+    layout.setSpacing(12)
 
-    header_row = QHBoxLayout()
+    # ── Encabezado: de qué prenda es la etiqueta ────────────────────────
+    header_card = QWidget()
+    header_card.setObjectName("inventoryLabelHeaderCard")
+    header_row = QHBoxLayout(header_card)
+    header_row.setContentsMargins(18, 12, 12, 12)
     header_row.setSpacing(10)
+    titulos = QVBoxLayout()
+    titulos.setSpacing(2)
+    nombre_label = QLabel("")
+    nombre_label.setObjectName("inventoryLabelNombre")
+    nombre_label.setWordWrap(True)
     header = QLabel("")
     header.setWordWrap(True)
     header.setObjectName("inventoryMetaCard")
-    header_row.addWidget(header, 1)
+    titulos.addWidget(nombre_label)
+    titulos.addWidget(header)
+    header_row.addLayout(titulos, 1)
+    posicion_label = QLabel("")
+    posicion_label.setObjectName("inventoryLabelPosicion")
+    header_row.addWidget(posicion_label, 0, Qt.AlignmentFlag.AlignVCenter)
     previous_button = QPushButton("Anterior")
     previous_button.setObjectName("inventoryLabelNavButton")
     previous_button.setAutoDefault(False)
@@ -193,42 +353,41 @@ def build_inventory_label_dialog(
     next_button.setAutoDefault(False)
     header_row.addWidget(previous_button)
     header_row.addWidget(next_button)
-    layout.addLayout(header_row)
+    layout.addWidget(header_card)
 
+    estado: dict[str, object] = {"mode": MODO_INICIAL, "copies": 1, "price": True}
+
+    cuerpo = QHBoxLayout()
+    cuerpo.setSpacing(12)
+
+    # ── Izquierda: qué etiqueta y cuántas ───────────────────────────────
     controls_card = QWidget()
     controls_card.setObjectName("inventoryLabelControlsCard")
+    controls_card.setFixedWidth(340)
     controls_layout = QVBoxLayout(controls_card)
     controls_layout.setContentsMargins(16, 14, 16, 14)
     controls_layout.setSpacing(8)
 
-    controls_title = QLabel("Formato de impresion")
-    controls_title.setObjectName("inventoryLabelSectionTitle")
-    controls_layout.addWidget(controls_title)
-
-    # Rediseño táctil (2026-09-05): toggles grandes en vez de combo,
-    # stepper −/+ en vez de spinbox y toggle en vez de checkbox.
-    estado: dict[str, object] = {"mode": "standard", "copies": 1, "price": True}
-
-    controls = QGridLayout()
-    controls.setHorizontalSpacing(18)
-    controls.setVerticalSpacing(8)
-
-    modo_title = QLabel("Modo")
-    modo_title.setObjectName("inventoryLabelFieldTitle")
-    mode_row = QHBoxLayout()
-    mode_row.setSpacing(8)
+    modo_title = QLabel("TAMAÑO DE LA ETIQUETA")
+    modo_title.setObjectName("inventoryLabelSectionTitle")
+    controls_layout.addWidget(modo_title)
     mode_buttons: dict[str, QPushButton] = {}
-    for texto, valor in (("Normal", "standard"), ("Split", "split"), ("Label", "dk1221")):
-        btn = QPushButton(texto)
-        btn.setObjectName("inventoryLabelToggle")
+    for valor in MODOS:
+        titulo, medida = NOMBRES_DE_MODO[valor]
+        btn = QPushButton(f"{titulo}\n{medida}")
+        btn.setObjectName("inventoryLabelModo")
+        btn.setIcon(icono_de_modo(valor))
+        btn.setIconSize(QSize(44, 44))
         btn.setCheckable(True)
         btn.setAutoDefault(False)
         mode_buttons[valor] = btn
-        mode_row.addWidget(btn, 1)
-    mode_buttons["standard"].setChecked(True)
+        controls_layout.addWidget(btn)
+    mode_buttons[MODO_INICIAL].setChecked(True)
 
-    copias_title = QLabel("Piezas / copias")
-    copias_title.setObjectName("inventoryLabelFieldTitle")
+    controls_layout.addSpacing(6)
+    copias_title = QLabel("¿CUÁNTAS?")
+    copias_title.setObjectName("inventoryLabelSectionTitle")
+    controls_layout.addWidget(copias_title)
     copies_row = QHBoxLayout()
     copies_row.setSpacing(8)
     copies_minus = QPushButton("−")
@@ -246,10 +405,10 @@ def build_inventory_label_dialog(
         btn.setAutoRepeatDelay(350)
         btn.setAutoRepeatInterval(70)
     copies_row.addWidget(copies_minus)
-    copies_row.addWidget(copies_label)
+    copies_row.addWidget(copies_label, 1)
     copies_row.addWidget(copies_plus)
-    copies_row.addStretch(1)
-    # Chips rápidos en SU renglón (debajo del stepper): un toque fija la cantidad
+    controls_layout.addLayout(copies_row)
+    # Chips rápidos: un toque fija la cantidad
     chips_row = QHBoxLayout()
     chips_row.setSpacing(6)
     chip_buttons: dict[int, QPushButton] = {}
@@ -259,78 +418,64 @@ def build_inventory_label_dialog(
         chip.setAutoDefault(False)
         chip.setCheckable(True)
         chip_buttons[n] = chip
-        chips_row.addWidget(chip)
-    chips_row.addStretch(1)
+        chips_row.addWidget(chip, 1)
+    controls_layout.addLayout(chips_row)
 
-    precio_title = QLabel("Precio en la etiqueta")
-    precio_title.setObjectName("inventoryLabelFieldTitle")
+    controls_layout.addSpacing(6)
+    precio_title = QLabel("PRECIO EN LA ETIQUETA")
+    precio_title.setObjectName("inventoryLabelSectionTitle")
     price_button = QPushButton("✓  💲 Mostrar precio")
     price_button.setObjectName("inventoryLabelToggle")
     price_button.setCheckable(True)
     price_button.setChecked(True)
     price_button.setAutoDefault(False)
     price_button.setToolTip("Incluir o quitar el precio de venta en la etiqueta impresa")
+    controls_layout.addWidget(precio_title)
+    controls_layout.addWidget(price_button)
+    controls_layout.addStretch(1)
+    cuerpo.addWidget(controls_card)
 
-    mode_hint = QLabel(build_inventory_label_mode_hint("standard"))
-    mode_hint.setWordWrap(True)
-    mode_hint.setObjectName("inventoryLabelModeHint")
-
-    controls.addWidget(modo_title, 0, 0)
-    controls.addLayout(mode_row, 1, 0)
-    controls.addWidget(copias_title, 0, 1)
-    controls.addLayout(copies_row, 1, 1)
-    controls.addWidget(precio_title, 0, 2)
-    controls.addWidget(price_button, 1, 2)
-    controls.addLayout(chips_row, 2, 1)
-    controls.addWidget(mode_hint, 3, 0, 1, 3)
-    controls.setColumnStretch(0, 3)
-    controls.setColumnStretch(1, 2)
-    controls.setColumnStretch(2, 2)
-    controls_layout.addLayout(controls)
-    layout.addWidget(controls_card)
-
-    preview_section_title = QLabel("Vista previa")
-    preview_section_title.setObjectName("inventoryLabelSectionTitle")
-    layout.addWidget(preview_section_title)
-
-    preview_caption = QLabel(
-        "La imagen se escala solo para esta vista. La impresion usa el archivo generado sin alterar su tamaño real."
-    )
-    preview_caption.setWordWrap(True)
-    preview_caption.setObjectName("inventoryLabelPreviewCaption")
-    layout.addWidget(preview_caption)
-
+    # ── Derecha: la etiqueta, como va a quedar ──────────────────────────
     preview_card = QWidget()
     preview_card.setObjectName("inventoryLabelPreviewCard")
     preview_card_layout = QVBoxLayout(preview_card)
-    preview_card_layout.setContentsMargins(16, 16, 16, 16)
+    preview_card_layout.setContentsMargins(16, 14, 16, 14)
     preview_card_layout.setSpacing(10)
-
+    preview_section_title = QLabel("ASÍ VA A SALIR")
+    preview_section_title.setObjectName("inventoryLabelSectionTitle")
+    preview_card_layout.addWidget(preview_section_title)
     preview_label = QLabel("Generando vista previa...")
     preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    preview_label.setMinimumSize(640, 240)
-    preview_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+    preview_label.setMinimumSize(440, 300)
+    # Ignored: el tamaño lo manda la ventana, no la imagen que se le ponga.
+    preview_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Ignored)
     preview_label.setObjectName("inventoryLabelPreviewImage")
+    preview_card_layout.addWidget(preview_label, 1)
+    mode_hint = QLabel(build_inventory_label_mode_hint(MODO_INICIAL))
+    mode_hint.setWordWrap(True)
+    mode_hint.setObjectName("inventoryLabelModeHint")
+    preview_card_layout.addWidget(mode_hint)
+    cuerpo.addWidget(preview_card, 1)
+    layout.addLayout(cuerpo, 1)
+
+    # ── Abajo: qué va a pasar, y el botón que lo hace ───────────────────
+    buttons_layout = QHBoxLayout()
+    buttons_layout.setSpacing(10)
     summary_label = QLabel("")
     summary_label.setWordWrap(True)
     summary_label.setObjectName("inventoryLabelSummaryCard")
-    preview_card_layout.addWidget(preview_label, 1)
-    preview_card_layout.addWidget(summary_label)
-    layout.addWidget(preview_card, 1)
-
-    buttons_layout = QHBoxLayout()
-    buttons_layout.addStretch(1)
+    buttons_layout.addWidget(summary_label, 1)
     close_button = QPushButton("Cerrar")
     close_button.setObjectName("secondaryButton")
     close_button.setAutoDefault(False)
     close_button.setDefault(False)
-    print_button = QPushButton("Imprimir etiqueta")
+    print_button = QPushButton(texto_boton_imprimir(None))
     print_button.setObjectName("primaryButton")
     print_button.setDefault(True)
     print_button.setAutoDefault(True)
     buttons_layout.addWidget(close_button)
     buttons_layout.addWidget(print_button)
-    preview_state: dict[str, LabelRenderResult | None] = {"result": None}
+    preview_state: dict[str, object] = {"result": None, "pixmap": None}
     dialog_state: dict[str, object] = {
         "variant_ids": [int(variant_id) for variant_id in variant_ids],
         "current_index": max(0, min(int(current_index), max(0, len(variant_ids) - 1))),
@@ -338,9 +483,13 @@ def build_inventory_label_dialog(
     }
 
     def apply_context(context: "InventoryLabelContext") -> None:
-        header.setText(
-            f"{context.sku} | {context.product_name} | talla {context.talla} | color {context.color}"
-        )
+        nombre_label.setText(str(context.product_name))
+        color = str(context.color or "").strip()
+        partes = [f"Talla {context.talla}" if str(context.talla or "").strip() else ""]
+        if color and color.casefold() not in {"sin color", "none"}:
+            partes.append(color)
+        partes.append(str(context.sku))
+        header.setText("   ·   ".join(parte for parte in partes if parte))
         # En un uniforme el precio no va en la etiqueta (cambia; para eso está
         # el QR), así que la opción ni aparece. Antes salía marcada y no hacía
         # nada (Daniel, 2026-11-05). En la ropa normal vuelve, prendida.
@@ -358,6 +507,20 @@ def build_inventory_label_dialog(
         total = len(dialog_state["variant_ids"])
         previous_button.setEnabled(current_position > 0)
         next_button.setEnabled(current_position < total - 1)
+        # Con una sola presentación no hay a dónde ir: los botones sobran.
+        varias = total > 1
+        posicion_label.setText(f"{current_position + 1} de {total}")
+        for sobra in (posicion_label, previous_button, next_button):
+            sobra.setVisible(varias)
+
+    def pintar_calcomania() -> None:
+        pixmap, result = preview_state.get("pixmap"), preview_state.get("result")
+        if pixmap is None or result is None:
+            return
+        preview_label.setText("")
+        preview_label.setPixmap(calcomania(pixmap, result.mode, preview_label.contentsRect().size()))
+
+    _AlCambiarDeTamano(preview_label, pintar_calcomania)
 
     def refresh_preview() -> None:
         mode_hint.setText(build_inventory_label_mode_hint(str(estado["mode"])))
@@ -370,28 +533,27 @@ def build_inventory_label_dialog(
             )
         except Exception as exc:  # noqa: BLE001
             preview_state["result"] = None
+            preview_state["pixmap"] = None
             preview_view = build_error_inventory_label_preview_view(str(exc))
             preview_label.clear()
             preview_label.setText(preview_view.preview_text)
             summary_label.setText(preview_view.summary_text)
+            print_button.setText(texto_boton_imprimir(None))
             print_button.setEnabled(preview_view.print_enabled)
             return
 
         preview_state["result"] = result
+        preview_state["pixmap"] = None
         preview_view = build_inventory_label_preview_view(result)
         pixmap = QPixmap(str(result.image_path))
         if pixmap.isNull():
             preview_label.clear()
             preview_label.setText(preview_view.preview_text)
         else:
-            scaled = pixmap.scaled(
-                preview_label.contentsRect().size(),
-                Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
-            )
-            preview_label.setText("")
-            preview_label.setPixmap(scaled)
+            preview_state["pixmap"] = pixmap
+            pintar_calcomania()
         summary_label.setText(preview_view.summary_text)
+        print_button.setText(texto_boton_imprimir(result))
         print_button.setEnabled(preview_view.print_enabled)
 
     def navigate_variant(step: int) -> None:
