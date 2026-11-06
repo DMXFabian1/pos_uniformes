@@ -327,7 +327,7 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         window = QuoteSatelliteWindow(user_id=1)
 
         self.assertIn("Kiosko de Presupuestos", window.windowTitle())
-        self.assertTrue(window.version_label.text().startswith("Version "))
+        self.assertTrue(window.version_label.text().startswith("Versión "))
 
     def test_grouped_kiosk_product_cards_use_compact_layout(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)

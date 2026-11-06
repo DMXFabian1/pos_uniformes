@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import re
+import subprocess
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 APP_DISPLAY_NAME = "POS Uniformes"
@@ -35,7 +38,56 @@ def app_version() -> str:
     return DEFAULT_APP_VERSION
 
 
+# ─── La versión que se ve ───────────────────────────────────────────────
+# Daniel, 2026-11-06: «el sistema de versiones sigue viéndose así, está mal
+# ¿no?» — la cabecera decía «Version 2026.11.11»: el archivo VERSION, que se
+# subía a mano y llevaba dos meses quieto. Lo que se enseña ahora sale solo
+# del último cambio: su fecha y su clave, «6 nov · 6ba73b01». En el kiosko lo
+# sella la build (VERSION.txt junto al exe); corriendo del código, lo dice git.
+_SELLO = re.compile(r"^(\d{4})\.(\d{2})\.(\d{2})\+([0-9a-fA-F]{6,40})$")
+_MESES = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
+
+
+def _sello_junto_al_exe() -> str:
+    if not getattr(sys, "frozen", False):
+        return ""
+    try:
+        return (Path(sys.executable).resolve().parent / "VERSION.txt").read_text(encoding="utf-8").strip()
+    except OSError:
+        return ""
+
+
+@lru_cache(maxsize=4)
+def _sello_de_git(raiz: str) -> str:
+    """«2026.11.06+6ba73b01» del último commit, o "" si git no contesta."""
+    try:
+        salida = subprocess.run(
+            ["git", "log", "-1", "--format=%cd+%h", "--date=format:%Y.%m.%d"],
+            cwd=raiz, capture_output=True, text=True, timeout=5,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),   # sin ventana negra en Windows
+        )
+    except Exception:  # noqa: BLE001 — sin git, sin sello; nunca tumba el arranque
+        return ""
+    return salida.stdout.strip() if salida.returncode == 0 else ""
+
+
+def sello_del_codigo() -> str:
+    """Fecha y clave del último cambio que trae esta PC, o "" si no se sabe."""
+    return _sello_junto_al_exe() or _sello_de_git(str(project_root()))
+
+
+def version_visible() -> str:
+    """«6 nov · 6ba73b01». Sin sello legible, lo que diga el sello o VERSION."""
+    sello = sello_del_codigo()
+    m = _SELLO.match(sello)
+    if m and 1 <= int(m.group(2)) <= 12:
+        return f"{int(m.group(3))} {_MESES[int(m.group(2)) - 1]} · {m.group(4)}"
+    return sello or app_version()
+
+
 def app_build_label() -> str:
+    if sello_del_codigo():
+        return f"Versión {version_visible()}"
     return f"Version {app_version()}"
 
 

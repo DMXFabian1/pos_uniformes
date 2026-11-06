@@ -65,7 +65,13 @@ Copy-Item (Join-Path $projectRoot "pos_uniformes.env.example") `
 # avisaria de una actualizacion que ya tiene, en cada arranque.
 $commit = ""
 try { $commit = (& git -C $projectRoot rev-parse --short HEAD 2>$null).Trim() } catch {}
-$publishedVersion = if ($commit) { "$version+$commit" } else { $version }
+# Lo publicado es FECHA DEL ULTIMO CAMBIO + commit (2026.11.06+6ba73b01), no
+# el archivo VERSION: ese se subia a mano y se quedo quieto. La app lo ensena
+# como "Version 6 nov - 6ba73b01". Sin git, cae al VERSION de siempre.
+$fecha = ""
+try { $fecha = (& git -C $projectRoot log -1 --format=%cd --date=format:%Y.%m.%d 2>$null).Trim() } catch {}
+if (-not $fecha) { $fecha = $version }
+$publishedVersion = if ($commit) { "$fecha+$commit" } else { $version }
 Set-Content -Path (Join-Path $bundleDir "VERSION.txt") -Value $publishedVersion
 
 Compress-Archive -Path (Join-Path $bundleDir "*") -DestinationPath $zipPath -Force

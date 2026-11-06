@@ -145,9 +145,9 @@ def main() -> int:
 
     # ── Splash ────────────────────────────────────────────────────────
     from pos_uniformes.ui.helpers.satellite_splash import SplashDelKiosko
-    from pos_uniformes.utils.app_metadata import app_version
+    from pos_uniformes.utils.app_metadata import version_visible
 
-    splash = SplashDelKiosko(app_version())
+    splash = SplashDelKiosko(version_visible())
     splash.show()
     app.processEvents()
 
