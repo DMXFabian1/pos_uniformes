@@ -14,8 +14,8 @@ from pos_uniformes.utils.venv_bootstrap import ensure_local_venv_site_packages
 ensure_local_venv_site_packages(Path(__file__))
 
 from PyQt6.QtCore import QLockFile, QStandardPaths, Qt
-from PyQt6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
-from PyQt6.QtWidgets import QApplication, QMessageBox, QSplashScreen
+from PyQt6.QtGui import QIcon
+from PyQt6.QtWidgets import QApplication, QMessageBox
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -32,48 +32,9 @@ from pos_uniformes.utils.app_metadata import satellite_display_name, satellite_w
 from pos_uniformes.utils.satellite_excepthook import install_satellite_excepthook
 
 
-def _build_splash_pixmap() -> QPixmap:
-    W, H = 520, 300
-    pix = QPixmap(W, H)
-    pix.fill(QColor("#f4ede0"))
-
-    painter = QPainter(pix)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-
-    # Barra superior de acento
-    painter.fillRect(0, 0, W, 8, QColor("#a84f2d"))
-
-    # Nombre de la app
-    font_title = QFont()
-    font_title.setPointSize(28)
-    font_title.setWeight(QFont.Weight.Black)
-    painter.setFont(font_title)
-    painter.setPen(QColor("#2f2a24"))
-    painter.drawText(0, 60, W, 50, Qt.AlignmentFlag.AlignHCenter, "Presupuestos Satélite")
-
-    # Subtítulo
-    font_sub = QFont()
-    font_sub.setPointSize(13)
-    font_sub.setWeight(QFont.Weight.Normal)
-    painter.setFont(font_sub)
-    painter.setPen(QColor("#87492c"))
-    painter.drawText(0, 118, W, 30, Qt.AlignmentFlag.AlignHCenter, "Maximoda")
-
-    # Separador
-    painter.setPen(QColor("#ddd0be"))
-    painter.drawLine(60, 168, W - 60, 168)
-
-    # Mensaje de carga (placeholder — se actualiza via showMessage)
-    painter.end()
-    return pix
-
-
-def _show_splash_message(splash: QSplashScreen, msg: str, app: QApplication) -> None:
-    splash.showMessage(
-        msg,
-        Qt.AlignmentFlag.AlignBottom | Qt.AlignmentFlag.AlignHCenter,
-        QColor("#87492c"),
-    )
+def _show_splash_message(splash, msg: str, app: QApplication, detalle: str = "", avance: float | None = None) -> None:
+    """Lo que dice la pantalla de arranque: qué hace, qué pasa si no resulta y cuánto lleva."""
+    splash.decir(msg, detalle, avance)
     app.processEvents()
 
 
@@ -183,8 +144,10 @@ def main() -> int:
     app._instance_lock = lock_file
 
     # ── Splash ────────────────────────────────────────────────────────
-    splash = QSplashScreen(_build_splash_pixmap())
-    splash.setFont(QFont("", 11))
+    from pos_uniformes.ui.helpers.satellite_splash import SplashDelKiosko
+    from pos_uniformes.utils.app_metadata import app_version
+
+    splash = SplashDelKiosko(app_version())
     splash.show()
     app.processEvents()
 
@@ -199,17 +162,23 @@ def main() -> int:
     except Exception as exc:  # noqa: BLE001
         print(f"Meilisearch no disponible: {exc}", file=sys.stderr)
 
-    _show_splash_message(splash, "Verificando conexión...", app)
+    _show_splash_message(
+        splash, "Buscando la PC principal…", "Es la que guarda las ventas y el catálogo.", 0.05
+    )
     # Se espera un poco a que la PC principal aparezca. El caso que duele es la
     # luz: vuelve, todo se prende junto, el servidor tarda en levantar Postgres
     # y el kiosko —que bootea en segundos— probaba UNA vez y se quedaba en modo
     # local toda la mañana. Si ya está encendida, esto no cuesta nada: vuelve
     # en el primer intento.
-    from pos_uniformes.services.satellite_startup_service import esperar_base
+    from pos_uniformes.services.satellite_startup_service import ESPERA_ARRANQUE_SEG, esperar_base
 
     def _esperando(intento: int, restan: int) -> None:
+        # No solo cuánto falta: qué va a pasar cuando se acabe la espera.
         _show_splash_message(
-            splash, f"Esperando a la PC principal… ({restan}s)", app
+            splash,
+            "Esperando a la PC principal…",
+            f"Todavía no contesta. Si en {int(restan)} s no aparece, abro con el catálogo guardado.",
+            1 - (restan / ESPERA_ARRANQUE_SEG if ESPERA_ARRANQUE_SEG else 1),
         )
 
     connection_available = esperar_base(avisar=_esperando)
@@ -222,11 +191,11 @@ def main() -> int:
         # expired») teniendo su modo local perfectamente bueno. Si cualquier
         # paso de aquí falla, se cae a local en vez de rendirse: un kiosko que
         # no abre es un kiosko que no vende.
-        _show_splash_message(splash, "Preparando base de datos...", app)
+        _show_splash_message(splash, "Conectando con la tienda…", "La PC principal ya contestó.", 0.45)
         try:
             bootstrap_schema()
             assert_database_ready()
-            _show_splash_message(splash, "Cargando catálogo...", app)
+            _show_splash_message(splash, "Cargando el catálogo…", "Escuelas, prendas y precios al día.", 0.75)
             operator_id = resolve_satellite_operator_id()
             window = QuoteSatelliteWindow(user_id=operator_id, offline_mode=False)
         except DatabasePreflightError as exc:
@@ -243,7 +212,10 @@ def main() -> int:
             connection_available = False
 
     if window is None:
-        _show_splash_message(splash, "Sin conexión — cargando catálogo local...", app)
+        _show_splash_message(
+            splash, "Abriendo en modo local",
+            "La PC principal no contestó: trabajo con el catálogo guardado y subo las ventas cuando vuelva.", 0.75,
+        )
         local_cache = load_catalog_cache()
         if local_cache is None:
             # Es el único caso en que de verdad no se puede abrir: sin catálogo
@@ -266,7 +238,7 @@ def main() -> int:
             offline_catalog_cache=local_cache,
         )
 
-    _show_splash_message(splash, "Listo.", app)
+    _show_splash_message(splash, "Listo", "", 1.0)
     window.showFullScreen()
     splash.finish(window)
     return app.exec()
