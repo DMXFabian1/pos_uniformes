@@ -43,6 +43,11 @@ logger = logging.getLogger(__name__)
 REFRESCO_MS = 5_000
 #: Ancho máximo de una burbuja: más ancho y se lee como documento, no como chat.
 ANCHO_BURBUJA = 560
+#: A esta distancia del fondo (px) se considera que «está abajo»: lo nuevo lo
+#: sigue. Más arriba, se respeta donde está leyendo. (Signal Desktop usa 15.)
+UMBRAL_ABAJO = 24
+#: Un mensaje con más renglones que esto sale recortado, con «Ver todo».
+RENGLONES_VISIBLES = 30
 
 _VERDE = "#00a884"
 _ESTILO = f"""
@@ -55,6 +60,11 @@ QListWidget::item:hover {{ background: #f5f6f6; }}
 QFrame#cabecera {{ background: #f0f2f5; border-bottom: 1px solid #e1e4e6; }}
 QScrollArea {{ background: #efeae2; border: none; }}
 QScrollArea > QWidget > QWidget {{ background: #efeae2; }}
+QScrollBar:vertical {{ background: transparent; width: 12px; margin: 2px; border: none; }}
+QScrollBar::handle:vertical {{ background: #c2c8cb; border-radius: 4px; min-height: 36px; }}
+QScrollBar::handle:vertical:hover {{ background: #9aa3a8; }}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
+QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
 QFrame#mia {{ background: #d9fdd3; border-radius: 10px; }}
 QFrame#otra {{ background: #ffffff; border-radius: 10px; }}
 QLabel#fecha {{ background: #ffffff; color: #54656f; border-radius: 8px;
@@ -69,6 +79,13 @@ QPushButton#suave {{ background: transparent; color: #54656f; border: none; font
 QPushButton#suave:hover {{ color: {_VERDE}; }}
 QToolButton#copiar {{ background: transparent; color: #027eb5; border: none; font-size: 12px;
                      padding: 0 2px; }}
+QToolButton#verTodo {{ background: transparent; color: #027eb5; border: none; font-size: 12px;
+                      font-weight: 700; padding: 2px 0; }}
+QLabel#nuevos {{ background: #d9fdd3; color: #1c6b4a; border-radius: 8px;
+                padding: 4px 12px; font-size: 11px; font-weight: 700; }}
+QPushButton#irAbajo {{ background: #ffffff; color: #54656f; border: 1px solid #d5dadd;
+                      border-radius: 18px; font-size: 13px; font-weight: 700; padding: 0 14px; }}
+QPushButton#irAbajo[nuevos="true"] {{ background: {_VERDE}; color: #ffffff; border: none; }}
 QToolButton#ejecutar {{ background: transparent; color: {_VERDE}; border: none; font-size: 12px;
                        font-weight: 700; padding: 0 6px; }}
 """
@@ -164,6 +181,31 @@ class _Escribir(QPlainTextEdit):
         self.setVerticalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAsNeeded if total > 6 else Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
+
+
+class _Conversacion(QScrollArea):
+    """La conversación, con su botón flotante de «ir abajo» en la esquina."""
+
+    def __init__(self) -> None:
+        super().__init__()
+        self.setWidgetResizable(True)
+        self.ir_abajo = QPushButton("↓", self)
+        self.ir_abajo.setObjectName("irAbajo")
+        self.ir_abajo.setFixedHeight(36)
+        self.ir_abajo.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.ir_abajo.setToolTip("Ir al último mensaje")
+        self.ir_abajo.hide()
+
+    def acomodar_boton(self) -> None:
+        self.ir_abajo.adjustSize()
+        self.ir_abajo.move(
+            self.width() - self.ir_abajo.width() - 26, self.height() - self.ir_abajo.height() - 14
+        )
+        self.ir_abajo.raise_()
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 — nombre de Qt
+        super().resizeEvent(event)
+        self.acomodar_boton()
 
 
 class _ItemChat(QWidget):
@@ -321,6 +363,14 @@ class BuzonDialog(QDialog):
         self._abierto: str = bz.GRUPO
         self._chats: list = []
         self._ultimo_pintado: tuple[str, int] | None = None
+        # Lo que hace que se sienta como un chat de verdad (2026-11-06):
+        self._pintado_hasta = 0            # id del último mensaje ya en pantalla
+        self._dia_ultimo: str | None = None
+        self._pegado = True                # está abajo: lo nuevo lo sigue
+        self._nuevos_abajo = 0             # llegaron mientras leía arriba
+        self._borradores: dict[str, str] = {}   # lo escrito a medias, por chat
+        self._firma_lista: tuple | None = None
+        self._boton_corriendo: QToolButton | None = None
 
         self.setWindowTitle("Buzón entre PCs")
         self.setStyleSheet(_ESTILO)
@@ -390,9 +440,13 @@ class BuzonDialog(QDialog):
         self._mensajes_ly.setContentsMargins(40, 12, 40, 12)
         self._mensajes_ly.setSpacing(4)
         self._mensajes_ly.addStretch()
-        self._scroll = QScrollArea()
-        self._scroll.setWidgetResizable(True)
+        self._scroll = _Conversacion()
         self._scroll.setWidget(self._mensajes)
+        self.ir_abajo = self._scroll.ir_abajo
+        self.ir_abajo.clicked.connect(self._bajar_al_final)
+        barra_v = self._scroll.verticalScrollBar()
+        barra_v.valueChanged.connect(self._al_mover_barra)
+        barra_v.rangeChanged.connect(self._al_cambiar_rango)
         der.addWidget(self._scroll, 1)
 
         barra = QFrame()
@@ -477,14 +531,20 @@ class BuzonDialog(QDialog):
             self._avisar("Sin conexión con la PC principal: no se mandó. Tu mensaje sigue escrito abajo.")
             return
         self.editor.clear()
+        self._borradores.pop(self._abierto, None)
+        self._pegado = True      # lo que mando yo siempre se ve: baja aunque estuviera leyendo arriba
         self.refrescar()
 
     # ── Acciones ────────────────────────────────────────────────────────
 
     def _al_escoger_chat(self, fila: int) -> None:
         if 0 <= fila < len(self._chats) and self._chats[fila].clave != self._abierto:
+            # Lo escrito a medias se queda en SU chat y vuelve al regresar.
+            self._borradores[self._abierto] = self.editor.toPlainText()
             self._abierto = self._chats[fila].clave
             self._ultimo_pintado = None
+            self.editor.setPlainText(self._borradores.get(self._abierto, ""))
+            self.editor.moveCursor(self.editor.textCursor().MoveOperation.End)
             self.refrescar()
             self.editor.setFocus()
 
@@ -547,7 +607,15 @@ class BuzonDialog(QDialog):
         self.yo_label.setText(f"Esta PC es <b style='color:#111b21'>{self._yo}</b>")
 
     def _pintar_lista(self, chats) -> None:
-        self._chats = list(chats)
+        chats = list(chats)
+        # Se repinta solo si algo cambió: rehacerla cada 5 s la hacía parpadear,
+        # perdía el renglón bajo el ratón y regresaba la lista hasta arriba.
+        firma = (self._yo, self._abierto, tuple(chats))
+        if firma == self._firma_lista:
+            return
+        self._firma_lista = firma
+        self._chats = chats
+        donde = self.lista.verticalScrollBar().value()
         self.lista.blockSignals(True)
         for i in range(self.lista.count()):
             viejo = self.lista.itemWidget(self.lista.item(i))
@@ -564,6 +632,7 @@ class BuzonDialog(QDialog):
                 fila_abierta = i
         self.lista.setCurrentRow(fila_abierta)
         self.lista.blockSignals(False)
+        self.lista.verticalScrollBar().setValue(donde)
         actual = self._chats[fila_abierta] if self._chats else None
         if actual is not None:
             self._abierto = actual.clave
@@ -573,6 +642,9 @@ class BuzonDialog(QDialog):
 
     def _pintar_conversacion(self, filas) -> None:
         ultimo = filas[-1][0] if filas else 0
+        mismo_chat = self._ultimo_pintado is not None and self._ultimo_pintado[0] == self._abierto
+        # Hasta dónde había leído ANTES de abrirlo: de ahí sale «N mensajes nuevos».
+        leido_antes = None if mismo_chat else int(self._leer_leidos().get(self._abierto, 0) or 0)
         if ultimo:
             self._guardar_leido(self._abierto, ultimo)
             self._apagar_globo()          # el chat abierto no tiene pendientes
@@ -581,6 +653,17 @@ class BuzonDialog(QDialog):
             return  # nada nuevo: no se repinta (no se pierde lo seleccionado)
         self._ultimo_pintado = firma
 
+        # Llegó algo al chat que ya está en pantalla: se AGREGA abajo. Antes se
+        # borraba y se repintaba todo, y la barra se iba hasta arriba (Daniel,
+        # 2026-11-06: «tengo que bajar manualmente para ver el nuevo mensaje»).
+        if mismo_chat and self._pintado_hasta:
+            nuevas = [f for f in filas if f[0] > self._pintado_hasta]
+            if nuevas:
+                self._agregar(nuevas)
+                return
+        self._pintar_todo(filas, leido_antes)
+
+    def _pintar_todo(self, filas, leido_antes: int | None) -> None:
         while self._mensajes_ly.count() > 1:     # el último es el resorte
             item = self._mensajes_ly.takeAt(0)
             viejo = item.widget()
@@ -590,6 +673,10 @@ class BuzonDialog(QDialog):
                 viejo.hide()
                 viejo.setParent(None)
                 viejo.deleteLater()
+        self._pintado_hasta = 0
+        self._dia_ultimo = None
+        self._nuevos_abajo = 0
+        self._pegado = True               # un chat recién abierto se ve desde el final
 
         if not filas:
             vacio = QLabel(
@@ -598,21 +685,75 @@ class BuzonDialog(QDialog):
             vacio.setObjectName("fecha")
             vacio.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._mensajes_ly.insertWidget(0, vacio, 0, Qt.AlignmentFlag.AlignHCenter)
+            self._pintar_ir_abajo()
             return
-        posicion = 0
-        dia_anterior = None
+        # La raya de «mensajes nuevos» va antes del primero que no había visto.
+        # Si TODO es nuevo no se pone: no separa nada.
+        sin_ver = [f[0] for f in filas if leido_antes is not None and f[0] > leido_antes and f[1] != self._yo]
+        raya_en = sin_ver[0] if sin_ver and sin_ver[0] != filas[0][0] else None
+        self._agregar(filas, raya_en=raya_en, cuantos_nuevos=len(sin_ver), recien_abierto=True)
+
+    def _agregar(self, filas, *, raya_en: int | None = None, cuantos_nuevos: int = 0,
+                 recien_abierto: bool = False) -> None:
+        """Pone estas burbujas al final, sin tocar las que ya están."""
+        posicion = self._mensajes_ly.count() - 1          # antes del resorte
+        ajenos = 0
         for _id, de, _para, texto, creado in filas:
+            if _id == raya_en:
+                raya = QLabel(
+                    "1 mensaje nuevo" if cuantos_nuevos == 1 else f"{cuantos_nuevos} mensajes nuevos"
+                )
+                raya.setObjectName("nuevos")
+                self._mensajes_ly.insertWidget(posicion, raya, 0, Qt.AlignmentFlag.AlignHCenter)
+                posicion += 1
             dia = _dia(creado)
-            if dia != dia_anterior:
+            if dia != self._dia_ultimo:
                 separador = QLabel(dia)
                 separador.setObjectName("fecha")
                 self._mensajes_ly.insertWidget(posicion, separador, 0, Qt.AlignmentFlag.AlignHCenter)
                 posicion += 1
-                dia_anterior = dia
+                self._dia_ultimo = dia
             self._mensajes_ly.insertWidget(posicion, self._burbuja(de, texto, creado))
             posicion += 1
-        # Después de que el layout acomode las burbujas, si no el máximo es viejo.
-        self._bajar.start()
+            self._pintado_hasta = max(self._pintado_hasta, _id)
+            if de != self._yo:
+                ajenos += 1
+        if not recien_abierto and not self._pegado:
+            # Está leyendo arriba: no se le mueve nada; el botón le dice que llegó algo.
+            self._nuevos_abajo += ajenos
+        self._pintar_ir_abajo()
+        if self._pegado:
+            # Por si el layout ya acomodó (el cambio de rango es lo que baja de verdad).
+            self._bajar.start()
+
+    # ── La barra: seguir lo nuevo sin quitarle su lugar a quien lee ─────
+
+    def _al_mover_barra(self, valor: int) -> None:
+        barra = self._scroll.verticalScrollBar()
+        self._pegado = valor >= barra.maximum() - UMBRAL_ABAJO
+        if self._pegado:
+            self._nuevos_abajo = 0
+        self._pintar_ir_abajo()
+
+    def _al_cambiar_rango(self, _minimo: int, maximo: int) -> None:
+        # El contenido creció (llegó un mensaje, se abrió un «Ver todo», cambió
+        # el tamaño de la ventana). Si estaba abajo, sigue abajo; si no, se queda.
+        # Bajar aquí y no con un timer: el máximo ya es el de verdad.
+        if self._pegado:
+            self._scroll.verticalScrollBar().setValue(maximo)
+        self._pintar_ir_abajo()
+
+    def _pintar_ir_abajo(self) -> None:
+        barra = self._scroll.verticalScrollBar()
+        visible = not self._pegado and barra.maximum() > 0
+        if visible:
+            n = self._nuevos_abajo
+            self.ir_abajo.setText("↓" if not n else (f"↓  {n} nuevo" if n == 1 else f"↓  {n} nuevos"))
+            self.ir_abajo.setProperty("nuevos", "true" if n else "false")
+            self.ir_abajo.style().unpolish(self.ir_abajo)
+            self.ir_abajo.style().polish(self.ir_abajo)
+            self._scroll.acomodar_boton()
+        self.ir_abajo.setVisible(visible)
 
     def _apagar_globo(self) -> None:
         from dataclasses import replace
@@ -627,7 +768,10 @@ class BuzonDialog(QDialog):
 
     def _bajar_al_final(self) -> None:
         barra = self._scroll.verticalScrollBar()
+        self._pegado = True
+        self._nuevos_abajo = 0
         barra.setValue(barra.maximum())
+        self._pintar_ir_abajo()
 
     def _burbuja(self, de: str, texto: str, creado) -> QWidget:
         from pos_uniformes.services import buzon_service as bz
@@ -650,7 +794,12 @@ class BuzonDialog(QDialog):
             quien.setStyleSheet("font-size: 12px; font-weight: 700; color: #1f7aec;")
             bly.addWidget(quien)
 
-        cuerpo = QLabel(texto)
+        # Lo que contesta PowerShell puede traer cientos de renglones: entero,
+        # un solo mensaje ocupaba pantallas y no se podía ni llegar al siguiente.
+        renglones = texto.splitlines()
+        recortado = len(renglones) > RENGLONES_VISIBLES + 5
+        corto = "\n".join(renglones[:RENGLONES_VISIBLES]) + "\n…" if recortado else texto
+        cuerpo = QLabel(corto)
         cuerpo.setObjectName("cuerpo")
         cuerpo.setTextFormat(Qt.TextFormat.PlainText)
         cuerpo.setWordWrap(True)
@@ -668,6 +817,20 @@ class BuzonDialog(QDialog):
         largo = max((cuerpo.fontMetrics().horizontalAdvance(r) for r in texto.splitlines() or [""]), default=0)
         cuerpo.setMinimumWidth(min(largo + 4, ANCHO_BURBUJA - 24))
         bly.addWidget(cuerpo)
+        if recortado:
+            ver = QToolButton()
+            ver.setObjectName("verTodo")
+            ver.setCursor(Qt.CursorShape.PointingHandCursor)
+            abrir = f"▾ Ver todo ({len(renglones)} renglones)"
+            ver.setText(abrir)
+
+            def _alternar(_=False, c=cuerpo, b=ver) -> None:
+                completo = b.text() == abrir
+                c.setText(texto if completo else corto)
+                b.setText("▴ Ver menos" if completo else abrir)
+
+            ver.clicked.connect(_alternar)
+            bly.addWidget(ver, 0, Qt.AlignmentFlag.AlignLeft)
 
         pie = QHBoxLayout()
         copiar = QToolButton()
@@ -711,6 +874,7 @@ class BuzonDialog(QDialog):
         if boton is not None:
             boton.setText("⏳ Ejecutando…")
             boton.setEnabled(False)
+            self._boton_corriendo = boton
         self._avisar(f"Ejecutando… lo que salga se le manda a {de}.")
         if self._en_hilo:
             import threading
@@ -757,7 +921,14 @@ class BuzonDialog(QDialog):
 
     def _al_terminar_ejecucion(self) -> None:
         self._avisar("")
-        self._ultimo_pintado = None
+        # Solo se devuelve el botón a su lugar: repintar todo movía la barra.
+        boton, self._boton_corriendo = self._boton_corriendo, None
+        if boton is not None:
+            try:
+                boton.setText("▶ Ejecutar")
+                boton.setEnabled(True)
+            except RuntimeError:      # la burbuja ya no existe (se cambió de chat)
+                pass
         self.refrescar()
 
     @staticmethod
