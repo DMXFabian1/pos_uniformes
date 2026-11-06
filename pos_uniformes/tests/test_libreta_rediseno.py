@@ -155,6 +155,42 @@ class LibretaDelDuenoTests(unittest.TestCase):
         self.assertIn("3 piezas", texto)
         self.assertIn("$657.00", texto)
 
+    # ── pestañas ─────────────────────────────────────────────────────────
+    def test_afluencia_tiene_su_pestana_aunque_no_haya_datos(self) -> None:
+        win = self._ventana()
+        win.show()
+        win._set_page("libreta")
+        win._pintar_libreta([_fila(1)])
+        win._pintar_afluencia_libreta([])
+        chip, pagina = win._libreta_pestanas["afluencia"]
+        self.assertTrue(chip.isEnabled())
+        chip.click()
+        self.assertFalse(pagina.isHidden())
+        self.assertTrue(win._libreta_pestanas["movimientos"][1].isHidden())
+        self.assertFalse(win.libreta_afluencia_vacio.isHidden())      # dice por qué está vacía
+
+    def test_afluencia_con_datos_ensena_la_tabla(self) -> None:
+        from pos_uniformes.services.afluencia_service import FilaAfluencia
+
+        win = self._ventana()
+        win.show()
+        win._set_page("libreta")
+        win._pintar_libreta([_fila(1)])
+        hora = datetime.now().replace(minute=0, second=0, microsecond=0)
+        win._pintar_afluencia_libreta([FilaAfluencia(hora=hora, entradas=14, salidas=14, pasan=80, ventas=2)])
+        win._libreta_pestanas["afluencia"][0].click()
+        self.assertTrue(win.libreta_afluencia_vacio.isHidden())
+        self.assertFalse(win.libreta_afluencia_table.isHidden())
+        self.assertEqual(win.libreta_afluencia_table.rowCount(), 2)    # la hora y el total
+
+    def test_por_dia_solo_existe_viendo_varios_dias(self) -> None:
+        win = self._ventana()
+        win.show()
+        win._set_page("libreta")
+        win._pintar_libreta([_fila(1)])
+        self.assertFalse(win._libreta_pestanas["dia"][0].isEnabled())
+        self.assertEqual(win._libreta_pestana, "movimientos")
+
     # ── la empleada ──────────────────────────────────────────────────────
     def test_la_empleada_ve_lo_de_siempre(self) -> None:
         win = self._ventana("VEND-4")

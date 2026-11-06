@@ -1723,8 +1723,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_caja_menu.addAction("🎯  Meta semanal…").triggered.connect(
             lambda _c=False: self._libreta_pedir_meta()
         )
-        self.libreta_caja_menu_button = QPushButton("💼 Caja")
-        self.libreta_caja_menu_button.setObjectName("secondaryButton")
+        self.libreta_caja_menu_button = QPushButton("💼 Caja  ▾")
+        self.libreta_caja_menu_button.setObjectName("libretaCajaBoton")
         self.libreta_caja_menu_button.setAutoDefault(False)
         self.libreta_caja_menu_button.setMinimumHeight(44)
         self.libreta_caja_menu_button.setMenu(self.libreta_caja_menu)
@@ -1737,8 +1737,9 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_print_button.setVisible(False)
         # Los dos van en la cabecera, junto a Actualizar (solo se enseñan al
         # dueño): con ellos en la barra de fecha la página no cabía a lo ancho.
-        header.insertWidget(2, self.libreta_caja_menu_button)
-        header.insertWidget(3, self.libreta_print_button)
+        header.insertWidget(2, self.libreta_print_button)
+        header.insertWidget(3, self.libreta_caja_menu_button)
+        header.insertSpacing(4, 14)       # lo de caja | lo de la ventana
         owner_bar_ly.addWidget(self.libreta_fecha_bar)
 
         self.libreta_opciones_panel = QFrame()
@@ -1836,11 +1837,41 @@ class QuoteSatelliteWindow(QMainWindow):
         owner_panel_ly.setSpacing(14)
         col_izq = QVBoxLayout()
         col_izq.setSpacing(8)
-        dia_ly, mov_col_ly, afl_ly = QVBoxLayout(), QVBoxLayout(), QVBoxLayout()
-        for sub in (dia_ly, mov_col_ly, afl_ly):
-            sub.setSpacing(8)
-            col_izq.addLayout(sub)
+        # Pestañas: Movimientos · Por día · Afluencia. Cada cosa con su lugar
+        # fijo — la afluencia quedaba al fondo de la página y solo aparecía
+        # si había datos («¿dónde queda afluencia?», Daniel 2026-11-05).
+        pestanas_ly = QHBoxLayout()
+        pestanas_ly.setSpacing(0)
+        self._libreta_pestanas: dict[str, tuple[QPushButton, QWidget]] = {}
+        self._libreta_pestana = "movimientos"
+        paginas: dict[str, QVBoxLayout] = {}
+        for clave, texto in (("movimientos", "🧾  Movimientos"), ("dia", "📅  Por día"), ("afluencia", "🚶  Afluencia")):
+            chip = QPushButton(texto)
+            chip.setObjectName("libretaPestana")
+            chip.setCheckable(True)
+            chip.setAutoDefault(False)
+            chip.setMinimumHeight(42)
+            chip.clicked.connect(lambda _c=False, k=clave: self._libreta_ver_pestana(k))
+            pestanas_ly.addWidget(chip)
+            pagina = QWidget()
+            pagina_ly = QVBoxLayout(pagina)
+            pagina_ly.setContentsMargins(0, 0, 0, 0)
+            pagina_ly.setSpacing(8)
+            paginas[clave] = pagina_ly
+            self._libreta_pestanas[clave] = (chip, pagina)
+        pestanas_ly.addStretch()
+        col_izq.addLayout(pestanas_ly)
+        for _chip, pagina in self._libreta_pestanas.values():
+            col_izq.addWidget(pagina)
         col_izq.addStretch(1)
+        dia_ly, mov_col_ly, afl_ly = paginas["dia"], paginas["movimientos"], paginas["afluencia"]
+        self._libreta_pestanas["dia"][0].setToolTip("El resumen de cada día, cuando ves varios")
+        self.libreta_afluencia_vacio = QLabel(
+            "Las cámaras no contaron a nadie en estas fechas (o el contador no está corriendo)."
+        )
+        self.libreta_afluencia_vacio.setObjectName("libretaMovVacio")
+        self.libreta_afluencia_vacio.setWordWrap(True)
+        afl_ly.addWidget(self.libreta_afluencia_vacio)
         self.libreta_col_der = QWidget()
         self.libreta_col_der.setFixedWidth(330)
         col_der = QVBoxLayout(self.libreta_col_der)
@@ -1947,6 +1978,8 @@ class QuoteSatelliteWindow(QMainWindow):
         mov_ly.setContentsMargins(0, 0, 0, 0)
         mov_ly.setSpacing(8)
         self._libreta_secciones["movimientos"]["cuerpo"] = [self.libreta_mov_cuerpo]
+        self._libreta_secciones["movimientos"]["sin_encabezado"] = True
+        self.libreta_mov_seccion.setVisible(False)
         # Filtros rápidos por tipo (para cuadrar tarjeta vs voucher, etc.)
         filtros_ly = QHBoxLayout()
         filtros_ly.setSpacing(6)
@@ -2015,18 +2048,30 @@ class QuoteSatelliteWindow(QMainWindow):
         # CAJA por defecto). No guarda nada; el DVR sirve el clip por RTSP.
         self.libreta_momento_button = QPushButton("📹 Ver momento")
         self.libreta_momento_button.clicked.connect(lambda: self._ver_momento_libreta())
-        for accion_btn in (
+        self.libreta_reprint_button.setText("🖨 Reimprimir")
+        acciones_grid = QGridLayout()
+        acciones_grid.setSpacing(6)
+        for n, accion_btn in enumerate((
             self.libreta_reprint_button,
             self.libreta_pago_button,
             self.libreta_reasignar_button,
-            self.libreta_privado_button,
-            self.libreta_delete_button,
             self.libreta_momento_button,
-        ):
-            accion_btn.setObjectName("secondaryButton")
+        )):
+            accion_btn.setObjectName("libretaAccion")
             accion_btn.setAutoDefault(False)
-            accion_btn.setMinimumHeight(40)
-            acciones_ly.addWidget(accion_btn)
+            accion_btn.setMinimumHeight(42)
+            acciones_grid.addWidget(accion_btn, n // 2, n % 2)
+        self.libreta_privado_button.setObjectName("libretaAccion")
+        self.libreta_privado_button.setAutoDefault(False)
+        self.libreta_privado_button.setMinimumHeight(42)
+        acciones_grid.addWidget(self.libreta_privado_button, 2, 0, 1, 2)
+        # Borrar va aparte y en otro tono: es lo único que no tiene vuelta.
+        self.libreta_delete_button.setText("🗑 Borrar este movimiento")
+        self.libreta_delete_button.setObjectName("libretaAccionBorrar")
+        self.libreta_delete_button.setAutoDefault(False)
+        self.libreta_delete_button.setMinimumHeight(36)
+        acciones_grid.addWidget(self.libreta_delete_button, 3, 0, 1, 2)
+        acciones_ly.addLayout(acciones_grid)
         self.libreta_acciones_bar.setVisible(False)
         # Sin nada elegido, la columna dice para qué sirve en vez de quedar vacía.
         self.libreta_mov_vacio = QLabel(
@@ -2059,6 +2104,9 @@ class QuoteSatelliteWindow(QMainWindow):
         )
         self.libreta_table.verticalHeader().setVisible(False)
         self.libreta_table.setAlternatingRowColors(True)
+        self.libreta_table.setShowGrid(False)
+        self.libreta_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.libreta_table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.libreta_table.cellDoubleClicked.connect(
             lambda fila, _col: self._mostrar_detalle_libreta(fila)
         )
@@ -2895,9 +2943,31 @@ class QuoteSatelliteWindow(QMainWindow):
         abierta = header.isChecked()
         flecha = "▾" if abierta else "▸"
         header.setText(f"{flecha}  {sec['titulo']}")
-        visible = not header.isHidden() and abierta
+        visible = (sec.get("sin_encabezado") or not header.isHidden()) and abierta
         for w in sec["cuerpo"]:
             w.setVisible(visible)
+        self._sync_libreta_pestanas()
+
+    def _libreta_ver_pestana(self, clave: str) -> None:
+        self._libreta_pestana = clave
+        self._sync_libreta_pestanas()
+
+    def _sync_libreta_pestanas(self) -> None:
+        """Qué pestaña se ve, y cuáles tienen algo que enseñar ahora."""
+        pestanas = getattr(self, "_libreta_pestanas", None)
+        if not pestanas or not hasattr(self, "libreta_afluencia_seccion"):
+            return
+        hay_dia = not self.libreta_daily_seccion.isHidden()
+        hay_afluencia = not self.libreta_afluencia_seccion.isHidden()
+        pestanas["dia"][0].setEnabled(hay_dia)
+        vacio = getattr(self, "libreta_afluencia_vacio", None)
+        if vacio is not None:
+            vacio.setVisible(not hay_afluencia)
+        if self._libreta_pestana == "dia" and not hay_dia:
+            self._libreta_pestana = "movimientos"     # «Por día» no existe viendo un solo día
+        for clave, (chip, pagina) in pestanas.items():
+            chip.setChecked(clave == self._libreta_pestana)
+            pagina.setVisible(clave == self._libreta_pestana)
 
     def _seccion_libreta(self, key: str, *, visible: bool, titulo: str | None = None, abierta: bool | None = None) -> None:
         """Muestra/oculta una sección plegable (y opcionalmente la abre/cierra o retitula)."""
@@ -3530,6 +3600,12 @@ class QuoteSatelliteWindow(QMainWindow):
         return " · ".join(partes)
 
     def _pintar_afluencia_libreta(self, filas: list) -> None:
+        QuoteSatelliteWindow._pintar_afluencia_tabla(self, filas)
+        sync = getattr(self, "_sync_libreta_pestanas", None)
+        if sync is not None:
+            sync()      # la pestaña sabe si hay algo que enseñar
+
+    def _pintar_afluencia_tabla(self, filas: list) -> None:
         """Tabla por hora: entran, pasan por fuera, ventas y conversión. Oculta sin datos."""
         from pos_uniformes.services.afluencia_service import totales
 

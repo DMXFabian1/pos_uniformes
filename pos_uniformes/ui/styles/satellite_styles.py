@@ -850,6 +850,50 @@ QPushButton#libretaSeccion:hover {
 QPushButton#libretaSeccion:checked {
     color: #73341c;
 }
+QPushButton#libretaPestana {
+    background: transparent;
+    color: #8a8177;
+    border: none;
+    border-bottom: 3px solid #e8dbc7;
+    border-radius: 0;
+    font-size: 15px;
+    font-weight: 800;
+    padding: 6px 20px;
+}
+QPushButton#libretaPestana:hover { color: #73341c; }
+QPushButton#libretaPestana:checked { color: #73341c; border-bottom: 3px solid #a84f2d; }
+QPushButton#libretaPestana:disabled { color: #cfc4b5; }
+QPushButton#libretaCajaBoton {
+    background: #fffdf8;
+    color: #73341c;
+    border: 1.5px solid #c9a583;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 800;
+    padding: 0 18px;
+    min-height: 44px;
+}
+QPushButton#libretaCajaBoton:hover, QPushButton#libretaCajaBoton:pressed { background: #f7e3d8; }
+QPushButton#libretaCajaBoton::menu-indicator { image: none; width: 0; }
+QPushButton#libretaAccion {
+    background: #fffdf8;
+    color: #2c2a27;
+    border: 1px solid #ddd0c0;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 0 8px;
+}
+QPushButton#libretaAccion:hover, QPushButton#libretaAccion:pressed { background: #f7e3d8; border-color: #c9a583; }
+QPushButton#libretaAccion:disabled { color: #b9afa2; background: #f6f1e8; }
+QPushButton#libretaAccionBorrar {
+    background: transparent;
+    color: #a33b25;
+    border: none;
+    font-size: 12px;
+    font-weight: 700;
+}
+QPushButton#libretaAccionBorrar:hover { text-decoration: underline; }
 QFrame#libretaFechaBar {
     background: #fffdf8;
     border: 1px solid #e3d5c2;
