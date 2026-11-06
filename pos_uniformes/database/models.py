@@ -2025,6 +2025,9 @@ class Trabajo(Base):
         index=True,
     )
     origen: Mapped[str] = mapped_column(String(60), nullable=False, default="principal", index=True)
+    #: Identificador de la PC que DEBE imprimirlo (`satelite.identificador`).
+    #: Vacío = lo imprime quien lo tome, como siempre.
+    destino: Mapped[str | None] = mapped_column(String(40), index=True)
     prioridad: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     contenido: Mapped[dict] = mapped_column(
         JSON().with_variant(JSONB(), "postgresql"),
@@ -2154,6 +2157,9 @@ class Satelite(Base):
     identificador: Mapped[str] = mapped_column(String(40), nullable=False, unique=True, index=True)
     nombre: Mapped[str] = mapped_column(String(60), nullable=False, default="satelite")
     ultimo_visto: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    #: Qué sabe imprimir esta PC ("TICKET,CORTE,…"), publicado con su latido:
+    #: así otra PC puede ofrecerla como destino si su impresora falla.
+    imprime: Mapped[str | None] = mapped_column(String(120))
     creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

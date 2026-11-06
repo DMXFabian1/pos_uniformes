@@ -52,8 +52,12 @@ def registrar(
     nombre: str,
     *,
     ahora: datetime | None = None,
+    imprime: str | None = None,
 ) -> Satelite:
     """Alta o actualización (upsert) del satélite + heartbeat. No hace commit.
+
+    De paso publica qué sabe imprimir esta PC (`imprime`; por defecto lo que
+    diga «Impresoras de esta PC»), para que otra la pueda elegir como destino.
 
     En una máquina de desarrollo no escribe nada: devuelve el registro que
     hubiera (o uno sin guardar) y no late."""
@@ -63,20 +67,67 @@ def registrar(
     )
     if es_de_desarrollo():
         return sat or Satelite(identificador=identificador[:40], nombre=(nombre or "satelite")[:60])
+    imprime = _lo_que_imprime_esta_pc() if imprime is None else imprime
     if sat is None:
         sat = Satelite(
             identificador=identificador[:40],
             nombre=(nombre or "satelite")[:60],
             ultimo_visto=momento,
+            imprime=imprime,
         )
         session.add(sat)
     else:
+        sat.imprime = imprime
         if nombre and sat.nombre != nombre[:60]:
             _llevar_el_buzon(session, sat.nombre, nombre[:60])
             sat.nombre = nombre[:60]
         sat.ultimo_visto = momento
     session.flush()
     return sat
+
+
+def _lo_que_imprime_esta_pc() -> str:
+    try:
+        from pos_uniformes.services.print_routing_cache_service import impresoras_de_esta_pc
+
+        return ",".join(impresoras_de_esta_pc())[:120]
+    except Exception:  # noqa: BLE001
+        return ""
+
+
+def otras_impresoras(session: Session, tipo: str, mi_identificador: str, *, ahora: datetime | None = None) -> list[dict]:
+    """Las OTRAS PCs que imprimen `tipo` ("TICKET"…): [{identificador, nombre, online}].
+
+    Primero las encendidas. Una apagada también sale (para que se vea que
+    existe y por qué no se puede elegir), salvo que lleve más de una semana
+    sin aparecer. Si la base aún no tiene la columna, no hay ninguna."""
+    momento = ahora or _ahora()
+    tipo = str(tipo).strip().upper()
+    try:
+        with session.begin_nested():
+            sats = listar(session)
+    except Exception:  # noqa: BLE001 — base sin migrar
+        return []
+    salida = []
+    for sat in sats:
+        if sat.identificador == mi_identificador:
+            continue
+        if tipo not in [t.strip().upper() for t in (sat.imprime or "").split(",")]:
+            continue
+        visto = sat.ultimo_visto
+        if visto is None:
+            continue
+        if visto.tzinfo is None:
+            visto = visto.replace(tzinfo=timezone.utc)
+        if momento - visto > timedelta(days=7):
+            continue
+        salida.append({
+            "identificador": sat.identificador,
+            "nombre": sat.nombre,
+            "online": esta_online(sat, ahora=momento),
+        })
+    salida.sort(key=lambda d: (not d["online"], d["nombre"].lower()))
+    return salida
 
 
 def _llevar_el_buzon(session: Session, viejo: str, nuevo: str) -> None:

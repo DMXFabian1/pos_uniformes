@@ -52,6 +52,7 @@ class TrabajoDispatcher:
         *,
         schedule: Callable[[int, Callable[[], None]], None] | None = None,
         tipos: Iterable[TipoTrabajo] | None = None,
+        para: str | None = None,
         on_event: Callable[[int, EstadoTrabajo, str | None], None] | None = None,
         connectivity_probe: Callable[[], bool] | None = None,
         idle_interval_ms: int = DEFAULT_IDLE_INTERVAL_MS,
@@ -84,6 +85,8 @@ class TrabajoDispatcher:
         self._handlers = dict(handlers)
         self._schedule = schedule
         self._tipos = list(tipos) if tipos is not None else list(self._handlers.keys())
+        # Identificador de esta PC: no toma lo que va dirigido a otra.
+        self._para = para
         self._on_event = on_event
         self._connectivity_probe = connectivity_probe
         self._idle_interval_ms = idle_interval_ms
@@ -136,7 +139,7 @@ class TrabajoDispatcher:
                 logger.exception("Despachador: no se pudieron soltar los reclamos vencidos")
                 session.rollback()
 
-            trabajo = svc.reclamar_siguiente(session, tipos=self._tipos)
+            trabajo = svc.reclamar_siguiente(session, tipos=self._tipos, para=self._para)
             if trabajo is None:
                 session.rollback()
                 return None

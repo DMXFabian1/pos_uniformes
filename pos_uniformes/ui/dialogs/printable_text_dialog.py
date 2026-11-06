@@ -540,8 +540,17 @@ def open_tickets_print_dialog(
     alt_checkbox_label: str | None = None,
     on_printed: "Callable[[], None] | None" = None,
     on_back: "Callable[[], None] | None" = None,
+    destinos: "list[dict] | None" = None,
+    enviar_a: "Callable[[str, list[str]], int] | None" = None,
 ) -> None:
     """Muestra uno o varios tickets en una sola vista.
+
+    destinos + enviar_a: las OTRAS PCs que imprimen tickets
+    (`[{identificador, nombre, online}]`). Con alguna, sale «¿DÓNDE SE
+    IMPRIME?» con una ficha por impresora —esta primero y marcada—; eligiendo
+    otra, Imprimir manda el ticket a su cola con `enviar_a(identificador,
+    textos)` en vez de imprimirlo aquí. Para cuando esta impresora falla
+    (Daniel, 2026-11-05).
 
     on_back agrega "← Regresar": cierra sin imprimir (no llama on_printed) y
     después invoca on_back para volver a la pregunta anterior (p.ej. cambiar
@@ -592,6 +601,12 @@ def open_tickets_print_dialog(
         "  font-size: 18px; font-weight: 800; min-height: 56px; padding: 0 28px; }"
         "QPushButton#ticketImprimir:pressed { background: #8a4326; }"
         "QPushButton#ticketImprimir:disabled { background: #c9a996; color: #f4ede2; }"
+        "QLabel#ticketSeccion { color: #73341c; font-size: 11px; font-weight: 800; }"
+        "QPushButton#ticketDestino { background: #fdfaf6; color: #2c2a27; text-align: left;"
+        "  border: 2px solid #ddd0c0; border-radius: 14px; padding: 8px 14px;"
+        "  font-size: 14px; font-weight: 700; min-height: 46px; }"
+        "QPushButton#ticketDestino:checked { background: #f7e3d8; border-color: #a84f2d; color: #73341c; }"
+        "QPushButton#ticketDestino:disabled { background: #f1ece4; color: #a89f93; border-color: #e6ddd0; }"
     )
     ScannerEnterGuard(dialog)
 
@@ -681,8 +696,88 @@ def open_tickets_print_dialog(
 
     printed_notified = False
 
+    # ── ¿Dónde se imprime? ───────────────────────────────────────────────
+    # Fichas como las del tamaño de etiqueta: esta PC primero y marcada; las
+    # otras, encendidas o no (una apagada se ve, pero no se puede elegir).
+    AQUI = ""
+    destino_elegido = {"id": AQUI, "nombre": ""}
+    destino_botones: dict[str, QPushButton] = {}
+    destinos_box: QWidget | None = None
+    otras = [d for d in (destinos or []) if d.get("identificador")] if enviar_a is not None else []
+    if otras:
+        destinos_box = QWidget()
+        destinos_ly = QVBoxLayout(destinos_box)
+        destinos_ly.setContentsMargins(0, 0, 0, 0)
+        destinos_ly.setSpacing(6)
+        seccion = QLabel("¿DÓNDE SE IMPRIME?")
+        seccion.setObjectName("ticketSeccion")
+        destinos_ly.addWidget(seccion)
+        fila_destinos = QHBoxLayout()
+        fila_destinos.setSpacing(8)
+
+        def _ficha(ident: str, texto: str, habilitada: bool = True) -> QPushButton:
+            btn = QPushButton(texto)
+            btn.setObjectName("ticketDestino")
+            btn.setCheckable(True)
+            btn.setAutoDefault(False)
+            btn.setEnabled(habilitada)
+            destino_botones[ident] = btn
+            fila_destinos.addWidget(btn, 1)
+            return btn
+
+        _ficha(AQUI, "🖨  Aquí\nla impresora de esta PC").setChecked(True)
+        for d in otras:
+            _ficha(
+                d["identificador"],
+                f"🖨  {d['nombre']}\n{'encendida' if d.get('online') else 'apagada: no se puede mandar'}",
+                bool(d.get("online")),
+            )
+        destinos_ly.addLayout(fila_destinos)
+
+        def _elegir(ident: str) -> None:
+            destino_elegido["id"] = ident
+            destino_elegido["nombre"] = next((d["nombre"] for d in otras if d["identificador"] == ident), "")
+            for clave, btn in destino_botones.items():
+                btn.setChecked(clave == ident)
+            if queue.is_printing() or (alt_queue is not None and alt_queue.is_printing()):
+                return
+            print_button.setText(idle_label if ident == AQUI else f"📡  Mandar a {destino_elegido['nombre']}")
+
+        for clave, btn in destino_botones.items():
+            btn.clicked.connect(lambda _c=False, k=clave: _elegir(k))
+        dialog.destino_botones = destino_botones   # para las pruebas
+
+    def _mandar_a_otra(textos: list[str]) -> bool:
+        """Encola el ticket para la PC elegida. False si no se pudo (y lo dice)."""
+        nombre = destino_elegido["nombre"]
+        try:
+            cuantos = enviar_a(destino_elegido["id"], textos)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(
+                dialog, "No se pudo mandar",
+                f"No se pudo mandar a {nombre}.\n\n{exc}\n\nRevisa la conexión con la PC principal.",
+            )
+            return False
+        QMessageBox.information(
+            dialog, "Enviado",
+            f"{cuantos} {unit_label}{'s' if cuantos != 1 else ''} en camino a {nombre}.\nSale en su impresora en unos segundos.",
+        )
+        return True
+
     def _start_print() -> None:
         nonlocal printed_notified
+        if destino_elegido["id"] != AQUI:
+            use_alt = alt_checkbox is not None and alt_checkbox.isChecked()
+            if not _mandar_a_otra(alt_tickets if use_alt else tickets):
+                return
+            if on_printed is not None and not printed_notified:
+                printed_notified = True
+                try:
+                    on_printed()
+                except Exception:  # noqa: BLE001
+                    pass
+            dialog.accept()
+            return
         # Candado entre AMBAS colas: un segundo clic con el checkbox cambiado
         # arrancaba la otra cola en paralelo (tickets duplicados intercalados).
         if queue.is_printing() or (alt_queue is not None and alt_queue.is_printing()):
@@ -723,6 +818,8 @@ def open_tickets_print_dialog(
     layout.addWidget(editor, 1)
     if alt_checkbox is not None:
         layout.addWidget(alt_checkbox)
+    if destinos_box is not None:
+        layout.addWidget(destinos_box)
     botones_ly = QHBoxLayout()
     botones_ly.setSpacing(12)
     if back_button is not None:

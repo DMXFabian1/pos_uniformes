@@ -55,7 +55,41 @@ def route_tickets(
             alt_checkbox_label=alt_checkbox_label,
             on_printed=on_printed,
             on_back=on_back,
+            # Por si esta impresora falla: las otras PCs que imprimen tickets.
+            destinos=otras_impresoras_de_tickets(),
+            enviar_a=lambda destino, textos: encolar_para(destino, textos, origen),
         )
+
+
+def otras_impresoras_de_tickets() -> list[dict]:
+    """Las otras PCs que imprimen tickets, para elegirlas en la ventana.
+
+    Vacío si no hay conexión o la base no las conoce: la ventana queda como
+    siempre, sin selector."""
+    try:
+        from pos_uniformes.services.satellite_startup_service import probe_database_host
+
+        if not probe_database_host(0.5):
+            return []
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.services.satelite_registry_service import otras_impresoras
+        from pos_uniformes.services.satellite_identity_service import get_satellite_id
+
+        with get_session() as session:
+            return otras_impresoras(session, "TICKET", get_satellite_id())
+    except Exception:  # noqa: BLE001 — sin esto se imprime aquí, como siempre
+        return []
+
+
+def encolar_para(destino: str, tickets: list[str], origen: str) -> int:
+    """Encola los tickets dirigidos a la PC `destino`. Devuelve cuántos."""
+    from pos_uniformes.database.connection import get_session
+    from pos_uniformes.services import trabajos_service as svc
+
+    with get_session() as session:
+        creados = svc.enviar_tickets(session, tickets, origen=origen, destino=destino)
+        session.commit()
+    return len(creados)
 
 
 def _enviar_al_satelite(parent: QWidget, tickets: list[str], origen: str) -> bool:

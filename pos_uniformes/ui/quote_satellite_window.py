@@ -529,6 +529,7 @@ class QuoteSatelliteWindow(QMainWindow):
             from pos_uniformes.ui.helpers.trabajo_print_handlers import build_handlers
 
             from pos_uniformes.services.print_routing_cache_service import tipos_que_atiende
+            from pos_uniformes.ui.helpers.servidor_impresion_runner import mi_identificador
 
             self._trabajo_dispatcher = TrabajoDispatcher(
                 get_session,
@@ -538,6 +539,7 @@ class QuoteSatelliteWindow(QMainWindow):
                 # tickets pero no las Brother reclamaría etiquetas y las dejaría
                 # en ERROR (2026-10-07).
                 tipos=tipos_que_atiende(),
+                para=mi_identificador(),
                 schedule=QTimer.singleShot,
                 on_event=self._on_trabajo_event,
                 # No abrir conexión (que bloquea el hilo de UI hasta el

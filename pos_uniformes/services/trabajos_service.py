@@ -41,8 +41,12 @@ def encolar(
     origen: str = "principal",
     creado_por: str = "SYSTEM",
     prioridad: int = 0,
+    destino: str | None = None,
 ) -> Trabajo:
-    """Crea un trabajo PENDIENTE y lo deja en la cola. Hace flush para asignar id."""
+    """Crea un trabajo PENDIENTE y lo deja en la cola. Hace flush para asignar id.
+
+    `destino`: identificador de la PC que debe imprimirlo; sin él lo toma
+    cualquiera que atienda ese tipo."""
     if not isinstance(tipo, TipoTrabajo):
         raise TypeError(f"tipo debe ser TipoTrabajo, no {type(tipo)!r}")
     if not isinstance(contenido, dict):
@@ -55,6 +59,7 @@ def encolar(
         origen=(origen or "principal").strip() or "principal",
         creado_por=(creado_por or "SYSTEM").strip() or "SYSTEM",
         prioridad=prioridad,
+        destino=(destino or "").strip()[:40] or None,
     )
     session.add(trabajo)
     session.flush()
@@ -79,6 +84,7 @@ def enviar_ticket(
     *,
     origen: str = "principal",
     creado_por: str = "SYSTEM",
+    destino: str | None = None,
 ) -> Trabajo:
     """Encola un ticket (texto ya renderizado a 80mm) para imprimir en el satélite."""
     if not texto or not texto.strip():
@@ -89,6 +95,7 @@ def enviar_ticket(
         {"texto": texto},
         origen=origen,
         creado_por=creado_por,
+        destino=destino,
     )
 
 
@@ -98,13 +105,14 @@ def enviar_tickets(
     *,
     origen: str = "principal",
     creado_por: str = "SYSTEM",
+    destino: str | None = None,
 ) -> list[Trabajo]:
     """Encola varios tickets de una venta/apartado en orden. Ignora los vacíos."""
     creados: list[Trabajo] = []
     for texto in textos:
         if texto and texto.strip():
             creados.append(
-                enviar_ticket(session, texto, origen=origen, creado_por=creado_por)
+                enviar_ticket(session, texto, origen=origen, creado_por=creado_por, destino=destino)
             )
     return creados
 
@@ -315,10 +323,18 @@ def listar(
     return list(session.scalars(stmt))
 
 
+def _solo_los_mios(stmt, para: str | None):
+    """Los que no van dirigidos a nadie, más los dirigidos a `para`."""
+    if not para:
+        return stmt
+    return stmt.where(or_(Trabajo.destino.is_(None), Trabajo.destino == para))
+
+
 def siguiente_pendiente(
     session: Session,
     *,
     tipos: Iterable[TipoTrabajo] | None = None,
+    para: str | None = None,
 ) -> Trabajo | None:
     """Devuelve el siguiente trabajo PENDIENTE disponible sin cambiar su estado (peek)."""
     stmt = (
@@ -330,6 +346,7 @@ def siguiente_pendiente(
     )
     if tipos is not None:
         stmt = stmt.where(Trabajo.tipo.in_(list(tipos)))
+    stmt = _solo_los_mios(stmt, para)
     return session.scalars(stmt).first()
 
 
@@ -337,8 +354,13 @@ def reclamar_siguiente(
     session: Session,
     *,
     tipos: Iterable[TipoTrabajo] | None = None,
+    para: str | None = None,
 ) -> Trabajo | None:
     """Toma atómicamente el siguiente PENDIENTE y lo pasa a EN_PROCESO.
+
+    `para`: identificador de ESTA PC. Con él no se toman los trabajos dirigidos
+    a otra: el kiosko cuya impresora falló manda su ticket a la principal, y si
+    él mismo atiende tickets se lo volvería a quedar.
 
     Usa FOR UPDATE SKIP LOCKED para que varios despachadores (o hilos) no tomen
     el mismo trabajo. En SQLite (tests) el lock se ignora sin error.
@@ -354,6 +376,7 @@ def reclamar_siguiente(
     )
     if tipos is not None:
         stmt = stmt.where(Trabajo.tipo.in_(list(tipos)))
+    stmt = _solo_los_mios(stmt, para)
     trabajo = session.scalars(stmt).first()
     if trabajo is None:
         return None

@@ -47,6 +47,34 @@ def tomar_candado() -> bool:
     return True
 
 
+def mi_identificador() -> str | None:
+    """El identificador de esta PC en el registro, o None si no se puede leer
+    (sin él el despachador se porta como siempre: toma lo de todos)."""
+    try:
+        from pos_uniformes.services.satellite_identity_service import get_satellite_id
+
+        return get_satellite_id() or None
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def latir(session_factory=None) -> bool:
+    """Un latido en el registro de PCs (con lo que esta imprime). Nunca truena."""
+    try:
+        from pos_uniformes.services.satelite_registry_service import registrar
+        from pos_uniformes.services.satellite_identity_service import get_satellite_id, get_satellite_name
+
+        if session_factory is None:
+            from pos_uniformes.database.connection import get_session as session_factory
+        with session_factory() as session:
+            registrar(session, get_satellite_id(), get_satellite_name())
+            session.commit()
+        return True
+    except Exception:  # noqa: BLE001 — sin base no late; el despachador sigue
+        logger.debug("Servidor de impresión: no se pudo latir", exc_info=True)
+        return False
+
+
 def es_servidor_de_impresion() -> tuple[bool, str]:
     """(es_servidor, cómo se llama esta PC) según el menú admin del kiosko."""
     from pos_uniformes.services.print_routing_cache_service import (
@@ -81,6 +109,7 @@ def correr(app, *, drenar: bool = False, origen: str = "") -> int:
         get_session,
         build_handlers(),
         tipos=tipos,
+        para=mi_identificador(),
         schedule=QTimer.singleShot,
         on_event=lambda tid, estado, err: logger.info(
             "Trabajo %s → %s%s", tid, getattr(estado, "value", estado), f" ({err})" if err else ""
@@ -108,6 +137,14 @@ def correr(app, *, drenar: bool = False, origen: str = "") -> int:
     despertador = QTimer()
     despertador.start(500)
     despertador.timeout.connect(lambda: None)
+
+    # Late como cualquier pantalla: el servidor de impresión corre con el
+    # kiosko cerrado, y sin latido esta PC saldría «apagada» justo cuando otra
+    # la quiere elegir para mandarle un ticket (2026-11-05).
+    latido = QTimer()
+    latido.timeout.connect(latir)
+    latido.start(60_000)
+    QTimer.singleShot(0, latir)
 
     despachador.start()
     return int(app.exec())
