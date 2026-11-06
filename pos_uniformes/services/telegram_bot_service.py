@@ -93,6 +93,7 @@ AYUDA = (
     "/version — qué versión trae la PC principal y cuál corren los kioskos\n"
     "/actualizar — trae lo nuevo y actualiza la tienda (respaldo antes, y vuelta atrás si falla)\n"
     "/volver — los kioskos regresan a la versión anterior, si la nueva salió mala\n"
+    "/camaras — si el contador de personas está contando y si sus números tienen sentido\n"
     "\nGENTE\n"
     "/asistencia — quién vino hoy, con un comando por empleada para marcar\n"
     "/falta_Fanny · /descanso_Fanny · /vino_Fanny — o con espacio: /falta Fanny\n"
@@ -314,6 +315,11 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
         from pos_uniformes.services import telegram_actualizar_service as tact
 
         return tact.atender_actualizar(cmd.argumento)
+    if cmd.nombre in ("camaras", "cámaras", "afluencia"):
+        from pos_uniformes.services import camaras_revision_service as crev
+
+        with session_factory() as session:
+            return crev.texto(crev.revisar(session, hoy=hoy))
     if cmd.nombre in ("version", "versión"):
         from pos_uniformes.services import telegram_actualizar_service as tact
 
