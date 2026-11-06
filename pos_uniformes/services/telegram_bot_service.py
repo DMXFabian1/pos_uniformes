@@ -89,6 +89,10 @@ AYUDA = (
     "/cartel Promoción de mochilas — rota sin interrumpir a nadie\n"
     "Mándame una foto y sale a pantalla completa (el pie de foto es el aviso)\n"
     "/avisos — los que están puestos, quién los vio, y quitarlos\n"
+    "\nEL SISTEMA\n"
+    "/version — qué versión trae la PC principal y cuál corren los kioskos\n"
+    "/actualizar — trae lo nuevo y actualiza la tienda (respaldo antes, y vuelta atrás si falla)\n"
+    "/volver — los kioskos regresan a la versión anterior, si la nueva salió mala\n"
     "\nGENTE\n"
     "/asistencia — quién vino hoy, con un comando por empleada para marcar\n"
     "/falta_Fanny · /descanso_Fanny · /vino_Fanny — o con espacio: /falta Fanny\n"
@@ -306,6 +310,18 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
         # El aviso va DESPUÉS y no cancela nada: el corte ya se hizo y hay que
         # decir lo que se guardó, no tragárselo.
         return mensaje + ("\n\n⚠️ " + opciones.aviso if opciones.aviso else "")
+    if cmd.nombre in ("actualizar", "actualiza"):
+        from pos_uniformes.services import telegram_actualizar_service as tact
+
+        return tact.atender_actualizar(cmd.argumento)
+    if cmd.nombre in ("version", "versión"):
+        from pos_uniformes.services import telegram_actualizar_service as tact
+
+        return tact.atender_version()
+    if cmd.nombre == "volver":
+        from pos_uniformes.services import telegram_actualizar_service as tact
+
+        return tact.atender_volver(cmd.argumento)
     if cmd.nombre == "nocorte":
         from pos_uniformes.services.corte_propuesta_service import cancelar
 

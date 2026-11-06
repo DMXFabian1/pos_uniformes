@@ -237,10 +237,25 @@ def _build_anuncios_boxes(dialog: QWidget) -> list[QGroupBox]:
         if not sat_estado:
             satelites_list.addItem("(Sin satélites registrados o sin conexión)")
         else:
+            # Cada PC dice con su latido qué versión trae: se ve quién ya tomó
+            # la actualización y quién se quedó atrás (2026-11-06).
+            try:
+                from pos_uniformes.services.satellite_update_service import version_remota
+
+                publicada = version_remota()
+            except Exception:  # noqa: BLE001
+                publicada = None
             for s in sat_estado:
                 punto = "🟢" if s["online"] else "⚪"
                 marca = "  (este)" if s["identificador"] == _mi_id else ""
-                satelites_list.addItem(f"{punto}  {s['nombre']}{marca}")
+                trae = (s.get("version") or "").strip()
+                if not trae:
+                    version = ""
+                elif publicada and trae != publicada:
+                    version = f"   ·   ⚠️ versión {rsvc.version_legible(trae)} (falta actualizar)"
+                else:
+                    version = f"   ·   versión {rsvc.version_legible(trae)}"
+                satelites_list.addItem(f"{punto}  {s['nombre']}{marca}{version}")
         # Lista de destinos (checkable) para el nuevo anuncio.
         destinos_list.clear()
         for s in sat_estado:

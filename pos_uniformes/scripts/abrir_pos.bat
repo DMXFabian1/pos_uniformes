@@ -60,20 +60,16 @@ if errorlevel 1 (
     goto :launch
 )
 
-echo Aplicando migraciones...
-.\.venv\Scripts\python.exe -m alembic upgrade head
-if errorlevel 1 (
-    echo *** Fallo la migracion - abriendo de todas formas. Manda reporte. ***
-    timeout /t 6 >nul
-    goto :launch
-)
-
+rem El orden y la vuelta atras viven en scripts\actualizar.py: build (sin
+rem publicar), respaldo + migraciones, y al final se publica a los kioskos.
+rem Si algo falla antes de publicar, la base no se toca, el codigo regresa a
+rem lo que corren los kioskos y el POS abre con eso. Avisa por Telegram.
 :build
-echo Build del satelite y publicacion a kioskos (unos minutos)...
-call scripts\build_presupuestos_satelite_windows.bat
+echo Aplicando lo nuevo: build, respaldo, migraciones y publicacion (unos minutos)...
+call scripts\actualizar_seguro.bat --al-abrir
 if errorlevel 1 (
-    echo *** Fallo la build del satelite - el POS abre igual. Manda reporte. ***
-    timeout /t 6 >nul
+    echo *** La actualizacion no quedo - el POS abre con lo de antes. Arriba dice por que. ***
+    timeout /t 8 >nul
 )
 goto :launch
 

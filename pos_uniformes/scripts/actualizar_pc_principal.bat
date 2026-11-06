@@ -22,17 +22,16 @@ git pull
 if errorlevel 1 goto :error
 
 echo.
-echo === 2/3 Aplicando migraciones de base de datos ===
-.\.venv\Scripts\python.exe -m alembic upgrade head
+echo === 2/3 Build, respaldo, migraciones y publicacion ===
+rem El orden y la vuelta atras viven en scripts\actualizar.py: primero el build
+rem (sin publicar), luego respaldo + migraciones, y al final se publica a los
+rem kioskos. Si algo falla antes de publicar, la base no se toca y el codigo
+rem regresa a lo que corren los kioskos. Avisa por Telegram como termino.
+call scripts\actualizar_seguro.bat
 if errorlevel 1 goto :error
 
 echo.
-echo === 3/3 Build del satelite (publica solo a los kioskos) ===
-call scripts\build_presupuestos_satelite_windows.bat
-if errorlevel 1 goto :error
-
-echo.
-echo === Dejando tareas y servicios al dia (y los pasos de una sola vez) ===
+echo === 3/3 Dejando tareas y servicios al dia (y los pasos de una sola vez) ===
 call scripts\postactualizacion.bat --pasos-unicos
 
 echo.
@@ -49,6 +48,7 @@ exit /b 0
 
 :error
 echo.
-echo *** ALGO FALLO - toma foto de este error y mandala ***
+echo *** ALGO FALLO - arriba dice que paso y como quedo todo. ***
+echo     Tambien llego por Telegram; el detalle esta en reportes\ultimo_update.log
 pause
 exit /b 1

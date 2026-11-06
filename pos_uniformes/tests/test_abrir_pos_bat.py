@@ -19,8 +19,10 @@ class AbrirPosTests(unittest.TestCase):
         self.texto = BAT.read_text(encoding="utf-8", errors="replace")
 
     def test_hace_los_cuatro_pasos_y_abre(self) -> None:
-        for paso in ("git fetch origin", "git pull", "alembic upgrade head",
-                     "build_presupuestos_satelite_windows.bat", "postactualizacion.bat", "main.py"):
+        # Desde 2026-11-06 migrar y publicar los hace scripts/actualizar.py, en
+        # su orden (build → respaldo → migraciones → publicar) y con vuelta atrás.
+        for paso in ("git fetch origin", "git pull", "actualizar_seguro.bat --al-abrir",
+                     "postactualizacion.bat", "main.py"):
             self.assertIn(paso, self.texto, f"falta el paso: {paso}")
 
     def test_si_los_kioskos_quedaron_atras_republica(self) -> None:
@@ -40,4 +42,5 @@ class AbrirPosTests(unittest.TestCase):
     def test_nunca_deja_de_abrir_el_pos(self) -> None:
         # Todo error cae a :launch; el POS abre aunque falle la actualización.
         self.assertGreaterEqual(self.texto.count("goto :launch"), 4)
+        self.assertNotIn("alembic upgrade head", self.texto)       # nunca migra sin respaldo
         self.assertTrue(self.texto.rstrip().endswith("exit /b 0"))

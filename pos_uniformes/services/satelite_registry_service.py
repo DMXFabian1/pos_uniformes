@@ -68,22 +68,47 @@ def registrar(
     if es_de_desarrollo():
         return sat or Satelite(identificador=identificador[:40], nombre=(nombre or "satelite")[:60])
     imprime = _lo_que_imprime_esta_pc() if imprime is None else imprime
+    version = _mi_version()
     if sat is None:
         sat = Satelite(
             identificador=identificador[:40],
             nombre=(nombre or "satelite")[:60],
             ultimo_visto=momento,
             imprime=imprime,
+            version=version,
         )
         session.add(sat)
     else:
         sat.imprime = imprime
+        if version:
+            sat.version = version
         if nombre and sat.nombre != nombre[:60]:
             _llevar_el_buzon(session, sat.nombre, nombre[:60])
             sat.nombre = nombre[:60]
         sat.ultimo_visto = momento
     session.flush()
     return sat
+
+
+def _mi_version() -> str | None:
+    """«2026.11.06+6ba73b01»: lo mismo que se publica para los kioskos."""
+    try:
+        from pos_uniformes.utils.app_metadata import sello_del_codigo
+
+        return (sello_del_codigo() or "")[:40] or None
+    except Exception:  # noqa: BLE001 — sin versión no se deja de latir
+        return None
+
+
+def version_legible(sello: str | None) -> str:
+    """«6 nov · 6ba73b01» a partir de lo que publica cada PC; "" si no ha dicho."""
+    import re
+
+    m = re.match(r"^(\d{4})\.(\d{2})\.(\d{2})\+([0-9a-fA-F]{6,40})$", (sello or "").strip())
+    if not m or not 1 <= int(m.group(2)) <= 12:
+        return (sello or "").strip()
+    meses = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
+    return f"{int(m.group(3))} {meses[int(m.group(2)) - 1]} · {m.group(4)}"
 
 
 def _lo_que_imprime_esta_pc() -> str:
@@ -187,9 +212,18 @@ def listar_con_estado(
                 "nombre": sat.nombre,
                 "online": esta_online(sat, umbral_seg=umbral_seg, ahora=momento),
                 "ultimo_visto": sat.ultimo_visto,
+                "version": sat.version,
             }
         )
     return salida
+
+
+def atrasadas(filas: list[dict], *, publicada: str | None) -> list[dict]:
+    """Las PCs que ya dijeron su versión y no es la publicada (para avisar)."""
+    publicada = (publicada or "").strip()
+    if not publicada:
+        return []
+    return [f for f in filas if (f.get("version") or "").strip() and f["version"].strip() != publicada]
 
 
 # ── Limpieza del registro ────────────────────────────────────────────────────

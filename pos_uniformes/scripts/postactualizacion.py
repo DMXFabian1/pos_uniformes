@@ -76,7 +76,13 @@ class Tarea:
         return ["schtasks", "/Create", "/F", "/TN", self.nombre, *self.schedule, "/TR", " ".join(partes)]
 
 
-def tareas_esperadas(*, hay_telegram: bool, resumen_a_hora_fija: bool, snapshot_casa: bool = False, afluencia: bool = False, corte: bool = False) -> list[Tarea]:
+#: La actualización de noche. Es OPCIONAL y viene apagada: se enciende desde el
+#: celular con «/actualizar noche» (2026-11-06). A las 19:30: ya cerró la tienda
+#: y se hizo el corte (18:50), y el respaldo de las 20:30 se lleva la base nueva.
+TAREA_ACTUALIZAR = Tarea("POS Actualizar", ("/SC", "DAILY", "/ST", "19:30"), "actualizar_desatendida.bat")
+
+
+def tareas_esperadas(*, hay_telegram: bool, resumen_a_hora_fija: bool, snapshot_casa: bool = False, afluencia: bool = False, corte: bool = False, actualizar_de_noche: bool = False) -> list[Tarea]:
     """Las tareas que deben existir en esta PC (puro, testeable).
 
     `snapshot_casa`: la copia de la Libreta a la PC de la casa cada 15 min
@@ -92,6 +98,9 @@ def tareas_esperadas(*, hay_telegram: bool, resumen_a_hora_fija: bool, snapshot_
         # es lo último que debería faltar en una PC con la base.
         Tarea("POS Respaldo", ("/SC", "DAILY", "/ST", "20:30"), "respaldo_diario.bat", ("--callado",)),
     ]
+    if actualizar_de_noche:
+        # Solo se conserva si Daniel ya la encendió: nunca se crea sola.
+        tareas.append(TAREA_ACTUALIZAR)
     if snapshot_casa:
         tareas.append(Tarea("POS Snapshot Casa", ("/SC", "MINUTE", "/MO", "15"), "enviar_snapshot_casa.bat"))
     if afluencia:
@@ -382,7 +391,8 @@ def aplicar(*, forzar: bool = False) -> list[str]:
         afluencia = existe_tarea("POS Afluencia") or (scripts_dir().parent / "afluencia" / ".venv").exists()
         # El corte propuesto solo si Daniel ya lo tenía instalado (cualquiera de sus tareas).
         corte = existe_tarea("POS Corte 1630") or existe_tarea("POS Corte 1730")
-        for t in tareas_esperadas(hay_telegram=hay_telegram(), resumen_a_hora_fija=fijo, snapshot_casa=snapshot, afluencia=afluencia, corte=corte):
+        de_noche = existe_tarea(TAREA_ACTUALIZAR.nombre)
+        for t in tareas_esperadas(hay_telegram=hay_telegram(), resumen_a_hora_fija=fijo, snapshot_casa=snapshot, afluencia=afluencia, corte=corte, actualizar_de_noche=de_noche):
             hechos.append(f"tarea al dia: {t.nombre}" if crear_tarea(t) else f"NO se pudo crear: {t.nombre}")
         marcar_aplicada()
         hechos.append(f"infraestructura en la version {INFRA_VERSION}")

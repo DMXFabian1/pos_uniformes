@@ -2160,6 +2160,9 @@ class Satelite(Base):
     #: Qué sabe imprimir esta PC ("TICKET,CORTE,…"), publicado con su latido:
     #: así otra PC puede ofrecerla como destino si su impresora falla.
     imprime: Mapped[str | None] = mapped_column(String(120))
+    #: Qué versión trae («2026.11.06+6ba73b01»), también con el latido: para
+    #: ver quién ya tomó la actualización y quién se quedó atrás.
+    version: Mapped[str | None] = mapped_column(String(40))
     creado_en: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

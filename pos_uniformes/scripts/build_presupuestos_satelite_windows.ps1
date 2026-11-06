@@ -1,5 +1,8 @@
 param(
-    [switch]$WithPrecheck
+    [switch]$WithPrecheck,
+    # Solo construir: la publicacion la hace el actualizador DESPUES de migrar
+    # (scripts\actualizar.py). Asi un build que falla no deja la base cambiada.
+    [switch]$SinPublicar
 )
 
 $ErrorActionPreference = "Stop"
@@ -50,6 +53,12 @@ if ($WithPrecheck) {
     & $venvPython (Join-Path $projectRoot "scripts\check_startup_health.py")
 }
 & $venvPython -m PyInstaller --noconfirm --clean $specPath
+# Si PyInstaller no termino bien, hasta aqui: sin esto el script seguia y el
+# actualizador creia que habia build (y migraba la base para un programa que no existe).
+if ($LASTEXITCODE -ne 0) {
+    Write-Host "*** PyInstaller fallo (codigo $LASTEXITCODE): no hay build. ***"
+    exit 1
+}
 
 # El bundle lleva un pos_uniformes.env listo junto al exe (copiado del
 # .example del repo, la UNICA fuente de estos defaults): una PC satelite
@@ -77,30 +86,13 @@ Set-Content -Path (Join-Path $bundleDir "VERSION.txt") -Value $publishedVersion
 Compress-Archive -Path (Join-Path $bundleDir "*") -DestinationPath $zipPath -Force
 
 # -- Publicacion para kioskos (auto-update por red, sin USB) --------------
-# Si existe C:\pos_updates (compartida en red como \\<servidor>\pos_updates),
-# la build se copia ahi y el lanzador de cada kiosko se actualiza solo al
-# arrancar. Sin la carpeta, este paso simplemente se omite.
-$updatesDir = $env:POS_UNIFORMES_UPDATES_DIR
-if (-not $updatesDir) { $updatesDir = "C:\pos_updates" }
-if (Test-Path $updatesDir) {
-    $publishDir = Join-Path $updatesDir "PresupuestosSatelite"
-    robocopy $bundleDir $publishDir /MIR /R:2 /W:2 | Out-Null
-    # VERSION.txt lleva version + commit: los kioskos se actualizan solos en
-    # CADA build publicada, aunque nadie haya subido el archivo VERSION. Sin
-    # esto, una base migrada + kioskos con exe viejo = "Base de datos no lista".
-    Set-Content -Path (Join-Path $publishDir "VERSION.txt") -Value $publishedVersion
-    # El lanzador tambien se publica: instalar un kiosko nuevo = copiar
-    # lanzador_satelite.bat + .ps1 desde la carpeta compartida.
-    Copy-Item (Join-Path $PSScriptRoot "lanzador_satelite.ps1") $updatesDir -Force
-    Copy-Item (Join-Path $PSScriptRoot "lanzador_satelite.bat") $updatesDir -Force
-    # Reparador para el kiosko (cuando el .exe se copia a medias).
-    Copy-Item (Join-Path $PSScriptRoot "reparar_satelite.bat") $updatesDir -Force -ErrorAction SilentlyContinue
-    # El instalador del servidor de impresion del kiosko tambien: ahi no hay
-    # repo ni Python, asi que tiene que llegar por la carpeta compartida.
-    Copy-Item (Join-Path $PSScriptRoot "instalar_servidor_impresion_kiosko.bat") $updatesDir -Force -ErrorAction SilentlyContinue
-    Write-Host "  Publicado para kioskos en: $publishDir ($publishedVersion)"
+# Vive en publicar_satelite.ps1: guarda la version anterior y luego copia la
+# nueva a C:\pos_updates. Con -SinPublicar se deja para despues.
+if ($SinPublicar) {
+    Write-Host "  (Build lista SIN publicar: se publica despues de migrar la base)"
 } else {
-    Write-Host "  (No existe $updatesDir - no se publico para kioskos)"
+    & (Join-Path $PSScriptRoot "publicar_satelite.ps1") -BundleDir $bundleDir
+    if ($LASTEXITCODE -ne 0) { exit 1 }
 }
 
 Write-Host ""

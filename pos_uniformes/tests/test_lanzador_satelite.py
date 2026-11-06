@@ -52,8 +52,13 @@ class ReparadorTests(unittest.TestCase):
         self.assertIn("lanzador_satelite.bat", texto)
 
     def test_el_build_lo_publica(self) -> None:
+        # Desde 2026-11-06 la publicación vive en publicar_satelite.ps1 (el
+        # build la llama, y el actualizador también, después de migrar).
         build = (_PS1.parent / "build_presupuestos_satelite_windows.ps1").read_text(encoding="utf-8", errors="ignore")
-        self.assertIn("reparar_satelite.bat", build)
+        self.assertIn("publicar_satelite.ps1", build)
+        publicar = (_PS1.parent / "publicar_satelite.ps1").read_text(encoding="utf-8", errors="ignore")
+        self.assertIn("reparar_satelite.bat", publicar)
+        self.assertIn("lanzador_satelite.ps1", publicar)
 
 
 class ForzarUpdateTests(unittest.TestCase):

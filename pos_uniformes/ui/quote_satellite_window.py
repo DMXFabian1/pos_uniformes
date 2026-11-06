@@ -7062,23 +7062,54 @@ class QuoteSatelliteWindow(QMainWindow):
         self._ofrecer_actualizacion(remota, parent=parent)
 
     def _ofrecer_actualizacion(self, remota: str, parent=None) -> None:
+        from pos_uniformes.services.satelite_registry_service import version_legible
         from pos_uniformes.services.satellite_update_service import version_local
+
+        # Actualizar cierra el programa: con una venta a medias no se ofrece
+        # (2026-11-06). Si lo pidieron desde Administración, se dice por qué;
+        # si fue el chequeo solo, se vuelve a ofrecer cuando el carrito esté vacío.
+        if getattr(self, "quote_cart", None):
+            if parent is not None:
+                QMessageBox.information(
+                    parent, "Hay una venta a medias",
+                    "Hay una versión nueva, pero actualizar cierra el programa y hay prendas "
+                    "en el carrito.\n\nTermina o vacía la venta y vuelve a buscar actualizaciones.",
+                )
+            else:
+                self._posponer_actualizacion(remota)
+            return
 
         parent = parent or self
         box = QMessageBox(parent)
         box.setWindowTitle("Actualización disponible")
         box.setText(
-            "Hay una versión nueva del satélite:\n\n"
-            f"    Instalada:  {version_local()}\n"
-            f"    Disponible: {remota}\n\n"
-            "Al actualizar, la app se cierra unos segundos y el lanzador "
-            "la reabre ya actualizada."
+            "Hay una versión nueva del kiosko:\n\n"
+            f"    Instalada:  {version_legible(version_local())}\n"
+            f"    Disponible: {version_legible(remota)}\n\n"
+            "Al actualizar, el programa se cierra unos segundos y se vuelve a "
+            "abrir ya actualizado."
         )
         actualizar = box.addButton("Actualizar ahora", QMessageBox.ButtonRole.YesRole)
         box.addButton("Ahora no", QMessageBox.ButtonRole.NoRole)
         box.exec()
         if box.clickedButton() is actualizar:
             self._aplicar_actualizacion(parent)
+
+    def _posponer_actualizacion(self, remota: str) -> None:
+        """Vuelve a ofrecer la actualización en un minuto (cuando ya no haya venta)."""
+        timer = getattr(self, "_update_reintento", None)
+        if timer is None:
+            # Hijo de la ventana: muere con ella (nada de singleShot suelto).
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.setInterval(60_000)
+            self._update_reintento = timer
+        try:
+            timer.timeout.disconnect()
+        except TypeError:
+            pass
+        timer.timeout.connect(lambda: self._ofrecer_actualizacion(remota))
+        timer.start()
 
     def _aplicar_actualizacion(self, parent=None) -> None:
         from pos_uniformes.services.satellite_update_service import lanzar_actualizador
