@@ -2779,3 +2779,40 @@ class BuzonMensaje(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
+    # 2026-11-06, el buzón como chat completo:
+    # a qué mensaje contesta (una respuesta a mano, o el resultado de un comando)
+    responde_a: Mapped[int | None] = mapped_column(Integer, index=True)
+    # solo en lo que contesta a un comando: "recibido" | "ok" | "error"
+    estado: Mapped[str | None] = mapped_column(String(12))
+    # se borró: el renglón queda (para que el chat no brinque) pero sin texto ni imagen
+    borrado_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # trae una imagen en `buzon_adjunto` (aparte, para no cargarla con cada consulta)
+    adjunto: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=sa_false())
+
+
+class BuzonAdjunto(Base):
+    """La imagen de un mensaje del buzón (una captura de pantalla pegada)."""
+
+    __tablename__ = "buzon_adjunto"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    mensaje_id: Mapped[int] = mapped_column(
+        ForeignKey("buzon_mensaje.id", ondelete="CASCADE"), nullable=False, unique=True
+    )
+    datos: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+
+
+class BuzonLeido(Base):
+    """Hasta qué mensaje leyó cada PC cada chat: de aquí salen las palomitas.
+
+    `chat` es la clave desde quien lee: "*" (el grupo) o el nombre de la otra PC.
+    """
+
+    __tablename__ = "buzon_leido"
+
+    lector: Mapped[str] = mapped_column(String(60), primary_key=True)
+    chat: Mapped[str] = mapped_column(String(60), primary_key=True)
+    hasta_id: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
