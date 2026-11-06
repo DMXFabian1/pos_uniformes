@@ -1468,6 +1468,7 @@ class QuoteSatelliteWindow(QMainWindow):
         view_ly.setSpacing(8)
 
         header = QHBoxLayout()
+        self._libreta_header_ly = header
         titulo_col = QVBoxLayout()
         titulo_col.setSpacing(0)
         self.libreta_titular_label = QLabel("")
@@ -1639,24 +1640,59 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_descanso_visto_button.clicked.connect(self._libreta_descanso_visto)
         view_ly.addWidget(self.libreta_descanso_visto_button)
 
-        # Barra del dueño: lo de todos los días (imprimir corte) a la vista;
-        # lo ocasional (rango de fechas, meta semanal) plegado bajo "Más
-        # opciones". Las correcciones de un movimiento (reimprimir, cambiar
-        # pago, borrar) viven junto a la tabla de movimientos, no aquí.
+        # Barra del dueño (rediseño 2026-11-05). Daniel: «¿cómo puedo ver días
+        # anteriores?» — había que abrir "Más opciones", poner dos fechas y
+        # tocar "Ver rango". Ahora la fecha es lo primero de la ventana:
+        # ◀ día ▶, Hoy / Semana / Mes / Su ciclo y, para lo raro, elegir fechas.
+        # A la derecha lo de caja: el corte como botón principal y lo demás
+        # (retiro, cortes, pagos, equipo, caja y nómina, meta) en un menú.
         self.libreta_owner_bar = QWidget()
         owner_bar_ly = QVBoxLayout()
         owner_bar_ly.setContentsMargins(0, 0, 0, 0)
         owner_bar_ly.setSpacing(6)
-        owner_row = QHBoxLayout()
-        owner_row.setSpacing(8)
-        self.libreta_print_button = QPushButton("🧾 Imprimir corte")
-        self.libreta_print_button.setObjectName("primaryButton")
-        self.libreta_print_button.setAutoDefault(False)
-        self.libreta_print_button.setMinimumHeight(44)
-        self.libreta_print_button.clicked.connect(self._imprimir_corte_libreta)
-        owner_row.addWidget(self.libreta_print_button)
-        # Gestión del negocio (no dependen de un movimiento): aquí arriba,
-        # a un toque, en vez de mezcladas con las correcciones de la tabla.
+        self.libreta_fecha_bar = QFrame()
+        self.libreta_fecha_bar.setObjectName("libretaFechaBar")
+        owner_row = QHBoxLayout(self.libreta_fecha_bar)
+        owner_row.setContentsMargins(10, 8, 10, 8)
+        owner_row.setSpacing(6)
+        self._libreta_fecha_ly = owner_row
+        self.libreta_dia_prev = QPushButton("◀")
+        self.libreta_dia_prev.setToolTip("Antes")
+        self.libreta_dia_prev.clicked.connect(lambda: self._libreta_mover_fecha(-1))
+        self.libreta_dia_next = QPushButton("▶")
+        self.libreta_dia_next.setToolTip("Después")
+        self.libreta_dia_next.clicked.connect(lambda: self._libreta_mover_fecha(1))
+        self.libreta_dia_label = QPushButton("Hoy")
+        self.libreta_dia_label.setObjectName("libretaFechaTitulo")
+        self.libreta_dia_label.setToolTip("Toca para elegir un día en el calendario")
+        self.libreta_dia_label.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.libreta_dia_label.clicked.connect(self._libreta_elegir_dia)
+        for flecha in (self.libreta_dia_prev, self.libreta_dia_next):
+            flecha.setObjectName("libretaFechaFlecha")
+            flecha.setFixedSize(44, 44)
+        for boton_fecha in (self.libreta_dia_prev, self.libreta_dia_label, self.libreta_dia_next):
+            boton_fecha.setAutoDefault(False)
+            owner_row.addWidget(boton_fecha)
+        owner_row.addSpacing(8)
+        # Aquí se acomodan Hoy / Semana / Su ciclo cuando entra el dueño
+        # (`_acomodar_periodos_libreta`); la empleada los sigue viendo arriba.
+        self._libreta_fecha_periodos_en = owner_row.count()
+        self.libreta_mes_button = QPushButton("Mes")
+        self.libreta_mes_button.setCheckable(True)
+        self.libreta_mes_button.setAutoDefault(False)
+        self.libreta_mes_button.clicked.connect(self._libreta_ver_mes)
+        owner_row.addWidget(self.libreta_mes_button)
+        self.libreta_opciones_button = QPushButton("📆 Elegir fechas")
+        self.libreta_opciones_button.setCheckable(True)
+        self.libreta_opciones_button.setAutoDefault(False)
+        self.libreta_opciones_button.toggled.connect(
+            lambda on: self.libreta_opciones_panel.setVisible(on)
+        )
+        owner_row.addWidget(self.libreta_opciones_button)
+        owner_row.addStretch()
+
+        # Gestión del negocio: los mismos botones de siempre siguen vivos
+        # (escondidos) y el menú «Caja» los dispara.
         self.libreta_retiro_button = QPushButton("💸 Retiro")
         self.libreta_retiro_button.clicked.connect(self._apuntar_retiro_libreta)
         self.libreta_cortes_button = QPushButton("🧾 Cortes")
@@ -1667,28 +1703,43 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_equipo_button.clicked.connect(self._abrir_equipo)
         self.libreta_caja_button = QPushButton("⚙ Caja y nómina")
         self.libreta_caja_button.clicked.connect(self._editar_caja_nomina)
-        for gestion_btn in (
-            self.libreta_retiro_button,
-            self.libreta_cortes_button,
-            self.libreta_pagos_button,
-            self.libreta_equipo_button,
-            self.libreta_caja_button,
+        from PyQt6.QtWidgets import QMenu
+
+        self.libreta_caja_menu = QMenu(self.libreta_owner_bar)
+        self.libreta_caja_menu.setObjectName("libretaCajaMenu")
+        for texto_menu, boton_viejo in (
+            ("💸  Apuntar un retiro", self.libreta_retiro_button),
+            ("🧾  Cortes anteriores", self.libreta_cortes_button),
+            ("💵  Pagos a empleadas", self.libreta_pagos_button),
+            ("👥  Equipo", self.libreta_equipo_button),
+            ("⚙  Caja y nómina", self.libreta_caja_button),
         ):
-            gestion_btn.setObjectName("secondaryButton")
-            gestion_btn.setAutoDefault(False)
-            gestion_btn.setMinimumHeight(44)
-            owner_row.addWidget(gestion_btn)
-        owner_row.addStretch()
-        self.libreta_opciones_button = QPushButton("⚙ Más opciones")
-        self.libreta_opciones_button.setObjectName("secondaryButton")
-        self.libreta_opciones_button.setCheckable(True)
-        self.libreta_opciones_button.setAutoDefault(False)
-        self.libreta_opciones_button.setMinimumHeight(44)
-        self.libreta_opciones_button.toggled.connect(
-            lambda on: self.libreta_opciones_panel.setVisible(on)
+            boton_viejo.setParent(self.libreta_owner_bar)
+            boton_viejo.setVisible(False)
+            self.libreta_caja_menu.addAction(texto_menu).triggered.connect(
+                lambda _c=False, b=boton_viejo: b.click()
+            )
+        self.libreta_caja_menu.addSeparator()
+        self.libreta_caja_menu.addAction("🎯  Meta semanal…").triggered.connect(
+            lambda _c=False: self._libreta_pedir_meta()
         )
-        owner_row.addWidget(self.libreta_opciones_button)
-        owner_bar_ly.addLayout(owner_row)
+        self.libreta_caja_menu_button = QPushButton("💼 Caja")
+        self.libreta_caja_menu_button.setObjectName("secondaryButton")
+        self.libreta_caja_menu_button.setAutoDefault(False)
+        self.libreta_caja_menu_button.setMinimumHeight(44)
+        self.libreta_caja_menu_button.setMenu(self.libreta_caja_menu)
+        self.libreta_caja_menu_button.setVisible(False)
+        self.libreta_print_button = QPushButton("🧾 Imprimir corte")
+        self.libreta_print_button.setObjectName("primaryButton")
+        self.libreta_print_button.setAutoDefault(False)
+        self.libreta_print_button.setMinimumHeight(44)
+        self.libreta_print_button.clicked.connect(self._imprimir_corte_libreta)
+        self.libreta_print_button.setVisible(False)
+        # Los dos van en la cabecera, junto a Actualizar (solo se enseñan al
+        # dueño): con ellos en la barra de fecha la página no cabía a lo ancho.
+        header.insertWidget(2, self.libreta_caja_menu_button)
+        header.insertWidget(3, self.libreta_print_button)
+        owner_bar_ly.addWidget(self.libreta_fecha_bar)
 
         self.libreta_opciones_panel = QFrame()
         self.libreta_opciones_panel.setObjectName("libretaCard")
@@ -1706,7 +1757,7 @@ class QuoteSatelliteWindow(QMainWindow):
         opciones_ly.addWidget(self.libreta_rango_desde)
         opciones_ly.addWidget(QLabel("al:"))
         opciones_ly.addWidget(self.libreta_rango_hasta)
-        self.libreta_rango_button = QPushButton("Ver rango")
+        self.libreta_rango_button = QPushButton("Ver esas fechas")
         self.libreta_rango_button.setCheckable(True)
         self.libreta_rango_button.setAutoDefault(False)
         self.libreta_rango_button.clicked.connect(
@@ -1714,20 +1765,22 @@ class QuoteSatelliteWindow(QMainWindow):
         )
         opciones_ly.addWidget(self.libreta_rango_button)
         opciones_ly.addStretch()
-        opciones_ly.addWidget(QLabel("Meta semanal (comisiones):"))
-        self.libreta_meta_spin = QSpinBox()
+        # La meta ya no vive aquí (va en el menú Caja); el campo sigue siendo
+        # donde se guarda el valor.
+        self.libreta_meta_spin = QSpinBox(self.libreta_owner_bar)
         self.libreta_meta_spin.setRange(0, 9999)
         self.libreta_meta_spin.setSpecialValueText("Sin meta")
-        opciones_ly.addWidget(self.libreta_meta_spin)
-        self.libreta_meta_save_button = QPushButton("Guardar meta")
+        self.libreta_meta_spin.setVisible(False)
+        self.libreta_meta_save_button = QPushButton("Guardar meta", self.libreta_owner_bar)
         self.libreta_meta_save_button.setAutoDefault(False)
         self.libreta_meta_save_button.clicked.connect(self._guardar_meta_libreta)
-        opciones_ly.addWidget(self.libreta_meta_save_button)
+        self.libreta_meta_save_button.setVisible(False)
         self.libreta_opciones_panel.setLayout(opciones_ly)
         self.libreta_opciones_panel.setVisible(False)
         owner_bar_ly.addWidget(self.libreta_opciones_panel)
         self.libreta_owner_bar.setLayout(owner_bar_ly)
-        view_ly.addWidget(self.libreta_owner_bar)
+        # Justo debajo del saludo, antes de las tarjetas: la fecha manda.
+        view_ly.insertWidget(1, self.libreta_owner_bar)
 
         # Tarjeta de la meta semanal de la empleada, con barra de progreso
         self.libreta_meta_bar = QFrame()
@@ -1774,10 +1827,27 @@ class QuoteSatelliteWindow(QMainWindow):
         view_ly.addWidget(self.libreta_emp_list)
 
         # ── Panel del dueño: corte por día, ranking de empleadas y detalle ──
+        # Dos columnas (rediseño 2026-11-05): a la izquierda lo que se lee
+        # —los movimientos, que antes quedaban al fondo—; a la derecha lo que
+        # se hace con ellos y el equipo.
         self.libreta_owner_panel = QWidget()
-        owner_panel_ly = QVBoxLayout()
+        owner_panel_ly = QHBoxLayout()
         owner_panel_ly.setContentsMargins(0, 0, 0, 0)
-        owner_panel_ly.setSpacing(8)
+        owner_panel_ly.setSpacing(14)
+        col_izq = QVBoxLayout()
+        col_izq.setSpacing(8)
+        dia_ly, mov_col_ly, afl_ly = QVBoxLayout(), QVBoxLayout(), QVBoxLayout()
+        for sub in (dia_ly, mov_col_ly, afl_ly):
+            sub.setSpacing(8)
+            col_izq.addLayout(sub)
+        col_izq.addStretch(1)
+        self.libreta_col_der = QWidget()
+        self.libreta_col_der.setFixedWidth(330)
+        col_der = QVBoxLayout(self.libreta_col_der)
+        col_der.setContentsMargins(0, 0, 0, 0)
+        col_der.setSpacing(8)
+        owner_panel_ly.addLayout(col_izq, 1)
+        owner_panel_ly.addWidget(self.libreta_col_der, 0, Qt.AlignmentFlag.AlignTop)
 
         # Secciones plegables (2026-09-09): cada encabezado es un botón que
         # abre/cierra su cuerpo. Menos saturación: lo que no se está viendo
@@ -1800,7 +1870,7 @@ class QuoteSatelliteWindow(QMainWindow):
         # Desglose por día: solo tiene sentido en periodos de varios días
         # (ciclo, rango). En "Hoy" repetiría las tarjetas → se oculta.
         self.libreta_daily_seccion = _seccion("POR DÍA", "dia")
-        owner_panel_ly.addWidget(self.libreta_daily_seccion)
+        dia_ly.addWidget(self.libreta_daily_seccion)
         self.libreta_daily_table = QTableWidget(0, 6)
         self.libreta_daily_table.setObjectName("libretaTabla")
         self.libreta_daily_table.setHorizontalHeaderLabels(
@@ -1817,14 +1887,14 @@ class QuoteSatelliteWindow(QMainWindow):
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
         self.libreta_daily_table.verticalHeader().setDefaultSectionSize(36)
-        owner_panel_ly.addWidget(self.libreta_daily_table)
+        dia_ly.addWidget(self.libreta_daily_table)
         self._libreta_secciones["dia"]["cuerpo"] = [self.libreta_daily_table]
 
         # Afluencia: lo que contaron las cámaras (afluencia/contador_afluencia.py)
         # contra las ventas de la misma hora. Oculto si no hay datos (el
         # contador no corre o la tabla aún no existe en esta base).
         self.libreta_afluencia_seccion = _seccion("AFLUENCIA  ·  quién entra vs quién compra, por hora", "afluencia")
-        owner_panel_ly.addWidget(self.libreta_afluencia_seccion)
+        afl_ly.addWidget(self.libreta_afluencia_seccion)
         self.libreta_afluencia_table = QTableWidget(0, 5)
         self.libreta_afluencia_table.setObjectName("libretaTabla")
         self.libreta_afluencia_table.setHorizontalHeaderLabels(
@@ -1840,36 +1910,38 @@ class QuoteSatelliteWindow(QMainWindow):
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
         self.libreta_afluencia_table.verticalHeader().setDefaultSectionSize(36)
-        owner_panel_ly.addWidget(self.libreta_afluencia_table)
+        afl_ly.addWidget(self.libreta_afluencia_table)
         self._libreta_secciones["afluencia"]["cuerpo"] = [self.libreta_afluencia_table]
         self.libreta_afluencia_seccion.setVisible(False)
         self.libreta_afluencia_table.setVisible(False)
 
         # Pendientes de hoy (solo dueño): pagos que tocan, posibles faltas,
         # descansos y horarios sin configurar, con botón de un toque.
-        self.libreta_pendientes_seccion = _seccion("PENDIENTES DE HOY  ·  lo que falta por registrar", "pendientes")
-        owner_panel_ly.addWidget(self.libreta_pendientes_seccion)
+        self.libreta_pendientes_seccion = _seccion("PENDIENTES DE HOY", "pendientes")
+        col_der.addWidget(self.libreta_pendientes_seccion)
         self.libreta_pendientes_box = QWidget()
         self.libreta_pendientes_ly = QVBoxLayout()
         self.libreta_pendientes_ly.setContentsMargins(0, 0, 0, 0)
         self.libreta_pendientes_ly.setSpacing(4)
         self.libreta_pendientes_box.setLayout(self.libreta_pendientes_ly)
-        owner_panel_ly.addWidget(self.libreta_pendientes_box)
+        col_der.addWidget(self.libreta_pendientes_box)
         self._libreta_secciones["pendientes"]["cuerpo"] = [self.libreta_pendientes_box]
         self.libreta_pendientes_seccion.setVisible(False)
         self.libreta_pendientes_box.setVisible(False)
 
-        self.libreta_equipo_seccion = _seccion("EQUIPO  ·  toca un nombre para ver solo sus movimientos", "equipo")
-        owner_panel_ly.addWidget(self.libreta_equipo_seccion)
+        self.libreta_equipo_seccion = _seccion("EQUIPO  ·  toca un nombre", "equipo")
+        col_der.addWidget(self.libreta_equipo_seccion)
         self.libreta_ranking_list = QListWidget()
         self.libreta_ranking_list.setObjectName("libretaLista")
-        self.libreta_ranking_list.setMaximumHeight(170)
+        self.libreta_ranking_list.setMaximumHeight(260)
+        self.libreta_ranking_list.setWordWrap(True)
+        self.libreta_ranking_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.libreta_ranking_list.itemClicked.connect(self._on_libreta_ranking_click)
-        owner_panel_ly.addWidget(self.libreta_ranking_list)
+        col_der.addWidget(self.libreta_ranking_list)
         self._libreta_secciones["equipo"]["cuerpo"] = [self.libreta_ranking_list]
 
         self.libreta_mov_seccion = _seccion("MOVIMIENTOS", "movimientos")
-        owner_panel_ly.addWidget(self.libreta_mov_seccion)
+        mov_col_ly.addWidget(self.libreta_mov_seccion)
         self.libreta_mov_cuerpo = QWidget()
         mov_ly = QVBoxLayout(self.libreta_mov_cuerpo)
         mov_ly.setContentsMargins(0, 0, 0, 0)
@@ -1909,12 +1981,22 @@ class QuoteSatelliteWindow(QMainWindow):
         # aparece cuando hay un movimiento seleccionado (2026-09-09).
         self.libreta_acciones_bar = QFrame()
         self.libreta_acciones_bar.setObjectName("libretaAccionesBar")
-        acciones_ly = QHBoxLayout(self.libreta_acciones_bar)
-        acciones_ly.setContentsMargins(12, 6, 12, 6)
+        acciones_ly = QVBoxLayout(self.libreta_acciones_bar)
+        acciones_ly.setContentsMargins(14, 12, 14, 12)
         acciones_ly.setSpacing(6)
-        acciones_label = QLabel("Con el movimiento seleccionado:")
-        acciones_label.setStyleSheet("font-size: 12px; color: #8a8177; background: transparent;")
+        acciones_label = QLabel("MOVIMIENTO ELEGIDO")
+        acciones_label.setStyleSheet(
+            "font-size: 11px; font-weight: 800; letter-spacing: 2px; color: #73341c; background: transparent;"
+        )
         acciones_ly.addWidget(acciones_label)
+        # Qué movimiento es, dicho en un renglón: así no hay duda de a cuál
+        # se le va a cambiar el pago o cuál se va a borrar.
+        self.libreta_mov_detalle = QLabel("")
+        self.libreta_mov_detalle.setWordWrap(True)
+        self.libreta_mov_detalle.setStyleSheet(
+            "font-size: 13px; font-weight: 600; color: #2c2a27; background: transparent; padding-bottom: 4px;"
+        )
+        acciones_ly.addWidget(self.libreta_mov_detalle)
         self.libreta_reprint_button = QPushButton("🖨 Reimprimir ticket")
         self.libreta_reprint_button.clicked.connect(self._reimprimir_ticket_libreta)
         self.libreta_pago_button = QPushButton("💳 Cambiar pago")
@@ -1943,10 +2025,17 @@ class QuoteSatelliteWindow(QMainWindow):
         ):
             accion_btn.setObjectName("secondaryButton")
             accion_btn.setAutoDefault(False)
+            accion_btn.setMinimumHeight(40)
             acciones_ly.addWidget(accion_btn)
-        acciones_ly.addStretch()
         self.libreta_acciones_bar.setVisible(False)
-        mov_ly.addWidget(self.libreta_acciones_bar)
+        # Sin nada elegido, la columna dice para qué sirve en vez de quedar vacía.
+        self.libreta_mov_vacio = QLabel(
+            "Toca un movimiento de la lista para reimprimir su ticket, cambiar el pago o corregirlo."
+        )
+        self.libreta_mov_vacio.setObjectName("libretaMovVacio")
+        self.libreta_mov_vacio.setWordWrap(True)
+        col_der.insertWidget(0, self.libreta_mov_vacio)
+        col_der.insertWidget(1, self.libreta_acciones_bar)
         self.libreta_table = QTableWidget(0, 7)
         self.libreta_table.setObjectName("libretaTabla")
         self.libreta_table.setHorizontalHeaderLabels(
@@ -1955,6 +2044,13 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
         )
+        # Desde que la tabla comparte renglón con la columna derecha, repartir
+        # parejo cortaba «Venta — Stayce» y las prendas: lo corto mide lo que
+        # su texto y el espacio es para lo que se lee.
+        for col_corta in (0, 1, 3, 4, 6):
+            self.libreta_table.horizontalHeader().setSectionResizeMode(
+                col_corta, QHeaderView.ResizeMode.ResizeToContents
+            )
         self.libreta_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         # En táctil, tabla-con-scroll-dentro-de-página-con-scroll es una
         # trampa: la tabla crece con sus filas y la página entera scrollea.
@@ -1991,7 +2087,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_pag_bar.setLayout(pag_ly)
         self.libreta_pag_bar.setVisible(False)
         mov_ly.addWidget(self.libreta_pag_bar)
-        owner_panel_ly.addWidget(self.libreta_mov_cuerpo, 1)
+        mov_col_ly.addWidget(self.libreta_mov_cuerpo, 1)
+        col_der.addStretch(1)
 
         self.libreta_owner_panel.setLayout(owner_panel_ly)
         for key in self._libreta_secciones:
@@ -2253,13 +2350,18 @@ class QuoteSatelliteWindow(QMainWindow):
 
     def _sync_libreta_filtros(self) -> None:
         """Refleja periodo/filtros en los botones y etiquetas."""
+        self._acomodar_periodos_libreta()
         for key, button in self._libreta_periodo_buttons.items():
             button.setChecked(key == self._libreta_periodo)
         self.libreta_rango_button.setChecked(self._libreta_periodo == "rango")
-        if self._libreta_periodo == "rango":
-            # El rango vive plegado bajo "Más opciones": si está activo,
-            # que se vea de dónde sale.
+        if self._libreta_periodo == "rango" and (
+            self.libreta_rango_desde.date() != self.libreta_rango_hasta.date()
+            and not self._libreta_es_mes()
+        ):
+            # Un rango a mano: que se vea de dónde sale. Un solo día o el mes
+            # se entienden con la barra de fecha y no abren nada.
             self.libreta_opciones_button.setChecked(True)
+        self._pintar_fecha_libreta()
         for key, button in self._libreta_tipo_buttons.items():
             button.setChecked(key == self._libreta_tipo_filtro)
         if self._libreta_emp_filtro:
@@ -2269,6 +2371,192 @@ class QuoteSatelliteWindow(QMainWindow):
             self.libreta_filtro_emp_label.setVisible(True)
         else:
             self.libreta_filtro_emp_label.setVisible(False)
+
+    # ── La barra de fecha del dueño (2026-11-05) ─────────────────────────
+
+    def _acomodar_periodos_libreta(self) -> None:
+        """Hoy / Semana / Ciclo van en la barra de fecha para el dueño y en la
+        cabecera para la empleada (que no tiene barra): un solo juego de
+        botones, cambiado de lugar según quién entró."""
+        es_dueno = bool(getattr(self, "_libreta_is_owner", False))
+        destino = "barra" if es_dueno else "cabecera"
+        # Lo de caja solo existe para el dueño.
+        self.libreta_caja_menu_button.setVisible(es_dueno)
+        self.libreta_print_button.setVisible(es_dueno)
+        self.libreta_semana_button.setVisible(es_dueno)
+        if getattr(self, "_libreta_periodos_en", "cabecera") == destino:
+            return
+        self._libreta_periodos_en = destino
+        botones = [self._libreta_periodo_buttons[k] for k in ("hoy", "semana", "semana_pasada", "ciclo")]
+        for b in botones:
+            self._libreta_header_ly.removeWidget(b)
+            self._libreta_fecha_ly.removeWidget(b)
+        if destino == "barra":
+            # Hoy · Semana · Mes · Su ciclo: del periodo más corto al más largo
+            # y, al final, el que depende de a quién se elija.
+            for n, b in enumerate(botones[:3]):
+                self._libreta_fecha_ly.insertWidget(self._libreta_fecha_periodos_en + n, b)
+            self._libreta_fecha_ly.insertWidget(
+                self._libreta_fecha_ly.indexOf(self.libreta_mes_button) + 1, botones[3]
+            )
+        else:
+            for n, b in enumerate(botones):
+                self._libreta_header_ly.insertWidget(2 + n, b)   # tras el saludo y el hueco
+
+    def _libreta_fechas_mostradas(self):
+        """(desde, hasta) en días de calendario de lo que se ve, o None en «ciclo»."""
+        from datetime import timedelta as _td
+
+        hoy = datetime.now().date()
+        periodo = self._libreta_periodo
+        if periodo == "hoy":
+            return hoy, hoy
+        if periodo == "rango":
+            desde = self.libreta_rango_desde.date().toPyDate()
+            hasta = self.libreta_rango_hasta.date().toPyDate()
+            return (desde, hasta) if desde <= hasta else (hasta, desde)
+        if periodo in ("semana", "semana_pasada"):
+            lunes = hoy - _td(days=hoy.weekday() + (7 if periodo == "semana_pasada" else 0))
+            return lunes, lunes + _td(days=6)
+        return None
+
+    def _libreta_es_mes(self) -> bool:
+        """¿El rango elegido es un mes de calendario (entero, o lo que va del actual)?"""
+        import calendar as _cal
+
+        if self._libreta_periodo != "rango":
+            return False
+        desde = self.libreta_rango_desde.date().toPyDate()
+        hasta = self.libreta_rango_hasta.date().toPyDate()
+        if desde.day != 1 or (desde.year, desde.month) != (hasta.year, hasta.month):
+            return False
+        ultimo = _cal.monthrange(desde.year, desde.month)[1]
+        return hasta.day == ultimo or hasta == datetime.now().date()
+
+    def _libreta_ver_fechas(self, desde, hasta) -> None:
+        """Enseña esos días. Si es solo hoy, vuelve a «Hoy» (que arranca en el
+        último corte, no a medianoche)."""
+        hoy = datetime.now().date()
+        if desde == hasta == hoy:
+            self._set_libreta_periodo("hoy")
+            return
+        self.libreta_rango_desde.setDate(QDate(desde.year, desde.month, desde.day))
+        self.libreta_rango_hasta.setDate(QDate(hasta.year, hasta.month, hasta.day))
+        self._set_libreta_periodo("rango")
+
+    def _libreta_ver_mes(self) -> None:
+        hoy = datetime.now().date()
+        self._libreta_ver_fechas(hoy.replace(day=1), hoy)
+
+    def _libreta_mover_fecha(self, sentido: int) -> None:
+        """◀ ▶: un día si se ve un día; la semana o el mes entero si se ve eso."""
+        import calendar as _cal
+        from datetime import timedelta as _td
+
+        fechas = self._libreta_fechas_mostradas()
+        if fechas is None:
+            return
+        desde, hasta = fechas
+        hoy = datetime.now().date()
+        es_mes = self._libreta_es_mes()
+        if es_mes:
+            mes = desde.month - 1 + sentido
+            anio, mes = desde.year + mes // 12, mes % 12 + 1
+            desde = desde.replace(year=anio, month=mes, day=1)
+            hasta = desde.replace(day=_cal.monthrange(anio, mes)[1])
+        else:
+            paso = _td(days=((hasta - desde).days + 1) * sentido)
+            desde, hasta = desde + paso, hasta + paso
+        if desde > hoy:
+            return          # el futuro no tiene ventas
+        self._libreta_ver_fechas(desde, min(hasta, hoy) if es_mes else hasta)
+
+    def _libreta_texto_fecha(self) -> str:
+        from datetime import timedelta as _td
+
+        dias = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
+        meses = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
+        meses_largo = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
+                       "septiembre", "octubre", "noviembre", "diciembre")
+        fechas = self._libreta_fechas_mostradas()
+        if fechas is None:
+            return f"Ciclo de {_nombre_de(self._libreta_emp_filtro or '', corto=True) or 'la empleada'}"
+        desde, hasta = fechas
+        hoy = datetime.now().date()
+        if desde == hasta:
+            corto = f"{dias[desde.weekday()]} {desde.day} de {meses[desde.month - 1]}"
+            if desde == hoy:
+                return f"Hoy · {corto}"
+            if desde == hoy - _td(days=1):
+                return f"Ayer · {corto}"
+            return f"{dias[desde.weekday()].capitalize()} {desde.day} de {meses_largo[desde.month - 1]}"
+        if self._libreta_es_mes():
+            return f"{meses_largo[desde.month - 1].capitalize()} {desde.year}"
+        if desde.month == hasta.month:
+            return f"Del {desde.day} al {hasta.day} de {meses[hasta.month - 1]}"
+        return f"Del {desde.day} de {meses[desde.month - 1]} al {hasta.day} de {meses[hasta.month - 1]}"
+
+    def _pintar_fecha_libreta(self) -> None:
+        """El título de la barra de fecha y qué flechas sirven ahora."""
+        titulo = getattr(self, "libreta_dia_label", None)
+        if titulo is None:
+            return
+        titulo.setText(self._libreta_texto_fecha())
+        fechas = self._libreta_fechas_mostradas()
+        hoy = datetime.now().date()
+        self.libreta_dia_prev.setEnabled(fechas is not None)
+        self.libreta_dia_next.setEnabled(fechas is not None and fechas[1] < hoy)
+        self.libreta_mes_button.setChecked(self._libreta_es_mes())
+        # Viendo un solo día, la columna Fecha repetiría lo que dice el título.
+        self.libreta_table.setColumnHidden(0, fechas is not None and fechas[0] == fechas[1])
+
+    def _libreta_elegir_dia(self) -> None:
+        """Tocar la fecha abre un calendario: el día que se toque es el que se ve."""
+        from PyQt6.QtWidgets import QCalendarWidget
+
+        fechas = self._libreta_fechas_mostradas()
+        hoy = datetime.now().date()
+        inicial = fechas[1] if fechas else hoy
+        dlg = QDialog(self)
+        dlg.setWindowTitle("¿Qué día quieres ver?")
+        dlg.setStyleSheet("QDialog { background: #f4ede2; }")
+        ly = QVBoxLayout(dlg)
+        ly.setContentsMargins(16, 14, 16, 14)
+        cal = QCalendarWidget()
+        cal.setFirstDayOfWeek(Qt.DayOfWeek.Monday)
+        cal.setVerticalHeaderFormat(QCalendarWidget.VerticalHeaderFormat.NoVerticalHeader)
+        cal.setMaximumDate(QDate(hoy.year, hoy.month, hoy.day))
+        cal.setSelectedDate(QDate(min(inicial, hoy).year, min(inicial, hoy).month, min(inicial, hoy).day))
+        cal.setMinimumSize(420, 340)
+        cal.setStyleSheet(
+            "QCalendarWidget QAbstractItemView { font-size: 16px; }"
+            "QCalendarWidget QWidget { background: #ffffff; color: #2c2a27; }"
+        )
+        ly.addWidget(cal)
+        elegido = {}
+
+        def _tomar(qd: QDate) -> None:
+            elegido["dia"] = qd.toPyDate()
+            dlg.accept()
+
+        cal.clicked.connect(_tomar)
+        self._libreta_dia_dialog = dlg          # para las pruebas
+        self._libreta_dia_calendario = cal
+        if dlg.exec() == QDialog.DialogCode.Accepted and "dia" in elegido:
+            self._libreta_ver_fechas(elegido["dia"], elegido["dia"])
+
+    def _libreta_pedir_meta(self) -> None:
+        """La meta semanal, desde el menú Caja (antes vivía en «Más opciones»)."""
+        from PyQt6.QtWidgets import QInputDialog
+
+        valor, ok = QInputDialog.getInt(
+            self, "Meta semanal", "Comisiones por semana para cada empleada (0 = sin meta):",
+            int(self.libreta_meta_spin.value()), 0, 9999,
+        )
+        if not ok:
+            return
+        self.libreta_meta_spin.setValue(valor)
+        self._guardar_meta_libreta()
 
     def _libreta_ventana_actual(self):
         """(desde, hasta) según el periodo elegido."""
@@ -3205,16 +3493,41 @@ class QuoteSatelliteWindow(QMainWindow):
         tabla = self.libreta_table
         hay = bool(tabla.selectionModel() and tabla.selectionModel().hasSelection())
         bar.setVisible(hay)
-        boton = getattr(self, "libreta_privado_button", None)
-        if boton is None:
-            return
+        vacio = getattr(self, "libreta_mov_vacio", None)
+        if vacio is not None:
+            vacio.setVisible(not hay)
         rows = list(getattr(self, "_libreta_rows_pintadas", []) or [])
         idx = tabla.currentRow()
         row = rows[idx] if hay and 0 <= idx < len(rows) else None
+        detalle = getattr(self, "libreta_mov_detalle", None)
+        if detalle is not None:
+            detalle.setText(self._libreta_resumen_de(row) if row is not None else "")
+        boton = getattr(self, "libreta_privado_button", None)
+        if boton is None:
+            return
         oculto = bool(getattr(row, "privado", False)) if row is not None else False
         boton.setText("👁 Incluir en el corte" if oculto else "🔒 Ocultar del corte")
         # Solo tiene sentido en cobros con tarjeta (el efectivo descuadraría).
         boton.setEnabled(row is None or oculto or bool(getattr(row, "pago_tarjeta", False)))
+
+    @staticmethod
+    def _libreta_resumen_de(row) -> str:
+        """«14:32 · Venta de Stayce · 3 piezas · $657.00 con tarjeta»"""
+        partes = []
+        creado = getattr(row, "created_at", None)
+        if creado is not None:
+            local = creado.astimezone() if creado.tzinfo else creado
+            partes.append(local.strftime("%d/%m %H:%M"))
+        quien = _nombre_de(getattr(row, "employee_name", "") or getattr(row, "employee_code", "") or "", corto=True)
+        tipo = str(getattr(row, "tipo", "") or "movimiento").capitalize()
+        partes.append(f"{tipo} de {quien}" if quien else tipo)
+        piezas = int(getattr(row, "piezas", 0) or 0)
+        if piezas:
+            partes.append(f"{piezas} pieza{'s' if piezas != 1 else ''}")
+        monto = getattr(row, "monto_total", None)
+        if monto is not None:
+            partes.append(f"${Decimal(monto):,.2f}" + (" con tarjeta" if getattr(row, "pago_tarjeta", False) else ""))
+        return " · ".join(partes)
 
     def _pintar_afluencia_libreta(self, filas: list) -> None:
         """Tabla por hora: entran, pasan por fuera, ventas y conversión. Oculta sin datos."""

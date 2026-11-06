@@ -850,6 +850,55 @@ QPushButton#libretaSeccion:hover {
 QPushButton#libretaSeccion:checked {
     color: #73341c;
 }
+QFrame#libretaFechaBar {
+    background: #fffdf8;
+    border: 1px solid #e3d5c2;
+    border-radius: 14px;
+}
+QPushButton#libretaFechaFlecha {
+    background: #f4ede2;
+    color: #73341c;
+    border: 1px solid #ddd0c0;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 800;
+    padding: 0;
+}
+QPushButton#libretaFechaFlecha:pressed { background: #e8dbc7; }
+QPushButton#libretaFechaFlecha:disabled { color: #cfc4b5; background: #f8f4ee; }
+QPushButton#libretaFechaTitulo {
+    background: transparent;
+    border: none;
+    color: #2c2a27;
+    font-size: 19px;
+    font-weight: 800;
+    min-width: 215px;
+    padding: 4px 8px;
+}
+QPushButton#libretaFechaTitulo:hover { color: #a84f2d; }
+QLabel#libretaMovVacio {
+    color: #8a8177;
+    font-size: 13px;
+    background: #fbf7f0;
+    border: 1px dashed #ddd0c0;
+    border-radius: 12px;
+    padding: 14px;
+}
+QMenu#libretaCajaMenu {
+    background: #fffdf8;
+    border: 1px solid #ddd0c0;
+    border-radius: 10px;
+    padding: 6px;
+}
+QMenu#libretaCajaMenu::item {
+    padding: 12px 22px;
+    font-size: 15px;
+    font-weight: 600;
+    color: #2c2a27;
+    border-radius: 8px;
+}
+QMenu#libretaCajaMenu::item:selected { background: #f7e3d8; color: #73341c; }
+QMenu#libretaCajaMenu::separator { height: 1px; background: #e8dbc7; margin: 6px 10px; }
 QFrame#libretaAccionesBar {
     background: #fbf3e8;
     border: 1px solid #e8c9ad;
