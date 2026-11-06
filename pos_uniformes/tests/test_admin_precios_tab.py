@@ -19,7 +19,8 @@ class DetrasDelPinTest(unittest.TestCase):
     def test_la_pestana_vive_en_el_dialogo_con_pin(self) -> None:
         # El diálogo entero pide PIN antes de abrir; no hay atajo aparte.
         self.assertIn("_prompt_pin", _FUENTE)
-        self.assertIn('"💲  Precios"', _FUENTE)
+        # Desde 2026-11-06 vive en «Mantenimiento» (Daniel: no se usa desde aquí), detrás del mismo PIN.
+        self.assertIn('_seccion("🧰   Mantenimiento", conteo_box, _build_precios_box(dialog))', _FUENTE)
 
     def test_no_hay_un_atajo_que_se_salte_el_pin(self) -> None:
         ventana = (

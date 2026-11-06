@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
 from PyQt6.QtPrintSupport import QPrinterInfo
 from PyQt6.QtWidgets import (
     QApplication,
@@ -14,10 +15,11 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QFileDialog,
     QScrollArea,
-    QTabWidget,
+    QStackedWidget,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QLabel,
@@ -43,6 +45,24 @@ from pos_uniformes.services.ticket_print_settings_cache_service import (
 from pos_uniformes.utils.config import settings, _appdata_config_dir, runtime_base_dir
 
 _ADMIN_PIN = "634700"
+
+#: Lo propio de la ventana de Administración: cabecera, menú lateral y estado.
+_ESTILO_ADMIN = """
+QFrame#adminCabecera { background: #6b1f3a; }
+QLabel#adminTitulo { color: #ffffff; font-size: 20px; font-weight: 800; background: transparent; }
+QLabel#adminSubtitulo { color: #e9cfd6; font-size: 12px; background: transparent; }
+QPushButton#adminBuzon { background: rgba(255, 255, 255, 0.14); color: #ffffff; border: 1px solid rgba(255, 255, 255, 0.35);
+                         border-radius: 10px; padding: 9px 16px; font-size: 13px; font-weight: 700; }
+QPushButton#adminBuzon:hover { background: rgba(255, 255, 255, 0.24); }
+QListWidget#adminMenu { background: #efe5d6; border: none; border-right: 1px solid #e0d2bd; outline: none;
+                        padding: 8px 8px; font-size: 14px; }
+QListWidget#adminMenu::item { padding: 10px 10px; border-radius: 9px; color: #4a3728; margin: 1px 0; }
+QListWidget#adminMenu::item:disabled { padding: 14px 10px 4px 10px; }
+QListWidget#adminMenu::item:hover:enabled { background: #e6d8c3; }
+QListWidget#adminMenu::item:selected { background: #6b1f3a; color: #ffffff; font-weight: 700; }
+QLabel#adminEstadoConexion { color: #1c7c54; font-weight: 700; font-size: 13px; }
+QLabel#adminEstadoConexion[local="true"] { color: #a35a00; }
+"""
 _ENV_FILENAME = "pos_uniformes.env"
 
 
@@ -846,9 +866,9 @@ def _build_precios_box(dialog: QWidget) -> QGroupBox:
     box = QGroupBox("Cambiar el precio de una prenda")
     layout = QVBoxLayout()
     hint = QLabel(
-        "Escribe un pedazo del nombre y toca Buscar. Cambia **solo el precio**: "
+        "Escribe un pedazo del nombre y toca Buscar. Cambia solo el precio: "
         "no renombra, no toca SKUs ni existencia. El POS y el kiosko se "
-        "re-indexan al abrir, o con el botón Sincronizar de la pestaña Búsqueda."
+        "re-indexan al abrir, o con el botón Sincronizar de la sección Búsqueda."
     )
     hint.setWordWrap(True)
     layout.addWidget(hint)
@@ -976,7 +996,7 @@ def _build_precios_box(dialog: QWidget) -> QGroupBox:
             dialog, "Listo",
             f"{len(cambian)} talla(s) con precio nuevo.\n\n"
             "El POS y el kiosko lo toman al abrir; si están abiertos, usa "
-            "Sincronizar en la pestaña Búsqueda.",
+            "Sincronizar en la sección Búsqueda.",
         )
 
     buscar_btn.clicked.connect(_buscar)
@@ -1143,24 +1163,14 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
         return
 
     dialog = QDialog(parent)
-    dialog.setWindowTitle("Administracion del satelite")
-    dialog.setMinimumWidth(480)
-
-    # — Estado actual —
-    status_box = QGroupBox("Estado de conexion")
-    status_form = QFormLayout()
-    status_form.setSpacing(8)
-    current_host_label = QLabel(settings.db_host)
-    current_host_label.setObjectName("subtleLine")
-    env_path_label = QLabel(str(_find_env_path()))
-    env_path_label.setWordWrap(True)
-    env_path_label.setObjectName("subtleLine")
-    status_form.addRow("Host actual:", current_host_label)
-    status_form.addRow("Archivo .env:", env_path_label)
-    status_box.setLayout(status_form)
+    dialog.setWindowTitle("Administración")
+    dialog.setMinimumWidth(860)
 
     # — Conexion —
-    config_box = QGroupBox("Cambiar conexion")
+    # Una sola tarjeta: antes «Estado de conexión» repetía arriba la misma IP
+    # que se editaba abajo, y la ruta del .env salía cortada (Daniel,
+    # 2026-11-06: «hay cosas que son de sobra»).
+    config_box = QGroupBox("Conexión con la PC principal")
     config_form = QFormLayout()
     config_form.setSpacing(8)
     host_input = QLineEdit(settings.db_host)
@@ -1168,12 +1178,28 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     password_input = QLineEdit(settings.db_password)
     password_input.setEchoMode(QLineEdit.EchoMode.Password)
     password_input.setPlaceholderText("Contrasena de la base de datos")
-    config_form.addRow("Host (IP PC principal):", host_input)
-    config_form.addRow("Contrasena BD:", password_input)
+    config_form.addRow("IP de la PC principal:", host_input)
+    config_form.addRow("Contraseña de la base:", password_input)
+
+    en_local = bool(getattr(parent, "offline_mode", False))
+    estado_conexion = QLabel(
+        f"●  Trabajando en modo local: la PC principal ({settings.db_host}) no contestó al abrir."
+        if en_local else f"●  Conectado a {settings.db_host}"
+    )
+    estado_conexion.setObjectName("adminEstadoConexion")
+    estado_conexion.setProperty("local", "true" if en_local else "false")
+    estado_conexion.setWordWrap(True)
+    ruta_env = str(_find_env_path())
+    env_path_label = QLabel()
+    env_path_label.setObjectName("satNota")
+    env_path_label.setToolTip(ruta_env)
+    env_path_label.setText(
+        env_path_label.fontMetrics().elidedText(f"Se guarda en {ruta_env}", Qt.TextElideMode.ElideMiddle, 520)
+    )
 
     test_result_label = QLabel("")
     test_result_label.setWordWrap(True)
-    test_btn = QPushButton("Probar conexion")
+    test_btn = QPushButton("Probar conexión")
     save_conn_btn = QPushButton("Guardar y reiniciar")
     save_conn_btn.setObjectName("primaryButton")
 
@@ -1186,10 +1212,10 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
         from PyQt6.QtWidgets import QApplication
         QApplication.processEvents()
         if probe_database_host(override_host=host):
-            test_result_label.setText(f"✓ Conexion exitosa a {host}")
+            test_result_label.setText(f"✓ Conexión exitosa a {host}")
             test_result_label.setStyleSheet("color: green;")
         else:
-            test_result_label.setText(f"✗ Sin respuesta en {host}. Verifica IP y que la PC principal este encendida.")
+            test_result_label.setText(f"✗ Sin respuesta en {host}. Verifica la IP y que la PC principal esté encendida.")
             test_result_label.setStyleSheet("color: red;")
 
     def handle_save_conn() -> None:
@@ -1203,7 +1229,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(dialog, "Error al guardar", f"No se pudo escribir .env:\n{exc}")
             return
-        QMessageBox.information(dialog, "Guardado", f"Configuracion guardada. Reiniciando hacia {host}.")
+        QMessageBox.information(dialog, "Guardado", f"Configuración guardada. Reiniciando hacia {host}.")
         dialog.accept()
         _restart_app()
 
@@ -1214,9 +1240,12 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     conn_btn_row.addWidget(save_conn_btn)
 
     config_layout = QVBoxLayout()
+    config_layout.setSpacing(10)
+    config_layout.addWidget(estado_conexion)
     config_layout.addLayout(config_form)
     config_layout.addWidget(test_result_label)
     config_layout.addLayout(conn_btn_row)
+    config_layout.addWidget(env_path_label)
     config_box.setLayout(config_layout)
 
     # — Impresora de tickets —
@@ -1715,6 +1744,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     # — Cerrar —
     close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
     close_buttons.rejected.connect(dialog.reject)
+    close_buttons.button(QDialogButtonBox.StandardButton.Close).setText("Cerrar")
 
     # Rediseño en pestañas: antes eran 5 secciones apiladas (saturado en el
     # táctil, Meilisearch quedaba fuera). Ahora se agrupan en 3 pestañas
@@ -1786,17 +1816,17 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     update_box = QGroupBox("Actualizaciones")
     update_layout = QVBoxLayout()
     try:
-        from pos_uniformes.services.satellite_update_service import version_local
+        from pos_uniformes.utils.app_metadata import version_visible
 
-        _version_txt = version_local()
+        _version_txt = version_visible()      # «6 nov · 6ba73b01», la misma de la cabecera
     except Exception:  # noqa: BLE001
         _version_txt = "?"
     update_hint = QLabel(
-        f"Versión instalada: {_version_txt}. Al actualizar, la app se cierra y "
-        "el lanzador copia la versión nueva desde la PC principal y la reabre."
+        f"Esta PC trae la versión <b>{_version_txt}</b>. Al actualizar, el programa se "
+        "cierra, copia la versión nueva desde la PC principal y se vuelve a abrir."
     )
     update_hint.setWordWrap(True)
-    buscar_updates_btn = QPushButton("🔄 Buscar actualizaciones")
+    buscar_updates_btn = QPushButton("🔄  Buscar actualizaciones")
     buscar_updates_btn.setObjectName("secondaryButton")
 
     def _buscar_updates() -> None:
@@ -1807,18 +1837,9 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     buscar_updates_btn.clicked.connect(_buscar_updates)
     update_layout.addWidget(update_hint)
     update_layout.addWidget(buscar_updates_btn)
-    update_layout.addStretch()
     update_box.setLayout(update_layout)
 
     # — Buzón entre PCs (mandar y copiar comandos sin WhatsApp) —
-    buzon_box = QGroupBox("Buzón entre PCs")
-    buzon_layout = QVBoxLayout()
-    buzon_hint = QLabel(
-        "Un chat de texto entre la PC principal, los kioskos y Claude. Sirve para "
-        "pasar un comando de PowerShell y mandar de regreso lo que salió. Cada "
-        "mensaje trae su botón «Copiar». Nada se ejecuta solo."
-    )
-    buzon_hint.setWordWrap(True)
     abrir_buzon_btn = QPushButton("💬 Abrir buzón")
     abrir_buzon_btn.setObjectName("primaryButton")
 
@@ -1828,37 +1849,111 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
         abrir_buzon(dialog)
 
     abrir_buzon_btn.clicked.connect(_abrir_buzon)
-    buzon_layout.addWidget(buzon_hint)
-    buzon_layout.addWidget(abrir_buzon_btn)
-    buzon_layout.addStretch()
-    buzon_box.setLayout(buzon_layout)
 
-    tabs = QTabWidget()
-    tabs.addTab(_make_tab(status_box, config_box, update_box), "🔌  Conexión")
-    tabs.addTab(
-        _make_tab(routing_box, estacion_hint, printer_box, label_box, escpos_box),
-        "🖨  Impresoras",
+    # ── El armazón (2026-11-06) ───────────────────────────────────────────
+    # Daniel: «hay que mejorar toda esta ventana». Eran nueve pestañas que no
+    # cabían (se leían «…», «Im…», «Te…»). Ahora es un menú a la izquierda con
+    # los nombres completos, agrupado por de qué es cada cosa. Conteos y
+    # Precios —que no se usan desde aquí— bajaron a «Mantenimiento», y el buzón
+    # dejó de ser una página con un solo botón: va en la cabecera.
+    try:
+        from pos_uniformes.services.satellite_identity_service import get_satellite_name
+
+        nombre_pc = (get_satellite_name() or "").strip() or "Esta PC"
+    except Exception:  # noqa: BLE001
+        nombre_pc = "Esta PC"
+
+    cabecera = QFrame()
+    cabecera.setObjectName("adminCabecera")
+    cab = QHBoxLayout(cabecera)
+    cab.setContentsMargins(20, 14, 16, 14)
+    cab_textos = QVBoxLayout()
+    cab_textos.setSpacing(1)
+    titulo = QLabel("Administración")
+    titulo.setObjectName("adminTitulo")
+    subtitulo = QLabel(f"{nombre_pc}  ·  Versión {_version_txt}")
+    subtitulo.setObjectName("adminSubtitulo")
+    cab_textos.addWidget(titulo)
+    cab_textos.addWidget(subtitulo)
+    cab.addLayout(cab_textos, 1)
+    abrir_buzon_btn.setText("💬  Buzón entre PCs")
+    abrir_buzon_btn.setObjectName("adminBuzon")
+    abrir_buzon_btn.setToolTip(
+        "El chat entre la PC principal, los kioskos y Claude: para pasar comandos y capturas."
     )
-    tabs.addTab(_make_tab(meili_box), "🔍  Búsqueda")
-    tabs.addTab(_make_tab(conteo_box), "📋  Conteos")
+    cab.addWidget(abrir_buzon_btn)
+
+    menu = QListWidget()
+    menu.setObjectName("adminMenu")
+    menu.setFixedWidth(214)
+    menu.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+    paginas = QStackedWidget()
+
+    def _grupo(texto: str) -> None:
+        item = QListWidgetItem(texto)
+        item.setFlags(Qt.ItemFlag.NoItemFlags)             # un letrero, no una opción
+        item.setData(Qt.ItemDataRole.UserRole, -1)
+        fuente = item.font()
+        fuente.setPointSize(max(8, fuente.pointSize() - 2))
+        fuente.setBold(True)
+        item.setFont(fuente)
+        item.setForeground(QColor("#a08c78"))
+        menu.addItem(item)
+
+    def _seccion(texto: str, *cajas: QWidget) -> None:
+        item = QListWidgetItem(texto)
+        item.setData(Qt.ItemDataRole.UserRole, paginas.addWidget(_make_tab(*cajas)))
+        menu.addItem(item)
+
+    _grupo("ESTA PC")
+    _seccion("🔌   Conexión y versión", config_box, update_box)
+    _seccion("🖨   Impresoras", routing_box, estacion_hint, printer_box, label_box, escpos_box)
+    _seccion("📹   Cámaras", _build_camaras_box(dialog))
+    _seccion("🔍   Búsqueda", meili_box)
+    _grupo("LA TIENDA")
     if anuncios_boxes:
-        tabs.addTab(_make_tab(*anuncios_boxes), "📣  Anuncios")
-    tabs.addTab(_make_tab(_build_temporada_box(dialog), _build_fechas_box(dialog)), "🎃  Temporada")
-    tabs.addTab(_make_tab(_build_precios_box(dialog)), "💲  Precios")
-    tabs.addTab(_make_tab(_build_camaras_box(dialog)), "📹  Cámaras")
-    tabs.addTab(_make_tab(buzon_box), "💬  Buzón")
+        _seccion("📣   Anuncios", *anuncios_boxes)
+    _seccion("🎃   Temporada", _build_temporada_box(dialog), _build_fechas_box(dialog))
+    _grupo("POCO USADO")
+    _seccion("🧰   Mantenimiento", conteo_box, _build_precios_box(dialog))
+
+    def _al_escoger(fila: int) -> None:
+        item = menu.item(fila)
+        indice = item.data(Qt.ItemDataRole.UserRole) if item is not None else -1
+        if indice is not None and indice >= 0:
+            paginas.setCurrentIndex(indice)
+
+    menu.currentRowChanged.connect(_al_escoger)
+    menu.setCurrentRow(1)                                  # la primera opción de verdad
+    dialog.menu = menu                                     # para las pruebas
+    dialog.paginas = paginas
+
+    cuerpo = QHBoxLayout()
+    cuerpo.setContentsMargins(0, 0, 0, 0)
+    cuerpo.setSpacing(0)
+    cuerpo.addWidget(menu)
+    cuerpo.addWidget(paginas, 1)
+
+    pie = QHBoxLayout()
+    pie.setContentsMargins(12, 8, 12, 10)
+    pie.addWidget(close_buttons)
 
     outer = QVBoxLayout()
-    outer.setContentsMargins(12, 12, 12, 12)
-    outer.addWidget(tabs)
-    outer.addWidget(close_buttons)
+    outer.setContentsMargins(0, 0, 0, 0)
+    outer.setSpacing(0)
+    outer.addWidget(cabecera)
+    outer.addLayout(cuerpo, 1)
+    outer.addLayout(pie)
     dialog.setLayout(outer)
+    dialog.setStyleSheet(dialog.styleSheet() + _ESTILO_ADMIN)
 
-    # Tamaño acotado a la pantalla; cada pestaña scrollea si hace falta.
+    # Tamaño acotado a la pantalla; cada sección scrollea si hace falta.
     screen = dialog.screen() or QApplication.primaryScreen()
     if screen is not None:
         avail = screen.availableGeometry()
-        dialog.resize(max(560, int(avail.width() * 0.5)), int(avail.height() * 0.8))
+        dialog.resize(
+            min(avail.width(), max(940, int(avail.width() * 0.6))), int(avail.height() * 0.8)
+        )
         dialog.setMaximumHeight(avail.height())
 
     dialog.exec()

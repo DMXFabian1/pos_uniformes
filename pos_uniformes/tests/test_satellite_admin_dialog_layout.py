@@ -18,6 +18,7 @@ from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QApplication, QGroupBox, QLabel, QTabWidget
 
 import pos_uniformes.ui.dialogs.satellite_admin_dialog as admin
@@ -66,22 +67,77 @@ class AdminDialogTabsTests(unittest.TestCase):
                 return gb
         return None
 
-    def test_dialog_has_expected_tabs(self) -> None:
+    @staticmethod
+    def _opciones(dialog) -> list[str]:
+        menu = dialog.menu
+        return [
+            menu.item(i).text() for i in range(menu.count())
+            if (menu.item(i).data(Qt.ItemDataRole.UserRole) or 0) >= 0
+            and menu.item(i).flags() & Qt.ItemFlag.ItemIsEnabled
+        ]
+
+    def test_el_menu_lateral_trae_cada_seccion_con_su_nombre_completo(self) -> None:
+        # Rediseño 2026-11-06: las 9 pestañas no cabían y se leían «…», «Im…»,
+        # «Te…». Ahora es un menú a la izquierda, agrupado.
         dialog = self._build_dialog()
-        tabs = dialog.findChild(QTabWidget)
-        self.assertIsNotNone(tabs)
-        labels = [tabs.tabText(i) for i in range(tabs.count())]
-        self.assertEqual(len(labels), 9)
-        joined = " ".join(labels)
-        for esperado in ("Conexión", "Impresoras", "Búsqueda", "Conteos", "Anuncios",
-                         "Temporada", "Precios", "Cámaras", "Buzón"):
-            self.assertIn(esperado, joined)
+        opciones = self._opciones(dialog)
+        self.assertEqual(len(opciones), 7)
+        for esperado in ("Conexión y versión", "Impresoras", "Cámaras", "Búsqueda",
+                         "Anuncios", "Temporada", "Mantenimiento"):
+            self.assertTrue(any(esperado in o for o in opciones), (esperado, opciones))
+        self.assertEqual(dialog.paginas.count(), 7)
+        self.assertIsNone(dialog.findChild(QTabWidget))
+
+    def test_cada_opcion_abre_su_pagina_y_los_letreros_no_se_eligen(self) -> None:
+        dialog = self._build_dialog()
+        menu, paginas = dialog.menu, dialog.paginas
+        vistos = set()
+        for fila in range(menu.count()):
+            menu.setCurrentRow(fila)
+            indice = menu.item(fila).data(Qt.ItemDataRole.UserRole)
+            if indice >= 0:
+                self.assertEqual(paginas.currentIndex(), indice)
+                vistos.add(indice)
+            else:
+                self.assertFalse(menu.item(fila).flags() & Qt.ItemFlag.ItemIsEnabled)
+        self.assertEqual(vistos, set(range(7)))
+
+    def test_abre_en_conexion(self) -> None:
+        dialog = self._build_dialog()
+        self.assertIn("Conexión", dialog.menu.currentItem().text())
+        self.assertEqual(dialog.paginas.currentIndex(), 0)
+
+    def test_conteos_y_precios_bajaron_a_mantenimiento(self) -> None:
+        dialog = self._build_dialog()
+        fila = next(i for i in range(dialog.menu.count()) if "Mantenimiento" in dialog.menu.item(i).text())
+        pagina = dialog.paginas.widget(dialog.menu.item(fila).data(Qt.ItemDataRole.UserRole))
+        titulos = {gb.title() for gb in pagina.findChildren(QGroupBox)}
+        self.assertEqual(titulos, {"Calendario de conteos", "Cambiar el precio de una prenda"})
+
+    def test_la_conexion_es_una_sola_tarjeta_y_dice_la_version_de_verdad(self) -> None:
+        with patch("pos_uniformes.utils.app_metadata.version_visible", return_value="6 nov · abc1234"):
+            dialog = self._build_dialog()
+        titles = {gb.title() for gb in dialog.findChildren(QGroupBox)}
+        self.assertIn("Conexión con la PC principal", titles)
+        self.assertNotIn("Estado de conexion", titles)       # repetía la misma IP
+        textos = " ".join(lbl.text() for lbl in dialog.findChildren(QLabel))
+        self.assertIn("6 nov · abc1234", textos)
+        self.assertNotIn("2026.11.11", textos)
+
+    def test_el_buzon_va_en_la_cabecera_y_no_es_una_pagina(self) -> None:
+        from PyQt6.QtWidgets import QPushButton
+
+        dialog = self._build_dialog()
+        boton = dialog.findChild(QPushButton, "adminBuzon")
+        self.assertIsNotNone(boton)
+        self.assertIn("Buzón", boton.text())
+        self.assertFalse(any("Buzón" in o for o in self._opciones(dialog)))
 
     def test_all_sections_survive_the_redesign(self) -> None:
         dialog = self._build_dialog()
         titles = {gb.title() for gb in dialog.findChildren(QGroupBox)}
-        self.assertIn("Estado de conexion", titles)
-        self.assertIn("Cambiar conexion", titles)
+        self.assertIn("Conexión con la PC principal", titles)
+        self.assertIn("Actualizaciones", titles)
         self.assertIn("Impresora de tickets", titles)
         self.assertIn("Impresoras de etiquetas", titles)
         self.assertIn("Meilisearch (busqueda rapida)", titles)
