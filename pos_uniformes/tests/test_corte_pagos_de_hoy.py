@@ -187,3 +187,62 @@ class LoQueYaSalioDelCajonTests(_CorteBase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class VentanaRedisenadaTests(_CorteBase):
+    """2026-11-06, Daniel: «necesito que mejoremos esta ventana». Las tres
+    cifras arriba, una pregunta grande, lo raro plegado y lo que queda en el
+    cajón abajo en grande. Nada se quitó."""
+
+    def _abrir(self, mirar):
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import hacer_corte_caja
+
+        def _exec(dlg):
+            mirar(dlg)
+            return QDialog.DialogCode.Rejected
+
+        with patch("pos_uniformes.ui.dialogs.corte_caja_dialog.QDialog.exec", _exec):
+            hacer_corte_caja(None, creado_por="VEND-1")
+
+    def test_lo_raro_viene_plegado_y_se_abre_a_un_toque(self) -> None:
+        from PyQt6.QtWidgets import QDoubleSpinBox
+
+        def mirar(dlg):
+            self.assertFalse(dlg.mas_opciones.isVisibleTo(dlg))
+            cajas = {sb.objectName() for sb in dlg.findChildren(QDoubleSpinBox)}
+            self.assertEqual(cajas, {"dinero"})                       # todas sin flechitas, iguales
+            dlg.mas_btn.click()
+            self.assertTrue(dlg.mas_opciones.isVisibleTo(dlg))
+            self.assertIn("Menos opciones", dlg.mas_btn.text())
+
+        self._abrir(mirar)
+
+    def test_el_resultado_se_mueve_con_la_venta_y_el_fondo(self) -> None:
+        from PyQt6.QtWidgets import QDoubleSpinBox
+
+        def mirar(dlg):
+            spins = dlg.findChildren(QDoubleSpinBox)
+            venta = max(spins, key=lambda s: s.minimumHeight())          # la grande es la venta
+            self.assertEqual(dlg.aviso_venta.text(), "✅ Es la venta registrada.")
+            # reactivo 11,160 + venta 5,000 − pagos de hoy marcados (Stayce y Fanny)
+            self.assertTrue(dlg.resultado_valor.text().startswith("$"))
+            antes = Decimal(dlg.resultado_valor.text().replace("$", "").replace(",", ""))
+            venta.setValue(4900.0)
+            self.assertIn("$100.00 menos que lo registrado", dlg.aviso_venta.text())
+            despues = Decimal(dlg.resultado_valor.text().replace("$", "").replace(",", ""))
+            self.assertEqual(antes - despues, Decimal("100.00"))
+            self.assertIn("Se queda de fondo: $11,160.00", dlg.resultado_pie.text())
+            self.assertIn(f"Se saca de la venta: ${max(despues - Decimal('11160'), Decimal('0')):,.2f}", dlg.resultado_pie.text())
+
+        self._abrir(mirar)
+
+    def test_las_tres_cifras_estan_arriba(self) -> None:
+        from PyQt6.QtWidgets import QLabel
+
+        def mirar(dlg):
+            titulos = [w.text() for w in dlg.findChildren(QLabel, "corteCifraTitulo")]
+            self.assertEqual(titulos, ["ABRIÓ CON", "VENTA EN EFECTIVO", "DEBE HABER EN EL CAJÓN"])
+            valores = [w.text() for w in dlg.findChildren(QLabel, "corteCifraValor")]
+            self.assertEqual(valores[:2], ["$11,160.00", "$5,000.00"])
+
+        self._abrir(mirar)

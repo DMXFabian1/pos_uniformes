@@ -11,16 +11,21 @@ import logging
 from decimal import Decimal
 from types import SimpleNamespace
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
+    QAbstractSpinBox,
     QCheckBox,
     QDialog,
     QDoubleSpinBox,
     QFormLayout,
+    QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -36,14 +41,91 @@ _GRANDE = "font-size: 22px; font-weight: 800; padding: 8px;"
 _NORMAL = "font-size: 18px; font-weight: 700; padding: 6px;"
 
 
+# La ventana de «Hacer corte» (rediseño 2026-11-06). Solo colores y formas;
+# los tamaños de letra van en cada widget.
+_ESTILO_CORTE = """
+QDialog#corteDialog { background: #f4ede2; }
+QDialog#corteDialog QLabel { color: #2c2a27; }
+QDialog#corteDialog QScrollArea { background: transparent; border: none; }
+QDialog#corteDialog QScrollArea > QWidget > QWidget { background: transparent; }
+QDialog#corteDialog QLabel#cortePeriodo { color: #8a8177; font-size: 13px; }
+QFrame#corteCifra { background: #fbf7f0; border: 1px solid #e6dccb; border-radius: 12px; }
+QFrame#corteCifra[acento="true"] { background: #6b1f3a; border: none; }
+QDialog#corteDialog QFrame#corteCifra[acento="true"] QLabel { color: #ffffff; }
+QDialog#corteDialog QLabel#corteCifraTitulo { color: #8a8177; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+QDialog#corteDialog QFrame#corteCifra[acento="true"] QLabel#corteCifraTitulo { color: #e9cfd6; }
+QDialog#corteDialog QLabel#corteCifraValor { font-size: 22px; font-weight: 800; }
+QDialog#corteDialog QLabel#corteCifraPie { color: #8a8177; font-size: 12px; }
+QFrame#corteCard { background: #fbf7f0; border: 1px solid #e6dccb; border-radius: 12px; }
+QDialog#corteDialog QLabel#corteCardTitulo { color: #8a8177; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+QDialog#corteDialog QLabel#cortePregunta { font-size: 16px; font-weight: 700; }
+QDialog#corteDialog QLabel#corteAviso { color: #8a8177; font-size: 13px; }
+QDialog#corteDialog QLabel#corteAviso[estado="igual"] { color: #1c7c54; font-weight: 700; }
+QDialog#corteDialog QLabel#corteAviso[estado="mas"], QLabel#corteAviso[estado="menos"] { color: #a35a00; font-weight: 700; }
+QDoubleSpinBox#dinero, QLineEdit#corteTexto { background: #ffffff; color: #2c2a27; border: 1px solid #d9cdb8;
+                                             border-radius: 10px; padding: 6px 12px; }
+QDoubleSpinBox#dinero:focus, QLineEdit#corteTexto:focus { border: 2px solid #6b1f3a; }
+QPushButton#corteMas { background: transparent; color: #6b1f3a; border: none; font-size: 14px;
+                       font-weight: 700; text-align: left; padding: 6px 2px; }
+QFrame#corteResultado { background: #e7f3ec; border: 1px solid #bfdccb; border-radius: 12px; }
+QDialog#corteDialog QLabel#corteResultadoTitulo { color: #1c7c54; font-size: 12px; font-weight: 700; letter-spacing: 1px; }
+QDialog#corteDialog QLabel#corteResultadoValor { color: #1c7c54; font-size: 30px; font-weight: 800; }
+QDialog#corteDialog QLabel#corteResultadoPie { color: #2c2a27; font-size: 14px; }
+QPushButton#cortePrimario { background: #8b4a2b; color: #ffffff; border: none; border-radius: 12px;
+                            font-size: 17px; font-weight: 800; padding: 14px 20px; }
+QPushButton#cortePrimario:hover { background: #a2583a; }
+QPushButton#corteCancelar { background: #fbf7f0; color: #8b4a2b; border: 1px solid #e6dccb; border-radius: 12px;
+                            font-size: 15px; font-weight: 700; padding: 14px 20px; }
+"""
+
+
 def _spin(valor: Decimal, grande: bool) -> QDoubleSpinBox:
     s = QDoubleSpinBox()
+    s.setObjectName("dinero")
     s.setRange(0.0, 9_999_999.0)
     s.setDecimals(2)
     s.setPrefix("$ ")
+    s.setGroupSeparatorShown(True)
     s.setValue(float(valor))
+    # Sin flechitas: nadie sube una venta de centavo en centavo. Se escribe.
+    s.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
+    s.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
     s.setStyleSheet(_GRANDE if grande else _NORMAL)
     return s
+
+
+def _cifra(titulo: str, valor: str, pie: str = "", *, acento: bool = False) -> QFrame:
+    """Una tarjeta chica con un número: ABRIÓ CON · VENTA · DEBE HABER."""
+    caja = QFrame()
+    caja.setObjectName("corteCifra")
+    caja.setProperty("acento", "true" if acento else "false")
+    ly = QVBoxLayout(caja)
+    ly.setContentsMargins(14, 10, 14, 10)
+    ly.setSpacing(2)
+    t = QLabel(titulo.upper())
+    t.setObjectName("corteCifraTitulo")
+    v = QLabel(valor)
+    v.setObjectName("corteCifraValor")
+    ly.addWidget(t)
+    ly.addWidget(v)
+    if pie:
+        p = QLabel(pie)
+        p.setObjectName("corteCifraPie")
+        ly.addWidget(p)
+    return caja
+
+
+def _card(titulo: str) -> tuple[QFrame, QVBoxLayout]:
+    caja = QFrame()
+    caja.setObjectName("corteCard")
+    ly = QVBoxLayout(caja)
+    ly.setContentsMargins(16, 12, 16, 14)
+    ly.setSpacing(8)
+    if titulo:
+        t = QLabel(titulo.upper())
+        t.setObjectName("corteCardTitulo")
+        ly.addWidget(t)
+    return caja, ly
 
 
 def _seccion_retiros(retiros: list, lines: list[str], tk_top, tk_mid, tk_row, tk_dbl, tk_bot, _TW) -> None:
@@ -415,104 +497,201 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
         QMessageBox.warning(parent, "Sin conexión", "No se alcanzó la base. Inténtalo otra vez.")
         return None
 
+    # ── La ventana (rediseño 2026-11-06: «necesito que mejoremos esta ventana») ──
+    # Antes: un bloque de texto, cuatro cajas negras con flechitas y todo al
+    # mismo nivel. Ahora: las tres cifras arriba, UNA pregunta grande (la venta)
+    # con su respuesta en vivo, el fondo, lo raro plegado en «Más opciones» y
+    # abajo, en grande, lo que queda en el cajón. Nada se quitó.
     dlg = QDialog(parent)
+    dlg.setObjectName("corteDialog")
     dlg.setWindowTitle("Hacer corte")
-    ly = QVBoxLayout()
-    ly.setContentsMargins(20, 18, 20, 18)
-    ly.setSpacing(10)
-    if grande:
-        dlg.setStyleSheet("QDialog { background: #f4ede2; } QLabel { color: #2c2a27; font-size: 18px; }")
-    resumen = QLabel(texto_estado_caja_sin_totales(estado) if (pagos_hechos or retiros_hechos) else texto_estado_caja(estado))
-    resumen.setWordWrap(True)
-    ly.addWidget(resumen)
+    dlg.setStyleSheet(_ESTILO_CORTE)
+    tam_etiqueta = "font-size: 16px;" if grande else "font-size: 14px;"
+
+    cuerpo = QWidget()
+    ly = QVBoxLayout(cuerpo)
+    ly.setContentsMargins(22, 18, 22, 10)
+    ly.setSpacing(12)
+
+    periodo = QLabel(f"Periodo: {_periodo(estado)}")
+    periodo.setObjectName("cortePeriodo")
+    ly.addWidget(periodo)
+
+    r = estado.resumen
+    cifras = QHBoxLayout()
+    cifras.setSpacing(10)
+    cifras.addWidget(_cifra("Abrió con", f"${estado.reactivo:,.2f}", "fondo (reactivo)"), 1)
+    cifras.addWidget(_cifra(
+        "Venta en efectivo", f"${r.efectivo:,.2f}",
+        f"{r.operaciones} operación{'es' if r.operaciones != 1 else ''}",
+    ), 1)
+    cifra_esperado = _cifra("Debe haber en el cajón", f"${estado.esperado:,.2f}", acento=True)
+    cifras.addWidget(cifra_esperado, 1)
+    ly.addLayout(cifras)
+    notas_arriba = []
+    if r.tarjeta:
+        notas_arriba.append(
+            f"💳 Con tarjeta llega ${r.tarjeta_neto:,.2f} (cobrado ${r.tarjeta:,.2f}); no está en el cajón."
+        )
+    if estado.entradas and not entradas_hechas:
+        notas_arriba.append(f"➕ Entró al cajón sin ser venta: ${estado.entradas:,.2f}")
+    if not (pagos_hechos or retiros_hechos):
+        if estado.pagos:
+            notas_arriba.append(f"Pagos a empleadas ya hechos: −${estado.pagos:,.2f}")
+        if estado.retiros:
+            notas_arriba.append(f"Retiros apuntados: −${estado.retiros:,.2f}")
+    for texto_nota in notas_arriba:
+        n = QLabel(texto_nota)
+        n.setObjectName("corteAviso")
+        n.setWordWrap(True)
+        ly.addWidget(n)
 
     # Desglose de lo que ya salió: marcado = salió del cajón en este periodo.
     casillas_hechos: list[tuple[QCheckBox, str, int, Decimal]] = []   # (casilla, "pago"/"retiro", id, monto)
-    for titulo_txt, filas, tipo in (
-        ("Pagos a empleadas en este periodo (desmarca el que NO salió del cajón):", pagos_hechos, "pago"),
-        ("Retiros apuntados en este periodo (desmarca el que NO salió del cajón):", retiros_hechos, "retiro"),
-    ):
-        if not filas:
-            continue
-        t = QLabel(titulo_txt)
-        t.setStyleSheet("font-weight: 700;")
-        ly.addWidget(t)
-        for rid, quien, monto, cuando, en_cajon in filas:
-            cb = QCheckBox(f"{quien}  ·  ${monto:,.2f}  ·  {cuando}")
-            cb.setChecked(en_cajon)
-            cb.setProperty("en_cajon_inicial", en_cajon)
-            if grande:
-                cb.setStyleSheet("font-size: 17px;")
-            ly.addWidget(cb)
-            casillas_hechos.append((cb, tipo, rid, monto))
-    if entradas_hechas:
-        t = QLabel("Entró al cajón sin ser venta en este periodo:")
-        t.setStyleSheet("font-weight: 700;")
-        ly.addWidget(t)
+    esperado_lbl = None
+    if pagos_hechos or retiros_hechos or entradas_hechas:
+        card, cly = _card("Lo que ya salió del cajón en este periodo")
+        pista = QLabel("Marcado = salió de este cajón. Desmarca lo que se pagó con otro dinero.")
+        pista.setObjectName("corteAviso")
+        pista.setWordWrap(True)
+        cly.addWidget(pista)
+        for filas, tipo in ((pagos_hechos, "pago"), (retiros_hechos, "retiro")):
+            for rid, quien, monto, cuando, en_cajon in filas:
+                # El nombre va primero (las pruebas y la vista lo buscan así).
+                cb = QCheckBox(f"{quien}  ·  ${monto:,.2f}  ·  {cuando}")
+                cb.setToolTip("Pago a empleada" if tipo == "pago" else "Retiro apuntado")
+                cb.setChecked(en_cajon)
+                cb.setProperty("en_cajon_inicial", en_cajon)
+                cb.setStyleSheet(tam_etiqueta)
+                cly.addWidget(cb)
+                casillas_hechos.append((cb, tipo, rid, monto))
         for motivo_e, monto_e, cuando_e in entradas_hechas:
-            lbl_e = QLabel(f"➕ {motivo_e}  ·  ${monto_e:,.2f}  ·  {cuando_e}")
-            if grande:
-                lbl_e.setStyleSheet("font-size: 17px;")
-            ly.addWidget(lbl_e)
-    if pagos_hechos or retiros_hechos:
-        esperado_lbl = QLabel("")
-        esperado_lbl.setWordWrap(True)
-        ly.addWidget(esperado_lbl)
-    else:
-        esperado_lbl = None
+            lbl_e = QLabel(f"➕ Entró ({motivo_e})  ·  ${monto_e:,.2f}  ·  {cuando_e}")
+            lbl_e.setStyleSheet(tam_etiqueta)
+            cly.addWidget(lbl_e)
+        if pagos_hechos or retiros_hechos:
+            esperado_lbl = QLabel("")
+            esperado_lbl.setObjectName("corteAviso")
+            esperado_lbl.setWordWrap(True)
+            cly.addWidget(esperado_lbl)
+        ly.addWidget(card)
 
-    form = QFormLayout()
-    # Se pregunta por la VENTA (Daniel 2026-09-10): es la cifra con la que se
-    # razona el corte. Lo que debe haber en el cajón se calcula y se muestra.
-    venta = _spin(estado.resumen.efectivo, grande)
-    form.addRow("¿Cuánto se vendió? (efectivo)", venta)
-    fondo = _spin(estado.reactivo, grande)
-    form.addRow("¿Cuánto se queda de fondo?", fondo)
-    otros = _spin(Decimal("0.00"), grande)
-    form.addRow("Otros retiros (opcional):", otros)
-    # Lo que papá dejó para la nómina: entra al cajón, los pagos salen
-    # completos y el sobrante se queda (Daniel, 2026-10-20).
+    # Pagos que tocan hoy: marcados = "ya le pagué del cajón", se registran
+    # al guardar y se restan de lo que debe quedar.
+    casillas_pago: list[tuple[QCheckBox, object]] = []
+    if avisos_hoy:
+        card, cly = _card("Pagos que tocan hoy")
+        pista = QLabel("Marca los que salieron del cajón; se registran al guardar el corte.")
+        pista.setObjectName("corteAviso")
+        pista.setWordWrap(True)
+        cly.addWidget(pista)
+        for aviso in avisos_hoy:
+            nombre = _nombre_de(aviso.employee_name or aviso.employee_code, corto=True)
+            cb = QCheckBox(f"{nombre}  ·  ${Decimal(aviso.total_estimado):,.2f}  ({aviso.comisiones} comisiones)")
+            cb.setChecked(True)
+            cb.setStyleSheet(tam_etiqueta)
+            cly.addWidget(cb)
+            casillas_pago.append((cb, aviso))
+        ly.addWidget(card)
+
+    # La pregunta: se pregunta por la VENTA (Daniel 2026-09-10), es la cifra
+    # con la que se razona el corte. Lo que debe haber en el cajón se calcula.
+    card, cly = _card("")
+    pregunta = QLabel("¿Cuánto se vendió en efectivo?")
+    pregunta.setObjectName("cortePregunta")
+    cly.addWidget(pregunta)
+    venta = _spin(estado.resumen.efectivo, True)
+    venta.setMinimumHeight(52)
+    cly.addWidget(venta)
+    dif = QLabel("")
+    dif.setObjectName("corteAviso")
+    dif.setWordWrap(True)
+    cly.addWidget(dif)
+    fondo_fila = QHBoxLayout()
+    fondo_lbl = QLabel("Se queda de fondo para mañana")
+    fondo_lbl.setStyleSheet(tam_etiqueta)
+    fondo_fila.addWidget(fondo_lbl, 1)
+    fondo = _spin(estado.reactivo, False)
+    fondo.setFixedWidth(190)
+    fondo_fila.addWidget(fondo)
+    cly.addLayout(fondo_fila)
+    ly.addWidget(card)
+
+    # Lo que casi nunca se usa, plegado: no estorba y sigue a un toque.
     from pos_uniformes.services.entradas_service import MOTIVO_POR_DEFECTO
 
-    entro = _spin(Decimal("0.00"), grande)
-    form.addRow("Entró dinero que no es venta (opcional):", entro)
+    mas_btn = QPushButton("▸  Más opciones  (otros retiros, dinero que entró, nota)")
+    mas_btn.setObjectName("corteMas")
+    mas_btn.setAutoDefault(False)
+    mas_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+    ly.addWidget(mas_btn)
+    mas_card, mly = _card("Más opciones")
+    form = QFormLayout()
+    form.setHorizontalSpacing(14)
+    form.setVerticalSpacing(10)
+    otros = _spin(Decimal("0.00"), False)
+    form.addRow("Otros retiros que salieron hoy:", otros)
+    # Lo que papá dejó para la nómina: entra al cajón, los pagos salen
+    # completos y el sobrante se queda (Daniel, 2026-10-20).
+    entro = _spin(Decimal("0.00"), False)
+    form.addRow("Entró dinero que no es venta:", entro)
     entro_motivo = QLineEdit()
+    entro_motivo.setObjectName("corteTexto")
     entro_motivo.setPlaceholderText(MOTIVO_POR_DEFECTO)
-    form.addRow("¿De dónde?", entro_motivo)
+    form.addRow("¿De dónde entró?", entro_motivo)
     nota = QLineEdit()
-    nota.setPlaceholderText("Nota (opcional)")
-    form.addRow("", nota)
-    ly.addLayout(form)
-
+    nota.setObjectName("corteTexto")
+    nota.setPlaceholderText("Algo que quieras dejar escrito en el corte")
+    form.addRow("Nota:", nota)
+    for i_fila in range(form.rowCount()):
+        etiqueta = form.itemAt(i_fila, QFormLayout.ItemRole.LabelRole)
+        if etiqueta is not None and etiqueta.widget() is not None:
+            etiqueta.widget().setStyleSheet(tam_etiqueta)
+    mly.addLayout(form)
     # Solo Daniel: dejar el papel sin la linea "Con tarjeta". Es por corte
     # (arranca apagada); en pantalla la sigue viendo.
     sin_tarjeta = QCheckBox("Ocultar los cobros con tarjeta (no salen en el ticket)")
     # Llega como la dejó la última vez (2026-09-10).
     sin_tarjeta.setChecked(bool(getattr(parametros, "ocultar_tarjeta", False)))
     sin_tarjeta.setVisible(str(creado_por or "").strip().upper() == OWNER_CODE)
-    if grande:
-        sin_tarjeta.setStyleSheet("font-size: 17px;")
-    ly.addWidget(sin_tarjeta)
+    sin_tarjeta.setStyleSheet(tam_etiqueta)
+    mly.addWidget(sin_tarjeta)
+    mas_card.setVisible(False)
+    ly.addWidget(mas_card)
 
-    # Pagos que tocan hoy: marcados = "ya le pagué del cajón", se registran
-    # al guardar y se restan de lo que debe quedar.
-    casillas_pago: list[tuple[QCheckBox, object]] = []
-    if avisos_hoy:
-        titulo_pagos = QLabel("Pagos que tocan hoy (marca los que salieron del cajón):")
-        titulo_pagos.setStyleSheet("font-weight: 700;")
-        ly.addWidget(titulo_pagos)
-        for aviso in avisos_hoy:
-            nombre = _nombre_de(aviso.employee_name or aviso.employee_code, corto=True)
-            cb = QCheckBox(f"{nombre}  ·  ${Decimal(aviso.total_estimado):,.2f}  ({aviso.comisiones} comisiones)")
-            cb.setChecked(True)
-            if grande:
-                cb.setStyleSheet("font-size: 17px;")
-            ly.addWidget(cb)
-            casillas_pago.append((cb, aviso))
+    def _alternar_mas() -> None:
+        abrir = not mas_card.isVisible()
+        mas_card.setVisible(abrir)
+        mas_btn.setText(
+            "▾  Menos opciones" if abrir
+            else "▸  Más opciones  (otros retiros, dinero que entró, nota)"
+        )
 
-    dif = QLabel("")
-    dif.setStyleSheet("font-weight: 700;")
-    ly.addWidget(dif)
+    mas_btn.clicked.connect(_alternar_mas)
+    dlg.mas_opciones = mas_card        # para las pruebas
+    dlg.mas_btn = mas_btn
+
+    # Abajo, en grande: lo que queda en el cajón.
+    resultado = QFrame()
+    resultado.setObjectName("corteResultado")
+    rly = QGridLayout(resultado)
+    rly.setContentsMargins(16, 12, 16, 12)
+    rly.setHorizontalSpacing(16)
+    res_titulo = QLabel("EN EL CAJÓN QUEDAN")
+    res_titulo.setObjectName("corteResultadoTitulo")
+    res_valor = QLabel("")
+    res_valor.setObjectName("corteResultadoValor")
+    res_pie = QLabel("")
+    res_pie.setObjectName("corteResultadoPie")
+    res_pie.setWordWrap(True)
+    res_pie.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+    rly.addWidget(res_titulo, 0, 0)
+    rly.addWidget(res_valor, 1, 0)
+    rly.addWidget(res_pie, 0, 1, 2, 1)
+    rly.setColumnStretch(1, 1)
+    dlg.resultado_valor = res_valor    # para las pruebas
+    dlg.resultado_pie = res_pie
+    dlg.aviso_venta = dif
 
     def _pagos_marcados() -> list:
         return [a for cb, a in casillas_pago if cb.isChecked()]
@@ -555,19 +734,33 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
             entradas_total = Decimal(getattr(estado, "entradas", 0) or 0) + Decimal(str(entro.value()))
             esperado_lbl.setText(
                 (f"Entró sin ser venta: +${entradas_total:,.2f}\n" if entradas_total else "")
-                + f"Salió del cajón en este periodo: -${marcados:,.2f}"
+                + f"Salió del cajón en este periodo: −${marcados:,.2f}"
                 + (f"  (no se resta ${no_salio:,.2f} que no salió de aquí)" if no_salio else "")
-                + f"\nEn el cajón debe haber: ${(estado.reactivo + estado.resumen.efectivo + entradas_total - marcados):,.2f}"
             )
-        detalle = f"En el cajón quedan ${_contado():,.2f}."
+            cifra_esperado.findChild(QLabel, "corteCifraValor").setText(
+                f"${(estado.reactivo + estado.resumen.efectivo + entradas_total - marcados):,.2f}"
+            )
         if d == 0:
-            dif.setText(f"✅ Es la venta registrada. {detalle}")
+            dif.setText("✅ Es la venta registrada.")
+            dif.setProperty("estado", "igual")
         elif d > 0:
-            dif.setText(f"${d:,.2f} más que lo registrado. {detalle}")
+            dif.setText(f"${d:,.2f} más que lo registrado (${estado.resumen.efectivo:,.2f}).")
+            dif.setProperty("estado", "mas")
         else:
-            dif.setText(f"${-d:,.2f} menos que lo registrado. {detalle}")
+            dif.setText(f"${-d:,.2f} menos que lo registrado (${estado.resumen.efectivo:,.2f}).")
+            dif.setProperty("estado", "menos")
+        dif.style().unpolish(dif)
+        dif.style().polish(dif)
+        queda = _contado()
+        res_valor.setText(f"${queda:,.2f}")
+        sacar = max(queda - Decimal(str(fondo.value())), Decimal("0.00")).quantize(Decimal("0.01"))
+        res_pie.setText(
+            f"Se saca de la venta: ${sacar:,.2f}\n"
+            f"Se queda de fondo: ${Decimal(str(fondo.value())):,.2f}"
+        )
 
     venta.valueChanged.connect(lambda _v: _refrescar_dif())
+    fondo.valueChanged.connect(lambda _v: _refrescar_dif())
     otros.valueChanged.connect(lambda _v: _refrescar_dif())
     entro.valueChanged.connect(lambda _v: _refrescar_dif())
     for cb, _a in casillas_pago:
@@ -576,19 +769,39 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
         cb.toggled.connect(lambda _v: _refrescar_dif())
     _refrescar_dif()
 
+    # Con muchos pagos o retiros la ventana crecía más que la pantalla: el
+    # cuerpo scrollea y los botones se quedan siempre a la vista.
+    area = QScrollArea()
+    area.setWidgetResizable(True)
+    area.setWidget(cuerpo)
+    area.setFrameShape(QScrollArea.Shape.NoFrame)
+    raiz = QVBoxLayout(dlg)
+    raiz.setContentsMargins(0, 0, 0, 0)
+    raiz.setSpacing(0)
+    raiz.addWidget(area, 1)
+    # El resultado va FUERA del scroll: con muchos pagos arriba, lo que queda
+    # en el cajón y los botones se quedan siempre a la vista.
+    pie_fijo = QVBoxLayout()
+    pie_fijo.setContentsMargins(22, 6, 22, 0)
+    pie_fijo.addWidget(resultado)
+    raiz.addLayout(pie_fijo)
     botones = QHBoxLayout()
+    botones.setContentsMargins(22, 8, 22, 18)
+    botones.setSpacing(10)
     cancelar = QPushButton("Cancelar")
+    cancelar.setObjectName("corteCancelar")
     cancelar.setAutoDefault(False)
     cancelar.clicked.connect(dlg.reject)
     botones.addWidget(cancelar)
-    ok = QPushButton("🖨 Guardar e imprimir corte")
-    ok.setObjectName("primaryButton")
+    ok = QPushButton("🖨  Guardar e imprimir corte")
+    ok.setObjectName("cortePrimario")
+    ok.setDefault(True)
     ok.clicked.connect(dlg.accept)
     botones.addWidget(ok, 1)
-    ly.addLayout(botones)
-    dlg.setLayout(ly)
-    if grande:
-        dlg.resize(560, 520)
+    raiz.addLayout(botones)
+    dlg.resize(640, 720 if (casillas_hechos or casillas_pago) else 600)
+    venta.setFocus()
+    venta.selectAll()
     if dlg.exec() != QDialog.DialogCode.Accepted:
         return None
 
