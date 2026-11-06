@@ -114,13 +114,15 @@ class SplashDelKiosko(QSplashScreen):
         painter.setFont(f)
         painter.setPen(QColor(_TINTA))
         painter.drawText(QRectF(margen, ALTO_BANDA + 30, ANCHO - 2 * margen, 30),
-                         Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter, self.mensaje)
+                         int(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter), self.mensaje)
         f = QFont()
         f.setPointSize(12)
         painter.setFont(f)
         painter.setPen(QColor(_GRIS))
         painter.drawText(QRectF(margen, ALTO_BANDA + 64, ANCHO - 2 * margen, 40),
-                         Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap,
+                         # AlignmentFlag | TextFlag no es un tipo que drawText acepte: va como entero.
+                         Qt.AlignmentFlag.AlignHCenter.value | Qt.AlignmentFlag.AlignTop.value
+                         | Qt.TextFlag.TextWordWrap.value,
                          self.detalle)
         # La barra: riel claro y lo avanzado en terracota.
         riel = QRectF(margen + 40, ALTO_BANDA + 122, ANCHO - 2 * (margen + 40), 8)

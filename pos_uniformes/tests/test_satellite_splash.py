@@ -65,3 +65,57 @@ class SplashDelKioskoTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ArranqueDeVerdadTests(unittest.TestCase):
+    """2026-11-06: al abrir el kiosko de verdad tronó dos veces — `drawContents`
+    mezclaba AlignmentFlag con TextFlag (TypeError al pintar) y las llamadas a
+    `_show_splash_message` pasaban el detalle donde iba la app. Las pruebas de
+    antes pintaban el fondo y nunca el texto, ni llamaban a la función."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_pinta_el_mensaje_el_detalle_y_la_barra_sin_tronar(self) -> None:
+        from PyQt6.QtGui import QPainter, QPixmap
+
+        s = mod.SplashDelKiosko("6 nov · abc1234")
+        s.decir("Esperando a la PC principal…",
+                "Todavía no contesta. Si en 53 s no aparece, abro con el catálogo guardado.", 0.4)
+        lienzo = QPixmap(mod.ANCHO, mod.ALTO)
+        lienzo.fill(QColor("#f7f0e3"))
+        p = QPainter(lienzo)
+        s.drawContents(p)          # el TypeError salía aquí
+        p.end()
+        img = lienzo.toImage()
+        oscuros = sum(
+            1 for x in range(60, mod.ANCHO - 60, 2) for y in range(mod.ALTO_BANDA + 30, mod.ALTO_BANDA + 104, 2)
+            if img.pixelColor(x, y).lightness() < 150
+        )
+        self.assertGreater(oscuros, 100)   # hay letras: mensaje y detalle
+
+    def test_las_llamadas_del_arranque_le_hablan_bien_a_la_funcion(self) -> None:
+        import ast
+        import inspect
+
+        from pos_uniformes import presupuestos_satelite_main as entrada
+
+        dichos = []
+
+        class _Falso:
+            def decir(self, mensaje, detalle="", avance=None):
+                dichos.append((mensaje, detalle, avance))
+
+        entrada._show_splash_message(_Falso(), "Buscando…", "detalle", 0.05)
+        self.assertEqual(dichos, [("Buscando…", "detalle", 0.05)])
+
+        # Y cada llamada del archivo: el detalle es texto y el avance, número.
+        arbol = ast.parse(inspect.getsource(entrada))
+        llamadas = [n for n in ast.walk(arbol) if isinstance(n, ast.Call)
+                    and getattr(n.func, "id", "") == "_show_splash_message"]
+        self.assertGreaterEqual(len(llamadas), 5)
+        for n in llamadas:
+            self.assertLessEqual(len(n.args), 4, ast.unparse(n))
+            if len(n.args) >= 3:
+                self.assertIsInstance(n.args[2], (ast.Constant, ast.JoinedStr), ast.unparse(n))

@@ -32,10 +32,10 @@ from pos_uniformes.utils.app_metadata import satellite_display_name, satellite_w
 from pos_uniformes.utils.satellite_excepthook import install_satellite_excepthook
 
 
-def _show_splash_message(splash, msg: str, app: QApplication, detalle: str = "", avance: float | None = None) -> None:
+def _show_splash_message(splash, msg: str, detalle: str = "", avance: float | None = None) -> None:
     """Lo que dice la pantalla de arranque: qué hace, qué pasa si no resulta y cuánto lleva."""
     splash.decir(msg, detalle, avance)
-    app.processEvents()
+    QApplication.processEvents()
 
 
 def bootstrap_schema() -> None:
