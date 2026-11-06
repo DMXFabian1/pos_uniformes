@@ -43,6 +43,49 @@ def _default_player_factory():
     return QMediaPlayer()
 
 
+#: Cuánto del stream se lee para adivinar su formato antes de enseñar el primer
+#: cuadro. El DVR siempre manda lo mismo (H.264), así que con poco basta.
+_PROBE_EN_VIVO = 64 * 1024
+#: Si el DVR no contesta en esto, se da por caído y el mosaico reintenta (antes 20 s).
+_ESPERA_RED_S = 8
+
+
+def opciones_en_vivo():
+    """Baja latencia para ver una cámara EN VIVO (Qt ≥ 6.10); None si no hay.
+
+    Daniel, 2026-11-06: «¿hay posibilidad de mejorar el tema del lag?». El
+    reproductor abría cada cámara como si fuera una película: juntaba video
+    antes de enseñarlo. `LowLatencyStreaming` le dice que es una transmisión
+    y que enseñe cada cuadro en cuanto llega."""
+    try:
+        from datetime import timedelta
+
+        from PyQt6.QtMultimedia import QPlaybackOptions
+    except ImportError:          # un Qt más viejo: se queda como estaba
+        return None
+    opciones = QPlaybackOptions()
+    opciones.setPlaybackIntent(QPlaybackOptions.PlaybackIntent.LowLatencyStreaming)
+    opciones.setProbeSize(_PROBE_EN_VIVO)
+    try:
+        opciones.setNetworkTimeout(timedelta(seconds=_ESPERA_RED_S))
+    except TypeError:
+        opciones.setNetworkTimeout(_ESPERA_RED_S * 1000)
+    return opciones
+
+
+def _reproductor_en_vivo():
+    """El del mosaico. La grabación («Ver momento») usa el normal: ahí sí
+    hace falta el búfer para pausar y brincar."""
+    player = _default_player_factory()
+    opciones = opciones_en_vivo()
+    if opciones is not None:
+        try:
+            player.setPlaybackOptions(opciones)
+        except Exception:  # noqa: BLE001 — sin la opción se ve igual, solo con retraso
+            pass
+    return player
+
+
 def _default_video_widget_factory() -> QWidget:
     from PyQt6.QtMultimediaWidgets import QVideoWidget
 
@@ -164,7 +207,7 @@ class CameraWallDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self._settings_loader = settings_loader
-        self._player_factory = player_factory or _default_player_factory
+        self._player_factory = player_factory or _reproductor_en_vivo
         self._video_factory = video_factory or _default_video_widget_factory
         self._pin_prompt = pin_prompt or _default_pin_prompt
         self._admin = False

@@ -171,3 +171,50 @@ class CameraWallDialogTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BajaLatenciaTests(unittest.TestCase):
+    """2026-11-06: el visor en vivo abría cada cámara como película (con búfer).
+    Ahora pide baja latencia; la grabación de «Ver momento» no, porque ahí se
+    pausa y se brinca."""
+
+    def test_las_opciones_en_vivo_piden_baja_latencia(self) -> None:
+        from PyQt6.QtMultimedia import QPlaybackOptions
+
+        from pos_uniformes.ui.dialogs import camera_wall_dialog as mod
+
+        opciones = mod.opciones_en_vivo()
+        self.assertEqual(opciones.playbackIntent(), QPlaybackOptions.PlaybackIntent.LowLatencyStreaming)
+        self.assertEqual(opciones.probeSize(), mod._PROBE_EN_VIVO)
+        espera = opciones.networkTimeout()
+        segundos = espera.total_seconds() if hasattr(espera, "total_seconds") else espera / 1000
+        self.assertEqual(segundos, mod._ESPERA_RED_S)
+
+    def test_el_reproductor_del_mosaico_las_trae_puestas(self) -> None:
+        from PyQt6.QtMultimedia import QPlaybackOptions
+
+        from pos_uniformes.ui.dialogs import camera_wall_dialog as mod
+
+        player = mod._reproductor_en_vivo()
+        self.assertEqual(
+            player.playbackOptions().playbackIntent(), QPlaybackOptions.PlaybackIntent.LowLatencyStreaming
+        )
+        player.deleteLater()
+
+    def test_el_mosaico_usa_ese_reproductor_y_la_grabacion_el_normal(self) -> None:
+        import inspect
+
+        from pos_uniformes.ui.dialogs import camera_playback_dialog, camera_wall_dialog
+
+        self.assertIn("player_factory or _reproductor_en_vivo", inspect.getsource(camera_wall_dialog))
+        self.assertIn("player_factory or _default_player_factory", inspect.getsource(camera_playback_dialog))
+
+    def test_con_un_qt_sin_la_opcion_no_truena(self) -> None:
+        from unittest.mock import MagicMock, patch
+
+        from pos_uniformes.ui.dialogs import camera_wall_dialog as mod
+
+        falso = MagicMock()
+        falso.setPlaybackOptions.side_effect = AttributeError("Qt viejo")
+        with patch.object(mod, "_default_player_factory", return_value=falso):
+            self.assertIs(mod._reproductor_en_vivo(), falso)
