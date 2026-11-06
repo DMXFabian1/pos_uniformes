@@ -353,6 +353,16 @@ def _ajustar_alto_lista(lista) -> None:
     lista.setFixedHeight(max(alto, 120))
 
 
+class _TarjetaEmpleada(QFrame):
+    """Tarjeta de una empleada en la columna Equipo de la Libreta: se toca entera."""
+
+    clicked = pyqtSignal()
+
+    def mousePressEvent(self, ev) -> None:  # noqa: N802 (API de Qt)
+        self.clicked.emit()
+        super().mousePressEvent(ev)
+
+
 class QuoteSatelliteWindow(QMainWindow):
     # Emite el resultado del watchdog de reconexión desde el hilo de fondo al
     # hilo de UI: (rows | None, school_links | None). None = DB no disponible.
@@ -1960,7 +1970,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_pendientes_seccion.setVisible(False)
         self.libreta_pendientes_box.setVisible(False)
 
-        self.libreta_equipo_seccion = _seccion("EQUIPO  ·  toca un nombre", "equipo")
+        self.libreta_equipo_seccion = _seccion("EQUIPO", "equipo")
         col_der.addWidget(self.libreta_equipo_seccion)
         self.libreta_ranking_list = QListWidget()
         self.libreta_ranking_list.setObjectName("libretaLista")
@@ -1968,8 +1978,18 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_ranking_list.setWordWrap(True)
         self.libreta_ranking_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.libreta_ranking_list.itemClicked.connect(self._on_libreta_ranking_click)
-        col_der.addWidget(self.libreta_ranking_list)
-        self._libreta_secciones["equipo"]["cuerpo"] = [self.libreta_ranking_list]
+        # La lista de renglones se cambió por una tarjeta por empleada
+        # (2026-11-05: «la sección de equipo no me convence, y su ciclo
+        # tampoco»). La lista sigue viva, escondida, con los mismos datos.
+        self.libreta_ranking_list.setVisible(False)
+        self.libreta_ranking_list.setParent(self.libreta_col_der)
+        self.libreta_equipo_box = QWidget()
+        self.libreta_equipo_ly = QVBoxLayout(self.libreta_equipo_box)
+        self.libreta_equipo_ly.setContentsMargins(0, 0, 0, 0)
+        self.libreta_equipo_ly.setSpacing(6)
+        self._libreta_equipo_cards: dict[str, QFrame] = {}
+        col_der.addWidget(self.libreta_equipo_box)
+        self._libreta_secciones["equipo"]["cuerpo"] = [self.libreta_equipo_box]
 
         self.libreta_mov_seccion = _seccion("MOVIMIENTOS", "movimientos")
         mov_col_ly.addWidget(self.libreta_mov_seccion)
@@ -2382,6 +2402,114 @@ class QuoteSatelliteWindow(QMainWindow):
         self._sync_libreta_filtros()
         self._refresh_libreta_view()
 
+    def _pintar_equipo_libreta(self, por_empleada: list) -> None:
+        """Una tarjeta por empleada: su nombre, sus comisiones en grande y lo
+        que hizo. Tocarla deja solo sus movimientos; la elegida se abre y
+        ofrece «Ver su ciclo» (lo que lleva desde su último pago) ahí mismo.
+
+        Antes era una lista de renglones largos y «Su ciclo» era un botón de
+        la barra que regañaba si no se había elegido a nadie."""
+        ly = self.libreta_equipo_ly
+        while ly.count():
+            w = ly.takeAt(0).widget()
+            if w is not None:
+                w.setParent(None)
+                w.deleteLater()
+        self._libreta_equipo_cards = {}
+        # Cómo se llama cada quien, tal como viene en sus movimientos: el
+        # letrero del filtro y el título del ciclo lo dicen con nombre.
+        self._libreta_nombres_equipo = {
+            **getattr(self, "_libreta_nombres_equipo", {}),
+            **{r.employee_code: _nombre_de(r.employee_name or r.employee_code, corto=True) for r in por_empleada},
+        }
+        if not por_empleada:
+            vacio = QLabel("Nadie ha vendido en estas fechas.")
+            vacio.setObjectName("libretaMovVacio")
+            vacio.setWordWrap(True)
+            ly.addWidget(vacio)
+            return
+        maximo = max((r.comisiones for r in por_empleada), default=0)
+        for r in por_empleada:
+            elegida = r.employee_code == self._libreta_emp_filtro
+            card = _TarjetaEmpleada()
+            card.setObjectName("libretaEmpCard")
+            card.setProperty("elegida", "true" if elegida else "false")
+            card.setCursor(Qt.CursorShape.PointingHandCursor)
+            card.setToolTip("Toca para quitar el filtro" if elegida else "Toca para ver solo sus movimientos")
+            card.clicked.connect(lambda c=r.employee_code: self._libreta_elegir_empleada(c))
+            v = QVBoxLayout(card)
+            v.setContentsMargins(14, 10, 14, 10)
+            v.setSpacing(4)
+            fila = QHBoxLayout()
+            fila.setSpacing(8)
+            textos = QVBoxLayout()
+            textos.setSpacing(0)
+            nombre = QLabel(_nombre_de(r.employee_name or r.employee_code, corto=True))
+            nombre.setObjectName("libretaEmpNombre")
+            sub = QLabel(
+                f"{r.operaciones} operaci{'ón' if r.operaciones == 1 else 'ones'} · "
+                f"{r.piezas} pieza{'' if r.piezas == 1 else 's'} · ${r.monto_total:,.0f}"
+            )
+            sub.setObjectName("libretaEmpSub")
+            textos.addWidget(nombre)
+            textos.addWidget(sub)
+            fila.addLayout(textos, 1)
+            numero = QLabel(str(r.comisiones))
+            numero.setObjectName("libretaEmpNumero")
+            numero.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            numero.setToolTip("Comisiones en estas fechas")
+            fila.addWidget(numero)
+            v.addLayout(fila)
+            # Barrita: cuánto lleva frente a la que más lleva.
+            barra = QProgressBar()
+            barra.setObjectName("libretaEmpBarra")
+            barra.setTextVisible(False)
+            barra.setFixedHeight(5)
+            barra.setRange(0, max(maximo, 1))
+            barra.setValue(r.comisiones)
+            v.addWidget(barra)
+            if elegida:
+                en_ciclo = self._libreta_periodo == "ciclo"
+                acciones = QHBoxLayout()
+                acciones.setSpacing(6)
+                ciclo = QPushButton("✓ Viendo su ciclo" if en_ciclo else "🗓 Ver su ciclo")
+                ciclo.setObjectName("libretaEmpCiclo")
+                ciclo.setCheckable(True)
+                ciclo.setChecked(en_ciclo)
+                ciclo.setAutoDefault(False)
+                ciclo.setToolTip("Lo que lleva desde su último pago: lo que se le va a pagar")
+                ciclo.clicked.connect(lambda _c=False: self._libreta_alternar_ciclo())
+                quitar = QPushButton("✕ Ver a todas")
+                quitar.setObjectName("libretaEmpQuitar")
+                quitar.setAutoDefault(False)
+                quitar.clicked.connect(lambda _c=False, c=r.employee_code: self._libreta_elegir_empleada(c))
+                acciones.addWidget(ciclo, 1)
+                acciones.addWidget(quitar)
+                v.addLayout(acciones)
+                card.boton_ciclo = ciclo
+            for hijo in (nombre, sub, numero, barra):
+                hijo.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
+            ly.addWidget(card)
+            self._libreta_equipo_cards[r.employee_code] = card
+
+    def _libreta_nombre_de_equipo(self, code: str | None) -> str:
+        if not code:
+            return ""
+        return getattr(self, "_libreta_nombres_equipo", {}).get(code) or _nombre_de(code, corto=True)
+
+    def _libreta_alternar_ciclo(self) -> None:
+        """«Ver su ciclo» en la tarjeta de la empleada elegida; otra vez = volver a hoy."""
+        self._set_libreta_periodo("hoy" if self._libreta_periodo == "ciclo" else "ciclo")
+
+    def _libreta_elegir_empleada(self, code: str) -> None:
+        """Tocar la tarjeta de una empleada = ver solo lo suyo; otra vez = todas."""
+        self._libreta_emp_filtro = None if self._libreta_emp_filtro == code else code
+        self._libreta_pagina = 0
+        if self._libreta_emp_filtro is None and self._libreta_periodo == "ciclo":
+            self._libreta_periodo = "hoy"  # el ciclo era DE esa empleada
+        self._sync_libreta_filtros()
+        self._refresh_libreta_view()
+
     def _on_libreta_ranking_click(self, item) -> None:
         """Clic en una empleada del ranking = filtrar sus movimientos;
         clic en la misma otra vez = quitar el filtro."""
@@ -2414,7 +2542,7 @@ class QuoteSatelliteWindow(QMainWindow):
             button.setChecked(key == self._libreta_tipo_filtro)
         if self._libreta_emp_filtro:
             self.libreta_filtro_emp_label.setText(
-                f"Filtrando: {self._libreta_emp_filtro} (clic en el ranking para quitar)"
+                f"Solo lo de {self._libreta_nombre_de_equipo(self._libreta_emp_filtro)}"
             )
             self.libreta_filtro_emp_label.setVisible(True)
         else:
@@ -2432,24 +2560,24 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_caja_menu_button.setVisible(es_dueno)
         self.libreta_print_button.setVisible(es_dueno)
         self.libreta_semana_button.setVisible(es_dueno)
+        # El ciclo es de UNA empleada: para el dueño vive en la tarjeta de la
+        # que elija (columna Equipo), no como botón suelto de la barra. Para
+        # ella sigue siendo su botón «Mi ciclo».
+        self.libreta_ciclo_button.setVisible(not es_dueno)
         if getattr(self, "_libreta_periodos_en", "cabecera") == destino:
             return
         self._libreta_periodos_en = destino
-        botones = [self._libreta_periodo_buttons[k] for k in ("hoy", "semana", "semana_pasada", "ciclo")]
+        botones = [self._libreta_periodo_buttons[k] for k in ("hoy", "semana", "semana_pasada")]
         for b in botones:
             self._libreta_header_ly.removeWidget(b)
             self._libreta_fecha_ly.removeWidget(b)
         if destino == "barra":
-            # Hoy · Semana · Mes · Su ciclo: del periodo más corto al más largo
-            # y, al final, el que depende de a quién se elija.
-            for n, b in enumerate(botones[:3]):
-                self._libreta_fecha_ly.insertWidget(self._libreta_fecha_periodos_en + n, b)
-            self._libreta_fecha_ly.insertWidget(
-                self._libreta_fecha_ly.indexOf(self.libreta_mes_button) + 1, botones[3]
-            )
-        else:
             for n, b in enumerate(botones):
-                self._libreta_header_ly.insertWidget(2 + n, b)   # tras el saludo y el hueco
+                self._libreta_fecha_ly.insertWidget(self._libreta_fecha_periodos_en + n, b)
+        else:
+            en = self._libreta_header_ly.indexOf(self.libreta_ciclo_button)
+            for n, b in enumerate(botones):
+                self._libreta_header_ly.insertWidget(en + n, b)   # justo antes de «Mi ciclo»
 
     def _libreta_fechas_mostradas(self):
         """(desde, hasta) en días de calendario de lo que se ve, o None en «ciclo»."""
@@ -2528,7 +2656,7 @@ class QuoteSatelliteWindow(QMainWindow):
                        "septiembre", "octubre", "noviembre", "diciembre")
         fechas = self._libreta_fechas_mostradas()
         if fechas is None:
-            return f"Ciclo de {_nombre_de(self._libreta_emp_filtro or '', corto=True) or 'la empleada'}"
+            return f"El ciclo de {self._libreta_nombre_de_equipo(self._libreta_emp_filtro) or 'la empleada'}"
         desde, hasta = fechas
         hoy = datetime.now().date()
         if desde == hasta:
@@ -4469,6 +4597,9 @@ class QuoteSatelliteWindow(QMainWindow):
                         f"${r.monto_total:,.0f} vendidos · {r.operaciones} operaciones{marca}"
                     )
                 )
+            pintar_equipo = getattr(self, "_pintar_equipo_libreta", None)
+            if pintar_equipo is not None and hasattr(self, "libreta_equipo_ly"):
+                pintar_equipo(por_empleada)
 
         if not self._libreta_is_owner:
             self._llenar_libreta_lista(rows)

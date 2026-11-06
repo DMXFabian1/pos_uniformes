@@ -191,6 +191,47 @@ class LibretaDelDuenoTests(unittest.TestCase):
         self.assertFalse(win._libreta_pestanas["dia"][0].isEnabled())
         self.assertEqual(win._libreta_pestana, "movimientos")
 
+    # ── equipo ───────────────────────────────────────────────────────────
+    def _con_equipo(self):
+        win = self._ventana()
+        win.show()
+        win._set_page("libreta")
+        filas = [_fila(1), _fila(2), _fila(3, nombre="Cristal", code="VEND-5")]
+        win._refresh_libreta_view = lambda: win._pintar_libreta(filas)
+        win._pintar_libreta(filas)
+        return win
+
+    def test_una_tarjeta_por_empleada_con_sus_comisiones(self) -> None:
+        from PyQt6.QtWidgets import QLabel
+
+        win = self._con_equipo()
+        self.assertEqual(list(win._libreta_equipo_cards), ["VEND-4", "VEND-5"])     # la que más lleva, primero
+        textos = [w.text() for w in win._libreta_equipo_cards["VEND-4"].findChildren(QLabel)]
+        self.assertIn("Stayce", textos)
+        self.assertIn("6", textos)                                                  # 2 ventas × 3 comisiones
+        self.assertTrue(win.libreta_ranking_list.isHidden())                        # la lista vieja ya no se ve
+        # «Su ciclo» ya no es un botón suelto de la barra del dueño.
+        self.assertTrue(win.libreta_ciclo_button.isHidden())
+
+    def test_tocar_la_tarjeta_filtra_y_ofrece_su_ciclo(self) -> None:
+        win = self._con_equipo()
+        self.assertFalse(hasattr(win._libreta_equipo_cards["VEND-4"], "boton_ciclo"))
+        win._libreta_equipo_cards["VEND-4"].clicked.emit()
+        self.assertEqual(win._libreta_emp_filtro, "VEND-4")
+        self.assertEqual(win.libreta_filtro_emp_label.text(), "Solo lo de Stayce")
+        elegida = win._libreta_equipo_cards["VEND-4"]
+        self.assertEqual(elegida.property("elegida"), "true")
+        with patch.object(win, "_ventana_ciclo_actual", return_value=win._libreta_ventana_actual()):
+            elegida.boton_ciclo.click()
+            self.assertEqual(win._libreta_periodo, "ciclo")
+            self.assertEqual(win.libreta_dia_label.text(), "El ciclo de Stayce")
+            self.assertFalse(win.libreta_dia_prev.isEnabled())          # un ciclo no se recorre con flechas
+            self.assertTrue(win._libreta_equipo_cards["VEND-4"].boton_ciclo.isChecked())
+            # Tocar la tarjeta otra vez quita el filtro y el ciclo se va con él.
+            win._libreta_equipo_cards["VEND-4"].clicked.emit()
+        self.assertIsNone(win._libreta_emp_filtro)
+        self.assertEqual(win._libreta_periodo, "hoy")
+
     # ── la empleada ──────────────────────────────────────────────────────
     def test_la_empleada_ve_lo_de_siempre(self) -> None:
         win = self._ventana("VEND-4")

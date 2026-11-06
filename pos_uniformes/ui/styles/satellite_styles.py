@@ -894,6 +894,42 @@ QPushButton#libretaAccionBorrar {
     font-weight: 700;
 }
 QPushButton#libretaAccionBorrar:hover { text-decoration: underline; }
+QFrame#libretaEmpCard {
+    background: #fffdf8;
+    border: 1px solid #e3d5c2;
+    border-radius: 14px;
+}
+QFrame#libretaEmpCard:hover { border-color: #c9a583; }
+QFrame#libretaEmpCard[elegida="true"] {
+    background: #fbf0e6;
+    border: 2px solid #a84f2d;
+}
+QLabel#libretaEmpNombre { font-size: 16px; font-weight: 800; color: #2c2a27; background: transparent; }
+QLabel#libretaEmpSub { font-size: 12px; color: #8a8177; background: transparent; }
+QLabel#libretaEmpNumero { font-size: 28px; font-weight: 900; color: #73341c; background: transparent; }
+QProgressBar#libretaEmpBarra { background: #efe6d8; border: none; border-radius: 2px; }
+QProgressBar#libretaEmpBarra::chunk { background: #c76b39; border-radius: 2px; }
+QPushButton#libretaEmpCiclo {
+    background: #a84f2d;
+    color: #ffffff;
+    border: none;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: 800;
+    min-height: 38px;
+    padding: 0 10px;
+}
+QPushButton#libretaEmpCiclo:checked { background: #73341c; }
+QPushButton#libretaEmpQuitar {
+    background: transparent;
+    color: #73341c;
+    border: 1px solid #ddd0c0;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 700;
+    min-height: 38px;
+    padding: 0 10px;
+}
 QFrame#libretaFechaBar {
     background: #fffdf8;
     border: 1px solid #e3d5c2;
