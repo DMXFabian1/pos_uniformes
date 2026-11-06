@@ -181,7 +181,7 @@ class JornadaTests(unittest.TestCase):
         self.assertEqual(self.s.scalars(select(ConteoInventario)).one().contado_por, "Stayce (VEND-4)")
 
     def test_el_tablero_trae_todas_las_escuelas_en_orden(self) -> None:
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
 
         dos = _seed(self.s, "Dos")
         tres = _seed(self.s, "Tres")
@@ -193,7 +193,7 @@ class JornadaTests(unittest.TestCase):
         jn.terminar_jornada(self.s, j, empleada_code="VEND-4")
         jn.aplicar_jornada(self.s, j, revisada_por="VEND-1")
         self.s.commit()
-        j.terminada_at = datetime.now() - timedelta(days=1)
+        j.terminada_at = datetime.now(timezone.utc) - timedelta(days=1)
         self.s.commit()
         jn.abrir_jornada(self.s, escuela_id=dos.id, empleada_code="VEND-5", empleada_nombre="Fanny")
         self.s.commit()
@@ -341,11 +341,11 @@ class JornadaTests(unittest.TestCase):
             jn.abrir_jornada(self.s, escuela_id=None, tipo_pieza="Pantalón", prenda=gris, empleada_code="VEND-5")
 
     def test_basicos_sin_jornada_recuerdan_la_fecha_de_sus_tallas(self) -> None:
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
 
         gris, azul = _seed_basicos(self.s, self.escuela, "Pantalón")
         v = self.s.scalar(select(Variante).where(Variante.sku.like("B%")).order_by(Variante.id))
-        v.ultimo_conteo_at = datetime.now() - timedelta(days=5)
+        v.ultimo_conteo_at = datetime.now(timezone.utc) - timedelta(days=5)
         self.s.commit()
         u = jn.ultimos_conteos(self.s)
         contada = next(n for n in (gris, azul) if n.startswith(v.producto.nombre_base))
@@ -407,9 +407,9 @@ class JornadaTests(unittest.TestCase):
         self.assertNotIn(j, jn.jornadas_abiertas(self.s))
 
     def test_cuando_habla_como_persona(self) -> None:
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
 
-        ahora = datetime.now()
+        ahora = datetime.now(timezone.utc)
         self.assertTrue(jn.cuando(ahora).startswith("hoy "))
         self.assertTrue(jn.cuando(ahora - timedelta(days=1)).startswith("ayer "))
         self.assertEqual(jn.cuando(None), "")
@@ -617,10 +617,10 @@ class UltimoConteoTests(unittest.TestCase):
 
     def test_sin_jornada_se_cae_a_la_fecha_de_las_tallas(self) -> None:
         """Los conteos de antes de las jornadas también cuentan (sin quién)."""
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
 
         v = self.s.scalars(select(Variante).join(Variante.producto).where(Variante.producto.has(escuela_id=self.b.id))).first()
-        v.ultimo_conteo_at = datetime.now() - timedelta(days=10)
+        v.ultimo_conteo_at = datetime.now(timezone.utc) - timedelta(days=10)
         self.s.commit()
         u = jn.ultimo_conteo_de(jn.ultimos_conteos(self.s), self.b.id)
         self.assertIsNotNone(u.fecha)

@@ -513,7 +513,7 @@ class SelectorConFechaTests(unittest.TestCase):
     """El selector del kiosko dice cuándo se contó cada escuela."""
 
     def setUp(self) -> None:
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
 
         engine = create_engine("sqlite:///:memory:")
         Base.metadata.create_all(engine)
@@ -528,7 +528,7 @@ class SelectorConFechaTests(unittest.TestCase):
         j = jn.abrir_jornada(s, escuela_id=a.id, empleada_code="VEND-4", empleada_nombre="Stayce Chavarria")
         jn.terminar_jornada(s, j, empleada_code="VEND-4")
         s.commit()
-        j.terminada_at = datetime.now() - timedelta(days=2)
+        j.terminada_at = datetime.now(timezone.utc) - timedelta(days=2)
         s.commit()
         s.close()
         self._dialogos = []
