@@ -58,6 +58,7 @@ def pulso(session, *, hoy: date | None = None, ahora: datetime | None = None) ->
     _bloque(session, lineas, lambda: _pantallas(session))
     _bloque(session, lineas, lambda: _impresion(session, ahora))
     _bloque(session, lineas, lambda: _respaldo())
+    _bloque(session, lineas, _vigilancia_externa)
     lineas.append("")
     _bloque(session, lineas, lambda: _esperando(session))
 
@@ -168,6 +169,12 @@ def _respaldo() -> list[str]:
     return [f"{BIEN if estado.al_dia else OJO} {linea}"]
 
 
+def _vigilancia_externa() -> list[str]:
+    from pos_uniformes.services import latido_externo_service as lat
+
+    return [lat.texto_estado()]
+
+
 def _esperando(session) -> list[str]:
     """Lo que pide una decisión suya. Si no hay nada, se dice — es buena noticia."""
     from pos_uniformes.services import anuncio_service as asvc
@@ -199,3 +206,29 @@ def _esperando(session) -> list[str]:
     if not pendientes:
         return [f"{BIEN} Nada esperando tu respuesta"]
     return pendientes
+
+
+# ── Salud (para el resumen de la noche) ──────────────────────────────────────
+
+
+def texto_salud(session, *, ahora: datetime | None = None) -> str:
+    """El renglón de «Salud» del resumen: pantallas, impresión y respaldo.
+
+    Lo que está mal solo se veía abriendo /pulso (auditoría 2026-11-07,
+    sección 6). Si todo está bien, una línea; si no, solo lo que está en ⚠️.
+    Lo que no se pudo leer también cuenta como ⚠️: callarlo enseñaría a
+    confiar de más."""
+    ahora = ahora or datetime.now().astimezone()
+    lineas: list[str] = []
+    for hacer in (lambda: _pantallas(session), lambda: _impresion(session, ahora), _respaldo):
+        _bloque(session, lineas, hacer)
+    malas = []
+    for i, linea in enumerate(lineas):
+        if linea.startswith(OJO):
+            malas.append(linea)
+            # La explicación que sigue (renglón con sangría) va con su línea.
+            if i + 1 < len(lineas) and lineas[i + 1].startswith("   "):
+                malas.append(lineas[i + 1])
+    if not malas:
+        return f"🩺 SALUD\n{BIEN} Todo en pie: pantallas, impresión y respaldo."
+    return "🩺 SALUD\n" + "\n".join(malas)

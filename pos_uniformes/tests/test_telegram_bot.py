@@ -86,8 +86,10 @@ class AtenderTests(unittest.TestCase):
             self.assertEqual(bot.atender_texto("/estado", session_factory=_sesion), "💰 Caja")
         with patch("pos_uniformes.services.resumen_diario_service.recolectar", return_value="D"), patch(
             "pos_uniformes.services.resumen_diario_service.formatear", return_value="📒 R"
-        ):
-            self.assertEqual(bot.atender_texto("/resumen", session_factory=_sesion, hoy=date(2026, 9, 8)), "📒 R")
+        ), patch("pos_uniformes.services.telegram_pulso_service.texto_salud", return_value="🩺 S"):
+            # El de hoy trae la salud de ahora; el de otro día no (vigilancia, 2026-11-07).
+            self.assertEqual(bot.atender_texto("/resumen", session_factory=_sesion, hoy=date(2026, 9, 8)), "📒 R\n\n🩺 S")
+            self.assertEqual(bot.atender_texto("/resumen ayer", session_factory=_sesion, hoy=date(2026, 9, 8)), "📒 R")
         with patch("pos_uniformes.services.resumen_diario_service.texto_solo_pendientes", return_value=""):
             self.assertEqual(bot.atender_texto("/pendientes", session_factory=_sesion), "Sin pendientes. ✅")
         self.assertIn("/corte", bot.atender_texto("/ayuda", session_factory=_sesion))

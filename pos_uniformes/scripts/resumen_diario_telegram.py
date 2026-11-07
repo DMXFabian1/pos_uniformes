@@ -111,6 +111,14 @@ def main(argv: list[str] | None = None) -> int:
             texto, botones = mensaje_asistencia(session, hoy)
         else:
             texto = formatear(recolectar(session, hoy, todo_el_dia=True))
+            # Lo que está mal (pantallas, impresión, respaldo) también aquí:
+            # solo se veía abriendo /pulso (auditoría 2026-11-07, sección 6).
+            try:
+                from pos_uniformes.services.telegram_pulso_service import texto_salud
+
+                texto += "\n\n" + texto_salud(session)
+            except Exception as exc:  # noqa: BLE001 — el resumen sale igual
+                texto += f"\n\n🩺 SALUD\n⚠️ No pude revisarla ({type(exc).__name__})."
     if args.imprimir:
         print(texto)
         return 0

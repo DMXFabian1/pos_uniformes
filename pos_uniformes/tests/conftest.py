@@ -372,9 +372,17 @@ def _vigilante_sin_memoria_de_esta_maquina(tmp_path):
 
     from pos_uniformes.services import telegram_corte_botones_service as tcb
 
+    from pos_uniformes.scripts import resumen_diario_telegram as rdt
+
+    # La revisión «el resumen no salió» se apaga: cualquier prueba del
+    # vigilante que corra con la hora real después de las 19:25 recibía un
+    # aviso de más (vigilancia, 2026-11-07). test_vigilancia_noviembre la
+    # prueba llamando a la original.
     with patch.object(al, "ruta_memoria", lambda: tmp_path / "bot_vigilante.json"), \
          patch.object(tbs, "ruta_offset", lambda: tmp_path / "bot_offset.json"), \
-         patch.object(tcb, "ruta_notas", lambda: tmp_path / "corte_notas_pendientes.json"):
+         patch.object(tcb, "ruta_notas", lambda: tmp_path / "corte_notas_pendientes.json"), \
+         patch.object(rdt, "ruta_resumen_enviado", lambda: tmp_path / "resumen_enviado.json"), \
+         patch.object(al.Vigilante, "_resumen_que_no_salio", lambda self, session, ahora: []):
         yield
 
 
