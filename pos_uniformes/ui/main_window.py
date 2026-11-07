@@ -2262,6 +2262,10 @@ class MainWindow(QMainWindow):
         quick_search_shortcut.activated.connect(self._open_quick_product_search)
         quick_search_shortcut_mac = QShortcut(QKeySequence("Meta+S"), self)
         quick_search_shortcut_mac.activated.connect(self._open_quick_product_search)
+        # Ctrl+Shift+M mapa de escuelas · Ctrl+Shift+E tipos de escocés (2026-11-07).
+        from pos_uniformes.ui.helpers.abrir_consultas import instalar_atajos
+
+        self._atajos_consultas = instalar_atajos(self)
         # Ctrl+K global via event filter (funciona incluso en diálogos modales)
         from PyQt6.QtWidgets import QApplication
 

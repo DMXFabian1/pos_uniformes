@@ -63,7 +63,53 @@ class KioskoTests(unittest.TestCase):
         self.assertIn("pos_uniformes.services.mapa_escuelas_service", spec)
         ventana = (RAIZ / "ui" / "quote_satellite_window.py").read_text(encoding="utf-8")
         self.assertIn('QPushButton("🏫 Mapa de escuelas")', ventana)
-        self.assertIn("mapa_escuelas_service.preparar()", ventana)
+        self.assertIn("abrir_mapa_escuelas(self)", ventana)
+        self.assertIn("pos_uniformes.ui.helpers.abrir_consultas", spec)
+
+
+class AtajosTests(unittest.TestCase):
+    """Ctrl+Shift+M mapa · Ctrl+Shift+E escocés, en el kiosko y en el POS."""
+
+    def test_los_dos_atajos_en_las_dos_ventanas(self) -> None:
+        for archivo in ("quote_satellite_window.py", "main_window.py"):
+            fuente = (RAIZ / "ui" / archivo).read_text(encoding="utf-8")
+            self.assertIn("instalar_atajos(self)", fuente, archivo)
+
+    def test_no_chocan_con_otros_atajos(self) -> None:
+        import re
+
+        for archivo in ("quote_satellite_window.py", "main_window.py"):
+            fuente = (RAIZ / "ui" / archivo).read_text(encoding="utf-8")
+            usados = re.findall(r'QKeySequence\("([^"]+)"\)', fuente)
+            self.assertNotIn("Ctrl+Shift+M", usados, archivo)
+            self.assertNotIn("Ctrl+Shift+E", usados, archivo)
+
+    def test_el_catalogo_de_escoceses_viene_en_assets(self) -> None:
+        from pos_uniformes.ui.helpers.abrir_consultas import ruta_tipos_escoces
+
+        ruta = ruta_tipos_escoces()
+        self.assertTrue(ruta.is_file())
+        self.assertEqual(ruta.read_bytes()[:5], b"%PDF-")
+
+    def test_los_atajos_abren_lo_suyo(self) -> None:
+        import pytest
+
+        pytest.importorskip("PyQt6.QtWidgets")
+        from PyQt6.QtWidgets import QApplication, QWidget
+
+        from pos_uniformes.ui.helpers import abrir_consultas as ac
+
+        _app = QApplication.instance() or QApplication([])
+        ventana = QWidget()
+        atajos = ac.instalar_atajos(ventana)
+        self.assertEqual([a.key().toString() for a in atajos], ["Ctrl+Shift+M", "Ctrl+Shift+E"])
+        with mock.patch.object(ac, "_abrir") as abrir:
+            atajos[1].activated.emit()
+            abrir.assert_called_once_with(ac.ruta_tipos_escoces())
+        with mock.patch.object(ac, "_abrir") as abrir, \
+                mock.patch("pos_uniformes.services.mapa_escuelas_service.preparar", return_value=Path("/x/mapa.html")):
+            atajos[0].activated.emit()
+            abrir.assert_called_once_with(Path("/x/mapa.html"))
 
 
 if __name__ == "__main__":

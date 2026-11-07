@@ -4884,7 +4884,7 @@ class QuoteSatelliteWindow(QMainWindow):
         # conteo, calculado al abrirlo (Daniel 10/10: «el mapa al satélite»).
         self.conteos_mapa_escuelas_btn = QPushButton("🏫 Mapa de escuelas")
         self.conteos_mapa_escuelas_btn.setAutoDefault(False)
-        self.conteos_mapa_escuelas_btn.setToolTip("Abre en el navegador el mapa de las escuelas con cómo va su conteo ahora (necesita internet para el mapa)")
+        self.conteos_mapa_escuelas_btn.setToolTip("Abre en el navegador el mapa de las escuelas con cómo va su conteo ahora (necesita internet para el mapa) · Ctrl+Shift+M")
         self.conteos_mapa_escuelas_btn.clicked.connect(self._abrir_mapa_escuelas)
         titulo_fila.addWidget(self.conteos_mapa_escuelas_btn)
         layout.addLayout(titulo_fila)
@@ -5678,21 +5678,9 @@ class QuoteSatelliteWindow(QMainWindow):
         self.conteos_ver_tabla_btn.setText("Ver mapa" if tabla else "Ver tabla")
 
     def _abrir_mapa_escuelas(self) -> None:
-        from PyQt6.QtCore import QUrl
-        from PyQt6.QtGui import QDesktopServices
-        from PyQt6.QtWidgets import QApplication
+        from pos_uniformes.ui.helpers.abrir_consultas import abrir_mapa_escuelas
 
-        from pos_uniformes.services import mapa_escuelas_service
-
-        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
-        try:
-            html = mapa_escuelas_service.preparar()
-        finally:
-            QApplication.restoreOverrideCursor()
-        if html is None:
-            QMessageBox.information(self, "Mapa de escuelas", "Esta PC no tiene el mapa de escuelas. Llega con la siguiente actualización.")
-            return
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(html)))
+        abrir_mapa_escuelas(self)
 
     def _open_conteo_mapa(self) -> None:
         from pos_uniformes.ui.dialogs.conteo_mapa_dialog import ConteoMapaDialog
@@ -6926,6 +6914,10 @@ class QuoteSatelliteWindow(QMainWindow):
         # ajustes). Lo normal es lo oficial, y no lleva ninguna marca.
         _real_shortcut = QShortcut(QKeySequence("Ctrl+Shift+R"), self)
         _real_shortcut.activated.connect(self._alternar_ver_real_libreta)
+        # Ctrl+Shift+M mapa de escuelas · Ctrl+Shift+E tipos de escocés.
+        from pos_uniformes.ui.helpers.abrir_consultas import instalar_atajos
+
+        self._atajos_consultas = instalar_atajos(self)
         _esc_shortcut = QShortcut(QKeySequence("Escape"), self)
         _esc_shortcut.activated.connect(self._handle_escape_key)
         _kiosk_ctrl_s = QShortcut(QKeySequence("Ctrl+S"), self)
