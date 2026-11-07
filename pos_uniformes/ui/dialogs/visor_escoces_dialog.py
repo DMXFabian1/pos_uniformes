@@ -59,8 +59,8 @@ QLineEdit#buscaEscoces {{
 }}
 QLineEdit#buscaEscoces:focus {{ border-color: {VINO}; }}
 QPushButton#chipFamilia {{
-    font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 14px;
-    background: #fbf7f1; color: #5a4636; border: 1px solid #ddd0c0; min-height: 0px;
+    font-size: 14px; font-weight: 700; padding: 8px 16px; border-radius: 20px;
+    background: #fbf7f1; color: #5a4636; border: 1px solid #ddd0c0; min-height: 24px;
 }}
 QPushButton#chipFamilia:hover {{ background: #f1e6d6; }}
 QPushButton#chipFamilia:checked {{ background: {VINO}; color: white; border-color: {VINO}; }}
@@ -85,8 +85,8 @@ QLabel#familiaEscoces {{ font-size: 13px; color: {GRIS}; }}
 QLabel#tartanEscoces {{ font-size: 14px; font-weight: 700; color: {VERDE}; }}
 QLabel#vacioEscoces {{ font-size: 15px; color: {GRIS}; }}
 QFrame#fichaEscoces QPushButton {{
-    font-size: 13px; font-weight: 700; padding: 8px 12px; border-radius: 10px;
-    background: #fbf7f1; color: #73341c; border: 1px solid #ddd0c0; min-height: 0px;
+    font-size: 14px; font-weight: 700; padding: 10px 12px; border-radius: 10px;
+    background: #fbf7f1; color: #73341c; border: 1px solid #ddd0c0; min-height: 26px;
 }}
 QFrame#fichaEscoces QPushButton:hover {{ background: #f1e6d6; }}
 QFrame#fichaEscoces QPushButton:disabled {{ color: #c4b8a8; }}
@@ -237,6 +237,16 @@ class VisorEscoces(_Visor):
         self.rejilla.setUniformItemSizes(True)
         self.rejilla.setWordWrap(True)
         self.rejilla.setSpacing(4)
+        self.rejilla.setVerticalScrollMode(QListWidget.ScrollMode.ScrollPerPixel)
+        # Pantalla táctil del kiosko: arrastrar con el dedo desliza la
+        # cuadrícula (sin esto, arrastrar solo cambiaba la tela elegida); un
+        # toque sin mover sigue eligiendo. Igual que el catálogo del kiosko.
+        try:
+            from PyQt6.QtWidgets import QScroller
+
+            QScroller.grabGesture(self.rejilla.viewport(), QScroller.ScrollerGestureType.LeftMouseButtonGesture)
+        except Exception:  # noqa: BLE001 — sin QScroller queda la barra
+            pass
         self.rejilla.currentItemChanged.connect(self._al_elegir)
         self.rejilla.itemActivated.connect(lambda _i: self.ver_en_grande())
         izquierda.addWidget(self.rejilla, 1)
@@ -387,9 +397,9 @@ class VisorEscoces(_Visor):
         self.parecidas_lbl.setText(f"Otras {tela.familia.lower()}:" if otras else "")
         for t in otras:
             b = QPushButton()
-            b.setFixedSize(54, 54)
+            b.setFixedSize(58, 58)
             b.setIcon(self._icono(t))
-            b.setIconSize(QSize(48, 48))
+            b.setIconSize(QSize(52, 52))
             b.setToolTip(f"{t.codigo} · {t.nombre}")
             b.setStyleSheet("QPushButton { padding: 0px; border-radius: 8px; background: white; }")
             b.clicked.connect(lambda _=False, c=t.codigo: self.ir_a(c))

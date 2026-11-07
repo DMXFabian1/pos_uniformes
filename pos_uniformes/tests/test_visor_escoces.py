@@ -88,6 +88,19 @@ class VentanaTests(unittest.TestCase):
         self.assertEqual(self.v.codigo.text(), "ESC-01")
         self.assertTrue(self.v.chips[""].isChecked())
 
+    def test_se_desliza_con_el_dedo(self):
+        """Kiosko con pantalla táctil (Daniel, 2026-11-07)."""
+        from PyQt6.QtWidgets import QScroller
+
+        self.assertTrue(QScroller.hasScroller(self.v.rejilla.viewport()) or
+                        QScroller.grabbedGesture(self.v.rejilla.viewport()) != 0)
+
+    def test_botones_del_tamano_de_un_dedo(self):
+        self.v.show()
+        _APP.processEvents()
+        for b in (self.v.anterior, self.v.siguiente, self.v.copiar, *self.v.chips.values()):
+            self.assertGreaterEqual(b.height(), 40, b.text())
+
     def test_copiar_codigo(self):
         self.v.busca.setText("12")
         self.v.copiar_codigo()
