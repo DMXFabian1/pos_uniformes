@@ -102,6 +102,21 @@ class PlantillaDelMapaTests(unittest.TestCase):
         self.assertIn("mapas_escuelas/estados_pos.js", gitignore)
 
 
+class MosaicosQueSiCarganTests(unittest.TestCase):
+    """En el kiosko el mapa salía lleno de «403 Access blocked»: openstreetmap.org
+    bloquea a quien pide sin Referer, y un archivo local no lo manda. CARTO
+    contesta 200 con «API KEY REQUIRED» dibujado (2026-11-07)."""
+
+    def test_esri_primero_y_sin_carto(self) -> None:
+        for nombre in ("plantilla_mapa.html", "mapa_escuelas_san_felipe.html"):
+            html = (MAPAS / nombre).read_text(encoding="utf-8")
+            lista = html[html.index("const MOSAICOS = ["):]
+            primero = lista[lista.index('"') + 1:]
+            self.assertTrue(primero.startswith("https://server.arcgisonline.com/"), nombre)
+            self.assertNotIn("cartocdn", html, nombre)
+            self.assertIn('on("tileerror"', html, nombre)     # si uno falla, el siguiente
+
+
 class ElPanelLoEscribeTests(unittest.TestCase):
     def test_el_generador_del_panel_escribe_el_estado_del_mapa(self) -> None:
         fuente = (Path(__file__).resolve().parents[1] / "scripts" / "generar_panel_uniformes.py").read_text(encoding="utf-8")

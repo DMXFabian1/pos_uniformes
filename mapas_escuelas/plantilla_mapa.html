@@ -197,9 +197,29 @@ const chipTipo = e => ({ telesec: "Telesec", conafe: "Conafe", particular: "Part
                          sabes: "Sabes", telebach: "Telebach" }[e.tipo] || "General");
 
 const map = L.map("map");
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  attribution: "&copy; OpenStreetMap", maxZoom: 19,
-}).addTo(map);
+// Los mosaicos: Esri (calles). Los de openstreetmap.org salían «403 Access
+// blocked» en el kiosko: su política bloquea a quien pide sin Referer, y un
+// mapa abierto como archivo no lo manda. CARTO tampoco sirve: ya pide clave y
+// contesta 200 con «API KEY REQUIRED» dibujado (2026-11-07). Si uno falla, se
+// pasa solo al siguiente.
+const MOSAICOS = [
+  ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+   { maxZoom: 19, attribution: "&copy; Esri" }],
+  ["https://server.arcgisonline.com/ArcGIS/rest/services/World_Topo_Map/MapServer/tile/{z}/{y}/{x}",
+   { maxZoom: 19, attribution: "&copy; Esri" }],
+  ["https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+   { maxZoom: 19, attribution: "&copy; OpenStreetMap" }],
+];
+let capaMosaicos = null, mosaicoActual = -1, mosaicosFallidos = 0;
+function usarMosaicos(i) {
+  if (i >= MOSAICOS.length) return;
+  if (capaMosaicos) map.removeLayer(capaMosaicos);
+  mosaicoActual = i; mosaicosFallidos = 0;
+  capaMosaicos = L.tileLayer(MOSAICOS[i][0], MOSAICOS[i][1]).addTo(map);
+  capaMosaicos.on("tileload", () => { mosaicosFallidos = 0; });
+  capaMosaicos.on("tileerror", () => { if (++mosaicosFallidos >= 4) usarMosaicos(mosaicoActual + 1); });
+}
+usarMosaicos(0);
 // Las burbujas tapaban los anillos: en el pueblo se agrupa menos, y cada
 // burbuja toma el color de la peor escuela que trae adentro (2026-11-07).
 const PEOR = { rojo: 3, ambar: 2, verde: 1, "": 0 };
