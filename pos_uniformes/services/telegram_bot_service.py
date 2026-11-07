@@ -71,7 +71,7 @@ AYUDA = (
     "\nPAGOS\n"
     "/pagos — a quién le toca cobrar y cuánto\n"
     "/pagar Fanny — el desglose; con «si» al final se registra\n"
-    "/deshacerpago — deshace el último pago\n"    "/fechapago Stayce 18/10 — el último pago de alguien pasa a ese día (si se registró tarde)\n"
+    "/deshacerpago — enseña el último pago y cómo deshacerlo (solo de hoy y antes del corte)\n"    "/fechapago Stayce 18/10 — el último pago de alguien pasa a ese día (si se registró tarde)\n"
     "/prestamos — los préstamos que te pidieron, para aprobar o rechazar\n"
     "/descansos — los días que te pidieron, con cómo queda la semana\n"
     "/receso 2026-10-27 2026-11-04 — tus vacaciones: el calendario lo dice\n"
@@ -499,7 +499,7 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
         from pos_uniformes.services import telegram_pagos_service as pg
 
         with session_factory() as session:
-            return pg.deshacer_pago(session, quien=CODIGO_REMOTO)
+            return pg.deshacer_pago(session, cmd.argumento, quien=CODIGO_REMOTO)
     if cmd.nombre in ("fechapago", "fecha_pago", "pagofecha"):
         from pos_uniformes.services import telegram_pagos_service as pg
 

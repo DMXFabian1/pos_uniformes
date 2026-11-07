@@ -116,6 +116,14 @@ def pagos(session: Session, *, hoy: date | None = None) -> str:
     return "\n".join(lineas)
 
 
+def _hay_que_pagar(det) -> bool:
+    """¿Hay un pago que registrar? También cuando el préstamo se come todo:
+    se entrega $0 pero el ciclo se cierra y el préstamo queda cobrado. Antes
+    decía «no tiene nada pendiente» y el ciclo nunca se cerraba (auditoría
+    2026-11-07, #13)."""
+    return det.total > 0 or Decimal(getattr(det, "prestamo_cubierto", 0) or 0) > 0
+
+
 def quienes_cobran(session: Session, *, hoy: date | None = None) -> list[tuple[str, str]]:
     """(código, nombre) de quienes tienen algo pendiente. Para los botones."""
     from pos_uniformes.services import nomina_service as nom
@@ -123,7 +131,7 @@ def quienes_cobran(session: Session, *, hoy: date | None = None) -> list[tuple[s
     salida = []
     for a in nom.avisos_de_pago(session, hoy):
         det = nom.pago_pendiente(session, a.employee_code, hoy)
-        if det.total > 0:
+        if _hay_que_pagar(det):
             salida.append((str(a.employee_code), _nombre(session, a.employee_code)))
     return salida
 
@@ -133,7 +141,7 @@ def tiene_pendiente(session: Session, code: str, *, hoy: date | None = None) -> 
 
     if not existe_y_trabaja(session, code):
         return False
-    return nom.pago_pendiente(session, code, hoy).total > 0
+    return _hay_que_pagar(nom.pago_pendiente(session, code, hoy))
 
 
 def monto_pendiente(session: Session, code: str, *, hoy: date | None = None):
@@ -155,7 +163,7 @@ def desglose_por_code(session: Session, code: str, *, hoy: date | None = None) -
         return _no_es_del_equipo(session, code)
     nombre = _nombre(session, code)
     det = nom.pago_pendiente(session, code, hoy)
-    if det.total <= 0:
+    if not _hay_que_pagar(det):
         return f"{nombre} no tiene nada pendiente ahora mismo."
     return "\n".join(_detalle_texto(det, nombre))
 
@@ -168,7 +176,7 @@ def pagar_por_code(session: Session, code: str, *, quien: str, hoy: date | None 
         return _no_es_del_equipo(session, code)
     nombre = _nombre(session, code)
     det = nom.pago_pendiente(session, code, hoy)
-    if det.total <= 0:
+    if not _hay_que_pagar(det):
         return f"{nombre} no tiene nada pendiente ahora mismo."
     try:
         nom.registrar_pago_con_monto(session, code, creado_por=quien, fecha=hoy)
@@ -177,6 +185,9 @@ def pagar_por_code(session: Session, code: str, *, quien: str, hoy: date | None 
         session.rollback()
         return f"No se pudo: {exc}"
     session.commit()
+    if det.total <= 0:
+        return (f"✅ Ciclo de {nombre} cerrado: el préstamo se llevó todo el pago "
+                f"(${Decimal(getattr(det, 'prestamo_cubierto', 0) or 0):,.2f}). No se le entrega nada.\n\nSi fue un error, /deshacerpago")
     return f"✅ Pagado a {nombre}: ${det.total:,.2f}\n\nSi fue un error, /deshacerpago"
 
 
@@ -204,7 +215,7 @@ def pagar(session: Session, argumento: str, *, quien: str, hoy: date | None = No
 
     nombre = _nombre(session, code)
     det = nom.pago_pendiente(session, code, hoy)
-    if det.total <= 0:
+    if not _hay_que_pagar(det):
         return f"{nombre} no tiene nada pendiente ahora mismo."
 
     if not confirmado:
@@ -311,8 +322,26 @@ def entrada(session: Session, argumento: str, *, quien: str) -> str:
 
 # ------------------------------------------------------------ /deshacerpago
 
-def deshacer_pago(session: Session, *, quien: str, hoy: date | None = None) -> str:
-    """Deshace el último pago registrado. La red debajo de /pagar."""
+def _corte_despues(session: Session, cuando):
+    """El primer corte hecho después de `cuando` (o None)."""
+    from pos_uniformes.database.models import LibretaCorte
+    from sqlalchemy import select
+
+    if cuando is None:
+        return None
+    return session.scalars(
+        select(LibretaCorte).where(LibretaCorte.created_at > cuando).order_by(LibretaCorte.created_at).limit(1)
+    ).first()
+
+
+def deshacer_pago(session: Session, argumento: str = "", *, quien: str, hoy: date | None = None) -> str:
+    """Deshace el último pago registrado. La red debajo de /pagar.
+
+    Dos pasos (auditoría 2026-11-07, #10): «/deshacerpago» dice a quién, cuánto
+    y a qué hora, y pide «/deshacerpago <id>»; con el id, si sigue siendo el
+    último, se deshace. Si ya hubo un corte después del pago, no se toca desde
+    aquí: ese corte ya restó el pago, y deshacerlo dejaba ese corte y el
+    siguiente descuadrados."""
     from pos_uniformes.database.models import EmpleadaPago
     from pos_uniformes.services import nomina_service as nom
     from sqlalchemy import select
@@ -334,6 +363,24 @@ def deshacer_pago(session: Session, *, quien: str, hoy: date | None = None) -> s
         return (
             f"El último pago es del {ultimo.fecha:%d/%m} a {nombre} (${monto:,.2f}), no de hoy. "
             "Desde aquí solo se deshace el de hoy; ese se corrige en la tienda."
+        )
+    corte = _corte_despues(session, getattr(ultimo, "created_at", None))
+    if corte is not None:
+        hora = f" de las {corte.created_at:%H:%M}" if getattr(corte, "created_at", None) else ""
+        return (
+            f"El pago a {nombre} (${monto:,.2f}) ya entró en el corte{hora}: ese corte ya lo restó. "
+            "Deshacerlo desde aquí dejaría ese corte y el siguiente descuadrados; corrígelo en la tienda."
+        )
+    arg = (argumento or "").strip().lstrip("#")
+    if arg != str(ultimo.id):
+        hora = f" a las {ultimo.created_at:%H:%M}" if getattr(ultimo, "created_at", None) else ""
+        if arg:
+            aviso = f"#{arg} ya no es el último pago. "
+        else:
+            aviso = ""
+        return (
+            f"{aviso}El último pago es a {nombre} de ${monto:,.2f} (hoy{hora}, #{ultimo.id}).\n"
+            f"Para deshacerlo manda: /deshacerpago {ultimo.id}"
         )
     try:
         r = nom.deshacer_pago(session, int(ultimo.id), creado_por=quien)

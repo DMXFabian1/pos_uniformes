@@ -106,6 +106,7 @@ class PagarConDosToquesTest(unittest.TestCase):
             pg,
             desglose_por_code=lambda *a, **k: "Evelyn Ortiz\nTOTAL: $1,412.00",
             monto_pendiente=lambda *a, **k: Decimal(monto) if pendiente else Decimal("0"),
+            tiene_pendiente=lambda *a, **k: pendiente,
             pagar_por_code=lambda *a, **k: self.pagados.append(a) or "✅ Pagado a Evelyn Ortiz",
         )
 
@@ -122,6 +123,13 @@ class PagarConDosToquesTest(unittest.TestCase):
         self.assertEqual(len(self.pagados), 1)
         self.assertIn("Pagado", texto)
         self.assertEqual(aviso, "Pagado")
+
+    def test_con_el_prestamo_comiendose_todo_ofrece_cerrar_el_ciclo(self):
+        """Sin botón, el ciclo nunca se cerraba (auditoría 2026-11-07)."""
+        with self._parches(monto="0.00"):
+            _aviso, _texto, botones = menu.atender("m:pagar:VEND-6", session_factory=_Sesion())
+        self.assertIn("✅ Cerrar su ciclo ($0, el préstamo se lo lleva)", _textos(botones))
+        self.assertIn("m:pagarok:VEND-6:0.00", botones)
 
     def test_el_boton_lleva_el_monto_que_se_enseño(self):
         with self._parches():

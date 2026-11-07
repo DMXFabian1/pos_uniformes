@@ -52,9 +52,18 @@ def cifras_de_propuesta(session, ahora: datetime | None = None):
     ahora = ahora or datetime.now().astimezone()
     e = estado_caja(session, ahora)
     avisos = pagos_que_tocan_hoy(session, ahora.date())
+    return max(_de_la_venta(e, avisos), Decimal("0.00")), Decimal(e.reactivo)
+
+
+def _de_la_venta(e, avisos) -> Decimal:
+    """Lo que queda de la venta tras pagar y lo que ya salió. Negativo si los
+    pagos fueron más: eso se toma del fondo.
+
+    Suma lo que entró sin ser venta (fondo de papá): está en el cajón para
+    cubrir la nómina y la propuesta no lo contaba (auditoría 2026-11-07)."""
     total_pagos = sum((Decimal(a.total_estimado) for a in avisos), Decimal("0.00"))
-    retiro = (e.resumen.efectivo - e.pagos - total_pagos - e.total_retiros).quantize(Decimal("0.01"))
-    return max(retiro, Decimal("0.00")), Decimal(e.reactivo)
+    entradas = Decimal(getattr(e, "entradas", 0) or 0)
+    return (e.resumen.efectivo + entradas - e.pagos - total_pagos - e.total_retiros).quantize(Decimal("0.01"))
 
 
 def tarjeta_del_periodo(session, ahora: datetime | None = None) -> Decimal:
@@ -77,14 +86,15 @@ def texto_propuesta_corte(session, ahora: datetime | None = None) -> str:
     ahora = ahora or datetime.now().astimezone()
     e = estado_caja(session, ahora)
     avisos = pagos_que_tocan_hoy(session, ahora.date())
-    total_pagos = sum((Decimal(a.total_estimado) for a in avisos), Decimal("0.00"))
-    retiro = (e.resumen.efectivo - e.pagos - total_pagos - e.total_retiros).quantize(Decimal("0.01"))
+    de_la_venta = _de_la_venta(e, avisos)
     lineas = [
         f"🧾 ¿Hacemos el corte? ({ahora:%d/%m %H:%M})",
         f"• Venta en efectivo: ${e.resumen.efectivo:,.2f} ({e.resumen.operaciones} ops)",
     ]
     if e.resumen.tarjeta:
         lineas.append(f"• Con tarjeta: ${e.resumen.tarjeta:,.2f} (no entra al cajón)")
+    if getattr(e, "entradas", 0):
+        lineas.append(f"• Entró sin ser venta (fondo de papá…): +${Decimal(e.entradas):,.2f}")
     for a in avisos:
         prest = Decimal(getattr(a, "prestamos", 0) or 0)
         resta = f" (ya sin ${prest:,.2f} del préstamo)" if prest else ""
@@ -98,12 +108,17 @@ def texto_propuesta_corte(session, ahora: datetime | None = None) -> str:
     # como un dato más de la lista. Y que se imprime en la tienda no se decía
     # en ninguna parte: eso es lo que vuelve el corte un hecho, no un número
     # (Daniel, 07/10: «esas opciones son poco claras»).
-    lineas += [
-        "",
-        "Si lo hago ahora:",
-        f"  sacas ${retiro:,.2f} y se quedan ${e.reactivo:,.2f} para mañana",
-        "  se imprime el ticket en la tienda",
-    ]
+    if de_la_venta >= 0:
+        consecuencia = [f"  sacas ${de_la_venta:,.2f} y se quedan ${e.reactivo:,.2f} para mañana"]
+    else:
+        # Decía «sacas $-1,200» (auditoría 2026-11-07, #11): los pagos fueron
+        # más que la venta y la diferencia sale del fondo.
+        queda = (Decimal(e.reactivo) + de_la_venta).quantize(Decimal("0.01"))
+        consecuencia = ["  no sacas nada: los pagos son más que la venta",
+                        f"  se toman ${-de_la_venta:,.2f} del fondo"
+                        + (f" y se quedan ${queda:,.2f} para mañana" if queda >= 0
+                           else f" y aun así faltan ${-queda:,.2f}")]
+    lineas += ["", "Si lo hago ahora:", *consecuencia, "  se imprime el ticket en la tienda"]
     return "\n".join(lineas)
 
 

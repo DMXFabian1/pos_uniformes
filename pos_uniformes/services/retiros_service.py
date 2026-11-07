@@ -15,7 +15,11 @@ MOTIVOS_RAPIDOS = ("Proveedor", "Renta", "Cambio", "Comida", "Luz / agua", "Otro
 _CENT = Decimal("0.01")
 
 
-def registrar_retiro(session, *, monto, motivo: str, creado_por: str):
+def registrar_retiro(session, *, monto, motivo: str, creado_por: str, revisar_repetido: bool = True):
+    """`revisar_repetido=False`: quien llama ya sabe que no es un doble envío
+    (aprobar un préstamo: cada uno tiene su id y solo se aprueba una vez). Dos
+    préstamos iguales de la misma empleada en dos minutos contestaban «Falló:
+    Ese retiro ya quedó apuntado» (auditoría 2026-11-07, #14)."""
     from pos_uniformes.database.models import CajaRetiro
     from pos_uniformes.services.nomina_service import puede_pagar
 
@@ -35,7 +39,7 @@ def registrar_retiro(session, *, monto, motivo: str, creado_por: str):
     from sqlalchemy import select
 
     hace_poco = datetime.now().astimezone() - timedelta(minutes=2)
-    repetido = session.scalars(
+    repetido = None if not revisar_repetido else session.scalars(
         select(CajaRetiro).where(
             CajaRetiro.monto == monto,
             CajaRetiro.motivo == motivo,

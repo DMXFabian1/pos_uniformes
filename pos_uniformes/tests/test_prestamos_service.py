@@ -127,6 +127,23 @@ class AprobarTest(_Base):
         self.assertEqual(Decimal(str(retiros[0].monto)), Decimal("1500"))
         self.assertIn("Fanny", retiros[0].motivo)
 
+    def test_dos_prestamos_iguales_seguidos_se_aprueban_los_dos(self):
+        """El segundo contestaba «Falló: Ese retiro ya quedó apuntado»: el
+        candado contra doble envío de /retiro los tomaba por repetidos
+        (auditoría 2026-11-07)."""
+        uno = self._pedir(monto="500", motivo="renta")
+        dos = self._pedir(monto="500", motivo="luz")
+        pr.aprobar(self.s, uno.id, quien="VEND-1")
+        pr.aprobar(self.s, dos.id, quien="VEND-1")
+        self.assertEqual(len(self.s.scalars(select(CajaRetiro)).all()), 2)
+
+    def test_el_mismo_prestamo_no_se_aprueba_dos_veces(self):
+        p = self._pedir(monto="500")
+        pr.aprobar(self.s, p.id, quien="VEND-1")
+        with self.assertRaises(pr.NoSePuede):
+            pr.aprobar(self.s, p.id, quien="VEND-1")
+        self.assertEqual(len(self.s.scalars(select(CajaRetiro)).all()), 1)
+
     def test_queda_el_rastro_de_quien_y_cuando(self):
         p = self._pedir()
         pr.aprobar(self.s, p.id, quien="VEND-1")

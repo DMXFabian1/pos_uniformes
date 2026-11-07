@@ -208,17 +208,18 @@ class LaPropuestaDiceQueVaAPasarTests(unittest.TestCase):
     lo vuelve un hecho y no un número (Daniel, 07/10).
     """
 
-    def _texto(self):
+    def _texto(self, efectivo="8420.00", pagos="0.00", entradas="0.00"):
         from types import SimpleNamespace
 
         from pos_uniformes.services import corte_remoto_service as crs
 
         resumen = SimpleNamespace(
-            efectivo=Decimal("8420.00"), operaciones=31, tarjeta=Decimal("1368.00")
+            efectivo=Decimal(efectivo), operaciones=31, tarjeta=Decimal("1368.00")
         )
         estado = SimpleNamespace(
-            resumen=resumen, pagos=Decimal("0.00"), total_retiros=Decimal("0.00"),
+            resumen=resumen, pagos=Decimal(pagos), total_retiros=Decimal("0.00"),
             reactivo=Decimal("500.00"), esperado=Decimal("8920.00"), desde=None,
+            entradas=Decimal(entradas),
         )
         with patch(
             "pos_uniformes.services.corte_caja_service.estado_caja", return_value=estado
@@ -226,6 +227,20 @@ class LaPropuestaDiceQueVaAPasarTests(unittest.TestCase):
             "pos_uniformes.services.corte_caja_service.pagos_que_tocan_hoy", return_value=[]
         ):
             return crs.texto_propuesta_corte(object())
+
+    def test_nunca_dice_sacas_negativo(self) -> None:
+        """Decía «sacas $-1,200» (auditoría 2026-11-07)."""
+        texto = self._texto(efectivo="300.00", pagos="1500.00")
+        self.assertNotIn("$-", texto)
+        self.assertIn("no sacas nada: los pagos son más que la venta", texto)
+        self.assertIn("se toman $1,200.00 del fondo y aun así faltan $700.00", texto)
+        texto = self._texto(efectivo="1300.00", pagos="1500.00")
+        self.assertIn("se toman $200.00 del fondo y se quedan $300.00 para mañana", texto)
+
+    def test_el_fondo_de_papa_cuenta_en_lo_que_sacas(self) -> None:
+        texto = self._texto(efectivo="1500.00", pagos="1250.00", entradas="1750.00")
+        self.assertIn("Entró sin ser venta (fondo de papá…): +$1,750.00", texto)
+        self.assertIn("sacas $2,000.00", texto)
 
     def test_separa_lo_que_hay_de_lo_que_pasaria(self) -> None:
         self.assertIn("Si lo hago ahora:", self._texto())
@@ -264,6 +279,13 @@ class BajarleALaVentaTests(unittest.TestCase):
         etiquetas = _etiquetas(botones)
         self.assertEqual(etiquetas[0], "✅ Nada, el corte tal cual")
         self.assertEqual(etiquetas[1], "Bajar $1,368  (lo de tarjeta)")
+
+    def test_la_tarjeta_con_centavos_baja_lo_que_dice(self) -> None:
+        """«Bajar $706» bajaba $705: la etiqueta redondeaba y el dato truncaba
+        (auditoría 2026-11-07)."""
+        _, botones = cb.pantalla_bajar(Decimal("7098"), Decimal("705.60"))
+        self.assertIn("Bajar $705.60  (lo de tarjeta)", _etiquetas(botones))
+        self.assertIn("cc:baja:705.60", botones)
 
     def test_sin_tarjeta_no_se_inventa_el_renglon(self) -> None:
         etiquetas = _etiquetas(cb.pantalla_bajar(Decimal("2820"), Decimal("0"))[1])

@@ -93,10 +93,15 @@ def pantalla_bajar(retiro: Decimal, tarjeta: Decimal) -> tuple[str, str]:
     filas = [[("✅ Nada, el corte tal cual", f"{PREFIJO}ok")]]
     ofrecidas: list[int] = []
     if 0 < tarjeta <= retiro:
-        entero = int(tarjeta)
-        ofrecidas.append(entero)
+        # La cifra exacta en la etiqueta y en el dato: la etiqueta redondeaba
+        # ($705.60 → «$706») y el dato truncaba (705): «Bajar $706» bajaba
+        # $705 (auditoría 2026-11-07, #15).
+        tarjeta = Decimal(tarjeta).quantize(Decimal("0.01"))
+        if tarjeta == tarjeta.to_integral_value():
+            ofrecidas.append(int(tarjeta))
+        etiqueta = _pesos(tarjeta) if tarjeta == tarjeta.to_integral_value() else f"${tarjeta:,.2f}"
         filas.append([(
-            f"Bajar {_pesos(tarjeta)}  (lo de tarjeta)", f"{PREFIJO}baja:{entero}"
+            f"Bajar {etiqueta}  (lo de tarjeta)", f"{PREFIJO}baja:{tarjeta:.2f}"
         )])
     for c in sorted(DE_SIEMPRE):
         if Decimal(c) > retiro or c in ofrecidas:

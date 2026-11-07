@@ -99,6 +99,19 @@ class PagarTest(unittest.TestCase):
         self.assertIn("no tiene nada pendiente", r)
         self.assertNotIn("/pagar", r)
 
+    def test_si_el_prestamo_se_come_todo_se_cierra_el_ciclo(self):
+        """Decía «no tiene nada pendiente» y el ciclo nunca se cerraba: las
+        comisiones seguían sumando y el préstamo nunca quedaba cobrado
+        (auditoría 2026-11-07)."""
+        det = _Det(total="0.00")
+        det.prestamo_cubierto = Decimal("1412.00")
+        r = self._correr("Evelyn", det=det)
+        self.assertIn("TOTAL: $0.00", r)
+        self.assertIn("/pagar Evelyn si", r)
+        r = self._correr("Evelyn si", det=det)
+        self.assertEqual(len(self.registrados), 1)
+        self.assertIn("✅ Ciclo de Evelyn Ortiz cerrado: el préstamo se llevó todo el pago ($1,412.00)", r)
+
     def test_a_quien_no_existe_lo_dice(self):
         r = self._correr("Menganita", code=None)
         self.assertIn("¿Quién es", r)
@@ -214,7 +227,10 @@ class DeshacerSoloElDeHoyTests(unittest.TestCase):
     def _ultimo(self, fecha):
         from types import SimpleNamespace
 
-        ultimo = SimpleNamespace(id=7, employee_code="VEND-2", total=Decimal("1300.00"), fecha=fecha)
+        from datetime import datetime
+
+        ultimo = SimpleNamespace(id=7, employee_code="VEND-2", total=Decimal("1300.00"), fecha=fecha,
+                                 created_at=datetime(2026, 10, 10, 13, 5))
         sesion = type("S", (), {
             "scalars": lambda s_, *a, **k: type("R", (), {"first": lambda r_: ultimo})(),
             "commit": lambda s_: None,
@@ -232,9 +248,9 @@ class DeshacerSoloElDeHoyTests(unittest.TestCase):
     def test_el_de_hoy_si(self):
         from pos_uniformes.services import nomina_service as nom
 
-        with patch.object(pg, "_nombre", return_value="Ana"), \
+        with patch.object(pg, "_nombre", return_value="Ana"), patch.object(pg, "_corte_despues", return_value=None), \
              patch.object(nom, "deshacer_pago", return_value={"prestamo_regresado": Decimal("0.00")}) as des:
-            r = pg.deshacer_pago(self._ultimo(date(2026, 10, 10)), quien="VEND-1", hoy=date(2026, 10, 10))
+            r = pg.deshacer_pago(self._ultimo(date(2026, 10, 10)), "7", quien="VEND-1", hoy=date(2026, 10, 10))
         des.assert_called_once()
         self.assertIn("Deshecho", r)
         self.assertNotIn("préstamo", r)
@@ -243,10 +259,60 @@ class DeshacerSoloElDeHoyTests(unittest.TestCase):
         """Auditoría 2026-11-07: el préstamo descontado se perdía al deshacer."""
         from pos_uniformes.services import nomina_service as nom
 
-        with patch.object(pg, "_nombre", return_value="Ana"), \
+        with patch.object(pg, "_nombre", return_value="Ana"), patch.object(pg, "_corte_despues", return_value=None), \
              patch.object(nom, "deshacer_pago", return_value={"prestamo_regresado": Decimal("500.00")}):
-            r = pg.deshacer_pago(self._ultimo(date(2026, 10, 10)), quien="VEND-1", hoy=date(2026, 10, 10))
+            r = pg.deshacer_pago(self._ultimo(date(2026, 10, 10)), "7", quien="VEND-1", hoy=date(2026, 10, 10))
         self.assertIn("Su préstamo de $500.00 vuelve a estar pendiente", r)
+
+    def _probar(self, argumento, corte=None):
+        from pos_uniformes.services import nomina_service as nom
+
+        with patch.object(pg, "_nombre", return_value="Ana"), patch.object(pg, "_corte_despues", return_value=corte), \
+             patch.object(nom, "deshacer_pago", return_value={}) as des:
+            r = pg.deshacer_pago(self._ultimo(date(2026, 10, 10)), argumento, quien="VEND-1", hoy=date(2026, 10, 10))
+        return r, des
+
+    def test_sin_id_solo_ensena_a_quien_y_cuanto(self):
+        """Auditoría 2026-11-07 #10: deshacía sin decir a quién ni pedir confirmación."""
+        r, des = self._probar("")
+        des.assert_not_called()
+        self.assertIn("Ana", r)
+        self.assertIn("$1,300.00", r)
+        self.assertIn("13:05", r)
+        self.assertIn("/deshacerpago 7", r)
+
+    def test_con_otro_id_no_deshace(self):
+        r, des = self._probar("6")
+        des.assert_not_called()
+        self.assertIn("#6 ya no es el último", r)
+
+    def test_si_ya_hubo_corte_no_se_toca(self):
+        """El corte ya restó el pago: deshacerlo dejaba dos cortes descuadrados."""
+        from datetime import datetime
+        from types import SimpleNamespace
+
+        r, des = self._probar("7", corte=SimpleNamespace(created_at=datetime(2026, 10, 10, 18, 0)))
+        des.assert_not_called()
+        self.assertIn("ya entró en el corte de las 18:00", r)
+
+    def test_busca_el_corte_en_la_base(self):
+        from datetime import datetime, timezone
+
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from pos_uniformes.database.models import Base, LibretaCorte
+
+        engine = create_engine("sqlite://")
+        Base.metadata.create_all(engine)
+        pago = datetime(2026, 10, 10, 13, 5)
+        with sessionmaker(engine)() as s:
+            s.add(LibretaCorte(fecha=date(2026, 10, 10), monto_final=Decimal("100"), created_at=datetime(2026, 10, 10, 12, 0)))
+            s.commit()
+            self.assertIsNone(pg._corte_despues(s, pago))
+            s.add(LibretaCorte(fecha=date(2026, 10, 10), monto_final=Decimal("100"), created_at=datetime(2026, 10, 10, 18, 0)))
+            s.commit()
+            self.assertIsNotNone(pg._corte_despues(s, pago))
 
 
 class RetiroRepetidoTests(unittest.TestCase):

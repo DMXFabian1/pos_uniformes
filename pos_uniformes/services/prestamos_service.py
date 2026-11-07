@@ -190,6 +190,7 @@ def aprobar(session: Session, prestamo_id: int, *, quien: str) -> PrestamoEmplea
         monto=Decimal(str(prestamo.monto)),
         motivo=f"Préstamo a {prestamo.employee_name or prestamo.employee_code}",
         creado_por=str(quien),
+        revisar_repetido=False,
     )
     session.flush()
     return prestamo

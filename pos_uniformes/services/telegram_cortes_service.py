@@ -62,12 +62,18 @@ def _quien(code: str) -> str:
     return mostrar(code)
 
 
+def desde_de(dias: int, hoy: date | None = None) -> date:
+    """Primer día de «los últimos N días», hoy incluido. Restaba N y
+    `/cortes 1` enseñaba hoy y ayer (auditoría 2026-11-07, #16)."""
+    return (hoy or date.today()) - timedelta(days=max(1, int(dias)) - 1)
+
+
 def ultimos(session: Session, *, dias: int = 14, tope: int = TOPE) -> list[CorteFila]:
     """Los cortes más recientes, del más nuevo al más viejo."""
     from pos_uniformes.database.models import LibretaCorte
     from pos_uniformes.services.historial_cortes_service import anotar_entradas, venta_oficial, venta_real
 
-    desde = date.today() - timedelta(days=int(dias))
+    desde = desde_de(dias)
     filas = anotar_entradas(session, session.scalars(
         select(LibretaCorte)
         .where(LibretaCorte.fecha >= desde)
@@ -130,7 +136,7 @@ def salidas_del_periodo(session: Session, *, dias: int = 14) -> SalidasPeriodo:
     from pos_uniformes.database.models import LibretaCorte
     from pos_uniformes.services.historial_cortes_service import anotar_entradas, venta_oficial, venta_real
 
-    desde = date.today() - timedelta(days=int(dias))
+    desde = desde_de(dias)
     filas = anotar_entradas(session, session.scalars(
         select(LibretaCorte).where(LibretaCorte.fecha >= desde)
     ).all())

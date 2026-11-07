@@ -123,10 +123,13 @@ def atender(dato: str, *, session_factory, hoy: date | None = None) -> tuple[str
         with session_factory() as session:
             texto = pg.desglose_por_code(session, code, hoy=hoy)
             monto = pg.monto_pendiente(session, code, hoy=hoy)
+            hay = pg.tiene_pendiente(session, code, hoy=hoy)
         # El botón lleva el monto que se enseñó: si al tocarlo ya es otro
         # (entraron comisiones), se enseña el nuevo y se pregunta otra vez
-        # (auditoría 2026-11-07).
-        botones = _con_volver([[("✅ Sí, pagar", f"{PREFIJO}pagarok:{code}:{monto:.2f}")]] if monto > 0 else [])
+        # (auditoría 2026-11-07). Con $0 (el préstamo se lo come) el botón
+        # cierra el ciclo.
+        etiqueta = "✅ Sí, pagar" if monto > 0 else "✅ Cerrar su ciclo ($0, el préstamo se lo lleva)"
+        botones = _con_volver([[(etiqueta, f"{PREFIJO}pagarok:{code}:{monto:.2f}")]] if hay else [])
         return "", texto, botones
 
     if accion.startswith("pagarok:"):

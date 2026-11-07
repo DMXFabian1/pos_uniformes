@@ -73,5 +73,16 @@ class LaVentaDeCadaCorteTests(unittest.TestCase):
         self.assertEqual(c.entradas_periodo, Decimal("0.00"))
 
 
+class CortesDeUnDiaTests(unittest.TestCase):
+    def test_un_dia_es_hoy(self) -> None:
+        """`/cortes 1` enseñaba hoy y ayer (auditoría 2026-11-07)."""
+        from pos_uniformes.services import telegram_cortes_service as tc
+
+        hoy = date(2026, 11, 7)
+        self.assertEqual(tc.desde_de(1, hoy), hoy)
+        self.assertEqual(tc.desde_de(14, hoy), date(2026, 10, 25))   # 14 días con hoy
+        self.assertEqual(tc.desde_de(0, hoy), hoy)
+
+
 if __name__ == "__main__":
     unittest.main()
