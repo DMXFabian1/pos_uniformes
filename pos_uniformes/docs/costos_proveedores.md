@@ -79,7 +79,7 @@ Sin nota de remisión: cantidades y costos dichos por Daniel. En la caja quedó 
 
 ### Propuesta (sin aplicar)
 
-- **Precio de lanzamiento:** el margen queda en 39–41%, igual que el otro navideño pero por debajo del 47–51% de los suéteres de Martell. Opción: subir el Adulto a 299 para dejar ambos tamaños en 41%.
+- **Precio de lanzamiento:** el margen queda en 39–41%, igual que el otro navideño pero por debajo del 47–51% de los suéteres de Martell. Opción: subir el Adulto a 299 para dejar ambos tamaños en 41%. **Decisión 07-nov-2026: se queda en 289.**
 - **Oferta de cierre:** es prenda de temporada. Después del 24 de diciembre, bajar a 229 / 249 deja todavía 30% de margen y ayuda a no cargar inventario hasta el próximo año.
 
 ## Alineación de precios SQLite ↔ caja (22-oct-2026)
