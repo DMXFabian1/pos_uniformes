@@ -29,6 +29,14 @@ _CENT = Decimal("0.01")
 TOLERANCIA_DIFERENCIA = Decimal("50.00")
 # Minutos después del cierre para avisar que no hubo corte.
 MINUTOS_SIN_CORTE = 10
+#: Si a esta hora después del cierre sigue sin corte —con propuesta en pie—,
+#: es que tampoco corrió el cierre automático (que va a los 45 min).
+MINUTOS_CORTE_FALLIDO = 90
+#: Margen antes de abrir y después de cerrar: una clienta que se quedó al
+#: cierre no es un 🚨 (auditoría 2026-11-07).
+MINUTOS_GRACIA_HORARIO = 20
+#: Una revisión del vigilante que lleva tanto fallando se avisa por Telegram.
+MINUTOS_REVISION_ROTA = 30
 
 #: Cuánto se espera antes de avisar que una pantalla se apagó. Un kiosko que
 #: se reinicia tarda un par de minutos en volver a latir (el margen de
@@ -229,7 +237,7 @@ def _cargar_memoria() -> dict:
             return {}
         crudo = json.loads(ruta.read_text(encoding="utf-8"))
         salida = {}
-        for clave in ("dia_respaldo_avisado", "dia_sin_corte_avisado"):
+        for clave in ("dia_respaldo_avisado", "dia_sin_corte_avisado", "dia_corte_fallido_avisado", "dia_pantallas"):
             valor = crudo.get(clave)
             try:
                 salida[clave] = date.fromisoformat(valor) if valor else None
@@ -239,6 +247,7 @@ def _cargar_memoria() -> dict:
             salida["ultimo_id"] = int(crudo["ultimo_id"]) if crudo.get("ultimo_id") is not None else None
         except (TypeError, ValueError):
             salida["ultimo_id"] = None
+        salida["pantallas_avisadas"] = [str(x) for x in (crudo.get("pantallas_avisadas") or [])]
         return salida
     except Exception:  # noqa: BLE001 — sin memoria se avisa una vez más, no se cae
         return {}
@@ -271,6 +280,10 @@ class Vigilante:
     #: De cuáles ya se avisó, para no repetirlo cada 25 segundos.
     pantallas_avisadas: set = field(default_factory=set, repr=False)
     dia_de_las_pantallas: date | None = None
+    dia_corte_fallido_avisado: date | None = None
+    #: Qué revisión está fallando y desde cuándo (y si ya se avisó).
+    _fallando: dict = field(default_factory=dict, repr=False)
+    _avisadas_guardadas: tuple = field(default=(None, ()), repr=False)
     _apertura: object = field(default=None, repr=False)
 
     # Lo «avisado hoy» se guarda en disco. Vivía solo en memoria, y cada vez
@@ -283,6 +296,12 @@ class Vigilante:
             self.dia_respaldo_avisado = memoria.get("dia_respaldo_avisado")
         if self.dia_sin_corte_avisado is None:
             self.dia_sin_corte_avisado = memoria.get("dia_sin_corte_avisado")
+        if self.dia_corte_fallido_avisado is None:
+            self.dia_corte_fallido_avisado = memoria.get("dia_corte_fallido_avisado")
+        # De qué pantallas ya se avisó hoy: vivía solo en memoria y cada
+        # reinicio del bot volvía a avisar la misma pantalla apagada, y el
+        # «✅ ya volvió» de las de antes nunca llegaba (auditoría 2026-11-07).
+        self._avisadas_guardadas = (memoria.get("dia_pantallas"), tuple(memoria.get("pantallas_avisadas") or ()))
         if self.ultimo_id is None:
             # Hasta qué venta se revisó el horario. Sin esto, cada reinicio
             # «marcaba dónde vamos» y las ventas hechas mientras el bot estaba
@@ -293,18 +312,48 @@ class Vigilante:
         _guardar_memoria({
             "dia_respaldo_avisado": self.dia_respaldo_avisado,
             "dia_sin_corte_avisado": self.dia_sin_corte_avisado,
+            "dia_corte_fallido_avisado": self.dia_corte_fallido_avisado,
             "ultimo_id": self.ultimo_id,
+            "dia_pantallas": self.dia_de_las_pantallas,
+            "pantallas_avisadas": sorted(self.pantallas_avisadas),
         })
 
     def revisar(self, session, ahora: datetime | None = None) -> list[str]:
-        """Devuelve los textos a mandar ahora (puede ser vacío)."""
+        """Devuelve los textos a mandar ahora (puede ser vacío).
+
+        Cada revisión va por su lado: antes, si una consulta tronaba, la vuelta
+        entera fallaba y con ella las pantallas y los descansos, y el error
+        solo quedaba en el log (auditoría 2026-11-07). Ahora la que truene se
+        salta, y si lleva media hora fallando se dice por Telegram."""
         ahora = _local(ahora or datetime.now().astimezone())
-        textos: list[str] = []
-        textos += self._movimientos_fuera_de_horario(session, ahora)
-        textos += self._cierre_sin_corte(session, ahora)
-        textos += self._respaldo_viejo(ahora)
-        textos += self._pantalla_apagada(session, ahora)
+        textos: list = []
+        for nombre, revision in (
+            ("los movimientos fuera de horario", lambda: self._movimientos_fuera_de_horario(session, ahora)),
+            ("si se hizo el corte", lambda: self._cierre_sin_corte(session, ahora)),
+            ("el respaldo", lambda: self._respaldo_viejo(ahora)),
+            ("las pantallas", lambda: self._pantalla_apagada(session, ahora)),
+        ):
+            try:
+                textos += revision()
+            except Exception as exc:  # noqa: BLE001 — una revisión rota no apaga a las demás
+                try:
+                    session.rollback()
+                except Exception:  # noqa: BLE001
+                    pass
+                textos += self._revision_fallo(nombre, exc, ahora)
+            else:
+                self._fallando.pop(nombre, None)
         return textos
+
+    def _revision_fallo(self, nombre: str, exc: BaseException, ahora: datetime) -> list[str]:
+        logger.warning("Vigilante: no pude revisar %s", nombre, exc_info=True)
+        desde, avisado = self._fallando.get(nombre, (ahora, False))
+        self._fallando[nombre] = (desde, avisado)
+        if avisado or (ahora - desde) < timedelta(minutes=MINUTOS_REVISION_ROTA):
+            return []
+        self._fallando[nombre] = (desde, True)
+        return [f"⚠️ Desde las {desde:%H:%M} no puedo revisar {nombre}: {str(exc)[:150]}\n"
+                "Mientras tanto, de eso no te va a llegar ningún aviso."]
 
     def _movimientos_fuera_de_horario(self, session, ahora: datetime) -> list[str]:
         from pos_uniformes.database.models import LibretaVenta
@@ -319,16 +368,32 @@ class Vigilante:
         rows = list(session.scalars(
             select(LibretaVenta).where(LibretaVenta.id > self.ultimo_id).order_by(LibretaVenta.id)
         ).all())
-        textos = []
+        fuera = []
+        gracia = timedelta(minutes=MINUTOS_GRACIA_HORARIO)
         for row in rows:
             self.ultimo_id = max(self.ultimo_id, int(row.id))
             momento = _local(row.created_at)
             apertura, cierre = hora_apertura(momento.date()), hora_cierre(momento.date())
-            if not (apertura <= momento.time() <= cierre):
-                textos.append(texto_fuera_de_horario(row, apertura, cierre))
+            # Con margen: una venta a las 18:03 de una clienta que se quedó al
+            # cierre no es noticia (auditoría 2026-11-07).
+            abre = (datetime.combine(momento.date(), apertura) - gracia).time()
+            cierra = (datetime.combine(momento.date(), cierre) + gracia).time()
+            if not (abre <= momento.time() <= cierra):
+                fuera.append((row, apertura, cierre))
         if rows:
             self._recordar()
-        return textos
+        if len(fuera) <= 1:
+            return [texto_fuera_de_horario(*f) for f in fuera]
+        # Varias en la misma vuelta (Daniel capturando de noche): un mensaje,
+        # no una ráfaga.
+        _, apertura, cierre = fuera[0]
+        renglones = [f"🚨 {len(fuera)} movimientos fuera de horario (horario {apertura:%H:%M}–{cierre:%H:%M}):"]
+        for row, _a, _c in fuera[:10]:
+            nombre = (row.employee_name or row.employee_code or "?").split()[0]
+            renglones.append(f"• {_local(row.created_at):%H:%M} {row.tipo} ${_d(row.monto_total):,.2f} por {nombre}")
+        if len(fuera) > 10:
+            renglones.append(f"• … y {len(fuera) - 10} más")
+        return ["\n".join(renglones)]
 
     def _cierre_sin_corte(self, session, ahora: datetime) -> list[str]:
         from pos_uniformes.database.models import LibretaCorte, LibretaVenta
@@ -336,7 +401,7 @@ class Vigilante:
 
         hoy = ahora.date()
         if self.dia_sin_corte_avisado == hoy:
-            return []
+            return self._corte_que_no_se_hizo(session, ahora)
         cierre = hora_cierre(hoy)
         if ahora < datetime.combine(hoy, cierre) + timedelta(minutes=MINUTOS_SIN_CORTE):
             return []
@@ -368,6 +433,39 @@ class Vigilante:
             return []
         return [texto_sin_corte(hoy, cierre)]
 
+
+    def _corte_que_no_se_hizo(self, session, ahora: datetime) -> list[str]:
+        """Segunda mirada, a la hora y media del cierre.
+
+        A los 10 min el vigilante ve la propuesta en pie y se calla: la
+        conversación está en marcha y el cierre automático va a los 45. Pero
+        si ese cierre truena o la tarea no corre, el error se queda en una
+        consola oculta y el día sin corte, sin que nadie se entere
+        (auditoría 2026-11-07)."""
+        from pos_uniformes.database.models import LibretaCorte, LibretaVenta
+        from pos_uniformes.services.horario_tienda_service import hora_cierre
+
+        hoy = ahora.date()
+        if self.dia_corte_fallido_avisado == hoy:
+            return []
+        if ahora < datetime.combine(hoy, hora_cierre(hoy)) + timedelta(minutes=MINUTOS_CORTE_FALLIDO):
+            return []
+        from pos_uniformes.services import corte_propuesta_service as prop
+
+        p = prop.leer()
+        self.dia_corte_fallido_avisado = hoy
+        self._recordar()
+        if not (p.hay and p.fecha == hoy) or p.cancelado:
+            return []   # sin propuesta ya avisó _cierre_sin_corte; «Hoy no» es una decisión
+        if session.scalar(select(func.count(LibretaCorte.id)).where(LibretaCorte.fecha == hoy)):
+            return []
+        inicio = datetime.combine(hoy, datetime.min.time()).astimezone()
+        if not session.scalar(select(func.count(LibretaVenta.id)).where(LibretaVenta.created_at >= inicio)):
+            return []
+        return [
+            "⚠️ El corte de hoy no se hizo: ni con la propuesta ni con el cierre automático.\n"
+            "Lo vendido sigue esperando corte. Hazlo con /corte cuando puedas."
+        ]
 
     def _respaldo_viejo(self, ahora: datetime) -> list[str]:
         """Avisa una vez al día si el último respaldo ya tiene días.
@@ -458,6 +556,9 @@ class Vigilante:
             self.pantallas_vistas_hoy = {}
             self.pantallas_sin_latir = {}
             self.pantallas_avisadas = set()
+            dia_guardado, guardadas = self._avisadas_guardadas
+            if dia_guardado == hoy:
+                self.pantallas_avisadas = set(guardadas)
             # Quién trabajó hoy sale del DATO y no solo de lo que este
             # vigilante alcanzó a ver. Si no, un reinicio del bot a media
             # mañana le borraba la memoria y una pantalla muerta desde antes
@@ -477,6 +578,8 @@ class Vigilante:
                     # Volvió: cerrar el aviso vale tanto como darlo. Sin esto,
                     # queda con la duda de si tiene que ir a la tienda.
                     self.pantallas_avisadas.discard(ident)
+                    self._avisadas_guardadas = (hoy, tuple(self.pantallas_avisadas))
+                    self._recordar()
                     textos.append(f"✅ {nombre} ya volvió.")
                 continue
             if ident not in self.pantallas_vistas_hoy:
@@ -494,6 +597,8 @@ class Vigilante:
             if minutos < MINUTOS_PANTALLA_MUERTA:
                 continue
             self.pantallas_avisadas.add(ident)
+            self._avisadas_guardadas = (hoy, tuple(self.pantallas_avisadas))
+            self._recordar()
             textos.append(
                 f"⚠️ {nombre} lleva {int(minutos)} min sin responder, y la tienda "
                 "está abierta.\nSi está apagada, ahí no se puede cotizar ni vender."
@@ -541,7 +646,50 @@ def procesar(session_factory, enviar, vigilante: Vigilante | None = None) -> int
                 enviadas += _descansos(session, enviar)
     except Exception as exc:  # noqa: BLE001 — base sin migrar, sin red...
         _avisar_vuelta_fallida(exc)
+        _vuelta_sin_base(exc, enviar)
+    else:
+        _vuelta_con_base(enviar)
     return enviadas
+
+
+#: Cuánto tiene que durar la falla para decirlo. Un reinicio de Postgres o
+#: un parpadeo de la red no merecen mensaje.
+MINUTOS_BASE_CAIDA = 10
+_base_falla_desde: datetime | None = None
+_base_falla_avisada = False
+
+
+def _vuelta_sin_base(exc: BaseException, enviar, ahora: datetime | None = None) -> None:
+    """Con la base caída no se puede encolar nada: el aviso sale directo.
+    Antes solo quedaba en el log, y un día sin base se veía igual que un día
+    tranquilo (auditoría 2026-11-07, #28)."""
+    global _base_falla_desde, _base_falla_avisada
+    ahora = ahora or datetime.now()
+    if _base_falla_desde is None:
+        _base_falla_desde = ahora
+    if _base_falla_avisada or ahora - _base_falla_desde < timedelta(minutes=MINUTOS_BASE_CAIDA):
+        return
+    try:
+        enviar(
+            f"⚠️ Desde las {_base_falla_desde:%H:%M} no puedo leer la base: {str(exc).splitlines()[0][:150] if str(exc) else type(exc).__name__}\n"
+            "Mientras siga así no te llegan avisos y los botones de dinero no funcionan. "
+            "¿Está prendida la PC servidor?"
+        )
+        _base_falla_avisada = True
+    except Exception:  # noqa: BLE001 — sin internet tampoco: se intenta en la siguiente vuelta
+        logger.debug("No se pudo avisar que la base está caída", exc_info=True)
+
+
+def _vuelta_con_base(enviar, ahora: datetime | None = None) -> None:
+    global _base_falla_desde, _base_falla_avisada
+    if _base_falla_avisada and _base_falla_desde is not None:
+        ahora = ahora or datetime.now()
+        try:
+            enviar(f"✅ La base volvió ({ahora:%H:%M}). Los avisos de mientras salen ahora.")
+        except Exception:  # noqa: BLE001
+            logger.debug("No se pudo avisar que la base volvió", exc_info=True)
+    _base_falla_desde = None
+    _base_falla_avisada = False
 
 
 def _descansos(session, enviar) -> int:

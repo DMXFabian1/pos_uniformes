@@ -94,14 +94,32 @@ def main(argv: list[str] | None = None) -> int:
     return 0
 
 
-def _mandar(mensaje: str, botones: str | None = None) -> None:
+def _mandar(mensaje: str, botones: str | None = None) -> bool:
+    """Lo manda por Telegram y, si no hay línea, lo deja en la cola de alertas
+    (el bot lo manda cuando vuelva). Antes la propuesta y «Cerré el día por
+    ti» se perdían sin internet (auditoría 2026-11-07, #20)."""
     try:
         from pos_uniformes.services import telegram_service
 
-        if telegram_service.token_configurado() and telegram_service.chat_id_configurado():
-            telegram_service.enviar_mensaje(mensaje, botones=botones)
+        if not (telegram_service.token_configurado() and telegram_service.chat_id_configurado()):
+            return False
+        telegram_service.enviar_mensaje(mensaje, botones=botones, conservar=True)
+        return True
     except Exception as exc:  # noqa: BLE001
-        print(f"(Telegram no disponible: {exc})")
+        print(f"(Telegram no disponible: {exc}; lo dejo en la cola)")
+    return _encolar(mensaje, botones)
+
+
+def _encolar(mensaje: str, botones: str | None = None) -> bool:
+    try:
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.services import alertas_service
+
+        with get_session() as session:
+            return alertas_service.encolar(session, mensaje, botones or "")
+    except Exception as exc:  # noqa: BLE001
+        print(f"(Tampoco se pudo encolar: {exc})")
+        return False
 
 
 def _recordar() -> int:
@@ -150,7 +168,7 @@ def _cerrar_si_nadie_contesto(*, simular: bool = False) -> int:
         leer,
         toca_cerrar_solo,
     )
-    from pos_uniformes.services.horario_tienda_service import AUTO_CODE, hora_cierre
+    from pos_uniformes.services.horario_tienda_service import AUTO_CODE, hora_cierre, hora_corte
 
     ahora = datetime.now().astimezone()
     propuesta = leer()
@@ -190,7 +208,7 @@ def _cerrar_si_nadie_contesto(*, simular: bool = False) -> int:
             if raro and not hubo_corte_despues and not propuesta.cancelado and hubo_movimiento:
                 _mandar(
                     "⚠️ No cerré el día solo: "
-                    + ("hoy no se propuso el corte (¿no corrió la tarea de las 17:30?)"
+                    + (f"hoy no se propuso el corte (¿no corrió la tarea de las {hora_corte(ahora.date()):%H:%M}?)"
                        if not (propuesta.hay and propuesta.fecha == ahora.date())
                        else "el recordatorio no corrió; lo intento en un rato")
                     + ". Si quieres, manda /corte."
@@ -202,8 +220,18 @@ def _cerrar_si_nadie_contesto(*, simular: bool = False) -> int:
 
         from pos_uniformes.services.corte_remoto_service import hacer_corte_y_avisar
 
-        resultado = hacer_corte_y_avisar(session, creado_por=AUTO_CODE, ahora=ahora)
+        try:
+            resultado = hacer_corte_y_avisar(session, creado_por=AUTO_CODE, ahora=ahora)
+        except Exception as exc:  # noqa: BLE001 — antes el error se quedaba en una consola oculta
+            print(f"El cierre automático falló: {exc}")
+            _mandar(_texto_cierre_fallido(str(exc)))
+            return 1
 
+    if not resultado.hecho:
+        # No decir «Cerré el día» de un corte que no se hizo.
+        print(resultado.mensaje)
+        _mandar(_texto_cierre_fallido(resultado.mensaje))
+        return 1
     mensaje = (
         "🌙 Cerré el día por ti: no contestaste la propuesta y en el kiosko "
         "nadie más puede hacer el corte.\n\n"
@@ -214,6 +242,14 @@ def _cerrar_si_nadie_contesto(*, simular: bool = False) -> int:
     print(mensaje)
     _mandar(mensaje)
     return 0
+
+
+def _texto_cierre_fallido(motivo: str) -> str:
+    return (
+        "⚠️ Quise cerrar el día por ti y no pude:\n"
+        f"{motivo[:300]}\n\n"
+        "Lo vendido sigue esperando corte. Hazlo con /corte cuando puedas."
+    )
 
 
 def _local(momento):

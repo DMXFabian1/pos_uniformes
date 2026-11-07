@@ -57,6 +57,11 @@ class DatosResumen:
     por_empleada: list[tuple[str, int, int]] = field(default_factory=list)  # (nombre, operaciones, comisiones)
     cortes: list[CorteResumen] = field(default_factory=list)
     horas_sin_corte: float | None = None  # desde el último corte (None = nunca)
+    #: Fecha del último corte cuando hoy no hay (None = nunca, o no se leyó).
+    ultimo_corte_fecha: date | None = None
+    #: Cuántos apartados nuevos: el monto NO va, es dinero comprometido, no
+    #: cobrado (regla «solo dinero real»; auditoría 2026-11-07).
+    apartados_n: int = 0
     pagos: list[PagoResumen] = field(default_factory=list)
     faltaron: list[str] = field(default_factory=list)
     #: Desde dónde se cuenta el dinero: el último corte (None = el día de
@@ -78,6 +83,10 @@ class DatosResumen:
     retiros: list[tuple[str, Decimal, str]] = field(default_factory=list)  # (motivo, monto, quién)
 
 
+def _apartados(n: int) -> str:
+    return "1 apartado nuevo" if n == 1 else f"{n} apartados nuevos"
+
+
 def _pesos(v: Decimal) -> str:
     return f"${Decimal(v):,.2f}"
 
@@ -93,8 +102,8 @@ def formatear(d: DatosResumen) -> str:
         lineas.append(f"• Ventas: {_pesos(d.ventas)}")
         if d.abonos:
             lineas.append(f"• Abonos: {_pesos(d.abonos)}")
-        if d.apartados:
-            lineas.append(f"• Apartados nuevos: {_pesos(d.apartados)} (comprometido)")
+        if d.apartados_n:
+            lineas.append(f"• {_apartados(d.apartados_n)} (no es dinero cobrado)")
         lineas.append(f"• Efectivo: {_pesos(d.efectivo)} · Tarjeta: {_pesos(d.tarjeta)}")
         if d.por_empleada:
             lineas.append("• Por empleada: " + ", ".join(f"{n} {o} ops/{c} com." for n, o, c in d.por_empleada))
@@ -124,6 +133,14 @@ def formatear(d: DatosResumen) -> str:
             if c.otros_retiros:
                 extras.append(f"otros retiros {_pesos(c.otros_retiros)}")
             lineas.append("   " + " · ".join(extras))
+    elif d.ultimo_corte_fecha is not None and d.ultimo_corte_fecha >= d.fecha - timedelta(days=1):
+        # El resumen sale a las 17:45 y la propuesta del corte a las 17:30:
+        # que todavía no haya corte de hoy es lo normal, no una alarma. Antes
+        # salía «❗ SIN CORTE HOY» casi a diario (el viernes ya pasaban las 24 h
+        # desde el del jueves) y enseñaba a ignorar el ❗ (auditoría 2026-11-07).
+        lineas.append("• Todavía no hay corte de hoy." if d.operaciones else "• Sin corte hoy (no hubo ventas).")
+    elif d.ultimo_corte_fecha is not None and d.operaciones:
+        lineas.append(f"• ❗ AYER NO HUBO CORTE. El último fue el {d.ultimo_corte_fecha:%d/%m}.")
     else:
         if d.horas_sin_corte is None:
             lineas.append("• Sin corte hoy (nunca se ha hecho uno).")
@@ -179,6 +196,13 @@ def formatear(d: DatosResumen) -> str:
 
 # ─── Acceso a datos ──────────────────────────────────────────────────────
 
+def entro_real(d: "DatosResumen") -> Decimal:
+    """Lo que entró: efectivo + tarjeta. Los abonos ya vienen dentro de esas
+    dos (`resumir_periodo` suma cada abono a su forma de pago); sumarlos otra
+    vez inflaba «Entró» en `/hoy` (auditoría 2026-11-07)."""
+    return d.efectivo + d.tarjeta
+
+
 def texto_hoy(d: DatosResumen, *, quien_esta: list[str] | None = None, ahora=None) -> str:
     """Cómo va el día **ahora**, en un vistazo (Daniel, 2026-09-25).
 
@@ -201,14 +225,13 @@ def texto_hoy(d: DatosResumen, *, quien_esta: list[str] | None = None, ahora=Non
             else "Todavía no se registra ninguna venta."
         )
     else:
-        entro = d.efectivo + d.tarjeta + d.abonos
-        lineas.append(f"💵 Entró: {_pesos(entro)}")
+        lineas.append(f"💵 Entró: {_pesos(entro_real(d))}")
         lineas.append(f"   efectivo {_pesos(d.efectivo)} · tarjeta {_pesos(d.tarjeta)}")
         if d.abonos:
-            lineas.append(f"   abonos {_pesos(d.abonos)}")
+            lineas.append(f"   (incluye {_pesos(d.abonos)} de abonos)")
         lineas.append(f"🛍 {d.operaciones} operaciones · {d.piezas} piezas")
-        if d.apartados:
-            lineas.append(f"📦 Apartados nuevos: {_pesos(d.apartados)} (comprometido, no cobrado)")
+        if d.apartados_n:
+            lineas.append(f"📦 {_apartados(d.apartados_n)} (no es dinero cobrado)")
 
     if quien_esta:
         lineas.append("")
@@ -226,7 +249,7 @@ def texto_hoy(d: DatosResumen, *, quien_esta: list[str] | None = None, ahora=Non
     return "\n".join(lineas)
 
 
-def recolectar(session, hoy: date | None = None) -> DatosResumen:
+def recolectar(session, hoy: date | None = None, *, todo_el_dia: bool = False) -> DatosResumen:
     """Lee todo lo del día. Cada bloque es defensivo: si una tabla no existe
     (base sin migrar) ese bloque se omite y el resto sale igual."""
     from pos_uniformes.services.corte_caja_service import resumir_periodo
@@ -250,6 +273,14 @@ def recolectar(session, hoy: date | None = None) -> DatosResumen:
             d.inicio_corte = hora_local(inicio_periodo(session))
         except Exception:  # noqa: BLE001 — sin el dato, el día de calendario
             session.rollback()
+        if todo_el_dia and d.inicio_corte is not None and d.inicio_corte.date() == hoy:
+            # El RESUMEN del día cuenta el día completo aunque ya se haya hecho
+            # el corte: desde donde empezó el primer corte de hoy. Si Daniel
+            # contestaba la propuesta de las 17:30 antes de las 17:45, el
+            # resumen salía «Sin operaciones desde el corte de hoy a las 17:3x»
+            # (auditoría 2026-11-07). /hoy sigue desde el último corte, como la
+            # Libreta.
+            d.inicio_corte = _inicio_del_primer_corte_de_hoy(session, hoy)
         if d.inicio_corte is not None:
             desde = d.inicio_corte
 
@@ -259,6 +290,7 @@ def recolectar(session, hoy: date | None = None) -> DatosResumen:
     r = resumir_periodo(rows)
     d.operaciones, d.piezas = r.operaciones, r.piezas
     d.ventas, d.abonos, d.apartados, d.efectivo, d.tarjeta = r.ventas, r.abonos, r.apartados, r.efectivo, r.tarjeta
+    d.apartados_n = sum(1 for row in rows if str(getattr(row, "tipo", "")) == "apartado")
     d.por_empleada = [
         (_nombre_de(e.employee_name or e.employee_code, corto=True), e.operaciones, e.comisiones)
         for e in resumir_por_empleada(rows)
@@ -273,6 +305,18 @@ def recolectar(session, hoy: date | None = None) -> DatosResumen:
     _bloque(session, lambda: _pendientes(session, d, hoy))
     _bloque(session, lambda: _retiros(session, d, desde, hasta))
     return d
+
+
+def _inicio_del_primer_corte_de_hoy(session, hoy: date):
+    """Dónde empezó el periodo que cerró el primer corte de hoy (None si fue
+    el primer corte de la historia: entonces se cuenta el día de calendario)."""
+    from pos_uniformes.database.models import LibretaCorte
+    from pos_uniformes.services.libreta_service import hora_local
+
+    primero = session.query(LibretaCorte).filter(LibretaCorte.fecha == hoy).order_by(LibretaCorte.id).first()
+    if primero is None or primero.desde is None:
+        return None
+    return hora_local(primero.desde)
 
 
 def _retiros(session, d: DatosResumen, desde: datetime, hasta: datetime) -> None:
@@ -334,6 +378,7 @@ def _cortes(session, d: DatosResumen, hoy: date) -> None:
     if not filas:
         ultimo = session.query(LibretaCorte).order_by(LibretaCorte.id.desc()).first()
         if ultimo is not None:
+            d.ultimo_corte_fecha = ultimo.fecha
             momento = ultimo.hasta or ultimo.created_at
             ahora = datetime.now(momento.tzinfo) if momento.tzinfo else datetime.now()
             d.horas_sin_corte = (ahora - momento).total_seconds() / 3600

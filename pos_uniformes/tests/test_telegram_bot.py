@@ -212,6 +212,63 @@ class BotonDesconocidoTests(unittest.TestCase):
         self.assertIn("No conozco ese botón", responder.call_args.args[1])
 
 
+class RelojAdelantadoTests(unittest.TestCase):
+    """Con el reloj de la PC más de 10 min adelantado, TODO mensaje parecía
+    viejo y el bot no atendía nada (auditoría 2026-11-07, #29). El filtro es
+    para el rezago al arrancar, no para lo que llega en vivo."""
+
+    def _escuchar(self, lotes):
+        import time
+
+        adelantado = time.time() + 20 * 60
+        respuestas = [{"result": lote} for lote in lotes] + [KeyboardInterrupt()]
+        with patch("pos_uniformes.services.telegram_service._llamar", side_effect=respuestas), \
+             patch("pos_uniformes.services.telegram_service.enviar_mensaje"), \
+             patch.object(bot, "asegurar_menu_fijado"), patch.object(bot, "limpiar_si_toca"), \
+             patch.object(bot, "_guardar_offset"), patch.object(bot, "_leer_offset", return_value=None), \
+             patch.object(bot.time, "time", return_value=adelantado), \
+             patch.object(bot, "atender_texto", return_value="ok") as atender:
+            with self.assertRaises(KeyboardInterrupt):
+                bot.escuchar(session_factory=_sesion, token="t", chat_id="123", alertas=False)
+        return [c.args[0] for c in atender.call_args_list]
+
+    def test_lo_que_llega_en_vivo_se_atiende(self) -> None:
+        import time
+
+        ahora = int(time.time())
+        rezago = [{"update_id": 1, "message": {"chat": {"id": 123}, "text": "/hoy", "message_id": 1, "date": ahora - 3600}}]
+        vivo = [{"update_id": 2, "message": {"chat": {"id": 123}, "text": "/pulso", "message_id": 2, "date": ahora}}]
+        self.assertEqual(self._escuchar([rezago, vivo]), ["/pulso"])
+
+
+class BotonQueFallaTests(unittest.TestCase):
+    """Con la base caída el error solo salía en el globito de dos segundos
+    (auditoría 2026-11-07, #27)."""
+
+    def test_el_error_tambien_queda_en_el_chat(self) -> None:
+        toque = {"id": "q1", "data": "cj:x", "message": {"chat": {"id": "123"}, "message_id": 5}}
+        with patch("pos_uniformes.services.telegram_service.responder_toque"), \
+             patch("pos_uniformes.services.telegram_service.editar_mensaje") as editar, \
+             patch("pos_uniformes.services.telegram_service.enviar_mensaje") as enviar, \
+             patch.object(bot, "boton_vencido", return_value=""), \
+             patch.object(bot, "atender_toque", side_effect=RuntimeError("connection refused")):
+            bot._atender_toque(toque, session_factory=_sesion, token="t", chat_id="123")
+        texto = enviar.call_args.args[0]
+        self.assertIn("Ese botón no se pudo hacer", texto)
+        self.assertIn("connection refused", texto)
+        editar.assert_not_called()       # el mensaje tocado conserva sus botones
+
+    def test_si_sale_bien_no_manda_nada_aparte(self) -> None:
+        toque = {"id": "q1", "data": "cj:x", "message": {"chat": {"id": "123"}, "message_id": 5}}
+        with patch("pos_uniformes.services.telegram_service.responder_toque"), \
+             patch("pos_uniformes.services.telegram_service.editar_mensaje"), \
+             patch("pos_uniformes.services.telegram_service.enviar_mensaje") as enviar, \
+             patch.object(bot, "boton_vencido", return_value=""), \
+             patch.object(bot, "atender_toque", return_value=("Listo", "lista nueva", "")):
+            bot._atender_toque(toque, session_factory=_sesion, token="t", chat_id="123")
+        enviar.assert_not_called()
+
+
 class MensajesEditadosTests(unittest.TestCase):
     def test_una_edicion_se_avisa_y_no_se_ejecuta(self) -> None:
         updates = {"result": [

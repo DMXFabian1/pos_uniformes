@@ -25,6 +25,11 @@ from pathlib import Path
 
 INTERVALO_SEG = 60
 CALMA_SEG = 180
+#: Tres levantadas en media hora es un bucle: algo lo tumba en cuanto
+#: arranca. Se dice una vez por hora (auditoría 2026-11-07, #28).
+BUCLE_VECES = 3
+BUCLE_VENTANA_SEG = 30 * 60
+BUCLE_AVISO_CADA_SEG = 60 * 60
 NOMBRE_MUTEX = "Global\\POSUniformesSupervisor"
 _MUTEX = None
 
@@ -81,6 +86,18 @@ class Servicio:
         self.levantar = levantar
         self.reiniciar = reiniciar
         self.ultimo_arranque: float = 0.0
+        self.levantadas: list[float] = []
+        self.ultimo_aviso_bucle: float = float("-inf")
+
+    def en_bucle(self, ahora: float) -> str:
+        """El aviso si lleva BUCLE_VECES levantadas en la ventana ('' si no)."""
+        self.levantadas = [t for t in self.levantadas if ahora - t < BUCLE_VENTANA_SEG]
+        if len(self.levantadas) < BUCLE_VECES or ahora - self.ultimo_aviso_bucle < BUCLE_AVISO_CADA_SEG:
+            return ""
+        self.ultimo_aviso_bucle = ahora
+        return (f"⚠️ {self.nombre}: lo he tenido que levantar {len(self.levantadas)} veces "
+                f"en la última media hora. Algo lo tumba en cuanto arranca; revisa "
+                "logs/supervisor.log en la PC principal.")
 
 
 def decidir(*, vivo: bool, ultimo_arranque: float, ahora: float, calma: float = CALMA_SEG) -> str:
@@ -92,8 +109,10 @@ def decidir(*, vivo: bool, ultimo_arranque: float, ahora: float, calma: float = 
     return "levantar"
 
 
-def vuelta(servicios: list[Servicio], *, ahora: float | None = None, reiniciar_todo: bool = False, log=None) -> list[str]:
-    """Una revisión. Devuelve qué hizo (para log/tests)."""
+def vuelta(servicios: list[Servicio], *, ahora: float | None = None, reiniciar_todo: bool = False, log=None,
+           avisar=None) -> list[str]:
+    """Una revisión. Devuelve qué hizo (para log/tests). `avisar(texto)`: por
+    donde se dice que un servicio está en bucle."""
     ahora = ahora if ahora is not None else time.time()
     hechos: list[str] = []
     for s in servicios:
@@ -107,7 +126,17 @@ def vuelta(servicios: list[Servicio], *, ahora: float | None = None, reiniciar_t
             if accion == "levantar":
                 s.levantar()
                 s.ultimo_arranque = ahora
+                s.levantadas.append(ahora)
                 hechos.append(f"{s.nombre}: levantado")
+                aviso = s.en_bucle(ahora)
+                if aviso and avisar is not None:
+                    try:
+                        avisar(aviso)
+                        hechos.append(f"{s.nombre}: avisado el bucle")
+                    except Exception:  # noqa: BLE001 — sin línea, queda en el log
+                        s.ultimo_aviso_bucle = float("-inf")
+                        if log:
+                            log.warning("Supervisor: no se pudo avisar el bucle de %s", s.nombre)
         except Exception as exc:  # noqa: BLE001 — un servicio no tumba al supervisor
             hechos.append(f"{s.nombre}: error {exc}")
             if log:
@@ -139,6 +168,13 @@ def servicios_reales() -> list[Servicio]:
     return lista
 
 
+def _avisar(texto: str) -> None:
+    from pos_uniformes.services import telegram_service
+
+    if telegram_service.token_configurado() and telegram_service.chat_id_configurado():
+        telegram_service.enviar_mensaje(texto, conservar=True)
+
+
 def _configurar_log() -> logging.Logger:
     from logging.handlers import RotatingFileHandler
 
@@ -167,7 +203,7 @@ def main(argv: list[str] | None = None) -> int:
     log.info("Supervisor arrancando: %s", ", ".join(s.nombre for s in servicios))
     reiniciar = "--reiniciar" in argv
     while True:
-        hechos = vuelta(servicios, reiniciar_todo=reiniciar or hay_bandera(), log=log)
+        hechos = vuelta(servicios, reiniciar_todo=reiniciar or hay_bandera(), log=log, avisar=_avisar)
         reiniciar = False
         for h in hechos:
             log.info(h)

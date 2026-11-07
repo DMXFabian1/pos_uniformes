@@ -288,7 +288,9 @@ def avisar_a_daniel(session: Session, solicitud) -> None:
     try:
         from pos_uniformes.services.telegram_service import enviar_mensaje
 
-        enviar_mensaje(texto, botones=botones)
+        # conservar: es una pregunta que espera respuesta; la limpieza de la
+        # mañana la borraba antes de que se contestara (auditoría 2026-11-07, #31).
+        enviar_mensaje(texto, botones=botones, conservar=True)
         return
     except Exception:  # noqa: BLE001
         pass

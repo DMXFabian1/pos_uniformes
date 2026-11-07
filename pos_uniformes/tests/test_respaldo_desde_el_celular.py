@@ -11,6 +11,7 @@ import json
 import unittest
 from unittest.mock import MagicMock, patch
 
+from pos_uniformes.services import respaldo_estado_service as est
 from pos_uniformes.services import telegram_respaldo_service as rs
 
 
@@ -211,3 +212,61 @@ class LosEnviadoresDeAntesSiguenSirviendoTests(unittest.TestCase):
             al.enviar_pendientes(ses, lambda t, b: salidas.append((t, b)))
         self.assertEqual(len(salidas), 1)
         self.assertIn("rs:ahora", _datos(salidas[0][1]))
+
+
+class NoPresumeUnRespaldoQueNoSeHizoTests(unittest.TestCase):
+    """Auditoría 2026-11-07, #25."""
+
+    def _correr(self, antes, despues):
+        from datetime import datetime
+        from pathlib import Path
+
+        estados = iter([
+            est.EstadoRespaldo(ultimo=antes, archivo=Path("a.dump"), tamano=10**7),
+            est.EstadoRespaldo(ultimo=despues, archivo=Path("a.dump"), tamano=10**7),
+        ])
+        proc = MagicMock(returncode=1, stderr="pg_dump: error: connection refused", stdout="")
+        with patch.object(est, "leer_estado", side_effect=lambda: next(estados)), \
+             patch("subprocess.run", return_value=proc), \
+             patch.object(est.EstadoRespaldo, "al_dia", new=True):
+            return rs._correr_respaldo()
+
+    def test_si_falla_no_dice_listo_aunque_el_de_anoche_este_al_dia(self) -> None:
+        from datetime import datetime
+
+        anoche = datetime(2026, 11, 6, 21, 0).astimezone()
+        ok, texto = self._correr(anoche, anoche)
+        self.assertFalse(ok)
+        self.assertIn("🛑 El respaldo no quedó", texto)
+        self.assertIn("connection refused", texto)
+
+    def test_con_uno_nuevo_si(self) -> None:
+        from datetime import datetime
+
+        ok, _ = self._correr(datetime(2026, 11, 6, 21, 0).astimezone(),
+                             datetime(2026, 11, 7, 10, 0).astimezone())
+        self.assertTrue(ok)
+
+
+class DosToquesUnSoloRespaldoTests(unittest.TestCase):
+    def test_el_segundo_toque_no_lanza_otro(self) -> None:
+        pendientes = []
+
+        class _Hilo:
+            def __init__(self, target=None, **kw):
+                pendientes.append(target)
+
+            def start(self):
+                pass                      # sigue corriendo
+
+        mandados = []
+        with patch("threading.Thread", _Hilo), \
+             patch.object(rs, "_correr_respaldo", return_value=(True, "✅ listo")):
+            rs.atender("rs:ahora", enviar=mandados.append)
+            aviso, texto, _ = rs.atender("rs:ahora", enviar=mandados.append)
+            self.assertEqual(aviso, "Ya lo estoy haciendo")
+            self.assertEqual(len(pendientes), 1)
+            pendientes[0]()               # termina el primero
+            self.assertEqual(rs.atender("rs:ahora", enviar=mandados.append)[0], "Haciendo el respaldo…")
+            pendientes[1]()
+        self.assertEqual(mandados, ["✅ listo", "✅ listo"])

@@ -27,6 +27,13 @@ class _Base(unittest.TestCase):
         self.addCleanup(parche.stop)
         self.t0 = datetime(2026, 10, 5, 9, 0, tzinfo=timezone.utc)
 
+    def _sin_linea(self, desde: datetime, hasta: datetime) -> None:
+        """El bot vivo y sin red reintenta cada pocos segundos (aquí, cada 5 min)."""
+        t = desde
+        while t <= hasta:
+            con.anotar_fallo(t)
+            t += timedelta(minutes=5)
+
 
 class CuentaElHuecoTests(_Base):
     def test_sin_nada_previo_no_dice_nada(self) -> None:
@@ -38,29 +45,28 @@ class CuentaElHuecoTests(_Base):
         self.assertIsNone(con.anotar_ok(self.t0 + timedelta(seconds=40)))
 
     def test_un_apagon_de_verdad_si(self) -> None:
-        con.anotar_fallo(self.t0)
+        self._sin_linea(self.t0, self.t0 + timedelta(hours=2, minutes=10))
         texto = con.anotar_ok(self.t0 + timedelta(hours=2, minutes=15))
         self.assertIsNotNone(texto)
         self.assertIn("2 h 15 min", texto)
 
     def test_el_hueco_empieza_en_el_PRIMER_fallo(self) -> None:
         # Cada vuelta del bot vuelve a fallar; el hueco no se reinicia.
-        con.anotar_fallo(self.t0)
-        con.anotar_fallo(self.t0 + timedelta(minutes=30))
-        con.anotar_fallo(self.t0 + timedelta(hours=1))
+        self._sin_linea(self.t0, self.t0 + timedelta(hours=2, minutes=55))
         texto = con.anotar_ok(self.t0 + timedelta(hours=3))
         self.assertIn("3 h", texto)
 
     def test_sobrevive_a_que_reinicien_el_bot(self) -> None:
         # El supervisor lo reinicia cada rato: si el estado viviera en memoria,
         # un hueco de dos horas se reportaría como de cinco minutos.
-        con.anotar_fallo(self.t0)
+        self._sin_linea(self.t0, self.t0 + timedelta(hours=1))
         # (aquí el proceso muere y arranca otro: solo queda el archivo)
+        self._sin_linea(self.t0 + timedelta(hours=1, minutes=5), self.t0 + timedelta(hours=1, minutes=55))
         texto = con.anotar_ok(self.t0 + timedelta(hours=2))
         self.assertIn("2 h", texto)
 
     def test_despues_de_contarlo_no_lo_repite(self) -> None:
-        con.anotar_fallo(self.t0)
+        self._sin_linea(self.t0, self.t0 + timedelta(minutes=55))
         self.assertIsNotNone(con.anotar_ok(self.t0 + timedelta(hours=1)))
         self.assertIsNone(con.anotar_ok(self.t0 + timedelta(hours=1, minutes=1)))
 
@@ -70,11 +76,33 @@ class CuentaElHuecoTests(_Base):
         con.anotar_ok(datetime(2026, 10, 5, 18, 0, tzinfo=timezone.utc))
         self.assertIsNone(con.anotar_ok(datetime(2026, 10, 6, 9, 0, tzinfo=timezone.utc)))
 
+    def test_sin_red_al_cerrar_y_la_pc_apagada_no_cuenta_la_noche(self) -> None:
+        """Se fue la red a las 18:30, la PC se apagó a las 19:00 y prendió al
+        otro día: decía «Estuve 14 h sin poder hablar» (auditoría 2026-11-07)."""
+        caida = datetime(2026, 10, 5, 18, 30).astimezone()
+        self._sin_linea(caida, caida + timedelta(minutes=30))
+        texto = con.anotar_ok(caida + timedelta(hours=14, minutes=30))
+        self.assertIn("Estuve 30 min sin poder hablar", texto)
+        self.assertIn("de las 18:30 a las 19:00 (después la PC estuvo apagada)", texto)
+
+    def test_un_rato_corto_antes_de_apagar_no_se_dice(self) -> None:
+        caida = datetime(2026, 10, 5, 18, 58).astimezone()
+        self._sin_linea(caida, caida + timedelta(minutes=1))
+        self.assertIsNone(con.anotar_ok(caida + timedelta(hours=14)))
+
+    def test_un_hueco_viejo_sin_cerrar_no_se_suma_al_nuevo(self) -> None:
+        ayer = datetime(2026, 10, 5, 18, 30).astimezone()
+        self._sin_linea(ayer, ayer + timedelta(minutes=2))
+        hoy = ayer + timedelta(hours=15)
+        self._sin_linea(hoy, hoy + timedelta(minutes=40))
+        texto = con.anotar_ok(hoy + timedelta(minutes=45))
+        self.assertIn("Estuve 45 min", texto)
+
     def test_un_archivo_corrupto_no_tumba_el_bot(self) -> None:
         con.ruta_estado().parent.mkdir(parents=True, exist_ok=True)
         con.ruta_estado().write_text("{roto", encoding="utf-8")
         self.assertIsNone(con.anotar_ok(self.t0))
-        con.anotar_fallo(self.t0)
+        self._sin_linea(self.t0, self.t0 + timedelta(minutes=55))
         self.assertIsNotNone(con.anotar_ok(self.t0 + timedelta(hours=1)))
 
     def test_un_disco_de_solo_lectura_tampoco(self) -> None:

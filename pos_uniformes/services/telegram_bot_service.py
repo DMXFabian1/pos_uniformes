@@ -352,7 +352,7 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
         from pos_uniformes.services.resumen_diario_service import formatear, recolectar
 
         with session_factory() as session:
-            return formatear(recolectar(session, hoy))
+            return formatear(recolectar(session, hoy, todo_el_dia=True))
     if cmd.nombre == "hoy":
         from pos_uniformes.services import asistencia_service as asis
         from pos_uniformes.services.resumen_diario_service import recolectar, texto_hoy
@@ -858,6 +858,11 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
     from pos_uniformes.services.alertas_service import Vigilante, procesar
 
     offset = _leer_offset()
+    # Solo el primer lote tras arrancar (o tras un hueco sin línea) puede
+    # traer mensajes de cuando nadie escuchaba. Lo que llega después es en
+    # vivo: filtrarlo por antigüedad hacía que con el reloj de la PC 10 min
+    # adelantado el bot no atendiera NADA (auditoría 2026-11-07, #29).
+    rezago = True
     vigilante = Vigilante() if alertas else None
     logger.info("Bot escuchando (chat %s)…", chat_id)
     try:
@@ -906,11 +911,21 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
                 # contarlo como tal mandaba «Volví a tener línea» falsos
                 # (2026-10-10).
                 logger.error("Otro bot está usando el mismo token (409 Conflict): %s", exc)
+                # Se dice por el chat (mandar mensajes sí funciona con el 409;
+                # lo que no llega son los comandos). Antes solo en el log
+                # (auditoría 2026-11-07, #28).
+                aviso = _conflicto.otro(time.time())
+                if aviso:
+                    try:
+                        _mandar(aviso)
+                    except Exception:  # noqa: BLE001
+                        logger.warning("No se pudo avisar del 409")
                 time.sleep(30)
                 if una_vez:
                     return
                 continue
             logger.warning("getUpdates falló: %s", exc)
+            rezago = True
             # Se anota el hueco: el bot no puede avisar mientras está
             # incomunicado —esa es la falla— pero sí contarlo al volver.
             try:
@@ -923,6 +938,7 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
             if una_vez:
                 return
             continue
+        _conflicto.listo()
         try:
             from pos_uniformes.services import bot_conexion_service as conexion
 
@@ -931,6 +947,7 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
                 _mandar(de_regreso)
         except Exception:  # noqa: BLE001
             logger.exception("No se pudo contar el hueco de conexión")
+        es_rezago, rezago = rezago, False
         for upd in payload.get("result", []):
             offset = int(upd["update_id"]) + 1
             toque = upd.get("callback_query")
@@ -973,7 +990,7 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
                 pass
             trae_foto = bool(telegram_service.foto_mas_grande(msg))
             botones = ""
-            if _es_viejo(msg):
+            if es_rezago and _es_viejo(msg):
                 logger.info("Mensaje viejo ignorado: %r", texto)
                 if trae_foto:
                     respuesta = (
@@ -1053,6 +1070,34 @@ def boton_vencido(dato: str, fecha_mensaje: int | float | None, ahora: datetime 
     )
 
 
+class _Conflicto:
+    """Otro proceso con el mismo token (409). Se avisa si dura más de un par
+    de minutos —un reinicio deja al viejo vivo unos segundos— y una vez por
+    episodio."""
+
+    SEGUNDOS = 120
+
+    def __init__(self) -> None:
+        self.desde: float | None = None
+        self.avisado = False
+
+    def otro(self, ahora: float) -> str:
+        if self.desde is None:
+            self.desde = ahora
+        if self.avisado or ahora - self.desde < self.SEGUNDOS:
+            return ""
+        self.avisado = True
+        return ("⚠️ Hay otro bot usando mi token (¿uno abierto en otra PC o en la Mac?).\n"
+                "Mientras siga así, tus comandos y botones le llegan a él y no a mí. Ciérralo.")
+
+    def listo(self) -> None:
+        self.desde = None
+        self.avisado = False
+
+
+_conflicto = _Conflicto()
+
+
 def _atender_toque(toque: dict, *, session_factory, token: str, chat_id: str) -> None:
     """Un botón tocado en el celular: marca, avisa y reescribe la lista en el
     mismo mensaje. Solo del chat autorizado."""
@@ -1090,6 +1135,15 @@ def _atender_toque(toque: dict, *, session_factory, token: str, chat_id: str) ->
         telegram_service.responder_toque(str(toque.get("id", "")), resultado[0] if resultado else "", token=token)
     except Exception as exc:  # noqa: BLE001
         logger.warning("No se pudo responder el toque: %s", exc)
+    if resultado and not resultado[1] and str(resultado[0]).startswith("Falló"):
+        # El globito dura dos segundos y con la base caída era lo único que se
+        # veía: parecía que el botón no hizo nada. Se deja también en el chat
+        # (auditoría 2026-11-07, #27). El mensaje tocado no se toca: sus
+        # botones siguen ahí para intentarlo otra vez.
+        try:
+            _mandar(f"⚠️ Ese botón no se pudo hacer.\n{resultado[0]}\n\nNo cambió nada; inténtalo otra vez en un rato.")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("No se pudo avisar del botón fallido: %s", exc)
     if resultado and resultado[1] and msg.get("message_id") is not None:
         tocado = int(msg["message_id"])
         try:

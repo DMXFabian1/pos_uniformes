@@ -86,13 +86,20 @@ def _tienda(session, hoy: date, ahora: datetime) -> list[str]:
 
 
 def _venta(session, hoy: date, ahora: datetime) -> list[str]:
+    """La misma cifra que `/hoy`: lo que entró (efectivo + tarjeta, que ya traen los abonos)
+    desde el último corte. Antes decía «Vendido» por día de calendario y sin
+    abonos, y los dos comandos daban dos «hoy» distintos (auditoría
+    2026-11-07, #23). La comparación con otros días sigue siendo de ventas
+    del día, que es lo que se puede comparar semana contra semana."""
     from pos_uniformes.services import comparativa_service as comp
+    from pos_uniformes.services.resumen_diario_service import entro_real, recolectar
 
-    c = comp.comparar(session, hoy, ahora=ahora)
-    lineas = [f"{MUDO} Vendido: ${c.hoy:,.2f}"]
-    detalle = comp.texto(c)
+    d = recolectar(session, hoy)
+    entro = entro_real(d)
+    lineas = [f"{MUDO} Entró: ${entro:,.2f}" + (f" ({d.periodo})" if d.inicio_corte is not None else "")]
+    detalle = comp.texto(comp.comparar(session, hoy, ahora=ahora))
     if detalle:
-        lineas.append(f"   {detalle}")
+        lineas.append(f"   ventas: {detalle}")
     return lineas
 
 

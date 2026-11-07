@@ -33,6 +33,13 @@ from pathlib import Path
 #: esto no se dice nada.
 MINIMO_PARA_AVISAR = timedelta(minutes=5)
 
+#: El bot reintenta cada 10 s mientras no hay línea. Si entre el último
+#: intento fallido y la vuelta pasó más que esto, en medio el bot no estaba
+#: corriendo (la PC se apagó): ese rato no es hueco. Antes un corte de red a
+#: las 18:30 con la PC apagada después daba «Estuve 14 h sin poder hablar»
+#: cada mañana (auditoría 2026-11-07, #30).
+SIN_INTENTOS = timedelta(minutes=15)
+
 _ARCHIVO = "bot_conexion.json"
 
 
@@ -46,6 +53,7 @@ def ruta_estado() -> Path:
 class Estado:
     caido_desde: datetime | None = None
     ultimo_ok: datetime | None = None
+    ultimo_fallo: datetime | None = None
 
 
 def _leer() -> Estado:
@@ -53,7 +61,11 @@ def _leer() -> Estado:
         datos = json.loads(ruta_estado().read_text(encoding="utf-8"))
     except Exception:  # noqa: BLE001 — sin archivo o ilegible: como si nada
         return Estado()
-    return Estado(caido_desde=_fecha(datos.get("caido_desde")), ultimo_ok=_fecha(datos.get("ultimo_ok")))
+    return Estado(
+        caido_desde=_fecha(datos.get("caido_desde")),
+        ultimo_ok=_fecha(datos.get("ultimo_ok")),
+        ultimo_fallo=_fecha(datos.get("ultimo_fallo")),
+    )
 
 
 def _fecha(valor) -> datetime | None:
@@ -73,6 +85,7 @@ def _guardar(estado: Estado) -> None:
                 {
                     "caido_desde": estado.caido_desde.isoformat() if estado.caido_desde else None,
                     "ultimo_ok": estado.ultimo_ok.isoformat() if estado.ultimo_ok else None,
+                    "ultimo_fallo": estado.ultimo_fallo.isoformat() if estado.ultimo_fallo else None,
                 },
                 ensure_ascii=False,
             ),
@@ -86,9 +99,13 @@ def anotar_fallo(ahora: datetime | None = None) -> None:
     """Una consulta a Telegram no pasó. Marca el inicio del hueco si es el primero."""
     ahora = ahora or datetime.now(timezone.utc)
     estado = _leer()
-    if estado.caido_desde is not None:
-        return  # ya veníamos caídos: el hueco empezó antes
-    _guardar(Estado(caido_desde=ahora, ultimo_ok=estado.ultimo_ok))
+    desde = estado.caido_desde
+    if desde is not None and estado.ultimo_fallo is not None and ahora - estado.ultimo_fallo > SIN_INTENTOS:
+        # El hueco anterior se quedó sin cerrar (se apagó la PC sin línea) y
+        # este es otro: empieza ahora. Un rato demasiado viejo para ser el
+        # mismo hueco no se cuenta.
+        desde = None
+    _guardar(Estado(caido_desde=desde or ahora, ultimo_ok=estado.ultimo_ok, ultimo_fallo=ahora))
 
 
 def anotar_ok(ahora: datetime | None = None) -> str | None:
@@ -98,10 +115,12 @@ def anotar_ok(ahora: datetime | None = None) -> str | None:
     _guardar(Estado(caido_desde=None, ultimo_ok=ahora))
     if estado.caido_desde is None:
         return None
-    hueco = ahora - estado.caido_desde
-    if hueco < MINIMO_PARA_AVISAR:
+    hasta, apagada = ahora, False
+    if estado.ultimo_fallo is not None and ahora - estado.ultimo_fallo > SIN_INTENTOS:
+        hasta, apagada = estado.ultimo_fallo, True
+    if hasta - estado.caido_desde < MINIMO_PARA_AVISAR:
         return None
-    return texto_del_hueco(estado.caido_desde, ahora)
+    return texto_del_hueco(estado.caido_desde, hasta, apagada=apagada)
 
 
 def _local(momento: datetime) -> datetime:
@@ -121,15 +140,24 @@ def duracion_legible(hueco: timedelta) -> str:
     return "1 día" if dias == 1 else f"{dias} días"
 
 
-def texto_del_hueco(desde: datetime, hasta: datetime) -> str:
-    """Lo que se le manda a Daniel cuando el bot recupera la línea."""
+def texto_del_hueco(desde: datetime, hasta: datetime, *, apagada: bool = False) -> str:
+    """Lo que se le manda a Daniel cuando el bot recupera la línea.
+
+    `apagada`: el hueco terminó porque el bot dejó de correr (PC apagada), no
+    porque volviera la red; `hasta` es el último intento."""
     d, h = _local(desde), _local(hasta)
     mismo_dia = d.date() == h.date()
-    rango = (
-        f"de las {d:%H:%M} a las {h:%H:%M}"
-        if mismo_dia
-        else f"desde el {d:%d/%m} a las {d:%H:%M} hasta hoy {h:%H:%M}"
-    )
+    if apagada:
+        rango = (f"el {d:%d/%m} " if d.date() != _local(datetime.now(timezone.utc)).date() else "") + (
+            f"de las {d:%H:%M} a las {h:%H:%M}" if mismo_dia
+            else f"desde las {d:%H:%M} hasta el {h:%d/%m} a las {h:%H:%M}"
+        ) + " (después la PC estuvo apagada)"
+    else:
+        rango = (
+            f"de las {d:%H:%M} a las {h:%H:%M}"
+            if mismo_dia
+            else f"desde el {d:%d/%m} a las {d:%H:%M} hasta hoy {h:%H:%M}"
+        )
     return (
         f"📡 Volví a tener línea.\n\n"
         f"Estuve {duracion_legible(hasta - desde)} sin poder hablar, {rango}.\n"

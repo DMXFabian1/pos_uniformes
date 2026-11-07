@@ -110,7 +110,7 @@ def main(argv: list[str] | None = None) -> int:
             # La tienda abre todos los días (horario_tienda_service).
             texto, botones = mensaje_asistencia(session, hoy)
         else:
-            texto = formatear(recolectar(session, hoy))
+            texto = formatear(recolectar(session, hoy, todo_el_dia=True))
     if args.imprimir:
         print(texto)
         return 0
@@ -120,11 +120,30 @@ def main(argv: list[str] | None = None) -> int:
     except Exception as exc:  # noqa: BLE001
         print(f"No se pudo enviar: {exc}")
         print(texto)
-        return 1
-    print(f"Resumen enviado ({n} mensaje(s)).")
+        # Sin internet el resumen se perdía: ahora se queda en la cola y el
+        # bot lo manda cuando vuelva la línea, con la hora en que se hizo
+        # (auditoría 2026-11-07, #20).
+        if not _encolar(texto, botones):
+            return 1
+        print("Quedó en la cola de alertas; sale cuando vuelva la línea.")
+        n = 0
+    else:
+        print(f"Resumen enviado ({n} mensaje(s)).")
     if args.si_toca and not args.pendientes and not args.asistencia:
         anotar_resumen_enviado(hoy)
     return 0
+
+
+def _encolar(texto: str, botones: str | None) -> bool:
+    try:
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.services import alertas_service
+
+        with get_session() as session:
+            return alertas_service.encolar(session, texto, botones or "")
+    except Exception as exc:  # noqa: BLE001
+        print(f"Tampoco se pudo dejar en la cola: {exc}")
+        return False
 
 
 TOLERANCIA_RESUMEN_MIN = 90

@@ -45,7 +45,7 @@ class _Base(unittest.TestCase):
 class SeLeeDeUnVistazoTests(_Base):
     def test_trae_todo_lo_que_importa(self) -> None:
         texto = self._pulso()
-        for pedazo in ("La tienda ahora", "Vendido", "corte", "Pantallas", "Respaldo"):
+        for pedazo in ("La tienda ahora", "Entró", "corte", "Pantallas", "Respaldo"):
             self.assertIn(pedazo, texto, pedazo)
 
     def test_cada_renglon_trae_su_marca(self) -> None:
@@ -68,7 +68,7 @@ class CuandoAlgoFallaTests(_Base):
             texto = self._pulso()
         self.assertIn("no se pudo leer este dato", texto)
         self.assertIn("Respaldo", texto)       # los de después salieron igual
-        self.assertIn("Vendido", texto)        # los de antes también
+        self.assertIn("Entró", texto)          # los de antes también
 
     def test_lo_que_no_se_sabe_no_se_asume_bien(self) -> None:
         with patch.object(pul, "_respaldo", side_effect=RuntimeError("disco")):
@@ -194,3 +194,37 @@ class ImpresionEnElPulsoTests(unittest.TestCase):
                    side_effect=RuntimeError("sin base")):
             pul._bloque(object(), lineas, lambda: pul._impresion(object(), self._AHORA))
         self.assertIn("no se pudo leer", "\n".join(lineas))
+
+
+class LaMismaCifraQueHoyTests(_Base):
+    """`/pulso` decía «Vendido» por día de calendario y sin abonos; `/hoy`,
+    «Entró» desde el corte. Dos cifras de «hoy» (auditoría 2026-11-07)."""
+
+    def test_pulso_y_hoy_dicen_lo_mismo(self) -> None:
+        from pos_uniformes.services.resumen_diario_service import recolectar, texto_hoy
+
+        momento = self.medio_dia.replace(tzinfo=None, hour=10)
+        for tipo, monto in (("venta", "450"), ("abono", "200")):
+            self.s.add(LibretaVenta(employee_code="VEND-2", employee_name="Ana", tipo=tipo, piezas=1,
+                                    monto_total=Decimal(monto), monto_neto=Decimal(monto),
+                                    created_at=momento))
+        self.s.commit()
+        hoy = texto_hoy(recolectar(self.s, self.hoy))
+        cifra = next(l for l in hoy.splitlines() if "Entró" in l).split("Entró: ")[1]
+        self.assertIn(f"Entró: {cifra}", self._pulso())
+
+    def test_los_abonos_no_se_cuentan_dos_veces(self) -> None:
+        """Una venta de $450 y un abono de $200 en efectivo: entraron $650,
+        no $850 (el abono ya está dentro del efectivo)."""
+        from pos_uniformes.services.resumen_diario_service import recolectar, texto_hoy
+
+        momento = self.medio_dia.replace(tzinfo=None, hour=10)
+        for tipo, monto in (("venta", "450"), ("abono", "200")):
+            self.s.add(LibretaVenta(employee_code="VEND-2", employee_name="Ana", tipo=tipo, piezas=1,
+                                    monto_total=Decimal(monto), monto_neto=Decimal(monto),
+                                    created_at=momento))
+        self.s.commit()
+        hoy = texto_hoy(recolectar(self.s, self.hoy))
+        self.assertIn("Entró: $650.00", hoy)
+        self.assertIn("(incluye $200.00 de abonos)", hoy)
+        self.assertIn("Entró: $650.00", self._pulso())

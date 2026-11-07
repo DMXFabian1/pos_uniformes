@@ -29,21 +29,25 @@ def _datos(**kw) -> DatosResumen:
 
 
 class LoQueEntroTest(unittest.TestCase):
-    def test_suma_efectivo_tarjeta_y_abonos(self):
-        r = texto_hoy(_datos(abonos=Decimal("300.00")), ahora=_AHORA)
-        self.assertIn("Entró: $6,500.00", r)      # 5000 + 1200 + 300
-        self.assertIn("efectivo $5,000.00", r)
+    def test_suma_efectivo_y_tarjeta_que_ya_traen_los_abonos(self):
+        """`resumir_periodo` mete cada abono en su forma de pago: los $300
+        de abono ya están en los $5,300 de efectivo. Antes se volvían a sumar
+        y «Entró» decía $6,800 (auditoría 2026-11-07)."""
+        r = texto_hoy(_datos(efectivo=Decimal("5300.00"), abonos=Decimal("300.00")), ahora=_AHORA)
+        self.assertIn("Entró: $6,500.00", r)      # 5300 + 1200
+        self.assertIn("efectivo $5,300.00", r)
         self.assertIn("tarjeta $1,200.00", r)
-        self.assertIn("abonos $300.00", r)
+        self.assertIn("(incluye $300.00 de abonos)", r)
 
     def test_sin_abonos_no_ensucia_la_linea(self):
         self.assertNotIn("abonos", texto_hoy(_datos(), ahora=_AHORA))
 
     def test_los_apartados_no_entran_al_total(self):
         """Dinero comprometido, no cobrado. La regla de la Libreta."""
-        r = texto_hoy(_datos(apartados=Decimal("4000.00")), ahora=_AHORA)
+        r = texto_hoy(_datos(apartados=Decimal("4000.00"), apartados_n=1), ahora=_AHORA)
         self.assertIn("Entró: $6,200.00", r)      # sin los 4,000
-        self.assertIn("comprometido, no cobrado", r)
+        self.assertIn("1 apartado nuevo (no es dinero cobrado)", r)
+        self.assertNotIn("4,000", r)               # ni su monto (2026-11-07)
 
     def test_dice_operaciones_y_piezas(self):
         self.assertIn("10 operaciones · 17 piezas", texto_hoy(_datos(), ahora=_AHORA))

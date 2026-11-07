@@ -20,8 +20,13 @@ apretó un botón y está esperando. El silencio no es éxito.
 from __future__ import annotations
 
 import logging
+import threading
 
 logger = logging.getLogger(__name__)
+
+#: Uno a la vez: dos toques lanzaban dos `pg_dump` sobre el mismo archivo
+#: (auditoría 2026-11-07, #25).
+_EN_CURSO = threading.Lock()
 
 #: Prefijo de los botones de esta pantalla.
 PREFIJO = "rs:"
@@ -54,6 +59,10 @@ def _correr_respaldo() -> tuple[bool, str]:
 
     raiz = Path(__file__).resolve().parents[2]
     try:
+        antes = est.leer_estado().ultimo
+    except Exception:  # noqa: BLE001
+        antes = None
+    try:
         proc = subprocess.run(
             [sys.executable, "-m", "pos_uniformes.scripts.respaldo_diario",
              "--sin-avisar"],
@@ -74,7 +83,11 @@ def _correr_respaldo() -> tuple[bool, str]:
     except Exception as exc:  # noqa: BLE001
         return False, f"🛑 El respaldo corrió pero no se pudo comprobar: {exc}"
 
-    if estado.al_dia:
+    # «Al día» no basta: si el de anoche estaba bien y el de ahora falló,
+    # el estado sigue al día y el botón decía ✅ de un respaldo que no se
+    # hizo. Tiene que haber uno NUEVO (auditoría 2026-11-07, #25).
+    nuevo = estado.ultimo is not None and (antes is None or estado.ultimo > antes)
+    if estado.al_dia and nuevo:
         return True, "✅ " + est.texto_resumen(estado).lstrip("✅⚠️ ")
     cola = (proc.stderr or proc.stdout or "").strip().splitlines()
     detalle = cola[-1] if cola else "sin detalle"
@@ -86,11 +99,16 @@ def atender(dato: str, *, enviar) -> tuple[str, str, str]:
 
     `enviar(texto)` es por donde sale el resultado cuando el hilo termina.
     """
-    import threading
-
     accion = str(dato or "")[len(PREFIJO):]
     if accion != "ahora":
         return "No conozco ese botón", "", ""
+
+    if not _EN_CURSO.acquire(blocking=False):
+        return (
+            "Ya lo estoy haciendo",
+            "💾 Ya hay un respaldo en marcha. Te aviso en cuanto termine.",
+            "",
+        )
 
     def _trabajo() -> None:
         try:
@@ -98,6 +116,8 @@ def atender(dato: str, *, enviar) -> tuple[str, str, str]:
         except Exception as exc:  # noqa: BLE001 — nunca dejar al usuario sin respuesta
             logger.exception("Respaldo desde el celular")
             texto = f"🛑 El respaldo falló: {exc}"
+        finally:
+            _EN_CURSO.release()
         try:
             enviar(texto)
         except Exception:  # noqa: BLE001
