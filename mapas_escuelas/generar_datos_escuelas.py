@@ -351,20 +351,7 @@ def carga_estado_pos(nombres: set[str]) -> dict[str, dict]:
                 print(f"  [aviso] '{nombre}' no existe en la base del POS")
                 continue
             est = escuela_estado_service.estado_de(session, escuela_id)
-            out[nombre] = {
-                "titular": est.titular,
-                "en_rojo": est.en_rojo,
-                "faltan": est.faltan_de_contar,
-                "tallas": est.tallas,
-                "pct_al_dia": est.pct_al_dia,
-                "agotadas": est.agotadas,
-                "piezas": est.piezas_en_tienda,
-                "vendido": est.vendido_piezas,
-                "pedido": len(est.pedido),
-                "faltas": len(est.faltas_sentidas),
-                "ultimo": est.ultimo_conteo.texto(),
-                "salud": est.salud,
-            }
+            out[nombre] = escuela_estado_service.para_mapa(est)
     finally:
         session.close()
     return out

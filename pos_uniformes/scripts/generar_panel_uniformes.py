@@ -2895,6 +2895,18 @@ def main():
 
     out_path = Path(__file__).resolve().parent.parent / "panel_uniformes.html"
     out_path.write_text(html, encoding="utf-8")
+
+    # El estado de cada escuela, también para el mapa (2026-11-07): sin esto
+    # los anillos del mapa se quedaban con el día en que se generó el mapa.
+    try:
+        from pos_uniformes.services.escuela_estado_service import escribir_estados_para_mapa  # noqa: PLC0415
+
+        carpeta_mapa = Path(__file__).resolve().parents[2] / "mapas_escuelas"
+        if carpeta_mapa.is_dir() and estados:
+            n = escribir_estados_para_mapa(estados, carpeta_mapa / "estados_pos.js")
+            print(f"  Mapa: estado de {n} escuelas al día")
+    except Exception as exc:  # noqa: BLE001 — el Panel ya quedó; el mapa se queda como estaba
+        print(f"  [aviso] no se pudo poner al día el mapa: {exc}")
     print(f"Panel generado: {out_path}")
     print(f"  Abre: file://{out_path}")
 

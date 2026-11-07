@@ -27,3 +27,5 @@ ownership-map-out*/
 pos_uniformes/backups/database/
 pos_uniformes/pos.db
 mapas_escuelas/cache_fichas/
+# el estado de cada escuela lo escribe el Panel al regenerarse (2026-11-07)
+mapas_escuelas/estados_pos.js

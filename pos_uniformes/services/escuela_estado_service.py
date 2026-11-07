@@ -293,3 +293,43 @@ def estados_de_todas(session: Session, *, dias: int = VENTANA_DIAS) -> dict[int,
     cache: dict = {}
     ids = [int(e) for e in session.scalars(select(Escuela.id).where(Escuela.activo.is_(True))).all()]
     return {eid: estado_de(session, eid, dias=dias, cache=cache) for eid in ids}
+
+
+def para_mapa(est: EstadoDeEscuela) -> dict:
+    """Lo que el mapa de escuelas necesita de una escuela (JSON).
+
+    Un solo lugar: lo usan el generador del mapa y el del Panel, que desde el
+    2026-11-07 escribe `mapas_escuelas/estados_pos.js` cada vez que se regenera
+    (antes el estado del mapa se quedaba con el día en que se generó el mapa)."""
+    return {
+        "titular": est.titular,
+        "en_rojo": est.en_rojo,
+        "faltan": est.faltan_de_contar,
+        "tallas": est.tallas,
+        "pct_al_dia": est.pct_al_dia,
+        "agotadas": est.agotadas,
+        "piezas": est.piezas_en_tienda,
+        "vendido": est.vendido_piezas,
+        "pedido": len(est.pedido),
+        "faltas": len(est.faltas_sentidas),
+        "ultimo": est.ultimo_conteo.texto(),
+        "salud": est.salud,
+    }
+
+
+def escribir_estados_para_mapa(estados: dict, destino, *, ahora=None) -> int:
+    """Escribe `estados_pos.js` (window.ESTADOS_POS) junto al mapa. Devuelve cuántas."""
+    import json
+    from pathlib import Path
+
+    momento = (ahora or datetime.now()).astimezone().isoformat(timespec="seconds")
+    escuelas = {str(e.nombre): para_mapa(e) for e in (estados or {}).values()}
+    contenido = (
+        "// Lo escribe el Panel de Uniformes al regenerarse: cómo va cada escuela.\n"
+        "window.ESTADOS_POS = "
+        + json.dumps({"generado": momento, "escuelas": escuelas}, ensure_ascii=False)
+        + ";\n"
+    )
+    Path(destino).write_text(contenido, encoding="utf-8")
+    return len(escuelas)
+
