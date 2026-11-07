@@ -29,6 +29,15 @@ if TYPE_CHECKING:
 
 
 def build_analytics_tab(window: "MainWindow") -> QWidget:
+    """La pestaña, rehecha sobre la Libreta (2026-11-07): ver
+    `ui/helpers/analytics_tablero.py`. La de antes leía la tabla `venta` del
+    POS, que quedó en 8 registros de abril."""
+    from pos_uniformes.ui.helpers.analytics_tablero import construir
+
+    return construir(window)
+
+
+def build_analytics_tab_vieja(window: "MainWindow") -> QWidget:  # pragma: no cover — referencia
     widget = QWidget()
     layout = QVBoxLayout()
     layout.setSpacing(10)
