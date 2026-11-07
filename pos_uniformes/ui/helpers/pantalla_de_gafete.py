@@ -32,6 +32,7 @@ class GateDeGafete:
     raiz: QWidget        # se mete en la página y se muestra/oculta
     entrada: QLineEdit   # donde cae el escaneo
     error: QLabel        # el renglón rojo, oculto hasta que haga falta
+    pie: QLabel | None = None   # «Hoy · Fanny 6 · …», chiquito; solo si se pidió
 
 
 def construir_gate(
@@ -42,6 +43,7 @@ def construir_gate(
     hoja: str,
     marcador: str = "Gafete...",
     al_escanear=None,
+    con_pie: bool = False,
 ) -> GateDeGafete:
     """Arma la pantalla de gafete, ya adornada según la temporada.
 
@@ -118,12 +120,25 @@ def construir_gate(
     error.setVisible(False)
     dentro.addWidget(error)
 
+    # Lo de hoy (operaciones por empleada y quién vendió al último), tenue y
+    # al pie de la tarjeta: las empleadas lo pidieron (2026-11-07) y no debe
+    # pelear con la escena. Oculto hasta que alguien le ponga texto.
+    pie = None
+    if con_pie:
+        pie = QLabel("")
+        pie.setObjectName("gatePie")
+        pie.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        pie.setWordWrap(True)
+        pie.setVisible(False)
+        dentro.addSpacing(6)
+        dentro.addWidget(pie)
+
     tarjeta.setLayout(dentro)
     fuera.addStretch()
     fuera.addWidget(tarjeta, 0, Qt.AlignmentFlag.AlignHCenter)
     fuera.addStretch()
     raiz.setLayout(fuera)
-    return GateDeGafete(raiz=raiz, entrada=entrada, error=error)
+    return GateDeGafete(raiz=raiz, entrada=entrada, error=error, pie=pie)
 
 
 def _temporada():

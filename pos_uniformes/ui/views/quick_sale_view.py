@@ -9,7 +9,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import QSize, Qt, QTimer
+from PyQt6.QtCore import QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
     QCheckBox,
@@ -148,6 +148,10 @@ QLineEdit#gateInput {{
     background: {_WARM_BG}; color: {_TEXT}; min-width: 360px;
 }}
 QLineEdit#gateInput:focus {{ border-color: {_BRAND}; background: white; }}
+QLabel#gatePie {{
+    font-size: 13px; color: {_MUTED}; font-weight: 600; letter-spacing: 0.3px;
+    padding-top: 4px;
+}}
 QLabel#gateError {{
     font-size: 12px; color: {_DANGER}; font-weight: 500;
     padding: 6px 12px; background: #fef0ee; border-radius: 6px;
@@ -222,6 +226,8 @@ QPushButton#btnLogout:hover {{ color: {_DANGER}; border-color: {_DANGER}; }}
 
 
 class QuickSaleWidget(QWidget):
+    #: Lo de hoy para el pie del gafete, leído en un hilo (el kiosko sin red no se congela).
+    _pie_gafete_leido = pyqtSignal(str)
     """Página de Venta Rápida para la app satélite."""
 
     _SCAN_HINT_DEFAULT = ""  # el hint solo muestra avisos breves (flash)
@@ -268,11 +274,52 @@ class QuickSaleWidget(QWidget):
             marcador="VEND-1",
             hoja=_GATE_STYLE,
             al_escanear=self._on_gate_scan,
+            con_pie=True,
         )
         self._gate_fondo = gate.raiz
         self._gate_input = gate.entrada
         self._gate_error = gate.error
+        self._gate_pie = gate.pie
+        self._pie_gafete_leido.connect(self._pintar_pie_gafete)
+        # Se refresca al volver al gafete y cada minuto mientras esté a la vista.
+        self._pie_timer = QTimer(self)
+        self._pie_timer.setInterval(60_000)
+        self._pie_timer.timeout.connect(self.refrescar_pie_gafete)
+        self._pie_timer.start()
+        self.refrescar_pie_gafete()
         return gate.raiz
+
+    def refrescar_pie_gafete(self) -> None:
+        """Cuántas operaciones lleva cada una hoy y quién vendió al último."""
+        if self._gate_pie is None or not self._gate_widget_visible():
+            return
+        import threading
+
+        def _leer() -> None:
+            try:
+                from pos_uniformes.database.connection import get_session
+                from pos_uniformes.services import gafete_hoy_service as gh
+
+                with get_session() as session:
+                    texto = gh.texto(gh.resumen_de_hoy(session))
+            except Exception:  # noqa: BLE001 — sin base, el pie se queda como estaba
+                return
+            try:
+                self._pie_gafete_leido.emit(texto)
+            except RuntimeError:
+                pass
+
+        threading.Thread(target=_leer, daemon=True, name="pie-gafete").start()
+
+    def _gate_widget_visible(self) -> bool:
+        gate = getattr(self, "_gate_widget", None)
+        return gate is None or not gate.isHidden()
+
+    def _pintar_pie_gafete(self, texto: str) -> None:
+        if self._gate_pie is None:
+            return
+        self._gate_pie.setText(texto)
+        self._gate_pie.setVisible(bool(texto))
 
     @staticmethod
     def _normalize_scan(raw: str) -> str:
@@ -2677,6 +2724,7 @@ class QuickSaleWidget(QWidget):
         self._gate_widget.setVisible(True)
         self._gate_input.clear()
         self._gate_error.setVisible(False)
+        self.refrescar_pie_gafete()
         QTimer.singleShot(0, self._gate_input.setFocus)
 
     # ─── API pública ─────────────────────────────────────────────────────
