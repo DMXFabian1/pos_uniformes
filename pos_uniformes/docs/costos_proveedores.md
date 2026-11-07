@@ -57,6 +57,31 @@ Precios de venta tomados de `Gestor_de_Inventarios/data/productos.db`.
 - **22-oct-2026 · UVEG:** 14, 16 → 355 (antes 345) · 32–38 → 365 (antes 345) · 40, 42 → 375 (antes 355).
   El costo sube por talla (174 → 184 → 197) y la venta estaba casi plana.
 
+## Tejidos Romanos
+
+### Compra 07-nov-2026 · Suéter Navideño C/Luces
+
+Sin nota de remisión: cantidades y costos dichos por Daniel. En la caja quedó como compra `ROMANOS-NAVLUCES-2026-11-07` (marca `Romanos`, color `Surtido`).
+
+| Cant | Prenda | Talla | SKU | Costo | Importe |
+|---:|---|---|---|---:|---:|
+| 65 | Suéter Navideño C/Luces | Infantil | SKU005654 | 160 | 10,400 |
+| 60 | Suéter Navideño C/Luces | Adulto | SKU005655 | 175 | 10,500 |
+| **125** | | | | | **20,900** |
+
+### Margen contra precio de venta
+
+| Prenda | Talla | Costo | Venta | Margen |
+|---|---|---:|---:|---:|
+| Navideño C/Luces | Infantil | 160 | 269 | 41% |
+| Navideño C/Luces | Adulto | 175 | 289 | 39% |
+| Navideño YMS226T (Mios, referencia) | Unitalla | 130 | 219 | 41% |
+
+### Propuesta (sin aplicar)
+
+- **Precio de lanzamiento:** el margen queda en 39–41%, igual que el otro navideño pero por debajo del 47–51% de los suéteres de Martell. Opción: subir el Adulto a 299 para dejar ambos tamaños en 41%.
+- **Oferta de cierre:** es prenda de temporada. Después del 24 de diciembre, bajar a 229 / 249 deja todavía 30% de margen y ayuda a no cargar inventario hasta el próximo año.
+
 ## Alineación de precios SQLite ↔ caja (22-oct-2026)
 
 Decisión: **los precios válidos son los de la caja (PostgreSQL de la tienda).** `productos.db` y los documentos se corrigen para igualarla, no al revés.
