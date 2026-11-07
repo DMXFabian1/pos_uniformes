@@ -1063,31 +1063,44 @@ class PedidoHojaDialog(QDialog):
         self._html = html
         self._titulo = titulo
         layout = QVBoxLayout()
-        ayuda = QLabel("Cópialo al WhatsApp del maquilador, imprímelo o mándatelo por Telegram.")
+        layout.setContentsMargins(22, 18, 22, 18)
+        layout.setSpacing(10)
+        encabezado = QLabel(titulo)
+        encabezado.setStyleSheet("font-size: 20px; font-weight: 800; color: #6b1f3a;")
+        layout.addWidget(encabezado)
+        ayuda = QLabel(
+            "Así se manda por WhatsApp o Telegram. «Imprimir hoja» saca la hoja carta "
+            "con las tallas en fila, casillas «Llegó» y lugar para el maquilador y la entrega."
+        )
         ayuda.setWordWrap(True)
+        ayuda.setStyleSheet("color: #8a8177; font-size: 13px;")
         layout.addWidget(ayuda)
         self._cuadro = QPlainTextEdit(texto)
         self._cuadro.setReadOnly(True)
-        self._cuadro.setStyleSheet("background: #ffffff; color: #1a1a1a; font-family: Menlo, Consolas, monospace; font-size: 13px;")
+        self._cuadro.setStyleSheet(
+            "background: #ffffff; color: #2c2a27; border: 1px solid #e6dccb; border-radius: 10px;"
+            "padding: 8px; font-family: Menlo, Consolas, monospace; font-size: 13px;"
+        )
         layout.addWidget(self._cuadro, 1)
         botones = QHBoxLayout()
-        copiar = QPushButton("Copiar")
+        botones.setSpacing(8)
+        copiar = QPushButton("📋  Copiar para WhatsApp")
         copiar.clicked.connect(self._copiar)
         botones.addWidget(copiar)
-        imprimir = QPushButton("Imprimir")
-        imprimir.clicked.connect(self._imprimir)
-        botones.addWidget(imprimir)
-        self._telegram_btn = QPushButton("Mandar por Telegram")
+        self._telegram_btn = QPushButton("✈️  Mandar por Telegram")
         self._telegram_btn.clicked.connect(self._telegram)
         botones.addWidget(self._telegram_btn)
         botones.addStretch()
+        imprimir = QPushButton("🖨  Imprimir hoja")
+        imprimir.setObjectName("primaryButton")
+        imprimir.clicked.connect(self._imprimir)
+        botones.addWidget(imprimir)
         cerrar = QPushButton("Cerrar")
-        cerrar.setObjectName("primaryButton")
         cerrar.clicked.connect(self.accept)
         botones.addWidget(cerrar)
         layout.addLayout(botones)
         self.setLayout(layout)
-        self.resize(520, 560)
+        self.resize(620, 600)
 
     def _copiar(self) -> None:
         QApplication.clipboard().setText(self._texto)

@@ -205,14 +205,23 @@ def construir_hoja_html(
     partes = [
         _ESTILO,
         _encabezado_hoja(titulo, cuenta, fecha, nivel, total, total_tallas),
-        '<p class="regla">Si no contaste una talla, déjala <b>vacía</b> — vacío NO es cero. '
-        "La pantalla de captura trae las prendas con estos mismos números.</p>",
+        # Lo único que no se puede olvidar, en una franja que se ve (2026-11-07).
+        f'<table width="100%" cellspacing="0" cellpadding="7" border="0"><tr>'
+        f'<td bgcolor="#fff4d6" style="color:{TEXTO};">'
+        f'<b>Si no contaste una talla, déjala vacía: vacío NO es cero.</b> '
+        f'<font color="{TEXTO_SUAVE}">La pantalla de captura trae las prendas con estos mismos números.</font>'
+        f"</td></tr></table>",
     ]
     tarjetas = [_tarjeta(i, total, g, titulo) for i, g in enumerate(grupos, 1)]
     alturas = [altura_tarjeta_pt(g, titulo) for g in grupos]
     ancho = 100 // TARJETAS_POR_FILA
-    for n_pag, indices in enumerate(paginar(alturas, tope_siguientes=PT_UTIL_SIGUIENTES)):
+    paginas = list(paginar(alturas, tope_siguientes=PT_UTIL_SIGUIENTES))
+    n_paginas = len(paginas)
+    for n_pag, indices in enumerate(paginas):
         if n_pag:
+            # Cada hoja dice cuál es y de cuántas: con varias, no se revuelven
+            # (2026-11-07). Va al pie de la anterior, antes del salto.
+            partes.append(_pie_de_pagina(n_pag, n_paginas, titulo))
             partes.append('<p style="page-break-before: always; margin: 0;"></p>')
         filas = []
         for i in range(0, len(indices), TARJETAS_POR_FILA):
@@ -228,7 +237,16 @@ def construir_hoja_html(
     partes.append(
         f'<p class="pie">Al terminar: computadora → <b>Conteos</b> → tu gafete → <b>Capturar</b>.</p>'
     )
+    if n_paginas > 1:
+        partes.append(_pie_de_pagina(n_paginas, n_paginas, titulo))
     return "\n".join(partes)
+
+
+def _pie_de_pagina(n: int, de: int, titulo: str) -> str:
+    return (
+        f'<p align="right" style="margin: 6pt 0 0 0;"><font size="2" color="{TEXTO_SUAVE}">'
+        f"{escape(titulo)} &nbsp;·&nbsp; Hoja <b>{n}</b> de <b>{de}</b></font></p>"
+    )
 
 
 def _solo_lo_que_falta(grupos: list[dict]) -> list[dict]:

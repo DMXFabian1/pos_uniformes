@@ -207,3 +207,23 @@ class SoloLoQueFaltaTests(unittest.TestCase):
         grupos = [{"producto_nombre": "Calceta Blanca", "tipo_pieza": "Calceta",
                    "variantes": [self._variante(1, dias=1, requiere=False)]}]
         self.assertEqual(_solo_lo_que_falta(grupos), [])
+
+
+class HojaDeConteoDetallesTests(unittest.TestCase):
+    """2026-11-07: la regla en una franja que se ve y «Hoja N de M» si son varias."""
+
+    def test_la_regla_va_resaltada(self) -> None:
+        html = hoja.construir_hoja_html(GRUPOS, titulo="X")
+        self.assertIn("vacío NO es cero", html)
+        self.assertIn('bgcolor="#fff4d6"', html)
+
+    def test_una_sola_hoja_no_se_numera(self) -> None:
+        self.assertNotIn("Hoja <b>1</b> de", hoja.construir_hoja_html(GRUPOS, titulo="X"))
+
+    def test_varias_hojas_dicen_cual_es(self) -> None:
+        muchos = [_grupo(f"Prenda {i}", [str(t) for t in range(4, 30, 2)]) for i in range(12)]
+        html = hoja.construir_hoja_html(muchos, titulo="Escuela X")
+        paginas = html.count("page-break-before: always") + 1
+        self.assertGreater(paginas, 1)
+        for n in range(1, paginas + 1):
+            self.assertIn(f"Hoja <b>{n}</b> de <b>{paginas}</b>", html)

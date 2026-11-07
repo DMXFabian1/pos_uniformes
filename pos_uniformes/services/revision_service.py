@@ -439,29 +439,103 @@ def texto_pedido(revision: Revision) -> str:
     return "\n".join(partes)
 
 
+#: Tallas por renglón en la hoja de pedido: más, y no cabe escribir en «Llegó».
+TALLAS_POR_RENGLON = 9
+
+
 def html_pedido(revision: Revision) -> str:
-    """La misma hoja, para imprimir en carta (QTextDocument: atributos HTML,
-    no CSS de tablas)."""
+    """La hoja de pedido para el maquilador, en carta (QTextDocument: atributos
+    HTML, no CSS de tablas).
+
+    Rediseño 2026-11-07 (Daniel: «hazlo completo»): el mismo encabezado que la
+    hoja de conteo; por prenda, las tallas EN FILA como las lee el maquilador
+    (Talla / Piezas / Llegó para palomear) con su total; renglones para anotar
+    maquilador, entrega y anticipo; y el total general en grande. El color
+    solo aparece si la prenda trae más de uno (si no, ya va en el nombre)."""
     import html as _html
+
+    from pos_uniformes.services.conteo_hoja_carta_service import (
+        BORDE,
+        CAFE,
+        CREMA,
+        CREMA_SUAVE,
+        TEXTO,
+        TEXTO_SUAVE,
+    )
 
     grupos = _agrupar_pedido(revision)
     fecha = revision.hoy.strftime("%d/%m/%Y")
     total = sum(p for _, tallas in grupos for _, _, p in tallas)
+    e = _html.escape
     partes = [
-        "<html><body style='font-family: Arial, sans-serif; color: #1a1a1a;'>",
-        f"<h2 style='color:#6f331d; margin-bottom:2px;'>Pedido · {_html.escape(revision.titulo)}</h2>",
-        f"<p style='margin-top:0; color:#555;'>{fecha} · {total} piezas · contó {_html.escape(revision.quien)}</p>",
+        f"<html><body style='font-family: Helvetica, Arial, sans-serif; color: {TEXTO};'>",
+        f'<table width="100%" cellspacing="0" cellpadding="8" border="0"><tr>'
+        f'<td bgcolor="{CAFE}"><font size="2" color="{CREMA}"><b>HOJA DE PEDIDO</b></font><br>'
+        f'<font size="6" color="#ffffff"><b>Pedido · {e(revision.titulo)}</b></font></td>'
+        f'<td bgcolor="{CAFE}" align="right" valign="bottom">'
+        f'<font size="2" color="{CREMA}">{len(grupos)} prenda{"s" if len(grupos) != 1 else ""} &nbsp;·&nbsp; {total} piezas</font></td>'
+        f"</tr></table>",
+        f'<table width="100%" cellspacing="0" cellpadding="6" border="0"><tr bgcolor="{CREMA}">'
+        f'<td><font size="2" color="{TEXTO_SUAVE}">FECHA</font><br><b>{fecha}</b></td>'
+        f'<td><font size="2" color="{TEXTO_SUAVE}">CONTÓ</font><br><b>{e(revision.quien or "")}</b></td>'
+        + "".join(
+            f'<td width="{ancho}"><font size="2" color="{TEXTO_SUAVE}">{rotulo}</font><br>'
+            f'<table width="94%" cellspacing="0" cellpadding="3" border="1" bordercolor="{BORDE}">'
+            f'<tr><td bgcolor="#ffffff" height="18">{dentro}</td></tr></table></td>'
+            for rotulo, ancho, dentro in (("MAQUILADOR", "34%", "&nbsp;"), ("ENTREGA", "18%", "&nbsp;"), ("ANTICIPO", "16%", "$"))
+        )
+        + "</tr></table>",
     ]
     if not grupos:
-        partes.append("<p>(sin piezas)</p>")
-    for prenda, tallas in grupos:
-        partes.append(f"<h3 style='color:#6f331d; margin:14px 0 4px 0;'>{_html.escape(prenda)}</h3>")
-        partes.append("<table cellpadding='5' cellspacing='0' border='1' bordercolor='#d9c7b8' width='60%'>")
-        partes.append("<tr bgcolor='#f5ebe0'><th align='left'>Talla</th><th align='left'>Color</th><th align='right'>Piezas</th></tr>")
-        for i, (talla, color, piezas) in enumerate(tallas):
-            fondo = " bgcolor='#faf7f3'" if i % 2 else ""
-            partes.append(f"<tr{fondo}><td>{_html.escape(talla or 'Uni')}</td><td>{_html.escape(color)}</td><td align='right'><b>{piezas}</b></td></tr>")
-        partes.append("</table>")
+        partes.append(f"<p>(sin piezas)</p></body></html>")
+        return "\n".join(partes)
+    from pos_uniformes.services.meilisearch_service import orden_talla
+
+    ancho_talla = f"{88 // TALLAS_POR_RENGLON}%"
+    ancho_rotulo = f"{100 - (88 // TALLAS_POR_RENGLON) * TALLAS_POR_RENGLON}%"   # que sumen 100
+    for n, (prenda, tallas) in enumerate(grupos, 1):
+        # En el orden del maquilador (6, 8, 10… CH, MD…), no en el de captura.
+        tallas = sorted(tallas, key=lambda x: (orden_talla(x[0] or ""), x[1] or ""))
+        varios_colores = len({c for _, c, _ in tallas if c}) > 1
+        subtotal = sum(p for _, _, p in tallas)
+        partes.append('<p style="margin: 0; font-size: 6pt;">&nbsp;</p>')
+        partes.append(
+            f'<table width="100%" cellspacing="0" cellpadding="5" border="0"><tr>'
+            f'<td bgcolor="{CREMA_SUAVE}"><font color="{CAFE}"><b>{n}. {e(prenda)}</b></font></td>'
+            f'<td bgcolor="{CREMA_SUAVE}" align="right"><font color="{CAFE}"><b>{subtotal} pzas</b></font></td>'
+            f"</tr></table>"
+        )
+        for inicio in range(0, len(tallas), TALLAS_POR_RENGLON):
+            tramo = tallas[inicio:inicio + TALLAS_POR_RENGLON]
+            vacias = TALLAS_POR_RENGLON - len(tramo)
+            def fila(etiqueta: str, celdas: list[str], *, fondo: str = "") -> str:
+                bg = f' bgcolor="{fondo}"' if fondo else ""
+                relleno = "".join(f'<td width="{ancho_talla}"{bg}>&nbsp;</td>' for _ in range(vacias))
+                return (
+                    f'<tr><td width="{ancho_rotulo}"{bg}><font size="2" color="{TEXTO_SUAVE}"><b>{etiqueta}</b></font></td>'
+                    + "".join(celdas) + relleno + "</tr>"
+                )
+            nombres = [
+                f'<td width="{ancho_talla}" align="center" bgcolor="{CREMA}"><b>{e((t or "Uni") + (" " + c if varios_colores and c else ""))}</b></td>'
+                for t, c, _ in tramo
+            ]
+            piezas = [f'<td width="{ancho_talla}" align="center"><font size="4"><b>{p}</b></font></td>' for _, _, p in tramo]
+            llego = [f'<td width="{ancho_talla}" align="center" height="22">&nbsp;</td>' for _ in tramo]
+            partes.append(
+                f'<table width="100%" cellspacing="0" cellpadding="5" border="1" bordercolor="{BORDE}">'
+                + fila("TALLA", nombres, fondo=CREMA)
+                + fila("PIEZAS", piezas)
+                + fila("LLEGÓ", llego)
+                + "</table>"
+            )
+    partes.append(
+        f'<table width="100%" cellspacing="0" cellpadding="10" border="0" style="margin-top: 14pt;"><tr>'
+        f'<td bgcolor="{CREMA}"><font size="2" color="{TEXTO_SUAVE}">Palomea «Llegó» cuando entregue el maquilador. '
+        f"Lo que no llegó queda pendiente.</font></td>"
+        f'<td bgcolor="{CAFE}" align="right" width="32%"><font size="2" color="{CREMA}"><b>TOTAL</b></font><br>'
+        f'<font size="6" color="#ffffff"><b>{total} piezas</b></font></td>'
+        f"</tr></table>"
+    )
     partes.append("</body></html>")
     return "\n".join(partes)
 

@@ -401,3 +401,42 @@ class ComparativoTests(_Escenario):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HojaDePedidoNuevaTests(HojaDePedidoTests):
+    """2026-11-07, Daniel: «hazlo completo». La hoja para el maquilador: tallas
+    en fila y en orden, total por prenda, casillas «Llegó», lugar para
+    maquilador/entrega/anticipo y el total en grande."""
+
+    def test_tallas_en_orden_con_su_total_y_llego(self) -> None:
+        r = self._revision([
+            ("Pants 2pz Práxedis Guerrero", "12", "", 3),
+            ("Pants 2pz Práxedis Guerrero", "6", "", 2),
+            ("Pants 2pz Práxedis Guerrero", "CH", "", 1),
+            ("Pants 2pz Práxedis Guerrero", "8", "", 6),
+        ])
+        html = rv.html_pedido(r)
+        i6, i8, i12, ich = (html.index(f"<b>{t}</b></td>") for t in ("6", "8", "12", "CH"))
+        self.assertLess(i6, i8)
+        self.assertLess(i8, i12)
+        self.assertLess(i12, ich)
+        self.assertIn("12 pzas", html)            # total de la prenda
+        self.assertIn("LLEGÓ", html)
+        self.assertIn("12 piezas", html)          # total general
+
+    def test_lugar_para_maquilador_entrega_y_anticipo(self) -> None:
+        html = rv.html_pedido(self._revision([("Camisa Práxedis Guerrero", "6", "", 1)]))
+        for rotulo in ("MAQUILADOR", "ENTREGA", "ANTICIPO", "CONTÓ"):
+            self.assertIn(rotulo, html)
+
+    def test_el_color_solo_si_la_prenda_trae_mas_de_uno(self) -> None:
+        uno = rv.html_pedido(self._revision([("Polo Práxedis Guerrero", "6", "AZUL", 1), ("Polo Práxedis Guerrero", "8", "AZUL", 1)]))
+        self.assertNotIn("6 AZUL", uno)
+        dos = rv.html_pedido(self._revision([("Polo Práxedis Guerrero", "6", "AZUL", 1), ("Polo Práxedis Guerrero", "6", "ROJO", 1)]))
+        self.assertIn("6 AZUL", dos)
+        self.assertIn("6 ROJO", dos)
+
+    def test_mas_de_nueve_tallas_parten_en_dos_renglones(self) -> None:
+        tallas = ["4", "6", "8", "10", "12", "14", "16", "CH", "MD", "GD", "EXG"]
+        html = rv.html_pedido(self._revision([("Playera Práxedis Guerrero", t, "", 1) for t in tallas]))
+        self.assertEqual(html.count("LLEGÓ</b>"), 2)
