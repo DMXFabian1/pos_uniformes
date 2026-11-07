@@ -135,6 +135,17 @@ def tiene_pendiente(session: Session, code: str, *, hoy: date | None = None) -> 
     return nom.pago_pendiente(session, code, hoy).total > 0
 
 
+def monto_pendiente(session: Session, code: str, *, hoy: date | None = None):
+    """Lo que se le pagaría ahora mismo (0 si no trabaja aquí o no hay nada)."""
+    from decimal import Decimal
+
+    from pos_uniformes.services import nomina_service as nom
+
+    if not existe_y_trabaja(session, code):
+        return Decimal("0.00")
+    return Decimal(nom.pago_pendiente(session, code, hoy).total).quantize(Decimal("0.01"))
+
+
 def desglose_por_code(session: Session, code: str, *, hoy: date | None = None) -> str:
     """De dónde sale cada peso. Lo mismo que enseña `/pagar Fulana`."""
     from pos_uniformes.services import nomina_service as nom
@@ -292,11 +303,15 @@ def deshacer_pago(session: Session, *, quien: str, hoy: date | None = None) -> s
             "Desde aquí solo se deshace el de hoy; ese se corrige en la tienda."
         )
     try:
-        nom.deshacer_pago(session, int(ultimo.id), creado_por=quien)
+        r = nom.deshacer_pago(session, int(ultimo.id), creado_por=quien)
     except PermissionError as exc:
         return f"No se pudo: {exc}"
     session.commit()
-    return f"↩️ Deshecho el pago a {nombre} de ${monto:,.2f}."
+    texto = f"↩️ Deshecho el pago a {nombre} de ${monto:,.2f}."
+    regresado = Decimal(str((r or {}).get("prestamo_regresado") or 0))
+    if regresado:
+        texto += f" Su préstamo de ${regresado:,.2f} vuelve a estar pendiente: se le descuenta en el siguiente pago."
+    return texto
 
 
 def _ajuste_comisiones(r: dict) -> str:

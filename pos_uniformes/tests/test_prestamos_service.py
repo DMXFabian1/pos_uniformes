@@ -248,3 +248,50 @@ class CobroParcial(_Base):
             Decimal("0.00"),
         )
         self.assertEqual(pr.total_por_cobrar(self.s, "VEND-5"), Decimal("2000.00"))
+
+
+class DeshacerElPagoRegresaLaDeuda(_Base):
+    """`/deshacerpago` borraba el pago pero el préstamo se quedaba «cobrado»:
+    al volver a pagarle recibía el sueldo completo y la deuda se perdía
+    (auditoría 2026-11-07)."""
+
+    def _aprobado(self, monto):
+        with self.setUpGanado():
+            p = self._pedir(monto=monto)
+            return pr.aprobar(self.s, p.id, quien="VEND-1")
+
+    def test_el_saldado_entero_vuelve_a_deberse(self):
+        p = self._aprobado("500")
+        pr.marcar_cobrados(self.s, "VEND-5", pago_id=77, cubierto=Decimal("500"))
+        self.assertEqual(pr.total_por_cobrar(self.s, "VEND-5"), Decimal("0.00"))
+        regresado = pr.regresar_cobrados(self.s, 77)
+        self.assertEqual(regresado, Decimal("500.00"))
+        self.assertEqual(p.estado, pr.APROBADO)
+        self.assertIsNone(p.pago_id)
+        self.assertEqual(pr.total_por_cobrar(self.s, "VEND-5"), Decimal("500.00"))
+
+    def test_la_parte_cobrada_se_junta_otra_vez(self):
+        p = self._aprobado("2000")
+        pr.marcar_cobrados(self.s, "VEND-5", pago_id=78, cubierto=Decimal("1300"))
+        self.assertEqual(pr.total_por_cobrar(self.s, "VEND-5"), Decimal("700.00"))
+        self.assertEqual(pr.regresar_cobrados(self.s, 78), Decimal("1300.00"))
+        filas = self.s.scalars(select(PrestamoEmpleada)).all()
+        self.assertEqual(len(filas), 1, "la parte cobrada se vuelve a juntar con su préstamo")
+        self.assertEqual(Decimal(str(p.monto)), Decimal("2000.00"))
+        self.assertEqual(pr.total_por_cobrar(self.s, "VEND-5"), Decimal("2000.00"))
+
+    def test_solo_lo_de_ese_pago(self):
+        self._aprobado("300")
+        pr.marcar_cobrados(self.s, "VEND-5", pago_id=10, cubierto=Decimal("300"))
+        self.assertEqual(pr.regresar_cobrados(self.s, 11), Decimal("0.00"))
+        self.assertEqual(pr.total_por_cobrar(self.s, "VEND-5"), Decimal("0.00"))
+
+    def test_nomina_lo_llama_al_deshacer(self):
+        import inspect
+
+        from pos_uniformes.services import nomina_service as nom
+
+        fuente = inspect.getsource(nom.deshacer_pago)
+        self.assertIn("regresar_cobrados(session, int(pago.id))", fuente)
+        # y antes de borrar el pago (después, `pago_id` ya sería NULL)
+        self.assertLess(fuente.index("regresar_cobrados(session"), fuente.index("session.delete(pago)"))

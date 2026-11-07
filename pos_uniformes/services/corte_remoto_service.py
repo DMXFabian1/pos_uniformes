@@ -192,14 +192,29 @@ def hacer_corte_y_avisar(
             f"Hoy ya hay un corte ({hora_previo}). Si de verdad quieres otro, manda:\n"
             "/corte segundo",
         )
-    if retirar is not None and Decimal(retirar) > Decimal(estado.esperado):
+    if retirar is not None:
         # «/corte 50000» con un dedo de más cerraba un corte con más dinero
         # del que había y el ticket declaraba una venta inflada (2026-10-10).
-        return ResultadoCorte(
-            False,
-            f"No hay tanto en el cajón: se esperan ${Decimal(estado.esperado):,.2f} y pediste "
-            f"retirar ${Decimal(retirar):,.2f}. Revisa la cifra y vuelve a mandar /corte.",
-        )
+        # Pero se comparaba contra TODO el cajón: con el fondo adentro y sin
+        # la nómina de hoy, que el corte paga antes de retirar. Con fondo
+        # $2,000, efectivo $4,000 y nómina $1,400 dejaba pasar «/corte 5500»
+        # y declaraba una venta de $6,900 (auditoría 2026-11-07). Lo que de
+        # verdad se puede sacar es lo que queda después de pagar y de dejar
+        # el fondo.
+        pagos_hoy = sum((Decimal(getattr(a, "total_estimado", 0) or 0) for a in avisos), Decimal("0.00"))
+        se_queda = Decimal(estado.reactivo) if fondo is None else min(Decimal(fondo), Decimal(estado.reactivo))
+        se_puede = (Decimal(estado.esperado) - pagos_hoy - se_queda).quantize(Decimal("0.01"))
+        if Decimal(retirar) > se_puede:
+            cuenta = [f"en el cajón ${Decimal(estado.esperado):,.2f}"]
+            if pagos_hoy:
+                cuenta.append(f"menos los pagos de hoy ${pagos_hoy:,.2f}")
+            cuenta.append(f"menos el fondo que se queda ${se_queda:,.2f}")
+            return ResultadoCorte(
+                False,
+                f"No hay tanto en el cajón: lo más que se puede sacar es ${max(se_puede, Decimal('0')):,.2f} "
+                f"({', '.join(cuenta)}) y pediste ${Decimal(retirar):,.2f}.\n"
+                "Revisa la cifra y vuelve a mandar /corte.",
+            )
 
     auto = cerrar_corte_automatico(
         session, creado_por=creado_por, ahora=ahora, retirar=retirar,

@@ -11,6 +11,8 @@ no están aquí a propósito — llevan cantidad y motivo, y eso se escribe.
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from datetime import date
 
 #: Prefijo de los datos que viajan en los botones (máx. 64 bytes por regla de Telegram).
@@ -120,13 +122,27 @@ def atender(dato: str, *, session_factory, hoy: date | None = None) -> tuple[str
         code = accion.split(":", 1)[1]
         with session_factory() as session:
             texto = pg.desglose_por_code(session, code, hoy=hoy)
-            puede = pg.tiene_pendiente(session, code, hoy=hoy)
-        botones = _con_volver([[("✅ Sí, pagar", f"{PREFIJO}pagarok:{code}")]] if puede else [])
+            monto = pg.monto_pendiente(session, code, hoy=hoy)
+        # El botón lleva el monto que se enseñó: si al tocarlo ya es otro
+        # (entraron comisiones), se enseña el nuevo y se pregunta otra vez
+        # (auditoría 2026-11-07).
+        botones = _con_volver([[("✅ Sí, pagar", f"{PREFIJO}pagarok:{code}:{monto:.2f}")]] if monto > 0 else [])
         return "", texto, botones
 
     if accion.startswith("pagarok:"):
-        code = accion.split(":", 1)[1]
+        code, _, mostrado = accion.split(":", 1)[1].partition(":")
         with session_factory() as session:
+            if mostrado:
+                ahora_es = pg.monto_pendiente(session, code, hoy=hoy)
+                visto = bot.leer_cifra(mostrado)
+                if visto is not None and ahora_es > 0 and abs(ahora_es - visto) >= Decimal("0.01"):
+                    texto = pg.desglose_por_code(session, code, hoy=hoy)
+                    return (
+                        "Cambió el monto",
+                        f"El monto cambió desde que lo viste: era ${visto:,.2f} y ahora es ${ahora_es:,.2f}. "
+                        "No pagué nada.\n\n" + texto,
+                        _con_volver([[("✅ Sí, pagar", f"{PREFIJO}pagarok:{code}:{ahora_es:.2f}")]]),
+                    )
             texto = pg.pagar_por_code(session, code, quien=bot.CODIGO_REMOTO, hoy=hoy)
         # El globito decía «Pagado» pasara lo que pasara, también cuando no se
         # pagó nada. Un visto bueno que sale siempre no informa (2026-10-08).

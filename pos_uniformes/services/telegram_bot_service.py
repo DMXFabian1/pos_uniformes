@@ -39,7 +39,7 @@ from __future__ import annotations
 import logging
 import time
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 
 logger = logging.getLogger("telegram_bot")
@@ -185,13 +185,21 @@ def leer_cifra(palabra: str) -> Decimal | None:
     crudo = str(palabra or "").strip().lower().replace("$", "").replace("_", "").replace(" ", "")
     if not crudo:
         return None
-    if "," in crudo:
-        if re.fullmatch(r"-?\d{1,3}(,\d{3})+(\.\d+)?", crudo):
+    # El punto de miles, igual que la coma: «1.500» son mil quinientos, no
+    # $1.50. Antes «/retiro 1.500 gasolina» apuntaba $1.50 y «/corte 5.000»
+    # cortaba sacando $5 sin preguntar (2026-11-07). Con punto y coma juntos,
+    # «1.500,50» es a la europea: miles con punto, centavos con coma.
+    if re.fullmatch(r"-?\d{1,3}(\.\d{3})+(,\d{1,2})?", crudo):
+        crudo = crudo.replace(".", "").replace(",", ".")
+    elif "," in crudo:
+        if re.fullmatch(r"-?\d{1,3}(,\d{3})+(\.\d{1,2})?", crudo):
             crudo = crudo.replace(",", "")
         elif re.fullmatch(r"-?\d+,\d{1,2}", crudo) and "." not in crudo:
             crudo = crudo.replace(",", ".")
         else:
             return None   # «5,00,0» o «1,5,5»: no se adivina
+    elif "." in crudo and not re.fullmatch(r"-?\d*\.\d{1,2}", crudo):
+        return None   # «5000.500» o «1.5.5»: tres centavos no existen, no se adivina
     try:
         valor = Decimal(crudo)
     except (InvalidOperation, ValueError):
@@ -1020,6 +1028,31 @@ def _es_de_servicio(msg: dict) -> bool:
     return bool((msg.get("from") or {}).get("is_bot"))
 
 
+#: Botones que mueven dinero: el corte, el cajón, los cortes (ajustar), los
+#: préstamos y «✅ Sí, pagar» del menú.
+_PREFIJOS_DE_DINERO = ("cc:", "cj:", "co:", "pr:", "m:pagarok:")
+
+
+def boton_vencido(dato: str, fecha_mensaje: int | float | None, ahora: datetime | None = None) -> str | None:
+    """Si el botón mueve dinero y su mensaje es de otro día, el texto que lo
+    dice; None si se puede atender.
+
+    Los botones se quedaban vivos hasta que la limpieza de la mañana borraba
+    el mensaje: el «Hoy no» de anoche, tocado antes de abrir, cancelaba el
+    corte de HOY, y «Hacer el corte y sacar $3,200» de anteayer cortaba el
+    periodo de hoy con otra cifra (auditoría 2026-11-07)."""
+    if not str(dato or "").startswith(_PREFIJOS_DE_DINERO) or not fecha_mensaje:
+        return None
+    ahora = ahora or datetime.now().astimezone()
+    del_mensaje = datetime.fromtimestamp(float(fecha_mensaje), tz=ahora.tzinfo or None).astimezone(ahora.tzinfo)
+    if del_mensaje.date() == ahora.date():
+        return None
+    return (
+        f"Ese botón es del {del_mensaje:%d/%m} y ya no hace nada: las cifras de ese día ya no son las de hoy.\n\n"
+        "Para lo de hoy: /corte, /pagar o /menu."
+    )
+
+
 def _atender_toque(toque: dict, *, session_factory, token: str, chat_id: str) -> None:
     """Un botón tocado en el celular: marca, avisa y reescribe la lista en el
     mismo mensaje. Solo del chat autorizado."""
@@ -1037,13 +1070,18 @@ def _atender_toque(toque: dict, *, session_factory, token: str, chat_id: str) ->
             texto, token=token, chat_id=chat_id, botones=botones or None
         )
 
-    try:
-        resultado = atender_toque(
-            dato, session_factory=session_factory, enviar=_mandar
-        )
-    except Exception as exc:  # noqa: BLE001
-        logger.exception("Error atendiendo el toque %r", dato)
-        resultado = (f"Falló: {exc}", "", "")
+    vencido = boton_vencido(dato, msg.get("date"))
+    if vencido:
+        # Se reescribe el mensaje viejo sin botones: así ya no se puede tocar.
+        resultado = ("Es de otro día", vencido, "")
+    else:
+        try:
+            resultado = atender_toque(
+                dato, session_factory=session_factory, enviar=_mandar
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Error atendiendo el toque %r", dato)
+            resultado = (f"Falló: {exc}", "", "")
     if resultado is None:
         # Un botón de una versión vieja del bot: antes, globito vacío y nada
         # (2026-10-10). Mejor decirlo.

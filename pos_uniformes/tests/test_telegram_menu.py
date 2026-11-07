@@ -97,13 +97,15 @@ class PagarConDosToquesTest(unittest.TestCase):
     def setUp(self) -> None:
         self.pagados = []
 
-    def _parches(self, *, pendiente=True):
+    def _parches(self, *, pendiente=True, monto="1412.00"):
+        from decimal import Decimal
+
         from pos_uniformes.services import telegram_pagos_service as pg
 
         return patch.multiple(
             pg,
             desglose_por_code=lambda *a, **k: "Evelyn Ortiz\nTOTAL: $1,412.00",
-            tiene_pendiente=lambda *a, **k: pendiente,
+            monto_pendiente=lambda *a, **k: Decimal(monto) if pendiente else Decimal("0"),
             pagar_por_code=lambda *a, **k: self.pagados.append(a) or "✅ Pagado a Evelyn Ortiz",
         )
 
@@ -120,6 +122,25 @@ class PagarConDosToquesTest(unittest.TestCase):
         self.assertEqual(len(self.pagados), 1)
         self.assertIn("Pagado", texto)
         self.assertEqual(aviso, "Pagado")
+
+    def test_el_boton_lleva_el_monto_que_se_enseño(self):
+        with self._parches():
+            _aviso, _texto, botones = menu.atender("m:pagar:VEND-6", session_factory=_Sesion())
+        self.assertIn("m:pagarok:VEND-6:1412.00", botones)
+
+    def test_si_el_monto_cambió_no_paga_y_enseña_el_nuevo(self):
+        """Entre el desglose y el «Sí» pueden entrar comisiones: se pagaba lo
+        de ese momento, no lo que se vio (auditoría 2026-11-07)."""
+        with self._parches(monto="1416.00"):
+            aviso, texto, botones = menu.atender("m:pagarok:VEND-6:1412.00", session_factory=_Sesion())
+        self.assertEqual(self.pagados, [])
+        self.assertIn("era $1,412.00 y ahora es $1,416.00", texto)
+        self.assertIn("m:pagarok:VEND-6:1416.00", botones)
+
+    def test_con_el_mismo_monto_paga(self):
+        with self._parches():
+            menu.atender("m:pagarok:VEND-6:1412.00", session_factory=_Sesion())
+        self.assertEqual(len(self.pagados), 1)
 
     def test_a_quien_no_debe_nada_no_le_sale_el_boton(self):
         with self._parches(pendiente=False):

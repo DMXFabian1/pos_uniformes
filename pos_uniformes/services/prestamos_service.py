@@ -264,6 +264,42 @@ def marcar_cobrados(
     return total
 
 
+def regresar_cobrados(session: Session, pago_id: int) -> Decimal:
+    """Deshacer un pago regresa la deuda que ese pago había cobrado.
+
+    `deshacer_pago` borraba el pago y la columna `pago_id` del préstamo se
+    quedaba en NULL (ondelete SET NULL), pero el préstamo seguía «cobrado»:
+    al volver a pagarle recibía el sueldo completo y la deuda se perdía sin
+    que nadie lo decidiera (auditoría 2026-11-07).
+
+    Lo inverso de `marcar_cobrados`: un préstamo saldado entero vuelve a
+    «aprobado» (se le cobra en el siguiente pago); una PARTE cobrada se suma de
+    regreso al préstamo del que salió, y si ese ya no estuviera pendiente, la
+    parte misma vuelve a ser deuda. Devuelve cuánto se regresó."""
+    import re
+
+    total = Decimal("0.00")
+    cobrados = session.scalars(
+        select(PrestamoEmpleada).where(PrestamoEmpleada.pago_id == int(pago_id), PrestamoEmpleada.estado == COBRADO)
+    ).all()
+    for p in cobrados:
+        monto = Decimal(str(p.monto))
+        total += monto
+        m = re.search(r"parte del #(\d+)\)?$", p.motivo or "")
+        origen = session.get(PrestamoEmpleada, int(m.group(1))) if m else None
+        if origen is not None and origen.estado == APROBADO and origen.employee_code == p.employee_code:
+            origen.monto = (Decimal(str(origen.monto)) + monto).quantize(_CENT)
+            session.add(origen)
+            session.delete(p)
+            continue
+        p.estado = APROBADO
+        p.cobrado_at = None
+        p.pago_id = None
+        session.add(p)
+    session.flush()
+    return total.quantize(_CENT)
+
+
 def _pedido(session: Session, prestamo_id: int) -> PrestamoEmpleada:
     prestamo = session.get(PrestamoEmpleada, int(prestamo_id))
     if prestamo is None:

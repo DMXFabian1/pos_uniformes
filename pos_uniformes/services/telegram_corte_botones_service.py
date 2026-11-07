@@ -57,7 +57,10 @@ def botones_de_propuesta(retiro: Decimal, fondo: Decimal) -> str:
         [
             # La cifra va EN el botón: es la del mensaje, y tenerla a la mano
             # al momento de tocar es lo que hace que no haya que releer.
-            [(f"✅ Hacer el corte y sacar {_pesos(retiro)}", f"{PREFIJO}ok")],
+            # Y la lleva también en el dato: si al tocarlo ya no es la misma
+            # (hubo ventas desde el mensaje), se enseña la nueva y se vuelve a
+            # preguntar (auditoría 2026-11-07).
+            [(f"✅ Hacer el corte y sacar {_pesos(retiro)}", f"{PREFIJO}ok:{Decimal(retiro):.2f}")],
             # «Bajarle a la venta» y no «sacar otra cantidad»: es la misma
             # operación preguntada por el lado que Daniel la piensa. Él sabe
             # cuánto quiere bajar —lo de tarjeta, un depósito—, no cuánto
@@ -245,7 +248,10 @@ def preguntar_por_la_nota(nota: str, retiro: Decimal) -> tuple[str, str]:
         "Si era un dedazo, no toques nada.",
         _teclado([
             [(f"✅ Sí, hacer el corte ({_pesos(retiro)})", f"{PREFIJO}nota:{dato}")],
-            [("🚫 No, fue un dedazo", f"{PREFIJO}no")],
+            # Su propio dato: antes mandaba «no», el mismo de «Hoy no», y un
+            # dedazo cancelaba el corte de todo el día — sin propuesta, sin
+            # recordatorio ni cierre automático (auditoría 2026-11-07).
+            [("🚫 No, fue un dedazo", f"{PREFIJO}nada")],
         ]),
     )
 
@@ -260,6 +266,11 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
     from pos_uniformes.services.corte_caja_service import estado_caja, pagos_que_tocan_hoy
 
     accion, _, crudo = str(dato or "")[len(PREFIJO):].partition(":")
+
+    if accion == "nada":
+        # «Fue un dedazo»: solo se cierra la pregunta. El corte de hoy sigue
+        # como estaba (propuesta, recordatorio y cierre automático).
+        return "Ok", "Ok, no hice nada. El corte de hoy sigue en pie.\n\nCuando quieras, /corte.", ""
 
     if accion == "no":
         from pos_uniformes.services.corte_propuesta_service import cancelar
@@ -313,6 +324,19 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
             )
             session.commit()
         return ("Corte hecho" if resultado.hecho else ""), resultado.mensaje, ""
+
+    if accion == "ok" and crudo:
+        # «Hacer el corte y sacar $3,200»: se hace solo si siguen siendo $3,200.
+        mostrado = _cifra(crudo)
+        with session_factory() as session:
+            ahora_sale, fondo_ahora = crs.cifras_de_propuesta(session)
+        if mostrado is not None and abs(Decimal(ahora_sale) - mostrado) >= Decimal("1"):
+            return (
+                "Cambió la cifra",
+                f"Desde ese mensaje cambiaron los números: ahora saldrían {_pesos(ahora_sale)} "
+                f"(el botón decía {_pesos(mostrado)}). No hice el corte.\n\n¿Lo hago con la cifra de ahora?",
+                botones_de_propuesta(ahora_sale, fondo_ahora),
+            )
 
     if accion in ("ok", "ret", "fnd", "baja"):
         retirar = fondo = None

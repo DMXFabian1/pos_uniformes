@@ -493,7 +493,7 @@ class HacerElCorteDesdeLaPantallaDeCortesTests(unittest.TestCase):
             )
         self.assertEqual(aviso, "")
         self.assertIn("¿Hacemos el corte?", texto)
-        self.assertIn("cc:ok", self._datos(botones))
+        self.assertIn("cc:ok:2820.00", self._datos(botones))
 
     def test_desde_aqui_hay_camino_de_vuelta(self) -> None:
         """La propuesta de la tarde no trae «volver» porque llega sola."""

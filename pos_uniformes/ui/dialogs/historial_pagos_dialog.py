@@ -213,7 +213,9 @@ class HistorialPagosDialog(QDialog):
             return
         self.recargar()
         cuando = r["fecha_ultimo_pago"].strftime("%d/%m") if r.get("fecha_ultimo_pago") else "sin fecha"
-        self.totales_label.setText(f"Pago deshecho. Último pago de {r['employee_name']}: {cuando}.")
+        regresado = r.get("prestamo_regresado") or 0
+        extra = f" Su préstamo de ${regresado:,.2f} vuelve a estar pendiente." if regresado else ""
+        self.totales_label.setText(f"Pago deshecho. Último pago de {r['employee_name']}: {cuando}.{extra}")
 
     def pintar(self, pagos: list) -> None:
         from pos_uniformes.services.nomina_service import resumir_pagos_por_empleada

@@ -203,10 +203,21 @@ class DeshacerSoloElDeHoyTests(unittest.TestCase):
     def test_el_de_hoy_si(self):
         from pos_uniformes.services import nomina_service as nom
 
-        with patch.object(pg, "_nombre", return_value="Ana"), patch.object(nom, "deshacer_pago") as des:
+        with patch.object(pg, "_nombre", return_value="Ana"), \
+             patch.object(nom, "deshacer_pago", return_value={"prestamo_regresado": Decimal("0.00")}) as des:
             r = pg.deshacer_pago(self._ultimo(date(2026, 10, 10)), quien="VEND-1", hoy=date(2026, 10, 10))
         des.assert_called_once()
         self.assertIn("Deshecho", r)
+        self.assertNotIn("préstamo", r)
+
+    def test_dice_que_el_prestamo_vuelve_a_deberse(self):
+        """Auditoría 2026-11-07: el préstamo descontado se perdía al deshacer."""
+        from pos_uniformes.services import nomina_service as nom
+
+        with patch.object(pg, "_nombre", return_value="Ana"), \
+             patch.object(nom, "deshacer_pago", return_value={"prestamo_regresado": Decimal("500.00")}):
+            r = pg.deshacer_pago(self._ultimo(date(2026, 10, 10)), quien="VEND-1", hoy=date(2026, 10, 10))
+        self.assertIn("Su préstamo de $500.00 vuelve a estar pendiente", r)
 
 
 class RetiroRepetidoTests(unittest.TestCase):

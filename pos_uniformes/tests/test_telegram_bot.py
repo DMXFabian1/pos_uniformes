@@ -51,9 +51,26 @@ class LeerCifraTests(unittest.TestCase):
             with self.subTest(raro=raro):
                 self.assertIsNone(bot.leer_cifra(raro))
 
+    def test_punto_de_miles(self) -> None:
+        """«/retiro 1.500 gasolina» apuntaba $1.50 y «/corte 5.000» sacaba $5
+        sin preguntar (auditoría 2026-11-07)."""
+        self.assertEqual(bot.leer_cifra("1.500"), Decimal("1500.00"))
+        self.assertEqual(bot.leer_cifra("5.000"), Decimal("5000.00"))
+        self.assertEqual(bot.leer_cifra("$1.250.000"), Decimal("1250000.00"))
+        self.assertEqual(bot.leer_cifra("1.500,50"), Decimal("1500.50"))
+        self.assertEqual(bot.leer_opciones_corte("5.000").retirar, Decimal("5000.00"))
+
+    def test_tres_centavos_no_se_adivinan(self) -> None:
+        for raro in ("5000.500", "1.5.5", "12.3456", "1,500.505"):
+            with self.subTest(raro=raro):
+                self.assertIsNone(bot.leer_cifra(raro))
+
     def test_lo_de_siempre_sigue_igual(self) -> None:
         self.assertEqual(bot.leer_cifra("5000"), Decimal("5000.00"))
         self.assertEqual(bot.leer_cifra("5000.5"), Decimal("5000.50"))
+        self.assertEqual(bot.leer_cifra("5000.50"), Decimal("5000.50"))
+        self.assertEqual(bot.leer_cifra("1.5"), Decimal("1.50"))
+        self.assertEqual(bot.leer_cifra(".50"), Decimal("0.50"))
 
 
 class AtenderTests(unittest.TestCase):

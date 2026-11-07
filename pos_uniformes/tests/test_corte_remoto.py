@@ -161,6 +161,43 @@ class NoSeRetiraMasDeLoQueHayTests(unittest.TestCase):
         self.assertIn("No hay tanto en el cajón", r.mensaje)
 
 
+    def _intentar(self, retirar, *, efectivo="4000", avisos=(), fondo=None):
+        estado = EstadoCaja(
+            desde=datetime(2026, 9, 9, 1, tzinfo=timezone.utc), hasta=_HASTA,
+            reactivo=Decimal("2000.00"),
+            resumen=ResumenPeriodo(5, 9, Decimal(efectivo), Decimal("0"), Decimal("0"), Decimal("0"), Decimal(efectivo)),
+            pagos=Decimal("0"),
+        )
+        with patch("pos_uniformes.services.corte_caja_service.estado_caja", return_value=estado), \
+             patch("pos_uniformes.services.corte_caja_service.pagos_que_tocan_hoy", return_value=list(avisos)), \
+             patch("pos_uniformes.services.corte_caja_service.ultimo_corte", return_value=None), \
+             patch("pos_uniformes.services.corte_caja_service.cerrar_corte_automatico") as cerrar, \
+             patch("pos_uniformes.services.corte_caja_service.cargar_parametros", return_value=SimpleNamespace(ocultar_tarjeta=False)):
+            cerrar.side_effect = RuntimeError("lo dejó pasar")
+            try:
+                r = crs.hacer_corte_y_avisar(MagicMock(), creado_por="VEND-1", ahora=_HASTA,
+                                             retirar=Decimal(retirar), fondo=fondo)
+            except RuntimeError:
+                return None
+        return r
+
+    def test_el_fondo_y_la_nomina_de_hoy_no_se_pueden_sacar(self) -> None:
+        """Fondo $2,000, efectivo $4,000, nómina de hoy $1,400: «/corte 5500»
+        pasaba (5,500 ≤ 6,000) y declaraba una venta de $6,900 (auditoría
+        2026-11-07). Lo más que se puede sacar es 4,000 − 1,400 = $2,600."""
+        nomina = [SimpleNamespace(employee_name="Fanny Ruiz", total_estimado=Decimal("1400"))]
+        r = self._intentar("5500", avisos=nomina)
+        self.assertIsNotNone(r)
+        self.assertFalse(r.hecho)
+        self.assertIn("lo más que se puede sacar es $2,600.00", r.mensaje)
+        self.assertIn("pagos de hoy $1,400.00", r.mensaje)
+        self.assertIsNone(self._intentar("2600", avisos=nomina))   # justo lo que hay: pasa
+
+    def test_dejar_menos_fondo_deja_sacar_mas(self) -> None:
+        self.assertIsNone(self._intentar("5000", fondo=Decimal("1000")))   # 6,000 − 1,000
+        self.assertFalse(self._intentar("5001", fondo=Decimal("1000")).hecho)
+
+
 class DosCortesElMismoDiaTests(unittest.TestCase):
     def _correr(self, nota=None):
         estado = _estado()

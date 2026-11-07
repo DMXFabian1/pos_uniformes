@@ -294,7 +294,12 @@ def deshacer_pago(session, pago_id: int, *, creado_por: str) -> dict:
             EmpleadaEvento.employee_code == code, EmpleadaEvento.fecha == pago.fecha, EmpleadaEvento.tipo == PAGO
         ).all():
             session.delete(ev)
-    resumen = {"employee_code": code, "employee_name": pago.employee_name, "fecha": pago.fecha, "total": pago.total, "fecha_ultimo_pago": fecha_restaurada}
+    # El préstamo que este pago había descontado vuelve a deberse.
+    from pos_uniformes.services.prestamos_service import regresar_cobrados
+
+    prestamo_regresado = regresar_cobrados(session, int(pago.id))
+    resumen = {"employee_code": code, "employee_name": pago.employee_name, "fecha": pago.fecha, "total": pago.total,
+               "fecha_ultimo_pago": fecha_restaurada, "prestamo_regresado": prestamo_regresado}
     session.delete(pago)
     session.commit()
     return resumen

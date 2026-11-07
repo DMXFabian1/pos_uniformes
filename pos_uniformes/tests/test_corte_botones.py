@@ -28,11 +28,11 @@ def _etiquetas(botones: str) -> list[str]:
 class LaPropuestaTests(unittest.TestCase):
     def test_lo_normal_es_un_solo_toque(self) -> None:
         datos = _datos(cb.botones_de_propuesta(Decimal("2820"), Decimal("1000")))
-        self.assertIn("cc:ok", datos)
+        self.assertIn("cc:ok:2820.00", datos)   # lleva la cifra que dice (2026-11-07)
 
     def test_estan_las_cuatro_salidas(self) -> None:
         datos = _datos(cb.botones_de_propuesta(Decimal("2820"), Decimal("1000")))
-        for esperado in ("cc:ok", "cc:bajar", "cc:fondo", "cc:cajon", "cc:no"):
+        for esperado in ("cc:ok:2820.00", "cc:bajar", "cc:fondo", "cc:cajon", "cc:no"):
             self.assertIn(esperado, datos, esperado)
 
     def test_el_texto_ya_no_dicta_comandos(self) -> None:
@@ -371,6 +371,19 @@ class UnDedazoNoDebeHacerUnCorteTests(unittest.TestCase):
         self.assertIn("¿Hago el corte con la nota «abc»?", texto)
         self.assertIn("cc:nota:abc", _datos(botones))
 
+    def test_el_dedazo_no_cancela_el_corte_del_dia(self) -> None:
+        """«🚫 No, fue un dedazo» mandaba el mismo dato que «Hoy no» y
+        cancelaba el corte de todo el día (auditoría 2026-11-07)."""
+        _, botones, _ = self._responder("/corte abc")
+        self.assertIn("cc:nada", _datos(botones))
+        self.assertNotIn("cc:no", _datos(botones))
+        with patch("pos_uniformes.services.corte_propuesta_service.cancelar") as cancelar:
+            aviso, texto, botones = cb.atender("cc:nada", session_factory=self.factory, quien="VEND-1")
+        cancelar.assert_not_called()
+        self.assertIn("no hice nada", texto)
+        self.assertIn("sigue en pie", texto)
+        self.assertEqual(botones, "")
+
     def test_avisa_lo_que_va_a_pasar_si_dice_que_sí(self) -> None:
         texto, _, _ = self._responder("/corte abc")
         self.assertIn("$460", texto)
@@ -432,8 +445,9 @@ class UnDedazoNoDebeHacerUnCorteTests(unittest.TestCase):
         self.assertEqual(aviso, "Corte hecho")
         self.assertEqual(hacer.call_args.kwargs["nota"], "depósito")
 
-    def test_el_dedazo_se_cancela_con_el_boton_de_siempre(self) -> None:
-        self.assertIn("cc:no", _datos(self._responder("/corte abc")[1]))
+    def test_el_dedazo_tiene_su_propio_boton(self) -> None:
+        # Antes reusaba «cc:no» (Hoy no) y cancelaba el corte del día.
+        self.assertIn("cc:nada", _datos(self._responder("/corte abc")[1]))
 
 
 class DesdeElCajonSeVuelveTests(unittest.TestCase):
@@ -453,3 +467,58 @@ class DesdeElCajonSeVuelveTests(unittest.TestCase):
             _, texto, botones = cb.atender("cc:cajon", session_factory=factory, quien="VEND-1")
         self.assertIn("cc:volver", _datos(botones))
         self.assertIn("Volver a la propuesta", texto)
+
+
+class BotonesQueYaNoValenTests(unittest.TestCase):
+    """Auditoría 2026-11-07: los botones de dinero seguían vivos hasta que la
+    limpieza borraba el mensaje, y actuaban con las cifras del momento."""
+
+    def test_un_boton_de_dinero_de_otro_dia_ya_no_hace_nada(self) -> None:
+        from datetime import datetime, timedelta, timezone
+
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        tz = timezone(timedelta(hours=-6))
+        ahora = datetime(2026, 11, 7, 8, 30, tzinfo=tz)
+        anoche = datetime(2026, 11, 6, 17, 30, tzinfo=tz).timestamp()
+        hoy = datetime(2026, 11, 7, 8, 0, tzinfo=tz).timestamp()
+        for dato in ("cc:no", "cc:ok:3200.00", "cj:pago:12", "pr:si:4", "co:aj:9", "m:pagarok:VEND-6:1412.00"):
+            with self.subTest(dato=dato):
+                texto = bot.boton_vencido(dato, anoche, ahora)
+                self.assertIsNotNone(texto)
+                self.assertIn("es del 06/11", texto)
+                self.assertIsNone(bot.boton_vencido(dato, hoy, ahora))
+        # Lo que no mueve dinero (el menú, ver los avisos) sigue funcionando.
+        self.assertIsNone(bot.boton_vencido("m:raiz", anoche, ahora))
+        self.assertIsNone(bot.boton_vencido("m:pagar:VEND-6", anoche, ahora))
+
+    def test_el_corte_se_hace_solo_con_la_cifra_del_boton(self) -> None:
+        from unittest.mock import MagicMock
+
+        from pos_uniformes.services import corte_remoto_service as crs
+
+        botones = cb.botones_de_propuesta(Decimal("3200"), Decimal("1000"))
+        self.assertIn("cc:ok:3200.00", _datos(botones))
+
+        class _F:
+            def __call__(self):
+                return self
+
+            def __enter__(self):
+                return MagicMock()
+
+            def __exit__(self, *a):
+                return False
+
+        with patch.object(crs, "cifras_de_propuesta", return_value=(Decimal("4100.00"), Decimal("1000"))), \
+             patch.object(crs, "hacer_corte_y_avisar") as hacer:
+            aviso, texto, botones = cb.atender("cc:ok:3200.00", session_factory=_F(), quien="VEND-1")
+        hacer.assert_not_called()
+        self.assertIn("ahora saldrían $4,100", texto)
+        self.assertIn("cc:ok:4100.00", _datos(botones))
+
+        with patch.object(crs, "cifras_de_propuesta", return_value=(Decimal("3200.40"), Decimal("1000"))), \
+             patch.object(crs, "hacer_corte_y_avisar") as hacer:
+            hacer.return_value = MagicMock(hecho=True, mensaje="corte hecho")
+            cb.atender("cc:ok:3200.00", session_factory=_F(), quien="VEND-1")
+        hacer.assert_called_once()
