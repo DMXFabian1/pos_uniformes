@@ -65,11 +65,12 @@ def _preparar_base():
 # ---------------------------------------------------------------------------
 
 NIVEL_ORDER = ["Preescolar", "Primaria", "Secundaria", "Bachillerato"]
+# Más suaves que antes (2026-11-07): distinguen el nivel sin gritar.
 NIVEL_COLORS = {
-    "Preescolar": "#7c4dff",
-    "Primaria": "#2979ff",
-    "Secundaria": "#00bfa5",
-    "Bachillerato": "#ff6d00",
+    "Preescolar": "#8a6bbf",
+    "Primaria": "#4a7fb8",
+    "Secundaria": "#3a9a8a",
+    "Bachillerato": "#c9733a",
 }
 PIEZA_ORDER = [
     "Pants 3pz", "Pants 2pz", "Pants Suelto", "Chamarra", "Playera",
@@ -305,40 +306,15 @@ def compute_insights(stats, school_levels, pieces_raw, catalog_rows, catalog_col
         detail = " · ".join(f"{p} ({cnt}/{n_school_levels})" for p, cnt in low_pieces)
         insights.append(("info", "Piezas con menor cobertura entre escuelas", detail))
 
-    # ── Stock analysis ─────────────────────────────────────────────────
-    stock_by_product = defaultdict(lambda: {"stock": 0, "variants": 0, "name": "", "school": ""})
-    zero_stock_products = 0
-    total_products = 0
-    zero_stock_schools: set[str] = set()
-    for row in catalog_rows:
-        pid = row[col_idx["producto_id"]]
-        vid = row[col_idx["variante_id"]]
-        if vid is None:
-            continue
-        if not row[col_idx["v_activo"]]:
-            continue
-        eid = row[col_idx["escuela_id"]]
-        ename = row[col_idx["escuela"]]
-        nivel = row[col_idx["nivel"]]
-        display = f"{ename} {nivel}" if eid in multi_level_ids else ename
-        p = stock_by_product[pid]
-        p["stock"] += row[col_idx["stock_actual"]] or 0
-        p["variants"] += 1
-        p["name"] = row[col_idx["nombre_base"]]
-        p["school"] = display
-
-    for pid, p in stock_by_product.items():
-        total_products += 1
-        if p["stock"] == 0:
-            zero_stock_products += 1
-            zero_stock_schools.add(p["school"])
-
-    if zero_stock_products > 0:
-        pct = round(zero_stock_products / total_products * 100)
-        with_stock = total_products - zero_stock_products
-        insights.append(("alert",
-                         f"{zero_stock_products} de {total_products} productos sin stock ({pct}%)",
-                         f"{with_stock} productos con inventario · {len(zero_stock_schools)} escuelas afectadas"))
+    # ── Lo agotado: la MISMA cifra de Disponibilidad (2026-11-07) ──────
+    d = DISPONIBILIDAD
+    if d.get("agotadas"):
+        insights.append((
+            "alert",
+            f"{d['agotadas']:,} tallas agotadas en {d['prendas_con_faltantes']} prendas",
+            f"{d['escuelas_con_faltantes']} escuelas con faltantes · cobertura {d['cobertura']}% "
+            "· el detalle está en Disponibilidad",
+        ))
 
     return insights, coverage_data
 
@@ -347,6 +323,10 @@ def compute_insights(stats, school_levels, pieces_raw, catalog_rows, catalog_col
 # HTML Section builders
 # ---------------------------------------------------------------------------
 
+def _dinero_corto(v: float) -> str:
+    return f"${v/1_000_000:.1f}M" if v >= 1_000_000 else f"${v/1000:.0f}K" if v >= 1000 else f"${v:,.0f}"
+
+
 def build_resumen(stats, insights, coverage_data, valor_por_nivel=None):
     niveles = stats["por_nivel"]
     total_escuelas = stats["escuelas"]
@@ -354,13 +334,21 @@ def build_resumen(stats, insights, coverage_data, valor_por_nivel=None):
 
     # ── Row 1: KPIs principales ──
     valor_inv = stats["valor_inventario"]
-    valor_str = f"${valor_inv/1_000_000:.1f}M" if valor_inv >= 1_000_000 else f"${valor_inv/1000:.0f}K" if valor_inv >= 1000 else f"${valor_inv:,.0f}"
+    valor_str = _dinero_corto(valor_inv)
+    # Los dos valores no cuadraban a simple vista ($4.5M arriba, $2.4M por
+    # nivel): la diferencia es lo que no es de una escuela. Se dice (2026-11-07).
+    valor_escuela = sum((valor_por_nivel or {}).values())
+    valor_sub = (
+        f"{_dinero_corto(valor_escuela)} uniformes de escuela · "
+        f"{_dinero_corto(max(valor_inv - valor_escuela, 0))} básicos y ropa"
+        if valor_escuela else "precio de venta"
+    )
     h.append('<div class="res-kpi-row">')
     kpis = [
         (f'{stats["escuelas"]}', "Escuelas", "school", "activas"),
         (f'{stats["productos"]:,}', "Productos", "product", "activos"),
         (f'{stats["stock_tienda"]:,}', "Piezas en tienda", "stock", f'{stats["stock_total"]:,} total'),
-        (valor_str, "Valor inventario", "valor", "precio de venta"),
+        (valor_str, "Valor del inventario", "valor", valor_sub),
     ]
     for val, label, cls, sub in kpis:
         h.append(f'<div class="res-kpi {cls}"><div class="res-kpi-val">{val}</div>'
@@ -393,24 +381,26 @@ def build_resumen(stats, insights, coverage_data, valor_por_nivel=None):
     h.append('</div></div>')
 
     # -- Col B: Salud del inventario --
-    v_total = stats["variantes_con_escuela"]
-    v_sin = stats["variantes_sin_stock"]
-    v_bajo = stats["variantes_bajo_min"]
+    # Las mismas tallas que cuenta Disponibilidad (uniformes de escuela, sin
+    # las tallas que se desactivaron con doble clic).
+    v_total = DISPONIBILIDAD.get("tallas", stats["variantes_con_escuela"])
+    v_sin = DISPONIBILIDAD.get("agotadas", stats["variantes_sin_stock"])
+    v_bajo = DISPONIBILIDAD.get("bajo", stats["variantes_bajo_min"])
     v_ok = v_total - v_sin - v_bajo
     pct_ok = round(v_ok / v_total * 100) if v_total else 0
     pct_bajo = round(v_bajo / v_total * 100) if v_total else 0
     pct_sin = (100 - pct_ok - pct_bajo) if v_total else 0
     h.append('<div class="res-card">')
-    h.append('<div class="res-card-title">Salud del inventario</div>')
+    h.append('<div class="res-card-title">Salud del inventario <span class="res-card-hint">tallas de uniforme de escuela · igual que Disponibilidad</span></div>')
     h.append(f'<div class="res-stacked-bar">'
              f'<div class="res-sb-seg ok" style="width:{pct_ok}%" title="OK: {v_ok:,}"></div>'
              f'<div class="res-sb-seg bajo" style="width:{pct_bajo}%" title="Bajo mínimo: {v_bajo:,}"></div>'
-             f'<div class="res-sb-seg sin" style="width:{pct_sin}%" title="Sin stock: {v_sin:,}"></div>'
+             f'<div class="res-sb-seg sin" style="width:{pct_sin}%" title="Agotadas: {v_sin:,}"></div>'
              f'</div>')
     h.append('<div class="res-legend">')
-    h.append(f'<span class="res-leg-item"><span class="res-leg-dot ok"></span>OK <b>{v_ok:,}</b></span>')
+    h.append(f'<span class="res-leg-item"><span class="res-leg-dot ok"></span>Completas <b>{v_ok:,}</b></span>')
     h.append(f'<span class="res-leg-item"><span class="res-leg-dot bajo"></span>Bajo mínimo <b>{v_bajo:,}</b></span>')
-    h.append(f'<span class="res-leg-item"><span class="res-leg-dot sin"></span>Sin stock <b>{v_sin:,}</b></span>')
+    h.append(f'<span class="res-leg-item"><span class="res-leg-dot sin"></span>Agotadas <b>{v_sin:,}</b></span>')
     h.append('</div></div>')
     h.append('</div>')  # close res-two-col
 
@@ -422,7 +412,7 @@ def build_resumen(stats, insights, coverage_data, valor_por_nivel=None):
     valor_total_nivel = sum(vpn.values()) or 1
     h.append('<div class="res-card">')
     valor_total_str = f"${valor_total_nivel/1_000_000:.1f}M" if valor_total_nivel >= 1_000_000 else f"${valor_total_nivel/1000:.0f}K"
-    h.append(f'<div class="res-card-title">Valor por nivel <span class="res-card-badge" style="background:var(--green-bg);color:var(--green)">{valor_total_str}</span></div>')
+    h.append(f'<div class="res-card-title">Uniformes de escuela, por nivel <span class="res-card-badge" style="background:var(--brand-light);color:var(--brand)">{valor_total_str}</span></div>')
     for nivel in NIVEL_ORDER:
         val = vpn.get(nivel, 0)
         if val == 0:
@@ -793,6 +783,10 @@ def chip_de_salud(estado):
     )
 
 
+#: Las cifras de Disponibilidad, para que el Resumen diga las mismas (ver build_variants).
+DISPONIBILIDAD: dict = {}
+
+
 def build_variants(catalog_rows, catalog_cols, multi_level_ids, estados=None):
     col_idx = {c: i for i, c in enumerate(catalog_cols)}
 
@@ -898,15 +892,26 @@ def build_variants(catalog_rows, catalog_cols, multi_level_ids, estados=None):
                 productos_criticos += 1
 
     cobertura_pct = round((total_tallas - tallas_agotadas) / total_tallas * 100) if total_tallas > 0 else 0
+    # El Resumen y las alertas dicen ESTOS mismos números (2026-11-07): antes el
+    # Resumen contaba 1,230 «sin stock», Disponibilidad 1,192 «agotadas» y la
+    # alerta «61 productos», cada uno con su propia regla.
+    DISPONIBILIDAD.clear()
+    DISPONIBILIDAD.update(
+        tallas=total_tallas, agotadas=tallas_agotadas, bajo=tallas_bajo,
+        prendas_con_faltantes=productos_criticos, cobertura=cobertura_pct,
+        escuelas_con_faltantes=sum(
+            1 for sdata in schools.values() if any(p["agotadas"] for p in sdata["products"].values())
+        ),
+    )
 
     h = []
 
     # ── Stats bar ──
     _cob_color = "var(--green)" if cobertura_pct >= 80 else "var(--orange)" if cobertura_pct >= 50 else "var(--red)"
     h.append('<div class="disp-stats">')
-    h.append(f'<div class="disp-stat agotado"><div class="disp-stat-val">{tallas_agotadas}</div><div class="disp-stat-label">Agotadas</div></div>')
+    h.append(f'<div class="disp-stat agotado"><div class="disp-stat-val">{tallas_agotadas}</div><div class="disp-stat-label">Tallas agotadas</div></div>')
     h.append(f'<div class="disp-stat bajo"><div class="disp-stat-val">{tallas_bajo}</div><div class="disp-stat-label">Bajo mínimo</div></div>')
-    h.append(f'<div class="disp-stat critico"><div class="disp-stat-val">{productos_criticos}</div><div class="disp-stat-label">Con faltantes</div></div>')
+    h.append(f'<div class="disp-stat critico"><div class="disp-stat-val">{productos_criticos}</div><div class="disp-stat-label">Prendas con faltantes</div></div>')
     h.append(f'<div class="disp-stat cob"><div class="disp-stat-val" style="color:{_cob_color}">{cobertura_pct}%</div><div class="disp-stat-label">Cobertura</div></div>')
     h.append('</div>')
 
@@ -1062,136 +1067,57 @@ def build_mapa():
     )
 
 
-def build_conteo(school_levels):
-    """Genera la pestaña de conteo de inventario (interactiva via QWebChannel)."""
-    # Cada escuela-nivel es una entrada separada en el selector
-    schools = []
-    for sl in school_levels:
-        eid = sl["escuela_id"]
-        nid = sl.get("nivel_id") or 0
-        display = sl.get("display_name", sl["escuela_nombre"])
-        nivel = sl.get("nivel_nombre", "")
-        schools.append((eid, nid, display, nivel))
-    schools.sort(key=lambda x: x[2])
+def build_conteo(estados):
+    """«Cómo van los conteos»: solo lectura (2026-11-07).
 
-    h = []
-
-    # Fallback for browser mode
-    h.append('<div id="conteo-fallback" style="display:none">')
-    h.append('<div class="section-card" style="text-align:center;padding:40px">')
-    h.append('<h3 style="color:var(--text-muted)">Conteo de inventario</h3>')
-    h.append('<p style="color:var(--text-muted)">Esta funcionalidad solo esta disponible dentro de la aplicacion POS.</p>')
-    h.append('</div></div>')
-
-    h.append('<div id="conteo-app">')
-
-    # ── Top controls ──
-    h.append('<div class="filter-bar" style="flex-wrap:wrap;gap:10px;align-items:center">')
-    h.append('<div style="display:flex;align-items:center;gap:8px">')
-    h.append('<label style="font-weight:600;font-size:13px">Escuela:</label>')
-    h.append('<select id="conteo-escuela" onchange="conteoLoadEscuela()" class="filter-select" style="min-width:220px">')
-    h.append('<option value="">— Seleccionar escuela —</option>')
-    h.append('<option value="basicos" data-nivel="">📦 Productos Básicos</option>')
-    for eid, nid, display, nivel in schools:
-        h.append(f'<option value="{eid}:{nid}" data-nivel="{_esc(nivel)}">{_esc(display)}</option>')
-    h.append('</select>')
-    h.append('<select id="conteo-tipo-pieza" onchange="conteoFilterTipoPieza()" class="filter-select" style="min-width:160px;display:none">')
-    h.append('<option value="">Todos los tipos</option>')
-    h.append('</select>')
+    Esta pestaña era el conteo VIEJO (registrar y ajustar desde el POS), con
+    otro modelo que las jornadas del kiosko: dos formas de contar la misma
+    tienda. El conteo se hace en el kiosko (Conteos → gafete); aquí se ve cómo
+    va cada escuela, con el mismo semáforo del mapa y de Disponibilidad
+    (`escuela_estado_service`)."""
+    estados = list((estados or {}).values())
+    orden = {"rojo": 0, "ambar": 1, "verde": 2}
+    estados.sort(key=lambda e: (orden.get(e.salud, 3), -e.faltan_de_contar, e.nombre.lower()))
+    cuantas = {k: sum(1 for e in estados if e.salud == k) for k in orden}
+    h = ['<div class="cnt-wrap">']
+    h.append('<div class="cnt-head"><div><div class="cnt-title">Cómo van los conteos</div>'
+             '<div class="cnt-sub">El conteo se hace en el kiosko: <b>Conteos</b> → tu gafete → la escuela. '
+             'Aquí solo se ve cómo va cada una.</div></div>'
+             '<input type="text" id="cntBuscar" class="disp-search cnt-buscar" placeholder="Buscar escuela…" '
+             'oninput="cntFiltrar()"></div>')
+    h.append('<div class="disp-stats">')
+    for clave, titulo, clase in (("rojo", "No sabemos qué hay", "agotado"), ("ambar", "Le falta contarse", "bajo"),
+                                 ("verde", "Al día", "ok")):
+        h.append(f'<div class="disp-stat {clase}"><div class="disp-stat-val">{cuantas[clave]}</div>'
+                 f'<div class="disp-stat-label">{titulo}</div></div>')
     h.append('</div>')
-    h.append('<div style="display:flex;align-items:center;gap:8px">')
-    h.append('<label style="font-weight:600;font-size:13px">Contado por:</label>')
-    h.append('<input type="text" id="conteo-por" placeholder="Nombre" class="search-box" style="min-width:140px;flex:0">')
-    h.append('</div>')
-    h.append('<button class="btn btn-outline" onclick="conteoImprimirHojas()" id="conteo-print-btn" disabled style="margin-left:auto">🖨 Hojas de conteo</button>')
-    h.append('<button class="btn" onclick="conteoGuardar()" id="conteo-guardar-btn" disabled>Guardar conteo</button>')
-    h.append('</div>')
-
-    # ── Sub-tabs ──
-    h.append('<div id="conteo-subtabs" style="display:none;margin-bottom:14px;gap:6px">')
-    h.append('<button class="btn btn-sm btn-outline active" onclick="conteoShowSubtab(\'contar\')" data-subtab="contar">Contar</button>')
-    h.append('<button class="btn btn-sm btn-outline" onclick="conteoShowSubtab(\'pendientes\')" data-subtab="pendientes">Pendientes <span id="conteo-pendientes-badge" style="display:none;background:var(--red);color:#fff;border-radius:99px;padding:0 6px;font-size:10px;margin-left:4px"></span></button>')
-    h.append('<button class="btn btn-sm btn-outline" onclick="conteoShowSubtab(\'historial\')" data-subtab="historial">Historial</button>')
-    h.append('</div>')
-
-    # ── Estado card with progress ──
-    h.append('<div id="conteo-estado" class="section-card" style="display:none">')
-    h.append('<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">')
-    h.append('<div id="conteo-estado-info" style="flex:1;font-size:13px"></div>')
-    h.append('<div style="display:flex;align-items:center;gap:8px">')
-    h.append('<label style="font-size:12px;color:var(--text-muted)">Vigencia (dias):</label>')
-    h.append('<input type="number" id="conteo-vigencia" min="1" max="365" value="90" style="width:60px;padding:4px;border-radius:var(--radius-xs);border:1px solid var(--border);font-size:12px;background:var(--card-bg);color:var(--text)">')
-    h.append('<button class="btn btn-sm btn-outline" onclick="conteoGuardarConfig()" style="font-size:11px;padding:3px 8px">Guardar</button>')
-    h.append('</div>')
-    h.append('</div>')
-    # Session progress bar
-    h.append('<div id="conteo-progress" style="margin-top:12px">')
-    h.append('<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">')
-    h.append('<span id="conteo-progress-text" style="color:var(--text-muted)">0 de 0 productos contados</span>')
-    h.append('<span id="conteo-progress-pct" style="font-weight:700;color:var(--brand)">0%</span>')
-    h.append('</div>')
-    h.append('<div style="height:8px;width:100%;background:var(--border-light);border-radius:99px;overflow:hidden">')
-    h.append('<div id="conteo-progress-fill" style="height:100%;background:var(--brand);width:0%;transition:width 0.4s cubic-bezier(0.4,0,0.2,1);border-radius:99px"></div>')
-    h.append('</div>')
-    h.append('</div>')
-    h.append('</div>')
-
-    # ── Panel: Contar ──
-    h.append('<div id="conteo-panel-contar" class="conteo-subtab-panel" style="display:none">')
-    # Search & filters
-    h.append('<div class="filter-bar" style="gap:8px;margin-bottom:14px">')
-    h.append('<input type="text" id="conteo-search" placeholder="Buscar producto o SKU..." class="search-box" oninput="conteoFilterProducts()">')
-    h.append('<button class="btn btn-sm btn-outline active" onclick="conteoSetFilter(\'todos\',this)" data-filter="todos">Todos</button>')
-    h.append('<button class="btn btn-sm btn-outline" onclick="conteoSetFilter(\'sincontar\',this)" data-filter="sincontar">Sin contar</button>')
-    h.append('<button class="btn btn-sm btn-outline" onclick="conteoSetFilter(\'diferencia\',this)" data-filter="diferencia">Con diferencia</button>')
-    h.append('</div>')
-    # Adjust prompt (hidden)
-    h.append('<div id="conteo-adjust-prompt" class="section-card conteo-adjust-prompt" style="display:none">')
-    h.append('<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">')
-    h.append('<span id="conteo-adjust-msg" style="font-size:13px"></span>')
-    h.append('<button class="btn btn-sm" onclick="conteoApplyAdjustments()">Si, ajustar stock</button>')
-    h.append('<button class="btn btn-sm btn-outline" onclick="conteoDismissPrompt()">No, ver pendientes</button>')
-    h.append('</div>')
-    h.append('</div>')
-    # Product cards container
-    h.append('<div id="conteo-products-container"></div>')
-    h.append('</div>')
-
-    # ── Panel: Pendientes ──
-    h.append('<div id="conteo-panel-pendientes" class="conteo-subtab-panel" style="display:none">')
-    h.append('<div class="section-card" style="padding:20px">')
-    # Toolbar
-    h.append('<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">')
-    h.append('<div style="display:flex;align-items:center;gap:10px">')
-    h.append('<h3 style="margin:0;font-size:17px">Conteos pendientes de ajuste</h3>')
-    h.append('<span id="conteo-pendientes-count" class="meta-chip" style="background:var(--red-bg,#fbe9e7);color:var(--red)"></span>')
-    h.append('</div>')
-    h.append('<div style="display:flex;gap:8px;align-items:center">')
-    h.append('<label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="conteo-select-all" onchange="conteoToggleAll(this)"> Seleccionar todos</label>')
-    h.append('<button class="btn btn-sm" onclick="conteoConfirmarAjustes()" id="conteo-ajustar-btn" disabled style="white-space:nowrap">Confirmar seleccionados</button>')
-    h.append('</div>')
-    h.append('</div>')
-    # Cards container
-    h.append('<div id="conteo-pendientes-container"></div>')
-    h.append('<div id="conteo-pendientes-empty" style="display:none;text-align:center;padding:40px;color:var(--text-muted)">')
-    h.append('<span style="font-size:32px">✅</span><p style="margin-top:8px">Sin conteos pendientes de ajuste</p></div>')
-    h.append('</div>')
-    h.append('</div>')
-
-    # ── Panel: Historial ──
-    h.append('<div id="conteo-panel-historial" class="conteo-subtab-panel" style="display:none">')
-    h.append('<div class="section-card" style="padding:20px">')
-    h.append('<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">')
-    h.append('<h3 style="margin:0;font-size:17px">Historial de conteos</h3>')
-    h.append('<span id="conteo-historial-count" class="meta-chip" style="color:var(--text-muted)"></span>')
-    h.append('</div>')
-    h.append('<div id="conteo-historial-container"></div>')
-    h.append('<div id="conteo-historial-empty" style="display:none;text-align:center;padding:40px;color:var(--text-muted)">')
-    h.append('<span style="font-size:32px">📋</span><p style="margin-top:8px">Sin historial de conteos</p></div>')
-    h.append('</div>')
-    h.append('</div>')
-
-    h.append('</div>')  # close conteo-app
+    if not estados:
+        h.append('<div class="section-card" style="text-align:center;padding:30px;color:var(--text-muted)">'
+                 'No se pudo leer cómo van los conteos.</div></div>')
+        return "\n".join(h)
+    h.append('<div class="section-card" style="padding:0;overflow:hidden"><table class="cnt-table"><thead><tr>'
+             '<th>Escuela</th><th>Cómo va</th><th>Tallas al día</th><th>Se contó</th><th>Contando ahora</th>'
+             '<th class="num">Agotadas</th></tr></thead><tbody>')
+    for e in estados:
+        color = SALUD_COLOR.get(e.salud, "#777")
+        pct = e.pct_al_dia
+        barra = f'<div class="cnt-bar"><div class="cnt-fill" style="width:{pct}%;background:{color}"></div></div>'
+        h.append(
+            f'<tr class="cnt-row" data-nombre="{_esc(e.nombre.lower())}">'
+            f'<td class="cnt-escuela">{_esc(e.nombre)}</td>'
+            f'<td><span class="cnt-chip" style="border-color:{color};color:{color}">● {_esc(e.titular)}</span></td>'
+            f'<td>{barra}<span class="cnt-pct">{e.al_dia} de {e.tallas}</span></td>'
+            f'<td>{_esc(e.ultimo_conteo.texto())}</td>'
+            f'<td>{_esc(e.quien_en_proceso) or "—"}</td>'
+            f'<td class="num">{e.agotadas}</td></tr>'
+        )
+    h.append('</tbody></table></div></div>')
+    h.append("""<script>
+function cntFiltrar() {
+  const q = (document.getElementById('cntBuscar').value || '').toLowerCase();
+  document.querySelectorAll('.cnt-row').forEach(r => { r.style.display = r.dataset.nombre.includes(q) ? '' : 'none'; });
+}
+</script>""")
     return "\n".join(h)
 
 
@@ -1201,6 +1127,7 @@ def build_conteo(school_levels):
 
 def generate_html(resumen, pieces, tariffs, variants, conteo, mapa):
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
+    generado_iso = datetime.now().astimezone().isoformat(timespec="seconds")
     return f"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -1210,7 +1137,8 @@ def generate_html(resumen, pieces, tariffs, variants, conteo, mapa):
 <style>
 /* ============ RESET & BASE ============ */
 :root {{
-    --brand: #87492c; --brand-light: #f5ebe0; --brand-dark: #5c3019;
+    /* Vino y terracota, como el kiosko y el POS (2026-11-07). */
+    --brand: #6b1f3a; --brand-light: #f5ebe0; --brand-dark: #4a1428; --accent: #a84f2d;
     --bg: #f7f5f2; --card-bg: #ffffff; --text: #1a1a1a; --text-muted: #6b7280;
     --border: #e5e5e5; --border-light: #f0ede8;
     --green: #16a34a; --green-bg: #dcfce7; --red: #dc2626; --red-bg: #fef2f2;
@@ -1236,10 +1164,10 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sys
 
 /* ============ LAYOUT ============ */
 .topbar {{
-    background: linear-gradient(135deg, var(--brand) 0%, var(--brand-dark) 100%);
+    background: linear-gradient(120deg, #6b1f3a 0%, #a84f2d 70%, #c96a35 100%);
     color: white; padding: 0 24px; height: 56px; display: flex; align-items: center;
     justify-content: space-between; position: sticky; top: 0; z-index: 100;
-    box-shadow: 0 2px 12px rgba(135,73,44,0.3);
+    box-shadow: 0 2px 12px rgba(107,31,58,0.25);
 }}
 .topbar h1 {{ font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }}
 .topbar .brand-accent {{ font-weight: 300; opacity: 0.8; }}
@@ -1278,14 +1206,14 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sys
 .res-kpi-row {{ display:grid; grid-template-columns:repeat(4, 1fr); gap:14px; margin-bottom:16px; }}
 .res-kpi {{ background:var(--card-bg); border-radius:var(--radius); padding:18px 20px;
     box-shadow:var(--shadow); border-left:4px solid var(--border); }}
-.res-kpi.school {{ border-left-color:var(--purple); }}
-.res-kpi.product {{ border-left-color:var(--blue); }}
+.res-kpi.school {{ border-left-color:var(--brand); }}
+.res-kpi.product {{ border-left-color:var(--accent); }}
 .res-kpi.stock {{ border-left-color:var(--green); }}
 .res-kpi.valor {{ border-left-color:var(--brand); }}
 .res-kpi-val {{ font-size:28px; font-weight:800; letter-spacing:-1px; }}
-.res-kpi.school .res-kpi-val {{ color:var(--purple); }}
-.res-kpi.product .res-kpi-val {{ color:var(--blue); }}
-.res-kpi.stock .res-kpi-val {{ color:var(--green); }}
+.res-kpi.school .res-kpi-val {{ color:var(--text); --x:var(--purple); }}
+.res-kpi.product .res-kpi-val {{ color:var(--text); --x:var(--blue); }}
+.res-kpi.stock .res-kpi-val {{ color:var(--text); --x:var(--green); }}
 .res-kpi.valor .res-kpi-val {{ color:var(--brand); }}
 .res-kpi-label {{ font-size:13px; font-weight:600; color:var(--text-muted); margin-top:2px; }}
 .res-kpi-sub {{ font-size:11px; color:var(--text-muted); }}
@@ -1567,12 +1495,12 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sys
     box-shadow:var(--shadow); text-align:center; border-bottom:3px solid transparent; }}
 .disp-stat.agotado {{ border-bottom-color:var(--red); }}
 .disp-stat.bajo {{ border-bottom-color:var(--orange); }}
-.disp-stat.critico {{ border-bottom-color:var(--red); }}
-.disp-stat.cob {{ border-bottom-color:var(--brand); }}
+.disp-stat.critico {{ border-bottom-color:#e08b1e; }}
+.disp-stat.cob {{ border-bottom-color:var(--green); }}
 .disp-stat-val {{ font-size:22px; font-weight:800; letter-spacing:-0.5px; }}
 .disp-stat.agotado .disp-stat-val {{ color:var(--red); }}
 .disp-stat.bajo .disp-stat-val {{ color:var(--orange); }}
-.disp-stat.critico .disp-stat-val {{ color:var(--red); }}
+.disp-stat.critico .disp-stat-val {{ color:#c27712; }}
 .disp-stat-label {{ font-size:11px; font-weight:600; color:var(--text-muted); margin-top:2px; text-transform:uppercase; letter-spacing:.3px; }}
 
 .disp-filter-bar {{ display:flex; gap:10px; margin-bottom:16px; align-items:center; }}
@@ -1701,6 +1629,29 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sys
     .collapsed .card-body {{ display: block !important; }}
     .kpi-card:hover, .product-card:hover, .school-card:hover {{ transform: none; box-shadow: var(--shadow); }}
 }}
+/* ============ 2026-11-07: frescura, conteos de solo lectura ============ */
+.topbar-fresh {{ font-size: 12px; font-weight: 700; padding: 5px 12px; border-radius: 99px;
+    background: rgba(255,255,255,0.16); border: 1px solid rgba(255,255,255,0.28); }}
+.topbar-fresh.vieja {{ background: #fff4d6; color: #7a5b00; border-color: #f0d98c; }}
+.res-card-hint {{ font-size: 11px; font-weight: 500; color: var(--text-muted); }}
+.cnt-head {{ display:flex; justify-content:space-between; align-items:flex-end; gap:16px; margin-bottom:14px; }}
+.cnt-title {{ font-size:20px; font-weight:800; }}
+.cnt-sub {{ font-size:13px; color:var(--text-muted); margin-top:2px; }}
+.cnt-buscar {{ max-width:260px; }}
+.cnt-table {{ width:100%; border-collapse:collapse; }}
+.cnt-table th {{ background:var(--brand); color:#fff; text-align:left; font-size:11px; letter-spacing:.4px;
+    text-transform:uppercase; padding:9px 12px; }}
+.cnt-table td {{ padding:9px 12px; border-bottom:1px solid var(--border-light); font-size:13px; }}
+.cnt-table tr:hover td {{ background:var(--brand-light); }}
+.cnt-table .num {{ text-align:right; }}
+.cnt-escuela {{ font-weight:700; }}
+.cnt-chip {{ border:1px solid; border-radius:99px; padding:2px 9px; font-size:11px; font-weight:700; white-space:nowrap; }}
+.cnt-bar {{ display:inline-block; width:90px; height:8px; background:var(--border-light); border-radius:99px;
+    overflow:hidden; vertical-align:middle; margin-right:8px; }}
+.cnt-fill {{ height:100%; border-radius:99px; }}
+.cnt-pct {{ font-size:12px; color:var(--text-muted); }}
+.disp-stat.ok {{ border-bottom-color:var(--green); }}
+.disp-stat.ok .disp-stat-val {{ color:var(--green); }}
 </style>
 </head>
 <body>
@@ -1708,7 +1659,7 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sys
 <div class="topbar">
     <h1>MAXIMODA <span class="brand-accent">— Panel de Uniformes</span></h1>
     <div class="topbar-right">
-        <span class="topbar-date">{now}</span>
+        <span class="topbar-fresh" id="frescura" data-generado="{generado_iso}" title="Generado el {now}">Actualizado el {now}</span>
         <button class="theme-toggle" onclick="toggleTheme()" id="themeBtn" title="Cambiar tema">🌙</button>
     </div>
 </div>
@@ -1719,7 +1670,7 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sys
     <div class="nav-tab" onclick="showTab('piezas')">Piezas</div>
     <div class="nav-tab" onclick="showTab('tarifarios')">Tarifarios</div>
     <div class="nav-tab" onclick="showTab('variantes')">Disponibilidad</div>
-    <div class="nav-tab" onclick="showTab('conteo')">Conteo</div>
+    <div class="nav-tab" onclick="showTab('conteo')">Conteos</div>
 </div>
 
 <div class="page">
@@ -1760,6 +1711,18 @@ function cargarMapaSiHace(id) {{
 }}
 
 document.addEventListener('DOMContentLoaded', () => cargarMapaSiHace('mapa'));
+// «Actualizado hace 3 h»: el Panel es una foto; que se note de cuándo (2026-11-07).
+function pintarFrescura() {{
+    const el = document.getElementById('frescura');
+    if (!el) return;
+    const min = Math.max(0, Math.round((Date.now() - new Date(el.dataset.generado)) / 60000));
+    const txt = min < 1 ? 'recién' : min < 60 ? `hace ${{min}} min` : min < 60 * 24 ? `hace ${{Math.round(min / 60)}} h`
+        : `hace ${{Math.round(min / 1440)}} día${{Math.round(min / 1440) === 1 ? '' : 's'}}`;
+    el.textContent = 'Actualizado ' + txt;
+    el.classList.toggle('vieja', min >= 60 * 12);
+}}
+document.addEventListener('DOMContentLoaded', pintarFrescura);
+setInterval(pintarFrescura, 60000);
 
 function showTab(id) {{
     cargarMapaSiHace(id);
@@ -2913,6 +2876,9 @@ def main():
      catalog_cols, valor_por_nivel, estados) = fetch_all_data()
     print(f"  {stats['escuelas']} escuelas, {stats['productos']} productos, {stats['variantes_activas']} variantes")
 
+    # Disponibilidad primero: sus cifras son las que dicen el Resumen y las alertas.
+    variants = build_variants(catalog_rows, catalog_cols, multi_level_ids, estados)
+
     print("Calculando insights...")
     insights, coverage_data = compute_insights(stats, school_levels, pieces_raw, catalog_rows, catalog_cols, multi_level_ids)
 
@@ -2922,8 +2888,7 @@ def main():
     resumen = build_resumen(stats, insights, coverage_data, valor_por_nivel)
     pieces = build_pieces(school_levels, pieces_raw, multi_level_ids, default_na)
     tariffs = build_tariffs(catalog_rows, catalog_cols, multi_level_ids)
-    variants = build_variants(catalog_rows, catalog_cols, multi_level_ids, estados)
-    conteo = build_conteo(school_levels)
+    conteo = build_conteo(estados)
     mapa = build_mapa()
 
     html = generate_html(resumen, pieces, tariffs, variants, conteo, mapa)
