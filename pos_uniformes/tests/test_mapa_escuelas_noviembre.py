@@ -70,14 +70,32 @@ class PlantillaDelMapaTests(unittest.TestCase):
 
     def test_leyenda_filtro_y_paleta(self) -> None:
         self.assertIn("CÓMO SE LEE", self.plantilla)
-        self.assertIn('id="selSalud"', self.plantilla)
+        self.assertIn('id="semaforo"', self.plantilla)
         self.assertIn("F.salud && saludDe(e) !== F.salud", self.plantilla)
         self.assertNotIn("#6b543c", self.plantilla)
         self.assertIn('Pre: "#8a6bbf"', self.plantilla)
 
+    def test_la_barra_ordenada(self) -> None:
+        """La barra (2026-11-07): niveles en tarjetas que filtran, semáforo con su
+        número (cada registro del POS cuenta una vez), filtros raros guardados."""
+        self.assertIn('id="niveles"', self.plantilla)
+        self.assertIn('"pos:" + e.pos', self.plantilla)
+        self.assertIn('<details class="mas" id="masFiltros">', self.plantilla)
+        self.assertNotIn('id="selSalud"', self.plantilla)
+        self.assertNotIn('id="chipsNivel"', self.plantilla)
+        # el estado en la lista: borde de su color y una línea, no un segundo punto
+        self.assertIn("d.style.borderLeftColor = SALUD[salud]", self.plantilla)
+        cuerpo = self.plantilla.split("<script>", 1)[0]
+        self.assertLess(cuerpo.index('id="niveles"'), cuerpo.index('id="semaforo"'))
+        self.assertLess(cuerpo.index('id="semaforo"'), cuerpo.index('id="masFiltros"'))
+
     def test_el_mapa_generado_es_la_plantilla_con_datos(self) -> None:
         self.assertIn("const ESCUELAS = [", self.mapa)
         self.assertNotIn("/*__DATOS__*/", self.mapa)
+        # y está al día con la plantilla: lo de antes y después de los datos, igual
+        antes, despues = self.plantilla.split("/*__DATOS__*/")
+        self.assertTrue(self.mapa.startswith(antes))
+        self.assertTrue(self.mapa.endswith(despues))
 
     def test_estados_pos_js_no_va_en_git(self) -> None:
         gitignore = (MAPAS.parent / ".gitignore").read_text(encoding="utf-8")

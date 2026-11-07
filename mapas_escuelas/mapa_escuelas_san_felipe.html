@@ -10,12 +10,42 @@
   html, body { margin: 0; height: 100%; font-family: -apple-system, "Segoe UI", sans-serif; }
   #app { display: flex; height: 100%; }
   #map { flex: 1; }
-  #panel { width: 350px; overflow-y: auto; background: #faf6ef; border-left: 1px solid #d8cbb8; padding: 12px 14px; box-sizing: border-box; }
-  h1 { font-size: 17px; margin: 0 0 2px; color: #4a3524; }
-  .sub { font-size: 11.5px; color: #8a7a66; margin-bottom: 8px; }
-  #buscador { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #d8cbb8; border-radius: 8px; font-size: 13px; background: #fff; margin-bottom: 8px; }
-  #compartidos { font-size: 11.5px; color: #6b1f3a; background: #f3ead9; border-radius: 8px; padding: 6px 9px; margin-bottom: 8px; line-height: 1.6; }
-  #cobertura { font-size: 11.5px; color: #6b1f3a; background: #f3ead9; border-radius: 8px; padding: 6px 9px; margin-bottom: 8px; line-height: 1.5; }
+  #panel { width: 360px; overflow-y: auto; background: #faf6ef; border-left: 1px solid #d8cbb8; padding: 0 14px 14px; box-sizing: border-box; }
+  .cabeza { position: sticky; top: 0; z-index: 5; background: #faf6ef; padding: 12px 0 8px; margin-bottom: 2px; border-bottom: 1px solid #ece2d2; }
+  .titulo { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  h1 { font-size: 17px; margin: 0; color: #6b1f3a; }
+  .sub { font-size: 11px; color: #8a7a66; margin: 1px 0 8px; }
+  #buscador { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #d8cbb8; border-radius: 8px; font-size: 13px; background: #fff; }
+  #buscador:focus { outline: 2px solid #6b1f3a33; border-color: #6b1f3a; }
+  .rotulo { font-size: 10.5px; font-weight: 700; letter-spacing: .6px; color: #8a7a66; text-transform: uppercase; margin: 12px 0 6px; display: flex; justify-content: space-between; }
+  .rotulo span { font-weight: 400; letter-spacing: 0; text-transform: none; }
+  #niveles { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+  .nv { background: #fff; border: 1px solid #e6dccc; border-radius: 10px; padding: 7px 9px 8px; cursor: pointer; user-select: none; transition: opacity .15s; }
+  .nv:hover { border-color: #cdbca3; }
+  .nv.off { opacity: .4; }
+  .nv-nombre { font-size: 11.5px; color: #5c4c39; display: flex; align-items: center; }
+  .nv-cifra { font-size: 17px; font-weight: 700; color: #3d2f20; margin: 1px 0 4px; }
+  .nv-cifra small { font-size: 11px; font-weight: 400; color: #8a7a66; }
+  .nv-barra { height: 4px; border-radius: 2px; background: #efe6d8; overflow: hidden; }
+  .nv-barra i { display: block; height: 100%; border-radius: 2px; }
+  #semaforo { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .sem { background: #fff; border: 1px solid #e6dccc; border-left: 4px solid; border-radius: 8px; padding: 5px 8px; cursor: pointer; user-select: none; }
+  .sem b { font-size: 16px; display: block; }
+  .sem span { font-size: 10.5px; color: #5c4c39; line-height: 1.2; display: block; }
+  .sem.on { background: #fdf3e8; box-shadow: 0 0 0 2px #6b1f3a; border-color: transparent; }
+  .sem.cero { opacity: .45; }
+  #compartidos { font-size: 11px; color: #5c4c39; margin-top: 6px; line-height: 1.5; }
+  #compartidos b { color: #3d2f20; }
+  details.mas { background: #fff; border: 1px solid #e6dccc; border-radius: 8px; padding: 0 9px; margin: 6px 0 0; }
+  details.mas[open] { padding-bottom: 8px; }
+  details.mas summary { text-transform: none; letter-spacing: 0; font-size: 12px; color: #5c4c39; padding: 7px 0; }
+  details.mas summary .activos { background: #6b1f3a; color: #fff; border-radius: 10px; padding: 0 7px; font-size: 10.5px; margin-left: 4px; }
+  .fila-res { display: flex; align-items: center; justify-content: space-between; margin: 10px 0 6px; }
+  .vista { display: flex; gap: 4px; margin-bottom: 10px; }
+  .vista button { flex: 1; padding: 6px 0; border: 1px solid #d8cbb8; border-radius: 7px; background: #fff; color: #5c4c39; font-size: 11.5px; cursor: pointer; }
+  .vista button:hover { border-color: #6b1f3a; color: #6b1f3a; }
+  .vista button.icono { flex: 0 0 36px; }
+  .link { background: none; border: none; color: #6b1f3a; font-size: 11.5px; cursor: pointer; padding: 0; text-decoration: underline; }
   .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
   .chip { font-size: 12px; padding: 4px 9px; border-radius: 20px; cursor: pointer; user-select: none; background: #fff; border: 1.5px solid transparent; color: #3d2f20; }
   .chips-tipo .chip { font-size: 11px; padding: 3px 8px; color: #5c4c39; }
@@ -28,20 +58,19 @@
   .switch { font-size: 12.5px; color: #5c4c39; cursor: pointer; user-select: none; margin-bottom: 6px; display: block; }
   select { font-size: 12px; padding: 4px 6px; border: 1px solid #d8cbb8; border-radius: 6px; background: #fff; color: #3d2f20; }
   #selLoc { width: 100%; box-sizing: border-box; padding: 6px 8px; margin-bottom: 6px; }
-  #resultado { font-size: 11.5px; color: #8a7a66; margin-bottom: 6px; }
-  .botones { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
-  .btn { flex: 1; min-width: 72px; padding: 7px 0; border: none; border-radius: 8px; background: #6b1f3a; color: #fff; font-size: 12px; cursor: pointer; }
-  .btn:hover { background: #55432f; }
-  .btn.sec { background: #a08f79; }
+  #resultado { font-size: 11.5px; color: #8a7a66; }
   .dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; box-sizing: border-box; }
   .dot.hueco { background: transparent !important; border: 2.5px solid; }
   details { margin-bottom: 6px; }
   summary { font-size: 12.5px; font-weight: 600; color: #6b1f3a; cursor: pointer; padding: 4px 2px; text-transform: uppercase; letter-spacing: .4px; }
   summary .cnt { color: #a08f79; font-weight: 400; }
-  .item { padding: 6px 9px; border-radius: 8px; margin-bottom: 4px; cursor: pointer; background: #fff; border: 1px solid #e6dccc; font-size: 12.5px; line-height: 1.3; }
+  .item { padding: 6px 9px; border-radius: 8px; margin-bottom: 4px; cursor: pointer; background: #fff; border: 1px solid #e6dccc; border-left: 4px solid #e6dccc; font-size: 12.5px; line-height: 1.3; }
   .item:hover { background: #f3ead9; }
   .item b { color: #3d2f20; font-weight: 600; }
+  .item.op { background: #fffdf9; }
+  .item.op b { font-weight: 500; color: #5c4c39; }
   .item .addr { color: #857662; font-size: 11px; margin-left: 17px; }
+  .item .como { font-size: 11px; font-weight: 600; margin: 2px 0 0 17px; }
   .prob { color: #b06a00; font-weight: 700; }
   .note { font-size: 11.5px; color: #8a7a66; background: #f3ead9; border-radius: 8px; padding: 8px 10px; margin-top: 8px; }
   .marker-cliente { border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 4px #0005; box-sizing: border-box; }
@@ -62,7 +91,7 @@
   .salud-cifras{font-size:11px;color:#5f594f;margin-top:2px}
   .salud-punto{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:middle}
   .leyenda-salud{font-size:11px;color:#5f594f;margin-top:4px}
-  #frescura{font-size:11.5px;font-weight:700;border-radius:8px;padding:5px 9px;margin-bottom:8px;background:#eef6ef;color:#2f6b3a}
+  #frescura{font-size:10.5px;font-weight:600;border-radius:10px;padding:1px 8px;background:#eef6ef;color:#2f6b3a}
   #frescura.vieja{background:#fff4d6;color:#7a5b00}
   .leyenda-mapa{background:#fffdf9;border:1px solid #e0d2bd;border-radius:10px;padding:8px 10px;font:11.5px system-ui,sans-serif;color:#3d2f20;box-shadow:0 1px 4px #0002;line-height:1.7}
   .leyenda-mapa b{font-size:11px;letter-spacing:.4px;color:#6b1f3a}
@@ -73,17 +102,20 @@
 <div id="app">
   <div id="map"></div>
   <div id="panel">
-    <h1>Escuelas de San Felipe</h1>
-    <div class="sub">Cabecera + comunidades cliente · directorio SEP</div>
-    <div id="frescura"></div>
-    <input id="buscador" type="search" placeholder="Buscar escuela, comunidad o CCT…">
-    <div id="cobertura"></div>
+    <div class="cabeza">
+      <div class="titulo"><h1>Escuelas de San Felipe</h1></div>
+      <div class="sub">Cabecera + comunidades cliente · directorio SEP</div>
+      <input id="buscador" type="search" placeholder="Buscar escuela, comunidad o CCT…">
+    </div>
+    <div class="rotulo">Cobertura en el pueblo <span>toca para filtrar</span></div>
+    <div id="niveles"></div>
+    <div class="rotulo">Cómo van los conteos <span id="frescura"></span></div>
+    <div id="semaforo"></div>
     <div id="compartidos"></div>
-    <div class="chips" id="chipsNivel"></div>
-    <div class="chips chips-tipo" id="chipsTipo"></div>
+    <div class="rotulo">Qué escuelas ver</div>
     <div class="seg" id="segModo">
       <div data-m="todas">Todas</div>
-      <div data-m="clientes">Solo clientes</div>
+      <div data-m="clientes">Clientes</div>
       <div data-m="oportunidades">Oportunidades</div>
     </div>
     <div id="distWrap" style="display:none">A menos de
@@ -95,28 +127,28 @@
         <option value="10">10 km</option>
       </select> de un cliente tuyo
     </div>
-    <label class="switch"><input type="checkbox" id="swRural"> Mostrar escuelas rurales (resto del municipio)</label>
-    <select id="selLoc"><option value="">Todas las comunidades</option></select>
-    <select id="selSeg" style="width:100%; box-sizing:border-box; padding:6px 8px; margin-bottom:6px">
-      <option value="">Seguimiento: todas</option>
-      <option value="sin">Sin contactar</option>
-      <option value="contactada">📞 Contactadas</option>
-      <option value="platica">🤝 En plática</option>
-      <option value="ganada">⭐ Ganadas</option>
-      <option value="no">✖ No les interesa</option>
-    </select>
-    <select id="selSalud" style="width:100%; box-sizing:border-box; padding:6px 8px; margin-bottom:6px">
-      <option value="">Cómo va el conteo: todas</option>
-      <option value="rojo">🔴 No sabemos qué hay</option>
-      <option value="ambar">🟠 Le falta contarse</option>
-      <option value="verde">🟢 Al día</option>
-    </select>
-    <div id="resultado"></div>
-    <div class="botones">
-      <button class="btn" id="btnPueblo">Ver pueblo</button>
-      <button class="btn" id="btnTodo">Ver municipio</button>
-      <button class="btn" id="btnPrint">Imprimir</button>
-      <button class="btn sec" id="btnLimpiar">Limpiar filtros</button>
+    <details class="mas" id="masFiltros">
+      <summary>Más filtros<span class="activos" id="masActivos" style="display:none"></span></summary>
+      <div class="chips chips-tipo" id="chipsTipo"></div>
+      <label class="switch"><input type="checkbox" id="swRural"> Mostrar escuelas rurales (resto del municipio)</label>
+      <select id="selLoc"><option value="">Todas las comunidades</option></select>
+      <select id="selSeg" style="width:100%; box-sizing:border-box; padding:6px 8px">
+        <option value="">Seguimiento: todas</option>
+        <option value="sin">Sin contactar</option>
+        <option value="contactada">📞 Contactadas</option>
+        <option value="platica">🤝 En plática</option>
+        <option value="ganada">⭐ Ganadas</option>
+        <option value="no">✖ No les interesa</option>
+      </select>
+    </details>
+    <div class="fila-res">
+      <div id="resultado"></div>
+      <button class="link" id="btnLimpiar">Quitar filtros</button>
+    </div>
+    <div class="vista">
+      <button id="btnPueblo">Ver el pueblo</button>
+      <button id="btnTodo">Ver el municipio</button>
+      <button id="btnPrint" class="icono" title="Imprimir el mapa">🖨</button>
     </div>
     <div id="listas"></div>
     <div class="note" id="pendientes"></div>
@@ -369,7 +401,15 @@ function aplica() {
   });
   document.getElementById("distWrap").style.display = F.modo === "oportunidades" ? "" : "none";
   document.getElementById("resultado").textContent =
-    `Mostrando ${vis.length} de ${ESCUELAS.length} escuelas`;
+    `${vis.length} de ${ESCUELAS.length} escuelas`;
+  // «Más filtros» dice cuántos tiene puestos, para que no se olviden cerrados.
+  const extras = Object.values(F.tipos).filter(v => !v).length + (F.niveles.Otro ? 0 : 1) +
+    (F.rural ? 1 : 0) + (F.loc ? 1 : 0) + (F.seg ? 1 : 0);
+  const masAct = document.getElementById("masActivos");
+  masAct.textContent = extras;
+  masAct.style.display = extras ? "" : "none";
+  document.getElementById("btnLimpiar").style.visibility =
+    (textoBusqueda || JSON.stringify(F) !== JSON.stringify(DEFAULTS)) ? "visible" : "hidden";
   persiste();
 }
 
@@ -385,8 +425,49 @@ function creaChips(contId, claves, textos, colores, grupo) {
     cont.appendChild(ch);
   });
 }
-creaChips("chipsNivel", Object.keys(NIVEL), NIVEL, C, "niveles");
 creaChips("chipsTipo", Object.keys(TIPOS_CHIP), TIPOS_CHIP, null, "tipos");
+creaChips("chipsTipo", ["Otro"], NIVEL, C, "niveles");
+
+// ---- Niveles: la cobertura en el pueblo, y cada tarjeta filtra su nivel ----
+(() => {
+  const cab = ESCUELAS.filter(e => esCabecera(e) && e.nivel !== "Otro");
+  const cont = document.getElementById("niveles");
+  ["Pre", "Pri", "Sec", "Bach"].forEach(nv => {
+    const del = cab.filter(e => e.nivel === nv);
+    const cl = del.filter(e => e.cliente).length;
+    const pct = del.length ? Math.round(100 * cl / del.length) : 0;
+    const d = document.createElement("div");
+    d.className = "nv";
+    d.dataset.k = nv; d.dataset.g = "niveles";
+    d.title = `${cl} de ${del.length} escuelas del pueblo son clientes · toca para ${"mostrar u ocultar"} ${NIVEL[nv].toLowerCase()}`;
+    d.innerHTML = `<div class="nv-nombre"><span class="dot" style="background:${C[nv]}"></span>${NIVEL[nv]}</div>` +
+      `<div class="nv-cifra">${cl}<small> de ${del.length} clientes</small></div>` +
+      `<div class="nv-barra"><i style="width:${pct}%;background:${C[nv]}"></i></div>`;
+    d.onclick = () => { F.niveles[nv] = !F.niveles[nv]; d.classList.toggle("off", !F.niveles[nv]); aplica(); };
+    cont.appendChild(d);
+  });
+})();
+
+// ---- Semáforo: cuántas escuelas en cada color; tocar uno filtra ----
+const SEM_TXT = { rojo: "no sabemos qué hay", ambar: "les falta contarse", verde: "al día" };
+function pintaSalud() {
+  document.querySelectorAll(".sem").forEach(x => x.classList.toggle("on", x.dataset.s === F.salud));
+}
+(() => {
+  const cont = document.getElementById("semaforo");
+  ["rojo", "ambar", "verde"].forEach(s => {
+    // Un registro del POS que cubre varios planteles (SABES son 13) cuenta una
+    // vez: si no, «18 no sabemos qué hay» serían 5 escuelas y SABES 13 veces.
+    const n = new Set(ESCUELAS.filter(e => saludDe(e) === s).map(e => comparteEstado(e) ? "pos:" + e.pos : e.cct)).size;
+    const d = document.createElement("div");
+    d.className = "sem" + (n ? "" : " cero");
+    d.dataset.s = s;
+    d.style.borderLeftColor = SALUD[s];
+    d.innerHTML = `<b style="color:${SALUD[s]}">${n}</b><span>${SEM_TXT[s]}</span>`;
+    d.onclick = () => { F.salud = F.salud === s ? "" : s; pintaSalud(); aplica(); };
+    cont.appendChild(d);
+  });
+})();
 
 // ---- Selector de modo ----
 function pintaModo() {
@@ -434,21 +515,27 @@ grupos.forEach((g, gi) => {
   det.innerHTML = `<summary>${etiqueta.get(g)} <span class="cnt">(${arr.length})</span></summary>`;
   arr.forEach(e => {
     const d = document.createElement("div");
-    d.className = "item";
+    d.className = "item" + (e.cliente ? "" : " op");
     const dotCls = e.cliente ? "dot" : "dot hueco";
     const style = e.cliente ? `background:${C[e.nivel]}` : `border-color:${C[e.nivel]}`;
     const extraNv = TIPO_TXT[e.tipo] ? ` · ${TIPO_TXT[e.tipo]}` : "";
     const al = e.alumnos ? `${e.alumnos} al. · ` : "";
     const salud = saludDe(e);
     const prestado = comparteEstado(e);
-    const estilo = prestado
-      ? `background:transparent;box-shadow:inset 0 0 0 2px ${SALUD[salud]}`
-      : `background:${SALUD[salud]}`;
     const titulo = SALUD_TXT[salud] + (prestado ? ` (de ${e.pos}, ${e.estado.comparten} planteles)` : "");
-    const pinta = salud ? `<span class="salud-punto" style="${estilo}" title="${titulo}"></span>` : "";
-    d.innerHTML = `<span class="${dotCls}" style="${style}"></span>` + pinta +
+    // El estado ya no es un segundo puntito: borde izquierdo de su color y, si
+    // no está al día, dicho en una línea (2026-11-07).
+    if (salud) {
+      d.style.borderLeftColor = SALUD[salud];
+      if (prestado) d.style.borderLeftStyle = "dashed";
+      d.title = titulo;
+    }
+    const como = salud && salud !== "verde"
+      ? `<div class="como" style="color:${SALUD[salud]}">${e.estado.titular}${prestado ? ` · de ${e.pos}` : ""}</div>` : "";
+    d.innerHTML = `<span class="${dotCls}" style="${style}"></span>` +
       `<b>${e.probable ? '<span class="prob">~</span> ' : ""}${e.nombre}</b>` +
       `<span class="seg-tag">${SEG[e.cct] ? " " + ESTADOS[SEG[e.cct]] : ""}</span>` +
+      como +
       `<div class="addr">${al}${NIVEL[e.nivel]}${extraNv}${e.turno ? " · " + e.turno : ""}${e.domicilio ? " · " + e.domicilio : ""}</div>`;
     d.onclick = () => cluster.zoomToShowLayer(e._m, () => e._m.openPopup());
     e._fila = d;
@@ -473,17 +560,6 @@ selLoc.onchange = () => {
   else encuadra(esCabecera, 0.1);
 };
 document.getElementById("selSeg").onchange = ev => { F.seg = ev.target.value; aplica(); };
-document.getElementById("selSalud").onchange = ev => { F.salud = ev.target.value; aplica(); };
-
-// ---- Cobertura (cabecera, fija) ----
-(() => {
-  const cab = ESCUELAS.filter(e => esCabecera(e) && e.nivel !== "Otro");
-  const partes = ["Pre", "Pri", "Sec", "Bach"].map(nv => {
-    const del = cab.filter(e => e.nivel === nv);
-    return `<span style="color:${C[nv]};font-weight:700">●</span> ${NIVEL[nv]} ${del.filter(e => e.cliente).length}/${del.length}`;
-  });
-  document.getElementById("cobertura").innerHTML = "<b>Cobertura en el pueblo:</b><br>" + partes.join(" · ");
-})();
 
 // ---- Clientes que cubren varios planteles ----
 // Su estado no está en ningún punto del mapa (pintarlo repetiría el mismo aviso
@@ -495,9 +571,9 @@ document.getElementById("selSalud").onchange = ev => { F.salud = ev.target.value
   });
   const caja = document.getElementById("compartidos");
   if (!vistos.size) { caja.style.display = "none"; return; }
-  caja.innerHTML = "<b>Clientes de varios planteles:</b><br>" + [...vistos.entries()].map(
+  caja.innerHTML = [...vistos.entries()].map(
     ([nombre, s]) => `<span class="salud-punto" style="background:${SALUD[s.salud]}"></span>` +
-      `<b>${nombre}</b> (${s.comparten} planteles) — ${s.titular}`
+      `<b>${nombre}</b> · ${s.comparten} planteles · ${s.titular}`
   ).join("<br>");
 })();
 
@@ -505,14 +581,16 @@ document.getElementById("selSalud").onchange = ev => { F.salud = ev.target.value
 (() => {
   const el = document.getElementById("frescura");
   if (!ESTADO_FRESCO || !ESTADO_FRESCO.generado) {
-    el.textContent = "Conteos: del día que se generó el mapa (sin actualizar)";
+    el.textContent = "sin actualizar";
+    el.title = "Es el estado del día que se generó el mapa";
     el.classList.add("vieja");
     return;
   }
   const min = Math.max(0, Math.round((Date.now() - new Date(ESTADO_FRESCO.generado)) / 60000));
   const txt = min < 1 ? "recién" : min < 60 ? `hace ${min} min` : min < 1440 ? `hace ${Math.round(min / 60)} h`
     : `hace ${Math.round(min / 1440)} día${Math.round(min / 1440) === 1 ? "" : "s"}`;
-  el.textContent = `Conteos actualizados ${txt}`;
+  el.textContent = txt;
+  el.title = `Conteos actualizados ${txt}`;
   el.classList.toggle("vieja", min >= 60 * 12);
 })();
 
@@ -553,13 +631,13 @@ window.addEventListener("afterprint", () => map.invalidateSize());
 
 // ---- Sincronizar controles con el estado (carga y Limpiar) ----
 function sincronizaUI() {
-  document.querySelectorAll(".chip").forEach(ch => ch.classList.toggle("off", !F[ch.dataset.g][ch.dataset.k]));
+  document.querySelectorAll("[data-g]").forEach(ch => ch.classList.toggle("off", !F[ch.dataset.g][ch.dataset.k]));
   pintaModo();
+  pintaSalud();
   document.getElementById("selDist").value = String(F.dist);
   document.getElementById("swRural").checked = F.rural;
   selLoc.value = F.loc;
   document.getElementById("selSeg").value = F.seg || "";
-  document.getElementById("selSalud").value = F.salud || "";
 }
 document.getElementById("btnLimpiar").onclick = () => {
   F = JSON.parse(JSON.stringify(DEFAULTS));
