@@ -215,10 +215,10 @@ QPlainTextEdit#cortesTicket { background: #ffffff; border: 1px solid #e6dccb; bo
         self.tabla = QTableWidget(0, len(COLUMNAS))
         self.tabla.setObjectName("libretaTabla")
         self.tabla.setHorizontalHeaderLabels(list(COLUMNAS))
-        # Las cifras se leen completas; solo Periodo y Nota se estiran.
+        # Las cifras y el periodo se leen completos; solo la Nota se estira
+        # (con lo real asomado, el periodo se aplastaba a «…»).
         encabezado = self.tabla.horizontalHeader()
         encabezado.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
-        encabezado.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         encabezado.setSectionResizeMode(len(COLUMNAS) - 1, QHeaderView.ResizeMode.Stretch)
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -255,15 +255,14 @@ QPlainTextEdit#cortesTicket { background: #ffffff; border: 1px solid #e6dccb; bo
         self.ajustar_button = QPushButton("✏️ Ajustar la venta")
         self.ajustar_button.setObjectName("libretaAccion")
         self.ajustar_button.setEnabled(False)
-        self.ajustar_button.setVisible(self._creado_por == "VEND-1")
         self.ajustar_button.clicked.connect(self.ajustar)
 
         # Quitar el ajuste: la cifra oficial vuelve a ser la real (pruebas).
         self.sin_ajuste_button = QPushButton("↩ Quitar el ajuste")
         self.sin_ajuste_button.setObjectName("libretaAccion")
         self.sin_ajuste_button.setEnabled(False)
-        self.sin_ajuste_button.setVisible(self._creado_por == "VEND-1")
         self.sin_ajuste_button.clicked.connect(self.quitar_ajuste)
+        self._pintar_botones_de_ajuste()
 
         self.delete_button = QPushButton("🗑 Borrar corte")
         self.delete_button.setObjectName("libretaAccionBorrar")
@@ -327,9 +326,10 @@ QPlainTextEdit#cortesTicket { background: #ffffff; border: 1px solid #e6dccb; bo
         self._cifras_widgets = []
         if t is None:
             return
+        efectivo = t.venta_real if self._modo_real else t.venta      # lo real solo con Ctrl+Shift+R
         for titulo, valor, pie, acento in (
             ("Cortes del mes", str(t.cortes), "", False),
-            ("Vendido", f"${t.vendido:,.2f}", f"efectivo ${t.venta_real:,.2f} + tarjeta ${t.tarjeta:,.2f}", True),
+            ("Vendido", f"${(efectivo + t.tarjeta):,.2f}", f"efectivo ${efectivo:,.2f} + tarjeta ${t.tarjeta:,.2f}", True),
             ("Pagos a empleadas", f"${t.pagos:,.2f}", "", False),
             ("Gastos", f"${t.otros_retiros:,.2f}", "", False),
         ):
@@ -382,26 +382,44 @@ QPlainTextEdit#cortesTicket { background: #ffffff; border: 1px solid #e6dccb; bo
         if self._cortes:
             t = totales_cortes(self._cortes, tarjeta=getattr(self, "_tarjeta_mes", 0))
             self._pintar_cifras(t)
-            # «Vendido» = lo que de verdad se vendió: efectivo + tarjeta, sin el
-            # reactivo y sin los ajustes. Lo entregado va aparte, porque es otra
-            # pregunta (Daniel, 2026-10-01).
-            texto = (
-                f"{t.cortes} corte(s) en el mes · Vendido: ${t.vendido:,.2f}"
-                f"  (efectivo ${t.venta_real:,.2f} + tarjeta ${t.tarjeta:,.2f})"
-            )
-            if t.ajustes:
-                texto += f" · Entregado: ${t.venta:,.2f} (ajustado ${t.ajustes:,.2f})"
+            if self._modo_real:
+                # Ctrl+Shift+R: «Vendido» = lo que de verdad se vendió (efectivo
+                # real + tarjeta) y lo entregado con su ajuste, aparte (2026-10-01).
+                texto = (
+                    f"{t.cortes} corte(s) en el mes · Vendido: ${t.vendido:,.2f}"
+                    f"  (efectivo ${t.venta_real:,.2f} + tarjeta ${t.tarjeta:,.2f})"
+                )
+                if t.ajustes:
+                    texto += f" · Entregado: ${t.venta:,.2f} (ajustado ${t.ajustes:,.2f})"
+            else:
+                # A la vista, solo la cifra oficial: el ajuste no se asoma ni en
+                # el renglón ni en las tarjetas (Daniel, 2026-11-07).
+                texto = (
+                    f"{t.cortes} corte(s) en el mes · Vendido: ${(t.venta + t.tarjeta):,.2f}"
+                    f"  (efectivo ${t.venta:,.2f} + tarjeta ${t.tarjeta:,.2f})"
+                )
             texto += f" · Pagos a empleadas: ${t.pagos:,.2f} · Gastos: ${t.otros_retiros:,.2f}"
             self.totales_label.setText(texto)
         elif not self.totales_label.text().startswith("Sin conexión"):
             self.totales_label.setText("No hay cortes en este mes.")
 
     def alternar_modo_real(self) -> None:
-        """Ctrl+Shift+R: asoma lo real (lo vendido sin ajustes) y el ajuste."""
+        """Ctrl+Shift+R: asoma lo real (lo vendido sin ajustes), el ajuste y
+        los botones de ajustar. Sin la combinación, nada de eso se ve."""
         self._modo_real = not self._modo_real
         for col in COLUMNAS_OCULTAS:
             self.tabla.setColumnHidden(col, not self._modo_real)
         self.setWindowTitle("Cortes anteriores" + ("  ·  con lo real" if self._modo_real else ""))
+        self._pintar_botones_de_ajuste()
+        fila = self.tabla.currentRow()
+        self.pintar(self._cortes)
+        if 0 <= fila < self.tabla.rowCount():
+            self.tabla.selectRow(fila)
+
+    def _pintar_botones_de_ajuste(self) -> None:
+        es_dueno = self._creado_por == "VEND-1"
+        self.ajustar_button.setVisible(es_dueno and self._modo_real)
+        self.sin_ajuste_button.setVisible(es_dueno and self._modo_real)
 
     def corte_seleccionado(self):
         fila = self.tabla.currentRow()

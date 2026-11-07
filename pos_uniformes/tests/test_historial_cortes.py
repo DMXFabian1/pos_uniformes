@@ -401,3 +401,59 @@ class DialogTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ElAjusteNoSeAsomaTests(unittest.TestCase):
+    """2026-11-07, Daniel: «quiero que también ocultes el ajustado, y no se vea
+    hasta usar esa combinación» (Ctrl+Shift+R)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        from PyQt6.QtWidgets import QApplication
+
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _dialogo(self, creado_por="VEND-1"):
+        from pos_uniformes.ui.dialogs.historial_cortes_dialog import HistorialCortesDialog
+
+        with patch.object(HistorialCortesDialog, "recargar"):
+            dlg = HistorialCortesDialog(None, hoy=date(2026, 9, 9), creado_por=creado_por)
+        dlg._tarjeta_mes = Decimal("1200")
+        # Uno ajustado (12,980 contra 13,000 esperado) y uno sin ajuste.
+        dlg.pintar([_corte(creado_por="VEND-1"), _corte(id=2, creado_por="ENC-1", monto_final=Decimal("13000.00"))])
+        return dlg
+
+    def test_a_la_vista_solo_la_cifra_oficial(self) -> None:
+        from PyQt6.QtWidgets import QLabel
+
+        dlg = self._dialogo()
+        self.assertNotIn("ajustado", dlg.totales_label.text())
+        self.assertNotIn("Entregado", dlg.totales_label.text())
+        # oficial: (12980 − 11160 + 1390) + (13000 − 11160 + 1390) = 3210 + 3230 = 6440 + tarjeta 1200
+        self.assertIn("Vendido: $7,640.00", dlg.totales_label.text())
+        valores = [w.text() for w in dlg.findChildren(QLabel, "corteCifraValor")]
+        self.assertIn("$7,640.00", valores)
+        self.assertFalse(dlg.ajustar_button.isVisibleTo(dlg))
+        self.assertFalse(dlg.sin_ajuste_button.isVisibleTo(dlg))
+
+    def test_con_la_combinacion_sale_lo_real_el_ajuste_y_los_botones(self) -> None:
+        from PyQt6.QtWidgets import QLabel
+
+        dlg = self._dialogo()
+        dlg.alternar_modo_real()
+        self.assertIn("ajustado", dlg.totales_label.text())
+        self.assertIn("Entregado: $6,440.00", dlg.totales_label.text())
+        # real: 3230 + 3230 = 6460 + tarjeta 1200
+        self.assertIn("Vendido: $7,660.00", dlg.totales_label.text())
+        valores = [w.text() for w in dlg.findChildren(QLabel, "corteCifraValor")]
+        self.assertIn("$7,660.00", valores)
+        self.assertTrue(dlg.ajustar_button.isVisibleTo(dlg))
+        self.assertTrue(dlg.sin_ajuste_button.isVisibleTo(dlg))
+        dlg.alternar_modo_real()
+        self.assertNotIn("ajustado", dlg.totales_label.text())
+        self.assertFalse(dlg.ajustar_button.isVisibleTo(dlg))
+
+    def test_la_encargada_no_los_ve_ni_con_la_combinacion(self) -> None:
+        dlg = self._dialogo(creado_por="ENC-1")
+        dlg.alternar_modo_real()
+        self.assertFalse(dlg.ajustar_button.isVisibleTo(dlg))
