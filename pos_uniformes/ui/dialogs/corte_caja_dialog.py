@@ -897,7 +897,9 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
     try:
         from pos_uniformes.ui.helpers.ticket_routing_helper import route_tickets
 
-        route_tickets(parent, "Corte de caja", [texto])
+        from pos_uniformes.database.models import TipoTrabajo
+
+        route_tickets(parent, "Corte de caja", [texto], tipo=TipoTrabajo.CORTE)
     except Exception:  # noqa: BLE001 — el corte ya quedó guardado
         logger.exception("Corte: falló la impresión")
     return corte
@@ -1082,7 +1084,9 @@ def hacer_corte_automatico(parent: QWidget | None, *, creado_por: str):
     try:
         from pos_uniformes.ui.helpers.ticket_routing_helper import route_tickets
 
-        route_tickets(parent, "Corte de caja", [texto])
+        from pos_uniformes.database.models import TipoTrabajo
+
+        route_tickets(parent, "Corte de caja", [texto], tipo=TipoTrabajo.CORTE)
     except Exception:  # noqa: BLE001 — el corte ya quedó guardado
         logger.exception("Corte automático: falló la impresión")
     return resultado, texto

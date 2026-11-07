@@ -226,3 +226,76 @@ class LaVentanaTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ElCorteEligeSuImpresoraTests(unittest.TestCase):
+    """2026-11-06, Daniel: «¿también puedo elegir la impresora a donde enviar
+    el corte?». Ya se podía, pero el camino lo trataba como ticket: ofrecía
+    las PCs que imprimen TICKETS y lo encolaba como ticket. Ahora el corte
+    pregunta por las PCs que imprimen CORTES y entra a la cola como CORTE."""
+
+    def _ruteo(self, tipo, *, puede: bool):
+        from pos_uniformes.ui.helpers import ticket_routing_helper as rt
+
+        visto = {}
+
+        def _dialogo(parent, title, tickets, **kw):
+            visto["destinos"] = kw.get("destinos")
+            visto["enviar_a"] = kw.get("enviar_a")
+
+        pedidos = []
+        with patch("pos_uniformes.services.print_routing_cache_service.load_print_routing", lambda: ("local", "kiosko-1")), \
+                patch("pos_uniformes.services.print_routing_cache_service.puede_imprimir", lambda t: puede), \
+                patch.object(rt, "otras_impresoras_de_tickets", lambda t=None: pedidos.append(str(getattr(t, "value", t))) or []), \
+                patch("pos_uniformes.ui.dialogs.printable_text_dialog.open_tickets_print_dialog", _dialogo), \
+                patch.object(rt, "_enviar_al_satelite", lambda p, t, o, tipo=None: pedidos.append(f"cola:{tipo.value}") or True):
+            rt.route_tickets(None, "Corte de caja", ["CORTE"], tipo=tipo)
+        return pedidos, visto
+
+    def test_el_corte_pregunta_por_las_pcs_que_imprimen_cortes(self) -> None:
+        from pos_uniformes.database.models import TipoTrabajo
+
+        pedidos, _ = self._ruteo(TipoTrabajo.CORTE, puede=True)
+        self.assertEqual(pedidos, ["CORTE"])
+        pedidos, _ = self._ruteo(None, puede=True)
+        self.assertEqual(pedidos, ["TICKET"])                # lo de siempre para un ticket
+
+    def test_si_esta_pc_no_imprime_cortes_se_encola_como_corte(self) -> None:
+        from pos_uniformes.database.models import TipoTrabajo
+
+        pedidos, _ = self._ruteo(TipoTrabajo.CORTE, puede=False)
+        self.assertEqual(pedidos, ["cola:CORTE"])
+
+    def test_mandado_a_otra_pc_entra_a_la_cola_como_corte_dirigido(self) -> None:
+        from contextlib import contextmanager
+
+        from sqlalchemy import create_engine, select
+        from sqlalchemy.orm import Session
+        from sqlalchemy.pool import StaticPool
+
+        from pos_uniformes.database.connection import Base
+        from pos_uniformes.database.models import TipoTrabajo, Trabajo
+        from pos_uniformes.ui.helpers import ticket_routing_helper as rt
+
+        engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+        Base.metadata.create_all(engine)
+        s = Session(engine)
+
+        @contextmanager
+        def _sesion():
+            yield s
+
+        with patch("pos_uniformes.database.connection.get_session", _sesion):
+            n = rt.encolar_para("pc-principal", ["CORTE DE CAJA"], "kiosko-1", tipo=TipoTrabajo.CORTE)
+        self.assertEqual(n, 1)
+        trabajo = s.scalars(select(Trabajo)).one()
+        self.assertEqual((trabajo.tipo, trabajo.destino), (TipoTrabajo.CORTE, "pc-principal"))
+        s.close()
+
+    def test_el_corte_y_su_reimpresion_lo_piden_como_corte(self) -> None:
+        import inspect
+
+        from pos_uniformes.ui.dialogs import corte_caja_dialog, historial_cortes_dialog
+
+        self.assertEqual(inspect.getsource(corte_caja_dialog).count("tipo=TipoTrabajo.CORTE"), 2)
+        self.assertIn("tipo=TipoTrabajo.CORTE", inspect.getsource(historial_cortes_dialog))

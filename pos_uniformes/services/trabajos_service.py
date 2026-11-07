@@ -124,6 +124,7 @@ def enviar_corte(
     origen: str = "principal",
     prioridad: int = 0,
     creado_por: str = "SYSTEM",
+    destino: str | None = None,
 ) -> Trabajo:
     """Encola el ticket de un CORTE. Mismo contenido que un ticket, otro tipo.
 
@@ -134,7 +135,7 @@ def enviar_corte(
         raise ValueError("Un corte sin texto no se encola.")
     return encolar(
         session, TipoTrabajo.CORTE, {"texto": texto},
-        origen=origen, prioridad=prioridad, creado_por=creado_por,
+        origen=origen, prioridad=prioridad, creado_por=creado_por, destino=destino,
     )
 
 

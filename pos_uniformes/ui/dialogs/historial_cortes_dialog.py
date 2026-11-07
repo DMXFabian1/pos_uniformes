@@ -545,6 +545,8 @@ class HistorialCortesDialog(QDialog):
         try:
             from pos_uniformes.ui.helpers.ticket_routing_helper import route_tickets
 
-            route_tickets(self, "Corte de caja (reimpresión)", [texto])
+            from pos_uniformes.database.models import TipoTrabajo
+
+            route_tickets(self, "Corte de caja (reimpresión)", [texto], tipo=TipoTrabajo.CORTE)
         except Exception:  # noqa: BLE001
             logger.exception("Historial de cortes: falló la reimpresión")
