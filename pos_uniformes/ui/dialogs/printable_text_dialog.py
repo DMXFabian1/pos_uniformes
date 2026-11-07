@@ -542,8 +542,14 @@ def open_tickets_print_dialog(
     on_back: "Callable[[], None] | None" = None,
     destinos: "list[dict] | None" = None,
     enviar_a: "Callable[[str, list[str]], int] | None" = None,
+    aqui_imprime: bool = True,
 ) -> None:
     """Muestra uno o varios tickets en una sola vista.
+
+    aqui_imprime=False: esta PC no tiene con qué imprimir esto (p. ej. un
+    corte en una PC sin «Cortes de caja»), así que no hay ficha «Aquí»: se
+    elige a qué PC mandarlo, con la primera encendida ya marcada (Daniel,
+    2026-11-07: «el reimprimir corte también quiero que me dé a elegir»).
 
     destinos + enviar_a: las OTRAS PCs que imprimen tickets
     (`[{identificador, nombre, online}]`). Con alguna, sale «¿DÓNDE SE
@@ -725,7 +731,8 @@ def open_tickets_print_dialog(
             fila_destinos.addWidget(btn, 1)
             return btn
 
-        _ficha(AQUI, "🖨  Aquí\nla impresora de esta PC").setChecked(True)
+        if aqui_imprime:
+            _ficha(AQUI, "🖨  Aquí\nla impresora de esta PC").setChecked(True)
         for d in otras:
             _ficha(
                 d["identificador"],
@@ -733,6 +740,8 @@ def open_tickets_print_dialog(
                 bool(d.get("online")),
             )
         destinos_ly.addLayout(fila_destinos)
+        if not aqui_imprime:
+            seccion.setText("¿A QUÉ PC SE MANDA?  (esta no imprime esto)")
 
         def _elegir(ident: str) -> None:
             destino_elegido["id"] = ident
@@ -746,6 +755,13 @@ def open_tickets_print_dialog(
         for clave, btn in destino_botones.items():
             btn.clicked.connect(lambda _c=False, k=clave: _elegir(k))
         dialog.destino_botones = destino_botones   # para las pruebas
+        if not aqui_imprime:
+            primera = next((d["identificador"] for d in otras if d.get("online")), None)
+            if primera is not None:
+                _elegir(primera)
+            else:
+                print_button.setEnabled(False)
+                print_button.setText("Ninguna PC encendida")
 
     def _mandar_a_otra(textos: list[str]) -> bool:
         """Encola el ticket para la PC elegida. False si no se pudo (y lo dice)."""

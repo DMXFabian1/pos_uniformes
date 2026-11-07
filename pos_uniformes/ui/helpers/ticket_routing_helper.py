@@ -43,6 +43,20 @@ def route_tickets(
     _modo, origen = load_print_routing()
     # Por TIPO: ver label_routing_helper.
     if not puede_imprimir(tipo):
+        # Un corte se elige a dónde va aunque esta PC no lo imprima (Daniel,
+        # 2026-11-07): la ventana sale sin la ficha «Aquí». Los tickets de venta
+        # siguen yéndose solos a la cola: ahí no hay que decidir nada.
+        otras = otras_impresoras_de_tickets(tipo) if tipo == TipoTrabajo.CORTE else []
+        if otras:
+            from pos_uniformes.ui.dialogs.printable_text_dialog import open_tickets_print_dialog
+
+            open_tickets_print_dialog(
+                parent, title, tickets, unit_label=unit_label, alt_tickets=alt_tickets,
+                alt_checkbox_label=alt_checkbox_label, on_printed=on_printed, on_back=on_back,
+                destinos=otras, aqui_imprime=False,
+                enviar_a=lambda destino, textos: encolar_para(destino, textos, origen, tipo=tipo),
+            )
+            return
         # Sin diálogo no hay checkbox: al satélite siempre va el juego base.
         # Encolar exitosamente cuenta como "impreso" para on_printed.
         if _enviar_al_satelite(parent, tickets, origen, tipo=tipo) and on_printed is not None:

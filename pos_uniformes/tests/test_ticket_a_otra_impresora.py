@@ -264,7 +264,9 @@ class ElCorteEligeSuImpresoraTests(unittest.TestCase):
         from pos_uniformes.database.models import TipoTrabajo
 
         pedidos, _ = self._ruteo(TipoTrabajo.CORTE, puede=False)
-        self.assertEqual(pedidos, ["cola:CORTE"])
+        # Primero pregunta si hay otras PCs que impriman cortes (ninguna en
+        # esta prueba) y entonces sí se va solo a la cola, como CORTE.
+        self.assertEqual(pedidos, ["CORTE", "cola:CORTE"])
 
     def test_mandado_a_otra_pc_entra_a_la_cola_como_corte_dirigido(self) -> None:
         from contextlib import contextmanager
@@ -299,3 +301,84 @@ class ElCorteEligeSuImpresoraTests(unittest.TestCase):
 
         self.assertEqual(inspect.getsource(corte_caja_dialog).count("tipo=TipoTrabajo.CORTE"), 2)
         self.assertIn("tipo=TipoTrabajo.CORTE", inspect.getsource(historial_cortes_dialog))
+
+
+class SinImpresoraAquiSeEligeADondeTests(unittest.TestCase):
+    """2026-11-07, Daniel: «el reimprimir corte también quiero que me dé a
+    elegir a dónde envío a imprimir». En una PC sin «Cortes de caja» el corte
+    se iba solo a la cola; ahora sale la ventana sin la ficha «Aquí»."""
+
+    DESTINOS = [
+        {"identificador": "kiosko-2", "nombre": "Kiosko 2", "online": False},
+        {"identificador": "pc-principal", "nombre": "PC principal", "online": True},
+    ]
+
+    def _abrir(self, accion, destinos, enviar_a=None):
+        from pos_uniformes.ui.dialogs import printable_text_dialog as ventana
+
+        enviados, avisos = [], []
+
+        def exec_falso(dlg):
+            accion(dlg)
+            return 0
+
+        with patch.object(QDialog, "exec", exec_falso), patch.object(
+            QMessageBox, "information", lambda *a, **k: avisos.append(a[2])
+        ), patch.object(QMessageBox, "warning", lambda *a, **k: avisos.append(a[2])):
+            ventana.open_tickets_print_dialog(
+                None, "Corte", ["CORTE"], print_fn=lambda t: True, destinos=destinos, aqui_imprime=False,
+                enviar_a=enviar_a or (lambda d, textos: enviados.append((d, list(textos))) or len(textos)),
+            )
+        return enviados, avisos
+
+    @staticmethod
+    def _imprimir(dlg) -> QPushButton:
+        return next(b for b in dlg.findChildren(QPushButton) if b.objectName() == "ticketImprimir")
+
+    def test_sin_ficha_aqui_y_la_primera_encendida_ya_marcada(self) -> None:
+        vistos = {}
+
+        def accion(dlg):
+            vistos["fichas"] = list(dlg.destino_botones)
+            vistos["marcada"] = dlg.destino_botones["pc-principal"].isChecked()
+            vistos["boton"] = self._imprimir(dlg).text()
+            self._imprimir(dlg).click()
+
+        enviados, avisos = self._abrir(accion, self.DESTINOS)
+        self.assertEqual(vistos["fichas"], ["kiosko-2", "pc-principal"])      # sin ""
+        self.assertTrue(vistos["marcada"])
+        self.assertIn("Mandar a PC principal", vistos["boton"])
+        self.assertEqual(enviados, [("pc-principal", ["CORTE"])])
+
+    def test_con_todas_apagadas_no_se_puede_mandar(self) -> None:
+        vistos = {}
+        apagadas = [{"identificador": "kiosko-2", "nombre": "Kiosko 2", "online": False}]
+        self._abrir(lambda dlg: vistos.update(boton=self._imprimir(dlg).text(), activo=self._imprimir(dlg).isEnabled()), apagadas)
+        self.assertFalse(vistos["activo"])
+        self.assertIn("Ninguna PC encendida", vistos["boton"])
+
+    def test_un_corte_en_una_pc_sin_impresora_abre_la_ventana_para_elegir(self) -> None:
+        from pos_uniformes.database.models import TipoTrabajo
+        from pos_uniformes.ui.helpers import ticket_routing_helper as rt
+
+        visto = {}
+        with patch("pos_uniformes.services.print_routing_cache_service.load_print_routing", lambda: ("satelite", "kiosko-1")), \
+                patch("pos_uniformes.services.print_routing_cache_service.puede_imprimir", lambda t: False), \
+                patch.object(rt, "otras_impresoras_de_tickets", lambda t=None: self.DESTINOS), \
+                patch("pos_uniformes.ui.dialogs.printable_text_dialog.open_tickets_print_dialog",
+                      lambda p, title, tickets, **kw: visto.update(kw)), \
+                patch.object(rt, "_enviar_al_satelite", lambda *a, **k: self.fail("se fue solo a la cola")):
+            rt.route_tickets(None, "Corte de caja (reimpresión)", ["CORTE"], tipo=TipoTrabajo.CORTE)
+        self.assertIs(visto["aqui_imprime"], False)
+        self.assertEqual(visto["destinos"], self.DESTINOS)
+
+    def test_un_ticket_de_venta_sigue_yendose_solo_a_la_cola(self) -> None:
+        from pos_uniformes.ui.helpers import ticket_routing_helper as rt
+
+        cola = []
+        with patch("pos_uniformes.services.print_routing_cache_service.load_print_routing", lambda: ("satelite", "kiosko-1")), \
+                patch("pos_uniformes.services.print_routing_cache_service.puede_imprimir", lambda t: False), \
+                patch.object(rt, "otras_impresoras_de_tickets", lambda t=None: self.fail("no debe preguntar")), \
+                patch.object(rt, "_enviar_al_satelite", lambda p, t, o, tipo=None: cola.append(tipo.value) or True):
+            rt.route_tickets(None, "Venta", ["TICKET"])
+        self.assertEqual(cola, ["TICKET"])
