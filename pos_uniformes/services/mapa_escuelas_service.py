@@ -8,12 +8,19 @@ de ahora y no los del día que se generó el mapa ni los de la última vez que
 alguien regeneró el Panel en la principal.
 
 Sin conexión el mapa abre igual, con el estado que trae dentro (y él mismo
-avisa «sin actualizar»)."""
+avisa «sin actualizar»).
+
+2026-11-07, «en el kiosko principal el mapa no abre»: Leaflet ya no se baja
+de unpkg.com al abrir (si esa página tarda o la red la bloquea, el mapa sale
+en blanco); va en `mapas_escuelas/vendor/` y se copia junto al HTML. Y el
+cálculo de los conteos tiene un tope de tiempo: con la base lenta el mapa abre
+con lo que trae dentro en vez de congelar la caja."""
 
 from __future__ import annotations
 
 import logging
 import shutil
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as _Tiempo
 import sys
 import tempfile
 from pathlib import Path
@@ -21,6 +28,8 @@ from pathlib import Path
 logger = logging.getLogger(__name__)
 
 NOMBRE = "mapa_escuelas_san_felipe.html"
+VENDOR = "vendor"  # Leaflet y markercluster, para no depender de internet
+TIEMPO_MAX_ESTADOS = 8.0  # segundos; más que eso y el mapa abre sin conteos nuevos
 
 
 def ubicar_mapa() -> Path | None:
@@ -50,18 +59,37 @@ def preparar(destino: Path | None = None, *, estados=None, calcular=None) -> Pat
     destino.mkdir(parents=True, exist_ok=True)
     html = destino / NOMBRE
     shutil.copyfile(origen, html)
+    vendor = origen.parent / VENDOR
+    if vendor.is_dir():
+        shutil.copytree(vendor, destino / VENDOR, dirs_exist_ok=True)
+    else:
+        logger.warning("Mapa de escuelas: falta %s; el mapa necesitará internet para dibujarse", vendor)
 
     from pos_uniformes.services import escuela_estado_service as svc
 
     js = destino / "estados_pos.js"
     try:
         if estados is None:
-            estados = (calcular or _calcular)()
+            estados = _con_tope(calcular or _calcular, TIEMPO_MAX_ESTADOS)
         svc.escribir_estados_para_mapa(estados, js)
     except Exception:  # noqa: BLE001 — sin base el mapa abre con lo que trae dentro
         logger.warning("Mapa de escuelas: no se pudo calcular el estado de los conteos", exc_info=True)
         js.unlink(missing_ok=True)
     return html
+
+
+def _con_tope(funcion, segundos: float):
+    """Corre `funcion` en otro hilo y se rinde a los `segundos` (TimeoutError).
+
+    El hilo no se puede matar: si la base contesta tarde, termina solo y su
+    resultado se tira. Lo que importa es que la caja no se quede congelada."""
+    pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="mapa-estados")
+    try:
+        return pool.submit(funcion).result(timeout=segundos)
+    except _Tiempo as exc:
+        raise TimeoutError(f"los conteos tardaron más de {segundos:g} s") from exc
+    finally:
+        pool.shutdown(wait=False)
 
 
 def _calcular() -> dict:

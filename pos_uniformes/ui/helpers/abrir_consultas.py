@@ -56,10 +56,20 @@ def _abrir_como_ventana(ruta: Path) -> bool:
     edge = ruta_edge()
     if edge is None:
         return False
+    # El ejecutable del kiosko no tiene consola: sin redirigir la entrada y
+    # salida, Popen puede fallar con «WinError 6, identificador no válido».
+    flags = getattr(subprocess, "DETACHED_PROCESS", 0) | getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0)
     try:
-        subprocess.Popen([str(edge), f"--app={QUrl.fromLocalFile(str(ruta)).toString()}", "--window-size=1400,900"])
+        subprocess.Popen(
+            [str(edge), f"--app={QUrl.fromLocalFile(str(ruta)).toString()}", "--window-size=1400,900"],
+            stdin=subprocess.DEVNULL,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            close_fds=True,
+            creationflags=flags,
+        )
         return True
-    except OSError:
+    except (OSError, ValueError):
         logger.warning("No se pudo abrir Edge en modo ventana", exc_info=True)
         return False
 
@@ -78,8 +88,14 @@ def abrir_mapa_escuelas(parent: QWidget | None = None) -> None:
     QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
     try:
         html = mapa_escuelas_service.preparar()
-    finally:
+    except Exception as exc:  # noqa: BLE001 — un error aquí no debe tumbar la caja
+        logger.warning("Mapa de escuelas: no se pudo preparar", exc_info=True)
         QApplication.restoreOverrideCursor()
+        QMessageBox.warning(parent, "Mapa de escuelas", f"No se pudo preparar el mapa de escuelas.\n\nDetalle: {exc}")
+        return
+    finally:
+        if QApplication.overrideCursor() is not None:
+            QApplication.restoreOverrideCursor()
     if html is None:
         QMessageBox.information(parent, "Mapa de escuelas", "Esta PC no tiene el mapa de escuelas. Llega con la siguiente actualización.")
         return
@@ -91,8 +107,14 @@ def abrir_mapa_escuelas(parent: QWidget | None = None) -> None:
             return
         except Exception:  # noqa: BLE001 — sin ventana propia, abre afuera
             logger.warning("Mapa de escuelas: no se pudo abrir la ventana", exc_info=True)
-    if not _abrir_como_ventana(html):
-        _abrir(html)
+    if _abrir_como_ventana(html) or _abrir(html):
+        return
+    QMessageBox.warning(
+        parent,
+        "Mapa de escuelas",
+        "Esta PC no pudo abrir el mapa: no encontró Edge ni un navegador.\n\n"
+        f"El archivo está en:\n{html}",
+    )
 
 
 def abrir_tipos_escoces(parent: QWidget | None = None) -> None:

@@ -44,6 +44,11 @@ datas += [
 _mapa_escuelas = PROJECT_ROOT.parent / "mapas_escuelas" / "mapa_escuelas_san_felipe.html"
 if _mapa_escuelas.exists():
     datas += [(str(_mapa_escuelas), "mapas_escuelas")]
+# Leaflet va dentro (2026-11-07): sin esto el mapa se baja de unpkg.com al
+# abrir y, si esa página no contesta, sale en blanco en el kiosko.
+_mapa_vendor = PROJECT_ROOT.parent / "mapas_escuelas" / "vendor"
+if _mapa_vendor.is_dir():
+    datas += [(str(_mapa_vendor), "mapas_escuelas/vendor")]
 
 # Traducción de Qt al español: sin este .qm los QMessageBox del exe salen
 # con Yes/No/Cancel aunque en desarrollo se vean en español.

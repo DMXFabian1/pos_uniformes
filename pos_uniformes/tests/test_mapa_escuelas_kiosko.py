@@ -56,6 +56,49 @@ class PrepararTests(unittest.TestCase):
             self.assertIsNone(svc.preparar(Path(tempfile.gettempdir()) / "no_usar"))
 
 
+class SinInternetTests(unittest.TestCase):
+    """«En el kiosko principal el mapa no abre» (2026-11-07): Leaflet va dentro."""
+
+    def test_el_mapa_no_pide_nada_a_unpkg(self) -> None:
+        carpeta = RAIZ.parent / "mapas_escuelas"
+        for nombre in ("mapa_escuelas_san_felipe.html", "plantilla_mapa.html", "mapa_preescolares_san_felipe.html"):
+            html = (carpeta / nombre).read_text(encoding="utf-8")
+            self.assertNotIn("unpkg.com", html, nombre)
+        for archivo in ("leaflet/leaflet.js", "leaflet/leaflet.css", "markercluster/leaflet.markercluster.js", "markercluster/MarkerCluster.css"):
+            self.assertTrue((carpeta / "vendor" / archivo).is_file(), archivo)
+
+    def test_preparar_copia_leaflet_junto_al_mapa(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            svc.preparar(Path(d), estados={1: _Est()})
+            self.assertTrue((Path(d) / "vendor" / "leaflet" / "leaflet.js").is_file())
+            self.assertTrue((Path(d) / "vendor" / "markercluster" / "leaflet.markercluster.js").is_file())
+
+    def test_la_base_lenta_no_congela_la_caja(self) -> None:
+        import threading
+        import time
+
+        soltar = threading.Event()
+
+        def lenta():
+            soltar.wait(5)
+            return {}
+
+        with tempfile.TemporaryDirectory() as d, mock.patch.object(svc, "TIEMPO_MAX_ESTADOS", 0.2):
+            (Path(d) / "estados_pos.js").write_text("viejo", encoding="utf-8")
+            inicio = time.monotonic()
+            html = svc.preparar(Path(d), calcular=lenta)
+            soltar.set()
+            self.assertLess(time.monotonic() - inicio, 2)
+            self.assertTrue(html.is_file())
+            self.assertFalse((Path(d) / "estados_pos.js").exists())
+
+    def test_los_dos_ejecutables_traen_el_mapa_y_leaflet(self) -> None:
+        for nombre in ("presupuestos_satelite_windows.spec", "pos_uniformes_windows.spec"):
+            spec = (RAIZ / "packaging" / "windows" / nombre).read_text(encoding="utf-8")
+            self.assertIn('"mapas_escuelas/vendor"', spec, nombre)
+            self.assertIn("mapa_escuelas_san_felipe.html", spec, nombre)
+
+
 class KioskoTests(unittest.TestCase):
     def test_el_satelite_trae_el_mapa_y_el_boton(self) -> None:
         spec = (RAIZ / "packaging" / "windows" / "presupuestos_satelite_windows.spec").read_text(encoding="utf-8")
@@ -116,3 +159,48 @@ class AtajosTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class AbrirSinTumbarLaCajaTests(unittest.TestCase):
+    """Si algo falla al abrir el mapa, aviso; nunca una excepción suelta en el kiosko."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        import os
+
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PyQt6.QtWidgets import QApplication
+
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_un_error_al_preparar_avisa(self) -> None:
+        from pos_uniformes.ui.helpers import abrir_consultas as ac
+
+        with mock.patch.object(svc, "preparar", side_effect=PermissionError("archivo en uso")), \
+                mock.patch.object(ac.QMessageBox, "warning") as aviso:
+            ac.abrir_mapa_escuelas(None)
+        aviso.assert_called_once()
+        self.assertIn("archivo en uso", aviso.call_args.args[2])
+
+    def test_sin_edge_ni_navegador_dice_donde_esta_el_archivo(self) -> None:
+        from pos_uniformes.ui.helpers import abrir_consultas as ac
+
+        with mock.patch.object(svc, "preparar", return_value=Path("C:/temp/mapa.html")), \
+                mock.patch.object(ac, "_hay_motor_web", return_value=False), \
+                mock.patch.object(ac, "_abrir_como_ventana", return_value=False), \
+                mock.patch.object(ac, "_abrir", return_value=False), \
+                mock.patch.object(ac.QMessageBox, "warning") as aviso:
+            ac.abrir_mapa_escuelas(None)
+        aviso.assert_called_once()
+        self.assertIn("mapa.html", aviso.call_args.args[2])
+
+    def test_edge_se_lanza_sin_consola(self) -> None:
+        from pos_uniformes.ui.helpers import abrir_consultas as ac
+
+        with mock.patch.object(ac, "ruta_edge", return_value=Path("C:/Edge/msedge.exe")), \
+                mock.patch.object(ac.subprocess, "Popen") as popen:
+            self.assertTrue(ac._abrir_como_ventana(Path("/tmp/mapa.html")))
+        kwargs = popen.call_args.kwargs
+        self.assertIs(kwargs["stdin"], ac.subprocess.DEVNULL)
+        self.assertIs(kwargs["stdout"], ac.subprocess.DEVNULL)
+        self.assertTrue(popen.call_args.args[0][1].startswith("--app=file://"))

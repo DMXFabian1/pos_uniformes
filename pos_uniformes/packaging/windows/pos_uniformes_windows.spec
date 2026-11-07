@@ -34,6 +34,15 @@ datas += [
     (str(PROJECT_ROOT / "scripts" / "setup_windows_local_bundle.bat"), "."),
 ]
 
+# El mapa de escuelas (Ctrl+Shift+M) con su Leaflet dentro (2026-11-07): sin
+# el HTML el POS decía «Esta PC no tiene el mapa»; sin vendor/ salía en blanco
+# si unpkg.com no contestaba. Mismo arreglo que el spec del satélite.
+_mapas = PROJECT_ROOT.parent / "mapas_escuelas"
+if (_mapas / "mapa_escuelas_san_felipe.html").exists():
+    datas += [(str(_mapas / "mapa_escuelas_san_felipe.html"), "mapas_escuelas")]
+if (_mapas / "vendor").is_dir():
+    datas += [(str(_mapas / "vendor"), "mapas_escuelas/vendor")]
+
 seed_backup = PROJECT_ROOT / "packaging" / "windows" / "seed" / "initial.dump"
 if seed_backup.exists():
     datas.append((str(seed_backup), "seed"))
@@ -50,6 +59,8 @@ hiddenimports += collect_submodules("alembic")
 hiddenimports += collect_submodules("meilisearch")
 # Mapa de escuelas y tipos de escocés en una ventana del programa (imports lazy).
 hiddenimports += [
+    "pos_uniformes.services.mapa_escuelas_service",
+    "pos_uniformes.ui.helpers.abrir_consultas",
     "pos_uniformes.ui.dialogs.visor_consulta_dialog",
     "pos_uniformes.ui.dialogs.visor_escoces_dialog",
     "pos_uniformes.ui.helpers.avisos_bonitos",
