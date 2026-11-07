@@ -36,7 +36,10 @@ class Fila:
 
     @property
     def dato(self) -> str:
-        return f"{PREFIJO}{self.clase}:{self.id}"
+        """El botón dice a qué estado lo deja, no «invierte»: un doble toque
+        (o Telegram reentregando el toque) volvía a restar un pago que se hizo
+        por transferencia (auditoría 2026-11-07, #12)."""
+        return f"{PREFIJO}{self.clase}:{self.id}:{'fuera' if self.en_cajon else 'dentro'}"
 
 
 def _cuando(momento) -> str:
@@ -132,15 +135,17 @@ def es_del_cajon(dato: str) -> bool:
 
 
 def atender(dato: str, *, session_factory) -> tuple[str, str, str]:
-    """Un botón: invierte si ese pago/retiro salió del cajón."""
+    """Un botón: deja ese pago/retiro dentro o fuera del cajón."""
     from pos_uniformes.services.corte_caja_service import marcar_fuera_del_cajon
 
     partes = str(dato or "")[len(PREFIJO):].split(":")
-    if len(partes) != 2 or partes[0] not in ("pago", "retiro"):
+    if len(partes) not in (2, 3) or partes[0] not in ("pago", "retiro"):
         return "No conozco ese botón", "", ""
     try:
         fila_id = int(partes[1])
     except ValueError:
+        return "No conozco ese botón", "", ""
+    if len(partes) == 3 and partes[2] not in ("fuera", "dentro"):
         return "No conozco ese botón", "", ""
 
     with session_factory() as session:
@@ -151,8 +156,16 @@ def atender(dato: str, *, session_factory) -> tuple[str, str, str]:
         if actual is None:
             texto, botones = texto_y_botones(session)
             return "Ese ya no está en el periodo", texto, botones
+        if len(partes) == 2:
+            # Botón de antes (invertía): no se adivina; se enseña la lista al día.
+            texto, botones = texto_y_botones(session)
+            return "Ese botón es de antes; aquí está la lista al día", texto, botones
+        queda_en_cajon = partes[2] == "dentro"
+        if actual.en_cajon == queda_en_cajon:
+            texto, botones = texto_y_botones(session)
+            return "Ya estaba así", texto, botones
         ids = {f"{partes[0]}s_ids": [fila_id]}
-        marcar_fuera_del_cajon(session, en_cajon=not actual.en_cajon, **ids)
+        marcar_fuera_del_cajon(session, en_cajon=queda_en_cajon, **ids)
         session.commit()
         texto, botones = texto_y_botones(session)
     aviso = "Sí salió del cajón" if not actual.en_cajon else "No salió del cajón"

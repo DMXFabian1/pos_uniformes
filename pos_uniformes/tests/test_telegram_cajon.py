@@ -90,7 +90,7 @@ class TocarUnoTests(_Base):
     def test_desmarcar_un_pago(self) -> None:
         p = self.pago(en_cajon=True)
         self.s.commit()
-        aviso, texto, _ = cj.atender(f"cj:pago:{p.id}", session_factory=self.factory)
+        aviso, texto, _ = cj.atender(f"cj:pago:{p.id}:fuera", session_factory=self.factory)
         self.assertEqual(aviso, "No salió del cajón")
         self._refrescar()
         self.assertFalse(self.s.get(EmpleadaPago, p.id).en_cajon)
@@ -100,7 +100,7 @@ class TocarUnoTests(_Base):
         # podría deshacer desde el celular.
         p = self.pago(en_cajon=False)
         self.s.commit()
-        aviso, _, _ = cj.atender(f"cj:pago:{p.id}", session_factory=self.factory)
+        aviso, _, _ = cj.atender(f"cj:pago:{p.id}:dentro", session_factory=self.factory)
         self.assertEqual(aviso, "Sí salió del cajón")
         self._refrescar()
         self.assertTrue(self.s.get(EmpleadaPago, p.id).en_cajon)
@@ -108,7 +108,7 @@ class TocarUnoTests(_Base):
     def test_desmarcar_un_retiro(self) -> None:
         r = self.retiro(en_cajon=True)
         self.s.commit()
-        cj.atender(f"cj:retiro:{r.id}", session_factory=self.factory)
+        cj.atender(f"cj:retiro:{r.id}:fuera", session_factory=self.factory)
         self._refrescar()
         self.assertFalse(self.s.get(CajaRetiro, r.id).en_cajon)
 
@@ -120,12 +120,38 @@ class TocarUnoTests(_Base):
         r = self.retiro(monto="350", en_cajon=True)
         self.s.commit()
         antes = estado_caja(self.s).esperado
-        cj.atender(f"cj:retiro:{r.id}", session_factory=self.factory)
+        cj.atender(f"cj:retiro:{r.id}:fuera", session_factory=self.factory)
         self._refrescar()
         self.assertEqual(estado_caja(self.s).esperado - antes, Decimal("350.00"))
 
+    def test_dos_toques_no_lo_regresan(self) -> None:
+        """Un doble toque invertía dos veces: el pago por transferencia volvía
+        a restarse del cajón (auditoría 2026-11-07)."""
+        p = self.pago(en_cajon=True)
+        self.s.commit()
+        cj.atender(f"cj:pago:{p.id}:fuera", session_factory=self.factory)
+        aviso, _, _ = cj.atender(f"cj:pago:{p.id}:fuera", session_factory=self.factory)
+        self.assertEqual(aviso, "Ya estaba así")
+        self._refrescar()
+        self.assertFalse(self.s.get(EmpleadaPago, p.id).en_cajon)
+
+    def test_el_boton_dice_a_donde_lo_deja(self) -> None:
+        self.pago(en_cajon=True)
+        self.s.commit()
+        _, botones = cj.texto_y_botones(self.s)
+        self.assertRegex(botones, r"cj:pago:\d+:fuera")
+
+    def test_un_boton_de_antes_no_hace_nada(self) -> None:
+        p = self.pago(en_cajon=True)
+        self.s.commit()
+        aviso, texto, _ = cj.atender(f"cj:pago:{p.id}", session_factory=self.factory)
+        self.assertIn("es de antes", aviso)
+        self.assertTrue(texto)
+        self._refrescar()
+        self.assertTrue(self.s.get(EmpleadaPago, p.id).en_cajon)
+
     def test_un_boton_mal_formado_no_revienta(self) -> None:
-        for malo in ("cj:", "cj:pago", "cj:pago:abc", "cj:otracosa:1"):
+        for malo in ("cj:", "cj:pago", "cj:pago:abc", "cj:otracosa:1", "cj:pago:1:quien"):
             aviso, _, _ = cj.atender(malo, session_factory=self.factory)
             self.assertEqual(aviso, "No conozco ese botón")
 
@@ -153,7 +179,7 @@ class EnganchadoAlBotTests(_Base):
         from pos_uniformes.services import telegram_bot_service as bot
 
         p = self.pago(en_cajon=True); self.s.commit()
-        aviso, _, _ = bot.atender_toque(f"cj:pago:{p.id}", session_factory=self.factory)
+        aviso, _, _ = bot.atender_toque(f"cj:pago:{p.id}:fuera", session_factory=self.factory)
         self.assertEqual(aviso, "No salió del cajón")
 
     def test_esta_en_la_ayuda_y_en_el_menu(self) -> None:

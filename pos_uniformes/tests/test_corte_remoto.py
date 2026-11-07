@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -28,7 +28,7 @@ def _estado(efectivo="7480", tarjeta="1200", pagos="0", retiros="0"):
 
 
 class TicketConRetiroTests(unittest.TestCase):
-    def _correr(self, *, retirar=None, sin_tarjeta=False, pagos_del_corte=(), retiros="0"):
+    def _correr(self, *, retirar=None, sin_tarjeta=False, pagos_del_corte=(), retiros="0", entradas=()):
         estado = _estado(retiros=retiros)
         corte = SimpleNamespace(
             monto_final=Decimal("1000.00") + (retirar or Decimal("6480")),
@@ -58,6 +58,8 @@ class TicketConRetiroTests(unittest.TestCase):
             "pos_uniformes.ui.dialogs.corte_caja_dialog.texto_ticket_corte_encargado", return_value="TICKET"
         ) as ticket, patch(
             "pos_uniformes.services.trabajos_service.enviar_ticket"
+        ), patch(
+            "pos_uniformes.services.entradas_service.entradas_del_periodo", return_value=list(entradas)
         ):
             resultado = crs.hacer_corte_y_avisar(
                 MagicMock(), creado_por="VEND-1", ahora=_HASTA,
@@ -80,6 +82,17 @@ class TicketConRetiroTests(unittest.TestCase):
         self.assertEqual(cerrar.call_args.kwargs["retirar"], Decimal("5000"))
         # 5000 + 1304 (pago) + 300 (ya salió) = 6604
         self.assertEqual(ticket.call_args.args[1], Decimal("6604.00"))
+
+    def test_el_fondo_de_papa_sale_en_el_ticket_y_no_es_venta(self) -> None:
+        """El ticket del corte del celular no traía las entradas; con /corte N
+        además las contaba como venta (auditoría 2026-11-07)."""
+        fondo = SimpleNamespace(monto=Decimal("1750"), motivo="Fondo de papá")
+        pago = SimpleNamespace(total=Decimal("1304.00"), employee_name="Fanny", employee_code="VEND-4")
+        resultado, ticket, _c, _o = self._correr(retirar=Decimal("5000"), pagos_del_corte=[pago], entradas=[fondo])
+        self.assertEqual(ticket.call_args.kwargs["entradas"], [fondo])
+        # 5000 + 1304 (pago) − 1750 (no es venta) = 4554
+        self.assertEqual(ticket.call_args.args[1], Decimal("4554.00"))
+        self.assertIn("Entró sin ser venta (Fondo de papá): +$1,750.00", resultado.mensaje)
 
     def test_el_mensaje_le_dice_a_daniel_cuanto_se_queda(self) -> None:
         resultado, _t, _c, _o = self._correr(retirar=Decimal("5000"))
@@ -199,9 +212,9 @@ class NoSeRetiraMasDeLoQueHayTests(unittest.TestCase):
 
 
 class DosCortesElMismoDiaTests(unittest.TestCase):
-    def _correr(self, nota=None):
+    def _correr(self, nota=None, hace=timedelta(minutes=5)):
         estado = _estado()
-        previo = SimpleNamespace(fecha=_HASTA.date(), created_at=_HASTA)
+        previo = SimpleNamespace(fecha=_HASTA.date(), created_at=_HASTA - hace, hasta=_HASTA - hace)
         with patch("pos_uniformes.services.corte_caja_service.estado_caja", return_value=estado), \
              patch("pos_uniformes.services.corte_caja_service.pagos_que_tocan_hoy", return_value=[]), \
              patch("pos_uniformes.services.corte_caja_service.ultimo_corte", return_value=previo), \
@@ -223,3 +236,12 @@ class DosCortesElMismoDiaTests(unittest.TestCase):
 
     def test_con_la_palabra_segundo_pasa(self) -> None:
         self.assertEqual(self._correr(nota="segundo"), "paso")
+
+    def test_el_de_la_tarde_pasa_aunque_haya_uno_de_mediodia(self) -> None:
+        """Con un corte a mediodía el de la tarde no se podía hacer: ningún
+        botón manda «segundo» y el cierre automático fallaba (auditoría
+        2026-11-07)."""
+        self.assertEqual(self._correr(hace=timedelta(hours=5)), "paso")
+
+    def test_a_la_media_hora_todavia_se_frena(self) -> None:
+        self.assertFalse(self._correr(hace=timedelta(minutes=40)).hecho)

@@ -65,15 +65,15 @@ def _quien(code: str) -> str:
 def ultimos(session: Session, *, dias: int = 14, tope: int = TOPE) -> list[CorteFila]:
     """Los cortes más recientes, del más nuevo al más viejo."""
     from pos_uniformes.database.models import LibretaCorte
-    from pos_uniformes.services.historial_cortes_service import venta_oficial, venta_real
+    from pos_uniformes.services.historial_cortes_service import anotar_entradas, venta_oficial, venta_real
 
     desde = date.today() - timedelta(days=int(dias))
-    filas = session.scalars(
+    filas = anotar_entradas(session, session.scalars(
         select(LibretaCorte)
         .where(LibretaCorte.fecha >= desde)
         .order_by(LibretaCorte.fecha.desc(), LibretaCorte.id.desc())
         .limit(int(tope))
-    ).all()
+    ).all())
 
     salida = []
     for c in filas:
@@ -128,12 +128,12 @@ class SalidasPeriodo:
 def salidas_del_periodo(session: Session, *, dias: int = 14) -> SalidasPeriodo:
     """Suma las diferencias de todos los cortes del periodo (sin tope)."""
     from pos_uniformes.database.models import LibretaCorte
-    from pos_uniformes.services.historial_cortes_service import venta_oficial, venta_real
+    from pos_uniformes.services.historial_cortes_service import anotar_entradas, venta_oficial, venta_real
 
     desde = date.today() - timedelta(days=int(dias))
-    filas = session.scalars(
+    filas = anotar_entradas(session, session.scalars(
         select(LibretaCorte).where(LibretaCorte.fecha >= desde)
-    ).all()
+    ).all())
 
     salio = sobro = ajustado = Decimal("0.00")
     n_falto = n_sobro = n_ajuste = 0
@@ -417,11 +417,12 @@ def texto_y_botones(session: Session, *, dias: int = 14, argumento: str = "") ->
 def detalle(session: Session, corte_id: int) -> tuple[str, list]:
     """(texto, filas de botones) de UN corte."""
     from pos_uniformes.database.models import LibretaCorte
-    from pos_uniformes.services.historial_cortes_service import venta_oficial, venta_real
+    from pos_uniformes.services.historial_cortes_service import anotar_entradas, venta_oficial, venta_real
 
     corte = session.get(LibretaCorte, int(corte_id))
     if corte is None:
         return "Ese corte ya no existe.", []
+    anotar_entradas(session, [corte])
 
     oficial = venta_oficial(corte)
     real = venta_real(corte)
@@ -433,6 +434,9 @@ def detalle(session: Session, corte_id: int) -> tuple[str, list]:
         lineas.append(f"Lo que de verdad se vendió: ${real:,.2f}")
         lineas.append(f"Ajuste tuyo: {'−' if oficial < real else '+'}${abs(oficial - real):,.2f}")
         lineas.append(f"Por qué: {corte.nota}" if corte.nota else "Sin decir por qué.")
+    entro = Decimal(str(getattr(corte, "entradas_periodo", 0) or 0))
+    if entro:
+        lineas.append(f"Entró sin ser venta (fondo de papá…): ${entro:,.2f} — no cuenta como venta")
     lineas.append("")
     lineas.append(f"Para cambiar la cifra:\n/ajustar {corte.id} 12500 depósito al banco")
 

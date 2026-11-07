@@ -34,7 +34,49 @@ def listar_cortes_mes(session, desde: date, hasta: date) -> list:
         .where(LibretaCorte.fecha >= desde, LibretaCorte.fecha <= hasta)
         .order_by(LibretaCorte.fecha.desc(), LibretaCorte.id.desc())
     )
-    return list(session.scalars(stmt).all())
+    return anotar_entradas(session, session.scalars(stmt).all())
+
+
+def anotar_entradas(session, cortes) -> list:
+    """Le pone a cada corte `entradas_periodo`: lo que entró al cajón en su
+    periodo sin ser venta (el fondo de papá).
+
+    El corte no lo guarda en una columna, pero sí está en el cajón: sin
+    restarlo, la «venta» de `/cortes`, del detalle y del historial salía
+    inflada con ese dinero, y `/ajustar` partía de una venta que no era
+    (auditoría 2026-11-07, #6). Una sola consulta para todos."""
+    cortes = list(cortes)
+    nuevos = [c for c in cortes if not es_legacy(c) and getattr(c, "hasta", None) is not None]
+    if not nuevos:
+        return cortes
+    try:
+        from pos_uniformes.database.models import CajaEntrada
+
+        stmt = select(CajaEntrada.monto, CajaEntrada.created_at).where(
+            CajaEntrada.created_at <= max(c.hasta for c in nuevos)
+        )
+        desdes = [c.desde for c in nuevos]
+        if all(d is not None for d in desdes):
+            stmt = stmt.where(CajaEntrada.created_at > min(desdes))
+        filas = list(session.execute(stmt).all())
+    except Exception:  # noqa: BLE001 — sin la tabla (base sin migrar), como antes
+        try:
+            session.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        filas = []
+    for c in nuevos:
+        total = sum(
+            (Decimal(str(monto)) for monto, cuando in filas
+             if cuando <= c.hasta and (c.desde is None or cuando > c.desde)),
+            Decimal("0.00"),
+        )
+        c.entradas_periodo = total.quantize(_CENT)
+    return cortes
+
+
+def _entradas(corte) -> Decimal:
+    return _d(getattr(corte, "entradas_periodo", 0))
 
 
 def es_legacy(corte) -> bool:
@@ -118,13 +160,14 @@ def es_del_dueno(corte) -> bool:
 def venta_oficial(corte) -> Decimal:
     """La venta que cuadra con la cifra del corte (la del ticket).
 
-    cifra − reactivo con que abrió + pagos + gastos. En los cortes viejos
-    (sin reactivo) la cifra ERA el total del día."""
+    cifra − reactivo con que abrió + pagos + gastos − lo que entró sin ser
+    venta (`anotar_entradas`). En los cortes viejos (sin reactivo) la cifra
+    ERA el total del día."""
     if es_legacy(corte):
         return _d(corte.monto_final)
     return (
         _d(corte.monto_final) - _d(corte.reactivo_inicial)
-        + _d(corte.retiros_pagos) + _d(corte.otros_retiros)
+        + _d(corte.retiros_pagos) + _d(corte.otros_retiros) - _entradas(corte)
     ).quantize(_CENT)
 
 
@@ -134,7 +177,7 @@ def venta_real(corte) -> Decimal | None:
         return None
     return (
         _d(corte.monto_esperado) - _d(corte.reactivo_inicial)
-        + _d(corte.retiros_pagos) + _d(corte.otros_retiros)
+        + _d(corte.retiros_pagos) + _d(corte.otros_retiros) - _entradas(corte)
     ).quantize(_CENT)
 
 
@@ -290,11 +333,12 @@ def ajustar_corte(session, corte_id: int, *, venta, creado_por: str, nota: str =
         raise ValueError("Ese corte ya no existe.")
     if es_legacy(corte):
         raise ValueError("Los cortes viejos no guardan la venta: no se pueden ajustar.")
+    anotar_entradas(session, [corte])
     venta = _d(venta)
     if venta < 0:
         raise ValueError("La venta no puede ser negativa.")
     nuevo_final = (
-        venta + _d(corte.reactivo_inicial) - _d(corte.retiros_pagos) - _d(corte.otros_retiros)
+        venta + _d(corte.reactivo_inicial) + _entradas(corte) - _d(corte.retiros_pagos) - _d(corte.otros_retiros)
     ).quantize(_CENT)
     if nuevo_final < _d(corte.reactivo_final):
         raise ValueError(

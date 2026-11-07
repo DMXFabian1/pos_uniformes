@@ -12,6 +12,7 @@ resbalar que un clic en la caja.
 
 from __future__ import annotations
 
+import logging
 from datetime import date, timedelta
 from decimal import Decimal, InvalidOperation
 
@@ -231,10 +232,27 @@ def retiro(session: Session, argumento: str, *, quien: str) -> str:
     if monto <= 0:
         return "El retiro tiene que ser mayor a cero."
 
-    motivo = " ".join(partes[1:]).strip()
+    resto = partes[1:]
+    forzar = bool(resto) and resto[-1].lower() in ("forzar", "!")
+    if forzar:
+        resto = resto[:-1]
+    motivo = " ".join(resto).strip()
     if not motivo:
         # Sin motivo, el corte de la noche es un misterio.
         return f"¿Para qué son los ${monto:,.2f}? Por ejemplo:\n/retiro {partes[0]} gasolina"
+
+    # Tope: lo que debería haber en el cajón. Con un cero de más el esperado
+    # quedaba negativo y el siguiente corte dejaba el fondo en $0 (auditoría
+    # 2026-11-07, #9). Si de verdad hay más (lo contaste), «forzar» al final.
+    if not forzar:
+        hay = _en_cajon(session)
+        if hay is not None and monto > hay:
+            return (
+                f"⚠️ No lo apunté: en el cajón debería haber ${hay:,.2f} y quieres sacar ${monto:,.2f}.\n"
+                "¿Un cero de más?\n\n"
+                f"Si de verdad hay más (lo contaste), mándalo con «forzar» al final:\n"
+                f"/retiro {partes[0]} {motivo} forzar"
+            )
 
     try:
         retiros_service.registrar_retiro(session, monto=monto, motivo=motivo, creado_por=quien)
@@ -243,6 +261,21 @@ def retiro(session: Session, argumento: str, *, quien: str) -> str:
         return f"No lo apunté: {exc}"
     session.commit()
     return f"✅ Retirado del cajón: ${monto:,.2f} para {motivo}.\n\nEl corte de hoy ya lo toma en cuenta."
+
+
+def _en_cajon(session) -> Decimal | None:
+    """Lo que debería haber en el cajón ahora (None si no se puede saber)."""
+    try:
+        from pos_uniformes.services.corte_caja_service import estado_caja
+
+        return estado_caja(session).esperado
+    except Exception:  # noqa: BLE001 — sin saberlo, no se frena el retiro
+        logging.getLogger(__name__).warning("Retiro: no se pudo calcular el cajón", exc_info=True)
+        try:
+            session.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        return None
 
 
 def entrada(session: Session, argumento: str, *, quien: str) -> str:

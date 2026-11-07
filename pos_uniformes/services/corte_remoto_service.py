@@ -139,6 +139,23 @@ def _local_hora(corte) -> str:
         return "hoy"
 
 
+#: Un corte de hace menos que esto es «el mismo» (doble toque, dedazo): el
+#: segundo pide la palabra «segundo». Uno más viejo es otro corte del día.
+MINUTOS_ENTRE_CORTES = 60
+
+
+def _reciente(previo, ahora: datetime) -> bool:
+    momento = getattr(previo, "hasta", None) or getattr(previo, "created_at", None)
+    if momento is None:
+        return True
+    try:
+        a = ahora if ahora.tzinfo else ahora.astimezone()
+        m = momento if momento.tzinfo else momento.astimezone()
+        return (a - m).total_seconds() < MINUTOS_ENTRE_CORTES * 60
+    except Exception:  # noqa: BLE001 — sin saberlo, se frena como antes
+        return True
+
+
 def hacer_corte_y_avisar(
     session, *, creado_por: str, ahora: datetime | None = None,
     retirar: Decimal | None = None, sin_tarjeta: bool | None = None,
@@ -183,9 +200,14 @@ def hacer_corte_y_avisar(
     from pos_uniformes.services.corte_caja_service import ultimo_corte
 
     previo = ultimo_corte(session)
-    if previo is not None and previo.fecha == ahora.date() and "segundo" not in (nota or "").lower():
+    if (previo is not None and previo.fecha == ahora.date() and "segundo" not in (nota or "").lower()
+            and _reciente(previo, ahora)):
         # Dos toques con una venta en medio hacían dos cortes el mismo día.
         # El segundo se pide con la palabra «segundo» en la nota (2026-10-10).
+        # Pero solo si el otro es de hace un rato: con un corte a mediodía el
+        # de la tarde no se podía hacer (ningún botón manda «segundo») y el
+        # cierre automático fallaba diciendo «Cerré el día» (auditoría
+        # 2026-11-07, #7).
         hora_previo = _local_hora(previo)
         return ResultadoCorte(
             False,
@@ -240,6 +262,13 @@ def hacer_corte_y_avisar(
     except Exception:  # noqa: BLE001
         session.rollback()
         retiros = []
+    try:
+        from pos_uniformes.services.entradas_service import entradas_del_periodo
+
+        entradas = entradas_del_periodo(session, auto.estado.desde, auto.estado.hasta)
+    except Exception:  # noqa: BLE001
+        session.rollback()
+        entradas = []
     ya_pagados = pagos_previos_del_periodo(session, auto)
     # El PAPEL se queda en la tienda: va sin los movimientos privados.
     # El mensaje de Telegram (más abajo) llega solo al celular de Daniel y
@@ -253,10 +282,16 @@ def hacer_corte_y_avisar(
     if retirar is not None:
         total_pagos = sum((Decimal(p.total) for p in auto.pagos), Decimal("0.00"))
         ya_salio = sum((Decimal(p.total) for p in ya_pagados), Decimal("0.00")) + auto.estado.total_retiros
-        venta_papel = (Decimal(retirar) + total_pagos + ya_salio).quantize(Decimal("0.01"))
+        # Lo que entró sin ser venta (fondo de papá) ya está en el cajón: no
+        # es venta, y sin restarlo el papel la inflaba (auditoría 2026-11-07, #6).
+        entro = sum((Decimal(e.monto) for e in entradas), Decimal("0.00"))
+        venta_papel = (Decimal(retirar) + total_pagos + ya_salio - entro).quantize(Decimal("0.01"))
     texto = texto_ticket_corte_encargado(
         auto.corte, venta_papel, auto.pagos, datos.por_empleada, retiros=datos.retiros,
         tarjeta=datos.tarjeta, tarjeta_ops=datos.tarjeta_ops, ya_pagados=ya_pagados, tarjeta_neto=getattr(datos, "tarjeta_neto", None),
+        # El fondo de papá no salía en el ticket del corte del celular, sí en
+        # el del kiosko (auditoría 2026-11-07, #6).
+        entradas=entradas,
     )
     impreso = False
     try:
@@ -277,6 +312,8 @@ def hacer_corte_y_avisar(
         lineas.append(f"✏️ El ticket dice venta ${venta_papel:,.2f} (te quedas ${sobrante:,.2f})")
     if auto.estado.resumen.tarjeta:
         lineas.append(f"Con tarjeta: ${auto.estado.resumen.tarjeta:,.2f} ({contar_tarjeta(rows)} voucher(s), no está en el cajón)")
+    for e in entradas:
+        lineas.append(f"Entró sin ser venta ({e.motivo}): +${Decimal(e.monto):,.2f}")
     for p in auto.pagos:
         lineas.append(f"Pagar a {(p.employee_name or p.employee_code).split()[0]}: ${Decimal(p.total):,.2f}")
     for p in ya_pagados:

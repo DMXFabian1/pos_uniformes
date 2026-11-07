@@ -63,7 +63,7 @@ AYUDA = (
     "/ajustar 12 12500 depósito al banco — cambia la cifra de ese corte\n"
     "/sintarjeta 12 — esconde los cobros con tarjeta de un corte ya hecho\n"
     "/contarjeta 12 — los vuelve a enseñar (si fue un error)\n"
-    "/retiro 500 gasolina — saca del cajón, con su motivo\n"
+    "/retiro 500 gasolina — saca del cajón, con su motivo (no más de lo que hay; «forzar» al final si sí)\n"
     "/entrada 1750 papá — dinero que entró al cajón sin ser venta (para la\n"
     "   nómina); los pagos salen del cajón normal y el corte lo suma\n"
     "/cajon — desmarca lo que NO salió del cajón (una transferencia,\n"

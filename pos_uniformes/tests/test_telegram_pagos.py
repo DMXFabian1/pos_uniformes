@@ -159,6 +159,35 @@ class RetiroTest(unittest.TestCase):
             self.assertTrue("mayor a cero" in r or "No entendí" in r)
 
 
+class RetiroConTopeTest(RetiroTest):
+    """Con un cero de más el esperado quedaba negativo y el siguiente corte
+    dejaba el fondo en $0 (auditoría 2026-11-07)."""
+
+    def _con_cajon(self, argumento, hay="4320.00"):
+        with patch.object(pg, "_en_cajon", return_value=Decimal(hay)):
+            return self._correr(argumento)
+
+    def test_mas_de_lo_que_hay_no_se_apunta(self):
+        r = self._con_cajon("15000 gasolina")
+        self.assertEqual(self.hechos, [])
+        self.assertIn("debería haber $4,320.00 y quieres sacar $15,000.00", r)
+        self.assertIn("/retiro 15000 gasolina forzar", r)
+
+    def test_dentro_de_lo_que_hay_si(self):
+        self._con_cajon("1500 gasolina")
+        self.assertEqual(self.hechos[0]["monto"], Decimal("1500"))
+
+    def test_forzar_lo_apunta_sin_esa_palabra_en_el_motivo(self):
+        r = self._con_cajon("15000 proveedor de telas forzar")
+        self.assertIn("✅", r)
+        self.assertEqual(self.hechos[0]["motivo"], "proveedor de telas")
+
+    def test_si_no_se_sabe_el_cajon_no_se_frena(self):
+        with patch.object(pg, "_en_cajon", return_value=None):
+            self._correr("15000 gasolina")
+        self.assertEqual(len(self.hechos), 1)
+
+
 class ElBotLosConoceTest(unittest.TestCase):
     def test_estan_en_la_ayuda_y_en_el_despachador(self):
         from pathlib import Path
