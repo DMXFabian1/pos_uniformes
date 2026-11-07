@@ -39,6 +39,12 @@ datas += [
     (str(PROJECT_ROOT / "scripts" / "setup_satelite.ps1"), "."),
 ]
 
+# El mapa de escuelas (Leaflet): se abre en el navegador desde Conteos con el
+# estado de los conteos calculado al momento (services/mapa_escuelas_service).
+_mapa_escuelas = PROJECT_ROOT.parent / "mapas_escuelas" / "mapa_escuelas_san_felipe.html"
+if _mapa_escuelas.exists():
+    datas += [(str(_mapa_escuelas), "mapas_escuelas")]
+
 # Traducción de Qt al español: sin este .qm los QMessageBox del exe salen
 # con Yes/No/Cancel aunque en desarrollo se vean en español.
 import PyQt6
@@ -57,6 +63,7 @@ hiddenimports += [
     # Imports lazy (dentro de métodos) — mismo precedente que el admin dialog:
     "pos_uniformes.ui.dialogs.label_print_confirmation_dialog",
     "pos_uniformes.services.inventory_label_service",
+    "pos_uniformes.services.mapa_escuelas_service",
     "pos_uniformes.ui.helpers.quick_sale_sports_uniform_helper",
     "pos_uniformes.services.label_printer_settings_cache_service",
     # Anuncios / cartelera (todos con imports lazy dentro de métodos):

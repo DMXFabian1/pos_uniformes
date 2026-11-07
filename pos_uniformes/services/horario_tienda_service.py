@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 
-APERTURA = time(9, 0)  # supuesto (2026-09-09): para las alertas de movimientos fuera de horario
+APERTURA = time(9, 0)  # confirmado por Daniel (2026-11-07): la tienda abre a las 9; para las alertas de movimientos fuera de horario
 CIERRE_NORMAL = time(18, 0)
 CIERRE_TEMPRANO = time(17, 0)
 DIAS_CIERRE_TEMPRANO = (3, 6)  # jueves, domingo
