@@ -388,3 +388,94 @@ class BorrarTests(_ConBase):
         d = self._ventana("Caja", confirmar_borrado=lambda _p: False)
         self._botones_borrar(d)[0].click()
         self.assertEqual(self._textos(d), ["se queda"])
+
+
+class ComandoQueNoContestaTests(_ConBase):
+    """2026-11-07: si la otra PC se cierra a medio comando, la burbuja ya no
+    dice «Ejecutando…» para siempre."""
+
+    def _con_recibido(self, minutos_atras: int):
+        from datetime import datetime, timedelta, timezone
+
+        with self._sesion() as s:
+            cmd = bz.enviar(s, "Get-Date | Out-String", de="Claude", para="Entrada")
+            r = bz.enviar(s, "⏳ Recibido en Entrada: ejecutando…", de="Entrada", para="Claude",
+                          responde_a=cmd.id, estado=bz.RECIBIDO)
+            r.created_at = datetime.now(timezone.utc) - timedelta(minutes=minutos_atras)
+            s.commit()
+
+    def _estados(self, d) -> list[str]:
+        return [w.text() for w in d._mensajes.findChildren(QLabel, "estadoComando") if w.text()]
+
+    def test_reciente_sigue_ejecutando(self) -> None:
+        self._con_recibido(1)
+        d = self._ventana("Claude")
+        d.abrir_chat("Entrada")
+        self.assertEqual(self._estados(d), ["⏳ Ejecutando en Entrada…"])
+
+    def test_viejo_dice_que_no_contesto(self) -> None:
+        self._con_recibido(10)
+        d = self._ventana("Claude")
+        d.abrir_chat("Entrada")
+        estados = self._estados(d)
+        self.assertEqual(len(estados), 1)
+        self.assertIn("Entrada no contestó", estados[0])
+
+    def test_pasa_a_no_contesto_con_el_tiempo_sin_mensajes_nuevos(self) -> None:
+        from datetime import datetime, timedelta, timezone
+
+        self._con_recibido(1)
+        ahora = {"t": datetime.now(timezone.utc)}
+        d = self._ventana("Claude", reloj=lambda: ahora["t"])
+        d.abrir_chat("Entrada")
+        self.assertIn("Ejecutando", self._estados(d)[0])
+        ahora["t"] += timedelta(minutes=10)
+        d.refrescar()
+        self.assertIn("no contestó", self._estados(d)[0])
+
+    def test_si_llego_el_resultado_no_importa_cuanto_tardo(self) -> None:
+        self._con_recibido(10)
+        with self._sesion() as s:
+            cmd = s.scalars(select(BuzonMensaje).order_by(BuzonMensaje.id)).first()
+            bz.enviar(s, "▶ Resultado", de="Entrada", para="Claude", responde_a=cmd.id, estado=bz.TERMINO_BIEN)
+            s.commit()
+        d = self._ventana("Claude")
+        d.abrir_chat("Entrada")
+        self.assertEqual(self._estados(d), ["✔ Corrió en Entrada: terminó bien"])
+
+
+class ClaudeDejaLasPalomitasTests(_ConBase):
+    """Lo que Claude lee desde la Mac queda leído: del otro lado, ✓✓."""
+
+    def test_leer_anota_lo_leido_y_la_otra_pc_ve_dos_palomitas(self) -> None:
+        from pos_uniformes.scripts import buzon_claude as cl
+
+        self._mandar("hola", de="Claude", para="Entrada")       # para que exista el chat
+        entrada = self._ventana("Entrada")
+        entrada.abrir_chat("Claude")
+        entrada.editor.setPlainText("¿ya viste esto?")
+        entrada.enviar()
+        self.assertEqual([w.text() for w in entrada._mensajes.findChildren(QLabel, "palomita")], ["✓"])
+        with self._sesion() as s:
+            renglones = cl.leer(s, "Entrada")
+        self.assertTrue(any("¿ya viste esto?" in r for r in renglones))
+        entrada.refrescar()
+        self.assertEqual([w.text() for w in entrada._mensajes.findChildren(QLabel, "palomita")], ["✓✓"])
+
+    def test_chats_dice_cuantos_hay_sin_leer_y_se_limpia_al_leer(self) -> None:
+        from pos_uniformes.scripts import buzon_claude as cl
+
+        self._mandar("uno", de="Entrada", para="Claude")
+        self._mandar("dos", de="Entrada", para="Claude")
+        with self._sesion() as s:
+            self.assertTrue(any(r.startswith("Entrada  (2 sin leer)") for r in cl.chats(s)))
+            cl.leer(s, "Entrada")
+            self.assertTrue(any(r.startswith("Entrada:") for r in cl.chats(s)))
+
+    def test_mandar_firma_como_claude(self) -> None:
+        from pos_uniformes.scripts import buzon_claude as cl
+
+        with self._sesion() as s:
+            cl.mandar(s, "Entrada", "Get-Date | Out-String")
+            m = s.scalars(select(BuzonMensaje)).one()
+            self.assertEqual((m.de, m.para), ("Claude", "Entrada"))

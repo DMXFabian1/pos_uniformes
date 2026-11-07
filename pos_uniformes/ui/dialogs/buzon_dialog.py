@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from PyQt6.QtCore import QBuffer, QByteArray, QIODevice, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QFont, QFontDatabase, QImage, QPixmap
@@ -59,6 +59,10 @@ PESO_IMAGEN = 1_500_000
 
 # Los estados de lo que contesta a un comando (los del servicio, a la mano).
 _RECIBIDO, _TERMINO_BIEN = "recibido", "ok"
+#: Un comando se corta a los 2 minutos (`buzon_ejecutar_service.TIEMPO_LIMITE`).
+#: Si después de esto sigue en «Ejecutando…», la otra PC se cerró o se trabó:
+#: ya no va a llegar nada y la burbuja lo dice (2026-11-07).
+SIN_RESPUESTA_SEG = 5 * 60
 
 _VERDE = "#00a884"
 _ESTILO = f"""
@@ -486,6 +490,7 @@ class BuzonDialog(QDialog):
         confirmar_borrado=None,
         ver_imagen=None,
         tramo: int = TRAMO,
+        reloj=None,
     ) -> None:
         super().__init__(parent)
         from pos_uniformes.services import buzon_service as bz
@@ -525,6 +530,7 @@ class BuzonDialog(QDialog):
         self._confirmar_borrado = confirmar_borrado or _confirmar_borrado
         self._ver_imagen = ver_imagen or _ver_imagen_completa
         self._tramo = max(1, int(tramo))
+        self._reloj = reloj or (lambda: datetime.now(timezone.utc))
         self._cuantos = self._tramo         # cuántos mensajes del chat abierto se traen
         self._buscando = ""                 # texto que se busca en el chat abierto
         self._respondiendo: _Fila | None = None
@@ -1022,6 +1028,8 @@ class BuzonDialog(QDialog):
         )
         if firma == anterior:
             self._pintar_palomitas()      # nada nuevo, pero alguien pudo haber leído
+            for mensaje_id in list(self._estados):
+                self._pintar_estado(mensaje_id)   # un «Ejecutando…» viejo pasa a «no contestó»
             return  # no se repinta (no se pierde lo seleccionado)
         self._ultimo_pintado = firma
 
@@ -1137,7 +1145,7 @@ class BuzonDialog(QDialog):
             if f.estado and f.responde_a:
                 # Cómo le fue a un comando. «Recibido» no pisa a un resultado.
                 if not (f.estado == _RECIBIDO and self._estados.get(f.responde_a, ("",))[0] not in ("", _RECIBIDO)):
-                    self._estados[f.responde_a] = (f.estado, f.de)
+                    self._estados[f.responde_a] = (f.estado, f.de, f.creado)
                 con_estado.add(f.responde_a)
             if f.estado == _RECIBIDO:
                 continue      # no es un mensaje: es el «ejecutando…» de la burbuja del comando
@@ -1175,8 +1183,14 @@ class BuzonDialog(QDialog):
         estado = self._estados.get(mensaje_id)
         if partes is None or estado is None:
             return
-        cual, quien = estado
-        if cual == _RECIBIDO:
+        cual, quien, desde = estado
+        if cual == _RECIBIDO and self._sin_respuesta(desde):
+            texto, color = (
+                f"⚠️ {quien} no contestó (empezó a las {_hora(desde)}): se cerró el programa o se trabó. "
+                "Mándalo otra vez si hace falta."
+            ), "#b3261e"
+            partes.estado.setWordWrap(True)
+        elif cual == _RECIBIDO:
             texto, color = f"⏳ Ejecutando en {quien}…", "#8a6d00"
         elif cual == _TERMINO_BIEN:
             texto, color = f"✔ Corrió en {quien}: terminó bien", "#1c7c54"
@@ -1185,6 +1199,12 @@ class BuzonDialog(QDialog):
         partes.estado.setText(texto)
         partes.estado.setStyleSheet(f"font-size: 12px; font-weight: 700; color: {color};")
         partes.estado.setVisible(True)
+
+    def _sin_respuesta(self, desde) -> bool:
+        if desde is None:
+            return False
+        momento = desde if desde.tzinfo is not None else desde.replace(tzinfo=timezone.utc)
+        return (self._reloj() - momento).total_seconds() > SIN_RESPUESTA_SEG
 
     def _pintar_palomitas(self) -> None:
         """✓ enviado · ✓✓ ya lo abrieron del otro lado."""
