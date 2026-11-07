@@ -312,3 +312,31 @@ class DeshacerElPagoRegresaLaDeuda(_Base):
         self.assertIn("regresar_cobrados(session, int(pago.id))", fuente)
         # y antes de borrar el pago (después, `pago_id` ya sería NULL)
         self.assertLess(fuente.index("regresar_cobrados(session"), fuente.index("session.delete(pago)"))
+
+
+class AprobarViejoTests(_Base):
+    """Auditoría 2026-11-07, sección 5: aprobar días después no volvía a
+    revisar el tope ni si la empleada seguía trabajando."""
+
+    def test_si_le_pagaron_desde_que_lo_pidio_ya_no_cabe(self):
+        with self._ganado("2000"):
+            p = self._pedir(monto="1000")
+        with self._ganado("300"), self.assertRaises(pr.NoSePuede) as caso:
+            pr.aprobar(self.s, p.id, quien="VEND-1")
+        self.assertIn("Ya no cabe", str(caso.exception))
+        self.assertEqual(p.estado, pr.PEDIDO)
+        self.assertEqual(self.s.scalars(select(CajaRetiro)).all(), [])
+
+    def test_si_ya_no_esta_activa_no_se_presta(self):
+        with self._ganado("2000"):
+            p = self._pedir(monto="500")
+        self.s.scalar(select(Empleada).where(Empleada.codigo == "VEND-5")).activo = False
+        with self._ganado("2000"), self.assertRaises(pr.NoSePuede) as caso:
+            pr.aprobar(self.s, p.id, quien="VEND-1")
+        self.assertIn("ya no está activa", str(caso.exception))
+
+    def test_el_mismo_no_cuenta_contra_si_mismo(self):
+        with self._ganado("1000"):
+            p = self._pedir(monto="700")
+            pr.aprobar(self.s, p.id, quien="VEND-1")
+        self.assertEqual(p.estado, pr.APROBADO)

@@ -84,7 +84,7 @@ class BotonesViejosQueNoDebenHacerNadaTests(_Base):
     """Ninguno puede reventar ni quedarse callado: el botón se queda girando."""
 
     GASTADOS = [
-        "co:ver:99999", "co:quitar:99999", "co:borrar:99999", "co:borrarok:99999",
+        "co:ver:99999", "co:quitar:99999", "co:quitarok:99999", "co:borrar:99999", "co:borrarok:99999",
         "pr:ok:99999", "pr:no:99999", "dc:ok:99999", "dc:no:99999",
         "av:quitar:99999", "av:mas:99999:3", "av:otra:99999",
         "cc:ret:abc", "cc:fnd:abc", "cc:baja:abc", "cc:nota:",

@@ -69,7 +69,9 @@ def _guardar(datos: dict) -> None:
     ruta = ruta_estado()
     try:
         ruta.parent.mkdir(parents=True, exist_ok=True)
-        ruta.write_text(json.dumps(datos), encoding="utf-8")
+        from pos_uniformes.utils.archivo_atomico import escribir_json
+
+        escribir_json(ruta, datos)
     except OSError:
         logger.warning("No se pudo guardar la lista de mensajes del bot")
 

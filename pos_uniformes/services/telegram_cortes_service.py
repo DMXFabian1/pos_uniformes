@@ -444,7 +444,7 @@ def detalle(session: Session, corte_id: int) -> tuple[str, list]:
     if entro:
         lineas.append(f"Entró sin ser venta (fondo de papá…): ${entro:,.2f} — no cuenta como venta")
     lineas.append("")
-    lineas.append(f"Para cambiar la cifra:\n/ajustar {corte.id} 12500 depósito al banco")
+    lineas.append(f"Para cambiar la cifra:\n/ajustar {corte.id} 12500 depósito al banco si")
 
     filas = []
     if real is not None and real != oficial:
@@ -488,7 +488,7 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
     # Las que siguen van sobre UN corte y necesitan su número. Antes se pedía
     # para todas, y el botón «‹ Cortes» —que no lleva ninguno— contestaba «no
     # conozco ese botón» (visto el 2026-10-08).
-    if que in ("ver", "quitar", "borrar", "borrarok"):
+    if que in ("ver", "quitar", "quitarok", "borrar", "borrarok"):
         try:
             corte_id = int(crudo)
         except ValueError:
@@ -500,6 +500,16 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
         return "", texto_, _con_volver(filas)
 
     if que == "quitar":
+        # Primer toque: solo pregunta (auditoría 2026-11-07, sección 5).
+        with session_factory() as session:
+            texto_, _ = detalle(session, corte_id)
+        texto_ += "\n\n¿Quito el ajuste? La cifra vuelve a ser lo que de verdad se vendió."
+        return "", texto_, _con_volver(
+            [[("Sí, quítalo", f"{PREFIJO}quitarok:{corte_id}")],
+             [("Mejor no", f"{PREFIJO}ver:{corte_id}")]]
+        )
+
+    if que == "quitarok":
         with session_factory() as session:
             try:
                 hist.quitar_ajuste(session, corte_id, creado_por=quien)
@@ -634,12 +644,34 @@ def ajustar(session: Session, argumento: str, *, quien: str) -> str:
     if cifra is None:
         return "No entendí. Se usa así:\n/ajustar 12 12500 depósito al banco"
     nota = partes[2].strip() if len(partes) > 2 else ""
+    # Dos pasos (auditoría 2026-11-07, sección 5): sin «si» al final solo
+    # se enseña cómo quedaría. Se revisa todo sin guardar, para que
+    # los errores (falta el por qué, deja el cajón negativo) salgan ya.
+    from pos_uniformes.services.telegram_pagos_service import CONFIRMAR
+
+    palabras = nota.split()
+    confirmado = bool(palabras) and palabras[-1].lower() in CONFIRMAR
+    if confirmado:
+        nota = " ".join(palabras[:-1])
     try:
-        hist.ajustar_corte(session, corte_id, venta=cifra, creado_por=quien, nota=nota)
-        session.commit()
+        r = hist.ajustar_corte(session, corte_id, venta=cifra, creado_por=quien, nota=nota, guardar=confirmado)
     except Exception as exc:  # noqa: BLE001
         session.rollback()
         return str(exc)
+    if not confirmado:
+        from pos_uniformes.database.models import LibretaCorte
+
+        corte = session.get(LibretaCorte, corte_id)
+        antes = r.get("venta_antes")
+        de = f" de ${antes:,.2f}" if antes is not None else ""
+        cuando = f" (del {corte.fecha:%d/%m})" if corte is not None else ""
+        return (
+            f"¿Cambio el corte {corte_id}{cuando}{de} a ${cifra:,.2f}?"
+            + (f"\nPor qué: {nota}" if nota else "")
+            + f"\n\nPara hacerlo, manda lo mismo con «si» al final:\n/ajustar {corte_id} {partes[1]}"
+            + (f" {nota}" if nota else "") + " si"
+        )
+    session.commit()
     return f"✅ El corte {corte_id} ahora dice ${cifra:,.2f}." + (
         f"\nPor qué: {nota}" if nota else ""
     )

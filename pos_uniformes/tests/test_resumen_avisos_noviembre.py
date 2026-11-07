@@ -86,7 +86,8 @@ class ElResumenCuentaElDiaCompletoTests(unittest.TestCase):
         from pathlib import Path
 
         raiz = Path(__file__).resolve().parents[1]
-        self.assertIn("formatear(recolectar(session, hoy, todo_el_dia=True))",
+        # /resumen ayer: el día cambia, el «día completo» no (sección 5).
+        self.assertIn("formatear(recolectar(session, dia, todo_el_dia=True))",
                       (raiz / "services" / "telegram_bot_service.py").read_text(encoding="utf-8"))
         self.assertIn("formatear(recolectar(session, hoy, todo_el_dia=True))",
                       (raiz / "scripts" / "resumen_diario_telegram.py").read_text(encoding="utf-8"))

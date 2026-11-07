@@ -206,7 +206,9 @@ def _escribir_notas(datos: dict) -> None:
 
     ruta = ruta_notas()
     ruta.parent.mkdir(parents=True, exist_ok=True)
-    ruta.write_text(json.dumps(datos, ensure_ascii=False), encoding="utf-8")
+    from pos_uniformes.utils.archivo_atomico import escribir_json
+
+    escribir_json(ruta, datos, ensure_ascii=False)
 
 
 def guardar_nota_pendiente(nota: str) -> str:

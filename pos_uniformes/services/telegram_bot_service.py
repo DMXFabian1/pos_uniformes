@@ -52,20 +52,24 @@ AYUDA = (
     "/corte 5000 — el mismo corte, pero se retiran $5,000\n"
     "/corte sintarjeta — sin que se vean los cobros con tarjeta\n"
     "   (se pueden juntar: /corte 5000 sintarjeta)\n"
+    "/corte fondo 2000 — deja ese fondo · /corte otros 350 — una salida no apuntada\n"
+    "/corte contarjeta — con los de tarjeta aunque los tengas ocultos\n"
+    "/corte segundo — otro corte si el anterior fue hace menos de una hora\n"
     "/nocorte — dejar pasar el corte propuesto hoy\n"
     "/estado — qué hay en caja ahora\n"
     "/pulso — ¿está todo en pie? la tienda entera en una pantalla\n"
     "/hoy — cómo va el día ahora mismo\n"
-    "/resumen — resumen del día (el de la noche, completo)\n"
+    "/resumen — resumen del día (el de la noche, completo) · /resumen ayer · /resumen 5/11\n"
     "/pendientes — lo que falta por registrar\n"
     "/cortes — los últimos cortes; toca uno para ajustarlo o borrarlo\n"
     "/cortes 30 — los de los últimos 30 días (para rastrear el dinero)\n"
-    "/ajustar 12 12500 depósito al banco — cambia la cifra de ese corte\n"
+    "/ajustar 12 12500 depósito al banco — enseña cómo queda; con «si» al final se cambia\n"
     "/sintarjeta 12 — esconde los cobros con tarjeta de un corte ya hecho\n"
     "/contarjeta 12 — los vuelve a enseñar (si fue un error)\n"
     "/retiro 500 gasolina — saca del cajón, con su motivo (no más de lo que hay; «forzar» al final si sí)\n"
     "/entrada 1750 papá — dinero que entró al cajón sin ser venta (para la\n"
     "   nómina); los pagos salen del cajón normal y el corte lo suma\n"
+    "/deshacer — los retiros y entradas de hoy, para deshacer uno (antes del corte)\n"
     "/cajon — desmarca lo que NO salió del cajón (una transferencia,\n"
     "   algo ya contado). Antes del corte\n"
     "\nPAGOS\n"
@@ -81,7 +85,7 @@ AYUDA = (
     "/prenda playera justo sierra — precio y cuántas hay por talla\n"
     "/escuela conalep — cómo va esa escuela\n"
     "/contar — qué falta contar, lo más urgente primero\n"
-    "/faltas — lo que pidieron y no había\n"
+    "/faltas — lo que pidieron y no había · /faltas 30 = los últimos 30 días\n"
     "\nLAS PANTALLAS\n"
     "/aviso Junta a las 6 — sale a pantalla completa en la tienda\n"
     "/aviso 3h Hoy cerramos temprano — y se quita solo en 3 horas\n"
@@ -92,6 +96,7 @@ AYUDA = (
     "\nEL SISTEMA\n"
     "/version — qué versión trae la PC principal y cuál corren los kioskos\n"
     "/actualizar — trae lo nuevo y actualiza la tienda (respaldo antes, y vuelta atrás si falla)\n"
+    "/actualizar noche — que se actualice sola cada noche (/actualizar noche no lo quita)\n"
     "/volver — los kioskos regresan a la versión anterior, si la nueva salió mala\n"
     "/camaras — si el contador de personas está contando y si sus números tienen sentido\n"
     "\nGENTE\n"
@@ -108,6 +113,29 @@ class Comando:
     argumento: str = ""
 
 
+def error_legible(exc: BaseException) -> str:
+    """«Falló: …» en palabras de la tienda, no el error de Python.
+
+    Antes salía crudo: «Falló: (psycopg.OperationalError) connection to
+    server at 192.168.0.10…» (auditoría 2026-11-07, sección 5). El detalle
+    completo queda en el log; aquí, qué pasó y qué hacer. Empieza siempre con
+    «Falló» porque así se reconoce un botón que no se hizo."""
+    nombre = type(exc).__name__
+    texto = str(exc)
+    bajo = f"{nombre} {texto}".lower()
+    if any(x in bajo for x in ("operationalerror", "connection to server", "could not connect",
+                                "no route to host", "connection refused", "server closed the connection",
+                                "interfaceerror")):
+        return ("Falló: no pude hablar con la base de datos de la tienda (¿está prendida la PC principal "
+                "y con red?). No se guardó nada; inténtalo en un rato.")
+    if "timeout" in bajo or "timed out" in bajo:
+        return "Falló: la tienda tardó demasiado en contestar. No sé si se hizo; revísalo antes de repetirlo."
+    if isinstance(exc, (ValueError, PermissionError)) and texto and "\n" not in texto and len(texto) < 300:
+        # Los nuestros ya vienen en español («Ese retiro ya se registró…»).
+        return f"Falló: {texto}"
+    return f"Falló: algo no salió ({nombre}). No se guardó nada; el detalle quedó en el registro del bot."
+
+
 def parsear(texto: str) -> Comando | None:
     t = (texto or "").strip()
     if not t.startswith("/"):
@@ -115,6 +143,9 @@ def parsear(texto: str) -> Comando | None:
     partes = t[1:].split(maxsplit=1)
     nombre = partes[0].split("@")[0].lower()
     argumento = partes[1].strip() if len(partes) > 1 else ""
+    # «/deshacer_r12» (tocable) = «/deshacer r12».
+    if nombre.startswith("deshacer_") and nombre != "deshacer_pago":
+        return Comando("deshacer", nombre[len("deshacer_"):])
     # "/falta_Fanny" (tocable en Telegram, una sola palabra) = "/falta Fanny".
     for base in ("falta", "descanso", "vino"):
         if nombre.startswith(base + "_") and len(nombre) > len(base) + 1:
@@ -283,6 +314,34 @@ def leer_opciones_corte(argumento: str) -> OpcionesCorte:
     )
 
 
+def dia_de_argumento(argumento: str, hoy: date) -> date:
+    """«», «hoy», «ayer», «antier», «5/11» o «5/11/2026» → la fecha.
+    Lo demás es error: antes «/resumen ayer» daba el de hoy callado."""
+    from datetime import timedelta
+
+    t = (argumento or "").strip().lower()
+    if t in ("", "hoy"):
+        return hoy
+    if t == "ayer":
+        return hoy - timedelta(days=1)
+    if t in ("antier", "anteayer", "antes de ayer"):
+        return hoy - timedelta(days=2)
+    partes = t.replace("-", "/").split("/")
+    try:
+        if len(partes) in (2, 3):
+            d, m = int(partes[0]), int(partes[1])
+            a = int(partes[2]) if len(partes) == 3 else hoy.year
+            if a < 100:
+                a += 2000
+            dia = date(a, m, d)
+            if len(partes) == 2 and dia > hoy:
+                dia = date(a - 1, m, d)
+            return dia
+    except ValueError:
+        pass
+    raise ValueError(f"No entendí «{argumento.strip()}» como día. Por ejemplo: /resumen ayer o /resumen 5/11")
+
+
 def _sin_argumento(cmd) -> str:
     """Un aviso corto cuando se le pone algo a un comando que no lleva nada.
 
@@ -339,6 +398,12 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
     if cmd.nombre == "nocorte":
         from pos_uniformes.services.corte_propuesta_service import cancelar
 
+        if (cmd.argumento or "").strip():
+            # «/nocorte mañana» cancelaba HOY (auditoría 2026-11-07, sección 5).
+            return (f"/nocorte solo deja pasar el corte de HOY y no lleva nada después; "
+                    f"«{cmd.argumento.strip()}» no lo entiendo. No cancelé nada.\n"
+                    "Si es el de hoy: /nocorte (solo).")
+
         if cancelar(hoy):
             return "Ok, hoy no se hace el corte. Cuando quieras, /corte."
         return ("Anotado: hoy no se hace el corte, ni te lo propongo ni lo cierro solo. "
@@ -347,12 +412,16 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
         from pos_uniformes.services.corte_remoto_service import texto_estado_actual
 
         with session_factory() as session:
-            return texto_estado_actual(session)
+            return _sin_argumento(cmd) + texto_estado_actual(session)
     if cmd.nombre == "resumen":
         from pos_uniformes.services.resumen_diario_service import formatear, recolectar
 
+        try:
+            dia = dia_de_argumento(cmd.argumento, hoy or date.today())
+        except ValueError as exc:
+            return str(exc)
         with session_factory() as session:
-            return formatear(recolectar(session, hoy, todo_el_dia=True))
+            return formatear(recolectar(session, dia, todo_el_dia=True))
     if cmd.nombre == "hoy":
         from pos_uniformes.services import asistencia_service as asis
         from pos_uniformes.services.resumen_diario_service import recolectar, texto_hoy
@@ -370,17 +439,17 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
                 linea = comp.texto(comp.comparar(session, hoy))
             except Exception:  # noqa: BLE001 — el día sale igual sin comparación
                 linea = ""
-            return texto + (f"\n\n{linea}" if linea else "")
+            return _sin_argumento(cmd) + texto + (f"\n\n{linea}" if linea else "")
     if cmd.nombre in ("pulso", "pulse", "todo"):
         from pos_uniformes.services.telegram_pulso_service import pulso
 
         with session_factory() as session:
-            return pulso(session, hoy=hoy)
+            return _sin_argumento(cmd) + pulso(session, hoy=hoy)
     if cmd.nombre == "pendientes":
         from pos_uniformes.services.resumen_diario_service import texto_solo_pendientes
 
         with session_factory() as session:
-            return texto_solo_pendientes(session, hoy) or "Sin pendientes. ✅"
+            return _sin_argumento(cmd) + (texto_solo_pendientes(session, hoy) or "Sin pendientes. ✅")
     if cmd.nombre == "asistencia":
         with session_factory() as session:
             return _sin_argumento(cmd) + mensaje_asistencia(session, hoy)[0]
@@ -495,6 +564,11 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
 
         with session_factory() as session:
             return pg.entrada(session, cmd.argumento, quien=CODIGO_REMOTO)
+    if cmd.nombre == "deshacer":
+        from pos_uniformes.services import telegram_pagos_service as pg
+
+        with session_factory() as session:
+            return pg.deshacer(session, cmd.argumento, quien=CODIGO_REMOTO, hoy=hoy)
     if cmd.nombre in ("deshacerpago", "deshacer_pago"):
         from pos_uniformes.services import telegram_pagos_service as pg
 
@@ -541,7 +615,29 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
                 return f"¿Quién? Escribe el nombre como aparece en la lista: /{cmd.nombre} Fanny"
             hecho = asis.marcar(session, code, accion, hoy)
             return hecho + "\n\n" + mensaje_asistencia(session, hoy)[0]
-    return f"No conozco /{cmd.nombre}. " + AYUDA
+    return comando_desconocido(cmd.nombre)
+
+
+def comandos_conocidos() -> list[str]:
+    """Los comandos que salen en la ayuda (de ahí se sacan, para no llevar
+    dos listas) más los que se atienden y no se anuncian."""
+    import re
+
+    nombres = set(re.findall(r"/([a-záéíóúñ_]+)", AYUDA))
+    nombres |= {"ayuda", "menu", "asistencia", "vino", "falta", "descanso", "version", "volver", "camaras"}
+    return sorted(nombres)
+
+
+def comando_desconocido(nombre: str) -> str:
+    """«No conozco /x. ¿Quisiste decir /y?» en vez de las 2,800 letras de la
+    ayuda (auditoría 2026-11-07, sección 5)."""
+    import difflib
+
+    parecidos = difflib.get_close_matches(nombre, comandos_conocidos(), n=2, cutoff=0.6)
+    texto = f"No conozco /{nombre}."
+    if parecidos:
+        texto += " ¿Quisiste decir " + " o ".join(f"/{p}" for p in parecidos) + "?"
+    return texto + "\nPara ver todo: /ayuda (o /menu con botones)."
 
 
 #: Comandos cuya respuesta lleva botones. Sin esto, `/avisos` decía «toca uno
@@ -845,9 +941,53 @@ def _guardar_offset(offset: int | None) -> None:
     try:
         ruta = ruta_offset()
         ruta.parent.mkdir(parents=True, exist_ok=True)
-        ruta.write_text(json.dumps({"offset": int(offset)}), encoding="utf-8")
+        from pos_uniformes.utils.archivo_atomico import escribir_json
+
+        escribir_json(ruta, {"offset": int(offset)})
     except Exception:  # noqa: BLE001 — recordar no vale un error
         pass
+
+
+#: Lo que sale al teclear «/» en Telegram (setMyCommands). Lo más usado
+#: arriba. Sin esto había que saberse los nombres (auditoría 2026-11-07).
+COMANDOS_MENU: tuple[tuple[str, str], ...] = (
+    ("menu", "Todo con botones"),
+    ("corte", "Hacer el corte ahora (/corte 5000 retira eso)"),
+    ("nocorte", "Dejar pasar el corte de hoy"),
+    ("hoy", "Cómo va el día"),
+    ("estado", "Qué hay en caja ahora"),
+    ("pulso", "¿Está todo en pie?"),
+    ("resumen", "Resumen del día (/resumen ayer)"),
+    ("pendientes", "Lo que falta por registrar"),
+    ("cortes", "Los últimos cortes (/cortes 30)"),
+    ("retiro", "Sacar del cajón: /retiro 500 gasolina"),
+    ("entrada", "Dinero que entró sin ser venta"),
+    ("deshacer", "Deshacer el último retiro o entrada de hoy"),
+    ("cajon", "Lo que no salió del cajón"),
+    ("pagos", "A quién le toca cobrar"),
+    ("pagar", "Pagarle a alguien: /pagar Fanny"),
+    ("deshacerpago", "Deshacer el último pago de hoy"),
+    ("prestamos", "Préstamos por aprobar"),
+    ("descansos", "Días que te pidieron"),
+    ("prenda", "Precio y existencias: /prenda playera"),
+    ("escuela", "Cómo va una escuela"),
+    ("contar", "Qué falta contar"),
+    ("faltas", "Lo que pidieron y no había"),
+    ("aviso", "Aviso a pantalla completa en la tienda"),
+    ("avisos", "Los avisos puestos"),
+    ("ayuda", "Todos los comandos"),
+)
+
+
+def registrar_comandos(token: str) -> None:
+    """Le dice a Telegram la lista de comandos para que la ofrezca al teclear «/»."""
+    import json
+
+    from pos_uniformes.services import telegram_service
+
+    telegram_service._llamar(token, "setMyCommands", {
+        "commands": json.dumps([{"command": c, "description": d} for c, d in COMANDOS_MENU], ensure_ascii=False)
+    })
 
 
 def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False, alertas: bool = True, on_tick=None) -> None:
@@ -869,6 +1009,10 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
         asegurar_menu_fijado(session_factory=session_factory, token=token, chat_id=chat_id)
     except Exception:  # noqa: BLE001 — sin menú fijado, el bot funciona igual
         logger.exception("No se pudo dejar el menú fijado")
+    try:
+        registrar_comandos(token)
+    except Exception:  # noqa: BLE001 — sin autocompletar, el bot funciona igual
+        logger.warning("No se pudo registrar la lista de comandos")
 
     def _mandar(texto: str, botones: str = "") -> None:
         # Alertas, cortes y avisos del vigilante: se quedan en el chat. Lo que
@@ -885,13 +1029,18 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
                 pass
         if alertas:
             procesar(session_factory, _mandar, vigilante)
+        # Cada uno por su lado: si fallaba la limpieza, el menú tampoco se
+        # refrescaba (auditoría 2026-11-07, #35).
         try:
             limpiar_si_toca(session_factory=session_factory, token=token, chat_id=chat_id)
+        except Exception:  # noqa: BLE001 — la limpieza nunca tumba el bot
+            logger.exception("Falló el barrido de mensajes")
+        try:
             refrescar_menu_si_toca(
                 session_factory=session_factory, token=token, chat_id=chat_id
             )
-        except Exception:  # noqa: BLE001 — la limpieza nunca tumba el bot
-            logger.exception("Falló el barrido de mensajes")
+        except Exception:  # noqa: BLE001
+            logger.exception("Falló el refresco del menú")
         if on_tick is not None:
             # Segundo latido: el barrido y el menú pueden tardar, y la espera
             # de getUpdates son hasta 40 s más.
@@ -1016,7 +1165,7 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
                         )
                 except Exception as exc:  # noqa: BLE001
                     logger.exception("Error atendiendo %r", texto)
-                    respuesta = f"Falló: {exc}"
+                    respuesta = error_legible(exc)
                 if not respuesta:
                     continue
             try:
@@ -1126,7 +1275,7 @@ def _atender_toque(toque: dict, *, session_factory, token: str, chat_id: str) ->
             )
         except Exception as exc:  # noqa: BLE001
             logger.exception("Error atendiendo el toque %r", dato)
-            resultado = (f"Falló: {exc}", "", "")
+            resultado = (error_legible(exc), "", "")
     if resultado is None:
         # Un botón de una versión vieja del bot: antes, globito vacío y nada
         # (2026-10-10). Mejor decirlo.

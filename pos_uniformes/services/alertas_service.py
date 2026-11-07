@@ -259,9 +259,11 @@ def _guardar_memoria(datos: dict) -> None:
     try:
         ruta = ruta_memoria()
         ruta.parent.mkdir(parents=True, exist_ok=True)
-        ruta.write_text(json.dumps({
+        from pos_uniformes.utils.archivo_atomico import escribir_json
+
+        escribir_json(ruta, {
             k: (v.isoformat() if isinstance(v, date) else v) for k, v in datos.items()
-        }), encoding="utf-8")
+        })
     except Exception:  # noqa: BLE001 — recordar no vale un error
         pass
 

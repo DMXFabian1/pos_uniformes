@@ -113,11 +113,28 @@ def _pedir(url: str, cuerpo: bytes | None, timeout: float, verificar: bool) -> s
     except Exception as exc:  # noqa: BLE001
         if _es_de_certificado(exc):
             raise  # lo atiende quien llama, para caer al modo sin verificar
+        if cuerpo is not None and _ya_se_mando(exc):
+            # El mensaje ya salió y lo que tardó fue la respuesta: repetirlo
+            # por el otro camino lo mandaba dos veces (auditoría 2026-11-07,
+            # #34). Quien llama lo trata como falla y no lo repite al instante.
+            soltar_pool()
+            raise
         _log.debug("Conexión reutilizada falló (%s); se va por el camino de siempre", exc)
         soltar_pool()
         req = urllib.request.Request(url, data=cuerpo)
         with urllib.request.urlopen(req, timeout=timeout, context=_contexto_ssl(verificar)) as resp:
             return resp.read().decode("utf-8")
+
+
+def _ya_se_mando(exc: BaseException) -> bool:
+    """¿El error llegó cuando la petición ya había salido (se acabó el tiempo
+    esperando la respuesta)? Una conexión que no abrió o que el servidor ya
+    había cerrado no mandó nada y sí se puede repetir."""
+    try:
+        from urllib3.exceptions import ReadTimeoutError
+    except Exception:  # noqa: BLE001
+        return False
+    return isinstance(exc, ReadTimeoutError)
 
 
 def _es_de_certificado(exc: BaseException) -> bool:
@@ -354,13 +371,25 @@ def desfijar_mensaje(message_id: int, *, token: str | None = None, chat_id: str 
         return False
 
 
+AVISO_RECORTADO = "\n… (no cupo todo en un mensaje; lo demás se cortó)"
+
+
+def recortar_para_editar(texto: str) -> str:
+    """Un mensaje editado no se puede partir en dos como uno nuevo. Antes se
+    cortaba a los 4,000 sin avisar (auditoría 2026-11-07, #35): ahora se dice."""
+    if len(texto) <= _MAX:
+        return texto
+    _log.warning("Mensaje editado de %s caracteres: se recorta", len(texto))
+    return texto[: _MAX - len(AVISO_RECORTADO)].rstrip() + AVISO_RECORTADO
+
+
 def editar_mensaje(
     message_id: int, texto: str, *, token: str | None = None, chat_id: str | None = None, botones: str | None = None
 ) -> None:
     """Reescribe un mensaje ya mandado (y sus botones). Para que la lista de
     asistencia se actualice en el mismo lugar en vez de mandar otra."""
     token, chat_id = _credenciales(token, chat_id)
-    datos = {"chat_id": chat_id, "message_id": str(message_id), "text": texto[:_MAX]}
+    datos = {"chat_id": chat_id, "message_id": str(message_id), "text": recortar_para_editar(texto)}
     if botones:
         datos["reply_markup"] = botones
     _llamar(token, "editMessageText", datos)

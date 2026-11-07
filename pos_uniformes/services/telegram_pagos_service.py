@@ -320,6 +320,77 @@ def entrada(session: Session, argumento: str, *, quien: str) -> str:
             "Los pagos salen del cajón como siempre; el corte ya suma esto y lo que sobre se queda.")
 
 
+# ------------------------------------------------------------ /deshacer
+
+def _dia_local(momento) -> date | None:
+    if momento is None:
+        return None
+    return (momento.astimezone() if momento.tzinfo else momento).date()
+
+
+def _movimientos_de_hoy(session: Session, hoy: date) -> list[tuple[str, object]]:
+    """Los retiros y entradas de hoy, el más nuevo primero: («r12», fila)."""
+    from pos_uniformes.database.models import CajaEntrada, CajaRetiro
+    from sqlalchemy import select
+
+    filas: list[tuple[str, object]] = []
+    for letra, modelo in (("r", CajaRetiro), ("e", CajaEntrada)):
+        for f in session.scalars(select(modelo).order_by(modelo.created_at.desc()).limit(20)).all():
+            if _dia_local(f.created_at) == hoy:
+                filas.append((f"{letra}{f.id}", f))
+    filas.sort(key=lambda x: x[1].created_at, reverse=True)
+    return filas
+
+
+def _renglon_movimiento(clave: str, fila) -> str:
+    que = "Retiro" if clave.startswith("r") else "Entrada"
+    hora = f"{fila.created_at.astimezone() if fila.created_at.tzinfo else fila.created_at:%H:%M}"
+    return f"{que} de ${Decimal(str(fila.monto)):,.2f} ({fila.motivo or 'sin motivo'}, {hora}) → /deshacer_{clave}"
+
+
+def deshacer(session: Session, argumento: str = "", *, quien: str, hoy: date | None = None) -> str:
+    """«/deshacer»: los retiros y entradas de hoy, cada uno con su
+    «/deshacer r12». Con la clave, se borra (auditoría 2026-11-07, sección 5:
+    las funciones existían y el celular no las ofrecía).
+
+    Mismas redes que /deshacerpago: solo de hoy, nunca uno que ya entró en un
+    corte, y el retiro de un préstamo no (ese se arregla con el préstamo)."""
+    from pos_uniformes.services import entradas_service, retiros_service
+
+    hoy_ = hoy or date.today()
+    movimientos = _movimientos_de_hoy(session, hoy_)
+    clave = (argumento or "").strip().lower().lstrip("#")
+    if not clave:
+        if not movimientos:
+            return "Hoy no hay retiros ni entradas que deshacer."
+        lineas = [_renglon_movimiento(c, f) for c, f in movimientos[:8]]
+        return "Retiros y entradas de hoy (toca el comando del que quieras deshacer):\n\n" + "\n".join(lineas)
+    fila = dict(movimientos).get(clave)
+    if fila is None:
+        return (f"No encuentro «{clave}» entre los retiros y entradas de hoy. "
+                "Manda /deshacer para ver la lista. Los de otros días se corrigen en la tienda.")
+    monto = Decimal(str(fila.monto))
+    if clave.startswith("r") and str(fila.motivo or "").startswith("Préstamo a"):
+        return (f"Ese retiro es el préstamo ({fila.motivo}, ${monto:,.2f}). Borrarlo dejaría el préstamo "
+                "aprobado sin su dinero; se corrige en la tienda.")
+    corte = _corte_despues(session, fila.created_at)
+    if corte is not None:
+        hora = f" de las {corte.created_at:%H:%M}" if getattr(corte, "created_at", None) else ""
+        return (f"Ese ya entró en el corte{hora}: deshacerlo dejaría ese corte descuadrado. "
+                "Se corrige en la tienda.")
+    try:
+        if clave.startswith("r"):
+            ok = retiros_service.eliminar_retiro(session, fila.id, creado_por=quien)
+        else:
+            ok = entradas_service.eliminar_entrada(session, fila.id, creado_por=quien)
+    except PermissionError as exc:
+        return f"No se pudo: {exc}"
+    if not ok:
+        return "Ya no estaba; nada que deshacer."
+    que = "el retiro" if clave.startswith("r") else "la entrada"
+    return f"↩️ Deshice {que} de ${monto:,.2f} ({fila.motivo or 'sin motivo'}). El cajón ya no lo cuenta."
+
+
 # ------------------------------------------------------------ /deshacerpago
 
 def _corte_despues(session: Session, cuando):

@@ -311,7 +311,7 @@ def quitar_ajuste(session, corte_id: int, *, creado_por: str) -> dict:
     return {"id": corte.id, "cambio": True, "antes": antes, "monto_final": real, "ajuste": (antes - real)}
 
 
-def ajustar_corte(session, corte_id: int, *, venta, creado_por: str, nota: str = "") -> dict:
+def ajustar_corte(session, corte_id: int, *, venta, creado_por: str, nota: str = "", guardar: bool = True) -> dict:
     """Cambia la venta OFICIAL de un corte ya hecho (SOLO el dueño, VEND-1).
 
     `venta` es lo que se reporta. La cifra del corte se recalcula con la
@@ -353,6 +353,10 @@ def ajustar_corte(session, corte_id: int, *, venta, creado_por: str, nota: str =
         raise ValueError(
             "Escribe por qué se ajusta: sin eso, ese dinero queda sin explicación."
         )
+    if not guardar:
+        # Solo revisar (el /ajustar del celular pregunta antes de hacerlo).
+        return {"id": corte.id, "venta": venta, "monto_final": nuevo_final, "antes": antes,
+                "venta_antes": venta_oficial(corte), "nota": nota}
     corte.monto_final = nuevo_final
     # La nota acompaña al ajuste; si se deja la cifra real, se borra con él.
     corte.nota = nota if hay_ajuste else None

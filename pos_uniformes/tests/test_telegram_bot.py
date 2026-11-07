@@ -225,6 +225,7 @@ class RelojAdelantadoTests(unittest.TestCase):
         with patch("pos_uniformes.services.telegram_service._llamar", side_effect=respuestas), \
              patch("pos_uniformes.services.telegram_service.enviar_mensaje"), \
              patch.object(bot, "asegurar_menu_fijado"), patch.object(bot, "limpiar_si_toca"), \
+             patch.object(bot, "registrar_comandos"), \
              patch.object(bot, "_guardar_offset"), patch.object(bot, "_leer_offset", return_value=None), \
              patch.object(bot.time, "time", return_value=adelantado), \
              patch.object(bot, "atender_texto", return_value="ok") as atender:
@@ -255,7 +256,8 @@ class BotonQueFallaTests(unittest.TestCase):
             bot._atender_toque(toque, session_factory=_sesion, token="t", chat_id="123")
         texto = enviar.call_args.args[0]
         self.assertIn("Ese botón no se pudo hacer", texto)
-        self.assertIn("connection refused", texto)
+        # En palabras de la tienda, no el error de Python (sección 5).
+        self.assertIn("base de datos de la tienda", texto)
         editar.assert_not_called()       # el mensaje tocado conserva sus botones
 
     def test_si_sale_bien_no_manda_nada_aparte(self) -> None:

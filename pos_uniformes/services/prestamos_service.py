@@ -178,6 +178,7 @@ def aprobar(session: Session, prestamo_id: int, *, quien: str) -> PrestamoEmplea
     Sin ese retiro, el corte de la noche saldría corto justo por el préstamo y
     parecería un descuadre."""
     prestamo = _pedido(session, prestamo_id)
+    _revisar_al_aprobar(session, prestamo)
     prestamo.estado = APROBADO
     prestamo.resuelto_por = str(quien)
     prestamo.resuelto_at = _ahora()
@@ -194,6 +195,28 @@ def aprobar(session: Session, prestamo_id: int, *, quien: str) -> PrestamoEmplea
     )
     session.flush()
     return prestamo
+
+
+def _revisar_al_aprobar(session: Session, prestamo: PrestamoEmpleada) -> None:
+    """El tope se revisó cuando lo pidió; aprobarlo días después lo daba por
+    bueno aunque ya le hubieran pagado (el tope vuelve a cero) o ya no
+    trabajara aquí (auditoría 2026-11-07, sección 5)."""
+    from pos_uniformes.database.models import Empleada
+
+    nombre = prestamo.employee_name or prestamo.employee_code
+    empleada = session.scalar(select(Empleada).where(Empleada.codigo == str(prestamo.employee_code)))
+    if empleada is not None and not empleada.activo:
+        raise NoSePuede(f"{nombre} ya no está activa: no se le puede prestar. Recházalo.")
+    monto = Decimal(str(prestamo.monto))
+    tope = tope_para(session, prestamo.employee_code)
+    otros = comprometido(session, prestamo.employee_code) - monto
+    disponible = max(tope - otros, Decimal("0.00")).quantize(_CENT)
+    if monto > disponible:
+        raise NoSePuede(
+            f"Ya no cabe: hoy lo más que se le puede prestar a {nombre} son ${disponible:,.2f} "
+            f"(el 70% de lo que lleva ganado, ${tope:,.2f}, menos lo que ya debe). "
+            "Lo pidió antes; desde entonces le pagaron o pidió más. Recházalo y que lo pida otra vez."
+        )
 
 
 def rechazar(session: Session, prestamo_id: int, *, quien: str) -> PrestamoEmpleada:

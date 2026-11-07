@@ -80,7 +80,10 @@ def _guardar(estado: Estado) -> None:
     ruta = ruta_estado()
     try:
         ruta.parent.mkdir(parents=True, exist_ok=True)
-        ruta.write_text(
+        from pos_uniformes.utils.archivo_atomico import escribir_texto
+
+        escribir_texto(
+            ruta,
             json.dumps(
                 {
                     "caido_desde": estado.caido_desde.isoformat() if estado.caido_desde else None,
@@ -89,7 +92,6 @@ def _guardar(estado: Estado) -> None:
                 },
                 ensure_ascii=False,
             ),
-            encoding="utf-8",
         )
     except Exception:  # noqa: BLE001 — llevar la cuenta jamás puede tumbar el bot
         pass

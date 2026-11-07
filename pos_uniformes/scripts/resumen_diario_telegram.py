@@ -170,7 +170,9 @@ def anotar_resumen_enviado(hoy) -> None:
     try:
         ruta = ruta_resumen_enviado()
         ruta.parent.mkdir(parents=True, exist_ok=True)
-        ruta.write_text(json.dumps({"fecha": hoy.isoformat()}), encoding="utf-8")
+        from pos_uniformes.utils.archivo_atomico import escribir_json
+
+        escribir_json(ruta, {"fecha": hoy.isoformat()})
     except Exception:  # noqa: BLE001 — recordar no vale un error
         pass
 

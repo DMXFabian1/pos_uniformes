@@ -205,8 +205,15 @@ class TocarUnCorteTests(unittest.TestCase):
         self.assertIsNone(self.s.get(LibretaCorte, cid))
 
     def test_quitar_el_ajuste(self) -> None:
-        aviso, _, _ = ct.atender(
+        """Primer toque pregunta; el segundo quita (auditoría 2026-11-07)."""
+        aviso, texto, botones = ct.atender(
             f"co:quitar:{self.corte.id}", session_factory=self.factory, quien="VEND-1"
+        )
+        self.assertEqual(aviso, "")
+        self.assertIn("¿Quito el ajuste?", texto)
+        self.assertIn(f"co:quitarok:{self.corte.id}", botones)
+        aviso, _, _ = ct.atender(
+            f"co:quitarok:{self.corte.id}", session_factory=self.factory, quien="VEND-1"
         )
         self.assertEqual(aviso, "Ajuste quitado")
 
