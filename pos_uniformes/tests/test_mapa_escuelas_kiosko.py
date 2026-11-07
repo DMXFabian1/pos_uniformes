@@ -103,14 +103,15 @@ class AtajosTests(unittest.TestCase):
         ventana = QWidget()
         atajos = ac.instalar_atajos(ventana)
         self.assertEqual([a.key().toString() for a in atajos], ["Ctrl+Shift+M", "Ctrl+Shift+E"])
-        with mock.patch.object(ac, "_abrir") as abrir:
+        # Abren en una ventana del programa (2026-11-07), no en el navegador.
+        with mock.patch("pos_uniformes.ui.dialogs.visor_consulta_dialog.mostrar_pdf") as pdf:
             atajos[1].activated.emit()
-            abrir.assert_called_once_with(ac.ruta_tipos_escoces())
-        with mock.patch.object(ac, "_abrir") as abrir, \
+            pdf.assert_called_once_with(ac.ruta_tipos_escoces(), "🧵 Tipos de escocés", ventana)
+        with mock.patch.object(ac, "_hay_motor_web", return_value=True), \
+                mock.patch("pos_uniformes.ui.dialogs.visor_consulta_dialog.mostrar_mapa") as mapa, \
                 mock.patch("pos_uniformes.services.mapa_escuelas_service.preparar", return_value=Path("/x/mapa.html")):
             atajos[0].activated.emit()
-            abrir.assert_called_once_with(Path("/x/mapa.html"))
-
+            mapa.assert_called_once_with(Path("/x/mapa.html"), ventana)
 
 if __name__ == "__main__":
     unittest.main()

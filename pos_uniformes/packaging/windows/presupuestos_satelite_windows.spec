@@ -65,6 +65,12 @@ hiddenimports += [
     "pos_uniformes.services.inventory_label_service",
     "pos_uniformes.services.mapa_escuelas_service",
     "pos_uniformes.ui.helpers.abrir_consultas",
+    # Las consultas en una ventana del programa: el PDF con QtPdf (viene en
+    # PyQt6, ~6 MB). El mapa necesita QtWebEngine, que NO va en el kiosko
+    # (~150 MB): ahí abre en Edge modo ventana.
+    "pos_uniformes.ui.dialogs.visor_consulta_dialog",
+    "PyQt6.QtPdf",
+    "PyQt6.QtPdfWidgets",
     "pos_uniformes.ui.helpers.quick_sale_sports_uniform_helper",
     "pos_uniformes.services.label_printer_settings_cache_service",
     # Anuncios / cartelera (todos con imports lazy dentro de métodos):

@@ -6,15 +6,26 @@ teclas, igual otro para tipos de escocés».
 - Ctrl+Shift+M — Mapa de escuelas (con el estado de los conteos de ahora).
 - Ctrl+Shift+E — Tipos de escocés (ESC-01…ESC-37, el PDF de las dos hojas).
 
-Las dos se abren en el programa de la PC (navegador / visor de PDF)."""
+Las dos se abren en una ventana del programa (Daniel: «que se sienta algo
+más del programa, como si fuera una ventana más»), ver
+`ui/dialogs/visor_consulta_dialog.py`. Si la PC no tiene el motor web (el
+ejecutable del kiosko no trae QtWebEngine: pesa ~150 MB), el mapa abre en
+Edge en modo aplicación —una ventana sin pestañas ni barra de direcciones— y
+si tampoco, en el navegador."""
 
 from __future__ import annotations
 
+import logging
+import os
+import subprocess
+import sys
 from pathlib import Path
 
 from PyQt6.QtCore import Qt, QUrl
 from PyQt6.QtGui import QDesktopServices, QKeySequence, QShortcut
 from PyQt6.QtWidgets import QApplication, QMessageBox, QWidget
+
+logger = logging.getLogger(__name__)
 
 ATAJO_MAPA = "Ctrl+Shift+M"
 ATAJO_ESCOCES = "Ctrl+Shift+E"
@@ -29,6 +40,38 @@ def _abrir(ruta: Path) -> bool:
     return QDesktopServices.openUrl(QUrl.fromLocalFile(str(ruta)))
 
 
+def ruta_edge() -> Path | None:
+    if not sys.platform.startswith("win"):
+        return None
+    for base in (os.environ.get("ProgramFiles(x86)"), os.environ.get("ProgramFiles"), os.environ.get("LOCALAPPDATA")):
+        if base:
+            ruta = Path(base) / "Microsoft" / "Edge" / "Application" / "msedge.exe"
+            if ruta.is_file():
+                return ruta
+    return None
+
+
+def _abrir_como_ventana(ruta: Path) -> bool:
+    """Edge en modo aplicación: una ventana sola, sin pestañas ni dirección."""
+    edge = ruta_edge()
+    if edge is None:
+        return False
+    try:
+        subprocess.Popen([str(edge), f"--app={QUrl.fromLocalFile(str(ruta)).toString()}", "--window-size=1400,900"])
+        return True
+    except OSError:
+        logger.warning("No se pudo abrir Edge en modo ventana", exc_info=True)
+        return False
+
+
+def _hay_motor_web() -> bool:
+    try:
+        import PyQt6.QtWebEngineWidgets  # noqa: F401
+    except ImportError:
+        return False
+    return True
+
+
 def abrir_mapa_escuelas(parent: QWidget | None = None) -> None:
     from pos_uniformes.services import mapa_escuelas_service
 
@@ -40,7 +83,16 @@ def abrir_mapa_escuelas(parent: QWidget | None = None) -> None:
     if html is None:
         QMessageBox.information(parent, "Mapa de escuelas", "Esta PC no tiene el mapa de escuelas. Llega con la siguiente actualización.")
         return
-    _abrir(html)
+    if _hay_motor_web():
+        try:
+            from pos_uniformes.ui.dialogs.visor_consulta_dialog import mostrar_mapa
+
+            mostrar_mapa(html, parent)
+            return
+        except Exception:  # noqa: BLE001 — sin ventana propia, abre afuera
+            logger.warning("Mapa de escuelas: no se pudo abrir la ventana", exc_info=True)
+    if not _abrir_como_ventana(html):
+        _abrir(html)
 
 
 def abrir_tipos_escoces(parent: QWidget | None = None) -> None:
@@ -48,7 +100,13 @@ def abrir_tipos_escoces(parent: QWidget | None = None) -> None:
     if not ruta.is_file():
         QMessageBox.information(parent, "Tipos de escocés", "Esta PC no tiene el catálogo de escoceses. Llega con la siguiente actualización.")
         return
-    _abrir(ruta)
+    try:
+        from pos_uniformes.ui.dialogs.visor_consulta_dialog import mostrar_pdf
+
+        mostrar_pdf(ruta, "🧵 Tipos de escocés", parent)
+    except Exception:  # noqa: BLE001 — sin QtPdf, el visor de la PC
+        logger.warning("Tipos de escocés: no se pudo abrir la ventana", exc_info=True)
+        _abrir(ruta)
 
 
 def instalar_atajos(ventana: QWidget) -> list[QShortcut]:
