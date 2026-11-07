@@ -138,7 +138,7 @@ def _seccion_retiros(retiros: list, lines: list[str], tk_top, tk_mid, tk_row, tk
     lines.append("RETIROS DEL CAJON".center(_TW))
     lines.append(tk_top())
     for r in retiros:
-        lines.append(tk_row(f"{str(r.motivo)[: _TW - 16]}:", f"${Decimal(r.monto):,.2f}"))
+        _fila_que_cabe(lines, f"{r.motivo}:", f"${Decimal(r.monto):,.2f}")
     if len(retiros) > 1:
         lines.append(tk_dbl())
         lines.append(tk_row("Total retiros:", f"${sum((Decimal(r.monto) for r in retiros), Decimal('0.00')):,.2f}"))
@@ -158,6 +158,31 @@ def _tk():
     )
 
     return TICKET_CHAR_WIDTH, tk_top, tk_mid, tk_dbl, tk_bot, tk_row, tk_line, tk_field
+
+
+def _fila_que_cabe(lines: list[str], etiqueta: str, valor: str) -> None:
+    """Un renglón etiqueta/importe que NUNCA se corta.
+
+    «Gasto (Préstamo a Katherine): -$300.00» no cabe en las 34 columnas de la
+    caja y se recortaba a «Gasto (Préstamo a Kat»: Daniel no alcanzaba a leer a
+    quién (2026-11-07). Si no cabe, la etiqueta se parte en renglones y el
+    importe va en el último, o solo, a la derecha."""
+    import textwrap
+
+    _TW, _tk_top, _tk_mid, _tk_dbl, _tk_bot, tk_row, tk_line, _tk_field = _tk()
+    ancho = _TW - 4
+    if len(etiqueta) + 1 + len(valor) <= ancho:
+        lines.append(tk_row(etiqueta, valor))
+        return
+    partes = textwrap.wrap(etiqueta, width=ancho) or [""]
+    for parte in partes[:-1]:
+        lines.append(tk_line(parte))
+    ultima = partes[-1]
+    if len(ultima) + 1 + len(valor) <= ancho:
+        lines.append(tk_row(ultima, valor))
+    else:
+        lines.append(tk_line(ultima))
+        lines.append(tk_row("", valor))
 
 
 def _nombre_pila(p) -> str:
@@ -205,11 +230,11 @@ def _bloque_cuenta(lines, *, corte, venta, tarjeta, tarjeta_ops, pagos_restar, r
         # suma antes de restar los pagos: los pagos salen completos del cajón
         # y aquí se ve de dónde salieron (2026-10-20).
         for e in entradas:
-            lines.append(tk_row(f"Entro ({str(e.motivo)[: _TW - 24]}):", f"+${Decimal(e.monto):,.2f}"))
+            _fila_que_cabe(lines, f"Entro ({e.motivo}):", f"+${Decimal(e.monto):,.2f}")
         for p in pagos_restar or []:
-            lines.append(tk_row(f"Pago a {_nombre_pila(p)}:"[: _TW - 14], f"-${Decimal(p.total):,.2f}"))
+            _fila_que_cabe(lines, f"Pago a {_nombre_pila(p)}:", f"-${Decimal(p.total):,.2f}")
         for r in retiros or []:
-            lines.append(tk_row(f"Gasto ({str(r.motivo)[: _TW - 24]}):", f"-${Decimal(r.monto):,.2f}"))
+            _fila_que_cabe(lines, f"Gasto ({r.motivo}):", f"-${Decimal(r.monto):,.2f}")
     if con_reactivo:
         lines.append(tk_dbl())
         lines.append(tk_row("SACAR DE LA VENTA:", f"${Decimal(sacar):,.2f}"))
@@ -244,14 +269,14 @@ def _bloque_pagos(lines, pagos: list, ya_pagados: list, *, total: bool, titulo: 
         if idx:
             lines.append(tk_mid())
         idx += 1
-        lines.append(tk_row(f"PAGAR A {_nombre_pila(p).upper()}:"[: _TW - 14], f"${Decimal(p.total):,.2f}"))
+        _fila_que_cabe(lines, f"PAGAR A {_nombre_pila(p).upper()}:", f"${Decimal(p.total):,.2f}")
         _desglose_pago(p, lines, tk_row)
     for p in ya_pagados:
         if idx:
             lines.append(tk_mid())
         idx += 1
         hora = _hora_local(getattr(p, "created_at", None)).strftime("%H:%M") if getattr(p, "created_at", None) else ""
-        lines.append(tk_row(f"YA PAGADO A {_nombre_pila(p).upper()}:"[: _TW - 14], f"${Decimal(p.total):,.2f}"))
+        _fila_que_cabe(lines, f"YA PAGADO A {_nombre_pila(p).upper()}:", f"${Decimal(p.total):,.2f}")
         if hora:
             lines.append(tk_line(f"  (se le pago a las {hora})"))
         _desglose_pago(p, lines, tk_row)

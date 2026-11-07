@@ -278,3 +278,48 @@ class TicketEncargadoTests(unittest.TestCase):
         self.assertIn("$0.00", texto)
         self.assertIn("Se tomo del reactivo.", texto)
         self.assertIn("Reactivo que queda:", texto)
+
+
+class NadaSeCortaEnElTicketTests(unittest.TestCase):
+    """2026-11-07, Daniel: «le presté 300 a Katherine, sale préstamo entre
+    paréntesis el nombre y no se alcanza a ver completo». El motivo del retiro
+    se recortaba a 14 letras para que cupiera el importe."""
+
+    def _ticket(self, retiros):
+        from decimal import Decimal
+        from types import SimpleNamespace
+
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import texto_ticket_corte_encargado
+
+        corte = SimpleNamespace(monto_final=Decimal("13000"), reactivo_final=Decimal("10360"), reactivo_inicial=Decimal("10360"),
+                                periodo_label="hoy", created_at=None, nota="", creado_por="VEND-1")
+        return texto_ticket_corte_encargado(corte, Decimal("3889"), [], [], retiros=retiros)
+
+    def test_el_prestamo_sale_con_el_nombre_completo(self) -> None:
+        from decimal import Decimal
+        from types import SimpleNamespace
+
+        texto = self._ticket([SimpleNamespace(motivo="Préstamo a Katherine Posada", monto=Decimal("300"))])
+        self.assertIn("Gasto (Préstamo a Katherine", texto)       # se parte, no se recorta
+        self.assertIn("Posada):", texto)
+        self.assertNotIn("Préstamo a Kat)", texto)
+        self.assertIn("-$300.00", texto)
+        # Y ningún renglón se pasa del ancho del papel.
+        for linea in texto.splitlines():
+            self.assertLessEqual(len(linea), 38, linea)
+
+    def test_un_motivo_corto_sigue_en_un_solo_renglon(self) -> None:
+        from decimal import Decimal
+        from types import SimpleNamespace
+
+        texto = self._ticket([SimpleNamespace(motivo="Renta", monto=Decimal("1500"))])
+        self.assertIn("│ Gasto (Renta):          -$1,500.00 │", texto)
+
+    def test_el_importe_queda_a_la_derecha_aunque_la_etiqueta_se_parta(self) -> None:
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import _fila_que_cabe
+
+        lines: list[str] = []
+        _fila_que_cabe(lines, "Gasto (Préstamo a María Fernanda Gutiérrez):", "-$300.00")
+        self.assertEqual(len(lines), 2)
+        self.assertTrue(lines[-1].rstrip(" │").endswith("-$300.00"))
+        self.assertTrue(all(len(l) == 38 for l in lines), lines)
