@@ -81,9 +81,9 @@ def resumen_de_hoy(session, *, hoy: date | None = None) -> ResumenHoy:
 
 
 def texto(r: ResumenHoy) -> str:
-    """«Hoy · Fanny 6 · Stayce 4 · Katherine 2    última: Fanny 16:42»; "" si no hay nada."""
+    """Dos renglones: «Hoy · Fanny 6 · Stayce 4» y «Última venta: Fanny, 16:42»; "" si no hay nada."""
     if r.vacio:
         return ""
     partes = "  ·  ".join(f"{nombre} {n}" for nombre, n in r.por_empleada)
-    cola = f"      última: {r.ultima[0]} {r.ultima[1]}" if r.ultima else ""
+    cola = f"\nÚltima venta: {r.ultima[0]}, {r.ultima[1]}" if r.ultima else ""
     return f"Hoy  ·  {partes}{cola}"

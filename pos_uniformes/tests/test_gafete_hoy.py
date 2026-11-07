@@ -66,7 +66,7 @@ class ResumenDeHoyTests(unittest.TestCase):
     def test_el_texto_es_una_linea_sin_montos(self) -> None:
         r = gh.ResumenHoy(por_empleada=(("Fanny", 6), ("Stayce", 4)), ultima=("Stayce", "16:42"))
         t = gh.texto(r)
-        self.assertEqual(t, "Hoy  ·  Fanny 6  ·  Stayce 4      última: Stayce 16:42")
+        self.assertEqual(t, "Hoy  ·  Fanny 6  ·  Stayce 4\nÚltima venta: Stayce, 16:42")
         self.assertNotIn("$", t)
 
 
