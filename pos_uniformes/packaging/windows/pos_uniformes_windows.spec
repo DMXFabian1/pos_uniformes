@@ -51,6 +51,8 @@ hiddenimports += collect_submodules("meilisearch")
 # Mapa de escuelas y tipos de escocés en una ventana del programa (imports lazy).
 hiddenimports += [
     "pos_uniformes.ui.dialogs.visor_consulta_dialog",
+    "pos_uniformes.ui.dialogs.visor_escoces_dialog",
+    "pos_uniformes.ui.helpers.avisos_bonitos",
     "PyQt6.QtPdf",
     "PyQt6.QtPdfWidgets",
     "PyQt6.QtPrintSupport",

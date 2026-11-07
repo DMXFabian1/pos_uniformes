@@ -104,9 +104,10 @@ class AtajosTests(unittest.TestCase):
         atajos = ac.instalar_atajos(ventana)
         self.assertEqual([a.key().toString() for a in atajos], ["Ctrl+Shift+M", "Ctrl+Shift+E"])
         # Abren en una ventana del programa (2026-11-07), no en el navegador.
-        with mock.patch("pos_uniformes.ui.dialogs.visor_consulta_dialog.mostrar_pdf") as pdf:
+        # Tipos de escocés: el catálogo con fotos, no el PDF (2026-11-07).
+        with mock.patch("pos_uniformes.ui.dialogs.visor_escoces_dialog.mostrar_escoces") as escoces:
             atajos[1].activated.emit()
-            pdf.assert_called_once_with(ac.ruta_tipos_escoces(), "🧵 Tipos de escocés", ventana)
+            escoces.assert_called_once_with(ventana)
         with mock.patch.object(ac, "_hay_motor_web", return_value=True), \
                 mock.patch("pos_uniformes.ui.dialogs.visor_consulta_dialog.mostrar_mapa") as mapa, \
                 mock.patch("pos_uniformes.services.mapa_escuelas_service.preparar", return_value=Path("/x/mapa.html")):

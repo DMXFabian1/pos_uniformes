@@ -96,6 +96,16 @@ def abrir_mapa_escuelas(parent: QWidget | None = None) -> None:
 
 
 def abrir_tipos_escoces(parent: QWidget | None = None) -> None:
+    # El catálogo de verdad (cuadrícula, buscar, ficha); el PDF solo si esta
+    # PC todavía no tiene las fotos (2026-11-07).
+    try:
+        from pos_uniformes.ui.dialogs.visor_escoces_dialog import hay_catalogo, mostrar_escoces
+
+        if hay_catalogo():
+            mostrar_escoces(parent)
+            return
+    except Exception:  # noqa: BLE001 — sin el catálogo nuevo, el PDF de antes
+        logger.warning("Tipos de escocés: no se pudo abrir el catálogo", exc_info=True)
     ruta = ruta_tipos_escoces()
     if not ruta.is_file():
         QMessageBox.information(parent, "Tipos de escocés", "Esta PC no tiene el catálogo de escoceses. Llega con la siguiente actualización.")

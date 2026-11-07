@@ -125,6 +125,9 @@ def main() -> int:
     from pos_uniformes.utils.qt_spanish import instalar_espanol_qt
 
     instalar_espanol_qt(app)  # Sí/No/Cancelar en vez de Yes/No/Cancel
+    from pos_uniformes.ui.helpers.avisos_bonitos import instalar as instalar_avisos
+
+    instalar_avisos(app)  # los QMessageBox con la cara del programa
     icon_path = satellite_windows_icon_path()
     if icon_path is not None:
         app.setWindowIcon(QIcon(str(icon_path)))

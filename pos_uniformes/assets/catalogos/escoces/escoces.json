@@ -1,0 +1,263 @@
+{
+ "telas": [
+  {
+   "codigo": "ESC-01",
+   "familia": "Marinos",
+   "nombre": "Marino / amarillo-rojo",
+   "tartan": "",
+   "foto": "ESC-01.jpg"
+  },
+  {
+   "codigo": "ESC-02",
+   "familia": "Marinos",
+   "nombre": "Marino / amarillo",
+   "tartan": "",
+   "foto": "ESC-02.jpg"
+  },
+  {
+   "codigo": "ESC-03",
+   "familia": "Marinos",
+   "nombre": "Marino-blanco / rojo",
+   "tartan": "",
+   "foto": "ESC-03.jpg"
+  },
+  {
+   "codigo": "ESC-04",
+   "familia": "Marinos",
+   "nombre": "Marino / blanco",
+   "tartan": "Menzies B&W",
+   "foto": "ESC-04.jpg"
+  },
+  {
+   "codigo": "ESC-05",
+   "familia": "Marinos",
+   "nombre": "Marino / rojo-mostaza",
+   "tartan": "",
+   "foto": "ESC-05.jpg"
+  },
+  {
+   "codigo": "ESC-06",
+   "familia": "Marinos",
+   "nombre": "Marino / rojo-blanco",
+   "tartan": "",
+   "foto": "ESC-06.jpg"
+  },
+  {
+   "codigo": "ESC-07",
+   "familia": "Marinos",
+   "nombre": "Marino / azul-blanco",
+   "tartan": "",
+   "foto": "ESC-07.jpg"
+  },
+  {
+   "codigo": "ESC-08",
+   "familia": "Marinos",
+   "nombre": "Marino / azul-blanco oscuro",
+   "tartan": "",
+   "foto": "ESC-08.jpg"
+  },
+  {
+   "codigo": "ESC-09",
+   "familia": "Rojos",
+   "nombre": "Rojo / negro chico",
+   "tartan": "",
+   "foto": "ESC-09.jpg"
+  },
+  {
+   "codigo": "ESC-10",
+   "familia": "Rojos",
+   "nombre": "Rojo / marino grande",
+   "tartan": "",
+   "foto": "ESC-10.jpg"
+  },
+  {
+   "codigo": "ESC-11",
+   "familia": "Rojos",
+   "nombre": "Rojo / marino brillante",
+   "tartan": "",
+   "foto": "ESC-11.jpg"
+  },
+  {
+   "codigo": "ESC-12",
+   "familia": "Rojos",
+   "nombre": "Rojo / marino-blanco grande",
+   "tartan": "",
+   "foto": "ESC-12.jpg"
+  },
+  {
+   "codigo": "ESC-13",
+   "familia": "Rojos",
+   "nombre": "Rojo / marino fino",
+   "tartan": "",
+   "foto": "ESC-13.jpg"
+  },
+  {
+   "codigo": "ESC-14",
+   "familia": "Rojos",
+   "nombre": "Rojo / multicolor chico",
+   "tartan": "",
+   "foto": "ESC-14.jpg"
+  },
+  {
+   "codigo": "ESC-15",
+   "familia": "Rojos",
+   "nombre": "Rojo / negro-amarillo",
+   "tartan": "Wallace",
+   "foto": "ESC-15.jpg"
+  },
+  {
+   "codigo": "ESC-16",
+   "familia": "Rojos",
+   "nombre": "Rojo Royal Stewart",
+   "tartan": "Royal Stewart",
+   "foto": "ESC-16.jpg"
+  },
+  {
+   "codigo": "ESC-17",
+   "familia": "Verdes",
+   "nombre": "Verde / marino",
+   "tartan": "Black Watch",
+   "foto": "ESC-17.jpg"
+  },
+  {
+   "codigo": "ESC-18",
+   "familia": "Verdes",
+   "nombre": "Verde / rojo",
+   "tartan": "",
+   "foto": "ESC-18.jpg"
+  },
+  {
+   "codigo": "ESC-19",
+   "familia": "Verdes",
+   "nombre": "Verde / blanco",
+   "tartan": "Dress Gordon",
+   "foto": "ESC-19.jpg"
+  },
+  {
+   "codigo": "ESC-20",
+   "familia": "Verdes",
+   "nombre": "Verde / gris-blanco",
+   "tartan": "",
+   "foto": "ESC-20.jpg"
+  },
+  {
+   "codigo": "ESC-21",
+   "familia": "Verdes",
+   "nombre": "Blanco / verde-rojo",
+   "tartan": "Dress Stewart",
+   "foto": "ESC-21.jpg"
+  },
+  {
+   "codigo": "ESC-22",
+   "familia": "Azules",
+   "nombre": "Azul rey",
+   "tartan": "≈ Royal Stewart Azul",
+   "foto": "ESC-22.jpg"
+  },
+  {
+   "codigo": "ESC-23",
+   "familia": "Azules",
+   "nombre": "Azul / celeste-negro",
+   "tartan": "",
+   "foto": "ESC-23.jpg"
+  },
+  {
+   "codigo": "ESC-24",
+   "familia": "Azules",
+   "nombre": "Azul / blanco",
+   "tartan": "",
+   "foto": "ESC-24.jpg"
+  },
+  {
+   "codigo": "ESC-25",
+   "familia": "Azules",
+   "nombre": "Celeste",
+   "tartan": "",
+   "foto": "ESC-25.jpg"
+  },
+  {
+   "codigo": "ESC-26",
+   "familia": "Azules",
+   "nombre": "Celeste / beige",
+   "tartan": "",
+   "foto": "ESC-26.jpg"
+  },
+  {
+   "codigo": "ESC-27",
+   "familia": "Beige y tierras",
+   "nombre": "Café / verde-blanco",
+   "tartan": "",
+   "foto": "ESC-27.jpg"
+  },
+  {
+   "codigo": "ESC-28",
+   "familia": "Beige y tierras",
+   "nombre": "Khaki / marino",
+   "tartan": "",
+   "foto": "ESC-28.jpg"
+  },
+  {
+   "codigo": "ESC-29",
+   "familia": "Beige y tierras",
+   "nombre": "Camel / negro",
+   "tartan": "",
+   "foto": "ESC-29.jpg"
+  },
+  {
+   "codigo": "ESC-30",
+   "familia": "Beige y tierras",
+   "nombre": "Khaki / negro-blanco",
+   "tartan": "",
+   "foto": "ESC-30.jpg"
+  },
+  {
+   "codigo": "ESC-31",
+   "familia": "Beige y tierras",
+   "nombre": "Beige / rojo-negro",
+   "tartan": "≈ Thomson Camel",
+   "foto": "ESC-31.jpg"
+  },
+  {
+   "codigo": "ESC-32",
+   "familia": "Beige y tierras",
+   "nombre": "Beige / negro-rojo grande",
+   "tartan": "",
+   "foto": "ESC-32.jpg"
+  },
+  {
+   "codigo": "ESC-33",
+   "familia": "Grises y blancos",
+   "nombre": "Gris / rojo",
+   "tartan": "≈ Grey Stewart",
+   "foto": "ESC-33.jpg"
+  },
+  {
+   "codigo": "ESC-34",
+   "familia": "Grises y blancos",
+   "nombre": "Blanco / rojo-negro",
+   "tartan": "",
+   "foto": "ESC-34.jpg"
+  },
+  {
+   "codigo": "ESC-35",
+   "familia": "Gales",
+   "nombre": "Negro y azul",
+   "tartan": "Príncipe de Gales",
+   "foto": "ESC-35.jpg"
+  },
+  {
+   "codigo": "ESC-36",
+   "familia": "Gales",
+   "nombre": "Negro y rojo",
+   "tartan": "Príncipe de Gales",
+   "foto": "ESC-36.jpg"
+  },
+  {
+   "codigo": "ESC-37",
+   "familia": "Gales",
+   "nombre": "Negro y verde",
+   "tartan": "Príncipe de Gales",
+   "foto": "ESC-37.jpg"
+  }
+ ]
+}

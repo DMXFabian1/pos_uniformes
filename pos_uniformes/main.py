@@ -97,6 +97,9 @@ def main() -> int:
     from pos_uniformes.utils.qt_spanish import instalar_espanol_qt
 
     instalar_espanol_qt(app)  # Sí/No/Cancelar en vez de Yes/No/Cancel
+    from pos_uniformes.ui.helpers.avisos_bonitos import instalar as instalar_avisos
+
+    instalar_avisos(app)  # los QMessageBox con la cara del programa
     app.setApplicationName(APP_DISPLAY_NAME)
     app.setApplicationDisplayName(APP_DISPLAY_NAME)
     app.setOrganizationName(APP_ORGANIZATION_NAME)

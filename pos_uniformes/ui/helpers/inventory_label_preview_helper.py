@@ -86,8 +86,8 @@ def build_inventory_label_print_confirmation(
     result: LabelRenderResult,
 ) -> str:
     return (
-        f"Se envio la etiqueta de '{sku}' a impresion.\n\n"
+        f"Se enviaron a la impresora las etiquetas de {sku}.\n\n"
         f"Modo: {nombre_de_modo(result.mode)}\n"
-        f"Piezas solicitadas: {result.requested_copies}\n"
-        f"Copias/hojas impresas: {result.effective_copies}"
+        f"Piezas: {result.requested_copies}\n"
+        f"{'Hojas' if result.mode == 'split' else 'Etiquetas'}: {result.effective_copies}"
     )

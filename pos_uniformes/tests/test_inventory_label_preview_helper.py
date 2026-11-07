@@ -93,8 +93,8 @@ class InventoryLabelPreviewHelperTests(unittest.TestCase):
 
         self.assertIn("SKU-008", message)
         self.assertIn("Modo: Tira de 4", message)
-        self.assertIn("Piezas solicitadas: 8", message)
-        self.assertIn("Copias/hojas impresas: 2", message)
+        self.assertIn("Piezas: 8", message)
+        self.assertIn("Hojas: 2", message)      # en tira se cuentan hojas
 
 
 if __name__ == "__main__":
