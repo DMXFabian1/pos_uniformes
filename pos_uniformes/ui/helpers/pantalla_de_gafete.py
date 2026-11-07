@@ -17,6 +17,7 @@ from dataclasses import dataclass
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
+    QHBoxLayout,
     QFrame,
     QLabel,
     QLineEdit,
@@ -32,7 +33,8 @@ class GateDeGafete:
     raiz: QWidget        # se mete en la página y se muestra/oculta
     entrada: QLineEdit   # donde cae el escaneo
     error: QLabel        # el renglón rojo, oculto hasta que haga falta
-    pie: QLabel | None = None   # «Hoy · Fanny 6 · …», chiquito; solo si se pidió
+    pie: QLabel | None = None        # «Última venta: Fanny, 16:42», chiquito; solo si se pidió
+    pie_fila: QWidget | None = None  # las fichas «Fanny 6 · Stayce 4 · …»
 
 
 def construir_gate(
@@ -124,13 +126,22 @@ def construir_gate(
     # al pie de la tarjeta: las empleadas lo pidieron (2026-11-07) y no debe
     # pelear con la escena. Oculto hasta que alguien le ponga texto.
     pie = None
+    pie_fila = None
     if con_pie:
+        pie_fila = QWidget()
+        pie_fila.setObjectName("gatePieFila")
+        fila_ly = QHBoxLayout(pie_fila)
+        fila_ly.setContentsMargins(0, 0, 0, 0)
+        fila_ly.setSpacing(8)
+        fila_ly.addStretch(1)
+        fila_ly.addStretch(1)
+        pie_fila.setVisible(False)
         pie = QLabel("")
         pie.setObjectName("gatePie")
         pie.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        pie.setWordWrap(True)
         pie.setVisible(False)
-        dentro.addSpacing(6)
+        dentro.addSpacing(10)
+        dentro.addWidget(pie_fila)
         dentro.addWidget(pie)
 
     tarjeta.setLayout(dentro)
@@ -138,7 +149,42 @@ def construir_gate(
     fuera.addWidget(tarjeta, 0, Qt.AlignmentFlag.AlignHCenter)
     fuera.addStretch()
     raiz.setLayout(fuera)
-    return GateDeGafete(raiz=raiz, entrada=entrada, error=error, pie=pie)
+    return GateDeGafete(raiz=raiz, entrada=entrada, error=error, pie=pie, pie_fila=pie_fila)
+
+
+def pintar_pie(gate: GateDeGafete, resumen) -> None:
+    """Las fichas de hoy —una por empleada, la que más lleva resaltada— y
+    abajo quién vendió al último. Con `resumen` vacío o None, no se ve nada."""
+    if gate.pie is None or gate.pie_fila is None:
+        return
+    fila = gate.pie_fila.layout()
+    # Se quitan las fichas de antes (los dos resortes se quedan).
+    for i in reversed(range(fila.count())):
+        item = fila.itemAt(i)
+        w = item.widget()
+        if w is not None:
+            fila.removeWidget(w)
+            w.setParent(None)        # fuera YA, no cuando el bucle de eventos llegue
+            w.deleteLater()
+    por_empleada = tuple(getattr(resumen, "por_empleada", ()) or ())
+    if not por_empleada:
+        gate.pie_fila.setVisible(False)
+        gate.pie.setVisible(False)
+        return
+    tope = max(n for _n, n in por_empleada)
+    for posicion, (nombre, n) in enumerate(por_empleada):
+        ficha = QLabel(f"{nombre}  <b>{n}</b>")
+        ficha.setObjectName("gateChip")
+        ficha.setProperty("lider", "true" if n == tope and n > 0 else "false")
+        ficha.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        fila.insertWidget(fila.count() - 1, ficha)
+    gate.pie_fila.setVisible(True)
+    ultima = getattr(resumen, "ultima", None)
+    if ultima:
+        gate.pie.setText(f"Última venta: <b>{ultima[0]}</b>, {ultima[1]}")
+        gate.pie.setVisible(True)
+    else:
+        gate.pie.setVisible(False)
 
 
 def _temporada():

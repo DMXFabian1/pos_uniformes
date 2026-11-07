@@ -96,11 +96,18 @@ class PieEnLaTarjetaTests(unittest.TestCase):
         satellite = SimpleNamespace(offline_mode=True, _kiosk_lookup_from_cache=None)
         with patch.object(QuickSaleWidget, "refrescar_pie_gafete", lambda self: None):
             w = QuickSaleWidget(satellite)
-        w._pintar_pie_gafete("Hoy  ·  Fanny 6")
-        self.assertTrue(w._gate_pie.isVisibleTo(w))
-        self.assertEqual(w._gate_pie.text(), "Hoy  ·  Fanny 6")
-        w._pintar_pie_gafete("")
+        from PyQt6.QtWidgets import QLabel
+
+        w._pintar_pie_gafete(gh.ResumenHoy(por_empleada=(("Fanny", 6), ("Stayce", 4)), ultima=("Fanny", "16:42")))
+        fichas = w._gate.pie_fila.findChildren(QLabel, "gateChip")
+        self.assertEqual([f.text() for f in fichas], ["Fanny  <b>6</b>", "Stayce  <b>4</b>"])
+        self.assertEqual([f.property("lider") for f in fichas], ["true", "false"])   # la que más lleva, resaltada
+        self.assertTrue(w._gate.pie_fila.isVisibleTo(w))
+        self.assertEqual(w._gate_pie.text(), "Última venta: <b>Fanny</b>, 16:42")
+        w._pintar_pie_gafete(gh.ResumenHoy())
+        self.assertFalse(w._gate.pie_fila.isVisibleTo(w))
         self.assertFalse(w._gate_pie.isVisibleTo(w))
+        self.assertEqual(w._gate.pie_fila.findChildren(QLabel, "gateChip"), [])
         w.deleteLater()
 
 

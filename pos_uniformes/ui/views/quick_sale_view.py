@@ -149,8 +149,14 @@ QLineEdit#gateInput {{
 }}
 QLineEdit#gateInput:focus {{ border-color: {_BRAND}; background: white; }}
 QLabel#gatePie {{
-    font-size: 13px; color: {_MUTED}; font-weight: 600; letter-spacing: 0.3px;
-    padding-top: 4px;
+    font-size: 13px; color: {_MUTED}; padding-top: 2px;
+}}
+QLabel#gateChip {{
+    font-size: 13px; color: {_TEXT}; background: {_WARM_BG};
+    border: 1px solid {_BORDER}; border-radius: 14px; padding: 5px 13px;
+}}
+QLabel#gateChip[lider="true"] {{
+    color: {_BRAND}; background: {_BRAND_LIGHT}; border-color: {_BRAND};
 }}
 QLabel#gateError {{
     font-size: 12px; color: {_DANGER}; font-weight: 500;
@@ -227,7 +233,7 @@ QPushButton#btnLogout:hover {{ color: {_DANGER}; border-color: {_DANGER}; }}
 
 class QuickSaleWidget(QWidget):
     #: Lo de hoy para el pie del gafete, leído en un hilo (el kiosko sin red no se congela).
-    _pie_gafete_leido = pyqtSignal(str)
+    _pie_gafete_leido = pyqtSignal(object)
     """Página de Venta Rápida para la app satélite."""
 
     _SCAN_HINT_DEFAULT = ""  # el hint solo muestra avisos breves (flash)
@@ -279,6 +285,7 @@ class QuickSaleWidget(QWidget):
         self._gate_fondo = gate.raiz
         self._gate_input = gate.entrada
         self._gate_error = gate.error
+        self._gate = gate
         self._gate_pie = gate.pie
         self._pie_gafete_leido.connect(self._pintar_pie_gafete)
         # Se refresca al volver al gafete y cada minuto mientras esté a la vista.
@@ -301,11 +308,11 @@ class QuickSaleWidget(QWidget):
                 from pos_uniformes.services import gafete_hoy_service as gh
 
                 with get_session() as session:
-                    texto = gh.texto(gh.resumen_de_hoy(session))
+                    resumen = gh.resumen_de_hoy(session)
             except Exception:  # noqa: BLE001 — sin base, el pie se queda como estaba
                 return
             try:
-                self._pie_gafete_leido.emit(texto)
+                self._pie_gafete_leido.emit(resumen)
             except RuntimeError:
                 pass
 
@@ -315,11 +322,10 @@ class QuickSaleWidget(QWidget):
         gate = getattr(self, "_gate_widget", None)
         return gate is None or not gate.isHidden()
 
-    def _pintar_pie_gafete(self, texto: str) -> None:
-        if self._gate_pie is None:
-            return
-        self._gate_pie.setText(texto)
-        self._gate_pie.setVisible(bool(texto))
+    def _pintar_pie_gafete(self, resumen) -> None:
+        from pos_uniformes.ui.helpers.pantalla_de_gafete import pintar_pie
+
+        pintar_pie(self._gate, resumen)
 
     @staticmethod
     def _normalize_scan(raw: str) -> str:
