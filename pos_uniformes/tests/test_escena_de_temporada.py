@@ -261,7 +261,7 @@ class LasTresPantallasDeGafeteSonLaMismaTests(unittest.TestCase):
 
         venta = QuickSaleWidget.__new__(QuickSaleWidget)
         QWidget.__init__(venta)
-        hechas = {"Venta rapida": venta._build_gate()}
+        hechas = {"Venta rápida": venta._build_gate()}
 
         from pos_uniformes.ui.helpers.pantalla_de_gafete import construir_gate
         from pos_uniformes.ui.views.quick_sale_view import _GATE_STYLE
@@ -315,7 +315,7 @@ class LasTresPantallasDeGafeteSonLaMismaTests(unittest.TestCase):
                 l.text() for l in gate.findChildren(QLabel)
                 if l.objectName() == "gateTitle"
             ))
-        self.assertEqual(titulos, {"Venta rapida", "Libreta", "Conteos"})
+        self.assertEqual(titulos, {"Venta rápida", "Libreta", "Conteos"})
 
 
 class LosDibujosDeDanielTests(unittest.TestCase):

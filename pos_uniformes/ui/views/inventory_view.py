@@ -49,7 +49,7 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_edit_button.setText("Editar")
     window.inventory_stock_button.setText("Stock")
     window.inventory_labels_button.setText("Etiquetas")
-    window.inventory_more_button.setText("Mas")
+    window.inventory_more_button.setText("Más")
     window.toggle_product_button.setText("Prod.")
     window.toggle_variant_button.setText("Pres.")
     window.delete_product_button.setText("Eliminar prod.")

@@ -1501,7 +1501,7 @@ class MainWindow(QMainWindow):
         self.sale_cart_table = QTableWidget()
         self.sale_qty_down_button = QPushButton("-1")
         self.sale_qty_up_button = QPushButton("+1")
-        self.sale_remove_button = QPushButton("Quitar linea")
+        self.sale_remove_button = QPushButton("Quitar línea")
         self.sale_clear_button = QPushButton("Vaciar carrito")
         self.sale_summary_label = QLabel("Carrito vacio.")
         self.sale_context_label = QLabel("Pago: Efectivo | Descuento: Sin descuento")
@@ -1535,7 +1535,7 @@ class MainWindow(QMainWindow):
         self.quote_save_button = QPushButton("Guardar presupuesto")
         self.quote_qty_down_button = QPushButton("-1")
         self.quote_qty_up_button = QPushButton("+1")
-        self.quote_remove_button = QPushButton("Quitar linea")
+        self.quote_remove_button = QPushButton("Quitar línea")
         self.quote_clear_button = QPushButton("Vaciar presupuesto")
         self.quote_cancel_button = QPushButton("Cancelar presupuesto")
         self.quote_convert_button = QPushButton("Cobrar presupuesto")
@@ -1577,7 +1577,7 @@ class MainWindow(QMainWindow):
         self.qr_preview_label = QLabel("Preview QR")
         self.qr_preview_info_label = QLabel()
         self.inventory_overview_label = QLabel("Selecciona una presentacion")
-        self.inventory_product_label = QLabel("Elige una fila para ver su ficha rapida.")
+        self.inventory_product_label = QLabel("Elige una fila para ver su ficha rápida.")
         self.inventory_status_badge = QLabel("Sin seleccion")
         self.inventory_stock_badge = QLabel("Sin stock")
         self.inventory_stock_hint_label = QLabel("")
@@ -1683,7 +1683,7 @@ class MainWindow(QMainWindow):
         self.settings_backup_button = QPushButton("Respaldo y restauracion")
         self.settings_cash_history_button = QPushButton("Historial de cortes")
         self.settings_business_button = QPushButton("Negocio e impresion")
-        self.settings_meilisearch_button = QPushButton("Meilisearch (busqueda)")
+        self.settings_meilisearch_button = QPushButton("Meilisearch (búsqueda)")
         self.settings_users_table = QTableWidget()
         self.settings_users_status_label = QLabel("Sin usuarios cargados.")
         self.settings_create_user_button = QPushButton("Crear usuario")
@@ -1770,7 +1770,7 @@ class MainWindow(QMainWindow):
         self.settings_business_logo_clear_button = QPushButton("Limpiar")
         self.settings_business_logo_preview_label = QLabel("Sin logo")
         self.settings_business_demo_button = QPushButton("Ver credencial demo")
-        self.settings_marketing_status_label = QLabel("Sin configuracion cargada.")
+        self.settings_marketing_status_label = QLabel("Sin configuración cargada.")
         self.settings_marketing_summary_label = QLabel("Sin resumen disponible.")
         self.dashboard_manual_promo_label = QLabel("Sin promociones manuales hoy.")
         self.settings_marketing_review_days_spin = QSpinBox()
@@ -1797,7 +1797,7 @@ class MainWindow(QMainWindow):
         self.settings_whatsapp_client_promotion_input = QTextEdit()
         self.settings_whatsapp_client_followup_input = QTextEdit()
         self.settings_whatsapp_client_greeting_input = QTextEdit()
-        self.settings_whatsapp_status_label = QLabel("Sin configuracion cargada.")
+        self.settings_whatsapp_status_label = QLabel("Sin configuración cargada.")
         self.settings_whatsapp_save_button = QPushButton("Guardar plantillas")
         self.settings_whatsapp_preview_combo = QComboBox()
         self.settings_whatsapp_preview_button = QPushButton("Vista previa")
@@ -1806,8 +1806,8 @@ class MainWindow(QMainWindow):
         self.settings_business_printer_combo = QComboBox()
         self.settings_business_ticket_printer_combo = QComboBox()
         self.settings_business_copies_spin = QSpinBox()
-        self.settings_business_status_label = QLabel("Sin configuracion cargada.")
-        self.settings_business_save_button = QPushButton("Guardar configuracion")
+        self.settings_business_status_label = QLabel("Sin configuración cargada.")
+        self.settings_business_save_button = QPushButton("Guardar configuración")
         self.tabs: QTabWidget | None = None
         self.connection_button: QPushButton | None = None
         self.header_more_button: QToolButton | None = None
@@ -2123,7 +2123,7 @@ class MainWindow(QMainWindow):
         self.catalog_school_scope_filter_combo.setToolTip(
             "Separa el catalogo entre uniforme escolar y ropa normal segun la categoria real del producto."
         )
-        self.catalog_clear_filters_button.setToolTip("Limpia todos los filtros del catalogo y muestra nuevamente todo el catalogo.")
+        self.catalog_clear_filters_button.setToolTip("Limpia todos los filtros del catálogo y muestra nuevamente todo el catálogo.")
         self.inventory_search_input.setToolTip(
             "Busca por producto, color, talla, marca, escuela o SKU. Si quieres mas precision, tambien acepta prefijos como sku:, producto: o color:."
         )
@@ -3019,7 +3019,7 @@ class MainWindow(QMainWindow):
                 ticket_printer_index = self.settings_business_ticket_printer_combo.findData(snapshot.ticket_printer)
                 self.settings_business_ticket_printer_combo.setCurrentIndex(ticket_printer_index if ticket_printer_index >= 0 else 0)
                 self.settings_business_copies_spin.setValue(snapshot.ticket_copies)
-                self.settings_business_status_label.setText("Configuracion cargada correctamente.")
+                self.settings_business_status_label.setText("Configuración cargada correctamente.")
                 self.settings_marketing_status_label.setText("Reglas de marketing cargadas correctamente.")
                 self.settings_whatsapp_status_label.setText("Plantillas cargadas correctamente.")
                 self._refresh_sale_discount_options()
@@ -3118,7 +3118,7 @@ class MainWindow(QMainWindow):
             return
         self.settings_business_logo_input.setText(str(managed_logo))
         self._refresh_business_logo_preview(str(managed_logo))
-        self.settings_business_status_label.setText("Logo listo para guardarse en la configuracion.")
+        self.settings_business_status_label.setText("Logo listo para guardarse en la configuración.")
 
     def _handle_clear_business_logo(self) -> None:
         self.settings_business_logo_input.clear()
@@ -5575,12 +5575,12 @@ class MainWindow(QMainWindow):
         motive_input = QLineEdit()
         motive_input.setPlaceholderText("Conteo general / correccion de lote")
         note_input = QLineEdit()
-        note_input.setPlaceholderText("Observacion adicional")
+        note_input.setPlaceholderText("Observación adicional")
         source_label = QLabel("Fuente")
         mode_label = QLabel("Tipo")
         reference_label = QLabel("Referencia")
         motive_label = QLabel("Motivo")
-        note_label = QLabel("Observacion")
+        note_label = QLabel("Observación")
         for label in (source_label, mode_label, reference_label, motive_label, note_label):
             label.setObjectName("inventoryFilterLabel")
         header_grid.addWidget(source_label, 0, 0)
@@ -5930,7 +5930,7 @@ class MainWindow(QMainWindow):
         motive_input = QLineEdit()
         motive_input.setPlaceholderText("Ajuste de lista / temporada / correccion comercial")
         note_input = QLineEdit()
-        note_input.setPlaceholderText("Observacion adicional")
+        note_input.setPlaceholderText("Observación adicional")
         for label_text, row_index, column_index in (
             ("Fuente", 0, 0),
             ("Operacion", 0, 2),
@@ -10408,7 +10408,7 @@ class MainWindow(QMainWindow):
             with get_session() as session:
                 self._refresh_analytics(session)
         except SQLAlchemyError:
-            self.status_label.setText("Estado: no se pudo refrescar la analitica.")
+            self.status_label.setText("Estado: no se pudo refrescar la analítica.")
 
     def _refresh_analytics(self, session) -> None:
         period_start, period_end = self._analytics_period_bounds()

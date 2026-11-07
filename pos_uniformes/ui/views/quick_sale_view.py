@@ -275,7 +275,7 @@ class QuickSaleWidget(QWidget):
 
         gate = construir_gate(
             emoji="📋",
-            titulo="Venta rapida",
+            titulo="Venta rápida",
             ayuda="Escanea tu QR de empleada para comenzar",
             marcador="VEND-1",
             hoja=_GATE_STYLE,

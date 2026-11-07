@@ -118,9 +118,9 @@ def build_products_tab(window: "MainWindow") -> QWidget:
     window.catalog_school_scope_filter_combo.addItem("Solo ropa normal", "general_only")
     window.catalog_school_scope_filter_combo.addItem("Por nombrar (entró con código)", "unidentified")
 
-    search_title = QLabel("Busqueda rapida")
+    search_title = QLabel("Búsqueda rápida")
     search_title.setObjectName("catalogSectionTitle")
-    search_hint = QLabel("Ubica una prenda por texto, separa por seccion y entra por linea con un solo clic.")
+    search_hint = QLabel("Ubica una prenda por texto, separa por sección y entra por línea con un solo clic.")
     search_hint.setObjectName("catalogSectionHint")
     macro_row = QHBoxLayout()
     macro_row.setSpacing(6)
@@ -149,7 +149,7 @@ def build_products_tab(window: "MainWindow") -> QWidget:
     search_row.addWidget(window.catalog_clear_filters_button, 1)
     hero_layout.addLayout(search_row)
 
-    macro_caption = QLabel("Linea rapida")
+    macro_caption = QLabel("Línea rápida")
     macro_caption.setObjectName("catalogSectionCaption")
     hero_layout.addWidget(macro_caption)
     hero_layout.addLayout(macro_row)
@@ -227,7 +227,7 @@ def build_products_tab(window: "MainWindow") -> QWidget:
     window.catalog_clear_filters_button.clicked.connect(window._handle_clear_catalog_filters)
     window.catalog_previous_page_button.clicked.connect(window._handle_catalog_previous_page)
     window.catalog_next_page_button.clicked.connect(window._handle_catalog_next_page)
-    window.catalog_type_filter_combo.setToolTip("Filtro detallado por linea o tipo de prenda.")
+    window.catalog_type_filter_combo.setToolTip("Filtro detallado por línea o tipo de prenda.")
     window.catalog_school_scope_filter_combo.setToolTip(
         "Separa rapido entre uniforme escolar y ropa normal segun la categoria real del producto."
     )

@@ -1734,13 +1734,8 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
         construir_caja_impresoras,
     )
 
-    estacion_hint = QLabel(
-        "📡  Esta PC no tiene ninguna impresora marcada, así que no hay nada "
-        "que configurar aquí. Todo se imprime donde sí haya. Si le conectaste "
-        "una, márcala arriba."
-    )
-    estacion_hint.setWordWrap(True)
-    estacion_hint.setObjectName("satNota")
+    # El aviso de «esta PC no imprime nada» lo da la propia caja de impresoras
+    # («📡 Estación: …»); aquí se repetía debajo con otras palabras (2026-11-07).
 
     def _aplicar_visibilidad_rol(marcados: set[str]) -> None:
         """Cada caja de configuración se ve solo si esa impresora existe aquí.
@@ -1752,7 +1747,6 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
         printer_box.setVisible(tickets)
         escpos_box.setVisible(tickets)
         label_box.setVisible(etiquetas)
-        estacion_hint.setVisible(not (tickets or etiquetas))
 
     routing_box = construir_caja_impresoras(dialog, al_cambiar=_aplicar_visibilidad_rol)
 
@@ -1922,7 +1916,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
 
     _grupo("ESTA PC")
     _seccion("🔌   Conexión y versión", config_box, update_box)
-    _seccion("🖨   Impresoras", routing_box, estacion_hint, printer_box, label_box, escpos_box)
+    _seccion("🖨   Impresoras", routing_box, printer_box, label_box, escpos_box)
     _seccion("📹   Cámaras", _build_camaras_box(dialog))
     _seccion("🔍   Búsqueda", meili_box)
     _grupo("LA TIENDA")

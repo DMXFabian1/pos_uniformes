@@ -33,7 +33,7 @@ def build_analytics_tab(window: "MainWindow") -> QWidget:
     layout = QVBoxLayout()
     layout.setSpacing(10)
 
-    filters_box = QGroupBox("Periodo de analitica")
+    filters_box = QGroupBox("Periodo de analítica")
     filters_box.setObjectName("infoCard")
     filters_layout = QGridLayout()
     filters_layout.setHorizontalSpacing(10)
@@ -165,7 +165,7 @@ def build_analytics_tab(window: "MainWindow") -> QWidget:
     layaway_layout.addWidget(window.analytics_layaway_delivered_label, 1, 1)
     layaway_box.setLayout(layaway_layout)
 
-    top_products_box = QGroupBox("Productos mas vendidos")
+    top_products_box = QGroupBox("Productos más vendidos")
     top_products_box.setObjectName("infoCard")
     top_products_layout = QVBoxLayout()
     top_products_layout.setSpacing(8)

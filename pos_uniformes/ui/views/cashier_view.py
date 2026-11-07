@@ -25,7 +25,7 @@ def build_cashier_tab(window: "MainWindow") -> QWidget:
     layout = QVBoxLayout()
     layout.setSpacing(8)
 
-    sale_box = QGroupBox("Venta rapida")
+    sale_box = QGroupBox("Venta rápida")
     sale_box.setObjectName("infoCard")
     sale_layout = QVBoxLayout()
     sale_layout.setSpacing(5)
