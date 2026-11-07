@@ -78,7 +78,11 @@ def _es_total(linea: str) -> bool:
     Se reconoce por el texto y no por su posición porque el ticket de venta, el
     de apartado y el del corte la ponen en lugares distintos."""
     sin_caja = linea.replace("│", "").replace("|", "").strip().upper()
-    return sin_caja.startswith("TOTAL") and any(c.isdigit() for c in sin_caja)
+    # «SACAR DE LA VENTA» es el total del corte: la cifra que importa ahí
+    # iba del tamaño de todo lo demás (Daniel, 2026-11-07).
+    return (sin_caja.startswith("TOTAL") or sin_caja.startswith("SACAR DE LA VENTA")) and any(
+        c.isdigit() for c in sin_caja
+    )
 
 
 def _marcador_de_imagen(linea: str) -> str | None:
@@ -160,10 +164,18 @@ def render_ticket(texto: str, *, ancho: int = ANCHO_PAPEL, adornos: bool | None 
     _AIRE_TOTAL_VERTICAL = 14
     util_total = util - _AIRE_TOTAL * 2
     grande = QFont(fuente)
+    # Se mide con la etiqueta de total más larga que traiga ESTE ticket
+    # («SACAR DE LA VENTA» es más larga que «TOTAL A PAGAR»): así nunca se
+    # monta sobre el importe.
+    etiquetas_total = [
+        l.replace("│", "").replace("|", "").replace("║", "").strip().rpartition(" ")[0].strip(" :")
+        for l in lineas if _es_total(l)
+    ]
+    etiqueta_mas_larga = max(etiquetas_total + ["TOTAL A PAGAR"], key=len)
     for candidato in range(tam + 8, tam, -1):
         grande.setPointSize(candidato)
         m = QFontMetrics(grande)
-        if m.horizontalAdvance("TOTAL A PAGAR") + m.horizontalAdvance("$0,000.00") + 24 <= util_total:
+        if m.horizontalAdvance(etiqueta_mas_larga) + m.horizontalAdvance("$00,000.00") + 24 <= util_total:
             break
     metrica_grande = QFontMetrics(grande)
 

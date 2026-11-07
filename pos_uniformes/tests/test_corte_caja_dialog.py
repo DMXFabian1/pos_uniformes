@@ -323,3 +323,50 @@ class NadaSeCortaEnElTicketTests(unittest.TestCase):
         self.assertEqual(len(lines), 2)
         self.assertTrue(lines[-1].rstrip(" │").endswith("-$300.00"))
         self.assertTrue(all(len(l) == 38 for l in lines), lines)
+
+
+class ElCorteEnPapelTests(unittest.TestCase):
+    """2026-11-07, Daniel: SACAR DE LA VENTA en grande, «Venta en efectivo» una
+    sola vez, y la nota del corte en el ticket simple."""
+
+    def _ticket(self, *, nota="", tarjeta=None, pagos=()):
+        from decimal import Decimal
+        from types import SimpleNamespace
+
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import texto_ticket_corte_encargado
+
+        corte = SimpleNamespace(monto_final=Decimal("13000"), reactivo_final=Decimal("10360"), reactivo_inicial=Decimal("10360"),
+                                periodo_label="hoy", created_at=None, nota=nota, creado_por="VEND-1")
+        return texto_ticket_corte_encargado(corte, Decimal("3889"), list(pagos), [], tarjeta=tarjeta, tarjeta_ops=1 if tarjeta else None)
+
+    def test_venta_en_efectivo_una_sola_vez_sin_tarjeta(self) -> None:
+        from decimal import Decimal
+        from types import SimpleNamespace
+
+        pago = SimpleNamespace(employee_name="Fanny Ortiz", total=Decimal("995.33"), dias_trabajados=None, sueldo_base=Decimal("1300"),
+                               comisiones=0, tarifa_comision=Decimal("2"), monto_comisiones=Decimal("0"), faltas=0, descuento_faltas=Decimal("0"))
+        texto = self._ticket(pagos=[pago])
+        self.assertEqual(texto.count("Venta en efectivo:"), 1)
+        self.assertIn("Pago a Fanny:", texto)
+
+    def test_con_tarjeta_si_se_repite_para_arrancar_la_resta(self) -> None:
+        from decimal import Decimal
+        from types import SimpleNamespace
+
+        pago = SimpleNamespace(employee_name="Fanny Ortiz", total=Decimal("995.33"), dias_trabajados=None, sueldo_base=Decimal("1300"),
+                               comisiones=0, tarifa_comision=Decimal("2"), monto_comisiones=Decimal("0"), faltas=0, descuento_faltas=Decimal("0"))
+        texto = self._ticket(pagos=[pago], tarjeta=Decimal("1200"))
+        self.assertEqual(texto.count("Venta en efectivo:"), 2)
+        self.assertIn("VENTA TOTAL:", texto)
+
+    def test_la_nota_sale_en_el_ticket_simple(self) -> None:
+        texto = self._ticket(nota="Depósito al banco de 2,000")
+        self.assertIn("Nota: Depósito al banco de 2,000", texto)
+        self.assertNotIn("Nota:", self._ticket())
+
+    def test_sacar_de_la_venta_se_dibuja_en_grande(self) -> None:
+        from pos_uniformes.services.ticket_imagen_service import _es_total
+
+        self.assertTrue(_es_total("│ SACAR DE LA VENTA:       $2,995.33 │"))
+        self.assertTrue(_es_total("│ TOTAL A PAGAR:           $1,200.00 │"))
+        self.assertFalse(_es_total("│ Venta en efectivo:       $3,889.00 │"))

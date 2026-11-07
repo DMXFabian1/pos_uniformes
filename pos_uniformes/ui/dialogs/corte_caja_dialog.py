@@ -211,7 +211,8 @@ def _bloque_cuenta(lines, *, corte, venta, tarjeta, tarjeta_ops, pagos_restar, r
         lines.append(tk_row("Reactivo en caja:", f"${reactivo_ini:,.2f}"))
         lines.append(tk_mid())
     lines.append(tk_row("Venta en efectivo:", f"${venta:,.2f}"))
-    if tarjeta_monto > 0:
+    con_tarjeta = tarjeta_monto > 0
+    if con_tarjeta:
         # Lo que LLEGA por la terminal (neto del 4.5%) es la cifra que manda
         # (Daniel 2026-09-14); lo cobrado no va en el papel.
         from pos_uniformes.services.libreta_service import aplicar_comision_terminal
@@ -224,8 +225,12 @@ def _bloque_cuenta(lines, *, corte, venta, tarjeta, tarjeta_ops, pagos_restar, r
     entradas = list(entradas or [])
     restas = list(pagos_restar or []) or list(retiros or []) or entradas
     if restas:
-        lines.append(tk_mid())
-        lines.append(tk_row("Venta en efectivo:", f"${venta:,.2f}"))
+        # «Venta en efectivo» salía dos veces seguidas (Daniel, 2026-11-07):
+        # solo se repite cuando en medio quedó la tarjeta y el VENTA TOTAL,
+        # para que la resta arranque de la cifra correcta.
+        if con_tarjeta:
+            lines.append(tk_mid())
+            lines.append(tk_row("Venta en efectivo:", f"${venta:,.2f}"))
         # Lo que entró sin ser venta (el fondo de papá para la nómina) se
         # suma antes de restar los pagos: los pagos salen completos del cajón
         # y aquí se ve de dónde salieron (2026-10-20).
@@ -1210,6 +1215,15 @@ def texto_ticket_corte_encargado(
         lines.append("* REIMPRESION *".center(_TW))
         lines.append(("Corte: " + _hora_local(corte.created_at).strftime("%d/%m/%Y %H:%M")).center(_TW))
     lines.append(datetime.now().strftime("%d/%m/%Y %H:%M").center(_TW))
+    # La nota del corte («depósito al banco») solo salía en el ticket completo
+    # del dueño; el simple, que es el que se imprime siempre, se la tragaba
+    # (Daniel, 2026-11-07).
+    nota = str(getattr(corte, "nota", "") or "").strip()
+    if nota:
+        import textwrap
+
+        for parte in textwrap.wrap(f"Nota: {nota}", width=_TW - 2):
+            lines.append(parte.center(_TW))
     lines.append("")
     _bloque_cuenta(lines, corte=corte, venta=venta_efectivo, tarjeta=tarjeta, tarjeta_ops=tarjeta_ops, tarjeta_neto=tarjeta_neto,
                    pagos_restar=pagos + ya_pagados, retiros=retiros, sacar=sacar, entradas=entradas)
