@@ -5,11 +5,12 @@ from __future__ import annotations
 
 def build_main_window_hero_cashier_styles() -> str:
     return """
+            /* La misma banda vino → terracota del kiosko (2026-11-06). */
             #heroPanel {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #6f331d, stop:0.55 #a84f2d, stop:1 #c96a35);
+                    stop:0 #6b1f3a, stop:0.6 #a84f2d, stop:1 #c96a35);
                 border-radius: 14px;
-                border: 1px solid rgba(255, 255, 255, 0.08);
+                border: none;
             }
             #heroTitle {
                 color: #f9f4ea;

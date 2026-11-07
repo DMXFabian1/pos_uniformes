@@ -48,9 +48,13 @@ def _build_main_window_shell_styles() -> str:
                 font-weight: 600;
             }
             QTabBar::tab:selected {
-                background: #a84f2d;
+                background: #6b1f3a;
                 color: #f7f1e8;
             }
+            /* Los avisos del sistema como parte del programa (2026-11-06). */
+            QMessageBox { background: #f3efe8; }
+            QMessageBox QLabel { color: #1f1f1b; font-size: 14px; min-width: 320px; }
+            QMessageBox QPushButton { min-width: 120px; min-height: 36px; }
             QTabBar::tab:hover:!selected {
                 background: #f0ebe4;
                 color: #4a3728;

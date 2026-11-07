@@ -35,21 +35,25 @@ from sqlalchemy.orm import Session
 
 from pos_uniformes.services.conteo_service import ESCUELA_ID_BASICOS, NOMBRE_BASICOS
 
+# La misma paleta que el corte y la Libreta (2026-11-06): crema, vino y terracota.
 _ESTILO = """
-    QDialog { background: #f7f5f2; }
-    QLabel { color: #1a1a1a; background: transparent; }
-    QComboBox { background: #ffffff; color: #1a1a1a; border: 1px solid #e5e5e5;
-                border-radius: 6px; padding: 4px 8px; min-height: 28px; }
-    QTableWidget { background: #ffffff; alternate-background-color: #faf7f3; color: #1a1a1a;
-                   border: 1px solid #e5e5e5; border-radius: 8px; }
-    QHeaderView::section { background: #f5ebe0; color: #5c3019; font-weight: 600;
-                           border: none; padding: 7px 6px; }
-    QPushButton { background: #ffffff; color: #87492c; border: 1px solid #e5d9cd;
-                  border-radius: 8px; padding: 7px 14px; }
-    QPushButton:hover { background: #f5ebe0; }
-    QPushButton#primaryButton { background: #87492c; color: #ffffff; border: none; font-weight: 600; }
-    QPushButton#primaryButton:hover { background: #5c3019; }
-    QPushButton#dangerButton { color: #8a2f2f; border-color: #e0c4c4; }
+    QDialog { background: #f4ede2; }
+    QLabel { color: #2c2a27; background: transparent; }
+    QComboBox { background: #ffffff; color: #2c2a27; border: 1px solid #d9cdb8;
+                border-radius: 10px; padding: 7px 12px; min-height: 30px; font-size: 14px; }
+    QComboBox:focus { border: 2px solid #6b1f3a; }
+    QCheckBox { color: #2c2a27; font-size: 14px; }
+    QTableWidget { background: #ffffff; alternate-background-color: #faf6f0; color: #2c2a27;
+                   border: 1px solid #e6dccb; border-radius: 10px; }
+    QHeaderView::section { background: #f1e6d6; color: #6b1f3a; font-weight: 700;
+                           border: none; padding: 8px 6px; }
+    QPushButton { background: #ffffff; color: #8b4a2b; border: 1px solid #e6dccb;
+                  border-radius: 10px; padding: 8px 14px; font-weight: 700; }
+    QPushButton:hover { background: #f1e6d6; }
+    QPushButton#primaryButton { background: #8b4a2b; color: #ffffff; border: none; font-weight: 800; }
+    QPushButton#primaryButton:hover { background: #a2583a; }
+    QPushButton#dangerButton { color: #b3261e; border-color: #e8c7c3; }
+    QPushButton#dangerButton:hover { background: #fbeae8; }
 """
 
 
@@ -104,8 +108,11 @@ class ConteoNuevaJornadaDialog(QDialog):
         self.titulo: str = ""   # "Práxedis Guerrero" o "Básicos · Camisa", para rotular
 
         layout = QVBoxLayout()
+        layout.setContentsMargins(22, 18, 22, 18)
         layout.setSpacing(10)
-        layout.addWidget(QLabel("¿Qué vas a contar?"))
+        pregunta = QLabel("¿Qué vas a contar?")
+        pregunta.setStyleSheet("font-size: 18px; font-weight: 800;")
+        layout.addWidget(pregunta)
         self._escuela_combo = QComboBox()
         self._escuela_combo.currentIndexChanged.connect(self._on_escuela)
         layout.addWidget(self._escuela_combo)

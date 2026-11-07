@@ -18,6 +18,8 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QDialog,
+    QFrame,
+    QGridLayout,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -148,9 +150,24 @@ class HistorialCortesDialog(QDialog):
         self._creado_por = str(creado_por or "").strip().upper()
         self._cortes: list = []
         self._datos_cache: dict[tuple[int, bool], object] = {}
-        self.resize(1260, 700)
+        self.resize(1260, 720)
+        # Rediseño 2026-11-06 (Daniel: «estética e impresión»): el mes como en
+        # la Libreta (◀ ▶), las cifras del mes en tarjetas, la tabla a la
+        # izquierda y el corte elegido a la derecha con su ticket y sus
+        # acciones en rejilla. Mismos widgets y nombres: las pruebas los usan.
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import _ESTILO_CORTE
+
+        self.setObjectName("corteDialog")
+        self.setStyleSheet(_ESTILO_CORTE + """
+QDialog#corteDialog QLabel#cortesTitulo { font-size: 20px; font-weight: 800; }
+QDialog#corteDialog QLabel#cortesSub { color: #8a8177; font-size: 13px; }
+QComboBox#cortesMes { background: #ffffff; border: 1px solid #d9cdb8; border-radius: 10px; padding: 6px 12px;
+                      font-size: 15px; font-weight: 700; color: #2c2a27; min-width: 190px; }
+QPlainTextEdit#cortesTicket { background: #ffffff; border: 1px solid #e6dccb; border-radius: 10px; padding: 8px; color: #2c2a27; }
+""")
 
         self.mes_combo = QComboBox()
+        self.mes_combo.setObjectName("cortesMes")
         y, m = self._hoy.year, self._hoy.month
         for _ in range(12):
             self.mes_combo.addItem(f"{_MESES[m - 1].capitalize()} {y}", (y, m))
@@ -158,18 +175,42 @@ class HistorialCortesDialog(QDialog):
             if m == 0:
                 m, y = 12, y - 1
         self.mes_combo.currentIndexChanged.connect(lambda _i: self.recargar())
-        self.refresh_button = QPushButton("Actualizar")
+        self.mes_prev = QPushButton("◀")
+        self.mes_prev.setObjectName("libretaFechaFlecha")
+        self.mes_prev.setToolTip("Mes anterior")
+        self.mes_prev.clicked.connect(lambda: self._mover_mes(1))
+        self.mes_next = QPushButton("▶")
+        self.mes_next.setObjectName("libretaFechaFlecha")
+        self.mes_next.setToolTip("Mes siguiente")
+        self.mes_next.clicked.connect(lambda: self._mover_mes(-1))
+        self.refresh_button = QPushButton("↻  Actualizar")
+        self.refresh_button.setObjectName("libretaAccion")
         self.refresh_button.clicked.connect(self.recargar)
 
-        filtros = QHBoxLayout()
-        filtros.addWidget(QLabel("Mes:"))
-        filtros.addWidget(self.mes_combo)
-        filtros.addWidget(self.refresh_button)
-        filtros.addStretch()
+        cabecera = QHBoxLayout()
+        cabecera.setSpacing(10)
+        textos = QVBoxLayout()
+        textos.setSpacing(0)
+        titulo = QLabel("Cortes")
+        titulo.setObjectName("cortesTitulo")
+        sub = QLabel("Cada corte con su ticket. Elige uno para reimprimirlo o corregirlo.")
+        sub.setObjectName("cortesSub")
+        textos.addWidget(titulo)
+        textos.addWidget(sub)
+        cabecera.addLayout(textos, 1)
+        cabecera.addWidget(self.mes_prev)
+        cabecera.addWidget(self.mes_combo)
+        cabecera.addWidget(self.mes_next)
+        cabecera.addWidget(self.refresh_button)
 
+        # Las cifras del mes, en tarjetas; el renglón de texto queda debajo
+        # (dice lo mismo en una línea, y es lo que leen las pruebas).
+        self.cifras = QHBoxLayout()
+        self.cifras.setSpacing(10)
+        self._cifras_widgets: list[QWidget] = []
         self.totales_label = QLabel("")
         self.totales_label.setWordWrap(True)
-        self.totales_label.setStyleSheet("font-size: 14px; font-weight: 700; color: #73341c;")
+        self.totales_label.setObjectName("corteAviso")
 
         self.tabla = QTableWidget(0, len(COLUMNAS))
         self.tabla.setObjectName("libretaTabla")
@@ -191,19 +232,20 @@ class HistorialCortesDialog(QDialog):
         QShortcut(QKeySequence(ATAJO_MODO_REAL), self, activated=self.alternar_modo_real)
 
         self.previa = QPlainTextEdit()
+        self.previa.setObjectName("cortesTicket")
         self.previa.setReadOnly(True)
         fuente = QFont("Courier New")
         fuente.setStyleHint(QFont.StyleHint.Monospace)
         fuente.setPointSize(11)
         self.previa.setFont(fuente)
-        self.previa.setPlaceholderText("Selecciona un corte para ver su ticket.")
+        self.previa.setPlaceholderText("Elige un corte de la lista para ver su ticket.")
         self.previa.setMinimumWidth(360)
 
         # Por defecto el ticket simple (el de siempre); la casilla saca el completo.
         self.formato_check = QCheckBox("Ticket completo (con operaciones por empleada)")
         self.formato_check.toggled.connect(lambda _v: self._mostrar_seleccionado())
-        self.reprint_button = QPushButton("🖨 Reimprimir corte")
-        self.reprint_button.setObjectName("primaryButton")
+        self.reprint_button = QPushButton("🖨  Reimprimir corte")
+        self.reprint_button.setObjectName("cortePrimario")
         self.reprint_button.setEnabled(False)
         self.reprint_button.clicked.connect(self.reimprimir)
 
@@ -211,52 +253,89 @@ class HistorialCortesDialog(QDialog):
         # y el periodo se recompone (ver historial_cortes_service.borrar_corte).
         # Ajustar: cambiar la venta que se reporta de un corte ya hecho.
         self.ajustar_button = QPushButton("✏️ Ajustar la venta")
-        self.ajustar_button.setObjectName("secondaryButton")
+        self.ajustar_button.setObjectName("libretaAccion")
         self.ajustar_button.setEnabled(False)
         self.ajustar_button.setVisible(self._creado_por == "VEND-1")
         self.ajustar_button.clicked.connect(self.ajustar)
 
         # Quitar el ajuste: la cifra oficial vuelve a ser la real (pruebas).
         self.sin_ajuste_button = QPushButton("↩ Quitar el ajuste")
-        self.sin_ajuste_button.setObjectName("secondaryButton")
+        self.sin_ajuste_button.setObjectName("libretaAccion")
         self.sin_ajuste_button.setEnabled(False)
         self.sin_ajuste_button.setVisible(self._creado_por == "VEND-1")
         self.sin_ajuste_button.clicked.connect(self.quitar_ajuste)
 
         self.delete_button = QPushButton("🗑 Borrar corte")
-        self.delete_button.setObjectName("secondaryButton")
+        self.delete_button.setObjectName("libretaAccionBorrar")
         self.delete_button.setEnabled(False)
         self.delete_button.setVisible(self._creado_por == "VEND-1")
         self.delete_button.clicked.connect(self.borrar)
 
-        derecha = QVBoxLayout()
-        derecha.addWidget(QLabel("Ticket:"))
+        card = QFrame()
+        card.setObjectName("corteCard")
+        derecha = QVBoxLayout(card)
+        derecha.setContentsMargins(16, 12, 16, 14)
+        derecha.setSpacing(8)
+        t = QLabel("CORTE ELEGIDO")
+        t.setObjectName("corteCardTitulo")
+        derecha.addWidget(t)
         derecha.addWidget(self.previa, 1)
         derecha.addWidget(self.formato_check)
         derecha.addWidget(self.reprint_button)
-        derecha.addWidget(self.ajustar_button)
-        derecha.addWidget(self.sin_ajuste_button)
-        derecha.addWidget(self.delete_button)
+        acciones = QGridLayout()
+        acciones.setHorizontalSpacing(8)
+        acciones.addWidget(self.ajustar_button, 0, 0)
+        acciones.addWidget(self.sin_ajuste_button, 0, 1)
+        derecha.addLayout(acciones)
+        derecha.addWidget(self.delete_button, 0, Qt.AlignmentFlag.AlignLeft)
 
         centro = QHBoxLayout()
+        centro.setSpacing(12)
         centro.addWidget(self.tabla, 3)
-        centro.addLayout(derecha, 2)
+        centro.addWidget(card, 2)
 
         cerrar = QPushButton("Cerrar")
+        cerrar.setObjectName("corteCancelar")
         cerrar.clicked.connect(self.accept)
         pie = QHBoxLayout()
         pie.addStretch()
         pie.addWidget(cerrar)
 
         ly = QVBoxLayout()
-        ly.setContentsMargins(16, 14, 16, 14)
-        ly.setSpacing(8)
-        ly.addLayout(filtros)
+        ly.setContentsMargins(20, 16, 20, 16)
+        ly.setSpacing(10)
+        ly.addLayout(cabecera)
+        ly.addLayout(self.cifras)
         ly.addWidget(self.totales_label)
         ly.addLayout(centro, 1)
         ly.addLayout(pie)
         self.setLayout(ly)
         self.recargar()
+
+    def _mover_mes(self, paso: int) -> None:
+        """El combo va del mes actual hacia atrás: +1 es el mes anterior."""
+        i = self.mes_combo.currentIndex() + paso
+        if 0 <= i < self.mes_combo.count():
+            self.mes_combo.setCurrentIndex(i)
+
+    def _pintar_cifras(self, t=None) -> None:
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import _cifra
+
+        for w in self._cifras_widgets:
+            self.cifras.removeWidget(w)
+            w.deleteLater()
+        self._cifras_widgets = []
+        if t is None:
+            return
+        for titulo, valor, pie, acento in (
+            ("Cortes del mes", str(t.cortes), "", False),
+            ("Vendido", f"${t.vendido:,.2f}", f"efectivo ${t.venta_real:,.2f} + tarjeta ${t.tarjeta:,.2f}", True),
+            ("Pagos a empleadas", f"${t.pagos:,.2f}", "", False),
+            ("Gastos", f"${t.otros_retiros:,.2f}", "", False),
+        ):
+            w = _cifra(titulo, valor, pie, acento=acento)
+            self.cifras.addWidget(w, 1)
+            self._cifras_widgets.append(w)
 
     # ----------------------------------------------------------------- datos
     def _rango(self) -> tuple[date, date]:
@@ -299,8 +378,10 @@ class HistorialCortesDialog(QDialog):
         for i, fila in enumerate(filas):
             for j, texto in enumerate(fila):
                 self.tabla.setItem(i, j, _item(texto, centrado=j not in (2, 10), negrita=(j == 5)))
+        self._pintar_cifras(None)
         if self._cortes:
             t = totales_cortes(self._cortes, tarjeta=getattr(self, "_tarjeta_mes", 0))
+            self._pintar_cifras(t)
             # «Vendido» = lo que de verdad se vendió: efectivo + tarjeta, sin el
             # reactivo y sin los ajustes. Lo entregado va aparte, porque es otra
             # pregunta (Daniel, 2026-10-01).

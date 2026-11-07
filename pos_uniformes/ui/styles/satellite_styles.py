@@ -524,6 +524,21 @@ QPushButton:checked {
     color: #f9f4ea;
     border-color: #8a4326;
 }
+/* Los avisos del sistema (QMessageBox) como parte del programa (2026-11-06):
+   fondo crema, letra legible y botones del tamaño de los demás. */
+QMessageBox {
+    background: #f4ede2;
+}
+QMessageBox QLabel {
+    color: #2c2a27;
+    font-size: 15px;
+    min-width: 320px;
+}
+QMessageBox QPushButton {
+    min-width: 120px;
+    min-height: 40px;
+    font-size: 14px;
+}
 QPushButton:disabled {
     background: #efe9de;
     color: #b3a794;

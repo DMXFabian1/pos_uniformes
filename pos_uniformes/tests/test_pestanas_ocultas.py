@@ -23,8 +23,8 @@ from pos_uniformes.ui.main_window import (  # noqa: E402
 _APP = QApplication.instance() or QApplication([])
 
 _ORDEN = [
-    "Resumen", "Caja", "Presupuestos", "Apartados", "Catalogo", "Inventario",
-    "Bodega", "Historial inventarios", "Panel Uniformes", "Analitica", "Configuracion",
+    "Resumen", "Caja", "Presupuestos", "Apartados", "Catálogo", "Inventario",
+    "Bodega", "Historial inventarios", "Panel Uniformes", "Analítica", "Configuración",
 ]
 
 
@@ -39,7 +39,7 @@ class PestanasOcultasTests(unittest.TestCase):
     def test_son_las_cuatro_que_se_mudaron(self) -> None:
         self.assertEqual(
             set(PESTANAS_MUDADAS_AL_KIOSKO),
-            {"Caja", "Presupuestos", "Apartados", "Catalogo"},
+            {"Caja", "Presupuestos", "Apartados", "Catálogo"},
         )
 
     def test_todas_existen_todavia_en_el_orden_real(self) -> None:
@@ -52,7 +52,7 @@ class PestanasOcultasTests(unittest.TestCase):
         self.assertEqual(
             quedan,
             ["Resumen", "Inventario", "Bodega", "Historial inventarios",
-             "Panel Uniformes", "Analitica", "Configuracion"],
+             "Panel Uniformes", "Analítica", "Configuración"],
         )
 
 

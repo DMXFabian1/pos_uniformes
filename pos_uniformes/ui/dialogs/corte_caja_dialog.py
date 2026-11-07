@@ -74,6 +74,9 @@ QDialog#corteDialog QLabel#corteResultadoPie { color: #2c2a27; font-size: 14px; 
 QPushButton#cortePrimario { background: #8b4a2b; color: #ffffff; border: none; border-radius: 12px;
                             font-size: 17px; font-weight: 800; padding: 14px 20px; }
 QPushButton#cortePrimario:hover { background: #a2583a; }
+QPushButton#corteChip { background: #ffffff; color: #6b1f3a; border: 1px solid #d9cdb8; border-radius: 16px;
+                        font-size: 13px; font-weight: 700; padding: 6px 14px; }
+QPushButton#corteChip:hover { background: #f1e6d6; border-color: #6b1f3a; }
 QPushButton#corteCancelar { background: #fbf7f0; color: #8b4a2b; border: 1px solid #e6dccb; border-radius: 12px;
                             font-size: 15px; font-weight: 700; padding: 14px 20px; }
 """
@@ -917,33 +920,49 @@ def editar_parametros_caja(parent: QWidget | None) -> bool:
         QMessageBox.warning(parent, "Sin conexión", "No se alcanzó la base.")
         return False
     dlg = QDialog(parent)
+    dlg.setObjectName("corteDialog")
     dlg.setWindowTitle("Caja y nómina")
-    ly = QVBoxLayout()
-    ly.setContentsMargins(20, 18, 20, 18)
-    form = QFormLayout()
+    dlg.setStyleSheet(_ESTILO_CORTE)
+    ly = QVBoxLayout(dlg)
+    ly.setContentsMargins(22, 18, 22, 18)
+    ly.setSpacing(12)
+    card, cly = _card("Fondo de caja")
+    fila = QHBoxLayout()
+    fila.addWidget(QLabel("Reactivo con el que abre la caja"), 1)
     reactivo = _spin(p.reactivo_actual, False)
+    reactivo.setFixedWidth(190)
+    fila.addWidget(reactivo)
+    cly.addLayout(fila)
+    hint = QLabel("Se actualiza solo en cada corte; cámbialo aquí únicamente para corregirlo.")
+    hint.setObjectName("corteAviso")
+    hint.setWordWrap(True)
+    cly.addWidget(hint)
+    ly.addWidget(card)
+    card, cly = _card("Reglas de pago")
     sueldo = _spin(p.sueldo_base, False)
     tarifa = _spin(p.tarifa_comision, False)
     falta = _spin(p.descuento_falta, False)
-    form.addRow("Fondo de caja (reactivo) ahora:", reactivo)
-    form.addRow("Sueldo base por semana:", sueldo)
-    form.addRow("Pesos por comisión:", tarifa)
-    form.addRow("Descuento por falta:", falta)
-    ly.addLayout(form)
-    hint = QLabel("El fondo se actualiza solo en cada corte; edítalo aquí únicamente para corregirlo.")
-    hint.setWordWrap(True)
-    hint.setStyleSheet("color: #8a8177; font-size: 12px;")
-    ly.addWidget(hint)
+    for texto, caja in (("Sueldo base por semana", sueldo), ("Pesos por comisión", tarifa), ("Descuento por falta", falta)):
+        fila = QHBoxLayout()
+        fila.addWidget(QLabel(texto), 1)
+        caja.setFixedWidth(190)
+        fila.addWidget(caja)
+        cly.addLayout(fila)
+    ly.addWidget(card)
     botones = QHBoxLayout()
+    botones.setSpacing(10)
     cancelar = QPushButton("Cancelar")
+    cancelar.setObjectName("corteCancelar")
+    cancelar.setAutoDefault(False)
     cancelar.clicked.connect(dlg.reject)
     ok = QPushButton("Guardar")
-    ok.setObjectName("primaryButton")
+    ok.setObjectName("cortePrimario")
+    ok.setDefault(True)
     ok.clicked.connect(dlg.accept)
     botones.addWidget(cancelar)
     botones.addWidget(ok, 1)
     ly.addLayout(botones)
-    dlg.setLayout(ly)
+    dlg.resize(520, 380)
     if dlg.exec() != QDialog.DialogCode.Accepted:
         return False
     try:
@@ -981,40 +1000,89 @@ def confirmar_pago(parent: QWidget | None, *, employee_code: str, employee_name:
         QMessageBox.warning(parent, "Sin conexión", "No se alcanzó la base. Inténtalo otra vez.")
         return None
     desde = d.desde.strftime("%d/%m") if d.desde else "inicio"
-    cuando = "" if fecha == _date.today() else f"Fecha del pago: {fecha:%d/%m/%Y}\n"
-    base_txt = (
-        f"{d.dias_trabajados} día(s) × ${d.tarifa_dia:,.2f}:  ${d.sueldo_base:,.2f}\n"
-        if d.por_dia
-        else f"Sueldo base:        ${d.sueldo_base:,.2f}\n"
+    # La ventana (rediseño 2026-11-06): antes era un aviso de sistema con el
+    # desglose en texto corrido. Ahora: quién y su periodo, el desglose en
+    # renglones (cada resta dice por qué) y A PAGAR en grande.
+    dlg = QDialog(parent)
+    dlg.setObjectName("corteDialog")
+    dlg.setWindowTitle("Pagar")
+    dlg.setStyleSheet(_ESTILO_CORTE)
+    ly = QVBoxLayout(dlg)
+    ly.setContentsMargins(22, 18, 22, 18)
+    ly.setSpacing(12)
+    quien = QLabel(employee_name)
+    quien.setObjectName("cortePregunta")
+    quien.setStyleSheet("font-size: 22px; font-weight: 800;")
+    ly.addWidget(quien)
+    periodo = QLabel(
+        f"Periodo: {desde} → {d.hasta:%d/%m}"
+        + ("" if fecha == _date.today() else f"   ·   Fecha del pago: {fecha:%d/%m/%Y}")
     )
-    texto = (
-        f"{employee_name}\n"
-        f"{cuando}"
-        f"Periodo: {desde} → {d.hasta:%d/%m}\n\n"
-        f"{base_txt}"
-        f"{d.comisiones} comisiones × ${d.tarifa_comision:,.2f}:  +${d.monto_comisiones:,.2f}\n"
-        + (f"{d.faltas} falta(s):        -${d.descuento_faltas:,.2f}\n" if d.faltas else "")
-        # El préstamo SE TIENE que ver: ya venía restado del total, así que sin
-        # esta línea el pago aparecía más chico sin decir por qué, y eso se lee
-        # como un error del programa (Daniel, 2026-10-04).
-        + (f"Préstamo:           -${d.prestamo_cubierto:,.2f}\n" if d.prestamo_cubierto else "")
-        + f"\nA PAGAR:  ${d.total:,.2f}"
-        + (
-            f"\n\nLe siguen quedando ${d.prestamo_sin_cubrir:,.2f} del préstamo\n"
-            "para el próximo pago."
-            if d.prestamo_sin_cubrir
-            else ""
-        )
-    )
-    box = QMessageBox(parent)
-    box.setWindowTitle("Pagar")
-    box.setText(texto)
-    if grande:
-        box.setStyleSheet("QLabel { font-size: 20px; font-weight: 700; } QPushButton { font-size: 18px; min-height: 48px; padding: 6px 18px; }")
-    pagar = box.addButton("💵 Ya le pagué", QMessageBox.ButtonRole.YesRole)
-    box.addButton("Cancelar", QMessageBox.ButtonRole.NoRole)
-    box.exec()
-    if box.clickedButton() is not pagar:
+    periodo.setObjectName("cortePeriodo")
+    ly.addWidget(periodo)
+    card, cly = _card("Cómo se arma")
+    rejilla = QGridLayout()
+    rejilla.setHorizontalSpacing(16)
+    rejilla.setVerticalSpacing(6)
+    renglones: list[tuple[str, str, str]] = []
+    if d.por_dia:
+        renglones.append((f"{d.dias_trabajados} día(s) × ${d.tarifa_dia:,.2f}", f"${d.sueldo_base:,.2f}", "normal"))
+    else:
+        renglones.append(("Sueldo base", f"${d.sueldo_base:,.2f}", "normal"))
+    renglones.append((f"{d.comisiones} comisiones × ${d.tarifa_comision:,.2f}", f"+${d.monto_comisiones:,.2f}", "suma"))
+    if d.faltas:
+        renglones.append((f"{d.faltas} falta(s)", f"−${d.descuento_faltas:,.2f}", "resta"))
+    # El préstamo SE TIENE que ver: ya venía restado del total, así que sin
+    # esta línea el pago aparecía más chico sin decir por qué, y eso se lee
+    # como un error del programa (Daniel, 2026-10-04).
+    if d.prestamo_cubierto:
+        renglones.append(("Préstamo", f"−${d.prestamo_cubierto:,.2f}", "resta"))
+    for fila_i, (texto, monto, clase) in enumerate(renglones):
+        e = QLabel(texto)
+        e.setStyleSheet("font-size: 15px;" if grande else "font-size: 14px;")
+        m = QLabel(monto)
+        color = {"suma": "#1c7c54", "resta": "#b3261e"}.get(clase, "#2c2a27")
+        m.setStyleSheet(f"font-size: 16px; font-weight: 700; color: {color};")
+        m.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        rejilla.addWidget(e, fila_i, 0)
+        rejilla.addWidget(m, fila_i, 1)
+    rejilla.setColumnStretch(0, 1)
+    cly.addLayout(rejilla)
+    ly.addWidget(card)
+    resultado = QFrame()
+    resultado.setObjectName("corteResultado")
+    rly = QGridLayout(resultado)
+    rly.setContentsMargins(16, 12, 16, 12)
+    t = QLabel("A PAGAR")
+    t.setObjectName("corteResultadoTitulo")
+    v = QLabel(f"${d.total:,.2f}")
+    v.setObjectName("corteResultadoValor")
+    rly.addWidget(t, 0, 0)
+    rly.addWidget(v, 1, 0)
+    if d.prestamo_sin_cubrir:
+        pie = QLabel(f"Le siguen quedando ${d.prestamo_sin_cubrir:,.2f} del préstamo para el próximo pago.")
+        pie.setObjectName("corteResultadoPie")
+        pie.setWordWrap(True)
+        pie.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        rly.addWidget(pie, 0, 1, 2, 1)
+        rly.setColumnStretch(1, 1)
+    ly.addWidget(resultado)
+    botones = QHBoxLayout()
+    botones.setSpacing(10)
+    cancelar = QPushButton("Cancelar")
+    cancelar.setObjectName("corteCancelar")
+    cancelar.setAutoDefault(False)
+    cancelar.clicked.connect(dlg.reject)
+    pagar = QPushButton("💵  Ya le pagué")
+    pagar.setObjectName("cortePrimario")
+    pagar.setDefault(True)
+    pagar.clicked.connect(dlg.accept)
+    botones.addWidget(cancelar)
+    botones.addWidget(pagar, 1)
+    ly.addLayout(botones)
+    dlg.resize(520, 420)
+    dlg.pagar_btn = pagar          # para las pruebas
+    if dlg.exec() != QDialog.DialogCode.Accepted:
         return None
     try:
         with get_session() as session:
@@ -1141,48 +1209,58 @@ def apuntar_retiro(parent: QWidget | None, *, creado_por: str, grande: bool = Fa
     from pos_uniformes.services.retiros_service import MOTIVOS_RAPIDOS, registrar_retiro
 
     dlg = QDialog(parent)
+    dlg.setObjectName("corteDialog")
     dlg.setWindowTitle("Saqué dinero del cajón")
-    ly = QVBoxLayout()
-    ly.setContentsMargins(20, 18, 20, 18)
-    ly.setSpacing(10)
-    if grande:
-        dlg.setStyleSheet("QDialog { background: #f4ede2; } QLabel { color: #2c2a27; font-size: 18px; }")
-    ly.addWidget(QLabel("¿Cuánto sacaste?"))
-    monto = _spin(Decimal("0.00"), grande)
-    ly.addWidget(monto)
-    ly.addWidget(QLabel("¿Para qué?"))
+    dlg.setStyleSheet(_ESTILO_CORTE)
+    ly = QVBoxLayout(dlg)
+    ly.setContentsMargins(22, 18, 22, 18)
+    ly.setSpacing(12)
+    card, cly = _card("")
+    pregunta = QLabel("¿Cuánto sacaste?")
+    pregunta.setObjectName("cortePregunta")
+    cly.addWidget(pregunta)
+    monto = _spin(Decimal("0.00"), True)
+    monto.setMinimumHeight(52)
+    cly.addWidget(monto)
+    ly.addWidget(card)
+    card, cly = _card("")
+    para = QLabel("¿Para qué?")
+    para.setObjectName("cortePregunta")
+    cly.addWidget(para)
     motivo = QLineEdit()
-    motivo.setPlaceholderText("Ej. Proveedor de playeras, renta, cambio...")
-    if grande:
-        motivo.setStyleSheet(_GRANDE)
+    motivo.setObjectName("corteTexto")
+    motivo.setPlaceholderText("Ej. proveedor de playeras, renta, cambio…")
+    motivo.setStyleSheet("font-size: 16px;")
+    motivo.setMinimumHeight(44)
     fila = QHBoxLayout()
+    fila.setSpacing(8)
     for m in MOTIVOS_RAPIDOS:
         b = QPushButton(m)
+        b.setObjectName("corteChip")
         b.setAutoDefault(False)
+        b.setCursor(Qt.CursorShape.PointingHandCursor)
         b.clicked.connect(lambda _c=False, t=m: motivo.setText(t))
-        if grande:
-            b.setMinimumHeight(44)
-            b.setStyleSheet("font-size: 16px; font-weight: 700;")
         fila.addWidget(b)
-    ly.addLayout(fila)
-    ly.addWidget(motivo)
+    fila.addStretch(1)
+    cly.addLayout(fila)
+    cly.addWidget(motivo)
+    ly.addWidget(card)
     botones = QHBoxLayout()
+    botones.setSpacing(10)
     cancelar = QPushButton("Cancelar")
+    cancelar.setObjectName("corteCancelar")
     cancelar.setAutoDefault(False)
     cancelar.clicked.connect(dlg.reject)
-    ok = QPushButton("💸 Apuntar retiro")
-    ok.setObjectName("primaryButton")
+    ok = QPushButton("💸  Apuntar retiro")
+    ok.setObjectName("cortePrimario")
+    ok.setDefault(True)
     ok.clicked.connect(dlg.accept)
-    if grande:
-        for b in (cancelar, ok):
-            b.setMinimumHeight(52)
-            b.setStyleSheet("font-size: 18px; font-weight: 700;")
     botones.addWidget(cancelar)
     botones.addWidget(ok, 1)
     ly.addLayout(botones)
-    dlg.setLayout(ly)
-    if grande:
-        dlg.resize(560, 360)
+    dlg.resize(560, 420)
+    monto.setFocus()
+    monto.selectAll()
     if dlg.exec() != QDialog.DialogCode.Accepted:
         return None
     try:

@@ -135,17 +135,17 @@ QFrame#gateCard {{
     border: 1.5px solid {_BORDER};
     border-radius: 16px;
 }}
-QLabel#gateEmoji {{ font-size: 36px; }}
+QLabel#gateEmoji {{ font-size: 44px; }}
 QLabel#gateTitle {{
-    font-size: 18px; font-weight: 600; color: {_TEXT};
+    font-size: 24px; font-weight: 800; color: {_TEXT};
 }}
 QLabel#gateHint {{
-    font-size: 13px; color: {_MUTED};
+    font-size: 14px; color: {_MUTED};
 }}
 QLineEdit#gateInput {{
-    font-size: 18px; padding: 14px 20px;
-    border: 1.5px solid {_BORDER}; border-radius: 10px;
-    background: {_WARM_BG}; color: {_TEXT}; min-width: 320px;
+    font-size: 20px; padding: 16px 22px;
+    border: 1.5px solid {_BORDER}; border-radius: 12px;
+    background: {_WARM_BG}; color: {_TEXT}; min-width: 360px;
 }}
 QLineEdit#gateInput:focus {{ border-color: {_BRAND}; background: white; }}
 QLabel#gateError {{

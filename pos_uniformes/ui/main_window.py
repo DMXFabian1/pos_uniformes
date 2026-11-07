@@ -642,7 +642,7 @@ from pos_uniformes.services.nombres_empleadas_service import nombres_por_codigo
 # Se ocultan, NO se borran: fueron la base del sistema, sus datos siguen
 # intactos y el código completo sigue en el repositorio. Para volver a ver
 # alguna, quitar su nombre de esta tupla.
-PESTANAS_MUDADAS_AL_KIOSKO = ("Caja", "Presupuestos", "Apartados", "Catalogo")
+PESTANAS_MUDADAS_AL_KIOSKO = ("Caja", "Presupuestos", "Apartados", "Catálogo")
 
 
 def caja_en_el_pos() -> bool:
@@ -1933,7 +1933,7 @@ class MainWindow(QMainWindow):
         except Exception:  # noqa: BLE001 — un aviso nunca impide abrir el POS
             pass
         self.header_more_button = QToolButton()
-        self.header_more_button.setText("Mas")
+        self.header_more_button.setText("Más")
         self.header_more_button.setObjectName("toolbarSoftButton")
         self.header_more_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
         self.header_more_button.setMenu(header_menu)
@@ -1991,13 +1991,13 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._wrap_tab_scroll(self._build_cashier_tab()), "Caja")
         self.tabs.addTab(self._wrap_tab_scroll(self._build_quotes_tab()), "Presupuestos")
         self.tabs.addTab(self._wrap_tab_scroll(self._build_layaway_tab()), "Apartados")
-        self.tabs.addTab(self._wrap_tab_scroll(self._build_catalog_tab()), "Catalogo")
+        self.tabs.addTab(self._wrap_tab_scroll(self._build_catalog_tab()), "Catálogo")
         self.tabs.addTab(self._wrap_tab_scroll(self._build_inventory_tab()), "Inventario")
         self.tabs.addTab(self._build_bodega_tab(), "Bodega")
         self.tabs.addTab(self._wrap_tab_scroll(self._build_history_tab()), "Historial inventarios")
         self.tabs.addTab(self._build_panel_uniformes_tab(), "Panel Uniformes")
-        self.tabs.addTab(self._wrap_tab_scroll(self._build_analytics_tab()), "Analitica")
-        self.tabs.addTab(self._wrap_tab_scroll(self._build_settings_tab()), "Configuracion")
+        self.tabs.addTab(self._wrap_tab_scroll(self._build_analytics_tab()), "Analítica")
+        self.tabs.addTab(self._wrap_tab_scroll(self._build_settings_tab()), "Configuración")
 
         container = QWidget()
         layout = QVBoxLayout()
@@ -2288,7 +2288,7 @@ class MainWindow(QMainWindow):
             self._clear_sale_capture()
         elif tab_name == "Presupuestos":
             self._clear_quote_capture()
-        elif tab_name == "Catalogo":
+        elif tab_name == "Catálogo":
             self._clear_catalog_capture()
 
     def _clear_sale_capture(self) -> None:
