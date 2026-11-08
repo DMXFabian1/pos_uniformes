@@ -1684,6 +1684,7 @@ class MainWindow(QMainWindow):
         self.settings_cash_history_button = QPushButton("Historial de cortes")
         self.settings_business_button = QPushButton("Negocio e impresion")
         self.settings_meilisearch_button = QPushButton("Meilisearch (búsqueda)")
+        self.settings_monederos_button = QPushButton("Monederos de clientes")
         self.settings_users_table = QTableWidget()
         self.settings_users_status_label = QLabel("Sin usuarios cargados.")
         self.settings_create_user_button = QPushButton("Crear usuario")
@@ -2632,6 +2633,11 @@ class MainWindow(QMainWindow):
         self.settings_backup_dialog.show()
         self.settings_backup_dialog.raise_()
         self.settings_backup_dialog.activateWindow()
+
+    def _open_monederos_settings_dialog(self) -> None:
+        from pos_uniformes.ui.dialogs.monederos_dialog import open_monederos_dialog
+
+        open_monederos_dialog(self, usuario_id=self.user_id)
 
     def _open_meilisearch_settings_dialog(self) -> None:
         from pos_uniformes.ui.dialogs.meilisearch_settings_dialog import open_meilisearch_settings_dialog
@@ -9322,6 +9328,7 @@ class MainWindow(QMainWindow):
         self.settings_cash_history_button.setEnabled(is_admin)
         self.settings_business_button.setEnabled(is_admin)
         self.settings_meilisearch_button.setEnabled(is_admin)
+        self.settings_monederos_button.setEnabled(is_admin)
         self.settings_create_user_button.setEnabled(is_admin)
         self.settings_edit_user_button.setEnabled(is_admin)
         self.settings_toggle_user_button.setEnabled(is_admin)

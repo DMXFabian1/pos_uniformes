@@ -664,8 +664,20 @@ class EliminarOperacionTests(unittest.TestCase):
         session = MagicMock()
         entry = object()
         session.get.return_value = entry
-        self.assertTrue(eliminar_operacion(session, 5))
+        with patch("pos_uniformes.services.monedero_service.tiene_movimientos", return_value=False):
+            self.assertTrue(eliminar_operacion(session, 5))
         session.delete.assert_called_once_with(entry)
+
+    def test_con_movimientos_de_monedero_no_se_borra(self) -> None:
+        from pos_uniformes.services.libreta_service import eliminar_operacion
+        from pos_uniformes.services.monedero_service import OperacionConMonedero
+
+        session = MagicMock()
+        session.get.return_value = object()
+        with patch("pos_uniformes.services.monedero_service.tiene_movimientos", return_value=True):
+            with self.assertRaises(OperacionConMonedero):
+                eliminar_operacion(session, 5)
+        session.delete.assert_not_called()
 
     def test_inexistente_devuelve_false(self) -> None:
         from pos_uniformes.services.libreta_service import eliminar_operacion

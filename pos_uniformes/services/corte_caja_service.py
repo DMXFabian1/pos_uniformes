@@ -49,6 +49,7 @@ class ResumenPeriodo:
     tarjeta: Decimal         # lo cobrado con tarjeta (no está en el cajón)
     efectivo: Decimal        # ventas + abonos pagados en efectivo
     tarjeta_neto: Decimal = Decimal("0.00")   # lo que de verdad LLEGA por la terminal (tras el 4.5%)
+    monedero: Decimal = Decimal("0.00")       # pagado con saldo de monedero: ni cajón ni terminal
 
 
 @dataclass(frozen=True)
@@ -76,14 +77,15 @@ class EstadoCaja:
 def resumir_periodo(rows: list) -> ResumenPeriodo:
     """Suma las operaciones de la Libreta de un periodo (mismas reglas que
     el corte por día: tarjeta no está en caja, apartado no es dinero)."""
+    from pos_uniformes.services.libreta_service import pagos_de
+
     operaciones = piezas = 0
-    ventas = abonos = apartados = tarjeta = efectivo = tarjeta_neto = Decimal("0.00")
+    ventas = abonos = apartados = tarjeta = efectivo = tarjeta_neto = monedero = Decimal("0.00")
     for row in rows:
         operaciones += 1
         piezas += int(row.piezas or 0)
         monto = _d(row.monto_total)
         tipo = str(row.tipo)
-        con_tarjeta = bool(getattr(row, "pago_tarjeta", False))
         if tipo == "apartado":
             apartados += monto
             continue
@@ -91,11 +93,12 @@ def resumir_periodo(rows: list) -> ResumenPeriodo:
             abonos += monto
         else:
             ventas += monto
-        if con_tarjeta:
-            tarjeta += monto
-            tarjeta_neto += _d(getattr(row, "monto_neto", None) or monto)
-        else:
-            efectivo += monto
+        pagos = pagos_de(row)
+        monedero += pagos.monedero
+        efectivo += pagos.efectivo
+        if pagos.tarjeta > 0:
+            tarjeta += pagos.tarjeta
+            tarjeta_neto += _d(getattr(row, "monto_neto", None) or pagos.tarjeta)
     return ResumenPeriodo(
         operaciones=operaciones,
         piezas=piezas,
@@ -105,6 +108,7 @@ def resumir_periodo(rows: list) -> ResumenPeriodo:
         tarjeta=tarjeta.quantize(_CENT),
         efectivo=efectivo.quantize(_CENT),
         tarjeta_neto=tarjeta_neto.quantize(_CENT),
+        monedero=monedero.quantize(_CENT),
     )
 
 
@@ -414,9 +418,12 @@ def datos_ticket_encargado(session, desde: datetime | None, hasta: datetime) -> 
     # Las comisiones y las piezas van completas: la empleada cobra lo que
     # trabajó. Lo que desaparece es el DINERO de los cobros privados.
     visibles = sin_privados(rows)
+    from pos_uniformes.services.libreta_service import pagos_de
+
+    # Con monedero, por la terminal pasó solo el resto (no el total).
     tarjeta = sum(
         (
-            _d(r.monto_total)
+            pagos_de(r).tarjeta
             for r in visibles
             if str(r.tipo) in ("venta", "abono") and bool(getattr(r, "pago_tarjeta", False))
         ),
@@ -429,7 +436,7 @@ def datos_ticket_encargado(session, desde: datetime | None, hasta: datetime) -> 
     )
     tarjeta_neto = sum(
         (
-            _d(getattr(r, "monto_neto", None) or r.monto_total)
+            _d(getattr(r, "monto_neto", None) or pagos_de(r).tarjeta)
             for r in visibles
             if str(r.tipo) in ("venta", "abono") and bool(getattr(r, "pago_tarjeta", False))
         ),

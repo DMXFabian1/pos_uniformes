@@ -6,7 +6,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
 
-from sqlalchemy import CheckConstraint, DateTime, Enum as SqlEnum
+from sqlalchemy import CheckConstraint, DateTime, Enum as SqlEnum, Index
 from sqlalchemy import Date, JSON, Boolean, ForeignKey, Integer, LargeBinary, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy import false as sa_false
 from sqlalchemy.dialects.postgresql import JSONB
@@ -2180,6 +2180,13 @@ class LibretaVenta(Base):
     """
 
     __tablename__ = "libreta_venta"
+    __table_args__ = (
+        CheckConstraint(
+            "monto_monedero >= 0 AND monto_monedero <= monto_total",
+            name="libreta_monto_monedero_valido",
+        ),
+        Index("uq_libreta_venta_operacion_uuid", "operacion_uuid", unique=True),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     employee_code: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
@@ -2216,6 +2223,136 @@ class LibretaVenta(Base):
         nullable=False,
         index=True,
     )
+    # Monedero: cliente identificado con su QR (para cashback y canje).
+    cliente_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cliente.id", ondelete="SET NULL"), index=True
+    )
+    # Identidad persistente de la venta: la misma en todos los reintentos de
+    # la cola offline. Base de la idempotencia del monedero.
+    operacion_uuid: Mapped[str | None] = mapped_column(String(36))
+    # Parte de monto_total pagada con saldo del monedero: no es efectivo ni
+    # tarjeta, no entra al cajón ni genera cashback.
+    monto_monedero: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), nullable=False, default=Decimal("0.00"), server_default="0"
+    )
+
+
+_MONEDERO_TIPOS_CREDITO = "'cashback', 'devolucion_canje', 'ajuste_abono'"
+_MONEDERO_TIPOS_DEBITO = "'canje', 'reversa_cashback', 'expiracion', 'ajuste_cargo'"
+
+
+class Monedero(Base):
+    """Monedero de fidelización de un cliente (saldo en MXN).
+
+    El saldo NO se guarda aquí: se deriva de `monedero_movimiento`. Esta fila
+    existe para el estado (activo/bloqueado/cerrado) y para bloquearla con
+    SELECT ... FOR UPDATE durante un canje. Ver services/monedero_service.py.
+    """
+
+    __tablename__ = "monedero"
+    __table_args__ = (
+        CheckConstraint("estado IN ('activo', 'bloqueado', 'cerrado')", name="monedero_estado_valido"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    cliente_id: Mapped[int] = mapped_column(
+        ForeignKey("cliente.id", ondelete="RESTRICT"), nullable=False, unique=True
+    )
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="activo", server_default="activo")
+    motivo_estado: Mapped[str | None] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class MonederoMovimiento(Base):
+    """Libro inmutable del monedero: créditos (+) y débitos (−).
+
+    Un trigger en Postgres impide editarlos o borrarlos; la única excepción
+    es poner `libreta_venta_id` en NULL al anular la venta ya compensada."""
+
+    __tablename__ = "monedero_movimiento"
+    __table_args__ = (
+        CheckConstraint(
+            f"tipo IN ({_MONEDERO_TIPOS_CREDITO}, {_MONEDERO_TIPOS_DEBITO})",
+            name="monedero_mov_tipo_valido",
+        ),
+        CheckConstraint(
+            f"(tipo IN ({_MONEDERO_TIPOS_CREDITO}) AND monto > 0)"
+            f" OR (tipo IN ({_MONEDERO_TIPOS_DEBITO}) AND monto < 0)",
+            name="monedero_mov_signo_valido",
+        ),
+        CheckConstraint(
+            f"tipo NOT IN ({_MONEDERO_TIPOS_CREDITO}) OR expira_at IS NOT NULL",
+            name="monedero_mov_credito_con_vencimiento",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    monedero_id: Mapped[int] = mapped_column(
+        ForeignKey("monedero.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    tipo: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    monto: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    libreta_venta_id: Mapped[int | None] = mapped_column(
+        ForeignKey("libreta_venta.id", ondelete="RESTRICT"), index=True
+    )
+    operacion_uuid: Mapped[str | None] = mapped_column(String(36), index=True)
+    movimiento_relacionado_id: Mapped[int | None] = mapped_column(
+        ForeignKey("monedero_movimiento.id", ondelete="RESTRICT"), index=True
+    )
+    idempotency_key: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    tasa_snapshot: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
+    base_calculo: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    expira_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    motivo: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
+    usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id", ondelete="RESTRICT"))
+    employee_code: Mapped[str | None] = mapped_column(String(40))
+    origen: Mapped[str | None] = mapped_column(String(60))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+
+
+class MonederoAplicacion(Base):
+    """Qué crédito consumió cada débito (y cuánto): FIFO por vencimiento."""
+
+    __tablename__ = "monedero_aplicacion"
+    __table_args__ = (
+        CheckConstraint("monto > 0", name="monedero_aplicacion_monto_positivo"),
+        UniqueConstraint("debito_id", "credito_id", name="uq_monedero_aplicacion_par"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    debito_id: Mapped[int] = mapped_column(
+        ForeignKey("monedero_movimiento.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    credito_id: Mapped[int] = mapped_column(
+        ForeignKey("monedero_movimiento.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    monto: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class MonederoConfig(Base):
+    """Bitácora de configuración del cashback. Rige la última vigente.
+
+    Sin ninguna fila (o deshabilitada) el cashback está apagado: la tasa
+    nunca se asume."""
+
+    __tablename__ = "monedero_config"
+    __table_args__ = (
+        CheckConstraint("tasa_cashback >= 0 AND tasa_cashback <= 100", name="monedero_config_tasa_valida"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tasa_cashback: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+    habilitado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=sa_false())
+    vigente_desde: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    usuario_id: Mapped[int] = mapped_column(ForeignKey("usuario.id", ondelete="RESTRICT"), nullable=False)
+    nota: Mapped[str | None] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class EmpleadaHorario(Base):

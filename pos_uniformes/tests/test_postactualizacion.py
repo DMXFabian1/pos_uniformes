@@ -12,7 +12,7 @@ from pos_uniformes.scripts import postactualizacion as post
 
 class TareasEsperadasTests(unittest.TestCase):
     #: Las que van siempre, con o sin Telegram, con o sin nada más.
-    BASE = ["POS Supervisor", "POS Supervisor check", "POS Respaldo"]
+    BASE = ["POS Supervisor", "POS Supervisor check", "POS Respaldo", "POS Monederos"]
 
     def test_sin_telegram_solo_el_supervisor_y_el_respaldo(self) -> None:
         nombres = [t.nombre for t in post.tareas_esperadas(hay_telegram=False, resumen_a_hora_fija=False)]

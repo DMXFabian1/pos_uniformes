@@ -48,6 +48,10 @@ from pos_uniformes.services.business_info_cache_service import (
     save_business_info as save_business_info_cache,
 )
 from pos_uniformes.ui.helpers.ticket_routing_helper import route_tickets
+from pos_uniformes.ui.helpers.quick_sale_monedero_helper import (
+    MonederoVentaMixin,
+    lineas_ticket_monedero,
+)
 from pos_uniformes.ui.helpers.quick_sale_sports_uniform_helper import (
     adapt_cache_row,
     build_promo_playera_item,
@@ -231,7 +235,7 @@ QPushButton#btnLogout:hover {{ color: {_DANGER}; border-color: {_DANGER}; }}
 """
 
 
-class QuickSaleWidget(QWidget):
+class QuickSaleWidget(MonederoVentaMixin, QWidget):
     #: Lo de hoy para el pie del gafete, leído en un hilo (el kiosko sin red no se congela).
     _pie_gafete_leido = pyqtSignal(object)
     """Página de Venta Rápida para la app satélite."""
@@ -246,6 +250,9 @@ class QuickSaleWidget(QWidget):
         self._items: list[dict] = []
         self._discount_active = False
         self._biz_info: tuple[str, str, str] | None = None
+        # Monedero: cliente identificado para esta venta (ver _identificar_cliente).
+        self._cliente: dict | None = None
+        self._usar_saldo = False
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -516,6 +523,7 @@ class QuickSaleWidget(QWidget):
 
         total_bar.setLayout(tb_layout)
         layout.addWidget(total_bar)
+        layout.addWidget(self._build_cliente_bar())
 
         # ── Scan bar ──
         scan_bar = QFrame()
@@ -568,6 +576,12 @@ class QuickSaleWidget(QWidget):
         self._btn_gasto.setStyleSheet(self._btn_sin_codigo.styleSheet())
         self._btn_gasto.clicked.connect(self._on_gasto_tienda)
         sb_layout.addWidget(self._btn_gasto)
+        self._btn_cliente = QPushButton("👛  Cliente")
+        self._btn_cliente.setToolTip("Buscar al cliente por nombre o teléfono (para usar saldo, escanea su QR)")
+        self._btn_cliente.setAutoDefault(False)
+        self._btn_cliente.setStyleSheet(self._btn_sin_codigo.styleSheet())
+        self._btn_cliente.clicked.connect(self._on_buscar_cliente)
+        sb_layout.addWidget(self._btn_cliente)
 
         scan_bar.setLayout(sb_layout)
         layout.addWidget(scan_bar)
@@ -667,6 +681,11 @@ class QuickSaleWidget(QWidget):
             # Gafete releído por el sensor: se ignora sin cortar la venta.
             self._flash_scan_hint("Gafete ignorado")
             self._scan_input.clear()
+            self._scan_input.setFocus()
+            return
+        if self._es_qr_cliente(sku):
+            self._scan_input.clear()
+            self._identificar_cliente(self._codigo_cliente_de(sku), por_qr=True)
             self._scan_input.setFocus()
             return
         self.add_sku(sku, self._qty_spin.value())
@@ -842,7 +861,11 @@ class QuickSaleWidget(QWidget):
 
         if self._discount_active and self._items:
             meta += f"  ·  Desc. (-${discount:,.2f})"
+        canje = self._canje_actual(total)
+        if canje > 0:
+            meta += f"  ·  Saldo -${canje:,.2f}  ·  Por cobrar ${total - canje:,.2f}"
         self._total_meta.setText(meta)
+        self._pintar_cliente_bar()
 
     # Geometría del carrito: padding del ::item (stylesheet) y alto de botón.
     _PAD_ITEM_CARRITO = 8
@@ -1138,6 +1161,7 @@ class QuickSaleWidget(QWidget):
         para registrar. Un apartado con `anticipo` anota además un abono por
         ese monto: es el dinero que sí entró al cajón hoy."""
         try:
+            import uuid as _uuid
             from datetime import timezone as _tz
 
             from pos_uniformes.services import libreta_local_queue_service as cola
@@ -1186,6 +1210,9 @@ class QuickSaleWidget(QWidget):
                     "descuento_empleada": bool(self._discount_active),
                     "origen": origen,
                     "created_at": datetime.now(_tz.utc).astimezone().isoformat(),
+                    # Identidad persistente: la misma en cada reintento.
+                    "operacion_uuid": str(_uuid.uuid4()),
+                    **self._datos_cliente_para_cola(tipo, total),
                 }
             )
             self._drenar_libreta_en_background()
@@ -1222,9 +1249,15 @@ class QuickSaleWidget(QWidget):
             else {}
         )
         self._registrar_en_libreta(tipo, cliente=cliente, pago_tarjeta=pago_tarjeta, **extra)
+        self._vaciar_carrito()
+
+    def _vaciar_carrito(self) -> None:
         self._items.clear()
         self._discount_active = False
         self._discount_check.setChecked(False)
+        # El cliente es de ESTA venta: la siguiente no hereda su monedero.
+        self._cliente = None
+        self._usar_saldo = False
         self._refresh_items_table()
         self._refresh_totals()
 
@@ -1958,6 +1991,11 @@ class QuickSaleWidget(QWidget):
             card = self._ask_card_payment()
         else:
             wants_copy, card, sin_ticket = self._ask_venta_options()
+            _s, _d, _t = self._compute_totals()
+            if sin_ticket and self._canje_actual(_t) > 0:
+                # Con saldo la venta se confirma en línea antes de todo.
+                self._cobrar_con_monedero(card, False, sin_ticket=True)
+                return
             if sin_ticket:
                 # Se anota igual (piezas, comisiones, forma de pago) y el
                 # carrito se vacía; nada va a la impresora. Reimpresión:
@@ -1966,7 +2004,11 @@ class QuickSaleWidget(QWidget):
                 self._avisar_sin_ticket()
                 self._scan_input.setFocus()
                 return
-        tickets = [self._build_venta_text()]
+        _subtotal, _desc, total_venta = self._compute_totals()
+        if self._canje_actual(total_venta) > 0:
+            self._cobrar_con_monedero(card, wants_copy)
+            return
+        tickets = [self._build_venta_text(monedero=self._monedero_para_ticket(total_venta, card))]
         if self._discount_active:
             tickets.append(self._build_employee_copy_text(terminal_commission=card))
         elif wants_copy:
@@ -2472,6 +2514,7 @@ class QuickSaleWidget(QWidget):
         terminal_commission: bool = False,
         fecha_str: str | None = None,
         reimpresion: bool = False,
+        monedero: dict | None = None,
     ) -> str:
         """Ticket de venta. Con store_copy=True genera la copia interna:
         mismo formato de articulos y totales, pero sin los datos que ve el
@@ -2535,6 +2578,8 @@ class QuickSaleWidget(QWidget):
         lines.append(tk_dbl_top())
         lines.append(tk_dbl_row("TOTAL A PAGAR:", f"${tk_fmt(total)}"))
         lines.append(tk_dbl_bot())
+        if monedero:
+            lines += lineas_ticket_monedero(monedero, tk_row)
 
         if not store_copy:
             self._append_terms(lines, self._TERMS_VENTA)

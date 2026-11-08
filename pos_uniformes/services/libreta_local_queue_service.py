@@ -90,6 +90,11 @@ def _ya_esta_en_la_base(session, entry: dict) -> bool:
 
     from pos_uniformes.database.models import LibretaVenta
 
+    # Ventas nuevas: identidad persistente, la misma en cada reintento.
+    if entry.get("operacion_uuid"):
+        return session.scalar(
+            select(LibretaVenta.id).where(LibretaVenta.operacion_uuid == str(entry["operacion_uuid"])).limit(1)
+        ) is not None
     creada = _fecha(entry)
     if creada is None or not entry.get("origen"):
         return False
@@ -103,9 +108,30 @@ def _ya_esta_en_la_base(session, entry: dict) -> bool:
     ) is not None
 
 
+def _cliente_id_de(session, entry: dict) -> int | None:
+    """El cliente del monedero: id si se resolvió en línea, o el código del
+    QR escaneado sin conexión (se resuelve ahora, al subir)."""
+    if entry.get("cliente_id") is not None:
+        try:
+            return int(entry["cliente_id"])
+        except (TypeError, ValueError):
+            return None
+    codigo = str(entry.get("cliente_codigo") or "").strip()
+    if not codigo:
+        return None
+    from pos_uniformes.services.sale_selected_client_service import find_active_sale_client_by_code
+
+    cliente = find_active_sale_client_by_code(session, codigo)
+    return cliente.id if cliente is not None else None
+
+
 def _subir(session, entry: dict) -> None:
     from pos_uniformes.services.libreta_service import registrar_operacion
 
+    # El canje nunca viaja por la cola (requiere conexión). Si aparece uno,
+    # algo está mal: que falle y avise en vez de subir dinero que no se cobró.
+    if Decimal(str(entry.get("monto_monedero", "0") or "0")) > 0:
+        raise ValueError("Venta con saldo de monedero en la cola offline: no se sube.")
     registrar_operacion(
         session,
         employee_code=str(entry.get("employee_code", "")),
@@ -126,6 +152,8 @@ def _subir(session, entry: dict) -> None:
         comisiones=(
             int(entry["comisiones"]) if entry.get("comisiones") is not None else None
         ),
+        cliente_id=_cliente_id_de(session, entry),
+        operacion_uuid=entry.get("operacion_uuid") or None,
     )
 
 
@@ -176,6 +204,18 @@ def drenar_pendientes(session) -> int:
     if por_avisar:
         _avisar_a_daniel(session, por_avisar)
     return subidas
+
+
+def cashback_pendiente() -> Decimal:
+    """Cashback estimado de ventas con cliente que aún no suben: se muestra
+    como "pendiente de sincronizar", nunca como saldo usable."""
+    total = Decimal("0.00")
+    for e in pendientes():
+        try:
+            total += Decimal(str(e.get("cashback_estimado") or "0"))
+        except Exception:  # noqa: BLE001
+            continue
+    return total.quantize(Decimal("0.01"))
 
 
 def atoradas() -> list[dict]:

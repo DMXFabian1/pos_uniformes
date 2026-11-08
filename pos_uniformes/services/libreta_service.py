@@ -156,6 +156,9 @@ def registrar_operacion(
     pago_tarjeta: bool = False,
     monto_neto: Decimal | None = None,
     comisiones: int | None = None,
+    cliente_id: int | None = None,
+    operacion_uuid: str | None = None,
+    acreditar_cashback: bool = True,
 ) -> LibretaVenta:
     """Anota una operación. `items` = líneas del carrito de venta rápida.
 
@@ -163,7 +166,12 @@ def registrar_operacion(
     en que se hicieron, no la del drenado.
     comisiones None → se calculan de los items (3pz=2, resto 1/unidad); los
     abonos deben pasar comisiones=0 explícito.
-    monto_neto None → igual a monto_total (efectivo)."""
+    monto_neto None → igual a monto_total (efectivo).
+
+    Monedero: con `cliente_id` (cliente identificado con su QR) una venta
+    gana cashback. Si acreditarlo falla, la venta NO se pierde: se anota en
+    el log y `monedero_service.acreditar_faltantes` lo repone después.
+    Esta vía nunca usa saldo: el canje es `registrar_venta_con_monedero`."""
     detalle = [
         {
             "sku": str(it.get("sku", "")),
@@ -195,13 +203,134 @@ def registrar_operacion(
         descuento_empleada=descuento_empleada,
         detalle=detalle,
         origen=origen,
+        cliente_id=(int(cliente_id) if cliente_id is not None else None),
+        operacion_uuid=(str(operacion_uuid) if operacion_uuid else None),
+        monto_monedero=Decimal("0.00"),
     )
     if created_at is not None:
         entry.created_at = created_at
     session.add(entry)
     session.flush()
     descontar_stock(session, entry)
+    if acreditar_cashback:
+        acreditar_cashback_sin_bloquear(session, entry)
     return entry
+
+
+def acreditar_cashback_sin_bloquear(session, entry: LibretaVenta):
+    """Cashback de la venta en su propio tramo: si falla, la venta sigue."""
+    if entry.cliente_id is None or str(entry.tipo) != "venta":
+        return None
+    from pos_uniformes.services import monedero_service
+
+    try:
+        with session.begin_nested():
+            return monedero_service.acreditar_cashback(session, libreta_venta=entry)
+    except Exception:  # noqa: BLE001 — el cashback se repone; la venta no se pierde
+        logger.exception("Monedero: no se acreditó el cashback de la venta %s", entry.id)
+        return None
+
+
+def registrar_venta_con_monedero(
+    session,
+    *,
+    employee_code: str,
+    employee_name: str,
+    items: list[dict],
+    monto_total: Decimal,
+    monto_monedero: Decimal,
+    cliente_id: int,
+    operacion_uuid: str,
+    pago_tarjeta: bool = False,
+    monto_neto: Decimal | None = None,
+    comisiones: int | None = None,
+    descuento_empleada: bool = False,
+    cliente: str | None = None,
+    origen: str | None = None,
+) -> tuple[LibretaVenta, object, object]:
+    """Venta pagada (en parte o toda) con saldo del monedero. EN LÍNEA.
+
+    En una sola transacción: anota la venta, descuenta stock, cobra el saldo
+    (con el monedero bloqueado) y acredita el cashback de lo pagado con
+    dinero. Si algo falla se lanza y NO queda nada: quien llama hace rollback
+    y la venta no se imprime. No hace commit (lo hace quien llama).
+
+    Repetirla con el mismo `operacion_uuid` devuelve lo ya registrado.
+
+    Devuelve (venta, canje, cashback|None)."""
+    from pos_uniformes.services import monedero_service
+
+    monto_total = Decimal(str(monto_total)).quantize(Decimal("0.01"))
+    monto_monedero = Decimal(str(monto_monedero)).quantize(Decimal("0.01"))
+    if not operacion_uuid:
+        raise monedero_service.MonederoError("Falta la identidad de la venta (operacion_uuid).")
+    if monto_monedero <= 0 or monto_monedero > monto_total:
+        raise monedero_service.MonederoError("El saldo a usar debe ser mayor a cero y no pasar el total.")
+    previa = session.scalars(
+        select(LibretaVenta).where(LibretaVenta.operacion_uuid == str(operacion_uuid))
+    ).first()
+    if previa is not None:
+        movs = {m.tipo: m for m in monedero_service.movimientos_de_operacion(session, previa.id)}
+        return previa, movs.get(monedero_service.CANJE), movs.get(monedero_service.CASHBACK)
+    entry = registrar_operacion(
+        session,
+        employee_code=employee_code,
+        employee_name=employee_name,
+        tipo="venta",
+        items=items,
+        monto_total=monto_total,
+        descuento_empleada=descuento_empleada,
+        cliente=cliente,
+        origen=origen,
+        pago_tarjeta=pago_tarjeta,
+        monto_neto=(
+            neto_de_cobro(monto_total, monto_monedero, pago_tarjeta) if monto_neto is None else monto_neto
+        ),
+        comisiones=comisiones,
+        cliente_id=cliente_id,
+        operacion_uuid=operacion_uuid,
+        acreditar_cashback=False,
+    )
+    entry.monto_monedero = monto_monedero
+    session.flush()
+    canje = monedero_service.canjear(
+        session, libreta_venta=entry, monto=monto_monedero, employee_code=entry.employee_code
+    )
+    cashback = acreditar_cashback_sin_bloquear(session, entry)
+    return entry, canje, cashback
+
+
+# ─── Cómo se pagó una operación ──────────────────────────────────────────
+
+
+@dataclass(frozen=True)
+class PagosOperacion:
+    """Reparto del cobro: monedero + (efectivo o tarjeta). Suman monto_total."""
+
+    monedero: Decimal
+    tarjeta: Decimal
+    efectivo: Decimal
+
+
+def pagos_de(row) -> PagosOperacion:
+    """Lo pagado con saldo NO es efectivo ni tarjeta: no está en el cajón ni
+    llega por la terminal. El resto va a un solo método (V1)."""
+    total = Decimal(str(getattr(row, "monto_total", 0) or 0)).quantize(Decimal("0.01"))
+    monedero = Decimal(str(getattr(row, "monto_monedero", 0) or 0)).quantize(Decimal("0.01"))
+    monedero = min(max(monedero, Decimal("0.00")), total) if total >= 0 else Decimal("0.00")
+    resto = (total - monedero).quantize(Decimal("0.01"))
+    if bool(getattr(row, "pago_tarjeta", False)):
+        return PagosOperacion(monedero, resto, Decimal("0.00"))
+    return PagosOperacion(monedero, Decimal("0.00"), resto)
+
+
+def neto_de_cobro(monto_total, monto_monedero, pago_tarjeta: bool) -> Decimal:
+    """Dinero que de verdad entra: lo cobrado fuera del monedero, menos la
+    comisión de terminal si fue con tarjeta."""
+    resto = (Decimal(str(monto_total)) - Decimal(str(monto_monedero or 0))).quantize(Decimal("0.01"))
+    if resto <= 0:
+        return Decimal("0.00")
+    return aplicar_comision_terminal(resto) if pago_tarjeta else resto
 
 
 def _referencia(entry: LibretaVenta) -> str | None:
@@ -425,18 +554,19 @@ def resumir_por_dia(rows: list[LibretaVenta]) -> list[CorteDia]:
         monto = Decimal(str(row.monto_total or 0))
         neto = Decimal(str(getattr(row, "monto_neto", None) or monto))
         tipo = str(row.tipo)
-        pago_tarjeta = bool(getattr(row, "pago_tarjeta", False))
+        # Lo pagado con monedero no está en el cajón.
+        efectivo = pagos_de(row).efectivo
+        if Decimal(str(getattr(row, "monto_monedero", 0) or 0)) > 0:
+            neto = Decimal(str(getattr(row, "monto_neto", None) or 0))
         if tipo == "apartado":
             bucket["apartados"] = (bucket["apartados"] + monto).quantize(Decimal("0.01"))
         elif tipo == "abono":
             bucket["abonos"] = (bucket["abonos"] + neto).quantize(Decimal("0.01"))
-            if not pago_tarjeta:
-                bucket["en_caja"] = (bucket["en_caja"] + monto).quantize(Decimal("0.01"))
+            bucket["en_caja"] = (bucket["en_caja"] + efectivo).quantize(Decimal("0.01"))
         else:
             bucket["ventas"] = (bucket["ventas"] + monto).quantize(Decimal("0.01"))
             bucket["neto"] = (bucket["neto"] + neto).quantize(Decimal("0.01"))
-            if not pago_tarjeta:
-                bucket["en_caja"] = (bucket["en_caja"] + monto).quantize(Decimal("0.01"))
+            bucket["en_caja"] = (bucket["en_caja"] + efectivo).quantize(Decimal("0.01"))
     return [
         CorteDia(
             dia=dia,
@@ -455,10 +585,46 @@ def resumir_por_dia(rows: list[LibretaVenta]) -> list[CorteDia]:
 
 def eliminar_operacion(session, operacion_id: int) -> bool:
     """Borra un registro de la Libreta (corrección del dueño: se imprimió
-    por error, venta que no se concretó). Devuelve True si existía."""
+    por error, venta que no se concretó). Devuelve True si existía.
+
+    Una venta que movió el monedero (cashback o pago con saldo) NO se borra
+    aquí: lanza `OperacionConMonedero`. Se anula desde el POS
+    (`anular_operacion_con_monedero`), que compensa el saldo primero."""
     entry = session.get(LibretaVenta, int(operacion_id))
     if entry is None:
         return False
+    from pos_uniformes.services import monedero_service
+
+    if monedero_service.tiene_movimientos(session, int(operacion_id)):
+        raise monedero_service.OperacionConMonedero(
+            "Esta venta movió el monedero del cliente: anúlala desde el POS "
+            "(Monederos → Anular venta) para devolver el saldo correctamente."
+        )
+    return _borrar_operacion(session, entry, int(operacion_id))
+
+
+def anular_operacion_con_monedero(session, operacion_id: int, *, usuario_id: int, motivo: str):
+    """Anulación COMPLETA de una venta con monedero (solo ADMIN, con motivo).
+
+    Compensa el monedero (reversa de cashback, devolución del saldo usado con
+    su vencimiento original), suelta la liga y luego borra la operación y
+    regresa el stock, como `eliminar_operacion`. Si el cashback ya se gastó
+    se detiene sin tocar nada (`CashbackYaGastado`). No hace commit.
+
+    Devuelve el `ResultadoAnulacion` o None si la operación no existe."""
+    from pos_uniformes.services import monedero_service
+
+    entry = session.get(LibretaVenta, int(operacion_id))
+    if entry is None:
+        return None
+    resultado = monedero_service.anular_operacion(session, entry, usuario_id=usuario_id, motivo=motivo)
+    monedero_service.soltar_operacion(session, entry.id)
+    _borrar_operacion(session, entry, int(operacion_id))
+    session.flush()
+    return resultado
+
+
+def _borrar_operacion(session, entry: LibretaVenta, operacion_id: int) -> bool:
     try:
         devolver_stock(session, entry)   # lo que se llevó, regresa
     except Exception:  # noqa: BLE001 — borrar la operación vale más que el número
@@ -568,7 +734,11 @@ def cambiar_pago_tarjeta(session, operacion_id: int, tarjeta: bool):
     if entry is None:
         return None
     total = Decimal(str(entry.monto_total or 0)).quantize(Decimal("0.01"))
-    if not tarjeta:
+    monedero = Decimal(str(getattr(entry, "monto_monedero", 0) or 0))
+    if monedero > 0:
+        # Con saldo de monedero el cobro con dinero es solo el resto.
+        neto = neto_de_cobro(total, monedero, bool(tarjeta))
+    elif not tarjeta:
         neto = total
     else:
         detalle = list(entry.detalle or [])

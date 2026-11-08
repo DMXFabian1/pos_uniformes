@@ -46,7 +46,9 @@ from pathlib import Path
 #       la creaba con consola visible "que había que dejar abierta" (2026-09-13)
 #   7 = "POS Respaldo" diaria a las 20:30. No existía ninguna tarea de respaldo:
 #       el runner estaba escrito y nadie lo disparaba (2026-10-01)
-INFRA_VERSION = 7
+#   8 = "POS Monederos" diaria a las 21:00: vencimientos del monedero de
+#       clientes y cashback que no se acreditó (2026-11-08)
+INFRA_VERSION = 8
 
 # Tareas que ya no van (las crearon versiones anteriores).
 TAREAS_OBSOLETAS = (
@@ -97,6 +99,9 @@ def tareas_esperadas(*, hay_telegram: bool, resumen_a_hora_fija: bool, snapshot_
         # el supervisor, porque no depende de que Telegram o el corte existan:
         # es lo último que debería faltar en una PC con la base.
         Tarea("POS Respaldo", ("/SC", "DAILY", "/ST", "20:30"), "respaldo_diario.bat", ("--callado",)),
+        # Monedero de clientes (2026-11-08): asienta lo vencido y repone
+        # cashback faltante. Idempotente; después del respaldo de las 20:30.
+        Tarea("POS Monederos", ("/SC", "DAILY", "/ST", "21:00"), "vencer_monederos.bat"),
     ]
     if actualizar_de_noche:
         # Solo se conserva si Daniel ya la encendió: nunca se crea sola.

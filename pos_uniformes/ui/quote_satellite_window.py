@@ -3724,7 +3724,11 @@ class QuoteSatelliteWindow(QMainWindow):
             partes.append(f"{piezas} pieza{'s' if piezas != 1 else ''}")
         monto = getattr(row, "monto_total", None)
         if monto is not None:
-            partes.append(f"${Decimal(monto):,.2f}" + (" con tarjeta" if getattr(row, "pago_tarjeta", False) else ""))
+            texto = f"${Decimal(monto):,.2f}" + (" con tarjeta" if getattr(row, "pago_tarjeta", False) else "")
+            monedero = Decimal(str(getattr(row, "monto_monedero", 0) or 0))
+            if monedero > 0:
+                texto += f" (${monedero:,.2f} con monedero)"
+            partes.append(texto)
         return " · ".join(partes)
 
     def _pintar_afluencia_libreta(self, filas: list) -> None:
@@ -3850,6 +3854,8 @@ class QuoteSatelliteWindow(QMainWindow):
         encabezado += f" · {nombre}"
         if getattr(row, "pago_tarjeta", False):
             encabezado += " · 💳 tarjeta"
+        if Decimal(str(getattr(row, "monto_monedero", 0) or 0)) > 0:
+            encabezado += " · 👛 monedero"
         titulo = QLabel(encabezado)
         titulo.setStyleSheet("font-size: 14px; font-weight: 700;")
         ly.addWidget(titulo)
@@ -3878,7 +3884,10 @@ class QuoteSatelliteWindow(QMainWindow):
         if con_precios:
             resumen += f" · Total: ${Decimal(str(row.monto_total or 0)):,.2f}"
             neto = Decimal(str(getattr(row, "monto_neto", None) or row.monto_total or 0))
-            if getattr(row, "pago_tarjeta", False):
+            monedero = Decimal(str(getattr(row, "monto_monedero", 0) or 0))
+            if monedero > 0:
+                resumen += f" · Monedero: ${monedero:,.2f}"
+            if getattr(row, "pago_tarjeta", False) or monedero > 0:
                 resumen += f" · Neto: ${neto:,.2f}"
         pie = QLabel(resumen)
         pie.setStyleSheet("font-size: 13px; font-weight: 700; color: #73341c;")

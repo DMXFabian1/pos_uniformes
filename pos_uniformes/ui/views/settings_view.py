@@ -84,6 +84,12 @@ def build_settings_tab(window: "MainWindow") -> QWidget:
             QStyle.StandardPixmap.SP_BrowserReload,
             window._open_meilisearch_settings_dialog,
         ),
+        (
+            window.settings_monederos_button,
+            "Cashback de clientes: tasa, saldos, ajustes, anulaciones y reporte.",
+            QStyle.StandardPixmap.SP_DialogSaveButton,
+            window._open_monederos_settings_dialog,
+        ),
     ]
     for index, (button, description, icon_name, handler) in enumerate(settings_buttons):
         row, column = divmod(index, 3)

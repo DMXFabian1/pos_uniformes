@@ -209,12 +209,11 @@ def _payload_dueno(db: Session) -> dict:
     neto = sum((c.monto_neto_ventas for c in cortes_hoy), Decimal("0.00"))
     abonos = sum((c.monto_abonos for c in cortes_hoy), Decimal("0.00"))
     ventas = sum((c.monto_ventas for c in cortes_hoy), Decimal("0.00"))
+    from pos_uniformes.services.libreta_service import pagos_de
+
+    # Con monedero, por la terminal pasó solo el resto (no el total).
     tarjeta = sum(
-        (
-            Decimal(str(r.monto_total or 0))
-            for r in rows
-            if str(r.tipo) == "venta" and bool(getattr(r, "pago_tarjeta", False))
-        ),
+        (pagos_de(r).tarjeta for r in rows if str(r.tipo) == "venta"),
         Decimal("0.00"),
     )
     comisiones = sum(int(getattr(r, "comisiones", 0) or 0) for r in rows)

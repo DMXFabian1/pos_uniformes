@@ -64,15 +64,23 @@ def _entradas(session, desde: datetime) -> list[str]:
         ("Efectivo", lv.pago_tarjeta.is_(False)),
         ("Tarjeta", lv.pago_tarjeta.is_(True)),
     ):
+        # Lo pagado con monedero no entró por efectivo ni tarjeta.
         t, n, c = session.execute(
             select(
-                func.coalesce(func.sum(lv.monto_total), 0),
+                func.coalesce(func.sum(lv.monto_total - lv.monto_monedero), 0),
                 func.coalesce(func.sum(lv.monto_neto), 0),
                 func.count(),
             ).where(lv.created_at >= desde, condicion)
         ).one()
         parte = f" ({t / total * 100:.0f}%)" if total else ""
         lineas.append(f"{etiqueta:<9} {_pesos(t):>14}{parte:<7} neto {_pesos(n):>14}  {c:,} ops")
+    m, c = session.execute(
+        select(func.coalesce(func.sum(lv.monto_monedero), 0), func.count()).where(
+            lv.created_at >= desde, lv.monto_monedero > 0
+        )
+    ).one()
+    if m:
+        lineas.append(f"{'Monedero':<9} {_pesos(m):>14}{'':<7} (saldo de clientes, no es dinero)  {c:,} ops")
 
     lineas += _sub("por tipo de operacion")
     for tipo, t, n, c in session.execute(
