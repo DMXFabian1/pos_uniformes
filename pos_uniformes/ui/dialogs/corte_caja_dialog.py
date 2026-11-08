@@ -648,7 +648,20 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
     fondo.setFixedWidth(190)
     fondo_fila.addWidget(fondo)
     cly.addLayout(fondo_fila)
+    # Cuando los pagos son más que la venta, en el cajón queda menos que el
+    # reactivo: el fondo baja solo a lo que hay y esta nota dice cuánto se
+    # tomó del reactivo (Daniel, 2026-11-07: «El reactivo que se queda no
+    # puede ser mayor a lo contado» y no sabía qué cifra poner).
+    fondo_nota = QLabel("")
+    fondo_nota.setObjectName("corteAviso")
+    fondo_nota.setProperty("estado", "menos")
+    fondo_nota.setWordWrap(True)
+    fondo_nota.setVisible(False)
+    cly.addWidget(fondo_nota)
     ly.addWidget(card)
+    # Lo que Daniel quiere dejar de fondo; lo que se muestra es eso, o lo
+    # que hay en el cajón si es menos.
+    fondo_deseado = {"valor": Decimal(str(fondo.value())), "ajustando": False}
 
     # Lo que casi nunca se usa, plegado: no estorba y sigue a un toque.
     from pos_uniformes.services.entradas_service import MOTIVO_POR_DEFECTO
@@ -723,6 +736,9 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
     rly.addWidget(res_pie, 0, 1, 2, 1)
     rly.setColumnStretch(1, 1)
     dlg.resultado_valor = res_valor    # para las pruebas
+    dlg.fondo = fondo
+    dlg.venta = venta
+    dlg.fondo_nota = fondo_nota
     dlg.resultado_pie = res_pie
     dlg.aviso_venta = dif
 
@@ -758,6 +774,31 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
         resta = sum((m for cb, _t, _i, m in casillas_hechos if cb.isChecked() and not cb.property("en_cajon_inicial")), Decimal("0.00"))
         return max(base - pagos_nuevos + regresa - resta, Decimal("0.00")).quantize(Decimal("0.01"))
 
+    def _ajustar_fondo(queda: Decimal) -> None:
+        """El fondo nunca pasa de lo que hay en el cajón; si baja, se explica."""
+        deseado = fondo_deseado["valor"]
+        mostrar = min(deseado, queda).quantize(Decimal("0.01"))
+        if Decimal(str(fondo.value())).quantize(Decimal("0.01")) != mostrar:
+            fondo_deseado["ajustando"] = True
+            try:
+                fondo.setValue(float(mostrar))
+            finally:
+                fondo_deseado["ajustando"] = False
+        if queda < estado.reactivo and mostrar == queda:
+            fondo_nota.setText(
+                f"Los pagos fueron más que la venta: en el cajón quedan ${queda:,.2f}, "
+                f"${estado.reactivo - queda:,.2f} menos que el reactivo (${estado.reactivo:,.2f}). "
+                f"Ese faltante se toma del reactivo y mañana se abre con ${queda:,.2f}."
+            )
+            fondo_nota.setVisible(True)
+        else:
+            fondo_nota.setVisible(False)
+
+    def _fondo_editado() -> None:
+        if not fondo_deseado["ajustando"]:
+            fondo_deseado["valor"] = Decimal(str(fondo.value())).quantize(Decimal("0.01"))
+        _refrescar_dif()
+
     def _refrescar_dif() -> None:
         v = Decimal(str(venta.value())).quantize(Decimal("0.01"))
         d = diferencia(v, estado.resumen.efectivo)
@@ -786,6 +827,7 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
         dif.style().polish(dif)
         queda = _contado()
         res_valor.setText(f"${queda:,.2f}")
+        _ajustar_fondo(queda)
         sacar = max(queda - Decimal(str(fondo.value())), Decimal("0.00")).quantize(Decimal("0.01"))
         res_pie.setText(
             f"Se saca de la venta: ${sacar:,.2f}\n"
@@ -793,7 +835,7 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
         )
 
     venta.valueChanged.connect(lambda _v: _refrescar_dif())
-    fondo.valueChanged.connect(lambda _v: _refrescar_dif())
+    fondo.valueChanged.connect(lambda _v: _fondo_editado())
     otros.valueChanged.connect(lambda _v: _refrescar_dif())
     entro.valueChanged.connect(lambda _v: _refrescar_dif())
     for cb, _a in casillas_pago:

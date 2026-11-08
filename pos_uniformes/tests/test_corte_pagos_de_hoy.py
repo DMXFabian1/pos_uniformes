@@ -246,3 +246,66 @@ class VentanaRedisenadaTests(_CorteBase):
             self.assertEqual(valores[:2], ["$11,160.00", "$5,000.00"])
 
         self._abrir(mirar)
+
+
+class FondoQueNoAlcanzaTests(_CorteBase):
+    """Los pagos fueron más que la venta (Daniel, 2026-11-07): el fondo baja
+    solo a lo que hay en el cajón, se explica y el corte se guarda."""
+
+    def test_el_fondo_baja_a_lo_que_hay_y_el_corte_se_guarda(self) -> None:
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import hacer_corte_caja
+
+        visto = {}
+
+        def _exec(dlg):
+            dlg.venta.setValue(1000.0)   # menos que los pagos de hoy (~$2,608)
+            visto["fondo"] = Decimal(str(dlg.fondo.value()))
+            visto["nota"] = dlg.fondo_nota.text()
+            visto["oculta"] = dlg.fondo_nota.isHidden()
+            return QDialog.DialogCode.Accepted
+
+        with patch("pos_uniformes.ui.dialogs.corte_caja_dialog.QDialog.exec", _exec):
+            corte = hacer_corte_caja(None, creado_por="VEND-1")
+        self.assertIsNotNone(corte)
+        corte_db = self.s.scalars(select(LibretaCorte)).one()
+        self.assertLess(corte_db.monto_final, Decimal("11160.00"))
+        self.assertEqual(visto["fondo"], corte_db.monto_final)
+        self.assertEqual(corte_db.reactivo_final, corte_db.monto_final)
+        self.assertFalse(visto["oculta"])
+        self.assertIn("se toma del reactivo", visto["nota"])
+        self.assertIn(f"${corte_db.monto_final:,.2f}", visto["nota"])
+        self.assertEqual(self.s.get(CajaParametros, 1).reactivo_actual, corte_db.monto_final)
+
+    def test_si_la_venta_vuelve_a_alcanzar_el_fondo_regresa(self) -> None:
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import hacer_corte_caja
+
+        visto = {}
+
+        def _exec(dlg):
+            dlg.venta.setValue(1000.0)
+            dlg.venta.setValue(5000.0)
+            visto["fondo"] = Decimal(str(dlg.fondo.value()))
+            visto["oculta"] = dlg.fondo_nota.isHidden()
+            return QDialog.DialogCode.Rejected
+
+        with patch("pos_uniformes.ui.dialogs.corte_caja_dialog.QDialog.exec", _exec):
+            hacer_corte_caja(None, creado_por="VEND-1")
+        self.assertEqual(visto["fondo"], Decimal("11160.00"))
+        self.assertTrue(visto["oculta"])
+
+    def test_un_fondo_menor_que_escribe_daniel_se_respeta(self) -> None:
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import hacer_corte_caja
+
+        visto = {}
+
+        def _exec(dlg):
+            dlg.fondo.setValue(8000.0)
+            dlg.venta.setValue(1000.0)
+            visto["fondo"] = Decimal(str(dlg.fondo.value()))
+            visto["oculta"] = dlg.fondo_nota.isHidden()
+            return QDialog.DialogCode.Rejected
+
+        with patch("pos_uniformes.ui.dialogs.corte_caja_dialog.QDialog.exec", _exec):
+            hacer_corte_caja(None, creado_por="VEND-1")
+        self.assertEqual(visto["fondo"], Decimal("8000.00"))
+        self.assertTrue(visto["oculta"])
