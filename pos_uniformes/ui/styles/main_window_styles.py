@@ -53,7 +53,9 @@ def _build_main_window_shell_styles() -> str:
             }
             /* Los avisos del sistema como parte del programa (2026-11-06). */
             QMessageBox { background: #f3efe8; }
-            QMessageBox QLabel { color: #1f1f1b; font-size: 14px; min-width: 320px; }
+            /* Sin min-width en QLabel: el ícono también es QLabel y medía 320 px
+               (2026-11-07). El resto lo pone ui/helpers/avisos_bonitos.py. */
+            QMessageBox QLabel { color: #1f1f1b; }
             QMessageBox QPushButton { min-width: 120px; min-height: 36px; }
             QTabBar::tab:hover:!selected {
                 background: #f0ebe4;

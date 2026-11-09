@@ -713,6 +713,22 @@ class AvisosTests(_Base):
             with self.subTest(boton.text()):
                 self.assertGreaterEqual(boton.minimumWidth(), boton.sizeHint().width())
 
+    def test_los_botones_del_aviso_caben_con_el_estilo_del_programa(self) -> None:
+        """Con avisos_bonitos instalado (como en el kiosko) su hoja de estilo
+        se aplica al mostrarse; los botones deben seguir cabiendo."""
+        from pos_uniformes.ui.helpers import avisos_bonitos
+
+        filtro = avisos_bonitos.instalar(self.app)
+        self.addCleanup(self.app.removeEventFilter, filtro)
+        self._anotar_fallando()
+        aviso = self.w._aviso_anotacion
+        aviso.show()
+        self.app.processEvents()
+        self.assertTrue(aviso.property("_aviso_bonito"))
+        for boton in aviso.buttons():
+            with self.subTest(boton.text()):
+                self.assertGreaterEqual(boton.width(), boton.sizeHint().width())
+
     def test_los_botones_del_cierre_no_quedan_cortados(self) -> None:
         self._anotar_fallando()
         vistos: dict[str, tuple[int, int]] = {}

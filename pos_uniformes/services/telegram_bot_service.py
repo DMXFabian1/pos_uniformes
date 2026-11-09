@@ -99,6 +99,7 @@ AYUDA = (
     "/actualizar noche — que se actualice sola cada noche (/actualizar noche no lo quita)\n"
     "/volver — los kioskos regresan a la versión anterior, si la nueva salió mala\n"
     "/camaras — si el contador de personas está contando y si sus números tienen sentido\n"
+    "/latido — que alguien de fuera te avise si esta PC se apaga (healthchecks.io)\n"
     "\nGENTE\n"
     "/asistencia — quién vino hoy, con un comando por empleada para marcar\n"
     "/falta_Fanny · /descanso_Fanny · /vino_Fanny — o con espacio: /falta Fanny\n"
@@ -421,7 +422,16 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
         except ValueError as exc:
             return str(exc)
         with session_factory() as session:
-            return formatear(recolectar(session, dia, todo_el_dia=True))
+            texto = formatear(recolectar(session, dia, todo_el_dia=True))
+            if dia == (hoy or date.today()):
+                # La salud es de ahora: en el resumen de otro día no aplica.
+                try:
+                    from pos_uniformes.services.telegram_pulso_service import texto_salud
+
+                    texto += "\n\n" + texto_salud(session)
+                except Exception:  # noqa: BLE001
+                    logger.warning("No se pudo armar la salud del resumen", exc_info=True)
+            return texto
     if cmd.nombre == "hoy":
         from pos_uniformes.services import asistencia_service as asis
         from pos_uniformes.services.resumen_diario_service import recolectar, texto_hoy
@@ -564,6 +574,12 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
 
         with session_factory() as session:
             return pg.entrada(session, cmd.argumento, quien=CODIGO_REMOTO)
+    if cmd.nombre in ("latido", "vigilancia"):
+        from pos_uniformes.services import latido_externo_service as lat
+
+        if (cmd.argumento or "").strip():
+            return lat.guardar_url(cmd.argumento)
+        return lat.texto_estado() + "\n\n" + lat.instrucciones()
     if cmd.nombre == "deshacer":
         from pos_uniformes.services import telegram_pagos_service as pg
 
@@ -1029,6 +1045,14 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
                 pass
         if alertas:
             procesar(session_factory, _mandar, vigilante)
+            # El latido hacia afuera (healthchecks.io): si deja de llegar, es
+            # el servicio de afuera el que avisa (auditoría 2026-11-07, §6).
+            try:
+                from pos_uniformes.services import latido_externo_service
+
+                latido_externo_service.latir()
+            except Exception:  # noqa: BLE001 — nunca tumba el bot
+                logger.debug("latido externo", exc_info=True)
         # Cada uno por su lado: si fallaba la limpieza, el menú tampoco se
         # refrescaba (auditoría 2026-11-07, #35).
         try:

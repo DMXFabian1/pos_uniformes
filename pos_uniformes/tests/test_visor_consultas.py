@@ -16,6 +16,14 @@ _app = QApplication.instance() or QApplication([])
 
 
 class ElPdfAbreAdentroTests(unittest.TestCase):
+    """El PDF queda para la PC que todavía no tiene el catálogo con fotos
+    (el atajo abre el catálogo desde 2026-11-07: test_visor_escoces)."""
+
+    def setUp(self) -> None:
+        p = patch("pos_uniformes.ui.dialogs.visor_escoces_dialog.hay_catalogo", return_value=False)
+        p.start()
+        self.addCleanup(p.stop)
+
     def tearDown(self) -> None:
         from pos_uniformes.ui.dialogs import visor_consulta_dialog as vc
 

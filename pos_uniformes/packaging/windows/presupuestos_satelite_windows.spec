@@ -69,6 +69,8 @@ hiddenimports += [
     # PyQt6, ~6 MB). El mapa necesita QtWebEngine, que NO va en el kiosko
     # (~150 MB): ahí abre en Edge modo ventana.
     "pos_uniformes.ui.dialogs.visor_consulta_dialog",
+    "pos_uniformes.ui.dialogs.visor_escoces_dialog",
+    "pos_uniformes.ui.helpers.avisos_bonitos",
     "PyQt6.QtPdf",
     "PyQt6.QtPdfWidgets",
     "pos_uniformes.ui.helpers.quick_sale_sports_uniform_helper",

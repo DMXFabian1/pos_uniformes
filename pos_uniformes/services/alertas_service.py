@@ -37,6 +37,11 @@ MINUTOS_CORTE_FALLIDO = 90
 MINUTOS_GRACIA_HORARIO = 20
 #: Una revisión del vigilante que lleva tanto fallando se avisa por Telegram.
 MINUTOS_REVISION_ROTA = 30
+#: Lo que se mandó a imprimir y lleva esto en la cola sin salir se avisa
+#: (auditoría 2026-11-07, sección 6: solo se veía abriendo /pulso).
+MINUTOS_IMPRESION_ATORADA = 15
+#: El resumen tolera 90 min de retraso de la tarea; pasado eso, lo manda el bot.
+MINUTOS_RESUMEN_PERDIDO = 100
 
 #: Cuánto se espera antes de avisar que una pantalla se apagó. Un kiosko que
 #: se reinicia tarda un par de minutos en volver a latir (el margen de
@@ -237,7 +242,8 @@ def _cargar_memoria() -> dict:
             return {}
         crudo = json.loads(ruta.read_text(encoding="utf-8"))
         salida = {}
-        for clave in ("dia_respaldo_avisado", "dia_sin_corte_avisado", "dia_corte_fallido_avisado", "dia_pantallas"):
+        for clave in ("dia_respaldo_avisado", "dia_sin_corte_avisado", "dia_corte_fallido_avisado", "dia_pantallas",
+                      "dia_resumen_revisado"):
             valor = crudo.get(clave)
             try:
                 salida[clave] = date.fromisoformat(valor) if valor else None
@@ -248,6 +254,10 @@ def _cargar_memoria() -> dict:
         except (TypeError, ValueError):
             salida["ultimo_id"] = None
         salida["pantallas_avisadas"] = [str(x) for x in (crudo.get("pantallas_avisadas") or [])]
+        try:
+            salida["impresion_avisada"] = int(crudo["impresion_avisada"]) if crudo.get("impresion_avisada") else None
+        except (TypeError, ValueError):
+            salida["impresion_avisada"] = None
         return salida
     except Exception:  # noqa: BLE001 — sin memoria se avisa una vez más, no se cae
         return {}
@@ -283,6 +293,9 @@ class Vigilante:
     pantallas_avisadas: set = field(default_factory=set, repr=False)
     dia_de_las_pantallas: date | None = None
     dia_corte_fallido_avisado: date | None = None
+    #: El trabajo más viejo de la cola del que ya se avisó (None = nada avisado).
+    impresion_avisada: int | None = None
+    dia_resumen_revisado: date | None = None
     #: Qué revisión está fallando y desde cuándo (y si ya se avisó).
     _fallando: dict = field(default_factory=dict, repr=False)
     _avisadas_guardadas: tuple = field(default=(None, ()), repr=False)
@@ -300,6 +313,10 @@ class Vigilante:
             self.dia_sin_corte_avisado = memoria.get("dia_sin_corte_avisado")
         if self.dia_corte_fallido_avisado is None:
             self.dia_corte_fallido_avisado = memoria.get("dia_corte_fallido_avisado")
+        if self.impresion_avisada is None:
+            self.impresion_avisada = memoria.get("impresion_avisada")
+        if self.dia_resumen_revisado is None:
+            self.dia_resumen_revisado = memoria.get("dia_resumen_revisado")
         # De qué pantallas ya se avisó hoy: vivía solo en memoria y cada
         # reinicio del bot volvía a avisar la misma pantalla apagada, y el
         # «✅ ya volvió» de las de antes nunca llegaba (auditoría 2026-11-07).
@@ -318,6 +335,8 @@ class Vigilante:
             "ultimo_id": self.ultimo_id,
             "dia_pantallas": self.dia_de_las_pantallas,
             "pantallas_avisadas": sorted(self.pantallas_avisadas),
+            "impresion_avisada": self.impresion_avisada,
+            "dia_resumen_revisado": self.dia_resumen_revisado,
         })
 
     def revisar(self, session, ahora: datetime | None = None) -> list[str]:
@@ -334,6 +353,8 @@ class Vigilante:
             ("si se hizo el corte", lambda: self._cierre_sin_corte(session, ahora)),
             ("el respaldo", lambda: self._respaldo_viejo(ahora)),
             ("las pantallas", lambda: self._pantalla_apagada(session, ahora)),
+            ("la cola de impresión", lambda: self._impresion_atorada(session, ahora)),
+            ("si salió el resumen", lambda: self._resumen_que_no_salio(session, ahora)),
         ):
             try:
                 textos += revision()
@@ -346,6 +367,72 @@ class Vigilante:
             else:
                 self._fallando.pop(nombre, None)
         return textos
+
+    def _impresion_atorada(self, session, ahora: datetime) -> list[str]:
+        """Tickets y etiquetas que no salen: la empleada cree que salieron.
+
+        Se avisa una vez por atorón (el trabajo más viejo de la cola) y se
+        dice cuando la cola se vacía (auditoría 2026-11-07, sección 6)."""
+        from pos_uniformes.services import trabajos_service as tr
+
+        try:
+            atorados = tr.esperando_impresion(session, minutos=MINUTOS_IMPRESION_ATORADA, ahora=ahora)
+        except Exception as exc:  # noqa: BLE001
+            # Una base sin la tabla de trabajos (instalación vieja, pruebas):
+            # no hay cola que revisar. Cualquier otro error sí se reporta.
+            if "trabajo" in str(exc).lower() and ("no such table" in str(exc).lower()
+                                                  or "does not exist" in str(exc).lower()):
+                session.rollback()
+                return []
+            raise
+        if not atorados:
+            if self.impresion_avisada is None:
+                return []
+            self.impresion_avisada = None
+            self._recordar()
+            return ["✅ Ya salió lo que estaba atorado en la cola de impresión."]
+        if self.impresion_avisada is not None:
+            return []      # mismo atorón (o uno que empezó mientras): ya se dijo
+        self.impresion_avisada = int(atorados[0].id)
+        self._recordar()
+        cuantos: dict[str, int] = {}
+        for t in atorados:
+            nombre = getattr(t.tipo, "value", str(t.tipo)).lower()
+            cuantos[nombre] = cuantos.get(nombre, 0) + 1
+        detalle = ", ".join(f"{n} {nombre}" for nombre, n in sorted(cuantos.items()))
+        desde = _local(atorados[0].created_at) if atorados[0].created_at else ahora
+        return [
+            f"🖨 No está saliendo el papel: {detalle} esperando desde las {desde:%H:%M}.\n"
+            "Las empleadas creen que sí salió. Revisa que esté prendida la PC con las impresoras "
+            "(el Servidor de impresión); en cuanto prenda, sale solo y te aviso."
+        ]
+
+    def _resumen_que_no_salio(self, session, ahora: datetime) -> list[str]:
+        """Si a la hora del resumen + 100 min no salió (la tarea de Windows no
+        corrió), lo manda el bot y dice por qué llegó tarde."""
+        from pos_uniformes.scripts.resumen_diario_telegram import anotar_resumen_enviado, resumen_ya_enviado
+        from pos_uniformes.services.horario_tienda_service import hora_resumen
+
+        hoy = ahora.date()
+        if self.dia_resumen_revisado == hoy:
+            return []
+        objetivo = datetime.combine(hoy, hora_resumen(hoy)) + timedelta(minutes=MINUTOS_RESUMEN_PERDIDO)
+        if ahora.replace(tzinfo=None) < objetivo:
+            return []
+        self.dia_resumen_revisado = hoy
+        self._recordar()
+        if resumen_ya_enviado(hoy):
+            return []
+        from pos_uniformes.services.resumen_diario_service import formatear, recolectar
+        from pos_uniformes.services.telegram_pulso_service import texto_salud
+
+        texto = formatear(recolectar(session, hoy, todo_el_dia=True))
+        salud = texto_salud(session, ahora=ahora)
+        anotar_resumen_enviado(hoy)
+        return [
+            f"⏰ El resumen de las {hora_resumen(hoy):%H:%M} no salió (la tarea programada no corrió); "
+            "te lo mando yo.\n\n" + texto + (f"\n\n{salud}" if salud else "")
+        ]
 
     def _revision_fallo(self, nombre: str, exc: BaseException, ahora: datetime) -> list[str]:
         logger.warning("Vigilante: no pude revisar %s", nombre, exc_info=True)

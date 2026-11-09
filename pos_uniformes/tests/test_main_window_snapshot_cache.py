@@ -11,7 +11,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtGui import QKeyEvent
-from PyQt6.QtTest import QTest
+from PyQt6.QtTest import QSignalSpy, QTest
 from PyQt6.QtWidgets import (
     QApplication,
     QDialog,
@@ -1289,14 +1289,22 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertEqual(callback.call_count, 1)
 
     def test_inventory_search_refresh_uses_single_debounce_timer(self) -> None:
+        """Antes esperaba «intervalo + 80 ms» con qWait y fallaba de vez en
+        cuando con la suite en paralelo (el timer aún no disparaba). Ahora
+        espera la señal real del timer, con tope, y cierra la ventana."""
         window = MainWindow(user_id=1)
+        self.addCleanup(_cerrar_ventana, window)
         callback = Mock()
         window._run_inventory_filter_refresh = callback
+        timer = window.inventory_filter_debounce_timer
+        disparos = QSignalSpy(timer.timeout)
 
         window._schedule_inventory_filter_refresh()
         window._schedule_inventory_filter_refresh()
-        QTest.qWait(window.inventory_filter_debounce_timer.interval() + 80)
 
+        self.assertTrue(disparos.wait(5_000), "el debounce nunca disparó")
+        self.assertEqual(len(disparos), 1)
+        self.assertFalse(timer.isActive())  # single-shot: ya no puede volver a disparar
         self.assertEqual(callback.call_count, 1)
 
     def test_catalog_immediate_refresh_cancels_pending_debounce(self) -> None:
@@ -1933,6 +1941,16 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertEqual(handler_calls, [], "_handle_inventory_table_selection no debe dispararse")
         self.assertEqual(window.inventory_variant_combo.currentIndex(), -1)
+
+
+def _cerrar_ventana(window: MainWindow) -> None:
+    """Cierra sin el diálogo de confirmación y la destruye de verdad, para no
+    acumular ventanas (y sus timers) en el mismo proceso."""
+    window._force_close = True
+    window.close()
+    window.deleteLater()
+    QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete.value)
+    QApplication.processEvents()
 
 
 if __name__ == "__main__":

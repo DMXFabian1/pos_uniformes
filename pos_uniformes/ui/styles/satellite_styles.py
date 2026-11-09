@@ -529,10 +529,10 @@ QPushButton:checked {
 QMessageBox {
     background: #f4ede2;
 }
+/* Sin min-width en QLabel: el ícono también es QLabel y medía 320 px
+   (2026-11-07). El resto lo pone ui/helpers/avisos_bonitos.py. */
 QMessageBox QLabel {
     color: #2c2a27;
-    font-size: 15px;
-    min-width: 320px;
 }
 QMessageBox QPushButton {
     min-width: 120px;

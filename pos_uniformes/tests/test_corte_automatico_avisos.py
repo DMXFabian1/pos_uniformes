@@ -92,10 +92,11 @@ class SinLineaSeEncolaTests(unittest.TestCase):
              patch.object(rd, "_encolar", return_value=True) as encolar, \
              patch.object(rd, "anotar_resumen_enviado") as anotar, \
              patch.object(rd, "resumen_ya_enviado", return_value=False), \
-             patch("pos_uniformes.services.horario_tienda_service.es_momento_de_resumen", return_value=True):
+             patch("pos_uniformes.services.horario_tienda_service.es_momento_de_resumen", return_value=True), \
+             patch("pos_uniformes.services.telegram_pulso_service.texto_salud", return_value="🩺 SALUD"):
             codigo = rd.main(["--si-toca"])
         self.assertEqual(codigo, 0)
-        encolar.assert_called_once_with("📊 Resumen", None)
+        encolar.assert_called_once_with("📊 Resumen\n\n🩺 SALUD", None)
         anotar.assert_called_once()       # que la tarea de las 17:45 no lo duplique
 
     def test_si_tampoco_se_encola_falla(self) -> None:

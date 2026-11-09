@@ -120,7 +120,9 @@ class UnaRevisionRotaNoApagaALasDemasTests(unittest.TestCase):
         rota = patch.object(al.Vigilante, "_movimientos_fuera_de_horario", side_effect=RuntimeError("tabla rota"))
         pantallas = patch.object(al.Vigilante, "_pantalla_apagada", return_value=["⚠️ Caja lleva 12 min"])
         corte = patch.object(al.Vigilante, "_cierre_sin_corte", return_value=[])
-        with rota, pantallas, corte:
+        cola = patch.object(al.Vigilante, "_impresion_atorada", return_value=[])
+        resumen = patch.object(al.Vigilante, "_resumen_que_no_salio", return_value=[])
+        with rota, pantallas, corte, cola, resumen:
             primero = v.revisar(sesion, datetime(2026, 11, 7, 10, 0))
             a_los_20 = v.revisar(sesion, datetime(2026, 11, 7, 10, 20))
             a_los_31 = v.revisar(sesion, datetime(2026, 11, 7, 10, 31))

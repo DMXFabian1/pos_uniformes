@@ -71,12 +71,26 @@ class ReintentarAnotarTests(unittest.TestCase):
             self.addCleanup(p.stop)
         self.addCleanup(shutil.rmtree, self.raiz, True)
         self.w = QuickSaleWidget(SimpleNamespace(offline_mode=True, _kiosk_lookup_from_cache=None))
+        self.addCleanup(self._cerrar_widget)
         self.w._employee_code, self.w._employee_name = "VEND-3", "Evelyn Ruiz"
         self.w._items = _items()
         for nombre in ("_drenar_libreta_en_background", "_flash_scan_hint", "_avisar_sin_ticket"):
             p = patch.object(self.w, nombre)
             setattr(self, nombre.strip("_"), p.start())
             self.addCleanup(p.stop)
+
+    def _cerrar_widget(self) -> None:
+        """No dejar avisos modales abiertos: contaminaban la cartelera."""
+        from PyQt6.QtCore import QEvent
+        if getattr(self, "_widget_cerrado", False):
+            return
+        self._widget_cerrado = True
+        for box in self.w.findChildren(QMessageBox):
+            box.done(0)
+        self.w.close()
+        self.w.deleteLater()
+        QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete.value)
+        QApplication.processEvents()
 
     # ── utilidades ────────────────────────────────────────────────────
     def _cola(self) -> list[dict]:
@@ -265,6 +279,21 @@ class ReintentarAnotarTests(unittest.TestCase):
             imprimir.call_args.kwargs["on_printed"]()
         self.assertEqual(len(self.w._anotaciones_pendientes), 1)
         self.assertIn("NO vuelvas a imprimir", self._aviso_texto())
+
+    # ── higiene Qt ────────────────────────────────────────────────────
+    def test_no_deja_avisos_ni_modal_activo(self) -> None:
+        """Antes dejaba un QMessageBox modal y fallaban 10 pruebas de la
+        cartelera que corrían después en el mismo proceso."""
+        antes = _modales_visibles()
+        self.assertFalse(self._anotar_fallando("venta"))
+        self.assertTrue(_modales_visibles() - antes)  # sí hubo aviso
+        self._cerrar_widget()
+        self.assertEqual(_modales_visibles() - antes, set())
+        self.assertIsNone(QApplication.activeModalWidget())
+
+
+def _modales_visibles() -> set[int]:
+    return {id(w) for w in QApplication.topLevelWidgets() if isinstance(w, QMessageBox) and w.isVisible()}
 
 
 if __name__ == "__main__":
