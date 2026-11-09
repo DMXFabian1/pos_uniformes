@@ -638,6 +638,18 @@ class QuoteSatelliteWindow(QMainWindow):
                 pass
 
     def closeEvent(self, event) -> None:  # noqa: N802 (API de Qt)
+        # C1: operaciones cobradas sin anotar → preguntar antes de cerrar.
+        # Cerrar no las borra (están en disco), pero se avisa.
+        venta = getattr(self, "quick_sale_widget", None)
+        if venta is not None:
+            try:
+                puede = venta.confirmar_cierre()
+            except Exception:  # noqa: BLE001 — revisar nunca impide cerrar
+                logging.getLogger(__name__).exception("No se pudo revisar lo pendiente al cerrar")
+                puede = True
+            if not puede:
+                event.ignore()
+                return
         for attr in ("_trabajo_listener", "_anuncio_listener"):
             listener = getattr(self, attr, None)
             if listener is not None:
@@ -2899,8 +2911,16 @@ class QuoteSatelliteWindow(QMainWindow):
 
         pendientes = len(libreta_cola.pendientes())
         atoradas = len(libreta_cola.atoradas())
-        self.libreta_pendientes_label.setVisible(pendientes > 0)
+        rescatados = libreta_cola.archivos_rescatados()
+        self.libreta_pendientes_label.setVisible(pendientes > 0 or bool(rescatados))
         texto_pendientes = f"{pendientes} registro(s) de esta terminal aun sin subir al servidor."
+        if rescatados:
+            # Un archivo de pendientes dañado se aparta (no se borra): mientras
+            # siga ahí, se dice. Lo quita Daniel cuando lo revise.
+            texto_pendientes += (
+                f" ⚠️ {len(rescatados)} archivo(s) de pendientes dañado(s) apartado(s) "
+                f"({', '.join(rescatados)}). Avísale a Daniel; no lo borres."
+            )
         if atoradas:
             # Ya no se calla: una venta que no sube tras varios intentos se dice
             # aquí y a Daniel le llega por Telegram (2026-10-15).
@@ -4107,11 +4127,18 @@ class QuoteSatelliteWindow(QMainWindow):
         if not eleccion:
             return
         nuevo_code, nuevo_nombre = eleccion
-        from pos_uniformes.services.libreta_service import reasignar_empleada
+        from pos_uniformes.services.libreta_service import ReasignacionNoPermitida, reasignar_empleada
 
         try:
             with get_session() as session:
-                reasignar_empleada(session, int(entry_id), nuevo_code, nuevo_nombre)
+                reasignar_empleada(
+                    session, int(entry_id), nuevo_code, nuevo_nombre,
+                    actor=str(getattr(self, "_libreta_code", "") or ""),
+                )
+        except (ReasignacionNoPermitida, PermissionError) as exc:
+            # Regla de negocio, no falla de red: se dice tal cual y no se toca nada.
+            QMessageBox.warning(self, "No se puede reasignar", str(exc))
+            return
         except Exception:  # noqa: BLE001
             logger.exception("Libreta: no se pudo reasignar el registro")
             QMessageBox.warning(self, "Sin conexión", "No se pudo guardar. Intenta de nuevo.")

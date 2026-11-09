@@ -185,12 +185,18 @@ class LibretaQueueTests(unittest.TestCase):
             return_value=self._tmp,
         )
         self._patcher.start()
+        # Avisos de archivos apartados de otras pruebas: no se heredan.
+        cola._RESCATES_POR_AVISAR.clear()
+        cola._RESCATE_RECIENTE.clear()
 
     def tearDown(self) -> None:
         self._patcher.stop()
-        queue_file = self._tmp / "data" / "libreta_pendiente.json"
-        if queue_file.exists():
-            queue_file.unlink()
+        cola._RESCATES_POR_AVISAR.clear()
+        cola._RESCATE_RECIENTE.clear()
+        carpeta = self._tmp / "data"
+        for archivo in [carpeta / "libreta_pendiente.json", *carpeta.glob("*.corrupto-*.json")]:
+            if archivo.exists():
+                archivo.unlink()
 
     def test_encolar_y_drenar(self) -> None:
         cola.encolar_operacion(
@@ -225,6 +231,10 @@ class LibretaQueueTests(unittest.TestCase):
         self.assertEqual(cola.pendientes(), [])
         cola.encolar_operacion({"employee_code": "X", "tipo": "venta", "items": [], "monto_total": "0"})
         self.assertEqual(len(cola.pendientes()), 1)
+        # Lo ilegible NO se pierde: quedó apartado con su contenido original.
+        apartados = list((self._tmp / "data").glob("libreta_pendiente.corrupto-*.json"))
+        self.assertEqual(len(apartados), 1)
+        self.assertEqual(apartados[0].read_text(encoding="utf-8"), "{corrupto")
 
 
 class QuickSaleLibretaHookTests(unittest.TestCase):
@@ -1805,9 +1815,14 @@ class ReasignarEmpleadaTests(unittest.TestCase):
 
         from pos_uniformes.database.models import LibretaVenta
 
+        from pos_uniformes.database.connection import Base
+        from pos_uniformes.database.models import Empleada
+
         engine = create_engine("sqlite://")
-        LibretaVenta.__table__.create(engine)
+        Base.metadata.create_all(engine)
         self.session = sessionmaker(bind=engine)()
+        self.session.add(Empleada(codigo="VEND-5", nombre_completo="Nayeli Herrera", activo=True))
+        self.session.commit()
 
     def tearDown(self) -> None:
         self.session.close()
@@ -1825,7 +1840,9 @@ class ReasignarEmpleadaTests(unittest.TestCase):
         )
         self.session.add(venta); self.session.commit()
 
-        out = reasignar_empleada(self.session, venta.id, "vend-5", "Nayeli Herrera")
+        out = reasignar_empleada(
+            self.session, venta.id, "vend-5", "Nayeli Herrera", actor="VEND-1", hoy=cuando.date()
+        )
         self.assertIs(out, venta)
         self.assertEqual(venta.employee_code, "VEND-5")
         self.assertEqual(venta.employee_name, "Nayeli Herrera")
@@ -1838,7 +1855,7 @@ class ReasignarEmpleadaTests(unittest.TestCase):
 
         from pos_uniformes.database.models import LibretaVenta
 
-        self.assertIsNone(reasignar_empleada(self.session, 999, "VEND-5", "N"))
+        self.assertIsNone(reasignar_empleada(self.session, 999, "VEND-5", "N", actor="VEND-1"))
         venta = LibretaVenta(
             employee_code="VEND-3", employee_name="Evelyn", tipo="venta", piezas=1,
             comisiones=1, monto_total=Decimal("100.00"), monto_neto=Decimal("100.00"),
@@ -1846,7 +1863,7 @@ class ReasignarEmpleadaTests(unittest.TestCase):
         )
         self.session.add(venta); self.session.commit()
         with self.assertRaises(ValueError):
-            reasignar_empleada(self.session, venta.id, "  ", "N")
+            reasignar_empleada(self.session, venta.id, "  ", "N", actor="VEND-1")
         self.assertEqual(venta.employee_code, "VEND-3")  # intacto
 
     def test_boton_del_dueno_pide_empleada_y_guarda(self) -> None:
@@ -1856,6 +1873,7 @@ class ReasignarEmpleadaTests(unittest.TestCase):
         tabla = MagicMock(); tabla.currentRow.return_value = 0
         fake = SimpleNamespace(
             _libreta_is_owner=True,
+            _libreta_code="VEND-1",
             _libreta_rows_pintadas=[row],
             libreta_table=tabla,
             _elegir_empleada_libreta=MagicMock(return_value=("VEND-5", "Nayeli Herrera")),
@@ -1867,7 +1885,7 @@ class ReasignarEmpleadaTests(unittest.TestCase):
             gs.return_value.__enter__.return_value = "sesion"
             QuoteSatelliteWindow._reasignar_libreta(fake)
         fake._elegir_empleada_libreta.assert_called_once_with("VEND-3")
-        reas.assert_called_once_with("sesion", 7, "VEND-5", "Nayeli Herrera")
+        reas.assert_called_once_with("sesion", 7, "VEND-5", "Nayeli Herrera", actor="VEND-1")
         fake._refresh_libreta_view.assert_called_once()
 
         # Cancelar el diálogo no guarda nada; una empleada no puede.

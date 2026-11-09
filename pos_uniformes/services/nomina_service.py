@@ -20,6 +20,7 @@ from pos_uniformes.services.calendario_empleadas_service import (
     ENCARGADO_CODE,
     VACACIONES,
     HorarioEmpleada,
+    bloquear_empleadas,
     cargar_horario,
     comisiones_desde_ultimo_pago,
     es_dia_trabajado,
@@ -214,6 +215,10 @@ def registrar_pago_con_monto(session, employee_code: str, *, creado_por: str, fe
     # día: el pendiente del sueldo semanal nunca baja a cero por sí solo
     # (2026-10-10). El candado va aquí, en el servicio, para que valga para
     # el bot, el menú, el kiosko y lo que venga.
+    # El candado va ANTES de revisar: dos pagos simultáneos (bot y celular a
+    # la vez) ya no pueden pasar los dos la revisión; y una reasignación en
+    # curso termina antes de que se cuenten las comisiones (D4, 2026-11-08).
+    bloquear_empleadas(session, [code])
     ya_cobro = (
         session.query(EmpleadaPago)
         .filter(EmpleadaPago.employee_code == code, EmpleadaPago.fecha == fecha)
@@ -261,6 +266,25 @@ def registrar_pago_con_monto(session, employee_code: str, *, creado_por: str, fe
     return pago
 
 
+def _pago_bloqueado(session, pago_id: int):
+    """El pago, ya con el candado de su empleada tomado y releído después del
+    candado (otro proceso pudo borrarlo o cambiarlo mientras esperábamos)."""
+    from pos_uniformes.database.models import EmpleadaPago
+
+    pago = session.get(EmpleadaPago, int(pago_id))
+    if pago is None:
+        raise ValueError("Ese pago ya no existe.")
+    bloquear_empleadas(session, [pago.employee_code])
+    from sqlalchemy import select
+
+    pago = session.execute(
+        select(EmpleadaPago).where(EmpleadaPago.id == int(pago_id)).execution_options(populate_existing=True)
+    ).scalar_one_or_none()
+    if pago is None:
+        raise ValueError("Ese pago ya no existe.")
+    return pago
+
+
 def deshacer_pago(session, pago_id: int, *, creado_por: str) -> dict:
     """Quita un pago registrado por error (SOLO Daniel, VEND-1).
 
@@ -274,9 +298,7 @@ def deshacer_pago(session, pago_id: int, *, creado_por: str) -> dict:
 
     if str(creado_por or "").strip().upper() != "VEND-1":
         raise PermissionError("Solo Daniel puede deshacer pagos.")
-    pago = session.get(EmpleadaPago, int(pago_id))
-    if pago is None:
-        raise ValueError("Ese pago ya no existe.")
+    pago = _pago_bloqueado(session, pago_id)
     code = str(pago.employee_code).upper()
     anterior = (pago.desde - timedelta(days=1)) if pago.desde else None
     horario = session.get(EmpleadaHorario, code)
@@ -332,9 +354,7 @@ def mover_fecha_pago(session, pago_id: int, nueva_fecha: date, *, creado_por: st
 
     if str(creado_por or "").strip().upper() != "VEND-1":
         raise PermissionError("Solo Daniel puede cambiar la fecha de un pago.")
-    pago = session.get(EmpleadaPago, int(pago_id))
-    if pago is None:
-        raise ValueError("Ese pago ya no existe.")
+    pago = _pago_bloqueado(session, pago_id)
     vieja = pago.fecha
     if nueva_fecha == vieja:
         raise ValueError(f"Ese pago ya está en el {vieja:%d/%m}.")

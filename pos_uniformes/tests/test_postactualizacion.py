@@ -205,9 +205,14 @@ class MainTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as d:
             from pos_uniformes.scripts import supervisor
 
-            with patch.object(supervisor, "_base", return_value=Path(d)), patch.object(post.sys, "platform", "darwin"):
+            # También `post._base`: sin él, la huella del código reiniciado se
+            # escribía en `data/servicios_reiniciados_con.txt` del repo real.
+            with patch.object(supervisor, "_base", return_value=Path(d)), \
+                 patch.object(post, "_base", return_value=Path(d)), \
+                 patch.object(post.sys, "platform", "darwin"):
                 post.reiniciar_servicios()
                 self.assertTrue(supervisor.hay_bandera())
+                self.assertTrue((Path(d) / "data" / "servicios_reiniciados_con.txt").exists())
 
 
 if __name__ == "__main__":

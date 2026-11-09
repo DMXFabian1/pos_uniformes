@@ -760,19 +760,126 @@ def cambiar_pago_tarjeta(session, operacion_id: int, tarjeta: bool):
     return entry
 
 
-def reasignar_empleada(session, operacion_id: int, employee_code: str, employee_name: str):
+class ReasignacionNoPermitida(ValueError):
+    """La reasignación se bloqueó por una regla de negocio (el texto se le
+    muestra tal cual al dueño)."""
+
+
+def _fecha_local(momento: datetime) -> date:
+    return momento.astimezone().date() if momento.tzinfo is not None else momento.date()
+
+
+def reasignar_empleada(
+    session,
+    operacion_id: int,
+    employee_code: str,
+    employee_name: str | None = None,
+    *,
+    actor: str,
+    hoy: date | None = None,
+):
     """Corrección del dueño: la venta se registró con el gafete de OTRA
     empleada (una puso su código y la otra hizo la venta). Mueve el
     registro completo — y con él sus comisiones — a la empleada correcta.
-    No toca montos, piezas ni fecha. Devuelve el registro o None."""
-    entry = session.get(LibretaVenta, int(operacion_id))
-    if entry is None:
-        return None
+    No toca montos, piezas ni fecha. Devuelve el registro o None si no existe.
+
+    Reglas (Daniel, 2026-11-08; si una falla, NO se reasigna):
+    - solo el dueño (VEND-1);
+    - solo el mismo día de la venta;
+    - la empleada destino existe, está activa y no es la misma;
+    - la comisión no se le ha pagado a la empleada original;
+    - la venta cae dentro de lo pendiente de la empleada destino (si a ella
+      ya se le pagó después de esa venta, nadie la cobraría).
+    Con las dos últimas no puede haber doble pago ni comisión perdida. El
+    candado por empleada evita que un pago se cuele a la mitad.
+
+    Deja constancia en la bitácora (quién, cuándo, de quién a quién y cuántas
+    comisiones) en la MISMA transacción: o pasan las dos cosas o ninguna."""
+    from pos_uniformes.database.models import Empleada
+    from pos_uniformes.services import auditoria_ausencias_service
+    from pos_uniformes.services.calendario_empleadas_service import bloquear_empleadas, corte_vigente
+    from pos_uniformes.services.nomina_service import OWNER_CODE
+
+    if str(actor or "").strip().upper() != OWNER_CODE:
+        raise PermissionError("Solo Daniel puede reasignar ventas.")
     code = str(employee_code or "").strip().upper()
     if not code:
         raise ValueError("Falta el código de la empleada")
+    entry = session.get(LibretaVenta, int(operacion_id))
+    if entry is None:
+        return None
+
+    destino = session.scalar(select(Empleada).where(Empleada.codigo == code))
+    if destino is None:
+        raise ReasignacionNoPermitida(f"No existe la empleada {code}.")
+    if not destino.activo:
+        raise ReasignacionNoPermitida(f"{destino.nombre_completo or code} no está activa.")
+
+    hoy = hoy or date.today()
+    if _fecha_local(entry.created_at) != hoy:
+        raise ReasignacionNoPermitida(
+            "Solo se puede reasignar una venta el mismo día en que se hizo."
+        )
+
+    # Candado de las dos empleadas (en orden) y luego se vuelve a leer la
+    # venta: lo que se valide abajo ya no lo puede cambiar un pago en curso.
+    origen_bloqueado = str(entry.employee_code or "").strip().upper()
+    bloquear_empleadas(session, [origen_bloqueado, code])
+    entry = session.execute(
+        select(LibretaVenta).where(LibretaVenta.id == int(operacion_id))
+        .execution_options(populate_existing=True)
+    ).scalar_one_or_none()
+    if entry is None:
+        session.rollback()
+        return None
+    anterior_code = str(entry.employee_code or "").strip().upper()
+    if anterior_code != origen_bloqueado:
+        # Otra reasignación la movió mientras esperábamos el candado (auditoría
+        # 2026-11-08, M2). El candado tomado es el de otra empleada: no se
+        # sigue, no se escribe bitácora y se suelta todo. Sin reintento
+        # automático: el dueño vuelve a intentarlo viendo el estado nuevo.
+        session.rollback()
+        raise ReasignacionNoPermitida(
+            "La venta cambió de empleada mientras se procesaba. Vuelve a intentarlo."
+        )
+    if anterior_code == code:
+        raise ReasignacionNoPermitida("La venta ya es de esa empleada.")
+
+    def _con_zona(momento: datetime) -> datetime:
+        # Una hora sin zona (SQLite en pruebas) es hora local de la tienda.
+        return momento.astimezone() if momento.tzinfo is None else momento
+
+    def _ya_pagada_a(empleada: str) -> bool:
+        # Misma regla que el pendiente: lo anterior al corte ya entró en un pago.
+        corte = corte_vigente(session, empleada)
+        return corte is not None and _con_zona(entry.created_at) < _con_zona(corte)
+
+    nombre_anterior = entry.employee_name or anterior_code
+    if _ya_pagada_a(anterior_code):
+        raise ReasignacionNoPermitida(
+            f"Esa venta ya se le pagó a {nombre_anterior}: no se puede reasignar."
+        )
+    nombre_nuevo = str(destino.nombre_completo or employee_name or code).strip()
+    if _ya_pagada_a(code):
+        raise ReasignacionNoPermitida(
+            f"A {nombre_nuevo} ya se le pagó después de esa venta: no entraría en "
+            "ningún pago. No se puede reasignar."
+        )
+
+    comisiones = int(entry.comisiones or 0)
     entry.employee_code = code
-    entry.employee_name = str(employee_name or code).strip()
+    entry.employee_name = nombre_nuevo
+    auditoria_ausencias_service.registrar(
+        session,
+        actor=actor,
+        origen="kiosko",
+        operacion="reasignar_venta",
+        entidad="libreta_venta",
+        entidad_id=int(entry.id),
+        employee_code=code,
+        antes={"employee_code": anterior_code, "employee_name": nombre_anterior, "comisiones": comisiones},
+        despues={"employee_code": code, "employee_name": nombre_nuevo, "comisiones": comisiones},
+    )
     session.commit()
     return entry
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 import unittest
 from datetime import date
 from decimal import Decimal
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 from pos_uniformes.services import telegram_pagos_service as pg
@@ -43,10 +44,20 @@ class PagarTest(unittest.TestCase):
         from pos_uniformes.services import nomina_service as nom
 
         sesion = object()
+        det = det or _Det()
+
+        def registrar(*a, **k):
+            # Como el servicio real: devuelve el pago GUARDADO. El mensaje del
+            # bot sale de aquí, no del pendiente calculado antes (M3).
+            self.registrados.append(a)
+            return SimpleNamespace(
+                total=det.total,
+                descuento_prestamos=getattr(det, "prestamo_cubierto", Decimal("0.00")),
+            )
+
         with patch.object(asis, "buscar_code", return_value=code), \
-             patch.object(nom, "pago_pendiente", return_value=det or _Det()), \
-             patch.object(nom, "registrar_pago_con_monto",
-                          side_effect=lambda *a, **k: self.registrados.append(a)), \
+             patch.object(nom, "pago_pendiente", return_value=det), \
+             patch.object(nom, "registrar_pago_con_monto", side_effect=registrar), \
              patch.object(pg, "_nombre", return_value="Evelyn Ortiz"), \
              patch.object(pg, "_detalle_texto", wraps=pg._detalle_texto):
             with patch("pos_uniformes.services.telegram_pagos_service.Session"):

@@ -179,16 +179,21 @@ def pagar_por_code(session: Session, code: str, *, quien: str, hoy: date | None 
     if not _hay_que_pagar(det):
         return f"{nombre} no tiene nada pendiente ahora mismo."
     try:
-        nom.registrar_pago_con_monto(session, code, creado_por=quien, fecha=hoy)
+        pago = nom.registrar_pago_con_monto(session, code, creado_por=quien, fecha=hoy)
     except (PermissionError, ValueError) as exc:
         # ValueError = ya cobró hoy (doble toque o reentrega de Telegram).
         session.rollback()
         return f"No se pudo: {exc}"
     session.commit()
-    if det.total <= 0:
+    # El mensaje sale del pago GUARDADO, calculado ya con el candado tomado,
+    # no de `det` (que se calculó antes y pudo quedar viejo si otro proceso
+    # deshizo o movió un pago mientras tanto — auditoría 2026-11-08, M3).
+    total = Decimal(str(getattr(pago, "total", 0) or 0))
+    if total <= 0:
+        cubierto = Decimal(str(getattr(pago, "descuento_prestamos", 0) or 0))
         return (f"✅ Ciclo de {nombre} cerrado: el préstamo se llevó todo el pago "
-                f"(${Decimal(getattr(det, 'prestamo_cubierto', 0) or 0):,.2f}). No se le entrega nada.\n\nSi fue un error, /deshacerpago")
-    return f"✅ Pagado a {nombre}: ${det.total:,.2f}\n\nSi fue un error, /deshacerpago"
+                f"(${cubierto:,.2f}). No se le entrega nada.\n\nSi fue un error, /deshacerpago")
+    return f"✅ Pagado a {nombre}: ${total:,.2f}\n\nSi fue un error, /deshacerpago"
 
 
 # ------------------------------------------------------------------- /pagar

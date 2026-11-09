@@ -85,3 +85,77 @@ def build_employee_ranking_view(
         total_pieces=total_pieces,
         total_amount=total_amount,
     )
+
+
+# ─── Ranking sobre la Libreta (fuente vigente) ───────────────────────────
+
+LIBRETA_RANKING_HEADERS = (
+    "#", "Empleada", "Puntos", "Piezas", "Operaciones",
+    "Importe ventas", "Apartados", "Importe apartados",
+)
+LIBRETA_ABONOS_HEADERS = ("Empleada", "Abonos cobrados", "Importe abonos")
+
+
+@dataclass(frozen=True)
+class LibretaRankingView:
+    status_label: str
+    rows: tuple[EmployeeRankingRowView, ...]
+    abonos_rows: tuple[tuple[str, ...], ...]
+
+
+def _dinero(valor, visible: bool) -> str:
+    return f"${Decimal(str(valor or 0)):,.2f}" if visible else "---"
+
+
+def build_libreta_ranking_view(
+    filas,
+    *,
+    period_label: str = "",
+    amounts_visible: bool = True,
+) -> LibretaRankingView:
+    """Tabla principal (ordenada por puntos) y tabla aparte de abonos.
+
+    Los abonos NO entran en operaciones ni en el importe de los apartados:
+    van solos, a nombre de quien los cobró."""
+    filas = list(filas or [])
+    period_suffix = f" | {period_label}" if period_label else ""
+    con_venta = [f for f in filas if f.operaciones or f.puntos]
+    if not filas:
+        return LibretaRankingView(
+            status_label=f"Sin operaciones en la Libreta{period_suffix.replace(' | ', ' — ')}.",
+            rows=(),
+            abonos_rows=(),
+        )
+    puntos = sum(f.puntos for f in filas)
+    piezas = sum(f.piezas for f in filas)
+    operaciones = sum(f.operaciones for f in filas)
+    importe = sum((f.importe_ventas for f in filas), Decimal("0.00"))
+    n = len(con_venta)
+    status_label = (
+        f"{n} empleada{'s' if n != 1 else ''}{period_suffix} · "
+        f"{puntos} punto{'s' if puntos != 1 else ''} · "
+        f"{piezas} pieza{'s' if piezas != 1 else ''} · "
+        f"{operaciones} operaci{'ones' if operaciones != 1 else 'ón'} · "
+        f"ventas {_dinero(importe, amounts_visible)}"
+    )
+    rows = tuple(
+        EmployeeRankingRowView(
+            values=(
+                str(f.posicion),
+                f.nombre or f.employee_code,
+                str(f.puntos),
+                str(f.piezas),
+                str(f.operaciones),
+                _dinero(f.importe_ventas, amounts_visible),
+                str(f.apartados),
+                _dinero(f.importe_apartados, amounts_visible),
+            ),
+            is_top=f.posicion == 1 and f.puntos > 0,
+        )
+        for f in con_venta
+    )
+    abonos_rows = tuple(
+        (f.nombre or f.employee_code, str(f.abonos), _dinero(f.importe_abonos, amounts_visible))
+        for f in sorted((f for f in filas if f.abonos), key=lambda f: (-f.importe_abonos, f.employee_code))
+    )
+    return LibretaRankingView(status_label=status_label, rows=rows, abonos_rows=abonos_rows)

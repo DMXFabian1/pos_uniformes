@@ -129,11 +129,8 @@ from pos_uniformes.services.employee_sales_history_service import (
     list_employee_day_sale_rows,
     load_employee_sale_detail_snapshot,
 )
-from pos_uniformes.services.employee_ranking_service import (
-    build_ranking_period_dates,
-    load_employee_ranking,
-)
-from pos_uniformes.ui.helpers.settings_employee_ranking_helper import build_employee_ranking_view
+from pos_uniformes.services.employee_ranking_service import build_ranking_period_dates
+from pos_uniformes.ui.helpers.settings_employee_ranking_helper import build_libreta_ranking_view
 from pos_uniformes.services.cash_session_action_service import (
     close_and_reopen_cash_session_action,
     close_cash_session_action,
@@ -1744,6 +1741,7 @@ class MainWindow(QMainWindow):
         self.settings_employee_sale_detail_dialog: QDialog | None = None
         self.settings_open_employee_ranking_button = QPushButton("Ranking")
         self.settings_employee_ranking_table = QTableWidget()
+        self.settings_employee_ranking_abonos_table = QTableWidget()
         self.settings_employee_ranking_status_label = QLabel("Sin datos.")
         self.settings_employee_ranking_period_combo = QComboBox()
         self.settings_employee_ranking_toggle_amounts_button = QPushButton("Ocultar monto")
@@ -3672,14 +3670,19 @@ class MainWindow(QMainWindow):
             "7 dias": "ultimos 7 dias",
             "Este mes": "este mes",
         }.get(period, period.lower())
+        # Fuente: la Libreta (kioskos). El POS formal ya no registra ventas, así
+        # que su ranking (`load_employee_ranking`) dejó de recibir datos.
+        from pos_uniformes.services import ranking_libreta_service
+
         try:
             with get_session() as session:
-                ranking_rows = load_employee_ranking(session, start_date=start_date, end_date=end_date)
+                ranking_rows = ranking_libreta_service.cargar(session, start_date, end_date)
         except Exception as exc:  # noqa: BLE001
             self.settings_employee_ranking_status_label.setText(f"No se pudo cargar el ranking: {exc}")
             self.settings_employee_ranking_table.setRowCount(0)
+            self.settings_employee_ranking_abonos_table.setRowCount(0)
             return
-        view = build_employee_ranking_view(
+        view = build_libreta_ranking_view(
             ranking_rows,
             period_label=period_label,
             amounts_visible=self.settings_employee_ranking_amounts_visible,
@@ -3689,13 +3692,23 @@ class MainWindow(QMainWindow):
         for row_index, row in enumerate(view.rows):
             for col_index, value in enumerate(row.values):
                 item = _table_item(value)
-                if col_index in {0, 2, 3}:
+                if col_index in {0, 2, 3, 4, 6}:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                if col_index in {4}:
+                if col_index in {5, 7}:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 if row.is_top:
                     item.setForeground(self.palette().highlight())
                 self.settings_employee_ranking_table.setItem(row_index, col_index, item)
+        abonos = self.settings_employee_ranking_abonos_table
+        abonos.setRowCount(len(view.abonos_rows))
+        for row_index, values in enumerate(view.abonos_rows):
+            for col_index, value in enumerate(values):
+                item = _table_item(value)
+                if col_index == 1:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                if col_index == 2:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                abonos.setItem(row_index, col_index, item)
         if view.rows:
             self.settings_employee_ranking_table.setCurrentCell(0, 0)
         else:

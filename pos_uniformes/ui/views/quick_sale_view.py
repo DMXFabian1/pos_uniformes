@@ -105,6 +105,19 @@ def mezclar_colores(base: str, encima: str, cuanto: float) -> str:
         return base
 
 
+def _botones_sin_cortar(*botones) -> None:
+    """QMessageBox reparte a sus botones menos ancho del que piden con la letra
+    del kiosko: «Cerrar (queda pendiente)» salía como «rar (queda pendie»
+    (prueba en tienda 2026-11-09; pasa igual con el estilo de Windows). Cada
+    botón queda, como mínimo, del ancho de su propio texto."""
+    for boton in botones:
+        try:
+            boton.ensurePolished()
+            boton.setMinimumWidth(boton.sizeHint().width())
+        except Exception:  # noqa: BLE001 — un botón angosto no detiene el aviso
+            pass
+
+
 def _temporada_de_hoy():
     """La temporada del calendario, o None. Nunca estorba si algo falla."""
     try:
@@ -253,6 +266,22 @@ class QuickSaleWidget(MonederoVentaMixin, QWidget):
         # Monedero: cliente identificado para esta venta (ver _identificar_cliente).
         self._cliente: dict | None = None
         self._usar_saldo = False
+        # Operaciones YA cobradas que no se pudieron anotar: la foto exacta
+        # de cada una, para «Reintentar anotar» (ver _retener_anotacion).
+        self._anotaciones_pendientes: list[dict] = []
+        self._reintentando_anotacion = False
+        # Reintentos fallidos SEGUIDOS: al llegar a _REINTENTOS_ANTES_DE_PARAR
+        # el aviso deja de ofrecer «Reintentar» (no se queda dando vueltas).
+        self._reintentos_fallidos = 0
+        # Respaldo en disco (C1): uuid de cada entrada pendiente → uuid de su
+        # operación (= nombre del archivo en data/sin_anotar). Operaciones
+        # que NI el respaldo se pudo guardar (se pierden si se cierra).
+        self._operacion_de: dict[str, str] = {}
+        self._sin_respaldo: dict[str, dict] = {}  # clave → {entradas, confirmadas}
+        # Entradas ya anotadas en este proceso cuyo respaldo no se pudo
+        # actualizar o borrar: no se vuelven a contar como pendientes.
+        self._ya_anotadas: set[str] = set()
+        self._sin_anotar_revisar: list[str] = []
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -266,6 +295,10 @@ class QuickSaleWidget(MonederoVentaMixin, QWidget):
         layout.addWidget(self._sale_widget)
 
         self.setLayout(layout)
+
+        # C1: lo cobrado y no anotado en una sesión anterior sigue en disco.
+        if self._recuperar_pendientes_persistidos():
+            QTimer.singleShot(1500, self._avisar_pendientes_recuperados)
 
     # ─── Gate de empleada ────────────────────────────────────────────────
 
@@ -554,6 +587,19 @@ class QuickSaleWidget(MonederoVentaMixin, QWidget):
         self._scan_hint = QLabel(self._SCAN_HINT_DEFAULT)
         self._scan_hint.setObjectName("scanHint")
         sb_layout.addWidget(self._scan_hint)
+        # Solo aparece si una operación cobrada no se pudo anotar: reintenta
+        # la MISMA operación (no cobra ni imprime otra vez).
+        self._btn_reintentar_anotar = QPushButton()
+        self._btn_reintentar_anotar.setObjectName("reintentarAnotarButton")
+        self._btn_reintentar_anotar.setAutoDefault(False)
+        self._btn_reintentar_anotar.setStyleSheet(
+            "QPushButton { background: #fdecea; color: #8a1f11;"
+            "  border: 2px solid #d9534f; border-radius: 12px;"
+            "  padding: 6px 12px; font-size: 13px; font-weight: 700; }"
+        )
+        self._btn_reintentar_anotar.clicked.connect(self._reintentar_anotacion)
+        self._btn_reintentar_anotar.setVisible(False)
+        sb_layout.addWidget(self._btn_reintentar_anotar)
         # Venta de productos SIN código (listones, parches, arreglos...):
         # abre un diálogo táctil con teclado numérico para el precio.
         self._btn_sin_codigo = QPushButton("➕  Sin código")
@@ -1145,6 +1191,19 @@ class QuickSaleWidget(MonederoVentaMixin, QWidget):
             neto += unit * int(it["cantidad"])
         return neto.quantize(Decimal("0.01"))
 
+    # ─── Anotar en la Libreta ────────────────────────────────────────────
+    # Cuatro cosas distintas que NO son la misma operación (auditoría
+    # 2026-11-08, A2/A3):
+    #   1. cobrar al cliente  — pasa en el mostrador, fuera del sistema;
+    #   2. imprimir el ticket — `route_tickets`; si falla, NO se anota nada
+    #      (on_printed no se llama) y el carrito sigue intacto;
+    #   3. anotar             — escribir la operación en la cola local de
+    #      esta PC (este bloque). Si falla, el cliente YA pagó: se guarda una
+    #      foto exacta de la operación y se ofrece «Reintentar anotar»;
+    #   4. sincronizar        — un hilo sube la cola a la base después. Si
+    #      falla, la operación ya está anotada y la Libreta dice cuántas
+    #      faltan por subir; no hay nada que reintentar aquí.
+
     def _registrar_en_libreta(
         self,
         tipo: str,
@@ -1153,77 +1212,565 @@ class QuickSaleWidget(MonederoVentaMixin, QWidget):
         pago_tarjeta: bool = False,
         anticipo: Decimal | None = None,
         anticipo_tarjeta: bool = False,
-    ) -> None:
+    ) -> bool:
         """Anota la operación en la Libreta: local primero (nunca bloquea el
-        mostrador ni pierde el registro), y un hilo la sube a la base.
+        mostrador), y un hilo la sube a la base.
 
-        Sustituye la libreta física y la copia de ticket que solo servía
-        para registrar. Un apartado con `anticipo` anota además un abono por
-        ese monto: es el dinero que sí entró al cajón hoy."""
+        Un apartado con `anticipo` anota además un abono por ese monto: es el
+        dinero que sí entró al cajón hoy. Las dos piezas se arman JUNTAS, con
+        su propio `operacion_uuid` cada una, antes de intentar guardar.
+
+        Devuelve True si quedó anotada. Si no se pudo guardar, la operación
+        queda retenida tal cual (ver `_retener_anotacion`) y devuelve False."""
+        # Un carrito vacío no es una venta. NO se compara contra la venta
+        # anterior: dos ventas iguales seguidas (mismo uniforme, otra
+        # clienta) son dos ventas. Lo que evita el doble registro es que
+        # el diálogo llama on_printed UNA vez y _registrar_y_vaciar vacía
+        # el carrito en el mismo acto; reimprimir desde la Libreta no
+        # pasa por aquí (sin on_printed).
+        if not self._items:
+            return True
         try:
-            import uuid as _uuid
-            from datetime import timezone as _tz
-
-            from pos_uniformes.services import libreta_local_queue_service as cola
-
-            _subtotal, _descuento, total = self._compute_totals()
-            total = Decimal(str(total)).quantize(Decimal("0.01"))
-            neto = self._monto_neto_actual(total, pago_tarjeta=pago_tarjeta)
-            # Un carrito vacío no es una venta. NO se compara contra la venta
-            # anterior: dos ventas iguales seguidas (mismo uniforme, otra
-            # clienta) son dos ventas. Lo que evita el doble registro es que
-            # el diálogo llama on_printed UNA vez y _registrar_y_vaciar vacía
-            # el carrito en el mismo acto; reimprimir desde la Libreta no
-            # pasa por aquí (sin on_printed).
-            if not self._items:
-                return
-
-            origen: str | None = None
-            try:
-                from pos_uniformes.services.satellite_identity_service import get_satellite_id
-
-                origen = get_satellite_id()
-            except Exception:  # noqa: BLE001
-                pass
-
-            cola.encolar_operacion(
-                {
-                    "employee_code": str(self._employee_code or ""),
-                    "employee_name": str(self._employee_name or self._employee_code or ""),
-                    "tipo": tipo,
-                    "cliente": cliente,
-                    "items": [
-                        {
-                            "sku": it["sku"],
-                            "nombre": it["nombre"],
-                            "talla": it["talla"],
-                            "cantidad": int(it["cantidad"]),
-                            "precio": str(it["precio"]),
-                        }
-                        for it in self._items
-                    ],
-                    "monto_total": str(total),
-                    "monto_neto": str(neto),
-                    "pago_tarjeta": bool(pago_tarjeta),
-                    "descuento_empleada": bool(self._discount_active),
-                    "origen": origen,
-                    "created_at": datetime.now(_tz.utc).astimezone().isoformat(),
-                    # Identidad persistente: la misma en cada reintento.
-                    "operacion_uuid": str(_uuid.uuid4()),
-                    **self._datos_cliente_para_cola(tipo, total),
-                }
+            entradas = self._armar_anotacion(
+                tipo, cliente=cliente, pago_tarjeta=pago_tarjeta,
+                anticipo=anticipo, anticipo_tarjeta=anticipo_tarjeta,
             )
-            self._drenar_libreta_en_background()
+        except Exception:  # noqa: BLE001 — la Libreta nunca rompe el flujo de tickets
+            _logger.exception("No se pudo preparar la operacion para la Libreta")
+            self._avisar_no_se_anoto(
+                "El cliente YA PAGÓ, pero la operación no se pudo preparar para "
+                "anotarla. NO le cobres otra vez. El carrito sigue aquí; avísale a Daniel.",
+                titulo="Falta anotar la operación",
+            )
+            return False
+        aviso = "Apartado y anticipo registrados" if len(entradas) > 1 else None
+        return self._anotar(entradas, aviso_exito=aviso)
+
+    def _armar_anotacion(
+        self,
+        tipo: str,
+        *,
+        cliente: str | None,
+        pago_tarjeta: bool,
+        anticipo: Decimal | None,
+        anticipo_tarjeta: bool,
+    ) -> list[dict]:
+        """Foto completa de la operación, tomada del carrito UNA sola vez.
+
+        Todo lo que el registro necesita va aquí (tipo, montos, descuento de
+        empleada, piezas, cliente, hora, uuid): un reintento reutiliza esta
+        misma foto y nunca vuelve a leer el carrito, que pudo cambiar."""
+        import uuid as _uuid
+        from datetime import timezone as _tz
+
+        _subtotal, _descuento, total = self._compute_totals()
+        total = Decimal(str(total)).quantize(Decimal("0.01"))
+        neto = self._monto_neto_actual(total, pago_tarjeta=pago_tarjeta)
+        origen = self._origen_satelite()
+        entradas = [
+            {
+                "employee_code": str(self._employee_code or ""),
+                "employee_name": str(self._employee_name or self._employee_code or ""),
+                "tipo": tipo,
+                "cliente": cliente,
+                "items": [
+                    {
+                        "sku": it["sku"],
+                        "nombre": it["nombre"],
+                        "talla": it["talla"],
+                        "cantidad": int(it["cantidad"]),
+                        "precio": str(it["precio"]),
+                    }
+                    for it in self._items
+                ],
+                "monto_total": str(total),
+                "monto_neto": str(neto),
+                "pago_tarjeta": bool(pago_tarjeta),
+                "descuento_empleada": bool(self._discount_active),
+                "origen": origen,
+                "created_at": datetime.now(_tz.utc).astimezone().isoformat(),
+                # Identidad persistente: la misma en cada reintento.
+                "operacion_uuid": str(_uuid.uuid4()),
+                **self._datos_cliente_para_cola(tipo, total),
+            }
+        ]
+        if tipo == "apartado" and anticipo is not None and anticipo > 0:
+            entradas.append(
+                self._entrada_abono(
+                    f"{cliente} · anticipo" if cliente else "anticipo",
+                    Decimal(str(anticipo)).quantize(Decimal("0.01")),
+                    pago_tarjeta=anticipo_tarjeta,
+                    origen=origen,
+                    operacion_uuid=str(_uuid.uuid4()),
+                )
+            )
+        return entradas
+
+    @staticmethod
+    def _origen_satelite() -> str | None:
+        try:
+            from pos_uniformes.services.satellite_identity_service import get_satellite_id
+
+            return get_satellite_id()
+        except Exception:  # noqa: BLE001
+            return None
+
+    def _anotar(self, entradas: list[dict], *, aviso_exito: str | None = None) -> bool:
+        """Guarda las entradas en la cola local. Si falla, retiene SOLO las
+        que no se guardaron (las anteriores ya quedaron en la cola)."""
+        from pos_uniformes.services import libreta_local_queue_service as cola
+
+        hechas: list[dict] = []
+        try:
+            for entrada in entradas:
+                # Idempotente por uuid: lo que ya entró no se duplica.
+                cola.encolar_operacion(entrada)
+                hechas.append(entrada)
         except Exception:  # noqa: BLE001 — la Libreta nunca rompe el flujo de tickets
             _logger.exception("No se pudo registrar la operacion en la Libreta")
-            return
-        if tipo == "apartado" and anticipo is not None and anticipo > 0:
-            self._registrar_abono(
-                f"{cliente} · anticipo" if cliente else "anticipo",
-                Decimal(str(anticipo)).quantize(Decimal("0.01")),
-                pago_tarjeta=anticipo_tarjeta,
-                aviso="Apartado y anticipo registrados",
+            self._retener_anotacion(entradas, hechas=hechas)
+            return False
+        self._despues_de_encolar()
+        if aviso_exito:
+            self._flash_scan_hint(aviso_exito)
+        return True
+
+    def _retener_anotacion(self, entradas: list[dict], *, hechas: list[dict] | None = None) -> None:
+        """El cliente ya pagó y no se pudo anotar: se guarda la foto exacta
+        para «Reintentar anotar», en memoria Y en disco (data/sin_anotar), para
+        que sobreviva a un cierre o reinicio. Queda un botón junto al escáner.
+
+        `hechas` son las entradas que SÍ entraron a la cola antes del error.
+        `encolar_operacion` escribe con reemplazo atómico, así que una entrada
+        que lanzó error no quedó escrita; solo se separan si todas traen uuid
+        (si no, no hay forma segura de reconocerlas y se conserva todo)."""
+        from pos_uniformes.services import libreta_sin_anotar_service as sin_anotar
+
+        hechas = list(hechas or [])
+        op = sin_anotar.uuid_de_operacion(entradas)
+        separable = bool(op) and all(e.get("operacion_uuid") for e in entradas)
+        if separable:
+            ok = {e["operacion_uuid"] for e in hechas}
+            faltan = [e for e in entradas if e["operacion_uuid"] not in ok]
+            confirmadas = sorted(ok)
+        else:
+            faltan, confirmadas = list(entradas), []
+            if hechas:
+                _logger.error(
+                    "Libreta: anotación parcial SIN uuid; se conserva completa para revisión manual: %s",
+                    sin_anotar.resumen_para_log(entradas),
+                )
+        clave = op or str(id(entradas))
+
+        ya = {e.get("operacion_uuid") for e in self._anotaciones_pendientes}
+        for entrada in faltan:
+            uuid = entrada.get("operacion_uuid")
+            if uuid is None or uuid not in ya:
+                self._anotaciones_pendientes.append(entrada)
+            if uuid:
+                self._operacion_de[uuid] = clave
+
+        if op:
+            respaldada = self._respaldar(entradas, confirmadas, clave)
+        else:
+            respaldada = False
+            self._sin_respaldo[clave] = {"entradas": list(entradas), "confirmadas": set()}
+        _logger.error(
+            "Libreta: operación cobrada SIN anotar. operacion=%s respaldo_en_disco=%s "
+            "anotadas=%s faltan=%s :: %s",
+            op, respaldada, confirmadas, [e.get("operacion_uuid") for e in faltan],
+            sin_anotar.resumen_para_log(entradas),
+        )
+        self._actualizar_boton_anotar()
+        self._mostrar_aviso_anotacion(ya_anotadas=[e for e in entradas if e in hechas] if separable else [])
+
+    def _respaldar(self, entradas: list[dict], confirmadas: list[str], clave: str) -> bool:
+        """Escribe el respaldo en disco. Si no se puede, la operación queda
+        marcada «sin respaldo» (el aviso pide apuntarla en papel)."""
+        from pos_uniformes.services import libreta_sin_anotar_service as sin_anotar
+
+        try:
+            sin_anotar.guardar(entradas, confirmadas=confirmadas)
+        except Exception:  # noqa: BLE001
+            _logger.exception(
+                "Libreta: NO se pudo guardar el respaldo en disco de la operación %s :: %s",
+                clave, sin_anotar.resumen_para_log(entradas),
             )
+            previo = self._sin_respaldo.get(clave, {}).get("confirmadas", set())
+            self._sin_respaldo[clave] = {
+                "entradas": list(entradas), "confirmadas": set(confirmadas) | previo,
+            }
+            return False
+        self._sin_respaldo.pop(clave, None)
+        return True
+
+    def _confirmar_respaldo(self, hechas: list[dict]) -> list[str]:
+        """Anota en el respaldo que estas entradas ya entraron a la cola local.
+
+        El respaldo NO se borra aquí: se conserva hasta que PostgreSQL confirme
+        todas las entradas (`libreta_sin_anotar_service.conciliar_con_base`,
+        al final del drenado). Si la operación no tenía respaldo (el disco
+        había fallado), se intenta crearlo ahora, ya marcado «en cola».
+
+        Devuelve las operaciones cuya marca no se pudo escribir. No es grave:
+        al arrancar, lo pendiente se calcula contra la cola real y reencolar
+        no duplica (uuid)."""
+        from pos_uniformes.services import libreta_sin_anotar_service as sin_anotar
+
+        por_op: dict[str, list[str]] = {}
+        for e in hechas:
+            uuid = e.get("operacion_uuid")
+            if not uuid:
+                continue
+            self._ya_anotadas.add(uuid)
+            clave = self._operacion_de.pop(uuid, None)
+            if clave:
+                por_op.setdefault(clave, []).append(uuid)
+        problemas: list[str] = []
+        for clave, uuids in por_op.items():
+            sin_resp = self._sin_respaldo.get(clave)
+            if sin_resp is not None:
+                sin_resp["confirmadas"] |= set(uuids)
+                ents = sin_resp["entradas"]
+                if sin_anotar.uuid_de_operacion(ents) and self._respaldar(
+                    ents, sorted(sin_resp["confirmadas"]), clave
+                ):
+                    continue  # respaldo creado (ya marcado en cola)
+                todas = {e.get("operacion_uuid") for e in ents}
+                if todas <= sin_resp["confirmadas"]:
+                    # Todo quedó en la cola (durable): ya no es «sin respaldo».
+                    self._sin_respaldo.pop(clave, None)
+                continue
+            try:
+                sin_anotar.marcar_en_cola(clave, uuids)
+            except ValueError:
+                pass  # clave sin uuid: nunca tuvo archivo en disco
+            except Exception:  # noqa: BLE001
+                _logger.exception(
+                    "Libreta: la operación %s SÍ quedó en la cola (%s) pero no se pudo "
+                    "anotar en su respaldo; reintentarla no la duplica", clave, uuids,
+                )
+                problemas.append(clave)
+        return problemas
+
+    @staticmethod
+    def _describir_entrada(entrada: dict) -> str:
+        tipo = str(entrada.get("tipo") or "")
+        monto = f"${Decimal(str(entrada.get('monto_total') or '0')):,.2f}"
+        cliente = entrada.get("cliente")
+        quien = str(entrada.get("employee_name") or entrada.get("employee_code") or "").strip()
+        cuando = ""
+        try:
+            cuando = datetime.fromisoformat(str(entrada.get("created_at"))).strftime("%d/%m %H:%M")
+        except (TypeError, ValueError):
+            pass
+        cola_txt = "".join(
+            f" — {t}" for t in (f"vendió {quien}" if quien else "", cuando) if t
+        )
+        if tipo == "abono":
+            return f"• Abono / anticipo de {monto}" + (f" ({cliente})" if cliente else "") + cola_txt
+        piezas = sum(int(it.get("cantidad", 0) or 0) for it in entrada.get("items") or [])
+        texto = f"• {'Apartado' if tipo == 'apartado' else 'Venta'} de {monto}, {piezas} pieza(s)"
+        if cliente:
+            texto += f", {cliente}"
+        if entrada.get("descuento_empleada"):
+            texto += ", con descuento de empleada"
+        if entrada.get("pago_tarjeta"):
+            texto += ", con tarjeta"
+        return texto + cola_txt
+
+    def _mostrar_aviso_anotacion(
+        self, *, ya_anotadas: list[dict] | None = None, encabezado: str | None = None
+    ) -> None:
+        """Aviso de error con «Reintentar anotar». Es modal a la ventana del
+        kiosko (WindowModal): hay que cerrarlo para seguir, pero no detiene
+        el programa ni los hilos de fondo."""
+        if not self._anotaciones_pendientes:
+            return
+        detalle = "\n".join(self._describir_entrada(e) for e in self._anotaciones_pendientes)
+        partes = [
+            encabezado
+            or (
+                "El cliente YA PAGÓ. Lo que falló fue GUARDAR la operación en esta "
+                "computadora (el archivo de pendientes no se pudo usar en este momento)."
+            ),
+            "NO le vuelvas a cobrar y NO vuelvas a imprimir el ticket.",
+        ]
+        if ya_anotadas:
+            partes.append(
+                "Ya quedó anotado:\n" + "\n".join(self._describir_entrada(e) for e in ya_anotadas)
+            )
+        partes.append(f"Falta anotar:\n{detalle}")
+        if self._sin_respaldo:
+            partes.append(
+                "⚠️ TAMPOCO se pudo guardar el respaldo en esta computadora. Si se cierra "
+                "el programa, esta operación SE PIERDE. Apúntala AHORA en papel (qué se "
+                "vendió, monto, quién la vendió y la hora) y avísale a Daniel."
+            )
+        else:
+            partes.append(
+                "Quedó guardada en esta computadora: aunque se cierre el programa, "
+                "volverá a aparecer al abrirlo."
+            )
+        insistir = self._reintentos_fallidos < self._REINTENTOS_ANTES_DE_PARAR
+        if insistir:
+            partes.append(
+                "Toca «Reintentar anotar»: se guarda exactamente esta misma operación. "
+                "Si sigue fallando, el botón ⚠️ junto al escáner queda a la vista; "
+                "avísale a Daniel."
+            )
+        else:
+            partes.append(
+                f"Ya se intentó {self._reintentos_fallidos} veces y sigue fallando: "
+                "deja de reintentar por ahora y avísale a Daniel. Puedes seguir "
+                "vendiendo; el botón ⚠️ junto al escáner queda a la vista para "
+                "intentarlo más tarde."
+            )
+        partes.append(
+            "(No es la impresora ni el internet: la subida al servidor es aparte "
+            "y se hace sola.)"
+        )
+        texto = "\n\n".join(partes)
+        try:
+            anterior = getattr(self, "_aviso_anotacion", None)
+            if anterior is not None:
+                anterior.close()
+            box = QMessageBox(QMessageBox.Icon.Warning, "Falta anotar la operación", texto, parent=self)
+            if insistir:
+                reintentar = box.addButton("Reintentar anotar", QMessageBox.ButtonRole.AcceptRole)
+                reintentar.clicked.connect(self._reintentar_anotacion)
+                _botones_sin_cortar(
+                    reintentar,
+                    box.addButton("Cerrar (queda pendiente)", QMessageBox.ButtonRole.RejectRole),
+                )
+            else:
+                _botones_sin_cortar(
+                    box.addButton("Entendido (queda pendiente)", QMessageBox.ButtonRole.RejectRole)
+                )
+            self._aviso_anotacion = box  # que no lo recoja el recolector
+            box.open()
+        except Exception:  # noqa: BLE001
+            _logger.warning("No se pudo mostrar el aviso de la Libreta")
+
+    def _actualizar_boton_anotar(self) -> None:
+        boton = getattr(self, "_btn_reintentar_anotar", None)
+        if boton is None:
+            return
+        n = len(self._anotaciones_pendientes)
+        boton.setText(f"⚠️ Falta anotar ({n}) · ya está cobrado · Reintentar")
+        boton.setVisible(n > 0)
+
+    def _reintentar_anotacion(self) -> bool:
+        """Vuelve a guardar la MISMA foto: mismo tipo, montos, descuento,
+        anticipo, empleada, hora y uuid. No lee el carrito, no imprime y no
+        cobra.
+
+        Tocarlo dos veces no duplica: mientras corre se ignora un segundo
+        toque, y la cola rechaza un uuid que ya tiene. Si falla a medias, lo
+        que sí entró deja de estar pendiente (en memoria y en disco)."""
+        if self._reintentando_anotacion or not self._anotaciones_pendientes:
+            return False
+        self._reintentando_anotacion = True
+        try:
+            from pos_uniformes.services import libreta_local_queue_service as cola
+
+            lote = list(self._anotaciones_pendientes)
+            hechas: list[dict] = []
+            fallo = False
+            for entrada in lote:
+                try:
+                    cola.encolar_operacion(entrada)
+                except Exception:  # noqa: BLE001
+                    _logger.exception(
+                        "Libreta: el reintento de anotar volvió a fallar (uuid=%s)",
+                        entrada.get("operacion_uuid"),
+                    )
+                    fallo = True
+                    break
+                hechas.append(entrada)
+            if hechas:
+                ids = {id(e) for e in hechas}
+                self._anotaciones_pendientes = [e for e in self._anotaciones_pendientes if id(e) not in ids]
+                problemas = self._confirmar_respaldo(hechas)
+                _logger.warning(
+                    "Libreta: reintento anotó %s; siguen pendientes %s",
+                    [e.get("operacion_uuid") for e in hechas],
+                    [e.get("operacion_uuid") for e in self._anotaciones_pendientes],
+                )
+            else:
+                problemas = []
+            self._actualizar_boton_anotar()
+            if fallo:
+                self._reintentos_fallidos += 1
+                # Lo que no tiene respaldo en disco, se intenta respaldar otra vez.
+                from pos_uniformes.services import libreta_sin_anotar_service as sin_anotar
+
+                for clave, d in list(self._sin_respaldo.items()):
+                    if sin_anotar.uuid_de_operacion(d["entradas"]):
+                        self._respaldar(d["entradas"], sorted(d["confirmadas"]), clave)
+                if hechas:
+                    self._despues_de_encolar()
+                self._mostrar_aviso_anotacion()  # solo el error; ningún aviso de éxito
+                return False
+            self._reintentos_fallidos = 0
+            aviso = getattr(self, "_aviso_anotacion", None)
+            if aviso is not None:
+                try:
+                    aviso.close()
+                except Exception:  # noqa: BLE001
+                    pass
+                self._aviso_anotacion = None
+            self._despues_de_encolar()
+            self._flash_scan_hint("✅ Operación anotada (sin cobrar ni imprimir otra vez)")
+            if problemas:
+                # Sin aviso a la empleada: la operación SÍ quedó en la cola y,
+                # si reaparece al arrancar, reintentarla no la duplica.
+                _logger.warning("Libreta: respaldos sin marcar como encolados: %s", problemas)
+            return True
+        finally:
+            self._reintentando_anotacion = False
+
+    # ── C1: pendientes en disco al arrancar y al cerrar ──────────────────
+
+    def _recuperar_pendientes_persistidos(self) -> bool:
+        """Carga lo cobrado-sin-anotar de sesiones anteriores (sin cobrar ni
+        imprimir). No duplica lo que ya está en memoria. Nunca truena:
+        devuelve True si hay algo que avisar."""
+        try:
+            from pos_uniformes.services import libreta_sin_anotar_service as sin_anotar
+
+            ops, revisar = sin_anotar.cargar(self._uuids_en_cola())
+        except Exception:  # noqa: BLE001
+            _logger.exception("Libreta: no se pudieron revisar los respaldos sin anotar")
+            return False
+        ya = {e.get("operacion_uuid") for e in self._anotaciones_pendientes}
+        nuevas = 0
+        for op in ops:
+            antes = nuevas
+            for entrada in op.faltantes:
+                uuid = entrada["operacion_uuid"]
+                if uuid in self._ya_anotadas:
+                    continue
+                self._operacion_de[uuid] = op.operacion_uuid
+                if uuid not in ya:
+                    self._anotaciones_pendientes.append(entrada)
+                    ya.add(uuid)
+                    nuevas += 1
+            if nuevas > antes:
+                _logger.warning(
+                    "Libreta: recuperada operación cobrada sin anotar %s (guardada %s) :: %s",
+                    op.operacion_uuid, op.guardado_at, sin_anotar.resumen_para_log(op.faltantes),
+                )
+        self._sin_anotar_revisar = list(revisar)
+        self._actualizar_boton_anotar()
+        return bool(nuevas or revisar)
+
+    @staticmethod
+    def _uuids_en_cola() -> set[str] | None:
+        """Lo que está HOY en la cola local; None si no se pudo leer (entonces
+        el respaldo usa su propia bitácora `en_cola`)."""
+        try:
+            from pos_uniformes.services import libreta_local_queue_service as cola
+
+            return cola.uuids_en_cola()
+        except Exception:  # noqa: BLE001
+            _logger.warning("Libreta: no se pudo leer la cola para revisar respaldos", exc_info=True)
+            return None
+
+    def _avisar_pendientes_recuperados(self) -> None:
+        if self._anotaciones_pendientes:
+            n = len(self.claves_pendientes())
+            self._mostrar_aviso_anotacion(
+                encabezado=(
+                    f"Al abrir el programa se encontraron {n} operación(es) que YA SE "
+                    "COBRARON pero no quedaron anotadas en la Libreta (de una sesión "
+                    "anterior; pudo venderlas otra empleada)."
+                )
+            )
+        if self._sin_anotar_revisar:
+            self._avisar_no_se_anoto(
+                f"Hay {len(self._sin_anotar_revisar)} respaldo(s) de operaciones sin anotar "
+                "que no se pudieron leer: "
+                + ", ".join(self._sin_anotar_revisar)
+                + ". No se borraron. Avísale a Daniel para revisarlos a mano.",
+                titulo="Respaldos por revisar",
+            )
+
+    def claves_pendientes(self) -> set[str]:
+        """Operaciones cobradas sin anotar, en memoria y en disco, contando
+        UNA vez cada operación (por su uuid)."""
+        claves = {
+            self._operacion_de.get(e.get("operacion_uuid"), e.get("operacion_uuid") or str(id(e)))
+            for e in self._anotaciones_pendientes
+        }
+        try:
+            from pos_uniformes.services import libreta_sin_anotar_service as sin_anotar
+
+            ops, _revisar = sin_anotar.cargar(self._uuids_en_cola())
+        except Exception:  # noqa: BLE001
+            ops = []
+        for op in ops:
+            if any(e["operacion_uuid"] not in self._ya_anotadas for e in op.faltantes):
+                claves.add(op.operacion_uuid)
+        return claves
+
+    _CIERRE_TIMEOUT_MS = 90_000
+    _REINTENTOS_ANTES_DE_PARAR = 3
+
+    def confirmar_cierre(self) -> bool:
+        """¿Se puede cerrar la ventana? Sin pendientes, sí. Con pendientes se
+        pregunta (Cancelar / Cerrar de todos modos). Cerrar NO borra los
+        respaldos en disco."""
+        try:
+            n = len(self.claves_pendientes())
+        except Exception:  # noqa: BLE001 — revisar nunca impide cerrar
+            _logger.exception("Libreta: no se pudo contar lo pendiente al cerrar")
+            return True
+        if n == 0:
+            return True
+        texto = (
+            f"Hay {n} operación(es) que YA SE COBRARON y no están anotadas en la Libreta.\n\n"
+            "Cerrar NO las borra: quedan guardadas en esta computadora y volverán a "
+            "aparecer al abrir el programa. Pero hay que anotarlas cuanto antes "
+            "(«Reintentar anotar»)."
+        )
+        if self._sin_respaldo:
+            texto += (
+                f"\n\n⚠️ {len(self._sin_respaldo)} de ellas NO tienen respaldo en disco: "
+                "si cierras, SE PIERDEN. Apúntalas en papel antes de cerrar."
+            )
+        cerrar = self._preguntar_cierre(texto)
+        if cerrar:
+            if self._sin_respaldo:
+                from pos_uniformes.services import libreta_sin_anotar_service as sin_anotar
+
+                for clave, d in list(self._sin_respaldo.items()):
+                    ents = d["entradas"]
+                    if not (sin_anotar.uuid_de_operacion(ents)
+                            and self._respaldar(ents, sorted(d["confirmadas"]), clave)):
+                        _logger.error(
+                            "Libreta: se cerró con una operación cobrada SIN anotar y SIN respaldo :: %s",
+                            sin_anotar.resumen_para_log(ents),
+                        )
+            _logger.warning("Libreta: ventana cerrada con %s operación(es) pendiente(s) de anotar", n)
+        return cerrar
+
+    def _preguntar_cierre(self, texto: str) -> bool:
+        """Cancelar (por omisión) o Cerrar de todos modos. Si nadie contesta en
+        `_CIERRE_TIMEOUT_MS` se cierra: los pendientes quedan en disco y un
+        reinicio desatendido (actualización) no se queda colgado."""
+        box = QMessageBox(QMessageBox.Icon.Warning, "Operaciones sin anotar", texto, parent=self.window())
+        cancelar = box.addButton("Cancelar (no cerrar)", QMessageBox.ButtonRole.RejectRole)
+        cerrar = box.addButton("Cerrar de todos modos", QMessageBox.ButtonRole.DestructiveRole)
+        _botones_sin_cortar(cancelar, cerrar)
+        box.setDefaultButton(cancelar)
+        box.setEscapeButton(cancelar)
+        reloj = QTimer(box)
+        reloj.setSingleShot(True)
+        reloj.timeout.connect(cerrar.click)
+        reloj.start(self._CIERRE_TIMEOUT_MS)
+        box.exec()
+        return box.clickedButton() is cerrar
 
     def _registrar_y_vaciar(
         self,
@@ -1233,21 +1780,61 @@ class QuickSaleWidget(MonederoVentaMixin, QWidget):
         pago_tarjeta: bool = False,
         anticipo: Decimal | None = None,
         anticipo_tarjeta: bool = False,
-    ) -> None:
+    ) -> bool:
         """Anota en la Libreta y vacía el carrito en el mismo acto.
 
         Si el carrito sobreviviera a la impresión, agregar una pieza más y
         reimprimir anotaría la venta dos veces (3 pzs y luego 4 = 7), y la
         siguiente clienta heredaría piezas ajenas. Los tickets ya quedaron
         armados como texto, así que reimprimir en la misma ventana sigue
-        funcionando."""
+        funcionando.
+
+        También se vacía si la anotación falló pero quedó RETENIDA: la
+        operación ya vive en «Reintentar anotar»; dejar el carrito invitaría a
+        cobrarla o imprimirla otra vez. Devuelve True solo si quedó anotada."""
         extra = (
             {"anticipo": anticipo, "anticipo_tarjeta": anticipo_tarjeta}
             if tipo == "apartado"
             else {}
         )
-        self._registrar_en_libreta(tipo, cliente=cliente, pago_tarjeta=pago_tarjeta, **extra)
-        self._vaciar_carrito()
+        retenidas_antes = len(self._anotaciones_pendientes)
+        anotada = bool(
+            self._registrar_en_libreta(tipo, cliente=cliente, pago_tarjeta=pago_tarjeta, **extra)
+        )
+        if anotada or len(self._anotaciones_pendientes) > retenidas_antes:
+            self._vaciar_carrito()
+        return anotada
+
+    def _despues_de_encolar(self) -> None:
+        """Tras anotar: sube en background y, si al anotar se apartó un archivo
+        de pendientes dañado, lo dice aquí mismo (una vez)."""
+        try:
+            self._drenar_libreta_en_background()
+        except Exception:  # noqa: BLE001
+            _logger.warning("No se pudo lanzar el drenado de la Libreta", exc_info=True)
+        try:
+            from pos_uniformes.services import libreta_local_queue_service as cola
+
+            apartado = cola.tomar_rescate_reciente()
+        except Exception:  # noqa: BLE001
+            apartado = None
+        if apartado:
+            self._avisar_no_se_anoto(
+                "El archivo de ventas pendientes de esta terminal estaba dañado. "
+                f"Se guardó aparte como «{apartado}» (no se borró) y se empezó uno "
+                "nuevo; esta venta sí quedó anotada. Avísale a Daniel: las ventas "
+                "que traía ese archivo hay que revisarlas.",
+                titulo="Archivo de pendientes apartado",
+            )
+
+    def _avisar_no_se_anoto(self, texto: str, *, titulo: str = "Libreta") -> None:
+        """Aviso que no detiene el mostrador (no es modal bloqueante)."""
+        try:
+            box = QMessageBox(QMessageBox.Icon.Warning, titulo, texto, parent=self)
+            self._aviso_libreta = box  # que no lo recoja el recolector
+            box.open()
+        except Exception:  # noqa: BLE001
+            _logger.warning("No se pudo mostrar el aviso de la Libreta: %s", texto)
 
     def _vaciar_carrito(self) -> None:
         self._items.clear()
@@ -2020,8 +2607,8 @@ class QuickSaleWidget(MonederoVentaMixin, QWidget):
                 # Se anota igual (piezas, comisiones, forma de pago) y el
                 # carrito se vacía; nada va a la impresora. Reimpresión:
                 # Libreta → 🖨 Reimprimir (build_reprint_ticket).
-                self._registrar_y_vaciar("venta", pago_tarjeta=card)
-                self._avisar_sin_ticket()
+                if self._registrar_y_vaciar("venta", pago_tarjeta=card):
+                    self._avisar_sin_ticket()
                 self._scan_input.setFocus()
                 return
         _subtotal, _desc, total_venta = self._compute_totals()
@@ -2198,44 +2785,52 @@ class QuickSaleWidget(MonederoVentaMixin, QWidget):
         aviso: str = "Abono registrado",
     ) -> None:
         try:
-            from datetime import timezone as _tz
-
             from pos_uniformes.services import libreta_local_queue_service as cola
 
-            neto = monto
-            if pago_tarjeta:
-                neto = self._apply_terminal_commission(monto)
-            origen: str | None = None
-            try:
-                from pos_uniformes.services.satellite_identity_service import get_satellite_id
-
-                origen = get_satellite_id()
-            except Exception:  # noqa: BLE001
-                pass
             cola.encolar_operacion(
-                {
-                    "employee_code": str(self._employee_code or ""),
-                    "employee_name": str(self._employee_name or self._employee_code or ""),
-                    "tipo": "abono",
-                    "cliente": cliente,
-                    "items": [],
-                    "monto_total": str(monto),
-                    "monto_neto": str(neto),
-                    "pago_tarjeta": bool(pago_tarjeta),
-                    # Los abonos NO dan comisión — pero sí quedan registrados.
-                    "comisiones": 0,
-                    "descuento_empleada": False,
-                    "origen": origen,
-                    "created_at": datetime.now(_tz.utc).astimezone().isoformat(),
-                }
+                self._entrada_abono(
+                    cliente, monto, pago_tarjeta=pago_tarjeta, origen=self._origen_satelite()
+                )
             )
-            self._drenar_libreta_en_background()
+            self._despues_de_encolar()
             self._flash_scan_hint(aviso)
         except Exception:  # noqa: BLE001
             _logger.exception("No se pudo registrar el abono en la Libreta")
             QMessageBox.warning(
                 self, "Abono no registrado", "No se pudo guardar el abono; intentalo de nuevo."
             )
+
+    def _entrada_abono(
+        self,
+        cliente: str | None,
+        monto: Decimal,
+        *,
+        pago_tarjeta: bool,
+        origen: str | None,
+        operacion_uuid: str | None = None,
+    ) -> dict:
+        from datetime import timezone as _tz
+
+        neto = self._apply_terminal_commission(monto) if pago_tarjeta else monto
+        entrada = {
+            "employee_code": str(self._employee_code or ""),
+            "employee_name": str(self._employee_name or self._employee_code or ""),
+            "tipo": "abono",
+            "cliente": cliente,
+            "items": [],
+            "monto_total": str(monto),
+            "monto_neto": str(neto),
+            "pago_tarjeta": bool(pago_tarjeta),
+            # Los abonos NO dan comisión — pero sí quedan registrados.
+            "comisiones": 0,
+            "descuento_empleada": False,
+            "origen": origen,
+            "created_at": datetime.now(_tz.utc).astimezone().isoformat(),
+        }
+        if operacion_uuid:
+            # El anticipo de un apartado: identidad propia para reintentar.
+            entrada["operacion_uuid"] = operacion_uuid
+        return entrada
 
     def _on_ticket_apartado(self) -> None:
         if not self._items:

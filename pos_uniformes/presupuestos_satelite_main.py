@@ -120,6 +120,11 @@ def main() -> int:
     app = QApplication(sys.argv)
     if "--servidor-impresion" in sys.argv:
         return _modo_servidor_de_impresion(app)
+    # Log a archivo: el .exe no tiene consola (console=False) y sin esto los
+    # errores (p. ej. «cobrada sin anotar») no quedaban en ningún lado.
+    from pos_uniformes.utils.kiosk_logging import configurar_log_kiosko
+
+    configurar_log_kiosko()
     app.setApplicationName(satellite_display_name())
     app.setOrganizationName("POSUniformes")
     from pos_uniformes.utils.qt_spanish import instalar_espanol_qt

@@ -1218,8 +1218,13 @@ def build_employee_ranking_dialog(window: "MainWindow") -> QDialog:
     dialog, layout = _create_settings_dialog(
         window,
         "Ranking de empleadas",
-        "Ventas confirmadas acreditadas por escaneo QR de empleada. Solo aparecen quienes tienen ventas en el periodo.",
-        width=780,
+        "Operaciones de la Libreta (kioskos), ordenadas por puntos de comision. "
+        "Los abonos van aparte, a nombre de quien los cobro.",
+        width=920,
+    )
+    from pos_uniformes.ui.helpers.settings_employee_ranking_helper import (
+        LIBRETA_ABONOS_HEADERS,
+        LIBRETA_RANKING_HEADERS,
     )
     toolbar = QHBoxLayout()
     window.settings_employee_ranking_period_combo.clear()
@@ -1237,10 +1242,8 @@ def build_employee_ranking_dialog(window: "MainWindow") -> QDialog:
 
     window.settings_employee_ranking_status_label.setObjectName("analyticsLine")
 
-    window.settings_employee_ranking_table.setColumnCount(6)
-    window.settings_employee_ranking_table.setHorizontalHeaderLabels(
-        ["#", "Empleada", "Tickets", "Piezas", "Monto", "Ultima venta"]
-    )
+    window.settings_employee_ranking_table.setColumnCount(len(LIBRETA_RANKING_HEADERS))
+    window.settings_employee_ranking_table.setHorizontalHeaderLabels(list(LIBRETA_RANKING_HEADERS))
     window.settings_employee_ranking_table.setObjectName("dataTable")
     window.settings_employee_ranking_table.verticalHeader().setVisible(False)
     window.settings_employee_ranking_table.setSelectionBehavior(
@@ -1253,16 +1256,32 @@ def build_employee_ranking_dialog(window: "MainWindow") -> QDialog:
     window.settings_employee_ranking_table.setMinimumHeight(280)
     header = window.settings_employee_ranking_table.horizontalHeader()
     from PyQt6.QtWidgets import QHeaderView
-    header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-    header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-    header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-    header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-    header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-    header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+    for col in range(len(LIBRETA_RANKING_HEADERS)):
+        header.setSectionResizeMode(
+            col, QHeaderView.ResizeMode.Stretch if col == 1 else QHeaderView.ResizeMode.ResizeToContents
+        )
+
+    abonos = window.settings_employee_ranking_abonos_table
+    abonos.setColumnCount(len(LIBRETA_ABONOS_HEADERS))
+    abonos.setHorizontalHeaderLabels(list(LIBRETA_ABONOS_HEADERS))
+    abonos.setObjectName("dataTable")
+    abonos.verticalHeader().setVisible(False)
+    abonos.setEditTriggers(abonos.EditTrigger.NoEditTriggers)
+    abonos.setAlternatingRowColors(True)
+    abonos.setMinimumHeight(120)
+    abonos_header = abonos.horizontalHeader()
+    for col in range(len(LIBRETA_ABONOS_HEADERS)):
+        abonos_header.setSectionResizeMode(
+            col, QHeaderView.ResizeMode.Stretch if col == 0 else QHeaderView.ResizeMode.ResizeToContents
+        )
 
     layout.addLayout(toolbar)
     layout.addWidget(window.settings_employee_ranking_status_label)
     layout.addWidget(window.settings_employee_ranking_table, 1)
+    abonos_label = QLabel("Abonos cobrados (aparte: no son ventas nuevas)")
+    abonos_label.setObjectName("analyticsLine")
+    layout.addWidget(abonos_label)
+    layout.addWidget(abonos)
     footer = QHBoxLayout()
     footer.addStretch()
     close_btn = QPushButton("Cerrar")

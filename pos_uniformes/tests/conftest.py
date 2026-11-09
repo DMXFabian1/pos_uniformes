@@ -378,6 +378,121 @@ def _vigilante_sin_memoria_de_esta_maquina(tmp_path):
         yield
 
 
+#: Archivos de la máquina que las pruebas NO deben tocar (auditoría C1,
+#: 2026-11-08: una corrida completa reescribía `data/` real del repo, incluido
+#: el estado del bot). (módulo, función que devuelve la ruta).
+_RUTAS_DE_LA_MAQUINA = (
+    # respaldo de operaciones cobradas sin anotar y cola de la Libreta
+    ("pos_uniformes.services.libreta_sin_anotar_service", "carpeta"),
+    ("pos_uniformes.services.libreta_local_queue_service", "_queue_path"),
+    ("pos_uniformes.services.libreta_local_queue_service", "_cortes_path"),
+    # cachés del kiosko (los escriben hilos de fondo de las ventanas)
+    ("pos_uniformes.services.catalog_local_cache_service", "_cache_path"),
+    ("pos_uniformes.services.school_links_cache_service", "_links_cache_path"),
+    ("pos_uniformes.services.anuncio_local_cache_service", "_dir"),
+    ("pos_uniformes.services.business_info_cache_service", "_cache_path"),
+    # estado del bot y log de errores del satélite
+    ("pos_uniformes.services.bot_conexion_service", "ruta_estado"),
+    ("pos_uniformes.utils.satellite_excepthook", "_log_path"),
+    ("pos_uniformes.services.temporada_service", "ruta_bitacora"),
+)
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _datos_de_la_maquina_fuera_del_alcance(tmp_path_factory):
+    """Ninguna prueba escribe en `pos_uniformes/data` ni `pos_uniformes/logs`
+    del repo (ahí viven el estado real del bot, los cachés y los respaldos de
+    esta máquina).
+
+    Cada función de ruta se envuelve: si la ruta que devuelve cae DENTRO de
+    esas carpetas, se desvía a una carpeta temporal de la sesión; si no (la
+    prueba ya desvió `satellite_data_dir` a su propia carpeta), se respeta.
+    Así quien prueba un caché con su carpeta temporal sigue igual.
+
+    Es de SESIÓN y no por prueba porque varios de esos archivos los escriben
+    hilos de fondo que terminan cuando la prueba que los lanzó ya acabó.
+    Solo existe en pytest: el kiosko y el POS no cargan conftest."""
+    import importlib
+    from unittest.mock import patch
+
+    raiz = Path(__file__).resolve().parents[1]
+    protegidas = [(raiz / "data").resolve(), (raiz / "logs").resolve()]
+    destino_base = tmp_path_factory.mktemp("datos_de_la_maquina")
+
+    def envolver(funcion):
+        def ruta(*args, **kwargs):
+            destino = Path(funcion(*args, **kwargs))
+            for carpeta in protegidas:
+                try:
+                    relativa = destino.resolve().relative_to(carpeta)
+                except ValueError:
+                    continue
+                return destino_base / carpeta.name / relativa
+            return destino
+
+        ruta.__wrapped__ = funcion
+        return ruta
+
+    parches = []
+    for nombre_modulo, atributo in _RUTAS_DE_LA_MAQUINA:
+        modulo = importlib.import_module(nombre_modulo)
+        parches.append(patch.object(modulo, atributo, envolver(getattr(modulo, atributo))))
+    for p in parches:
+        p.start()
+    # A propósito NO se retiran al terminar la sesión: al salir el proceso de
+    # pruebas, temporizadores e hilos de ventanas que sobrevivieron siguen
+    # corriendo un momento y escribían el índice de anuncios y la bitácora
+    # de temporada en el repo. El desvío dura hasta que el proceso muere.
+    yield destino_base
+
+
+#: Estado de la Libreta que NO se comparte entre pruebas: un respaldo
+#: «cobrado sin anotar» que deja una prueba lo recuperaría la ventana de la
+#: siguiente (y al cerrarla preguntaría por él).
+_RUTAS_POR_PRUEBA = (
+    ("pos_uniformes.services.libreta_sin_anotar_service", "carpeta"),
+    ("pos_uniformes.services.libreta_local_queue_service", "_queue_path"),
+    ("pos_uniformes.services.libreta_local_queue_service", "_cortes_path"),
+)
+
+
+@pytest.fixture(autouse=True)
+def _libreta_de_cada_prueba(tmp_path, _datos_de_la_maquina_fuera_del_alcance):
+    """Encima del desvío de sesión: la cola y los respaldos de la Libreta que
+    caerían en el repo van a la carpeta temporal de ESTA prueba."""
+    import importlib
+    from unittest.mock import patch
+
+    raiz = Path(__file__).resolve().parents[1]
+    datos = (raiz / "data").resolve()
+
+    def envolver(actual):
+        original = getattr(actual, "__wrapped__", actual)
+
+        def ruta(*args, **kwargs):
+            destino = Path(original(*args, **kwargs))
+            try:
+                relativa = destino.resolve().relative_to(datos)
+            except ValueError:
+                return destino
+            return tmp_path / "libreta_aislada" / relativa
+
+        ruta.__wrapped__ = original
+        return ruta
+
+    parches = [
+        patch.object(m, a, envolver(getattr(m, a)))
+        for m, a in ((importlib.import_module(n), a) for n, a in _RUTAS_POR_PRUEBA)
+    ]
+    for p in parches:
+        p.start()
+    try:
+        yield
+    finally:
+        for p in reversed(parches):
+            p.stop()
+
+
 @pytest.fixture(autouse=True)
 def _temporada_sin_ajuste_de_esta_maquina(tmp_path):
     """Los tests ven el calendario, no lo que esta máquina tenga configurado.

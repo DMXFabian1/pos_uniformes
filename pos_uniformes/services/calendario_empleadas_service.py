@@ -609,6 +609,87 @@ def registrar_pago(session, employee_code: str, fecha: date) -> None:
     session.commit()
 
 
+def bloquear_empleadas(session, employee_codes) -> None:
+    """Candado por empleada para lo que mueve sus comisiones: pagar, deshacer
+    o mover un pago, y reasignar una venta (auditoría 2026-11-08, D4).
+
+    Sin él, una reasignación y un pago al mismo tiempo podían ver cada uno el
+    estado de antes del otro: el pago incluía la venta y la reasignación se
+    la pasaba a otra, que la volvía a cobrar. Con el candado, el segundo
+    espera a que el primero termine y ve lo que dejó.
+
+    Es de TRANSACCIÓN (`pg_advisory_xact_lock`): se suelta solo con el commit
+    o el rollback, aunque el programa se caiga. Se toma siempre en orden
+    alfabético de código, así dos operaciones que tocan a las mismas dos
+    empleadas no pueden esperarse en cruz. Fuera de PostgreSQL (las pruebas
+    con SQLite) no hay candado.
+
+    Después del candado, lo que la sesión ya tenía en memoria de esas
+    empleadas se vuelve a leer de la base (M3): lo que se calcule ya con el
+    candado tomado parte del estado actual, no del de antes de esperar."""
+    from sqlalchemy import text
+
+    codes = sorted({str(c or "").strip().upper() for c in employee_codes if str(c or "").strip()})
+    if not codes:
+        return
+    try:
+        dialecto = session.get_bind().dialect.name
+    except Exception:  # noqa: BLE001 — sesión simulada en pruebas
+        return
+    if dialecto == "postgresql":
+        for code in codes:
+            session.execute(text("SELECT pg_advisory_xact_lock(hashtext(:llave))"), {"llave": f"comisiones:{code}"})
+    _olvidar_lo_leido_antes_del_candado(session, codes)
+
+
+def _olvidar_lo_leido_antes_del_candado(session, codes: list[str]) -> None:
+    """Lo que la sesión ya traía en memoria de estas empleadas se vuelve a
+    leer de la base en su siguiente uso (auditoría 2026-11-08, M3).
+
+    La sesión no expira nada al hacer commit (`expire_on_commit=False`) y
+    `session.get` devuelve el objeto que ya tiene sin consultar. Así, el
+    `/pagar` de Telegram — que calcula el pendiente ANTES de pagar — seguía
+    usando el horario y los pagos de antes de esperar el candado, aunque otro
+    proceso hubiera deshecho o movido un pago mientras tanto.
+
+    Solo se expiran objetos de ESTAS empleadas (horario, pagos, eventos,
+    ventas de la Libreta, préstamos, su ficha) y nunca uno con cambios sin
+    guardar: eso tiraría trabajo de la transacción en curso. No es un
+    `expire_all()`."""
+    try:
+        objetos = list(session.identity_map.values())
+        con_cambios = set(session.new) | set(session.dirty) | set(session.deleted)
+    except Exception:  # noqa: BLE001 — sesión simulada en pruebas
+        return
+    from sqlalchemy import inspect as _inspect
+
+    buscadas = set(codes)
+    for obj in objetos:
+        if obj in con_cambios:
+            continue
+        # Se lee lo que el objeto YA tiene cargado, sin ir a la base: un
+        # objeto expirado (o borrado por otro proceso) no se toca.
+        cargado = _inspect(obj).dict
+        code = cargado.get("employee_code")
+        if code is None and type(obj).__name__ == "Empleada":
+            code = cargado.get("codigo")
+        if code is not None and str(code).strip().upper() in buscadas:
+            session.expire(obj)
+
+
+def corte_vigente(session, employee_code: str):
+    """Desde qué momento cuentan hoy las comisiones de la empleada: lo
+    anterior ya entró en un pago. None si nunca ha cobrado (todo cuenta).
+
+    Es la MISMA regla que usa el pendiente (`comisiones_desde_ultimo_pago`),
+    para que pagar y reasignar no puedan opinar distinto."""
+    code = str(employee_code or "").strip().upper()
+    horario = cargar_horario(session, code)
+    if horario.fecha_ultimo_pago is None:
+        return None
+    return _corte_de_comisiones(session, code, horario)
+
+
 def comisiones_desde_ultimo_pago(session, employee_code: str, horario: HorarioEmpleada) -> int:
     """Comisiones acumuladas en la Libreta desde el último pago (para el
     banner "Comisiones desde tu último pago").

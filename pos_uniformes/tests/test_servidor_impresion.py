@@ -11,6 +11,7 @@ donde está el riesgo. La impresión en sí ya tiene sus tests en los handlers.
 from __future__ import annotations
 
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from pos_uniformes.scripts import servidor_impresion as srv
@@ -74,10 +75,21 @@ class DesdeElExeDelSateliteTests(unittest.TestCase):
 
         from pos_uniformes import presupuestos_satelite_main as sat
 
+        import logging
+        import tempfile
+
         viejo = _sys.argv
         _sys.argv = argv
+        # El modo servidor abre `logs/servidor_impresion.log` con basicConfig:
+        # que caiga en una carpeta temporal y no deje ese handler colgado en
+        # la raíz del proceso de pruebas (auditoría C1, 2026-11-08).
+        raiz = logging.getLogger()
+        handlers_antes = list(raiz.handlers)
+        carpeta = tempfile.TemporaryDirectory()
+        self.addCleanup(carpeta.cleanup)
         try:
-            with patch.object(sat, "install_satellite_excepthook"), \
+            with patch("pos_uniformes.utils.config.satellite_data_dir", return_value=Path(carpeta.name)), \
+                 patch.object(sat, "install_satellite_excepthook"), \
                  patch.object(sat, "QApplication", return_value=object()), \
                  patch.object(sat, "bootstrap_schema"), \
                  patch("pos_uniformes.ui.helpers.servidor_impresion_runner.correr",
@@ -89,6 +101,10 @@ class DesdeElExeDelSateliteTests(unittest.TestCase):
                 return sat.main(), correr
         finally:
             _sys.argv = viejo
+            for h in list(raiz.handlers):
+                if h not in handlers_antes:
+                    raiz.removeHandler(h)
+                    h.close()
 
     def test_la_bandera_despacha_sin_abrir_el_kiosko(self) -> None:
         salida, correr = self._main(["app.exe", "--servidor-impresion"])
