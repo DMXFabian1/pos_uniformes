@@ -21,6 +21,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtWidgets import QApplication, QInputDialog
 
 HOY = datetime.now().date()
+D = Decimal
 
 
 def _fila(i: int, *, tarjeta: bool = False, nombre: str = "Stayce Chavarria", code: str = "VEND-4"):
@@ -154,6 +155,19 @@ class LibretaDelDuenoTests(unittest.TestCase):
         self.assertIn("Venta de", texto)
         self.assertIn("3 piezas", texto)
         self.assertIn("$657.00", texto)
+
+    def test_con_tarjeta_llega_sin_contar_el_monedero(self) -> None:
+        """WALLET-002: venta de $500 = $100 saldo + $400 tarjeta (llegan $382),
+        más una de $657 en efectivo. Antes salía $282 y "cobrado $500"."""
+        win = self._ventana()
+        mixta = _fila(2, tarjeta=True)
+        mixta.monto_total, mixta.monto_monedero, mixta.monto_neto = D("500.00"), D("100.00"), D("382.00")
+        with patch.object(win, "_llenar_libreta_cards") as cards:
+            win._pintar_libreta([_fila(1), mixta])
+        tarjeta = cards.call_args.args[0][1]
+        self.assertEqual(tarjeta[1], "$382")
+        self.assertIn("cobrado $400", tarjeta[2])
+        self.assertEqual(cards.call_args.args[0][0][1], "$657")   # el cajón no cambia
 
     # ── pestañas ─────────────────────────────────────────────────────────
     def test_afluencia_tiene_su_pestana_aunque_no_haya_datos(self) -> None:

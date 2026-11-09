@@ -1169,16 +1169,14 @@ class QuickSaleWidget(MonederoVentaMixin, QWidget):
             _subtotal, _descuento, total = self._compute_totals()
             total = Decimal(str(total)).quantize(Decimal("0.01"))
             neto = self._monto_neto_actual(total, pago_tarjeta=pago_tarjeta)
-            # Reimprimir el mismo ticket no debe anotar la venta dos veces.
-            key = (
-                tipo,
-                cliente,
-                str(total),
-                tuple((it["sku"], int(it["cantidad"])) for it in self._items),
-            )
-            if key == getattr(self, "_last_libreta_key", None):
+            # Un carrito vacío no es una venta. NO se compara contra la venta
+            # anterior: dos ventas iguales seguidas (mismo uniforme, otra
+            # clienta) son dos ventas. Lo que evita el doble registro es que
+            # el diálogo llama on_printed UNA vez y _registrar_y_vaciar vacía
+            # el carrito en el mismo acto; reimprimir desde la Libreta no
+            # pasa por aquí (sin on_printed).
+            if not self._items:
                 return
-            self._last_libreta_key = key
 
             origen: str | None = None
             try:
@@ -1258,6 +1256,7 @@ class QuickSaleWidget(MonederoVentaMixin, QWidget):
         # El cliente es de ESTA venta: la siguiente no hereda su monedero.
         self._cliente = None
         self._usar_saldo = False
+        self._monedero_op = None
         self._refresh_items_table()
         self._refresh_totals()
 

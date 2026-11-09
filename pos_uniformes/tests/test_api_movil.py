@@ -197,6 +197,22 @@ class ApiMovilTests(unittest.TestCase):
         self.assertEqual(hoy["comisiones"], 5)
         self.assertEqual(hoy["ventas"], 2)
 
+    def test_neto_tarjeta_con_monedero(self) -> None:
+        """WALLET-002: lo pagado con saldo no es efectivo. Venta de $500 con
+        $100 de saldo y $400 con tarjeta: la terminal deja $382 (4.5%)."""
+        s = self.session
+        s.add(LibretaVenta(
+            employee_code="VEND-4", employee_name="Fanny", tipo="venta",
+            piezas=1, comisiones=1, monto_total=Decimal("500.00"),
+            monto_monedero=Decimal("100.00"), monto_neto=Decimal("382.00"),
+            pago_tarjeta=True, detalle=[], created_at=datetime.now(),
+        ))
+        s.commit()
+        self._como("VEND-1")
+        hoy = self.client.get("/api/v1/movil/inicio").json()["dueno"]["hoy"]
+        self.assertEqual(hoy["tarjeta"], "400.00")
+        self.assertEqual(hoy["neto_tarjeta"], "382.00")
+
     def test_calendario_navegable(self) -> None:
         self._como("VEND-4")
         data = self.client.get("/api/v1/movil/calendario?year=2026&month=10").json()

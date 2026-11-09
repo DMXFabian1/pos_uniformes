@@ -208,14 +208,13 @@ def _payload_dueno(db: Session) -> dict:
     en_caja = sum((c.monto_en_caja for c in cortes_hoy), Decimal("0.00"))
     neto = sum((c.monto_neto_ventas for c in cortes_hoy), Decimal("0.00"))
     abonos = sum((c.monto_abonos for c in cortes_hoy), Decimal("0.00"))
-    ventas = sum((c.monto_ventas for c in cortes_hoy), Decimal("0.00"))
     from pos_uniformes.services.libreta_service import pagos_de
 
-    # Con monedero, por la terminal pasó solo el resto (no el total).
-    tarjeta = sum(
-        (pagos_de(r).tarjeta for r in rows if str(r.tipo) == "venta"),
-        Decimal("0.00"),
-    )
+    # Con monedero, por la terminal pasó solo el resto (no el total), y lo
+    # pagado con saldo no es efectivo ni tarjeta.
+    ventas_rows = [r for r in rows if str(r.tipo) == "venta"]
+    tarjeta = sum((pagos_de(r).tarjeta for r in ventas_rows), Decimal("0.00"))
+    efectivo = sum((pagos_de(r).efectivo for r in ventas_rows), Decimal("0.00"))
     comisiones = sum(int(getattr(r, "comisiones", 0) or 0) for r in rows)
     ventas_count = sum(1 for r in rows if str(r.tipo) == "venta")
 
@@ -223,7 +222,8 @@ def _payload_dueno(db: Session) -> dict:
         "hoy": {
             "en_caja": str(en_caja),
             "tarjeta": str(tarjeta),
-            "neto_tarjeta": str(neto - (ventas - tarjeta)),
+            # Neto de ventas = efectivo + tarjeta neta (el monedero no suma).
+            "neto_tarjeta": str(neto - efectivo),
             "abonos": str(abonos),
             "comisiones": comisiones,
             "ventas": ventas_count,

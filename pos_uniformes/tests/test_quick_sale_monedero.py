@@ -121,7 +121,7 @@ class CanjeTest(_Base):
              patch.object(w, "_ask_venta_options", return_value=(False, False, False)), \
              patch("pos_uniformes.database.connection.get_session", self._session_ctx(session)), \
              patch("pos_uniformes.services.libreta_service.registrar_venta_con_monedero",
-                   return_value=(MagicMock(), MagicMock(), cashback)) as reg, \
+                   return_value=(SimpleNamespace(monto_monedero=D("37.00")), MagicMock(), cashback)) as reg, \
              patch("pos_uniformes.services.monedero_service.resumen_cliente",
                    return_value=SimpleNamespace(disponible=D("21.07"))), \
              patch("pos_uniformes.ui.helpers.ticket_routing_helper.route_tickets") as route, \
@@ -169,6 +169,130 @@ class CanjeTest(_Base):
             w._on_ticket_venta()
         reg.assert_not_called()
         self.assertEqual(len(w._items), 1)
+
+
+class ConfirmacionInciertaTest(_Base):
+    """WALLET-001: si la red se cae mientras se confirma, la base pudo haber
+    guardado. Reintentar NO debe descontar el saldo otra vez."""
+
+    def _session_ctx(self, session):
+        @contextmanager
+        def _cm():
+            yield session
+        return _cm
+
+    def _cobrar(self, w, session, **reg_kw):
+        with patch.object(w, "_load_business_info", return_value=("MAXIMODA", "", "")), \
+             patch.object(w, "_ask_venta_options", return_value=(False, False, False)), \
+             patch("pos_uniformes.database.connection.get_session", self._session_ctx(session)), \
+             patch("pos_uniformes.services.libreta_service.registrar_venta_con_monedero", **reg_kw) as reg, \
+             patch("pos_uniformes.services.monedero_service.resumen_cliente",
+                   return_value=SimpleNamespace(disponible=D("0.42"))), \
+             patch.object(helper.QMessageBox, "warning") as aviso, \
+             patch("pos_uniformes.ui.helpers.ticket_routing_helper.route_tickets") as route:
+            w._on_ticket_venta()
+        return reg, aviso, route
+
+    def _venta_ok(self):
+        return (SimpleNamespace(monto_monedero=D("37.00")), MagicMock(), SimpleNamespace(monto=D("20.65")))
+
+    def test_corte_al_confirmar_avisa_y_el_reintento_usa_la_misma_identidad(self):
+        w = self._widget()
+        w._cliente = _cliente()
+        w._usar_saldo = True
+        caida = MagicMock()
+        caida.commit.side_effect = OperationalError("commit", {}, Exception("down"))
+        reg1, aviso, route = self._cobrar(w, caida, return_value=self._venta_ok())
+        route.assert_not_called()
+        self.assertIn("puede que SÍ haya quedado registrada", aviso.call_args.args[2])
+        self.assertEqual(len(w._items), 1)           # el carrito queda para reintentar
+        op1 = reg1.call_args.kwargs["operacion_uuid"]
+
+        # Vuelve la red y se cobra otra vez, mismo carrito.
+        reg2, _aviso, route2 = self._cobrar(w, MagicMock(), return_value=self._venta_ok())
+        self.assertEqual(reg2.call_args.kwargs["operacion_uuid"], op1)
+        route2.assert_called_once()
+        self.assertEqual(w._items, [])
+
+    def test_la_siguiente_venta_igual_es_otra_operacion(self):
+        w = self._widget()
+        w._cliente = _cliente()
+        w._usar_saldo = True
+        reg1, _a, _r = self._cobrar(w, MagicMock(), return_value=self._venta_ok())
+        w._items = _items()
+        w._cliente = _cliente()
+        w._usar_saldo = True
+        reg2, _a, _r = self._cobrar(w, MagicMock(), return_value=self._venta_ok())
+        self.assertNotEqual(reg1.call_args.kwargs["operacion_uuid"], reg2.call_args.kwargs["operacion_uuid"])
+
+    def test_cambiar_el_carrito_es_otra_operacion(self):
+        w = self._widget()
+        w._cliente = _cliente()
+        w._usar_saldo = True
+        caida = MagicMock()
+        caida.commit.side_effect = OperationalError("commit", {}, Exception("down"))
+        reg1, _a, _r = self._cobrar(w, caida, return_value=self._venta_ok())
+        w._items.append({"sku": "SKU2", "nombre": "Playera", "talla": "8", "color": "",
+                         "precio": D("150.00"), "cantidad": 1})
+        reg2, _a, _r = self._cobrar(w, MagicMock(), return_value=self._venta_ok())
+        self.assertNotEqual(reg1.call_args.kwargs["operacion_uuid"], reg2.call_args.kwargs["operacion_uuid"])
+
+    def test_si_falla_leer_el_saldo_la_venta_igual_se_imprime(self):
+        w = self._widget()
+        w._cliente = _cliente()
+        w._usar_saldo = True
+        with patch.object(w, "_load_business_info", return_value=("MAXIMODA", "", "")), \
+             patch.object(w, "_ask_venta_options", return_value=(False, False, False)), \
+             patch("pos_uniformes.database.connection.get_session", self._session_ctx(MagicMock())), \
+             patch("pos_uniformes.services.libreta_service.registrar_venta_con_monedero",
+                   return_value=self._venta_ok()), \
+             patch("pos_uniformes.services.monedero_service.resumen_cliente",
+                   side_effect=OperationalError("saldo", {}, Exception("down"))), \
+             patch.object(helper.QMessageBox, "warning") as aviso, \
+             patch("pos_uniformes.ui.helpers.ticket_routing_helper.route_tickets") as route:
+            w._on_ticket_venta()
+        aviso.assert_not_called()
+        route.assert_called_once()
+        ticket = route.call_args.args[2][0]
+        self.assertIn("Pagado con monedero", ticket)
+        self.assertNotIn("Saldo en monedero", ticket)
+        self.assertEqual(w._items, [])
+
+    def test_el_ticket_dice_lo_que_cobro_la_base(self):
+        """En un reintento la base devuelve el canje del primer intento."""
+        w = self._widget()
+        w._cliente = _cliente(disponible=D("50.00"))
+        w._usar_saldo = True
+        reg, _a, route = self._cobrar(
+            w, MagicMock(),
+            return_value=(SimpleNamespace(monto_monedero=D("37.00")), MagicMock(), None),
+        )
+        ticket = route.call_args.args[2][0]
+        self.assertIn("-$37.00", ticket)
+        self.assertIn("$413.00", ticket)
+
+
+class VentasIgualesSeguidasTest(_Base):
+    """WALLET-003: dos ventas iguales seguidas son dos ventas."""
+
+    def test_dos_ventas_iguales_se_anotan_las_dos(self):
+        w = self._widget(online=False)
+        with patch("pos_uniformes.services.libreta_local_queue_service.encolar_operacion") as enc, \
+             patch.object(w, "_drenar_libreta_en_background"):
+            w._registrar_y_vaciar("venta")
+            w._items = _items()
+            w._registrar_y_vaciar("venta")
+        self.assertEqual(enc.call_count, 2)
+        uuids = {c.args[0]["operacion_uuid"] for c in enc.call_args_list}
+        self.assertEqual(len(uuids), 2)
+
+    def test_carrito_vacio_no_se_anota(self):
+        w = self._widget(online=False)
+        w._items = []
+        with patch("pos_uniformes.services.libreta_local_queue_service.encolar_operacion") as enc, \
+             patch.object(w, "_drenar_libreta_en_background"):
+            w._registrar_en_libreta("venta")
+        enc.assert_not_called()
 
 
 class TicketTest(unittest.TestCase):

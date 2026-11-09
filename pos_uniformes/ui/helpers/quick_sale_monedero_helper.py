@@ -62,6 +62,13 @@ def lineas_ticket_monedero(info: dict, tk_row) -> list[str]:
     return lineas
 
 
+MENSAJE_CONFIRMACION_INCIERTA = (
+    "Se perdió la conexión mientras se confirmaba la venta: puede que SÍ haya quedado registrada.\n\n"
+    "No cobres de otra forma todavía. Cuando vuelva la conexión, cobra otra vez con saldo "
+    "SIN cambiar el carrito: si ya quedó registrada se imprime sin descontar el saldo dos veces."
+)
+
+
 def _es_error_de_red(exc: BaseException) -> bool:
     from sqlalchemy import exc as sa_exc
 
@@ -361,6 +368,21 @@ class MonederoVentaMixin:
              "cantidad": int(it["cantidad"]), "precio": str(it["precio"])}
             for it in self._items
         ]
+        # Identidad de ESTA venta: la misma en cada reintento del mismo cobro.
+        # Si la red se cae mientras se confirma, no se sabe si la base alcanzó
+        # a guardar; al reintentar con la misma identidad la base devuelve la
+        # venta ya registrada en vez de cobrar el saldo otra vez.
+        huella = (
+            # Sin el monto de saldo: si se reescanea el QR tras un corte, el
+            # saldo leído ya trae descontado el canje anterior y cambiaría.
+            int(c["id"]), str(total), bool(tarjeta), bool(self._discount_active),
+            tuple((it["sku"], it["cantidad"], it["precio"]) for it in items),
+        )
+        previa = getattr(self, "_monedero_op", None)
+        if previa is None or previa[0] != huella:
+            self._monedero_op = (huella, str(_uuid.uuid4()))
+        operacion_uuid = self._monedero_op[1]
+        confirmando = False
         try:
             with get_session() as session:
                 try:
@@ -372,19 +394,32 @@ class MonederoVentaMixin:
                         monto_total=total,
                         monto_monedero=canje,
                         cliente_id=int(c["id"]),
-                        operacion_uuid=str(_uuid.uuid4()),
+                        operacion_uuid=operacion_uuid,
                         pago_tarjeta=bool(tarjeta),
                         descuento_empleada=bool(self._discount_active),
                         origen=origen,
                     )
+                    cashback_monto = Decimal(cashback.monto) if cashback is not None else _CERO
+                    # Lo que la base cobró de verdad (en un reintento es lo
+                    # del primer intento, no lo que hoy calcula la pantalla).
+                    canje = Decimal(str(_venta.monto_monedero or 0)).quantize(Decimal("0.01"))
+                    confirmando = True
                     session.commit()
                 except Exception:
                     session.rollback()
                     raise
-                saldo = mon.resumen_cliente(session, int(c["id"])).disponible
-                cashback_monto = Decimal(cashback.monto) if cashback is not None else _CERO
+                # Ya quedó registrada: nada de aquí en adelante la deshace.
+                self._monedero_op = None
+                try:
+                    saldo = mon.resumen_cliente(session, int(c["id"])).disponible
+                except Exception:  # noqa: BLE001 — solo es el saldo impreso
+                    _logger.exception("Monedero: venta registrada, no se pudo leer el saldo")
+                    saldo = None
         except Exception as exc:  # noqa: BLE001
-            if _es_error_de_red(exc):
+            if confirmando and _es_error_de_red(exc):
+                self._avisar_sin_conexion()
+                QMessageBox.warning(self, "Monedero", MENSAJE_CONFIRMACION_INCIERTA)
+            elif _es_error_de_red(exc):
                 self._avisar_sin_conexion()
                 QMessageBox.warning(self, "Monedero", mon.MENSAJE_SIN_CONEXION)
             elif isinstance(exc, (mon.MonederoError, PermissionError)):

@@ -4448,6 +4448,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self._libreta_last_pintura = (list(rows), ranking_rows)
         from pos_uniformes.services.libreta_service import (
             describir_detalle,
+            pagos_de,
             resumir_por_dia,
             resumir_por_empleada,
         )
@@ -4469,15 +4470,11 @@ class QuoteSatelliteWindow(QMainWindow):
             total_en_caja = sum((c.monto_en_caja for c in cortes), Decimal("0.00"))
             total_neto = sum((c.monto_neto_ventas for c in cortes), Decimal("0.00"))
             total_abonos = sum((c.monto_abonos for c in cortes), Decimal("0.00"))
-            total_ventas = sum((c.monto_ventas for c in cortes), Decimal("0.00"))
-            total_tarjeta = sum(
-                (
-                    Decimal(str(r.monto_total or 0))
-                    for r in rows
-                    if str(r.tipo) == "venta" and bool(getattr(r, "pago_tarjeta", False))
-                ),
-                Decimal("0.00"),
-            )
+            # Con monedero, por la terminal pasó solo el resto (no el total), y
+            # lo pagado con saldo no es efectivo ni tarjeta.
+            ventas_rows = [r for r in rows if str(r.tipo) == "venta"]
+            total_tarjeta = sum((pagos_de(r).tarjeta for r in ventas_rows), Decimal("0.00"))
+            total_efectivo = sum((pagos_de(r).efectivo for r in ventas_rows), Decimal("0.00"))
             # Principio de Daniel (2026-09-06): la Libreta habla de dinero
             # REAL, sin falsas expectativas. Nada de "vendido en total" (el
             # valor de un apartado no es dinero recibido). Solo:
@@ -4485,7 +4482,9 @@ class QuoteSatelliteWindow(QMainWindow):
             #   · lo que llega por la terminal (tarjeta, ya neto del 4.5%),
             #   · los abonos (parte del cajón, se muestran para explicarlo),
             #   · las comisiones del equipo.
-            neto_tarjeta = total_neto - (total_ventas - total_tarjeta)
+            # El neto de ventas es efectivo + tarjeta ya neta (el monedero no
+            # suma): quitando el efectivo queda lo que deja la terminal.
+            neto_tarjeta = total_neto - total_efectivo
             # Si el dueño ajustó un corte del periodo, su cifra es la que vale
             # aquí también (Ctrl+Shift+R muestra la real).
             # Lo OFICIAL (lo que se presenta y se audita) lleva los ajustes del
