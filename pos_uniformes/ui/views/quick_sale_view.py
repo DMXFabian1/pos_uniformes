@@ -1504,11 +1504,20 @@ class QuickSaleWidget(MonederoVentaMixin, QWidget):
         employee_name: str,
         descuento_empleada: bool,
         created_at,
+        monto_total=None,
+        monto_monedero=None,
+        pago_tarjeta: bool = False,
     ) -> str | None:
         """Reconstruye el ticket de una operación YA registrada en la Libreta
         (para reimprimir si la impresora falló). No registra nada ni toca el
         carrito: presta el estado, arma el texto y lo devuelve todo como
-        estaba. Abonos no tienen ticket → None."""
+        estaba. Abonos no tienen ticket → None.
+
+        Una venta pagada en parte (o toda) con monedero lleva lo que se usó
+        de saldo y el resto por cobrar con su método, tal como quedó
+        guardado: sin eso el papel dice solo "TOTAL A PAGAR" y se cobraría
+        el total otra vez. Es un dato histórico: NO se consulta el saldo de
+        hoy ni el cashback. Sin monedero el ticket es el de siempre."""
         if tipo not in ("venta", "apartado"):
             return None
         items = [
@@ -1535,7 +1544,19 @@ class QuickSaleWidget(MonederoVentaMixin, QWidget):
             self._discount_active = bool(descuento_empleada)
             self._employee_name = employee_name or self._employee_name
             if tipo == "venta":
-                return self._build_venta_text(fecha_str=fecha_str, reimpresion=True)
+                canje = Decimal(str(monto_monedero or 0)).quantize(Decimal("0.01"))
+                monedero = None
+                if canje > 0:
+                    _s, _d, total_items = self._compute_totals()
+                    total = Decimal(str(monto_total if monto_total is not None else total_items))
+                    monedero = {
+                        "canje": canje,
+                        "por_cobrar": max(total.quantize(Decimal("0.01")) - canje, Decimal("0.00")),
+                        "metodo": "Tarjeta" if pago_tarjeta else "Efectivo",
+                    }
+                return self._build_venta_text(
+                    fecha_str=fecha_str, reimpresion=True, monedero=monedero
+                )
             return self._build_apartado_text(
                 cliente or "", copy_label="CLIENTE", fecha_str=fecha_str, reimpresion=True
             )

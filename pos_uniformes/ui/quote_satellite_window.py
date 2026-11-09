@@ -4225,6 +4225,10 @@ class QuoteSatelliteWindow(QMainWindow):
             employee_name=_nombre_de(row.employee_name or row.employee_code),
             descuento_empleada=bool(getattr(row, "descuento_empleada", False)),
             created_at=row.created_at,
+            # Lo pagado con saldo y el resto, como quedó guardado.
+            monto_total=getattr(row, "monto_total", None),
+            monto_monedero=getattr(row, "monto_monedero", None),
+            pago_tarjeta=bool(getattr(row, "pago_tarjeta", False)),
         )
         if not texto:
             QMessageBox.information(

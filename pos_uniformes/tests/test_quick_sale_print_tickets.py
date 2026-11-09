@@ -448,6 +448,48 @@ class ReimpresionTicketTests(unittest.TestCase):
         self.assertEqual(w._items, _items())
         self.assertEqual(w._employee_name, "Daniel")
 
+    # ── WALLET-006: la reimpresión dice lo que se pagó con monedero ──────
+    _DETALLE_450 = [{"sku": "SKU1", "nombre": "Pants", "talla": "6", "cantidad": 1, "precio": "450.00"}]
+
+    def _reimprimir(self, w, **kw):
+        from datetime import datetime
+
+        with patch.object(w, "_load_business_info", return_value=("MAXIMODA", "", "")):
+            return w.build_reprint_ticket(
+                tipo="venta", detalle=self._DETALLE_450, cliente=None, employee_name="Fanny",
+                descuento_empleada=False, created_at=datetime(2026, 11, 8, 12, 0), **kw,
+            )
+
+    def test_historica_sin_monedero_queda_identica(self) -> None:
+        w = self._widget()
+        antes = self._reimprimir(w)                                   # como se llamaba antes
+        despues = self._reimprimir(w, monto_total=Decimal("450.00"), monto_monedero=Decimal("0.00"),
+                                   pago_tarjeta=True)
+        self.assertEqual(antes, despues)
+        self.assertNotIn("monedero", despues.lower())
+
+    def test_monedero_parcial_con_efectivo(self) -> None:
+        w = self._widget()
+        texto = self._reimprimir(w, monto_total=Decimal("450.00"), monto_monedero=Decimal("37.00"))
+        self.assertIn(tk_row("Pagado con monedero:", "-$37.00"), texto)
+        self.assertIn(tk_row("Efectivo:", "$413.00"), texto)
+        self.assertNotIn("Saldo en monedero", texto)   # no se consulta el saldo de hoy
+        self.assertNotIn("Cashback", texto)            # fuera de esta fase
+        self.assertEqual(w._items, _items())           # el carrito sigue intacto
+
+    def test_monedero_parcial_con_tarjeta(self) -> None:
+        w = self._widget()
+        texto = self._reimprimir(w, monto_total=Decimal("450.00"), monto_monedero=Decimal("37.00"),
+                                 pago_tarjeta=True)
+        self.assertIn(tk_row("Tarjeta:", "$413.00"), texto)
+        self.assertNotIn("Efectivo:", texto)
+
+    def test_todo_con_monedero_no_queda_nada_por_cobrar(self) -> None:
+        w = self._widget()
+        texto = self._reimprimir(w, monto_total=Decimal("450.00"), monto_monedero=Decimal("450.00"))
+        self.assertIn(tk_row("Pagado con monedero:", "-$450.00"), texto)
+        self.assertIn(tk_row("Efectivo:", "$0.00"), texto)
+
     def test_apartado_reimpreso_y_abono_sin_ticket(self) -> None:
         from datetime import datetime
 

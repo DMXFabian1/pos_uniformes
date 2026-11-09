@@ -1560,6 +1560,25 @@ class ReimprimirDesdeLibretaTests(unittest.TestCase):
         self.assertEqual(ruta.call_args.args[2], ["TEXTO DEL TICKET"])
         self.assertNotIn("on_printed", ruta.call_args.kwargs)  # jamás re-registra
 
+    def test_pasa_lo_pagado_con_monedero(self) -> None:
+        """WALLET-006: el ticket se arma con lo que quedó guardado."""
+        from datetime import datetime
+
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        row = SimpleNamespace(
+            tipo="venta", detalle=[{"sku": "S"}], cliente=None, employee_name="Fanny",
+            employee_code="VEND-4", descuento_empleada=False, created_at=datetime(2026, 11, 8, 12, 0),
+            monto_total=Decimal("450.00"), monto_monedero=Decimal("37.00"), pago_tarjeta=True,
+        )
+        fake = self._fake(row)
+        with patch("pos_uniformes.ui.helpers.ticket_routing_helper.route_tickets"):
+            QuoteSatelliteWindow._reimprimir_row_libreta(fake, row)
+        kw = fake.quick_sale_widget.build_reprint_ticket.call_args.kwargs
+        self.assertEqual(kw["monto_total"], Decimal("450.00"))
+        self.assertEqual(kw["monto_monedero"], Decimal("37.00"))
+        self.assertTrue(kw["pago_tarjeta"])
+
     def test_empleada_no_puede_reimprimir_desde_movimientos(self) -> None:
         from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
 

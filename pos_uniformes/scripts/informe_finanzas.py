@@ -35,66 +35,113 @@ def _sub(texto: str) -> list[str]:
     return ["", texto, "-" * len(texto)]
 
 
-def _entradas(session, desde: datetime) -> list[str]:
-    """Lo que entro, separado por donde cayo el dinero."""
+def _dinero(lv):
+    """(cobrado, recibido) de cada renglon de la Libreta, como expresiones SQL.
+
+    - Venta: lo cobrado con dinero (sin lo pagado con monedero, que es saldo
+      de clientes) y su neto (ya sin la comision de terminal).
+    - Abono: dinero que si entro (anticipo, abonos y liquidacion).
+    - Apartado: CERO. Su valor no es dinero recibido; su dinero entra por
+      los abonos. Contarlo seria contar el apartado y luego sus abonos.
+    """
+    from sqlalchemy import case
+
+    es_apartado = lv.tipo == "apartado"
+    cobrado = case((es_apartado, 0), else_=lv.monto_total - lv.monto_monedero)
+    recibido = case((es_apartado, 0), else_=lv.monto_neto)
+    return cobrado, recibido
+
+
+def _entradas(session, desde: datetime, *, solo_empleada: str | None = None) -> list[str]:
+    """Lo que entro, separado por donde cayo el dinero.
+
+    `solo_empleada` limita todo a un codigo (lo usan las pruebas para no
+    depender de lo demas que haya en la base)."""
     from sqlalchemy import func, literal_column, select
 
     from pos_uniformes.database import models as m
 
     lv = m.LibretaVenta
+    cobrado, recibido = _dinero(lv)
+    filtro = [lv.created_at >= desde]
+    if solo_empleada:
+        filtro.append(lv.employee_code == solo_empleada)
+    no_apartado = lv.tipo != "apartado"
     lineas = _titulo("lo que entro")
 
     fila = session.execute(
         select(
-            func.coalesce(func.sum(lv.monto_total), 0),
-            func.coalesce(func.sum(lv.monto_neto), 0),
+            func.coalesce(func.sum(cobrado), 0),
+            func.coalesce(func.sum(recibido), 0),
             func.count(),
             func.coalesce(func.sum(lv.piezas), 0),
-        ).where(lv.created_at >= desde)
+        ).where(*filtro, no_apartado)
     ).one()
     total, neto, operaciones, piezas = fila
+    monedero, ops_monedero = session.execute(
+        select(func.coalesce(func.sum(lv.monto_monedero), 0), func.count()).where(
+            *filtro, lv.monto_monedero > 0
+        )
+    ).one()
+    valor_apartados, ops_apartados = session.execute(
+        select(func.coalesce(func.sum(lv.monto_total), 0), func.count()).where(
+            *filtro, lv.tipo == "apartado"
+        )
+    ).one()
     lineas.append(f"Operaciones cobradas : {operaciones:,} ({piezas:,} piezas)")
     lineas.append(f"Cobrado              : {_pesos(total)}")
     lineas.append(f"Recibido de verdad   : {_pesos(neto)}")
     if total and total != neto:
         lineas.append(f"Se quedo la terminal : {_pesos(total - neto)}")
+    if monedero:
+        lineas.append(
+            f"Pagado con monedero  : {_pesos(monedero)} (saldo de clientes, no es dinero)"
+        )
+    if ops_apartados:
+        lineas.append(
+            f"Apartados hechos     : {ops_apartados:,} por {_pesos(valor_apartados)}"
+            " (no es dinero: entra por sus abonos)"
+        )
 
     lineas += _sub("por donde entro")
     for etiqueta, condicion in (
         ("Efectivo", lv.pago_tarjeta.is_(False)),
         ("Tarjeta", lv.pago_tarjeta.is_(True)),
     ):
-        # Lo pagado con monedero no entró por efectivo ni tarjeta.
+        # Lo pagado con monedero no entro por efectivo ni tarjeta: una venta
+        # pagada toda con saldo no cuenta aqui.
         t, n, c = session.execute(
             select(
-                func.coalesce(func.sum(lv.monto_total - lv.monto_monedero), 0),
-                func.coalesce(func.sum(lv.monto_neto), 0),
+                func.coalesce(func.sum(cobrado), 0),
+                func.coalesce(func.sum(recibido), 0),
                 func.count(),
-            ).where(lv.created_at >= desde, condicion)
+            ).where(*filtro, no_apartado, condicion, lv.monto_total > lv.monto_monedero)
         ).one()
         parte = f" ({t / total * 100:.0f}%)" if total else ""
         lineas.append(f"{etiqueta:<9} {_pesos(t):>14}{parte:<7} neto {_pesos(n):>14}  {c:,} ops")
-    m, c = session.execute(
-        select(func.coalesce(func.sum(lv.monto_monedero), 0), func.count()).where(
-            lv.created_at >= desde, lv.monto_monedero > 0
+    if monedero:
+        lineas.append(
+            f"{'Monedero':<9} {_pesos(monedero):>14}{'':<7} (saldo de clientes, no es dinero)  {ops_monedero:,} ops"
         )
-    ).one()
-    if m:
-        lineas.append(f"{'Monedero':<9} {_pesos(m):>14}{'':<7} (saldo de clientes, no es dinero)  {c:,} ops")
 
     lineas += _sub("por tipo de operacion")
     for tipo, t, n, c in session.execute(
         select(
             lv.tipo,
-            func.coalesce(func.sum(lv.monto_total), 0),
-            func.coalesce(func.sum(lv.monto_neto), 0),
+            func.coalesce(func.sum(cobrado), 0),
+            func.coalesce(func.sum(recibido), 0),
             func.count(),
         )
-        .where(lv.created_at >= desde)
+        .where(*filtro, no_apartado)
         .group_by(lv.tipo)
-        .order_by(func.sum(lv.monto_total).desc())
+        .order_by(func.sum(cobrado).desc())
     ):
         lineas.append(f"{(tipo or '?'):<9} {_pesos(t):>14}        neto {_pesos(n):>14}  {c:,} ops")
+    if ops_apartados:
+        lineas.append(
+            f"{'apartado':<9} {'-':>14}        valor {_pesos(valor_apartados):>13}  {ops_apartados:,} ops"
+            "  (no es dinero)"
+        )
 
     lineas += _sub("mes por mes")
     # Una sola expresion reusada en select/group_by/order_by. Construirla
@@ -105,12 +152,14 @@ def _entradas(session, desde: datetime) -> list[str]:
     for mes, t, n, c, p in session.execute(
         select(
             mes_col,
-            func.coalesce(func.sum(lv.monto_total), 0),
-            func.coalesce(func.sum(lv.monto_neto), 0),
+            func.coalesce(func.sum(cobrado), 0),
+            func.coalesce(func.sum(recibido), 0),
             func.count(),
             func.coalesce(func.sum(lv.piezas), 0),
         )
-        .where(lv.created_at >= desde)
+        # Ops y piezas de todo (el apartado tambien mueve piezas); su dinero
+        # ya vale cero en _dinero.
+        .where(*filtro)
         .group_by(mes_col)
         .order_by(mes_col)
     ):
@@ -119,17 +168,19 @@ def _entradas(session, desde: datetime) -> list[str]:
         )
 
     lineas += _sub("quien cobro")
+    # Las comisiones son de todas sus operaciones (apartados incluidos); el
+    # dinero, solo el que de verdad cobro.
     for codigo, nombre, t, c, com in session.execute(
         select(
             lv.employee_code,
             func.max(lv.employee_name),
-            func.coalesce(func.sum(lv.monto_total), 0),
+            func.coalesce(func.sum(cobrado), 0),
             func.count(),
             func.coalesce(func.sum(lv.comisiones), 0),
         )
-        .where(lv.created_at >= desde)
+        .where(*filtro)
         .group_by(lv.employee_code)
-        .order_by(func.sum(lv.monto_total).desc())
+        .order_by(func.sum(cobrado).desc())
     ):
         parte = f"{t / total * 100:5.1f}%" if total else "    - "
         lineas.append(
@@ -360,10 +411,11 @@ def construir(session, dias: int) -> str:
 
     from sqlalchemy import func as f2
 
+    # Lo mismo que "Recibido de verdad": sin monedero y sin el valor de los
+    # apartados (su dinero ya esta en los abonos).
+    _cobrado, recibido = _dinero(m.LibretaVenta)
     neto = session.execute(
-        select(f2.coalesce(f2.sum(m.LibretaVenta.monto_neto), 0)).where(
-            m.LibretaVenta.created_at >= desde
-        )
+        select(f2.coalesce(f2.sum(recibido), 0)).where(m.LibretaVenta.created_at >= desde)
     ).scalar_one()
 
     resumen = _titulo("en una linea")
