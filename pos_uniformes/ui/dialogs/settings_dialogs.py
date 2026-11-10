@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from pos_uniformes.services.respaldo_estado_service import HORA_RESPALDO
 from pos_uniformes.ui.helpers.date_field_helper import configure_friendly_date_edit
 
 if TYPE_CHECKING:
@@ -1005,7 +1006,7 @@ def build_backup_settings_dialog(window: "MainWindow") -> QDialog:
 
     backup_hint = QLabel(
         "El respaldo automatico ya esta programado: la tarea \"POS Respaldo\" corre todos los dias "
-        "a las 20:30 en esta PC. Aqui arriba dice como va; si lleva dias sin respaldo correcto, "
+        f"a las {HORA_RESPALDO} en esta PC. Aqui arriba dice como va; si lleva dias sin respaldo correcto, "
         "corre scripts\\actualizar_pc_principal.bat (vuelve a dejar la tarea) o scripts\\revisar_respaldos.bat "
         "para ver por que. Abajo puedes hacer uno a mano cuando quieras, revisar la carpeta y restaurar un .dump."
     )

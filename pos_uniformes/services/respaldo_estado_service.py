@@ -26,9 +26,16 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+#: A qué hora corre la tarea «POS Respaldo». Era a las 20:30 y nunca corrió:
+#: la PC principal se apaga entre las 16:24 y las 18:08 (eventos de Windows
+#: del 24/10 al 08/11/2026). A las 13:00 la tienda está abierta y la PC
+#: prendida; un pg_dump de ~2 MB tarda segundos y no frena las ventas.
+#: Una sola fuente: la usan la tarea (postactualizacion) y los textos.
+HORA_RESPALDO = "13:00"
+
 #: Arriba de esto el respaldo ya es viejo y se avisa. El respaldo sale a las
-#: 20:30 y el aviso se revisa desde las 10:00: 36 horas cubren una noche
-#: normal (13.5 h) y delatan la primera noche que falló (37.5 h). Con dos
+#: 13:00 y el aviso se revisa desde las 10:00: 36 horas cubren un día
+#: normal (21 h) y delatan el primer día que falló (45 h). Con dos
 #: días pasaban ~38 h entre la falla y el aviso, con dos días de trabajo
 #: expuestos (2026-10-10). El lunes se dan 60 h, por el domingo cerrado.
 HORAS_PARA_AVISAR = 36

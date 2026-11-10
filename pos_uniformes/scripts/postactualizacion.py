@@ -35,6 +35,11 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from pos_uniformes.services.respaldo_estado_service import HORA_RESPALDO
+
+#: Después del respaldo, para que el respaldo se lleve la base de antes.
+HORA_MONEDEROS = "13:15"
+
 # Súbela cuando cambien las tareas de abajo: es lo que dispara el trabajo.
 #   1 = vigías cada 5 min (2026-09-09)
 #   2 = supervisor único oculto + diarias por correr_oculto.vbs (2026-09-10)
@@ -48,7 +53,10 @@ from pathlib import Path
 #       el runner estaba escrito y nadie lo disparaba (2026-10-01)
 #   8 = "POS Monederos" diaria a las 21:00: vencimientos del monedero de
 #       clientes y cashback que no se acreditó (2026-11-08)
-INFRA_VERSION = 8
+#   9 = "POS Respaldo" a las 13:00 y "POS Monederos" a las 13:15. A las 20:30
+#       y 21:00 la PC ya estaba apagada (se apaga entre 16:24 y 18:08): el
+#       respaldo automático no corrió ni una vez en semanas (2026-11-09)
+INFRA_VERSION = 9
 
 # Tareas que ya no van (las crearon versiones anteriores).
 TAREAS_OBSOLETAS = (
@@ -80,7 +88,7 @@ class Tarea:
 
 #: La actualización de noche. Es OPCIONAL y viene apagada: se enciende desde el
 #: celular con «/actualizar noche» (2026-11-06). A las 19:30: ya cerró la tienda
-#: y se hizo el corte (18:50), y el respaldo de las 20:30 se lleva la base nueva.
+#: y se hizo el corte (18:50). (El respaldo ya no corre de noche: es a las 13:00.)
 TAREA_ACTUALIZAR = Tarea("POS Actualizar", ("/SC", "DAILY", "/ST", "19:30"), "actualizar_desatendida.bat")
 
 
@@ -98,10 +106,11 @@ def tareas_esperadas(*, hay_telegram: bool, resumen_a_hora_fija: bool, snapshot_
         # siempre y NADA lo corría — no había tarea ni instalador. Va aquí, con
         # el supervisor, porque no depende de que Telegram o el corte existan:
         # es lo último que debería faltar en una PC con la base.
-        Tarea("POS Respaldo", ("/SC", "DAILY", "/ST", "20:30"), "respaldo_diario.bat", ("--callado",)),
+        # A media jornada (2026-11-09): a las 20:30 la PC ya estaba apagada.
+        Tarea("POS Respaldo", ("/SC", "DAILY", "/ST", HORA_RESPALDO), "respaldo_diario.bat", ("--callado",)),
         # Monedero de clientes (2026-11-08): asienta lo vencido y repone
-        # cashback faltante. Idempotente; después del respaldo de las 20:30.
-        Tarea("POS Monederos", ("/SC", "DAILY", "/ST", "21:00"), "vencer_monederos.bat"),
+        # cashback faltante. Idempotente; después del respaldo.
+        Tarea("POS Monederos", ("/SC", "DAILY", "/ST", HORA_MONEDEROS), "vencer_monederos.bat"),
     ]
     if actualizar_de_noche:
         # Solo se conserva si Daniel ya la encendió: nunca se crea sola.

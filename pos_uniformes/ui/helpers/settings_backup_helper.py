@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from pos_uniformes.services.respaldo_estado_service import HORA_RESPALDO
 from pos_uniformes.utils.date_format import format_display_datetime
 
 
@@ -42,7 +43,7 @@ def build_settings_backup_automatic_status_view(
     if automatic_status is None:
         return (
             "Automatico: todavia no ha corrido ninguno.",
-            "La tarea \"POS Respaldo\" corre a las 20:30; si ya paso esa hora y sigue asi, "
+            f"La tarea \"POS Respaldo\" corre a las {HORA_RESPALDO}; si ya paso esa hora y sigue asi, "
             "corre scripts\\actualizar_pc_principal.bat para volver a dejarla instalada.",
         )
 

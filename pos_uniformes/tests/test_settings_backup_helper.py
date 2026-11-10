@@ -118,6 +118,6 @@ class NoMandarAProgramarLoQueYaEstaProgramadoTests(unittest.TestCase):
         self.assertNotIn("run_scheduled_backup", detalle)
         self.assertNotIn("Programa", detalle)
         self.assertIn("POS Respaldo", detalle)
-        self.assertIn("20:30", detalle)
+        self.assertIn("13:00", detalle)
         self.assertIn("actualizar_pc_principal", detalle)
         self.assertIn("no ha corrido", resumen)
