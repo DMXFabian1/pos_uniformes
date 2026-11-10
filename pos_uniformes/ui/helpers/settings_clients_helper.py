@@ -78,3 +78,69 @@ def _loyalty_level_tone(loyalty_level: str) -> str:
         "PROFESOR": "positive",
         "MAYORISTA": "warning",
     }.get(loyalty_level, "muted")
+
+
+# -- E1-C3: lista del ADMIN sobre el modelo nuevo -------------------------------
+# Sin columnas de Nivel ni Desc. (D5). La columna 1 conserva el id del cliente
+# para la seleccion, como antes.
+
+CLIENTES_ADMIN_COLUMNAS = (
+    "Codigo",
+    "Cliente",
+    "Tipo",
+    "Telefono",
+    "Origen",
+    "Alta",
+    "QR",
+    "Credencial",
+    "Estado",
+    "Notas",
+)
+COLUMNA_QR = 6
+COLUMNA_CREDENCIAL = 7
+COLUMNA_ESTADO = 8
+
+
+@dataclass(frozen=True)
+class ClienteAdminRowView:
+    client_id: int
+    client_code: str
+    values: tuple[str, ...]
+    qr_tone: str
+    card_tone: str
+    status_tone: str
+
+
+@dataclass(frozen=True)
+class ClientesAdminView:
+    status_label: str
+    rows: tuple[ClienteAdminRowView, ...]
+
+
+def build_clientes_admin_view(clients: list[dict[str, object]], *, estado_label: str = "") -> ClientesAdminView:
+    sufijo = f" ({estado_label.lower()})" if estado_label else ""
+    return ClientesAdminView(
+        status_label=f"Clientes{sufijo}: {len(clients)}",
+        rows=tuple(
+            ClienteAdminRowView(
+                client_id=int(c["id"]),
+                client_code=str(c["code"]),
+                values=(
+                    str(c["code"]),
+                    str(c["name"]),
+                    str(c["tipo"] or "Sin tipo"),
+                    str(c["phone"]),
+                    str(c["origen"]),
+                    str(c["alta"]),
+                    str(c["qr_label"]),
+                    str(c["card_label"]),
+                    str(c["status_label"]),
+                    str(c["notes"]),
+                ),
+                qr_tone="positive" if str(c["qr_label"]) == "Listo" else "warning",
+                card_tone="positive" if str(c["card_label"]) == "Lista" else "muted",
+                status_tone="positive" if str(c["status_label"]) == "ACTIVO" else "muted",
+            )
+            for c in clients
+        ),
+    )

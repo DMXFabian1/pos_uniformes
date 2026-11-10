@@ -28,6 +28,7 @@ from PyQt6.QtWidgets import (
 
 from pos_uniformes.services.respaldo_estado_service import HORA_RESPALDO
 from pos_uniformes.ui.helpers.date_field_helper import configure_friendly_date_edit
+from pos_uniformes.ui.helpers.settings_clients_helper import CLIENTES_ADMIN_COLUMNAS
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
@@ -166,7 +167,9 @@ def build_clients_settings_dialog(window: "MainWindow") -> QDialog:
     )
     window.settings_clients_status_label.setObjectName("analyticsLine")
     actions = QHBoxLayout()
-    window.settings_clients_search_input.setPlaceholderText("Buscar por codigo, nombre, telefono, tipo, nivel o notas")
+    window.settings_clients_search_input.setPlaceholderText("Codigo, nombre o telefono")
+    window.settings_clients_search_input.setMinimumWidth(220)
+    window.settings_view_client_button.setObjectName("toolbarSecondaryButton")
     window.settings_create_client_button.setObjectName("toolbarPrimaryButton")
     window.settings_update_client_button.setObjectName("toolbarSecondaryButton")
     window.settings_toggle_client_button.setObjectName("toolbarGhostButton")
@@ -176,6 +179,13 @@ def build_clients_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_clients_search_input.textChanged.connect(
         lambda _text: window.settings_clients_debounce_timer.start()
     )
+    for _combo in (
+        window.settings_clients_estado_combo,
+        window.settings_clients_tipo_combo,
+        window.settings_clients_origen_combo,
+    ):
+        _combo.currentIndexChanged.connect(lambda _i: window._refresh_settings_clients())
+    window.settings_view_client_button.clicked.connect(window._handle_view_client_ficha)
     window.settings_create_client_button.clicked.connect(window._handle_create_client)
     window.settings_update_client_button.clicked.connect(window._handle_update_client)
     window.settings_toggle_client_button.clicked.connect(window._handle_toggle_client)
@@ -183,16 +193,23 @@ def build_clients_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_client_whatsapp_button.clicked.connect(window._handle_open_client_whatsapp)
     actions.addWidget(QLabel("Buscar"))
     actions.addWidget(window.settings_clients_search_input, 1)
+    filtros = QHBoxLayout()
+    filtros.addWidget(QLabel("Estado"))
+    filtros.addWidget(window.settings_clients_estado_combo)
+    filtros.addWidget(QLabel("Tipo"))
+    filtros.addWidget(window.settings_clients_tipo_combo)
+    filtros.addWidget(QLabel("Origen"))
+    filtros.addWidget(window.settings_clients_origen_combo)
+    filtros.addStretch()
+    actions.addWidget(window.settings_view_client_button)
     actions.addWidget(window.settings_create_client_button)
     actions.addWidget(window.settings_update_client_button)
     actions.addWidget(window.settings_toggle_client_button)
     actions.addWidget(window.settings_generate_client_qr_button)
     actions.addWidget(window.settings_client_whatsapp_button)
 
-    window.settings_clients_table.setColumnCount(11)
-    window.settings_clients_table.setHorizontalHeaderLabels(
-        ["Codigo", "Cliente", "Tipo", "Nivel", "Desc.", "Telefono", "Notas", "QR", "Credencial", "Estado", "Actualizado"]
-    )
+    window.settings_clients_table.setColumnCount(len(CLIENTES_ADMIN_COLUMNAS))
+    window.settings_clients_table.setHorizontalHeaderLabels(list(CLIENTES_ADMIN_COLUMNAS))
     window.settings_clients_table.setObjectName("dataTable")
     window.settings_clients_table.verticalHeader().setVisible(False)
     window.settings_clients_table.setSelectionBehavior(window.settings_clients_table.SelectionBehavior.SelectRows)
@@ -202,6 +219,7 @@ def build_clients_settings_dialog(window: "MainWindow") -> QDialog:
 
     layout.addWidget(window.settings_clients_status_label)
     layout.addLayout(actions)
+    layout.addLayout(filtros)
     layout.addWidget(window.settings_clients_table)
     footer = QHBoxLayout()
     footer.addStretch()
@@ -959,7 +977,9 @@ def build_marketing_settings_dialog(window: "MainWindow") -> QDialog:
 
     actions = QHBoxLayout()
     actions.addWidget(window.settings_marketing_history_button)
-    actions.addWidget(window.settings_marketing_recalculate_button)
+    # E1-A (D6): «Recalcular niveles» ya no se agrega al diálogo. El botón y
+    # su manejador siguen existiendo sin cambios; solo deja de ofrecerse.
+    window.settings_marketing_recalculate_button.setVisible(False)
     actions.addWidget(window.settings_marketing_save_button)
     actions.addStretch()
 

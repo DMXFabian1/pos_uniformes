@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
@@ -12,6 +13,8 @@ from sqlalchemy.orm import Session
 from pos_uniformes.database.connection import get_session
 from pos_uniformes.database.models import Cliente, EstadoVenta, NivelLealtad, RolUsuario, TipoCliente, Usuario, Venta
 from pos_uniformes.services.business_settings_service import BusinessSettingsService
+
+_logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -173,6 +176,19 @@ class LoyaltyService:
     ) -> Cliente | None:
         if client is None:
             return None
+        # E1-B (R4, opción A): un cliente SIN nivel se omite a propósito. No se
+        # recalcula ni se toca su nivel, su descuento ni sus metadatos de
+        # asignación; asignarle nivel es una acción explícita del ADMIN. Solo
+        # aplica a `None` exacto: cualquier otro valor sigue el camino de
+        # siempre, y los errores reales (p. ej. un objeto sin nivel_lealtad)
+        # siguen saliendo como excepción.
+        if client.nivel_lealtad is None:
+            _logger.info(
+                "Recalculo de nivel omitido: cliente %s sin nivel (motivo=%s).",
+                getattr(client, "codigo_cliente", None) or getattr(client, "id", None),
+                reason,
+            )
+            return client
         normalized_level = cls.evaluate_auto_level(session, client, reference_time=reference_time)
         cls.assign_level(
             client,

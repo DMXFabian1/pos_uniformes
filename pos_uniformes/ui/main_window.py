@@ -10,6 +10,7 @@ from pathlib import Path
 import subprocess
 import sys
 from time import monotonic
+from types import SimpleNamespace
 import unicodedata
 from urllib.parse import quote
 from uuid import uuid4
@@ -157,7 +158,12 @@ from pos_uniformes.services.catalog_mutation_service import (
     toggle_catalog_variant_state,
 )
 from pos_uniformes.services.compra_service import CompraItemInput, CompraService
-from pos_uniformes.services.customer_card_service import CustomerCardRenderInput, CustomerCardService
+from pos_uniformes.services.customer_card_service import (
+    COLOR_ESTANDAR_PRIMARIO,
+    COLOR_ESTANDAR_SECUNDARIO,
+    CustomerCardRenderInput,
+    CustomerCardService,
+)
 from pos_uniformes.services.employee_card_service import EmployeeCardService
 from pos_uniformes.services.history_snapshot_service import (
     HistorySnapshotFilters,
@@ -254,13 +260,19 @@ from pos_uniformes.services.settings_backup_action_service import (
     open_settings_backup_folder,
     restore_settings_backup,
 )
-from pos_uniformes.services.settings_client_action_service import (
-    create_settings_client,
-    generate_settings_client_qr,
-    load_settings_client_prompt_snapshot,
-    toggle_settings_client,
-    update_settings_client,
+from pos_uniformes.services.settings_client_action_service import generate_settings_client_qr
+from pos_uniformes.services.settings_cliente_admin_actions import (
+    alternar_estado,
+    cargar_ficha,
+    crear_cliente,
+    editar_cliente,
+    tipos_para_combo,
 )
+from pos_uniformes.services.clientes.identidad_service import CoincidenciasPorConfirmarError
+from pos_uniformes.ui.dialogs.cliente_admin_dialogs import prompt_cliente_ficha, prompt_motivo
+from pos_uniformes.ui.dialogs.cliente_ficha_dialog import ORIGEN_ETIQUETAS, construir_ficha_dialog, etiqueta_origen
+from pos_uniformes.services.clientes import admin_service
+from pos_uniformes.services.clientes.ficha_service import cargar_ficha as cargar_ficha_cliente
 from pos_uniformes.services.settings_marketing_action_service import (
     load_settings_marketing_history_rows,
     recalculate_settings_loyalty_levels,
@@ -310,7 +322,6 @@ from pos_uniformes.ui.dialogs.settings_dialogs import (
     build_users_settings_dialog,
 )
 from pos_uniformes.ui.dialogs.settings_prompt_dialogs import (
-    prompt_client_data,
     prompt_employee_data,
     prompt_employee_pin,
     prompt_client_whatsapp_data,
@@ -577,6 +588,11 @@ from pos_uniformes.ui.helpers.settings_cash_history_summary_helper import (
     build_settings_cash_history_status_label,
 )
 from pos_uniformes.ui.helpers.settings_clients_helper import (
+    CLIENTES_ADMIN_COLUMNAS,
+    COLUMNA_CREDENCIAL,
+    COLUMNA_ESTADO,
+    COLUMNA_QR,
+    build_clientes_admin_view,
     build_settings_clients_error_view,
     build_settings_clients_view,
 )
@@ -639,6 +655,7 @@ from pos_uniformes.services.nombres_empleadas_service import nombres_por_codigo
 # Se ocultan, NO se borran: fueron la base del sistema, sus datos siguen
 # intactos y el código completo sigue en el repositorio. Para volver a ver
 # alguna, quitar su nombre de esta tupla.
+
 PESTANAS_MUDADAS_AL_KIOSKO = ("Caja", "Presupuestos", "Apartados", "Catálogo")
 
 
@@ -1700,6 +1717,22 @@ class MainWindow(QMainWindow):
         self.settings_clients_table = QTableWidget()
         self.settings_clients_status_label = QLabel("Sin clientes cargados.")
         self.settings_clients_search_input = QLineEdit()
+        # E1-C3: filtros de la lista y ficha de solo lectura.
+        self.settings_clients_estado_combo = QComboBox()
+        for _etiqueta, _estado in (
+            ("Activos", admin_service.ESTADO_ACTIVOS),
+            ("Inactivos", admin_service.ESTADO_INACTIVOS),
+            ("Archivados", admin_service.ESTADO_ARCHIVADOS),
+            ("Todos", admin_service.ESTADO_TODOS),
+        ):
+            self.settings_clients_estado_combo.addItem(_etiqueta, _estado)
+        self.settings_clients_tipo_combo = QComboBox()
+        self.settings_clients_tipo_combo.addItem("Todos los tipos", None)
+        self.settings_clients_origen_combo = QComboBox()
+        self.settings_clients_origen_combo.addItem("Todos los origenes", None)
+        for _origen, _etiqueta in ORIGEN_ETIQUETAS.items():
+            self.settings_clients_origen_combo.addItem(_etiqueta, _origen or admin_service.ORIGEN_ANTERIOR)
+        self.settings_view_client_button = QPushButton("Ver ficha")
         self.settings_create_client_button = QPushButton("Crear cliente")
         self.settings_update_client_button = QPushButton("Editar cliente")
         self.settings_toggle_client_button = QPushButton("Activar / desactivar")
@@ -3162,11 +3195,12 @@ class MainWindow(QMainWindow):
             logo_path=logo_path,
             full_name="Daniel Fabian",
             customer_since=datetime.now(),
-            loyalty_level="PROFESOR",
-            level_label="Profesor",
-            primary_color="#1F3A44",
-            secondary_color="#D7E3E7",
+            loyalty_level="",
+            level_label="",
+            primary_color=COLOR_ESTANDAR_PRIMARIO,
+            secondary_color=COLOR_ESTANDAR_SECUNDARIO,
             qr_path=str(sample_qr),
+            client_code="CLI-000123",
         )
         output_path = CustomerCardService.demo_output_path()
         try:
@@ -3325,39 +3359,57 @@ class MainWindow(QMainWindow):
         self.settings_suppliers_status_label.setText(suppliers_view.status_label)
 
     def _refresh_settings_clients(self, *, session=None) -> None:
+        """E1-C3: lista del ADMIN con filtros de estado, tipo y origen.
+
+        Sin columnas de Nivel ni Desc. (D5)."""
         search_text = self.settings_clients_search_input.text().strip()
+        estado = self.settings_clients_estado_combo.currentData() or admin_service.ESTADO_ACTIVOS
+        tipo_clave = self.settings_clients_tipo_combo.currentData() or None
+        origen = self.settings_clients_origen_combo.currentData() or None
+
+        def _cargar(s):
+            if self.settings_clients_tipo_combo.count() <= 1:
+                for clave, nombre in tipos_para_combo(s):
+                    self.settings_clients_tipo_combo.addItem(nombre, clave)
+            return admin_service.listar_para_admin(
+                s, self.user_id, texto=search_text, estado=estado, tipo_clave=tipo_clave, origen=origen
+            )
+
         try:
             if session is not None:
-                clients = ClientService.list_clients(session, search_text)
+                filas = _cargar(session)
             else:
                 with get_session() as s:
-                    clients = ClientService.list_clients(s, search_text)
+                    filas = _cargar(s)
         except Exception as exc:  # noqa: BLE001
             clients_view = build_settings_clients_error_view(str(exc))
             self.settings_clients_status_label.setText(clients_view.status_label)
             self.settings_clients_table.setRowCount(len(clients_view.rows))
             return
-        clients_view = build_settings_clients_view(
+        clients_view = build_clientes_admin_view(
             [
                 {
-                    "id": int(client.id),
-                    "code": client.codigo_cliente,
-                    "name": client.nombre,
-                    "client_type": client.tipo_cliente.value,
-                    "loyalty_level": client.nivel_lealtad.value,
-                    "discount_label": f"{Decimal(client.descuento_preferente).quantize(Decimal('0.01'))}%",
-                    "has_discount": Decimal(client.descuento_preferente) > Decimal("0.00"),
-                    "phone": client.telefono or "",
-                    "notes": client.notas or "",
-                    "qr_label": "Listo" if QrGenerator.exists_for_client(client) else "Pendiente",
-                    "card_label": "Lista" if bool(client.card_image_path) and Path(str(client.card_image_path)).exists() else "Pendiente",
-                    "active": bool(client.activo),
-                    "active_label": "ACTIVO" if client.activo else "INACTIVO",
-                    "updated_label": format_display_datetime(client.updated_at),
+                    "id": fila.id,
+                    "code": fila.codigo,
+                    "name": fila.nombre,
+                    "tipo": fila.tipo,
+                    "phone": fila.telefono,
+                    "origen": etiqueta_origen(fila.origen),
+                    "alta": format_display_datetime(fila.alta),
+                    "qr_label": "Listo" if QrGenerator.exists_for_client(SimpleNamespace(codigo_cliente=fila.codigo)) else "Pendiente",
+                    "card_label": (
+                        "Lista" if CustomerCardService.exists_for_client(SimpleNamespace(codigo_cliente=fila.codigo)) else "Pendiente"
+                    ),
+                    "status_label": "ARCHIVADO" if fila.archivado else ("ACTIVO" if fila.activo else "INACTIVO"),
+                    "notes": fila.notas,
                 }
-                for client in clients
-            ]
+                for fila in filas
+            ],
+            estado_label=self.settings_clients_estado_combo.currentText(),
         )
+        if self.settings_clients_table.columnCount() != len(CLIENTES_ADMIN_COLUMNAS):
+            self.settings_clients_table.setColumnCount(len(CLIENTES_ADMIN_COLUMNAS))
+            self.settings_clients_table.setHorizontalHeaderLabels(list(CLIENTES_ADMIN_COLUMNAS))
         self.settings_clients_table.setRowCount(len(clients_view.rows))
         for row_index, client_row in enumerate(clients_view.rows):
             for column_index, value in enumerate(client_row.values):
@@ -3366,21 +3418,35 @@ class MainWindow(QMainWindow):
                     item.setData(Qt.ItemDataRole.UserRole + 1, client_row.client_code)
                 if column_index == 1:
                     item.setData(Qt.ItemDataRole.UserRole, client_row.client_id)
-                if column_index == 2:
-                    _set_table_badge_style(item, client_row.client_type_tone)
-                if column_index == 3:
-                    _set_table_badge_style(item, client_row.loyalty_level_tone)
-                if column_index == 4 and client_row.discount_tone is not None:
-                    _set_table_badge_style(item, client_row.discount_tone)
-                if column_index == 7:
+                if column_index == COLUMNA_QR:
                     _set_table_badge_style(item, client_row.qr_tone)
-                if column_index == 8:
+                if column_index == COLUMNA_CREDENCIAL:
                     _set_table_badge_style(item, client_row.card_tone)
-                if column_index == 9:
+                if column_index == COLUMNA_ESTADO:
                     _set_table_badge_style(item, client_row.status_tone)
                 self.settings_clients_table.setItem(row_index, column_index, item)
         self.settings_clients_table.resizeColumnsToContents()
+        encabezado = self.settings_clients_table.horizontalHeader()
+        encabezado.setStretchLastSection(False)  # re-estira Notas tras ajustar anchos
+        encabezado.setStretchLastSection(True)
         self.settings_clients_status_label.setText(clients_view.status_label)
+
+    def _handle_view_client_ficha(self) -> None:
+        """E1-C3: ficha de solo lectura del cliente seleccionado."""
+        client_id = self._selected_settings_client_id()
+        if self.current_role != RolUsuario.ADMIN:
+            QMessageBox.warning(self, "Sin permiso", "Solo ADMIN puede ver la ficha del cliente.")
+            return
+        if client_id is None:
+            QMessageBox.warning(self, "Sin seleccion", "Selecciona un cliente en la tabla.")
+            return
+        try:
+            with get_session() as session:
+                ficha = cargar_ficha_cliente(session, cliente_id=client_id, usuario_id=self.user_id)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "No se pudo abrir la ficha", str(exc))
+            return
+        construir_ficha_dialog(self, ficha).exec()
 
     def _refresh_settings_employees(self) -> None:
         search_text = self.settings_employees_search_input.text().strip()
@@ -4120,25 +4186,42 @@ class MainWindow(QMainWindow):
         if feedback is not None:
             QMessageBox.warning(self, feedback.title, feedback.message)
             return
-        data = prompt_client_data(
+        try:
+            with get_session() as session:
+                tipos = tipos_para_combo(session)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "No se pudo abrir", str(exc))
+            return
+        # E1-C1: la ficha pide identidad y tipo; no hay nivel ni descuento (D5).
+        data = prompt_cliente_ficha(
             self,
             title="Crear cliente",
-            helper_text="Captura los datos base del cliente para futuras ventas, apartados o programas de fidelizacion.",
+            helper_text="Captura nombre, telefono y tipo del cliente.",
+            tipos=tipos,
         )
         if data is None:
             return
-        try:
-            with get_session() as session:
-                result = create_settings_client(
-                    session,
-                    admin_user_id=self.user_id,
-                    payload=data,
-                    render_card=self._render_client_card_safe,
-                )
-                session.commit()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "No se pudo crear", str(exc))
-            return
+        confirmar = False
+        while True:
+            try:
+                with get_session() as session:
+                    result = crear_cliente(
+                        session,
+                        admin_user_id=self.user_id,
+                        datos=data,
+                        confirmar_telefono_compartido=confirmar,
+                        render_card=self._render_client_card_safe,
+                    )
+                    session.commit()
+            except CoincidenciasPorConfirmarError as exc:
+                if confirmar or not self._confirmar_telefono_compartido(exc.coincidencias):
+                    return
+                confirmar = True
+                continue
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.critical(self, "No se pudo crear", str(exc))
+                return
+            break
 
         self.refresh_all()
         result_feedback = build_settings_client_result_feedback(
@@ -4148,6 +4231,22 @@ class MainWindow(QMainWindow):
             asset_error=result.card_error,
         )
         QMessageBox.information(self, result_feedback.title, result_feedback.message)
+
+    def _confirmar_telefono_compartido(self, coincidencias) -> bool:
+        """E1-C1: un telefono repetido nunca se guarda en silencio."""
+        lineas = "\n".join(f"- {c.codigo} {c.nombre} ({c.telefono_enmascarado})" for c in coincidencias)
+        respuesta = QMessageBox.question(
+            self,
+            "Telefono ya registrado",
+            (
+                f"Ese telefono ya esta en {len(coincidencias)} ficha(s):\n{lineas}\n\n"
+                "Si es la misma persona, cancela y usa su ficha.\n"
+                "Si es otra persona que comparte el telefono, elige Si para guardarlo."
+            ),
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        return respuesta == QMessageBox.StandardButton.Yes
 
     def _handle_update_client(self) -> None:
         client_id = self._selected_settings_client_id()
@@ -4161,45 +4260,53 @@ class MainWindow(QMainWindow):
             return
         try:
             with get_session() as session:
-                prompt_snapshot = load_settings_client_prompt_snapshot(session, client_id=client_id)
-                data = prompt_client_data(
-                    self,
-                    title="Editar cliente",
-                    helper_text="Actualiza telefono, tipo comercial, descuento o notas del cliente.",
-                    current_values={
-                        "nombre": prompt_snapshot.name,
-                        "tipo_cliente": prompt_snapshot.client_type,
-                        "descuento_preferente": prompt_snapshot.discount_label,
-                        "telefono": prompt_snapshot.phone,
-                        "notas": prompt_snapshot.notes,
-                    },
-                )
+                actuales = cargar_ficha(session, client_id=client_id)
+                tipos = tipos_para_combo(session)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo abrir", str(exc))
             return
+        if actuales.get("archivado") == "1":
+            QMessageBox.warning(self, "Ficha archivada", "La ficha esta archivada y no se puede editar.")
+            return
+        # E1-C1: editar nunca toca nivel, descuento ni programas (C1).
+        data = prompt_cliente_ficha(
+            self,
+            title="Editar cliente",
+            helper_text="Actualiza nombre, telefono, tipo o notas del cliente.",
+            tipos=tipos,
+            current_values=actuales,
+        )
         if data is None:
             return
 
-        try:
-            with get_session() as session:
-                result = update_settings_client(
-                    session,
-                    admin_user_id=self.user_id,
-                    client_id=client_id,
-                    payload=data,
-                    render_card=self._render_client_card_safe,
-                )
-                session.commit()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "No se pudo actualizar", str(exc))
-            return
+        confirmar = False
+        while True:
+            try:
+                with get_session() as session:
+                    result = editar_cliente(
+                        session,
+                        admin_user_id=self.user_id,
+                        client_id=client_id,
+                        datos=data,
+                        confirmar_telefono_compartido=confirmar,
+                    )
+                    session.commit()
+            except CoincidenciasPorConfirmarError as exc:
+                if confirmar or not self._confirmar_telefono_compartido(exc.coincidencias):
+                    return
+                confirmar = True
+                continue
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.critical(self, "No se pudo actualizar", str(exc))
+                return
+            break
 
         self.refresh_all()
         result_feedback = build_settings_client_result_feedback(
             "update_client",
             client_name=result.client_name,
-            asset_path=str(result.card_path) if result.card_path is not None else None,
-            asset_error=result.card_error,
+            asset_path=None,
+            asset_error=None,
         )
         QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
@@ -4213,12 +4320,21 @@ class MainWindow(QMainWindow):
         if feedback is not None:
             QMessageBox.warning(self, feedback.title, feedback.message)
             return
+        # E1-C1: activar o desactivar pide un motivo y deja evento.
+        motivo = prompt_motivo(
+            self,
+            title="Cambiar estado del cliente",
+            helper_text="Escribe por que se activa o desactiva esta ficha. Queda en su historial.",
+        )
+        if motivo is None:
+            return
         try:
             with get_session() as session:
-                result = toggle_settings_client(
+                result = alternar_estado(
                     session,
                     admin_user_id=self.user_id,
                     client_id=client_id,
+                    motivo=motivo,
                 )
                 session.commit()
         except Exception as exc:  # noqa: BLE001
@@ -4536,29 +4652,29 @@ class MainWindow(QMainWindow):
         qr_path = QrGenerator.path_for_client(client)
         if not qr_path.exists():
             qr_path = QrGenerator.generate_for_client(client)
+        # E1-C2: sin tipo ni descuento; el mensaje solo lleva el codigo.
         qr_note = (
             f"Codigo de cliente: {client.codigo_cliente}\n"
-            f"Tipo: {client.tipo_cliente.value}\n"
-            f"Descuento registrado: {Decimal(client.descuento_preferente).quantize(Decimal('0.01'))}%\n"
             "Te comparto tu QR de cliente en la imagen adjunta."
         )
         return normalized_phone, qr_path, qr_note
 
     def _prepare_client_card_delivery(self, client: Cliente) -> tuple[str, Path, str]:
         normalized_phone, _qr_path, _qr_note = self._prepare_client_qr_delivery(client)
-        # Regenera la credencial para evitar reutilizar un PNG desactualizado
-        # cuando cambia la plantilla, el nivel o el logo del negocio.
-        card_path = CustomerCardService.render_and_attach(client)
+        # E1-C2: credencial estandar para todos, con o sin nivel viejo. Se
+        # regenera para no reutilizar un PNG desactualizado (plantilla o logo).
+        # `render_for_client` no escribe en la ficha (`card_image_path`).
+        card_path = CustomerCardService.render_for_client(client)
         card_note = (
             f"Codigo de cliente: {client.codigo_cliente}\n"
-            f"Nivel: {client.nivel_lealtad.value}\n"
             "Te comparto tu credencial de cliente en la imagen adjunta."
         )
         return normalized_phone, card_path, card_note
 
     def _render_client_card_safe(self, client: Cliente) -> tuple[Path | None, str | None]:
         try:
-            card_path = CustomerCardService.render_and_attach(client)
+            # E1-C2: credencial estandar, sin nivel; no escribe en la ficha.
+            card_path = CustomerCardService.render_for_client(client)
             return card_path, None
         except Exception as exc:  # noqa: BLE001
             return None, str(exc)

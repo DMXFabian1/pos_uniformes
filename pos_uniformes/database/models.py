@@ -357,13 +357,27 @@ class Cliente(Base):
         index=True,
     )
     descuento_preferente: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("0.00"), nullable=False)
-    nivel_lealtad: Mapped[NivelLealtad] = mapped_column(
+    # E1-A: el nivel histórico se conserva, pero una ficha puede no tener
+    # nivel (NULL = «Sin nivel»). No se asigna BASICO por omisión.
+    nivel_lealtad: Mapped[NivelLealtad | None] = mapped_column(
         SqlEnum(NivelLealtad, name="nivel_lealtad"),
-        default=NivelLealtad.BASICO,
-        nullable=False,
+        nullable=True,
         index=True,
     )
     telefono: Mapped[str | None] = mapped_column(String(40), index=True)
+    # E1-A: 10 dígitos derivados de `telefono` para detectar duplicados.
+    # No es único: un teléfono compartido es válido. `telefono` no se toca.
+    telefono_normalizado: Mapped[str | None] = mapped_column(String(10), index=True)
+    origen_alta: Mapped[str | None] = mapped_column(String(30))
+    # E1-C0: tipo del catálogo nuevo (GENERAL, DOCENTE, MAYORISTA, INSTITUCION).
+    # El enum `tipo_cliente` de arriba queda congelado como historial (etapa R).
+    tipo_cliente_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cliente_tipo.id", ondelete="RESTRICT"), index=True
+    )
+    # E1-C0: archivado reversible. Una ficha archivada queda fuera de todo
+    # flujo, pero sus operaciones conservan su `cliente_id` (C12).
+    archivado_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    archivado_motivo: Mapped[str | None] = mapped_column(String(255))
     cliente_desde: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -394,6 +408,49 @@ class Cliente(Base):
         order_by="desc(AutorizacionPromocionManual.created_at)",
     )
     presupuestos: Mapped[list["Presupuesto"]] = relationship(back_populates="cliente")
+    tipo_catalogo: Mapped["ClienteTipo | None"] = relationship()
+
+
+class ClienteTipo(Base):
+    """E1-C0: catálogo de tipos de cliente. Un tipo es una etiqueta: no da
+    nivel, membresía ni beneficio. La carga inicial son exactamente GENERAL,
+    DOCENTE, MAYORISTA e INSTITUCION (P1); administrarlo es de E3."""
+
+    __tablename__ = "cliente_tipo"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    clave: Mapped[str] = mapped_column(String(30), nullable=False, unique=True)
+    nombre: Mapped[str] = mapped_column(String(60), nullable=False)
+    descripcion: Mapped[str | None] = mapped_column(Text())
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    orden: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+
+class ClienteEvento(Base):
+    """E1-A: bitácora de la ficha del cliente (solo agrega; no se borra)."""
+
+    __tablename__ = "cliente_evento"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    cliente_id: Mapped[int] = mapped_column(
+        ForeignKey("cliente.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    tipo: Mapped[str] = mapped_column(String(40), nullable=False)
+    detalle: Mapped[dict | None] = mapped_column(JSON().with_variant(JSONB(), "postgresql"))
+    usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id", ondelete="RESTRICT"))
+    employee_code: Mapped[str | None] = mapped_column(String(40))
+    origen: Mapped[str | None] = mapped_column(String(60))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
 
 
 class Empleada(Base):

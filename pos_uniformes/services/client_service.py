@@ -8,6 +8,8 @@ from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.orm import Session
 
 from pos_uniformes.database.models import Cliente, RolUsuario, TipoCliente, Usuario
+from pos_uniformes.services.clientes import identidad_service
+from pos_uniformes.services.clientes.telefono import normalizar_telefono
 from pos_uniformes.services.loyalty_service import LoyaltyService
 
 
@@ -74,26 +76,19 @@ class ClientService:
         notas: str = "",
     ) -> Cliente:
         cls._validar_admin(admin_user)
-        normalized_name = nombre.strip()
-        if not normalized_name:
-            raise ValueError("El nombre del cliente no puede estar vacio.")
-        client = Cliente(
-            codigo_cliente=cls._generate_client_code(session),
-            nombre=normalized_name,
+        # E1-B (R1, K1): el alta del ADMIN nace sin nivel y con descuento 0.
+        # `descuento_preferente` se ignora a propósito: asignar nivel o
+        # descuento es una acción explícita aparte (E1-C).
+        cls.normalize_discount(descuento_preferente)  # sigue validando el rango
+        return identidad_service.dar_de_alta(
+            session,
+            nombre=nombre,
+            telefono=telefono,
+            origen=identidad_service.ORIGEN_POS_ADMIN,
             tipo_cliente=tipo_cliente,
-            descuento_preferente=cls.normalize_discount(descuento_preferente),
-            telefono=telefono.strip() or None,
-            notas=notas.strip() or None,
-            activo=True,
+            notas=notas,
+            usuario_id=getattr(admin_user, "id", None),
         )
-        LoyaltyService.assign_level(
-            client,
-            level=LoyaltyService.default_level_for_client_type(tipo_cliente),
-            actor_user=admin_user,
-            reason="alta_manual",
-        )
-        session.add(client)
-        return client
 
     @classmethod
     def create_client_quick(
@@ -113,22 +108,14 @@ class ClientService:
             raise ValueError("El nombre del cliente no puede estar vacio.")
         if not normalized_phone:
             raise ValueError("El telefono del cliente no puede estar vacio.")
-        client = Cliente(
-            codigo_cliente=cls._generate_client_code(session),
+        # E1-B (K1): el alta rápida de Presupuesto nace sin nivel ni descuento.
+        return identidad_service.dar_de_alta(
+            session,
             nombre=normalized_name,
-            tipo_cliente=TipoCliente.GENERAL,
-            descuento_preferente=Decimal("0.00"),
             telefono=normalized_phone,
-            activo=True,
+            origen=identidad_service.ORIGEN_PRESUPUESTO_KIOSKO,
+            usuario_id=getattr(usuario, "id", None),
         )
-        LoyaltyService.assign_level(
-            client,
-            level=LoyaltyService.resolve_initial_level(usuario.rol),
-            actor_user=usuario,
-            reason="alta_rapida_presupuesto",
-        )
-        session.add(client)
-        return client
 
     @classmethod
     def update_client(
@@ -146,10 +133,22 @@ class ClientService:
         normalized_name = nombre.strip()
         if not normalized_name:
             raise ValueError("El nombre del cliente no puede estar vacio.")
+        if client.nivel_lealtad is None:
+            # E1-B (R1, R3): editar a un cliente SIN nivel nunca le asigna
+            # nivel ni toca su descuento ni los metadatos de asignación.
+            cls.normalize_discount(descuento_preferente)  # sigue validando el rango
+            client.nombre = normalized_name
+            client.tipo_cliente = tipo_cliente
+            client.telefono = telefono.strip() or None
+            client.telefono_normalizado = normalizar_telefono(client.telefono)
+            client.notas = notas.strip() or None
+            session.add(client)
+            return client
         client.nombre = normalized_name
         client.tipo_cliente = tipo_cliente
         client.descuento_preferente = cls.normalize_discount(descuento_preferente)
         client.telefono = telefono.strip() or None
+        client.telefono_normalizado = normalizar_telefono(client.telefono)
         client.notas = notas.strip() or None
         LoyaltyService.assign_level(
             client,

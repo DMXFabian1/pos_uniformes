@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+SIN_NIVEL = "Sin nivel"
+
+
 def _normalize_loyalty_level(loyalty_level: object) -> str:
+    if loyalty_level is None:
+        return SIN_NIVEL
     if hasattr(loyalty_level, "value"):
         return str(getattr(loyalty_level, "value"))
     return str(loyalty_level)
@@ -25,4 +30,5 @@ def build_settings_marketing_summary_label(loyalty_levels: list[object]) -> str:
         f"LEAL: {counts['LEAL']} | "
         f"PROFESOR: {counts['PROFESOR']} | "
         f"MAYORISTA: {counts['MAYORISTA']}"
+        + (f" | {SIN_NIVEL}: {counts[SIN_NIVEL]}" if counts.get(SIN_NIVEL) else "")
     )

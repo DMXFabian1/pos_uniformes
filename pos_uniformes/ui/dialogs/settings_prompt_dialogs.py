@@ -21,6 +21,9 @@ from pos_uniformes.database.models import RolUsuario, TipoCliente
 from pos_uniformes.services.client_service import ClientService
 
 
+DESCUENTO_BLOQUEADO_NOTA = "El nivel y el descuento se asignan despues, como accion del ADMIN."
+
+
 def _create_settings_prompt_dialog(
     parent: QWidget,
     title: str,
@@ -199,7 +202,14 @@ def prompt_client_data(
     title: str,
     helper_text: str,
     current_values: dict[str, str] | None = None,
+    descuento_bloqueado: bool = False,
 ) -> dict[str, str] | None:
+    """Captura los datos del cliente.
+
+    `descuento_bloqueado` (E1-B, R1): en el alta y al editar a un cliente sin
+    nivel, el descuento no se captura aquí. Sin el parámetro, el formulario se
+    comporta como siempre.
+    """
     dialog, layout = _create_settings_prompt_dialog(parent, title, helper_text, width=560)
     form = QFormLayout()
     name_input = QLineEdit()
@@ -226,10 +236,17 @@ def prompt_client_data(
         discount_spin.setValue(float(current_values.get("descuento_preferente", "0") or 0))
         phone_input.setText(current_values.get("telefono", ""))
         notes_input.setPlainText(current_values.get("notas", ""))
+    elif descuento_bloqueado:
+        discount_spin.setValue(0.0)
     else:
         discount_spin.setValue(float(ClientService.default_discount_for_type(TipoCliente.GENERAL)))
+    if descuento_bloqueado:
+        discount_spin.setEnabled(False)
+        discount_spin.setToolTip(DESCUENTO_BLOQUEADO_NOTA)
 
     def _sync_discount_with_type() -> None:
+        if descuento_bloqueado:
+            return
         client_type = client_type_combo.currentData()
         if not isinstance(client_type, TipoCliente):
             return
@@ -241,6 +258,11 @@ def prompt_client_data(
     form.addRow("Nombre", name_input)
     form.addRow("Tipo cliente", client_type_combo)
     form.addRow("Desc. preferente", discount_spin)
+    if descuento_bloqueado:
+        nota_descuento = QLabel(DESCUENTO_BLOQUEADO_NOTA)
+        nota_descuento.setObjectName("subtleLine")
+        nota_descuento.setWordWrap(True)
+        form.addRow("", nota_descuento)
     form.addRow("Telefono", phone_input)
     form.addRow("Notas", notes_input)
     layout.addLayout(form)

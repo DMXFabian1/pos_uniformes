@@ -44,7 +44,7 @@ export default function ScannerScreen() {
       if (cliente) {
         setResult({ type: 'client', data: cliente })
         setMode('client')
-        pushHistory({ type: 'client', label: cliente.nombre, subLabel: cliente.tipo_cliente, raw })
+        pushHistory({ type: 'client', label: cliente.nombre, subLabel: cliente.tipo || 'Cliente', raw })
         autoTimer.current = setTimeout(() => {
           setClient({ id: cliente.id, nombre: cliente.nombre, codigo_cliente: cliente.codigo_cliente })
           navigate('/catalog')
@@ -216,13 +216,8 @@ export default function ScannerScreen() {
               <div className="flex-1 min-w-0">
                 <p className="text-xs text-ink-400 uppercase tracking-wide font-semibold">Cliente identificado</p>
                 <p className="font-bold text-ink-900 truncate text-lg mt-0.5">{result.data.nombre}</p>
-                <p className="text-xs text-ink-500 mt-0.5">{result.data.tipo_cliente} · {result.data.nivel_lealtad}</p>
+                <p className="text-xs text-ink-500 mt-0.5">{result.data.codigo_cliente} · {result.data.tipo || 'Cliente'}</p>
               </div>
-              {result.data.descuento_preferente > 0 && (
-                <span className="shrink-0 bg-success-50 text-success-500 border border-success-100 text-xs font-bold px-2.5 py-1.5 rounded-xl">
-                  -{result.data.descuento_preferente}%
-                </span>
-              )}
             </div>
             <p className="text-center text-xs text-ink-400">Navegando al catalogo en 2 s...</p>
           </div>

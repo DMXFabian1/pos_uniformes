@@ -48,6 +48,7 @@ from pos_uniformes.services.business_info_cache_service import (
     save_business_info as save_business_info_cache,
 )
 from pos_uniformes.ui.helpers.ticket_routing_helper import route_tickets
+from pos_uniformes.ui.helpers.quick_sale_cliente_helper import ClienteRapidoMixin
 from pos_uniformes.ui.helpers.quick_sale_monedero_helper import (
     MonederoVentaMixin,
     lineas_ticket_monedero,
@@ -248,7 +249,7 @@ QPushButton#btnLogout:hover {{ color: {_DANGER}; border-color: {_DANGER}; }}
 """
 
 
-class QuickSaleWidget(MonederoVentaMixin, QWidget):
+class QuickSaleWidget(ClienteRapidoMixin, MonederoVentaMixin, QWidget):
     #: Lo de hoy para el pie del gafete, leído en un hilo (el kiosko sin red no se congela).
     _pie_gafete_leido = pyqtSignal(object)
     """Página de Venta Rápida para la app satélite."""
@@ -623,10 +624,10 @@ class QuickSaleWidget(MonederoVentaMixin, QWidget):
         self._btn_gasto.clicked.connect(self._on_gasto_tienda)
         sb_layout.addWidget(self._btn_gasto)
         self._btn_cliente = QPushButton("👛  Cliente")
-        self._btn_cliente.setToolTip("Buscar al cliente por nombre o teléfono (para usar saldo, escanea su QR)")
+        self._btn_cliente.setToolTip("Buscar o registrar al cliente (para usar saldo, escanea su QR)")
         self._btn_cliente.setAutoDefault(False)
         self._btn_cliente.setStyleSheet(self._btn_sin_codigo.styleSheet())
-        self._btn_cliente.clicked.connect(self._on_buscar_cliente)
+        self._btn_cliente.clicked.connect(self._on_cliente_rapido)  # E1-B: buscador y alta
         sb_layout.addWidget(self._btn_cliente)
 
         scan_bar.setLayout(sb_layout)

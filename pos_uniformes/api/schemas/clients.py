@@ -2,18 +2,17 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
-
 from pydantic import BaseModel
 
 
 class ClienteOut(BaseModel):
+    """E1-C4: lo que ve la vendedora al escanear. Sin nivel, sin descuento y
+    con el telefono enmascarado (P2, D5)."""
+
     id: int
     codigo_cliente: str
     nombre: str
-    tipo_cliente: str
-    nivel_lealtad: str
-    descuento_preferente: Decimal
-    telefono: str | None
+    tipo: str | None
+    telefono_enmascarado: str
 
     model_config = {"from_attributes": True}

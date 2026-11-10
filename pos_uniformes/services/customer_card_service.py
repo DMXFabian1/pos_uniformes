@@ -16,7 +16,6 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 from pos_uniformes.database.connection import get_session
 from pos_uniformes.database.models import Cliente
 from pos_uniformes.services.business_settings_service import BusinessSettingsService
-from pos_uniformes.services.loyalty_service import LoyaltyService
 from pos_uniformes.utils.headless_browser_helper import resolve_headless_browser_executable
 from pos_uniformes.utils.qr_generator import QrGenerator
 
@@ -59,6 +58,13 @@ class CustomerCardRenderInput:
     primary_color: str
     secondary_color: str
     qr_path: str
+    client_code: str = ""
+
+
+# E1-C2: credencial estándar, igual para todos. Sin nivel, sin descuento y con
+# el código del cliente. Los colores ya no dependen del nivel (D5).
+COLOR_ESTANDAR_PRIMARIO = "#1F3A44"
+COLOR_ESTANDAR_SECUNDARIO = "#E3EAEC"
 
 
 class CustomerCardService:
@@ -150,18 +156,18 @@ class CustomerCardService:
         qr_path = QrGenerator.path_for_client(cliente)
         if not qr_path.exists():
             qr_path = QrGenerator.generate_for_client(cliente)
-        visual = LoyaltyService.visual_spec(cliente.nivel_lealtad)
         customer_since = cliente.cliente_desde or cliente.created_at or datetime.now()
         return CustomerCardRenderInput(
             business_name=cls._business_name(),
             logo_path=str(logo_path) if logo_path else None,
             full_name=cliente.nombre,
             customer_since=customer_since,
-            loyalty_level=visual.level.value,
-            level_label=visual.label,
-            primary_color=visual.primary_color,
-            secondary_color=visual.secondary_color,
+            loyalty_level="",
+            level_label="",
+            primary_color=COLOR_ESTANDAR_PRIMARIO,
+            secondary_color=COLOR_ESTANDAR_SECUNDARIO,
             qr_path=str(qr_path),
+            client_code=str(cliente.codigo_cliente),
         )
 
     @classmethod
@@ -254,6 +260,7 @@ class CustomerCardService:
             "{{ loyalty_level }}": escape(payload.loyalty_level),
             "{{ level_label }}": escape(payload.level_label),
             "{{ qr_path }}": cls._asset_src(payload.qr_path),
+            "{{ client_code }}": escape(payload.client_code),
         }
         document = template_html.replace(
             '<link rel="stylesheet" href="./customer-card.css" />',
@@ -455,13 +462,13 @@ class CustomerCardService:
         )
         draw.text(
             (150, 557),
-            "Nivel de lealtad",
+            "Codigo de cliente",
             font=cls._font(20),
             fill=payload.primary_color,
         )
         draw.text(
             (150, 582),
-            payload.level_label.upper(),
+            payload.client_code,
             font=cls._font(30, bold=True),
             fill=payload.primary_color,
         )
@@ -493,7 +500,7 @@ class CustomerCardService:
         )
         draw.text(
             (CARD_SIZE[0] // 2, 1140),
-            payload.loyalty_level,
+            payload.client_code,
             anchor="mm",
             font=cls._font(22, bold=True),
             fill=payload.primary_color,

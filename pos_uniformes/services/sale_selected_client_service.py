@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+from decimal import Decimal
+
 from sqlalchemy import func, select
 
 from pos_uniformes.database.models import Cliente
@@ -9,6 +12,8 @@ from pos_uniformes.services.loyalty_service import LoyaltyService
 from pos_uniformes.services.sale_client_benefit_service import SaleClientBenefit, resolve_sale_client_benefit
 from pos_uniformes.services.sale_client_sync_service import SaleClientSyncState, resolve_sale_client_sync_state
 
+
+SIN_NIVEL_LABEL = "Sin nivel"
 
 _CLIENT_SCAN_TRANSLATION = str.maketrans(
     {
@@ -51,12 +56,20 @@ def load_sale_selected_client_benefit(
     if client is None:
         return None
 
-    return resolve_sale_client_benefit(
+    benefit = resolve_sale_client_benefit(
         preferred_discount=client.descuento_preferente,
         loyalty_level=client.nivel_lealtad,
-        loyalty_discount_resolver=lambda level: LoyaltyService.discount_for_level(level, session=session),
+        # E1-B (R3): un cliente SIN nivel no tiene descuento por nivel (0 %).
+        # No se llama a `discount_for_level(None)`, que lo trataría como BASICO.
+        loyalty_discount_resolver=lambda level: (
+            Decimal("0.00") if level is None else LoyaltyService.discount_for_level(level, session=session)
+        ),
         normalize_discount_value=normalize_discount_value,
     )
+    if client.nivel_lealtad is None:
+        # E1-B (R3): la etiqueta de un cliente sin nivel no dice «Basico».
+        return replace(benefit, source_label=SIN_NIVEL_LABEL)
+    return benefit
 
 
 def load_sale_selected_client_discount_percent(
