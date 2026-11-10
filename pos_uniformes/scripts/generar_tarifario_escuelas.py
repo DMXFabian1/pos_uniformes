@@ -1082,6 +1082,7 @@ GENERAL_PAGES = [
          _s("Exc. Sec. / Bach.", ["Escuela", "2 pzas", "3 pzas"],
             [["Telesecundaria 454", "$650", "$750"],
              ["Telesecundaria 512", "$650", "$750"],
+             ["Técnica de San Bartolo", "$650", "695/705/715"],
              ["CECYTE", "$650", "$750"],
              ["Conalep", "$650", "$750"],
              ["UVEG", "$690", "$790"]]),
