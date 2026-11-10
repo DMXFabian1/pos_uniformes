@@ -283,6 +283,9 @@ class VisorWhatsapp(_Visor):
 
         super().__init__("💬 WhatsApp", parent)
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
+        # Se abre desde avisos modales (la credencial, la búsqueda de
+        # clientes): sin esto quedaría bloqueada detrás de ellos.
+        self.setWindowModality(Qt.WindowModality.ApplicationModal)
         self.detalle.setText(PASO_PEGAR_WHATSAPP)
         self.vista = QWebEngineView(self)
         self.vista.setPage(QWebEnginePage(_perfil_whatsapp(), self.vista))

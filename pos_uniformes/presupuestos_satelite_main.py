@@ -117,6 +117,10 @@ def _modo_servidor_de_impresion(app) -> int:
 def main() -> int:
     # Una excepcion que escape de un slot no debe cerrar el kiosko.
     install_satellite_excepthook()
+    # Como en main.py: sin esto, el motor web (WhatsApp Web, el mapa) no se
+    # puede cargar después y todo abre en el navegador. En el ejecutable del
+    # kiosko, que no trae el motor web, no cambia nada.
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True)
     app = QApplication(sys.argv)
     if "--servidor-impresion" in sys.argv:
         return _modo_servidor_de_impresion(app)

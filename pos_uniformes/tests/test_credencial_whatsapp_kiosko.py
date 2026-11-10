@@ -230,5 +230,29 @@ class SoloConClientesNuevosTests(_Qt):
         dialogo.assert_not_called()
 
 
+
+class ArranqueDelKioskoTests(unittest.TestCase):
+    """Sin AA_ShareOpenGLContexts antes de crear la app, el motor web no carga
+    después y WhatsApp Web abre en el navegador, fuera del programa (Mac,
+    2026-11-10)."""
+
+    def test_el_kiosko_deja_listo_el_motor_web_antes_de_crear_la_app(self) -> None:
+        import inspect
+
+        from pos_uniformes import presupuestos_satelite_main as kiosko_main
+
+        fuente = inspect.getsource(kiosko_main.main)
+        atributo = fuente.find("AA_ShareOpenGLContexts")
+        self.assertNotEqual(atributo, -1)
+        self.assertLess(atributo, fuente.find("QApplication(sys.argv)"))
+
+    def test_whatsapp_se_puede_usar_con_avisos_abiertos(self) -> None:
+        import inspect
+
+        from pos_uniformes.ui.dialogs.visor_consulta_dialog import VisorWhatsapp
+
+        self.assertIn("ApplicationModal", inspect.getsource(VisorWhatsapp.__init__))
+
+
 if __name__ == "__main__":
     unittest.main()
