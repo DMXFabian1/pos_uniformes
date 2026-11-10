@@ -11,7 +11,7 @@ from contextlib import redirect_stdout
 from decimal import Decimal
 from unittest.mock import patch
 
-from sqlalchemy import create_engine, func, select
+from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
@@ -101,6 +101,12 @@ class ArchivarClientesPruebaTests(unittest.TestCase):
         self.assertTrue(all(c.archivado_en is None for c in self.fichas))
 
     def test_todos_incluye_cada_ficha_existente(self) -> None:
+        # «Todos» recorre cada ficha de la base compartida. Con la suite en
+        # paralelo, otra prueba podía borrar una ficha a media pasada
+        # (StaleDataError). El candado deja fuera altas y bajas ajenas hasta
+        # que esta transacción se revierte; las demás solo esperan.
+        self.s.execute(text("SET LOCAL lock_timeout = '30s'"))
+        self.s.execute(text("LOCK TABLE cliente IN SHARE ROW EXCLUSIVE MODE"))
         total = self.s.scalar(select(func.count(Cliente.id)))
         r = script.ejecutar(self.s, usuario_id=self.admin.id, motivo=MOTIVO, todos=True, aplicar=True)
         self.assertEqual(r.candidatas, total)
