@@ -14,5 +14,8 @@ class ClienteOut(BaseModel):
     nombre: str
     tipo: str | None
     telefono_enmascarado: str
+    #: E4-E: programa activo («Maximoda Club»…) o None. Solo la etiqueta: sin
+    #: porcentajes ni beneficios (E5), y sin propuestas pendientes.
+    programa: str | None = None
 
     model_config = {"from_attributes": True}

@@ -9,6 +9,7 @@ from enum import Enum
 from sqlalchemy import CheckConstraint, DateTime, Enum as SqlEnum, Index
 from sqlalchemy import Date, JSON, Boolean, ForeignKey, Integer, LargeBinary, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy import false as sa_false
+from sqlalchemy import text as sa_text
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -450,6 +451,111 @@ class ClienteEvento(Base):
         server_default=func.now(),
         nullable=False,
         index=True,
+    )
+
+
+# -- E4: programas y membresías -------------------------------------------------
+# Una membresía es una etiqueta: no da descuento ni cambia precios (eso es E5).
+# Un cliente tiene como máximo UNA membresía activa y UNA propuesta pendiente
+# (D1 ajustada); lo garantizan dos índices únicos parciales, no la pantalla.
+
+PROGRAMA_ESTADOS = ("borrador", "activo", "pausado", "cerrado")
+PROGRAMA_INGRESO_MODOS = ("directo_empleada", "aprobacion_dueno")
+MEMBRESIA_ESTADOS = ("pendiente", "activa", "rechazada", "expirada", "cancelada", "vencida", "reemplazada")
+
+
+def _en(columna: str, valores: tuple[str, ...]) -> str:
+    return f"{columna} IN (" + ", ".join(f"'{v}'" for v in valores) + ")"
+
+
+class Programa(Base):
+    __tablename__ = "programa"
+    __table_args__ = (
+        CheckConstraint(_en("estado", PROGRAMA_ESTADOS), name="programa_estado_valido"),
+        CheckConstraint(_en("ingreso_modo", PROGRAMA_INGRESO_MODOS), name="programa_ingreso_modo_valido"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    clave: Mapped[str] = mapped_column(String(30), unique=True, nullable=False)
+    nombre: Mapped[str] = mapped_column(String(80), nullable=False)
+    descripcion: Mapped[str | None] = mapped_column(Text())
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="borrador")
+    ingreso_modo: Mapped[str] = mapped_column(String(30), nullable=False)
+    #: Tipo que toma el cliente al aprobarse (P-E4-2). Vacío = no cambia el tipo.
+    tipo_sugerido_clave: Mapped[str | None] = mapped_column(String(30))
+    #: Vacío = sin vencimiento (P-E4-3).
+    vigencia_dias: Mapped[int | None] = mapped_column(Integer)
+    orden: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    creado_por_usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id", ondelete="RESTRICT"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class Membresia(Base):
+    __tablename__ = "membresia"
+    __table_args__ = (
+        CheckConstraint(_en("estado", MEMBRESIA_ESTADOS), name="membresia_estado_valido"),
+        Index(
+            "ux_membresia_una_activa_por_cliente",
+            "cliente_id",
+            unique=True,
+            postgresql_where=sa_text("estado = 'activa'"),
+            sqlite_where=sa_text("estado = 'activa'"),
+        ),
+        Index(
+            "ux_membresia_una_pendiente_por_cliente",
+            "cliente_id",
+            unique=True,
+            postgresql_where=sa_text("estado = 'pendiente'"),
+            sqlite_where=sa_text("estado = 'pendiente'"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    cliente_id: Mapped[int] = mapped_column(ForeignKey("cliente.id", ondelete="RESTRICT"), nullable=False, index=True)
+    programa_id: Mapped[int] = mapped_column(ForeignKey("programa.id", ondelete="RESTRICT"), nullable=False, index=True)
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    desde: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    hasta: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    propuesta_por_employee_code: Mapped[str | None] = mapped_column(String(40))
+    motivo_propuesta: Mapped[str | None] = mapped_column(String(255))
+    alta_por_usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id", ondelete="RESTRICT"))
+    resuelta_por: Mapped[str | None] = mapped_column(String(80))
+    resuelta_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    motivo_resolucion: Mapped[str | None] = mapped_column(String(255))
+    #: E4-B: recordatorios diarios al dueño y cuándo vio la empleada la respuesta.
+    recordatorios: Mapped[int] = mapped_column(Integer, server_default=sa_text("0"), default=0, nullable=False)
+    ultimo_recordatorio_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    avisada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    programa: Mapped["Programa"] = relationship()
+
+
+class MembresiaEvento(Base):
+    """Historial inmutable de cada membresía (quién, cuándo, por qué)."""
+
+    __tablename__ = "membresia_evento"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    membresia_id: Mapped[int] = mapped_column(
+        ForeignKey("membresia.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    tipo: Mapped[str] = mapped_column(String(40), nullable=False)
+    antes: Mapped[str | None] = mapped_column(String(20))
+    despues: Mapped[str | None] = mapped_column(String(20))
+    motivo: Mapped[str | None] = mapped_column(String(255))
+    detalle: Mapped[dict | None] = mapped_column(JSON().with_variant(JSONB(), "postgresql"))
+    usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id", ondelete="RESTRICT"))
+    employee_code: Mapped[str | None] = mapped_column(String(40))
+    quien: Mapped[str | None] = mapped_column(String(80))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
 
 

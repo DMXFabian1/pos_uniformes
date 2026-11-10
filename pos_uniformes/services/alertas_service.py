@@ -733,6 +733,7 @@ def procesar(session_factory, enviar, vigilante: Vigilante | None = None) -> int
                     if encolar(session, texto, botones):
                         enviadas += enviar_pendientes(session, enviar)
                 enviadas += _descansos(session, enviar)
+                enviadas += _membresias(session, enviar)
     except Exception as exc:  # noqa: BLE001 — base sin migrar, sin red...
         _avisar_vuelta_fallida(exc)
         _vuelta_sin_base(exc, enviar)
@@ -798,6 +799,27 @@ def _descansos(session, enviar) -> int:
         return 0
     if not avisos:
         session.commit()  # vencidas sin nada que avisar (no debería pasar)
+        return 0
+    for texto, botones in avisos:
+        if not encolar(session, texto, botones):
+            return 0
+    return enviar_pendientes(session, enviar)
+
+
+def _membresias(session, enviar) -> int:
+    """E4-B: caduca las propuestas de programa de más de 7 días y recuerda,
+    una vez al día, las que siguen esperando. Va aparte de los descansos: si
+    la base todavía no tiene las tablas de programas, los descansos siguen."""
+    from pos_uniformes.services.fidelizacion import membresia_service
+
+    try:
+        avisos = membresia_service.tarea_periodica(session)
+    except Exception:  # noqa: BLE001 — base sin migrar: no tumba las alertas
+        logger.debug("Programas: no se pudo revisar la tarea periódica", exc_info=True)
+        session.rollback()
+        return 0
+    if not avisos:
+        session.commit()
         return 0
     for texto, botones in avisos:
         if not encolar(session, texto, botones):

@@ -44,6 +44,9 @@ ESTADO_INACTIVOS = "inactivos"
 ESTADO_ARCHIVADOS = "archivados"
 ESTADO_TODOS = "todos"
 ORIGEN_ANTERIOR = "anterior"  # fichas sin `origen_alta` (anteriores a E1-A)
+# E4-D: filtro «Programa» de la lista. Además de estas dos, vale la clave de un programa.
+PROGRAMA_NINGUNO = "NINGUNO"
+PROGRAMA_PENDIENTE = "PENDIENTE"
 
 
 # -- permisos -----------------------------------------------------------------
@@ -265,6 +268,45 @@ class FilaClienteAdmin:
     activo: bool
     archivado: bool
     notas: str
+    programa: str = ""  # E4-D: «Maximoda Club», «… (propuesta a Profesional)» o ""
+
+
+def _programas_de(session: Session, ids: list[int]) -> dict[int, str]:
+    """E4-D: texto de la columna «Programa» para estas fichas, en una consulta."""
+    from pos_uniformes.database.models import Membresia, Programa
+
+    if not ids:
+        return {}
+    activas: dict[int, str] = {}
+    pendientes: dict[int, str] = {}
+    filas = session.execute(
+        select(Membresia.cliente_id, Membresia.estado, Programa.nombre)
+        .join(Programa, Programa.id == Membresia.programa_id)
+        .where(Membresia.cliente_id.in_(ids), Membresia.estado.in_(("activa", "pendiente")))
+    ).all()
+    for cliente_id, estado, nombre in filas:
+        (activas if estado == "activa" else pendientes)[int(cliente_id)] = str(nombre)
+    textos = {}
+    for cliente_id in set(activas) | set(pendientes):
+        partes = [activas[cliente_id]] if cliente_id in activas else []
+        if cliente_id in pendientes:
+            partes.append(f"(propuesta a {pendientes[cliente_id].replace('Maximoda ', '')})")
+        textos[cliente_id] = " ".join(partes)
+    return textos
+
+
+def _filtro_programa(stmt, programa: str):
+    from pos_uniformes.database.models import Membresia, Programa
+
+    clave = programa.strip().upper()
+    activa = select(Membresia.id).where(Membresia.cliente_id == Cliente.id, Membresia.estado == "activa")
+    if clave == PROGRAMA_NINGUNO:
+        return stmt.where(~activa.exists())
+    if clave == PROGRAMA_PENDIENTE:
+        pendiente = select(Membresia.id).where(Membresia.cliente_id == Cliente.id, Membresia.estado == "pendiente")
+        return stmt.where(pendiente.exists())
+    en_programa = activa.join(Programa, Programa.id == Membresia.programa_id).where(Programa.clave == clave)
+    return stmt.where(en_programa.exists())
 
 
 def listar_para_admin(
@@ -276,6 +318,7 @@ def listar_para_admin(
     tipo_clave: str | None = None,
     origen: str | None = None,
     limite: int = LIMITE_LISTA,
+    programa: str | None = None,
 ) -> list[FilaClienteAdmin]:
     exigir_admin(session, usuario_id)
     stmt = select(Cliente, ClienteTipo).outerjoin(ClienteTipo, ClienteTipo.id == Cliente.tipo_cliente_id)
@@ -295,6 +338,8 @@ def listar_para_admin(
         stmt = stmt.where(Cliente.origen_alta.is_(None))
     elif origen:
         stmt = stmt.where(Cliente.origen_alta == origen)
+    if programa:
+        stmt = _filtro_programa(stmt, programa)
 
     buscado = (texto or "").strip()
     if buscado:
@@ -308,7 +353,9 @@ def listar_para_admin(
 
     stmt = stmt.order_by(Cliente.nombre, Cliente.id).limit(max(1, min(int(limite), LIMITE_LISTA)))
     filas = []
-    for cliente, tipo in session.execute(stmt).all():
+    resultado = session.execute(stmt).all()
+    programas = _programas_de(session, [int(c.id) for c, _t in resultado])
+    for cliente, tipo in resultado:
         filas.append(
             FilaClienteAdmin(
                 id=int(cliente.id),
@@ -321,6 +368,7 @@ def listar_para_admin(
                 activo=bool(cliente.activo),
                 archivado=cliente.archivado_en is not None,
                 notas=cliente.notas or "",
+                programa=programas.get(int(cliente.id), ""),
             )
         )
     return filas

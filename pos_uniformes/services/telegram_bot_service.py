@@ -78,6 +78,7 @@ AYUDA = (
     "/deshacerpago — enseña el último pago y cómo deshacerlo (solo de hoy y antes del corte)\n"    "/fechapago Stayce 18/10 — el último pago de alguien pasa a ese día (si se registró tarde)\n"
     "/prestamos — los préstamos que te pidieron, para aprobar o rechazar\n"
     "/descansos — los días que te pidieron, con cómo queda la semana\n"
+    "/programas — clientes propuestos a Profesional o Mayorista\n"
     "/receso 2026-10-27 2026-11-04 — tus vacaciones: el calendario lo dice\n"
     "   y tu martes deja de ocupar el cupo · /receso quitar\n"
     "/sonidos — los sonidos que puede hacer un aviso\n"
@@ -532,6 +533,11 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
 
         with session_factory() as session:
             return dsc.texto_y_botones(session, hoy=hoy)[0]
+    if cmd.nombre == "programas":
+        from pos_uniformes.services import telegram_membresias_service as mbs
+
+        with session_factory() as session:
+            return mbs.texto_y_botones(session)[0]
     if cmd.nombre in ("vacaciones", "primas", "ingreso") and _vacaciones_en_obra():
         from pos_uniformes.services import vacaciones_service as vs
 
@@ -666,6 +672,7 @@ _CON_BOTONES = {
     "cajón": ("pos_uniformes.services.telegram_cajon_service", "texto_y_botones"),
     "prestamos": ("pos_uniformes.services.telegram_prestamos_service", "texto_y_botones"),
     "descansos": ("pos_uniformes.services.telegram_descansos_service", "texto_y_botones"),
+    "programas": ("pos_uniformes.services.telegram_membresias_service", "texto_y_botones"),
     "primas": ("pos_uniformes.services.telegram_vacaciones_service", "primas"),
     "vacaciones": ("pos_uniformes.services.telegram_vacaciones_service", "con_botones"),
     "préstamos": ("pos_uniformes.services.telegram_prestamos_service", "texto_y_botones"),
@@ -888,6 +895,11 @@ def atender_toque(
     if dsc.es_de_descansos(dato):
         return dsc.atender(dato, session_factory=session_factory, quien=CODIGO_REMOTO)
 
+    from pos_uniformes.services import telegram_membresias_service as mbs
+
+    if mbs.es_de_membresias(dato):
+        return mbs.atender(dato, session_factory=session_factory, quien=CODIGO_REMOTO)
+
     from pos_uniformes.services import telegram_vacaciones_service as vac
 
     if vac.es_de_vacaciones(dato):
@@ -985,6 +997,7 @@ COMANDOS_MENU: tuple[tuple[str, str], ...] = (
     ("deshacerpago", "Deshacer el último pago de hoy"),
     ("prestamos", "Préstamos por aprobar"),
     ("descansos", "Días que te pidieron"),
+    ("programas", "Clientes propuestos a Profesional o Mayorista"),
     ("prenda", "Precio y existencias: /prenda playera"),
     ("escuela", "Cómo va una escuela"),
     ("contar", "Qué falta contar"),

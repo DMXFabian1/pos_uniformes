@@ -49,6 +49,7 @@ from pos_uniformes.services.business_info_cache_service import (
 )
 from pos_uniformes.ui.helpers.ticket_routing_helper import route_tickets
 from pos_uniformes.ui.helpers.quick_sale_cliente_helper import ClienteRapidoMixin
+from pos_uniformes.ui.helpers.quick_sale_programa_helper import ProgramaClienteMixin
 from pos_uniformes.ui.helpers.quick_sale_monedero_helper import (
     MonederoVentaMixin,
     lineas_ticket_monedero,
@@ -249,7 +250,7 @@ QPushButton#btnLogout:hover {{ color: {_DANGER}; border-color: {_DANGER}; }}
 """
 
 
-class QuickSaleWidget(ClienteRapidoMixin, MonederoVentaMixin, QWidget):
+class QuickSaleWidget(ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMixin, QWidget):
     #: Lo de hoy para el pie del gafete, leído en un hilo (el kiosko sin red no se congela).
     _pie_gafete_leido = pyqtSignal(object)
     """Página de Venta Rápida para la app satélite."""
@@ -558,6 +559,7 @@ class QuickSaleWidget(ClienteRapidoMixin, MonederoVentaMixin, QWidget):
         total_bar.setLayout(tb_layout)
         layout.addWidget(total_bar)
         layout.addWidget(self._build_cliente_bar())
+        layout.addWidget(self._build_programa_bar())  # E4-C: programa del cliente
 
         # ── Scan bar ──
         scan_bar = QFrame()
@@ -913,6 +915,7 @@ class QuickSaleWidget(ClienteRapidoMixin, MonederoVentaMixin, QWidget):
             meta += f"  ·  Saldo -${canje:,.2f}  ·  Por cobrar ${total - canje:,.2f}"
         self._total_meta.setText(meta)
         self._pintar_cliente_bar()
+        self._pintar_programa_bar()
 
     # Geometría del carrito: padding del ::item (stylesheet) y alto de botón.
     _PAD_ITEM_CARRITO = 8

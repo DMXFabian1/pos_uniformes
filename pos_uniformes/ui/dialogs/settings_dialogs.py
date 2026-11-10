@@ -183,8 +183,11 @@ def build_clients_settings_dialog(window: "MainWindow") -> QDialog:
         window.settings_clients_estado_combo,
         window.settings_clients_tipo_combo,
         window.settings_clients_origen_combo,
+        window.settings_clients_programa_combo,
     ):
         _combo.currentIndexChanged.connect(lambda _i: window._refresh_settings_clients())
+    window.settings_client_programas_button.setObjectName("toolbarGhostButton")
+    window.settings_client_programas_button.clicked.connect(window._handle_open_programas)
     window.settings_view_client_button.clicked.connect(window._handle_view_client_ficha)
     window.settings_create_client_button.clicked.connect(window._handle_create_client)
     window.settings_update_client_button.clicked.connect(window._handle_update_client)
@@ -200,7 +203,10 @@ def build_clients_settings_dialog(window: "MainWindow") -> QDialog:
     filtros.addWidget(window.settings_clients_tipo_combo)
     filtros.addWidget(QLabel("Origen"))
     filtros.addWidget(window.settings_clients_origen_combo)
+    filtros.addWidget(QLabel("Programa"))
+    filtros.addWidget(window.settings_clients_programa_combo)
     filtros.addStretch()
+    filtros.addWidget(window.settings_client_programas_button)
     actions.addWidget(window.settings_view_client_button)
     actions.addWidget(window.settings_create_client_button)
     actions.addWidget(window.settings_update_client_button)

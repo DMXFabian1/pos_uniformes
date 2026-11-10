@@ -160,7 +160,8 @@ class ApiByQrTests(unittest.TestCase):
     def test_cliente_con_nivel_no_cambia(self) -> None:
         r = self.client.get("/api/v1/clients/by-qr/CLI-L3")
         self.assertEqual(r.status_code, 200, r.text)
-        self.assertEqual(set(r.json()), {"id", "codigo_cliente", "nombre", "tipo", "telefono_enmascarado"})
+        # E4-E (C10): se agrega `programa`; sigue sin nivel ni descuento.
+        self.assertEqual(set(r.json()), {"id", "codigo_cliente", "nombre", "tipo", "telefono_enmascarado", "programa"})
 
 
 class ListadoEnPostgresTests(unittest.TestCase):

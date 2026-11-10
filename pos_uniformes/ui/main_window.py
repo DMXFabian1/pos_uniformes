@@ -1732,6 +1732,18 @@ class MainWindow(QMainWindow):
         self.settings_clients_origen_combo.addItem("Todos los origenes", None)
         for _origen, _etiqueta in ORIGEN_ETIQUETAS.items():
             self.settings_clients_origen_combo.addItem(_etiqueta, _origen or admin_service.ORIGEN_ANTERIOR)
+        # E4-D: filtro «Programa» y ventana «Programas».
+        self.settings_clients_programa_combo = QComboBox()
+        for _etiqueta, _valor in (
+            ("Todos los programas", None),
+            ("Sin programa", admin_service.PROGRAMA_NINGUNO),
+            ("Con propuesta pendiente", admin_service.PROGRAMA_PENDIENTE),
+            ("Maximoda Club", "CLUB"),
+            ("Maximoda Profesional", "PROFESIONAL"),
+            ("Maximoda Mayorista", "MAYORISTA"),
+        ):
+            self.settings_clients_programa_combo.addItem(_etiqueta, _valor)
+        self.settings_client_programas_button = QPushButton("Programas")
         self.settings_view_client_button = QPushButton("Ver ficha")
         self.settings_create_client_button = QPushButton("Crear cliente")
         self.settings_update_client_button = QPushButton("Editar cliente")
@@ -3366,13 +3378,16 @@ class MainWindow(QMainWindow):
         estado = self.settings_clients_estado_combo.currentData() or admin_service.ESTADO_ACTIVOS
         tipo_clave = self.settings_clients_tipo_combo.currentData() or None
         origen = self.settings_clients_origen_combo.currentData() or None
+        programa_combo = getattr(self, "settings_clients_programa_combo", None)  # E4-D
+        programa = (programa_combo.currentData() if programa_combo is not None else None) or None
 
         def _cargar(s):
             if self.settings_clients_tipo_combo.count() <= 1:
                 for clave, nombre in tipos_para_combo(s):
                     self.settings_clients_tipo_combo.addItem(nombre, clave)
             return admin_service.listar_para_admin(
-                s, self.user_id, texto=search_text, estado=estado, tipo_clave=tipo_clave, origen=origen
+                s, self.user_id, texto=search_text, estado=estado, tipo_clave=tipo_clave, origen=origen,
+                programa=programa,
             )
 
         try:
@@ -3402,12 +3417,18 @@ class MainWindow(QMainWindow):
                     ),
                     "status_label": "ARCHIVADO" if fila.archivado else ("ACTIVO" if fila.activo else "INACTIVO"),
                     "notes": fila.notas,
+                    "programa": fila.programa,
                 }
                 for fila in filas
             ],
             estado_label=self.settings_clients_estado_combo.currentText(),
         )
-        if self.settings_clients_table.columnCount() != len(CLIENTES_ADMIN_COLUMNAS):
+        tabla_clientes = self.settings_clients_table
+        encabezados_actuales = [
+            (tabla_clientes.horizontalHeaderItem(i).text() if tabla_clientes.horizontalHeaderItem(i) else "")
+            for i in range(tabla_clientes.columnCount())
+        ]
+        if encabezados_actuales != list(CLIENTES_ADMIN_COLUMNAS):  # E4-D: también si cambian los textos
             self.settings_clients_table.setColumnCount(len(CLIENTES_ADMIN_COLUMNAS))
             self.settings_clients_table.setHorizontalHeaderLabels(list(CLIENTES_ADMIN_COLUMNAS))
         self.settings_clients_table.setRowCount(len(clients_view.rows))
@@ -3446,7 +3467,22 @@ class MainWindow(QMainWindow):
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo abrir la ficha", str(exc))
             return
-        construir_ficha_dialog(self, ficha).exec()
+        from pos_uniformes.ui.dialogs.cliente_fidelizacion_panel import FidelizacionPanel
+
+        panel = FidelizacionPanel(get_session, cliente_id=client_id, usuario_id=self.user_id)  # E4-D
+        construir_ficha_dialog(self, ficha, panel_fidelizacion=panel).exec()
+        if panel.hubo_cambios:
+            self._refresh_settings_clients()
+
+    def _handle_open_programas(self) -> None:
+        """E4-D: ventana «Programas» (solo ADMIN)."""
+        if self.current_role != RolUsuario.ADMIN:
+            QMessageBox.warning(self, "Sin permiso", "Solo ADMIN puede administrar los programas.")
+            return
+        from pos_uniformes.ui.dialogs.programas_dialog import ProgramasDialog
+
+        ProgramasDialog(self, get_session, usuario_id=self.user_id).exec()
+        self._refresh_settings_clients()
 
     def _refresh_settings_employees(self) -> None:
         search_text = self.settings_employees_search_input.text().strip()

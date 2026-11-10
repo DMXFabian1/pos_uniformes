@@ -54,7 +54,9 @@ class ApiByQrE1C4Tests(unittest.TestCase):
         r = self.client.get("/api/v1/clients/by-qr/cli-ok1")
         self.assertEqual(r.status_code, 200, r.text)
         datos = r.json()
-        self.assertEqual(set(datos), {"id", "codigo_cliente", "nombre", "tipo", "telefono_enmascarado"})
+        # E4-E (C10): se agrega `programa` (solo la etiqueta del programa activo).
+        self.assertEqual(set(datos), {"id", "codigo_cliente", "nombre", "tipo", "telefono_enmascarado", "programa"})
+        self.assertIsNone(datos["programa"], "sin tablas de programas, el escaneo sigue y no lo muestra")
         self.assertEqual(datos["tipo"], "Docente")
         self.assertNotIn("6671234567", r.text)
         self.assertEqual(datos["telefono_enmascarado"], "•••• ••45 67")

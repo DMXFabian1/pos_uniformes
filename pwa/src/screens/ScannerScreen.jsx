@@ -217,6 +217,9 @@ export default function ScannerScreen() {
                 <p className="text-xs text-ink-400 uppercase tracking-wide font-semibold">Cliente identificado</p>
                 <p className="font-bold text-ink-900 truncate text-lg mt-0.5">{result.data.nombre}</p>
                 <p className="text-xs text-ink-500 mt-0.5">{result.data.codigo_cliente} · {result.data.tipo || 'Cliente'}</p>
+                {result.data.programa && (
+                  <p className="text-xs font-semibold text-brand-700 mt-1">★ {result.data.programa}</p>
+                )}
               </div>
             </div>
             <p className="text-center text-xs text-ink-400">Navegando al catalogo en 2 s...</p>

@@ -1,4 +1,7 @@
-"""Ficha del cliente (E1-C3). Solo lectura: no hay botones que modifiquen."""
+"""Ficha del cliente (E1-C3). Solo lectura: no hay botones que modifiquen.
+
+E4-D: la pestaña «Fidelización» puede traer el panel del ADMIN con sus
+acciones; sin él, se queda el aviso de antes."""
 
 from __future__ import annotations
 
@@ -73,7 +76,9 @@ def _tabla(encabezados: list[str], filas: list[FilaHistorial], vacio: str) -> QW
     return contenedor
 
 
-def construir_ficha_dialog(parent: QWidget | None, ficha: FichaCliente) -> QDialog:
+def construir_ficha_dialog(
+    parent: QWidget | None, ficha: FichaCliente, *, panel_fidelizacion: QWidget | None = None
+) -> QDialog:
     dialog = QDialog(parent)
     dialog.setWindowTitle(f"Ficha {ficha.codigo}")
     dialog.setMinimumSize(760, 520)
@@ -106,13 +111,16 @@ def construir_ficha_dialog(parent: QWidget | None, ficha: FichaCliente) -> QDial
         form.addRow(etiqueta, valor_label)
     pestanas.addTab(datos, "Datos")
 
-    fidelizacion = QWidget()
-    caja_fid = QVBoxLayout(fidelizacion)
-    aviso = QLabel(PROGRAMAS_PENDIENTES)
-    aviso.setWordWrap(True)
-    caja_fid.addWidget(aviso)
-    caja_fid.addStretch()
-    pestanas.addTab(fidelizacion, "Fidelizacion")
+    if panel_fidelizacion is not None:
+        pestanas.addTab(panel_fidelizacion, "Fidelizacion")
+    else:
+        fidelizacion = QWidget()
+        caja_fid = QVBoxLayout(fidelizacion)
+        aviso = QLabel(PROGRAMAS_PENDIENTES)
+        aviso.setWordWrap(True)
+        caja_fid.addWidget(aviso)
+        caja_fid.addStretch()
+        pestanas.addTab(fidelizacion, "Fidelizacion")
 
     compras = QWidget()
     caja_compras = QVBoxLayout(compras)

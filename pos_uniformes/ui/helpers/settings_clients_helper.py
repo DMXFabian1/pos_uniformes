@@ -94,6 +94,7 @@ CLIENTES_ADMIN_COLUMNAS = (
     "QR",
     "Credencial",
     "Estado",
+    "Programa",  # E4-D: antes de Notas, para no mover las columnas de E1-C
     "Notas",
 )
 COLUMNA_QR = 6
@@ -135,6 +136,7 @@ def build_clientes_admin_view(clients: list[dict[str, object]], *, estado_label:
                     str(c["qr_label"]),
                     str(c["card_label"]),
                     str(c["status_label"]),
+                    str(c.get("programa") or ""),
                     str(c["notes"]),
                 ),
                 qr_tone="positive" if str(c["qr_label"]) == "Listo" else "warning",

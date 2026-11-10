@@ -3304,6 +3304,14 @@ class QuoteSatelliteWindow(QMainWindow):
             return
 
         self._libreta_descanso_respuestas = [rid for rid, _t in respuestas]
+        # E4-C: lo que el dueño decidió de los clientes que ella propuso a un
+        # programa sale en el mismo recuadro (su propia sesión: si falla, no
+        # esconde lo de los descansos).
+        from pos_uniformes.ui.helpers import libreta_programas_aviso
+
+        programas = libreta_programas_aviso.respuestas(get_session, code)
+        self._libreta_programa_respuestas = [mid for mid, _t in programas]
+        respuestas = respuestas + programas
         etiqueta = getattr(self, "libreta_descanso_respuesta", None)
         visto = getattr(self, "libreta_descanso_visto_button", None)
         if etiqueta is not None and visto is not None:
@@ -3371,6 +3379,9 @@ class QuoteSatelliteWindow(QMainWindow):
                 session.commit()
         except Exception:  # noqa: BLE001 — se le vuelve a enseñar la próxima vez
             logger.exception("Libreta: no se pudo marcar la respuesta como vista")
+        from pos_uniformes.ui.helpers import libreta_programas_aviso
+
+        libreta_programas_aviso.marcar_vistas(get_session, getattr(self, "_libreta_programa_respuestas", []), code)
         self._libreta_descanso_refrescar()
 
     def _libreta_pedir_descanso(self) -> None:
