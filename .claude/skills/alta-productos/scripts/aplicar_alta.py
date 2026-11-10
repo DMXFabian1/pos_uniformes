@@ -22,8 +22,15 @@ alta.json (los nombres de catálogo deben EXISTIR tal cual; no se crean aquí):
   },
   "color": "Sin color",
   "variantes": [{"talla": "10", "precio": 650}, {"talla": "12", "precio": 650}],
-  "uniforme": {"grupo": "Deportivo"}        # opcional: liga la pieza al uniforme de la escuela
+  "uniforme": {"grupo": "Deportivo", "orden": 2}   # opcional: liga la pieza nueva al uniforme
 }
+
+Solo ligar productos que YA existen (p. ej. piezas generales) al uniforme de una escuela:
+{
+  "escuela": "Ignacio Allende (Jaral)",
+  "ligar_al_uniforme": [{"producto": "Falda Escoces", "grupo": "Diario", "orden": 9}]
+}
+("producto" y "ligar_al_uniforme" pueden ir juntos en el mismo spec.)
 """
 from __future__ import annotations
 
@@ -49,7 +56,7 @@ def main() -> int:
     from sqlalchemy.orm import Session
 
     from pos_uniformes.database.models import (
-        AtributoProducto, Categoria, Escuela, Marca, NivelEducativo, RolUsuario,
+        AtributoProducto, Categoria, Escuela, Marca, NivelEducativo, Producto, RolUsuario,
         TipoPieza, TipoPrenda, Usuario,
     )
     from pos_uniformes.services import uniforme_service
@@ -57,11 +64,15 @@ def main() -> int:
     from pos_uniformes.utils.config import settings
 
     spec = json.loads(args.spec.read_text(encoding="utf-8"))
-    prod = spec["producto"]
+    prod = spec.get("producto")
     color = (spec.get("color") or "Sin color").strip()
-    variantes = spec["variantes"]
-    if not variantes:
-        print("ERROR: el spec no trae variantes.")
+    variantes = spec.get("variantes") or []
+    ligar = spec.get("ligar_al_uniforme") or []
+    if prod and not variantes:
+        print("ERROR: el spec trae producto pero no variantes.")
+        return 2
+    if not prod and not ligar:
+        print("ERROR: el spec no trae 'producto' ni 'ligar_al_uniforme'.")
         return 2
 
     engine = create_engine(args.db_url or settings.database_url, connect_args={"connect_timeout": 5})
@@ -84,42 +95,53 @@ def main() -> int:
             print("ERROR: no hay usuario ADMIN activo.")
             return 2
 
-        categoria = por_nombre(Categoria, prod["categoria"], "categoría")
-        marca = por_nombre(Marca, prod["marca"], "marca")
-        if categoria is None or marca is None:
-            raise SystemExit("ERROR: categoría y marca son obligatorias.")
-        escuela = por_nombre(Escuela, prod.get("escuela"), "escuela")
+        escuela = por_nombre(Escuela, (prod or {}).get("escuela") or spec.get("escuela"), "escuela")
+
+        def ligar_pieza(producto, conf: dict) -> None:
+            if escuela is None:
+                raise SystemExit("ERROR: ligar al uniforme requiere escuela.")
+            uni = uniforme_service.uniforme_de(session, escuela.id, crear=True)
+            pieza = uniforme_service.agregar_pieza(
+                session, uni.id, producto.id, grupo=conf.get("grupo"),
+                obligatoria=bool(conf.get("obligatoria", True)), orden=conf.get("orden"),
+            )
+            print(f"Uniforme de {escuela.nombre}: «{producto.nombre}» en grupo «{pieza.grupo}», orden {pieza.orden}")
 
         try:
-            producto = CatalogService.crear_producto(
-                session, admin, categoria, marca, prod["nombre"],
-                descripcion=prod.get("descripcion"),
-                escuela=escuela,
-                tipo_prenda=por_nombre(TipoPrenda, prod.get("tipo_prenda"), "tipo de prenda"),
-                tipo_pieza=por_nombre(TipoPieza, prod.get("tipo_pieza"), "tipo de pieza"),
-                nivel_educativo=por_nombre(NivelEducativo, prod.get("nivel_educativo"), "nivel"),
-                atributo=por_nombre(AtributoProducto, prod.get("atributo"), "atributo"),
-                genero=prod.get("genero"), escudo=prod.get("escudo"), ubicacion=prod.get("ubicacion"),
-            )
-            print(f"\nProducto: «{producto.nombre}» (id {producto.id})")
-            print(f"{'SKU':<12} {'Talla':<6} {'Color':<12} {'Precio':>8}")
-            for v in variantes:
-                var = CatalogService.crear_variante(
-                    session, admin, producto, v.get("sku"), str(v["talla"]),
-                    v.get("color") or color, Decimal(str(v["precio"])),
-                    costo_referencia=Decimal(str(v["costo"])) if v.get("costo") is not None else None,
-                    stock_inicial=int(v.get("stock", 0)),
+            if prod:
+                categoria = por_nombre(Categoria, prod["categoria"], "categoría")
+                marca = por_nombre(Marca, prod["marca"], "marca")
+                if categoria is None or marca is None:
+                    raise SystemExit("ERROR: categoría y marca son obligatorias.")
+                producto = CatalogService.crear_producto(
+                    session, admin, categoria, marca, prod["nombre"],
+                    descripcion=prod.get("descripcion"),
+                    escuela=escuela,
+                    tipo_prenda=por_nombre(TipoPrenda, prod.get("tipo_prenda"), "tipo de prenda"),
+                    tipo_pieza=por_nombre(TipoPieza, prod.get("tipo_pieza"), "tipo de pieza"),
+                    nivel_educativo=por_nombre(NivelEducativo, prod.get("nivel_educativo"), "nivel"),
+                    atributo=por_nombre(AtributoProducto, prod.get("atributo"), "atributo"),
+                    genero=prod.get("genero"), escudo=prod.get("escudo"), ubicacion=prod.get("ubicacion"),
                 )
-                print(f"{var.sku:<12} {var.talla:<6} {var.color:<12} {var.precio_venta:>8}")
+                print(f"\nProducto: «{producto.nombre}» (id {producto.id})")
+                print(f"{'SKU':<12} {'Talla':<6} {'Color':<12} {'Precio':>8}")
+                for v in variantes:
+                    var = CatalogService.crear_variante(
+                        session, admin, producto, v.get("sku"), str(v["talla"]),
+                        v.get("color") or color, Decimal(str(v["precio"])),
+                        costo_referencia=Decimal(str(v["costo"])) if v.get("costo") is not None else None,
+                        stock_inicial=int(v.get("stock", 0)),
+                    )
+                    print(f"{var.sku:<12} {var.talla:<6} {var.color:<12} {var.precio_venta:>8}")
 
-            if spec.get("uniforme"):
-                if escuela is None:
-                    raise SystemExit("ERROR: 'uniforme' requiere escuela.")
-                uni = uniforme_service.uniforme_de(session, escuela.id, crear=True)
-                pieza = uniforme_service.agregar_pieza(
-                    session, uni.id, producto.id, grupo=spec["uniforme"].get("grupo")
-                )
-                print(f"Uniforme de {escuela.nombre}: pieza en grupo «{pieza.grupo}»")
+                if spec.get("uniforme"):
+                    ligar_pieza(producto, spec["uniforme"])
+
+            for conf in ligar:
+                existente = session.scalar(select(Producto).where(Producto.nombre == conf["producto"]))
+                if existente is None:
+                    raise SystemExit(f"ERROR: producto «{conf['producto']}» no existe (nombre exacto).")
+                ligar_pieza(existente, conf)
         except ValueError as exc:
             session.rollback()
             print(f"\nERROR del POS: {exc}")
