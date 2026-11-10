@@ -11,9 +11,11 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QFormLayout,
+    QFrame,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
+    QHeaderView,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -29,6 +31,7 @@ from PyQt6.QtWidgets import (
 from pos_uniformes.services.respaldo_estado_service import HORA_RESPALDO
 from pos_uniformes.ui.helpers.date_field_helper import configure_friendly_date_edit
 from pos_uniformes.ui.helpers.settings_clients_helper import CLIENTES_ADMIN_COLUMNAS
+from pos_uniformes.ui.styles import clientes_styles
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
@@ -159,34 +162,98 @@ def build_suppliers_settings_dialog(window: "MainWindow") -> QDialog:
 
 
 def build_clients_settings_dialog(window: "MainWindow") -> QDialog:
-    dialog, layout = _create_settings_dialog(
-        window,
-        "Clientes",
-        "Administra clientes para futuras ventas, apartados y programas de fidelizacion.",
-        width=1040,
-    )
-    window.settings_clients_status_label.setObjectName("analyticsLine")
-    actions = QHBoxLayout()
-    window.settings_clients_search_input.setPlaceholderText("Codigo, nombre o telefono")
-    window.settings_clients_search_input.setMinimumWidth(220)
-    window.settings_view_client_button.setObjectName("toolbarSecondaryButton")
+    dialog, layout = _create_settings_dialog(window, "Clientes", None, width=1180)
+    clientes_styles.aplicar(dialog)
+    dialog.resize(1320, 700)
+    layout.setContentsMargins(18, 18, 18, 14)
+
+    # Encabezado: título, contador y el botón principal.
+    encabezado = QFrame()
+    encabezado.setObjectName("cliHeaderCard")
+    fila_enc = QHBoxLayout(encabezado)
+    fila_enc.setContentsMargins(18, 14, 18, 14)
+    fila_enc.setSpacing(12)
+    textos = QVBoxLayout()
+    textos.setSpacing(2)
+    titulo = QLabel("Clientes")
+    titulo.setObjectName("cliTitulo")
+    subtitulo = QLabel("Fichas para ventas, apartados y programas de fidelización.")
+    subtitulo.setObjectName("cliSubtitulo")
+    textos.addWidget(titulo)
+    textos.addWidget(subtitulo)
+    fila_enc.addLayout(textos, 1)
+    window.settings_clients_status_label.setObjectName("cliContador")
+    fila_enc.addWidget(window.settings_clients_status_label, 0, Qt.AlignmentFlag.AlignVCenter)
+    window.settings_client_programas_button.setText("★ Programas")
+    window.settings_client_programas_button.setObjectName("toolbarSecondaryButton")
+    fila_enc.addWidget(window.settings_client_programas_button, 0, Qt.AlignmentFlag.AlignVCenter)
+    window.settings_create_client_button.setText("+ Crear cliente")
     window.settings_create_client_button.setObjectName("toolbarPrimaryButton")
-    window.settings_update_client_button.setObjectName("toolbarSecondaryButton")
-    window.settings_toggle_client_button.setObjectName("toolbarGhostButton")
-    window.settings_generate_client_qr_button.setObjectName("toolbarSecondaryButton")
-    window.settings_client_whatsapp_button.setObjectName("toolbarGhostButton")
-    window.settings_client_whatsapp_button.setText("WhatsApp + credencial")
+    fila_enc.addWidget(window.settings_create_client_button, 0, Qt.AlignmentFlag.AlignVCenter)
+    layout.addWidget(encabezado)
+
+    # Buscador y filtros.
+    window.settings_clients_search_input.setObjectName("cliBuscar")
+    window.settings_clients_search_input.setPlaceholderText("Buscar por código, nombre o teléfono")
+    window.settings_clients_search_input.setClearButtonEnabled(True)
     window.settings_clients_search_input.textChanged.connect(
         lambda _text: window.settings_clients_debounce_timer.start()
     )
-    for _combo in (
-        window.settings_clients_estado_combo,
-        window.settings_clients_tipo_combo,
-        window.settings_clients_origen_combo,
-        window.settings_clients_programa_combo,
+    layout.addWidget(window.settings_clients_search_input)
+
+    filtros_card = QFrame()
+    filtros_card.setObjectName("cliFiltros")
+    filtros = QHBoxLayout(filtros_card)
+    filtros.setContentsMargins(14, 10, 14, 10)
+    filtros.setSpacing(8)
+    for etiqueta, combo in (
+        ("Estado", window.settings_clients_estado_combo),
+        ("Tipo", window.settings_clients_tipo_combo),
+        ("Origen", window.settings_clients_origen_combo),
+        ("Programa", window.settings_clients_programa_combo),
     ):
-        _combo.currentIndexChanged.connect(lambda _i: window._refresh_settings_clients())
-    window.settings_client_programas_button.setObjectName("toolbarGhostButton")
+        nombre = QLabel(etiqueta)
+        nombre.setObjectName("cliFiltroEtiqueta")
+        filtros.addWidget(nombre)
+        filtros.addWidget(combo)
+        filtros.addSpacing(8)
+        combo.currentIndexChanged.connect(lambda _i: window._refresh_settings_clients())
+    filtros.addStretch()
+    layout.addWidget(filtros_card)
+
+    # Tabla.
+    tabla = window.settings_clients_table
+    tabla.setColumnCount(len(CLIENTES_ADMIN_COLUMNAS))
+    tabla.setHorizontalHeaderLabels(list(CLIENTES_ADMIN_COLUMNAS))
+    tabla.setObjectName("cliTabla")
+    tabla.verticalHeader().setVisible(False)
+    tabla.verticalHeader().setDefaultSectionSize(38)
+    tabla.setShowGrid(False)
+    tabla.setSelectionBehavior(tabla.SelectionBehavior.SelectRows)
+    tabla.setSelectionMode(tabla.SelectionMode.SingleSelection)
+    tabla.setEditTriggers(tabla.EditTrigger.NoEditTriggers)
+    tabla.setAlternatingRowColors(True)
+    tabla.setMinimumHeight(340)
+    tabla.horizontalHeader().setStretchLastSection(True)
+    tabla.horizontalHeader().setHighlightSections(False)
+    tabla.horizontalHeader().setTextElideMode(Qt.TextElideMode.ElideRight)
+    # Programa y Notas se reparten lo que sobra: así no hay barra horizontal.
+    for columna in (CLIENTES_ADMIN_COLUMNAS.index("Programa"), CLIENTES_ADMIN_COLUMNAS.index("Notas")):
+        tabla.horizontalHeader().setSectionResizeMode(columna, QHeaderView.ResizeMode.Stretch)
+    tabla.setWordWrap(False)
+    tabla.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+    tabla.setToolTip("Doble clic para ver la ficha.")
+    tabla.doubleClicked.connect(lambda _i: window._handle_view_client_ficha())
+    layout.addWidget(tabla, 1)
+
+    # Lo que se hace con el cliente elegido, abajo y junto a Cerrar.
+    window.settings_view_client_button.setObjectName("toolbarSecondaryButton")
+    window.settings_update_client_button.setText("Editar")
+    window.settings_update_client_button.setObjectName("toolbarSecondaryButton")
+    window.settings_generate_client_qr_button.setObjectName("toolbarGhostButton")
+    window.settings_client_whatsapp_button.setText("WhatsApp + credencial")
+    window.settings_client_whatsapp_button.setObjectName("toolbarGhostButton")
+    window.settings_toggle_client_button.setObjectName("cliPeligro")
     window.settings_client_programas_button.clicked.connect(window._handle_open_programas)
     window.settings_view_client_button.clicked.connect(window._handle_view_client_ficha)
     window.settings_create_client_button.clicked.connect(window._handle_create_client)
@@ -194,46 +261,27 @@ def build_clients_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_toggle_client_button.clicked.connect(window._handle_toggle_client)
     window.settings_generate_client_qr_button.clicked.connect(window._handle_generate_client_qr)
     window.settings_client_whatsapp_button.clicked.connect(window._handle_open_client_whatsapp)
-    actions.addWidget(QLabel("Buscar"))
-    actions.addWidget(window.settings_clients_search_input, 1)
-    filtros = QHBoxLayout()
-    filtros.addWidget(QLabel("Estado"))
-    filtros.addWidget(window.settings_clients_estado_combo)
-    filtros.addWidget(QLabel("Tipo"))
-    filtros.addWidget(window.settings_clients_tipo_combo)
-    filtros.addWidget(QLabel("Origen"))
-    filtros.addWidget(window.settings_clients_origen_combo)
-    filtros.addWidget(QLabel("Programa"))
-    filtros.addWidget(window.settings_clients_programa_combo)
-    filtros.addStretch()
-    filtros.addWidget(window.settings_client_programas_button)
-    actions.addWidget(window.settings_view_client_button)
-    actions.addWidget(window.settings_create_client_button)
-    actions.addWidget(window.settings_update_client_button)
-    actions.addWidget(window.settings_toggle_client_button)
-    actions.addWidget(window.settings_generate_client_qr_button)
-    actions.addWidget(window.settings_client_whatsapp_button)
-
-    window.settings_clients_table.setColumnCount(len(CLIENTES_ADMIN_COLUMNAS))
-    window.settings_clients_table.setHorizontalHeaderLabels(list(CLIENTES_ADMIN_COLUMNAS))
-    window.settings_clients_table.setObjectName("dataTable")
-    window.settings_clients_table.verticalHeader().setVisible(False)
-    window.settings_clients_table.setSelectionBehavior(window.settings_clients_table.SelectionBehavior.SelectRows)
-    window.settings_clients_table.setAlternatingRowColors(True)
-    window.settings_clients_table.setMinimumHeight(340)
-    window.settings_clients_table.horizontalHeader().setStretchLastSection(True)
-
-    layout.addWidget(window.settings_clients_status_label)
-    layout.addLayout(actions)
-    layout.addLayout(filtros)
-    layout.addWidget(window.settings_clients_table)
-    footer = QHBoxLayout()
-    footer.addStretch()
+    pie = QHBoxLayout()
+    pie.setSpacing(8)
+    seleccion = QLabel("Cliente elegido:")
+    seleccion.setObjectName("cliFiltroEtiqueta")
+    pie.addWidget(seleccion)
+    for boton in (
+        window.settings_view_client_button,
+        window.settings_update_client_button,
+        window.settings_generate_client_qr_button,
+        window.settings_client_whatsapp_button,
+        window.settings_toggle_client_button,
+    ):
+        boton.setAutoDefault(False)
+        pie.addWidget(boton)
+    pie.addStretch()
     close_btn = QPushButton("Cerrar")
     close_btn.setObjectName("toolbarGhostButton")
+    close_btn.setAutoDefault(False)
     close_btn.clicked.connect(dialog.reject)
-    footer.addWidget(close_btn)
-    layout.addLayout(footer)
+    pie.addWidget(close_btn)
+    layout.addLayout(pie)
     return dialog
 
 

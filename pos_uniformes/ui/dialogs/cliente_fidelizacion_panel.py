@@ -8,14 +8,18 @@ propia sesión y se confirma sola; si falla, se dice por qué y no cambia nada.
 from __future__ import annotations
 
 import logging
+from html import escape
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
-    QFormLayout,
+    QFrame,
     QHBoxLayout,
+    QHeaderView,
     QInputDialog,
     QLabel,
     QMessageBox,
     QPushButton,
+    QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -39,53 +43,121 @@ class FidelizacionPanel(QWidget):
         self.panel: aps.PanelPrograma | None = None
 
         caja = QVBoxLayout(self)
-        form = QFormLayout()
+        caja.setContentsMargins(4, 4, 4, 4)
+        caja.setSpacing(12)
+        fila_tarjetas = QWidget()
+        fila_tarjetas.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Maximum)
+        tarjetas = QHBoxLayout(fila_tarjetas)
+        tarjetas.setContentsMargins(0, 0, 0, 0)
+        tarjetas.setSpacing(12)
+
+        # Programa actual
+        self.programa_card = QFrame()
+        self.programa_card.setObjectName("cliProgramaCard")
+        ly_prog = QVBoxLayout(self.programa_card)
+        ly_prog.setContentsMargins(16, 14, 16, 14)
+        ly_prog.setSpacing(4)
+        ly_prog.addWidget(self._etiqueta("Programa actual"))
+        fila_nombre = QHBoxLayout()
+        fila_nombre.setSpacing(8)
+        self.estrella_label = QLabel("★")
+        self.estrella_label.setObjectName("cliEstrella")
         self.actual_label = QLabel("")
-        self.pendiente_label = QLabel("")
-        self.pendiente_label.setWordWrap(True)
-        form.addRow("Programa", self.actual_label)
-        form.addRow("Propuesta", self.pendiente_label)
-        caja.addLayout(form)
-
-        fila_pendiente = QHBoxLayout()
-        self.aprobar_button = QPushButton("Aprobar propuesta")
-        self.rechazar_button = QPushButton("Rechazar propuesta…")
-        for b in (self.aprobar_button, self.rechazar_button):
-            b.setObjectName("toolbarSecondaryButton")
-            b.setAutoDefault(False)
-            fila_pendiente.addWidget(b)
-        fila_pendiente.addStretch()
-        caja.addLayout(fila_pendiente)
-
+        self.actual_label.setObjectName("cliProgramaNombre")
+        self.actual_label.setWordWrap(True)
+        fila_nombre.addWidget(self.estrella_label)
+        fila_nombre.addWidget(self.actual_label, 1)
+        ly_prog.addLayout(fila_nombre)
+        self.actual_desde_label = QLabel("")
+        self.actual_desde_label.setObjectName("cliSubtitulo")
+        ly_prog.addWidget(self.actual_desde_label)
+        ly_prog.addStretch()
         fila_acciones = QHBoxLayout()
         self.inscribir_button = QPushButton("Inscribir o cambiar de programa…")
         self.sacar_button = QPushButton("Sacar del programa…")
         self.inscribir_button.setObjectName("toolbarSecondaryButton")
-        self.sacar_button.setObjectName("toolbarGhostButton")
+        self.sacar_button.setObjectName("cliPeligro")
         for b in (self.inscribir_button, self.sacar_button):
             b.setAutoDefault(False)
             fila_acciones.addWidget(b)
         fila_acciones.addStretch()
-        caja.addLayout(fila_acciones)
+        ly_prog.addLayout(fila_acciones)
+        tarjetas.addWidget(self.programa_card, 1)
 
-        nota = QLabel("Es una etiqueta: por ahora ningún programa cambia precios ni descuentos.")
-        nota.setObjectName("subtleLine")
+        # Propuesta pendiente
+        self.propuesta_card = QFrame()
+        self.propuesta_card.setObjectName("cliPropuestaCard")
+        ly_prop = QVBoxLayout(self.propuesta_card)
+        ly_prop.setContentsMargins(16, 14, 16, 14)
+        ly_prop.setSpacing(6)
+        ly_prop.addWidget(self._etiqueta("Propuesta"))
+        self.pendiente_label = QLabel("")
+        self.pendiente_label.setWordWrap(True)
+        self.pendiente_label.setMinimumHeight(66)
+        self.pendiente_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        ly_prop.addWidget(self.pendiente_label)
+        ly_prop.addStretch()
+        fila_pendiente = QHBoxLayout()
+        self.aprobar_button = QPushButton("Aprobar propuesta")
+        self.rechazar_button = QPushButton("Rechazar propuesta…")
+        self.aprobar_button.setObjectName("toolbarPrimaryButton")
+        self.rechazar_button.setObjectName("toolbarGhostButton")
+        for b in (self.aprobar_button, self.rechazar_button):
+            b.setAutoDefault(False)
+            fila_pendiente.addWidget(b)
+        fila_pendiente.addStretch()
+        ly_prop.addLayout(fila_pendiente)
+        tarjetas.addWidget(self.propuesta_card, 1)
+        caja.addWidget(fila_tarjetas)
+
+        nota = QLabel("Por ahora los programas son una etiqueta: no cambian precios ni descuentos.")
+        nota.setObjectName("cliNota")
+        nota.setWordWrap(True)
         caja.addWidget(nota)
 
-        caja.addWidget(QLabel("Historial"))
+        historial = QLabel("HISTORIAL")
+        historial.setObjectName("cliSeccion")
+        caja.addWidget(historial)
         self.historial = QTableWidget(0, 5)
         self.historial.setHorizontalHeaderLabels(["Fecha", "Evento", "Programa", "Quién", "Motivo"])
         self.historial.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.historial.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.historial.verticalHeader().setVisible(False)
-        self.historial.setObjectName("dataTable")
-        self.historial.horizontalHeader().setStretchLastSection(True)
+        self.historial.verticalHeader().setDefaultSectionSize(36)
+        self.historial.setShowGrid(False)
+        self.historial.setAlternatingRowColors(True)
+        self.historial.setObjectName("cliTabla")
+        encabezado = self.historial.horizontalHeader()
+        for col in range(4):
+            encabezado.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+        encabezado.setSectionResizeMode(4, QHeaderView.ResizeMode.Stretch)
+        self.historial.setMinimumHeight(150)
         caja.addWidget(self.historial, 1)
+        self.historial_vacio = QLabel("Todavía no ha estado en ningún programa.")
+        self.historial_vacio.setObjectName("cliVacio")
+        self.historial_vacio.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        caja.addWidget(self.historial_vacio)
+        self.relleno = QWidget()
+        self.relleno.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Expanding)
+        caja.addWidget(self.relleno)
 
         self.aprobar_button.clicked.connect(self._aprobar)
         self.rechazar_button.clicked.connect(self._rechazar)
         self.inscribir_button.clicked.connect(self._inscribir)
         self.sacar_button.clicked.connect(self._sacar)
         self.recargar()
+
+    @staticmethod
+    def _etiqueta(texto: str) -> QLabel:
+        etiqueta = QLabel(texto.upper())
+        etiqueta.setObjectName("cliCampoEtiqueta")
+        return etiqueta
+
+    @staticmethod
+    def _marcar(tarjeta: QFrame, propiedad: str, valor: bool) -> None:
+        tarjeta.setProperty(propiedad, "true" if valor else "false")
+        tarjeta.style().unpolish(tarjeta)
+        tarjeta.style().polish(tarjeta)
 
     # ─── Lectura ─────────────────────────────────────────────────────────
 
@@ -103,17 +175,24 @@ class FidelizacionPanel(QWidget):
             return
         p = self.panel
         if p.actual:
+            self.actual_label.setText(p.actual)
             desde = format_display_datetime(p.actual_desde) if p.actual_desde else ""
-            self.actual_label.setText(f"★ {p.actual}" + (f"  (desde {desde})" if desde else ""))
+            self.actual_desde_label.setText(f"Desde el {desde}" if desde else "")
         else:
             self.actual_label.setText("Sin programa")
+            self.actual_desde_label.setText("Se inscribe desde Venta Rápida o aquí.")
+        self.estrella_label.setVisible(bool(p.actual))
+        self._marcar(self.programa_card, "activo", bool(p.actual))
         if p.pendiente:
             pe = p.pendiente
             self.pendiente_label.setText(
-                f"⏳ {pe.programa}, la propuso {pe.propuesta_por} el {format_display_datetime(pe.fecha)}.\n«{pe.motivo}»"
+                f"⏳ <b>{escape(pe.programa)}</b><br>"
+                f"<span style='color:#6d665e'>La propuso {escape(pe.propuesta_por)} el "
+                f"{escape(format_display_datetime(pe.fecha))}</span><br>«{escape(pe.motivo)}»"
             )
         else:
             self.pendiente_label.setText("Ninguna")
+        self._marcar(self.propuesta_card, "pendiente", p.pendiente is not None)
         hay_pendiente = p.pendiente is not None
         self.aprobar_button.setEnabled(hay_pendiente)
         self.rechazar_button.setEnabled(hay_pendiente)
@@ -125,7 +204,13 @@ class FidelizacionPanel(QWidget):
             valores = (format_display_datetime(fila.fecha), fila.evento, fila.programa, fila.quien, fila.motivo)
             for c, valor in enumerate(valores):
                 self.historial.setItem(r, c, QTableWidgetItem(valor))
-        self.historial.resizeColumnsToContents()
+        self.historial.setVisible(bool(p.historial))
+        self.historial_vacio.setVisible(not p.historial)
+        self.relleno.setVisible(not p.historial)
+        # Lo que no aplica no se enseña (sigue desactivado, como antes).
+        self.aprobar_button.setVisible(hay_pendiente)
+        self.rechazar_button.setVisible(hay_pendiente)
+        self.sacar_button.setVisible(p.actual is not None)
 
     # ─── Acciones ────────────────────────────────────────────────────────
 

@@ -3446,10 +3446,7 @@ class MainWindow(QMainWindow):
                 if column_index == COLUMNA_ESTADO:
                     _set_table_badge_style(item, client_row.status_tone)
                 self.settings_clients_table.setItem(row_index, column_index, item)
-        self.settings_clients_table.resizeColumnsToContents()
-        encabezado = self.settings_clients_table.horizontalHeader()
-        encabezado.setStretchLastSection(False)  # re-estira Notas tras ajustar anchos
-        encabezado.setStretchLastSection(True)
+        self.settings_clients_table.resizeColumnsToContents()  # Programa y Notas se estiran solas (settings_dialogs)
         self.settings_clients_status_label.setText(clients_view.status_label)
 
     def _handle_view_client_ficha(self) -> None:

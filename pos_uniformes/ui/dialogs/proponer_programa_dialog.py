@@ -6,6 +6,8 @@ muestra ni promete porcentajes: lo decide el dueño.
 
 from __future__ import annotations
 
+from html import escape
+
 from PyQt6.QtWidgets import (
     QDialog,
     QHBoxLayout,
@@ -17,6 +19,7 @@ from PyQt6.QtWidgets import (
 )
 
 from pos_uniformes.services.fidelizacion.membresia_service import MOTIVO_PROPUESTA_MINIMO
+from pos_uniformes.ui.styles import kiosko_clientes_styles
 
 PROGRAMAS = (
     ("PROFESIONAL", "Maximoda Profesional", "Docentes y profesionales que compran seguido."),
@@ -27,41 +30,56 @@ PROGRAMAS = (
 class ProponerProgramaDialog(QDialog):
     def __init__(self, parent=None, *, nombre_cliente: str) -> None:
         super().__init__(parent)
+        kiosko_clientes_styles.aplicar(self)
         self.setWindowTitle("Proponer programa")
-        self.setMinimumWidth(460)
+        self.setMinimumWidth(520)
         self.resultado: tuple[str, str] | None = None
 
         ly = QVBoxLayout(self)
-        titulo = QLabel(f"Proponer a <b>{nombre_cliente}</b> para:")
+        ly.setContentsMargins(22, 20, 22, 18)
+        ly.setSpacing(10)
+        titulo = QLabel("Proponer programa")
+        titulo.setObjectName("kcTitulo")
         ly.addWidget(titulo)
+        para = QLabel(f"Para <b>{escape(nombre_cliente)}</b>. Lo aprueba el dueño.")
+        para.setObjectName("kcSubtitulo")
+        ly.addWidget(para)
+        ly.addSpacing(4)
+
         self.opciones: dict[str, QRadioButton] = {}
         for clave, nombre, ayuda in PROGRAMAS:
-            radio = QRadioButton(f"{nombre} — {ayuda}")
+            radio = QRadioButton(f"★ {nombre}\n{ayuda}")
+            radio.setObjectName("kcOpcion")
             radio.toggled.connect(self._validar)
             self.opciones[clave] = radio
             ly.addWidget(radio)
 
-        ly.addWidget(QLabel("¿Por qué? (lo lee el dueño para decidir)"))
+        ly.addSpacing(4)
+        pregunta = QLabel("¿POR QUÉ? (LO LEE EL DUEÑO PARA DECIDIR)")
+        pregunta.setObjectName("kcSeccion")
+        ly.addWidget(pregunta)
         self.motivo_input = QPlainTextEdit()
         self.motivo_input.setPlaceholderText("Ej.: maestra de la Benito Juárez, compra para su grupo")
-        self.motivo_input.setFixedHeight(80)
+        self.motivo_input.setFixedHeight(96)
         self.motivo_input.textChanged.connect(self._validar)
         ly.addWidget(self.motivo_input)
 
         self.aviso = QLabel("")
-        self.aviso.setStyleSheet("color: #8a7a68; font-size: 12px;")
+        self.aviso.setObjectName("kcAviso")
         ly.addWidget(self.aviso)
         nota = QLabel("Queda pendiente hasta que el dueño la apruebe. Si en 7 días no hay respuesta, caduca.")
+        nota.setObjectName("kcNota")
         nota.setWordWrap(True)
-        nota.setStyleSheet("color: #8a7a68; font-size: 12px;")
         ly.addWidget(nota)
 
         botones = QHBoxLayout()
         botones.addStretch()
         self.cancelar_button = QPushButton("Cancelar")
+        self.cancelar_button.setObjectName("kcFantasma")
         self.cancelar_button.setAutoDefault(False)
         self.cancelar_button.clicked.connect(self.reject)
         self.enviar_button = QPushButton("Enviar propuesta")
+        self.enviar_button.setObjectName("kcPrimario")
         self.enviar_button.setAutoDefault(False)
         self.enviar_button.clicked.connect(self._enviar)
         botones.addWidget(self.cancelar_button)

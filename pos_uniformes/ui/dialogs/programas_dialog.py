@@ -7,10 +7,14 @@ descripción y estado. No se borran programas: se pausan o cierran.
 from __future__ import annotations
 
 import logging
+from html import escape
 
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
+    QFrame,
     QFormLayout,
     QHBoxLayout,
     QLabel,
@@ -26,10 +30,17 @@ from PyQt6.QtWidgets import (
 
 from pos_uniformes.services.fidelizacion import admin_programas_service as aps
 from pos_uniformes.services.fidelizacion import membresia_service as ms
+from pos_uniformes.ui.styles import clientes_styles
 
 _logger = logging.getLogger(__name__)
 
 COLUMNAS = ("Programa", "Estado", "Cómo se entra", "Tipo al aprobar", "Vigencia", "Miembros", "Propuestas")
+#: Color de la columna Estado: (fondo, letra).
+ESTADO_TONOS = {
+    "Activo": ("#e5f2eb", "#245241"),
+    "Pausado": ("#fbf0cf", "#8a5a00"),
+    "Cerrado": ("#ece8e1", "#6e675f"),
+}
 ESTADO_AYUDA = (
     "Pausado o cerrado: ya no se inscribe ni se aprueba a nadie nuevo. "
     "Quien ya es miembro lo sigue siendo."
@@ -39,11 +50,18 @@ ESTADO_AYUDA = (
 class EditarProgramaDialog(QDialog):
     def __init__(self, parent: QWidget | None, fila: aps.FilaPrograma) -> None:
         super().__init__(parent)
+        clientes_styles.aplicar(self)
         self.setWindowTitle(f"Editar {fila.nombre}")
-        self.setMinimumWidth(440)
+        self.setMinimumWidth(480)
         self.resultado: tuple[str, str, str] | None = None
         ly = QVBoxLayout(self)
+        ly.setContentsMargins(18, 18, 18, 14)
+        ly.setSpacing(12)
+        titulo = QLabel(f"Editar {fila.nombre}")
+        titulo.setObjectName("cliTitulo")
+        ly.addWidget(titulo)
         form = QFormLayout()
+        form.setVerticalSpacing(10)
         self.nombre_input = QLineEdit(fila.nombre)
         self.descripcion_input = QPlainTextEdit(fila.descripcion)
         self.descripcion_input.setFixedHeight(80)
@@ -59,11 +77,12 @@ class EditarProgramaDialog(QDialog):
         ly.addLayout(form)
         ayuda = QLabel(ESTADO_AYUDA)
         ayuda.setWordWrap(True)
-        ayuda.setObjectName("subtleLine")
+        ayuda.setObjectName("cliNota")
         ly.addWidget(ayuda)
         botones = QHBoxLayout()
         botones.addStretch()
         cancelar = QPushButton("Cancelar")
+        cancelar.setObjectName("toolbarGhostButton")
         cancelar.clicked.connect(self.reject)
         self.guardar_button = QPushButton("Guardar")
         self.guardar_button.setObjectName("toolbarPrimaryButton")
@@ -85,25 +104,46 @@ class EditarProgramaDialog(QDialog):
 class ProgramasDialog(QDialog):
     def __init__(self, parent: QWidget | None, session_factory, *, usuario_id: int) -> None:
         super().__init__(parent)
+        clientes_styles.aplicar(self)
         self.setWindowTitle("Programas")
-        self.setMinimumSize(820, 360)
+        self.setMinimumSize(900, 460)
         self._session_factory = session_factory
         self._usuario_id = int(usuario_id)
         self.filas: list[aps.FilaPrograma] = []
         ly = QVBoxLayout(self)
-        aviso = QLabel("Por ahora los programas son una etiqueta: no cambian precios ni descuentos.")
-        aviso.setObjectName("subtleLine")
-        ly.addWidget(aviso)
+        ly.setContentsMargins(18, 18, 18, 14)
+        ly.setSpacing(12)
+        encabezado = QFrame()
+        encabezado.setObjectName("cliHeaderCard")
+        ly_enc = QHBoxLayout(encabezado)
+        ly_enc.setContentsMargins(18, 14, 18, 14)
+        textos = QVBoxLayout()
+        textos.setSpacing(2)
+        titulo = QLabel("Programas de fidelización")
+        titulo.setObjectName("cliTitulo")
+        subtitulo = QLabel("Por ahora los programas son una etiqueta: no cambian precios ni descuentos.")
+        subtitulo.setObjectName("cliSubtitulo")
+        textos.addWidget(titulo)
+        textos.addWidget(subtitulo)
+        ly_enc.addLayout(textos, 1)
+        self.resumen_label = QLabel("")
+        self.resumen_label.setObjectName("cliContador")
+        ly_enc.addWidget(self.resumen_label, 0, Qt.AlignmentFlag.AlignVCenter)
+        ly.addWidget(encabezado)
         self.tabla = QTableWidget(0, len(COLUMNAS))
         self.tabla.setHorizontalHeaderLabels(list(COLUMNAS))
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabla.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.tabla.verticalHeader().setVisible(False)
-        self.tabla.setObjectName("dataTable")
+        self.tabla.verticalHeader().setDefaultSectionSize(40)
+        self.tabla.setShowGrid(False)
+        self.tabla.setAlternatingRowColors(True)
+        self.tabla.setObjectName("cliTabla")
         self.tabla.doubleClicked.connect(lambda _i: self._editar())
         ly.addWidget(self.tabla, 1)
         self.descripcion = QLabel("")
+        self.descripcion.setObjectName("cliNota")
         self.descripcion.setWordWrap(True)
         ly.addWidget(self.descripcion)
         self.tabla.itemSelectionChanged.connect(self._mostrar_descripcion)
@@ -134,8 +174,31 @@ class ProgramasDialog(QDialog):
         for r, f in enumerate(self.filas):
             for c, valor in enumerate((f.nombre, f.estado, f.ingreso, f.tipo_sugerido, f.vigencia,
                                        str(f.miembros), str(f.pendientes))):
-                self.tabla.setItem(r, c, QTableWidgetItem(valor))
+                item = QTableWidgetItem(valor)
+                if c == 0:
+                    fuente = item.font()
+                    fuente.setBold(True)
+                    item.setFont(fuente)
+                if c == 1 and valor in ESTADO_TONOS:
+                    fondo, letra = ESTADO_TONOS[valor]
+                    item.setBackground(QColor(fondo))
+                    item.setForeground(QColor(letra))
+                if c in (1, 5, 6):
+                    item.setTextAlignment(int(Qt.AlignmentFlag.AlignCenter))
+                if c == 6 and f.pendientes:
+                    item.setForeground(QColor("#8a5a00"))
+                    fuente = item.font()
+                    fuente.setBold(True)
+                    item.setFont(fuente)
+                self.tabla.setItem(r, c, item)
         self.tabla.resizeColumnsToContents()
+        self.tabla.horizontalHeader().setStretchLastSection(True)
+        miembros = sum(f.miembros for f in self.filas)
+        pendientes = sum(f.pendientes for f in self.filas)
+        self.resumen_label.setText(
+            f"{miembros} miembro{'s' if miembros != 1 else ''} · "
+            f"{pendientes} propuesta{'s' if pendientes != 1 else ''}"
+        )
         self.editar_button.setEnabled(bool(self.filas))
         if self.filas and not self.tabla.selectedItems():
             self.tabla.selectRow(0)
@@ -146,7 +209,13 @@ class ProgramasDialog(QDialog):
 
     def _mostrar_descripcion(self) -> None:
         f = self._seleccionada()
-        self.descripcion.setText(f.descripcion if f else "")
+        if f is None:
+            self.descripcion.setText("")
+            return
+        texto = f"<b>{escape(f.nombre)}</b>"
+        if f.descripcion:
+            texto += f" — {escape(f.descripcion)}"
+        self.descripcion.setText(texto)
 
     def _editar(self) -> None:
         f = self._seleccionada()

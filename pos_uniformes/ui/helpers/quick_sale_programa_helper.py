@@ -21,6 +21,8 @@ from dataclasses import dataclass
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QDialog, QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton
 
+from pos_uniformes.ui.styles import kiosko_clientes_styles
+
 _logger = logging.getLogger(__name__)
 
 SIN_CONEXION_TOOLTIP = "Sin conexión: inscríbelo después."
@@ -69,20 +71,15 @@ class ProgramaClienteMixin:
     def _build_programa_bar(self) -> QFrame:
         bar = QFrame()
         bar.setObjectName("programaBar")
-        bar.setStyleSheet(
-            "QFrame#programaBar { background: #fbf6ee; border: 1px solid #eadcc6; border-radius: 10px; }"
-            "QLabel { font-size: 13px; color: #2c2a27; }"
-            "QPushButton { font-size: 12px; font-weight: 600; padding: 5px 10px; border-radius: 8px;"
-            " border: 1px solid #d9c3a5; background: white; }"
-            "QPushButton:disabled { color: #b9aa98; }"
-        )
+        bar.setStyleSheet(kiosko_clientes_styles.FRANJA_PROGRAMA)
         ly = QHBoxLayout()
-        ly.setContentsMargins(14, 4, 10, 4)
+        ly.setContentsMargins(14, 6, 10, 6)
         ly.setSpacing(8)
         self._programa_label = QLabel("")
         self._programa_label.setTextFormat(Qt.TextFormat.PlainText)
         ly.addWidget(self._programa_label, 1)
         self._btn_inscribir_club = QPushButton("★ Inscribir a Maximoda Club")
+        self._btn_inscribir_club.setObjectName("kcFranjaClub")
         self._btn_inscribir_club.setAutoDefault(False)
         self._btn_inscribir_club.clicked.connect(self._on_inscribir_club)
         ly.addWidget(self._btn_inscribir_club)

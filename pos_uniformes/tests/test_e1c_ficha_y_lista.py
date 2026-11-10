@@ -88,7 +88,7 @@ class FichaServiceTests(unittest.TestCase):
             ficha_service.cargar_ficha(self.s, cliente_id=self.cliente.id, usuario_id=self.cajero.id)
 
     def test_dialogo_de_solo_lectura(self) -> None:
-        QApplication.instance() or QApplication([])
+        self.app = QApplication.instance() or QApplication([])  # guardada: sin referencia, Qt la destruye
         ficha = ficha_service.cargar_ficha(self.s, cliente_id=self.cliente.id, usuario_id=self.admin.id)
         dialogo = construir_ficha_dialog(None, ficha)
         pestanas = dialogo.findChild(QTabWidget)
