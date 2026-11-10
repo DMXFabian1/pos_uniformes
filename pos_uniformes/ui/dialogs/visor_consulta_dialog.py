@@ -1,5 +1,6 @@
 """Las consultas (mapa de escuelas, tipos de escocés) en una ventana del
-programa, no en el navegador (2026-11-07).
+programa, no en el navegador (2026-11-07). También WhatsApp Web, para mandar
+la credencial al cliente nuevo (2026-11-10).
 
 Daniel: «al usar los comandos para ver mapa y ver pdf abre el navegador, me
 gustaría que se sintiera algo más del programa, como si fuera una ventana más».
@@ -236,6 +237,80 @@ class VisorPdf(_Visor):
         from PyQt6.QtPdfWidgets import QPdfView
 
         self.vista.setZoomMode(QPdfView.ZoomMode.FitToWidth)
+
+
+# ---------------------------------------------------------------------------
+# WhatsApp Web
+# ---------------------------------------------------------------------------
+
+_PERFIL_WHATSAPP = None
+
+
+def _perfil_whatsapp():
+    """Un perfil propio y guardado en disco: el QR se escanea una sola vez."""
+    global _PERFIL_WHATSAPP
+    if _PERFIL_WHATSAPP is None:
+        from PyQt6.QtCore import QStandardPaths
+        from PyQt6.QtWebEngineCore import QWebEngineProfile
+
+        perfil = QWebEngineProfile("whatsapp_web", QApplication.instance())
+        carpeta = Path(QStandardPaths.writableLocation(QStandardPaths.StandardLocation.AppDataLocation)) / "whatsapp_web"
+        perfil.setPersistentStoragePath(str(carpeta))
+        perfil.setCachePath(str(carpeta / "cache"))
+        perfil.setPersistentCookiesPolicy(QWebEngineProfile.PersistentCookiesPolicy.ForcePersistentCookies)
+        # WhatsApp Web no abre en navegadores que no reconoce: el motor es
+        # Chromium, así que se presenta como Chrome (sin la marca QtWebEngine).
+        perfil.setHttpUserAgent(agente_chrome(perfil.httpUserAgent()))
+        _PERFIL_WHATSAPP = perfil
+    return _PERFIL_WHATSAPP
+
+
+def agente_chrome(agente: str) -> str:
+    return " ".join(parte for parte in agente.split() if not parte.startswith("QtWebEngine/"))
+
+
+class VisorWhatsapp(_Visor):
+    """WhatsApp Web en una ventana del programa (Daniel, 2026-11-10).
+
+    Cerrarla solo la esconde: así WhatsApp sigue conectado y la siguiente
+    credencial abre al instante."""
+
+    clave = "whatsapp"
+
+    def __init__(self, url: str, parent: QWidget | None = None) -> None:
+        from PyQt6.QtWebEngineCore import QWebEnginePage
+        from PyQt6.QtWebEngineWidgets import QWebEngineView
+
+        super().__init__("💬 WhatsApp", parent)
+        self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, False)
+        self.detalle.setText(PASO_PEGAR_WHATSAPP)
+        self.vista = QWebEngineView(self)
+        self.vista.setPage(QWebEnginePage(_perfil_whatsapp(), self.vista))
+        self.cuerpo.addWidget(self.vista)
+        self.vista.load(QUrl(url))
+
+    def abrir_chat(self, url: str) -> None:
+        self.vista.load(QUrl(url))
+        self.traer_al_frente()
+
+    def closeEvent(self, event) -> None:  # noqa: N802
+        event.ignore()
+        self.hide()
+
+
+PASO_PEGAR_WHATSAPP = "Pega la credencial con Ctrl+V y da Enviar"
+
+
+def mostrar_whatsapp(url: str, parent: QWidget | None = None) -> VisorWhatsapp:
+    """Abre WhatsApp Web en el chat de `url` (o lleva ahí la ventana que ya está)."""
+    ya = _ABIERTAS.get(VisorWhatsapp.clave)
+    if ya is not None:
+        ya.abrir_chat(url)
+        return ya
+    visor = VisorWhatsapp(url, parent)
+    _ABIERTAS[VisorWhatsapp.clave] = visor
+    visor.show()
+    return visor
 
 
 # ---------------------------------------------------------------------------

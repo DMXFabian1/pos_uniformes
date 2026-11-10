@@ -39,11 +39,11 @@ def crear_cliente(
     *,
     admin_user_id: int,
     datos: dict[str, str],
-    confirmar_telefono_compartido: bool = False,
     render_card: Callable[[object], tuple[Path | None, str | None]] | None = None,
 ) -> SettingsClientActionResult:
-    """Alta del ADMIN. Una coincidencia de teléfono sin confirmar detiene el
-    alta con `CoincidenciasPorConfirmarError`."""
+    """Alta del ADMIN. El teléfono es obligatorio (10 dígitos,
+    `TelefonoInvalidoError`) y único: si ya es de otra ficha, no se crea
+    (`CoincidenciasPorConfirmarError`). Daniel, 2026-11-10."""
     admin_service.exigir_admin(session, admin_user_id)
     cliente = identidad_service.dar_de_alta(
         session,
@@ -53,8 +53,8 @@ def crear_cliente(
         tipo_clave=datos.get("tipo_clave") or identidad_service.TIPO_GENERAL,
         notas=datos.get("notas"),
         usuario_id=int(admin_user_id),
+        exigir_telefono_valido=True,
         revisar_duplicados=True,
-        confirmar_telefono_compartido=confirmar_telefono_compartido,
     )
     card_path, card_error = render_card(cliente) if render_card is not None else (None, None)
     return SettingsClientActionResult(
@@ -71,7 +71,6 @@ def editar_cliente(
     admin_user_id: int,
     client_id: int,
     datos: dict[str, str],
-    confirmar_telefono_compartido: bool = False,
 ) -> SettingsClientActionResult:
     """Identidad y tipo, cada uno con su evento. Sin cambios, sin eventos."""
     cliente = admin_service.editar_identidad(
@@ -81,7 +80,6 @@ def editar_cliente(
         nombre=datos.get("nombre", ""),
         telefono=datos.get("telefono"),
         notas=datos.get("notas"),
-        confirmar_telefono_compartido=confirmar_telefono_compartido,
     )
     clave = (datos.get("tipo_clave") or "").strip()
     if clave:

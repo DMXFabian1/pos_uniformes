@@ -4,7 +4,8 @@ Mixin para `QuickSaleWidget`. Es una franja propia debajo de la barra del
 Monedero, que no se toca. Muestra en qué programa está el cliente ligado a la
 venta y deja a la empleada:
 
-- inscribirlo a Maximoda Club (queda activo al instante), o
+- inscribirlo a Maximoda Club (queda activo al instante; el cliente que se
+  registra en el kiosko ya entra solo, desde 2026-11-10), o
 - proponerlo a Profesional o Mayorista con un motivo (lo aprueba el dueño
   por Telegram).
 
@@ -188,15 +189,16 @@ class ProgramaClienteMixin:
         if self._programa_ejecutar(hacer):
             self._flash_scan_hint(f"{c['nombre']} ya es miembro de Maximoda Club")
 
-    def _on_proponer_programa(self) -> None:
+    def _on_proponer_programa(self) -> bool:
+        """True si la propuesta quedó guardada."""
         if not self._programa_puede_actuar():
-            return
+            return False
         from pos_uniformes.ui.dialogs.proponer_programa_dialog import ProponerProgramaDialog
 
         c = self._cliente
         dialogo = ProponerProgramaDialog(self, nombre_cliente=str(c["nombre"]))
         if dialogo.exec() != int(QDialog.DialogCode.Accepted) or dialogo.resultado is None:
-            return
+            return False
         clave, motivo = dialogo.resultado
 
         def hacer(session, ms):
@@ -211,6 +213,8 @@ class ProgramaClienteMixin:
 
         if self._programa_ejecutar(hacer):
             self._flash_scan_hint("Propuesta enviada: esperando aprobación")
+            return True
+        return False
 
     def _programa_ejecutar(self, hacer) -> bool:
         from pos_uniformes.database.connection import get_session

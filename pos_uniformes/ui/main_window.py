@@ -268,7 +268,11 @@ from pos_uniformes.services.settings_cliente_admin_actions import (
     editar_cliente,
     tipos_para_combo,
 )
-from pos_uniformes.services.clientes.identidad_service import CoincidenciasPorConfirmarError
+from pos_uniformes.services.clientes.identidad_service import (
+    CoincidenciasPorConfirmarError,
+    TelefonoInvalidoError,
+    mensaje_telefono_ya_registrado,
+)
 from pos_uniformes.ui.dialogs.cliente_admin_dialogs import prompt_cliente_ficha, prompt_motivo
 from pos_uniformes.ui.dialogs.cliente_ficha_dialog import ORIGEN_ETIQUETAS, construir_ficha_dialog, etiqueta_origen
 from pos_uniformes.services.clientes import admin_service
@@ -4234,27 +4238,24 @@ class MainWindow(QMainWindow):
         )
         if data is None:
             return
-        confirmar = False
-        while True:
-            try:
-                with get_session() as session:
-                    result = crear_cliente(
-                        session,
-                        admin_user_id=self.user_id,
-                        datos=data,
-                        confirmar_telefono_compartido=confirmar,
-                        render_card=self._render_client_card_safe,
-                    )
-                    session.commit()
-            except CoincidenciasPorConfirmarError as exc:
-                if confirmar or not self._confirmar_telefono_compartido(exc.coincidencias):
-                    return
-                confirmar = True
-                continue
-            except Exception as exc:  # noqa: BLE001
-                QMessageBox.critical(self, "No se pudo crear", str(exc))
-                return
-            break
+        try:
+            with get_session() as session:
+                result = crear_cliente(
+                    session,
+                    admin_user_id=self.user_id,
+                    datos=data,
+                    render_card=self._render_client_card_safe,
+                )
+                session.commit()
+        except CoincidenciasPorConfirmarError as exc:
+            QMessageBox.warning(self, "Teléfono ya registrado", mensaje_telefono_ya_registrado(exc.coincidencias))
+            return
+        except TelefonoInvalidoError as exc:
+            QMessageBox.warning(self, "Teléfono inválido", str(exc))
+            return
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "No se pudo crear", str(exc))
+            return
 
         self.refresh_all()
         result_feedback = build_settings_client_result_feedback(
@@ -4264,22 +4265,6 @@ class MainWindow(QMainWindow):
             asset_error=result.card_error,
         )
         QMessageBox.information(self, result_feedback.title, result_feedback.message)
-
-    def _confirmar_telefono_compartido(self, coincidencias) -> bool:
-        """E1-C1: un telefono repetido nunca se guarda en silencio."""
-        lineas = "\n".join(f"- {c.codigo} {c.nombre} ({c.telefono_enmascarado})" for c in coincidencias)
-        respuesta = QMessageBox.question(
-            self,
-            "Telefono ya registrado",
-            (
-                f"Ese telefono ya esta en {len(coincidencias)} ficha(s):\n{lineas}\n\n"
-                "Si es la misma persona, cancela y usa su ficha.\n"
-                "Si es otra persona que comparte el telefono, elige Si para guardarlo."
-            ),
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        return respuesta == QMessageBox.StandardButton.Yes
 
     def _handle_update_client(self) -> None:
         client_id = self._selected_settings_client_id()
@@ -4312,27 +4297,24 @@ class MainWindow(QMainWindow):
         if data is None:
             return
 
-        confirmar = False
-        while True:
-            try:
-                with get_session() as session:
-                    result = editar_cliente(
-                        session,
-                        admin_user_id=self.user_id,
-                        client_id=client_id,
-                        datos=data,
-                        confirmar_telefono_compartido=confirmar,
-                    )
-                    session.commit()
-            except CoincidenciasPorConfirmarError as exc:
-                if confirmar or not self._confirmar_telefono_compartido(exc.coincidencias):
-                    return
-                confirmar = True
-                continue
-            except Exception as exc:  # noqa: BLE001
-                QMessageBox.critical(self, "No se pudo actualizar", str(exc))
-                return
-            break
+        try:
+            with get_session() as session:
+                result = editar_cliente(
+                    session,
+                    admin_user_id=self.user_id,
+                    client_id=client_id,
+                    datos=data,
+                )
+                session.commit()
+        except CoincidenciasPorConfirmarError as exc:
+            QMessageBox.warning(self, "Teléfono ya registrado", mensaje_telefono_ya_registrado(exc.coincidencias))
+            return
+        except TelefonoInvalidoError as exc:
+            QMessageBox.warning(self, "Teléfono inválido", str(exc))
+            return
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "No se pudo actualizar", str(exc))
+            return
 
         self.refresh_all()
         result_feedback = build_settings_client_result_feedback(

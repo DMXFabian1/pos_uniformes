@@ -190,13 +190,22 @@ class AltasDeClientServiceTests(_EnTransaccion):
             ClientService.create_client(self.s, self._usuario(RolUsuario.ADMIN), "X", descuento_preferente=Decimal("101"))
 
     def test_alta_rapida_de_presupuesto(self) -> None:
-        tel = self._tel("09")
-        previo = ids.dar_de_alta(self.s, nombre=f"Previo {self.marca}", telefono=tel, origen=ids.ORIGEN_VENTA_RAPIDA)
-        c = ClientService.create_client_quick(self.s, self._usuario(RolUsuario.CAJERO), f"Presup {self.marca}", telefono=tel)
+        c = ClientService.create_client_quick(self.s, self._usuario(RolUsuario.CAJERO), f"Presup {self.marca}",
+                                              telefono=self._tel("09"))
         self._assert_sin_nivel(c, ids.ORIGEN_PRESUPUESTO_KIOSKO)
         (ev,) = self._eventos(c)
         self.assertEqual(ev.tipo, ids.EVENTO_ALTA)
-        self.assertEqual(ev.detalle["coincidencias"], [previo.id])
+        self.assertEqual(ev.detalle["coincidencias"], [])
+
+    def test_alta_rapida_de_presupuesto_con_telefono_repetido_o_invalido_no_se_crea(self) -> None:
+        # Daniel, 2026-11-10: teléfono de 10 dígitos y único también en el POS.
+        tel = self._tel("11")
+        previo = ids.dar_de_alta(self.s, nombre=f"Previo {self.marca}", telefono=tel, origen=ids.ORIGEN_VENTA_RAPIDA)
+        with self.assertRaises(ValueError) as err:
+            ClientService.create_client_quick(self.s, self._usuario(RolUsuario.CAJERO), f"Presup {self.marca}", telefono=tel)
+        self.assertIn(previo.codigo_cliente, str(err.exception))
+        with self.assertRaises(ids.TelefonoInvalidoError):
+            ClientService.create_client_quick(self.s, self._usuario(RolUsuario.CAJERO), f"Presup {self.marca}", telefono="123")
 
 
 class EdicionSinNivelTests(_EnTransaccion):

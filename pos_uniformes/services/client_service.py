@@ -80,15 +80,21 @@ class ClientService:
         # `descuento_preferente` se ignora a propósito: asignar nivel o
         # descuento es una acción explícita aparte (E1-C).
         cls.normalize_discount(descuento_preferente)  # sigue validando el rango
-        return identidad_service.dar_de_alta(
-            session,
-            nombre=nombre,
-            telefono=telefono,
-            origen=identidad_service.ORIGEN_POS_ADMIN,
-            tipo_cliente=tipo_cliente,
-            notas=notas,
-            usuario_id=getattr(admin_user, "id", None),
-        )
+        # Teléfono de 10 dígitos y único (Daniel, 2026-11-10).
+        try:
+            return identidad_service.dar_de_alta(
+                session,
+                nombre=nombre,
+                telefono=telefono,
+                origen=identidad_service.ORIGEN_POS_ADMIN,
+                tipo_cliente=tipo_cliente,
+                notas=notas,
+                usuario_id=getattr(admin_user, "id", None),
+                exigir_telefono_valido=True,
+                revisar_duplicados=True,
+            )
+        except identidad_service.CoincidenciasPorConfirmarError as exc:
+            raise ValueError(identidad_service.mensaje_telefono_ya_registrado(exc.coincidencias)) from exc
 
     @classmethod
     def create_client_quick(
@@ -109,13 +115,19 @@ class ClientService:
         if not normalized_phone:
             raise ValueError("El telefono del cliente no puede estar vacio.")
         # E1-B (K1): el alta rápida de Presupuesto nace sin nivel ni descuento.
-        return identidad_service.dar_de_alta(
-            session,
-            nombre=normalized_name,
-            telefono=normalized_phone,
-            origen=identidad_service.ORIGEN_PRESUPUESTO_KIOSKO,
-            usuario_id=getattr(usuario, "id", None),
-        )
+        # Teléfono de 10 dígitos y único, como en Venta Rápida (Daniel, 2026-11-10).
+        try:
+            return identidad_service.dar_de_alta(
+                session,
+                nombre=normalized_name,
+                telefono=normalized_phone,
+                origen=identidad_service.ORIGEN_PRESUPUESTO_KIOSKO,
+                usuario_id=getattr(usuario, "id", None),
+                exigir_telefono_valido=True,
+                revisar_duplicados=True,
+            )
+        except identidad_service.CoincidenciasPorConfirmarError as exc:
+            raise ValueError(identidad_service.mensaje_telefono_ya_registrado(exc.coincidencias)) from exc
 
     @classmethod
     def update_client(

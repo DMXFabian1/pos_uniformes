@@ -98,9 +98,12 @@ def editar_identidad(
     nombre: str,
     telefono: str | None,
     notas: str | None,
-    confirmar_telefono_compartido: bool = False,
 ) -> Cliente:
-    """Cambia nombre, teléfono y notas. Nada más (C1)."""
+    """Cambia nombre, teléfono y notas. Nada más (C1).
+
+    Si cambia el teléfono, el nuevo debe tener 10 dígitos y no ser de otra
+    ficha (Daniel, 2026-11-10). Las fichas viejas con teléfono repetido o
+    inválido se pueden seguir editando mientras no se toque el teléfono."""
     usuario = exigir_admin(session, usuario_id)
     cliente = _cliente(session, cliente_id)
     _no_archivado(cliente)
@@ -123,8 +126,10 @@ def editar_identidad(
 
     coincidencias: list[identidad.ClienteEncontrado] = []
     if "telefono" in cambios:
+        if normalizar_telefono(nuevo_telefono) is None:
+            raise identidad.TelefonoInvalidoError("El teléfono debe tener 10 dígitos válidos.")
         coincidencias = identidad.coincidencias_por_telefono(session, nuevo_telefono, excluir_id=int(cliente.id))
-        if coincidencias and not confirmar_telefono_compartido:
+        if coincidencias:
             raise identidad.CoincidenciasPorConfirmarError(coincidencias)
 
     cliente.nombre = nuevo_nombre

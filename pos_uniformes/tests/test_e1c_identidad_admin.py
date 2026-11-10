@@ -11,12 +11,12 @@ import unittest
 import uuid
 from decimal import Decimal
 from types import SimpleNamespace
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtWidgets import QApplication, QComboBox, QDialog, QDialogButtonBox, QLineEdit, QWidget
-from sqlalchemy import create_engine, select
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
@@ -111,9 +111,10 @@ class EdicionTests(_Base):
 
 
 class TelefonoCompartidoTests(_Base):
-    """T-N3: un teléfono repetido al editar pide confirmación y queda registrado."""
+    """T-N3 (Daniel, 2026-11-10): el teléfono es único. Un teléfono que ya es
+    de otra ficha no se guarda, ni al crear ni al editar; ya no se confirma."""
 
-    def test_coincidencia_detiene_y_con_confirmacion_guarda(self) -> None:
+    def test_editar_a_un_telefono_de_otra_ficha_no_se_guarda(self) -> None:
         a = self._alta(nombre="Persona A", telefono=f"6678{self.sufijo}")
         b = self._alta(nombre="Persona B", telefono=f"6677{self.sufijo}")
         with self.assertRaises(ids.CoincidenciasPorConfirmarError) as err:
@@ -122,29 +123,35 @@ class TelefonoCompartidoTests(_Base):
         self.assertEqual([x.id for x in err.exception.coincidencias], [a.id])
         self.s.refresh(b)
         self.assertEqual(b.telefono, f"6677{self.sufijo}")
+        self.assertEqual(self._eventos(b, adm.EVENTO_EDICION), [])
 
-        adm.editar_identidad(self.s, cliente_id=b.id, usuario_id=self.admin.id, nombre=b.nombre,
-                             telefono=a.telefono, notas=None, confirmar_telefono_compartido=True)
-        ev = self._eventos(b, adm.EVENTO_EDICION)[-1]
-        self.assertEqual(ev.detalle["coincidencias"], [a.id])
-        self.assertEqual(ev.detalle["telefono"], "valido")
+    def test_editar_a_un_telefono_invalido_no_se_guarda(self) -> None:
+        b = self._alta(nombre="Persona B", telefono=f"6677{self.sufijo}")
+        for malo in ("", "123"):
+            with self.subTest(telefono=malo), self.assertRaises(ids.TelefonoInvalidoError):
+                adm.editar_identidad(self.s, cliente_id=b.id, usuario_id=self.admin.id, nombre=b.nombre,
+                                     telefono=malo, notas=None)
+        self.s.refresh(b)
+        self.assertEqual(b.telefono, f"6677{self.sufijo}")
 
     def test_su_propio_telefono_no_cuenta_como_coincidencia(self) -> None:
         a = self._alta()
         adm.editar_identidad(self.s, cliente_id=a.id, usuario_id=self.admin.id, nombre="Otro nombre",
                              telefono=a.telefono, notas=None)
 
-    def test_alta_del_admin_con_telefono_repetido_pide_confirmacion(self) -> None:
+    def test_alta_del_admin_con_telefono_repetido_no_se_crea(self) -> None:
         a = self._alta()
         datos = {"nombre": "Otra", "telefono": a.telefono, "tipo_clave": "DOCENTE", "notas": ""}
+        antes = self.s.scalar(select(func.count()).select_from(Cliente))
         with self.assertRaises(ids.CoincidenciasPorConfirmarError):
             acciones.crear_cliente(self.s, admin_user_id=self.admin.id, datos=datos)
-        r = acciones.crear_cliente(self.s, admin_user_id=self.admin.id, datos=datos, confirmar_telefono_compartido=True)
-        nuevo = self.s.scalar(select(Cliente).where(Cliente.codigo_cliente == r.client_code))
-        self.assertEqual(self._eventos(nuevo)[0].tipo, ids.EVENTO_ALTA_TELEFONO_COMPARTIDO)
-        self.assertIsNone(nuevo.nivel_lealtad)
-        self.assertEqual(Decimal(nuevo.descuento_preferente), Decimal("0.00"))
-        self.assertEqual(ids.tipo_por_clave(self.s, "DOCENTE").id, nuevo.tipo_cliente_id)
+        self.assertEqual(self.s.scalar(select(func.count()).select_from(Cliente)), antes)
+
+    def test_alta_del_admin_exige_telefono_de_10_digitos(self) -> None:
+        for malo in ("", "123"):
+            datos = {"nombre": "Sin tel", "telefono": malo, "tipo_clave": "GENERAL", "notas": ""}
+            with self.subTest(telefono=malo), self.assertRaises(ids.TelefonoInvalidoError):
+                acciones.crear_cliente(self.s, admin_user_id=self.admin.id, datos=datos)
 
 
 class TipoTests(_Base):
@@ -349,25 +356,22 @@ class PantallaTests(_Qt):
         self.assertEqual(prompt.call_args.kwargs["tipos"], [("GENERAL", "General")])
         crear.assert_not_called()
 
-    def test_crear_con_telefono_repetido_pregunta_y_reintenta(self) -> None:
+    def test_crear_con_telefono_repetido_da_error_y_no_reintenta(self) -> None:
         coincidencia = ids.ClienteEncontrado(id=1, codigo="CLI-000001", nombre="Ana", telefono_enmascarado="•••• 4567")
-        llamadas = []
-
-        def crear(_s, **kw):
-            llamadas.append(kw["confirmar_telefono_compartido"])
-            if not kw["confirmar_telefono_compartido"]:
-                raise ids.CoincidenciasPorConfirmarError([coincidencia])
-            return SimpleNamespace(client_name="Ana", card_path=None, card_error=None)
-
+        crear = MagicMock(side_effect=ids.CoincidenciasPorConfirmarError([coincidencia]))
         falso = SimpleNamespace(current_role=RolUsuario.ADMIN, user_id=1, _render_client_card_safe=None,
-                                refresh_all=lambda: None, _confirmar_telefono_compartido=lambda c: True)
+                                refresh_all=MagicMock())
         with patch("pos_uniformes.ui.main_window.get_session", side_effect=lambda: self._ctx()), patch(
             "pos_uniformes.ui.main_window.tipos_para_combo", return_value=[]
         ), patch("pos_uniformes.ui.main_window.prompt_cliente_ficha", return_value={"nombre": "Ana"}), patch(
-            "pos_uniformes.ui.main_window.crear_cliente", side_effect=crear
-        ), patch("pos_uniformes.ui.main_window.QMessageBox.information"):
+            "pos_uniformes.ui.main_window.crear_cliente", crear
+        ), patch("pos_uniformes.ui.main_window.QMessageBox.warning") as aviso:
             MainWindow._handle_create_client(falso)
-        self.assertEqual(llamadas, [False, True])
+        crear.assert_called_once()
+        self.assertNotIn("confirmar_telefono_compartido", crear.call_args.kwargs)
+        aviso.assert_called_once()
+        self.assertIn("CLI-000001", aviso.call_args.args[2])
+        falso.refresh_all.assert_not_called()
 
     def test_cambiar_estado_sin_motivo_no_hace_nada(self) -> None:
         falso = SimpleNamespace(current_role=RolUsuario.ADMIN, _selected_settings_client_id=lambda: 5)

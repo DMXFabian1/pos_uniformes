@@ -12,6 +12,9 @@ Reglas (K1, R1):
   no detienen el alta, pero quedan registradas en el evento.
 - Un teléfono compartido es válido: se crea con confirmación explícita y el
   evento `alta_telefono_compartido` guarda los ids de las coincidencias.
+  Ninguna pantalla lo ofrece ya: en el kiosko y en el POS el teléfono es
+  obligatorio y único (Daniel, 2026-11-10). Las altas de la tienda pasan
+  `exigir_telefono_valido=True, revisar_duplicados=True` y nunca confirman.
 - A la empleada solo le viaja el teléfono enmascarado (P2).
 """
 
@@ -85,6 +88,18 @@ class CoincidenciasPorConfirmarError(ValueError):
     def __init__(self, coincidencias: list[ClienteEncontrado]) -> None:
         super().__init__(f"Ya hay {len(coincidencias)} cliente(s) con ese teléfono.")
         self.coincidencias = coincidencias
+
+
+def mensaje_telefono_ya_registrado(coincidencias: list[ClienteEncontrado]) -> str:
+    """El error que ve la empleada cuando el teléfono ya es de otro cliente."""
+    lineas = "\n".join(
+        f"• {c.nombre} · {c.codigo}" + (f" · Tel {c.telefono_enmascarado}" if c.telefono_enmascarado else "")
+        for c in coincidencias
+    )
+    return (
+        f"Ya hay un cliente con ese teléfono:\n{lineas}\n\n"
+        "No se guardó. Si es la misma persona, usa su ficha."
+    )
 
 
 def _a_encontrado(cliente: Cliente) -> ClienteEncontrado:

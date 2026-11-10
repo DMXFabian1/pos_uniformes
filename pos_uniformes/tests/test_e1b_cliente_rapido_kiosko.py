@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import unittest
+import unittest.mock
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -65,32 +66,40 @@ class DialogoTests(_Qt):
         self.assertEqual(llamadas, [("Pedro Ruiz", "6671110011", False)])
         self.assertEqual(d.elegido.codigo, "CLI-000009")
 
-    def test_coincidencia_ofrece_es_esta_persona_y_otra_persona_con_confirmacion(self) -> None:
+    def test_telefono_ya_registrado_da_error_y_no_crea(self) -> None:
+        # Daniel, 2026-11-10: en el kiosko no se acepta un teléfono repetido;
+        # ya no existe «Es otra persona con el mismo teléfono».
         llamadas = []
 
         def registrar(nombre, tel, confirmar):
             llamadas.append(confirmar)
-            if not confirmar:
-                raise CoincidenciasPorConfirmarError([ANA])
-            return ClienteEncontrado(id=10, codigo="CLI-000010", nombre=nombre, telefono_enmascarado="•••• ••45 21")
+            raise CoincidenciasPorConfirmarError([ANA])
 
         d = ClienteRapidoDialog(None, buscar=lambda t: [], registrar=registrar)
         d.nombre_input.setText("Hija de Ana")
         d.telefono_input.setText("6671234521")
-        d.registrar_button.click()
-        self.assertIsNone(d.elegido, "no debe crear en silencio")
+        with patch("pos_uniformes.ui.dialogs.cliente_rapido_dialog.QMessageBox.warning") as aviso:
+            d.registrar_button.click()
+        aviso.assert_called_once()
+        self.assertIn("Ana López", aviso.call_args.args[2])
+        self.assertIsNone(d.elegido, "no debe crear")
+        self.assertFalse(hasattr(d, "otra_persona_button"))
+        self.assertEqual(llamadas, [False], "nunca pide confirmar un teléfono compartido")
         self.assertTrue(d.elegir_button.isEnabled())
-        self.assertFalse(d.otra_persona_button.isHidden())
         self.assertIn("Ana López", d.resultados.item(0).text())
-        with patch("pos_uniformes.ui.dialogs.cliente_rapido_dialog.QMessageBox.question",
-                   return_value=QMessageBox.StandardButton.No):
-            d.otra_persona_button.click()
-        self.assertEqual(llamadas, [False])
-        with patch("pos_uniformes.ui.dialogs.cliente_rapido_dialog.QMessageBox.question",
-                   return_value=QMessageBox.StandardButton.Yes):
-            d.otra_persona_button.click()
-        self.assertEqual(llamadas, [False, True])
-        self.assertEqual(d.elegido.codigo, "CLI-000010")
+
+    def test_telefono_obligatorio_de_10_digitos_sin_llamar_a_la_base(self) -> None:
+        registrar = unittest.mock.MagicMock()
+        for malo in ("", "123", "66712345", "0000000000"):
+            with self.subTest(telefono=malo):
+                d = ClienteRapidoDialog(None, buscar=lambda t: [], registrar=registrar)
+                d.nombre_input.setText("Luis")
+                d.telefono_input.setText(malo)
+                with patch("pos_uniformes.ui.dialogs.cliente_rapido_dialog.QMessageBox.warning") as aviso:
+                    d.registrar_button.click()
+                aviso.assert_called_once()
+                self.assertIsNone(d.elegido)
+        registrar.assert_not_called()
 
     def test_telefono_invalido_avisa_y_no_registra(self) -> None:
         def registrar(*a):

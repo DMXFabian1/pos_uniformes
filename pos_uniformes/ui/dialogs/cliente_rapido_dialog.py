@@ -5,9 +5,11 @@ solo decide qué mostrar. Así se prueba sin base de datos y el kiosko decide
 cómo y cuándo conectarse.
 
 Flujo de alta en 3 pasos: buscar → «Registrar nuevo» → confirmar.
-Nunca crea en silencio un cliente con teléfono repetido: muestra las fichas
-que coinciden con «Es esta persona» y, aparte, «Es otra persona con el mismo
-teléfono», que pide confirmación.
+En el kiosko el teléfono es obligatorio y único (Daniel, 2026-11-10): si no
+tiene 10 dígitos o ya hay un cliente con ese número, avisa con un error y no
+registra. Las fichas que ya tienen ese número quedan en la lista para elegirlas
+con «Es esta persona». El teléfono compartido con confirmación sigue solo en el
+POS.
 """
 
 from __future__ import annotations
@@ -35,7 +37,9 @@ from pos_uniformes.services.clientes.identidad_service import (
     ClienteEncontrado,
     CoincidenciasPorConfirmarError,
     TelefonoInvalidoError,
+    mensaje_telefono_ya_registrado,
 )
+from pos_uniformes.services.clientes.telefono import normalizar_telefono
 from pos_uniformes.ui.styles import kiosko_clientes_styles
 
 Buscar = Callable[[str], list[ClienteEncontrado]]
@@ -56,7 +60,8 @@ class ClienteRapidoDialog(QDialog):
         self._buscar = buscar
         self._registrar = registrar
         self.elegido: ClienteEncontrado | None = None
-        self._pendiente_compartido: tuple[str, str] | None = None
+        #: True si `elegido` se acaba de registrar aquí (no se eligió de la lista).
+        self.es_nuevo = False
 
         kiosko_clientes_styles.aplicar(self)
         self.setMinimumSize(600, 680)
@@ -108,13 +113,7 @@ class ClienteRapidoDialog(QDialog):
         self.elegir_button.setObjectName("kcPrimario")
         self.elegir_button.setAutoDefault(False)
         self.elegir_button.clicked.connect(self._on_elegir)
-        self.otra_persona_button = QPushButton("Es otra persona con el mismo teléfono")
-        self.otra_persona_button.setObjectName("kcFantasma")
-        self.otra_persona_button.setAutoDefault(False)
-        self.otra_persona_button.setVisible(False)
-        self.otra_persona_button.clicked.connect(self._on_otra_persona)
         acciones.addWidget(self.elegir_button)
-        acciones.addWidget(self.otra_persona_button)
         acciones.addStretch()
         layout.addLayout(acciones)
 
@@ -143,7 +142,7 @@ class ClienteRapidoDialog(QDialog):
         self.registrar_button = QPushButton("Registrar")
         self.registrar_button.setObjectName("kcSecundario")
         self.registrar_button.setAutoDefault(False)
-        self.registrar_button.clicked.connect(lambda _checked=False: self._on_registrar(confirmar=False))
+        self.registrar_button.clicked.connect(lambda _checked=False: self._on_registrar())
         campos.addWidget(self.registrar_button, 1, 2)
         alta.addLayout(campos)
         layout.addWidget(tarjeta)
@@ -176,7 +175,6 @@ class ClienteRapidoDialog(QDialog):
     def _actualizar_botones(self) -> None:
         self.elegir_button.setEnabled(self.resultados.count() > 0)
         self._pila.setCurrentWidget(self.resultados if self.resultados.count() else self.vacio_label)
-        self.otra_persona_button.setVisible(self._pendiente_compartido is not None)
 
     def _avisar(self, titulo: str, mensaje: str) -> None:
         QMessageBox.warning(self, titulo, mensaje)
@@ -185,7 +183,6 @@ class ClienteRapidoDialog(QDialog):
 
     def _on_buscar(self) -> None:
         texto = self.busqueda_input.text().strip()
-        self._pendiente_compartido = None
         if not texto:
             self.estado_label.setText("Escribe un nombre, código o los últimos dígitos del teléfono.")
             self._mostrar([])
@@ -207,42 +204,32 @@ class ClienteRapidoDialog(QDialog):
         self.elegido = item.data(Qt.ItemDataRole.UserRole)
         self.accept()
 
-    def _on_registrar(self, confirmar: bool = False) -> None:
+    def _on_registrar(self) -> None:
         nombre = self.nombre_input.text().strip()
         telefono = self.telefono_input.text().strip()
         if not nombre:
             self._avisar("Falta el nombre", "Escribe el nombre completo del cliente.")
             return
+        if normalizar_telefono(telefono) is None:
+            self._avisar(
+                "Teléfono inválido",
+                "El teléfono es obligatorio y debe tener 10 dígitos. Sin él no se puede mandar la credencial.",
+            )
+            self.telefono_input.setFocus()
+            return
         try:
-            nuevo = self._registrar(nombre, telefono, bool(confirmar))
+            nuevo = self._registrar(nombre, telefono, False)
         except TelefonoInvalidoError as exc:
             self._avisar("Teléfono inválido", str(exc))
             return
         except CoincidenciasPorConfirmarError as exc:
-            self._pendiente_compartido = (nombre, telefono)
-            self.estado_label.setText(
-                f"{exc} Si es la misma persona, elígela con «Es esta persona». "
-                "Si es otra persona con el mismo teléfono, usa el botón de al lado."
-            )
             self._mostrar(exc.coincidencias)
+            self.estado_label.setText("Ese teléfono ya está registrado. Si es la misma persona, elígela de la lista.")
+            self._avisar("Teléfono ya registrado", mensaje_telefono_ya_registrado(exc.coincidencias))
             return
         except Exception as exc:  # noqa: BLE001
             self._avisar("No se pudo registrar", str(exc))
             return
         self.elegido = nuevo
+        self.es_nuevo = True
         self.accept()
-
-    def _on_otra_persona(self) -> None:
-        if self._pendiente_compartido is None:
-            return
-        respuesta = QMessageBox.question(
-            self,
-            "Teléfono compartido",
-            "¿Confirmas que es OTRA persona que comparte el teléfono? Se registrará una ficha nueva "
-            "y quedará constancia de las fichas con el mismo teléfono.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-            QMessageBox.StandardButton.No,
-        )
-        if respuesta != QMessageBox.StandardButton.Yes:
-            return
-        self._on_registrar(confirmar=True)

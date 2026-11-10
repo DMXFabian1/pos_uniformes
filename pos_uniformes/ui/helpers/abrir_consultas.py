@@ -51,13 +51,16 @@ def ruta_edge() -> Path | None:
     return None
 
 
-def _abrir_como_ventana(ruta: Path) -> bool:
-    """Edge en modo aplicación: una ventana sola, sin pestañas ni dirección."""
+def _abrir_como_ventana(ruta: Path | str) -> bool:
+    """Edge en modo aplicación: una ventana sola, sin pestañas ni dirección.
+
+    `ruta` es un archivo local o una dirección de internet."""
     edge = ruta_edge()
     if edge is None:
         return False
+    url = ruta if isinstance(ruta, str) else QUrl.fromLocalFile(str(ruta)).toString()
     try:
-        subprocess.Popen([str(edge), f"--app={QUrl.fromLocalFile(str(ruta)).toString()}", "--window-size=1400,900"])
+        subprocess.Popen([str(edge), f"--app={url}", "--window-size=1400,900"])
         return True
     except OSError:
         logger.warning("No se pudo abrir Edge en modo ventana", exc_info=True)
@@ -128,3 +131,21 @@ def instalar_atajos(ventana: QWidget) -> list[QShortcut]:
         atajo.activated.connect(lambda accion=accion: accion(ventana))
         atajos.append(atajo)
     return atajos
+
+
+def abrir_whatsapp_web(url: str, parent: QWidget | None = None) -> bool:
+    """WhatsApp Web, nunca la app de escritorio (Daniel, 2026-11-10).
+
+    Igual que el mapa: en una ventana del programa si hay motor web; si no
+    (el kiosko), en Edge en modo aplicación; y si tampoco, en el navegador."""
+    if _hay_motor_web():
+        try:
+            from pos_uniformes.ui.dialogs.visor_consulta_dialog import mostrar_whatsapp
+
+            mostrar_whatsapp(url, parent)
+            return True
+        except Exception:  # noqa: BLE001 — sin ventana propia, abre afuera
+            logger.warning("WhatsApp Web: no se pudo abrir la ventana", exc_info=True)
+    if _abrir_como_ventana(url):
+        return True
+    return bool(QDesktopServices.openUrl(QUrl(url)))

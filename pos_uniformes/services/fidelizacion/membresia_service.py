@@ -28,6 +28,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
+import logging
+
 from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -72,6 +74,9 @@ MOTIVO_PROPUESTA_MINIMO = 10
 MOTIVO_ADMIN_MINIMO = 5
 QUIEN_DUENO_TELEGRAM = "dueño (Telegram)"
 ORIGEN_TELEGRAM = "telegram"
+
+
+_logger = logging.getLogger(__name__)
 
 
 class NoSePuede(ValueError):
@@ -242,6 +247,39 @@ def inscribir_por_empleada(session: Session, *, cliente_id: int, programa_clave:
     _guardar(session, membresia)
     _evento(session, membresia, EV_ALTA, antes=None, employee_code=empleada.codigo, quien=empleada.nombre_completo)
     session.flush()
+    return membresia
+
+
+CLUB = "CLUB"
+
+
+def inscribir_al_club_al_registrar(session: Session, *, cliente_id: int, employee_code: str | None) -> Membresia | None:
+    """El cliente que se registra en el kiosko entra directo a Maximoda Club,
+    sin que la empleada apriete nada (Daniel, 2026-11-10).
+
+    Va en la misma transacción que el alta, dentro de un punto de guardado: si
+    no se puede (no hay empleada, el Club no está disponible), regresa None y
+    el alta sigue igual, sin programa. La empleada lo puede inscribir después
+    desde la franja."""
+    if not (employee_code or "").strip():
+        return None
+    punto = None
+    try:
+        punto = session.begin_nested()
+        membresia = inscribir_por_empleada(
+            session, cliente_id=int(cliente_id), programa_clave=CLUB, employee_code=str(employee_code)
+        )
+        punto.commit()
+    except (NoSePuede, PermissionError) as exc:
+        if punto is not None:
+            punto.rollback()
+        _logger.info("Alta sin Club para el cliente %s: %s", cliente_id, exc)
+        return None
+    except Exception:  # noqa: BLE001 - el Club nunca tumba el alta
+        if punto is not None and punto.is_active:
+            punto.rollback()
+        _logger.exception("Alta sin Club para el cliente %s: falló la inscripción", cliente_id)
+        return None
     return membresia
 
 
