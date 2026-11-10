@@ -9,6 +9,11 @@ venta y deja a la empleada:
 - proponerlo a Profesional o Mayorista con un motivo (lo aprueba el dueño
   por Telegram).
 
+Mientras haya una propuesta esperando, la franja la vuelve a leer cada
+`REVISAR_PROPUESTA_MS`: cuando Daniel aprueba o rechaza por Telegram, cambia
+sola y se le avisa a la empleada (2026-11-10: «ya aprobé y no hubo cambios
+inmediatos»).
+
 Es solo una etiqueta: no cambia precios, ni la venta, ni el Monedero, ni la
 cola sin conexión. Sin conexión no se inscribe ni se propone (D3). Cambiar de
 programa o sacar a alguien es solo en el POS con ADMIN (P-E4-7).
@@ -19,7 +24,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtWidgets import QDialog, QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton
 
 from pos_uniformes.ui.styles import kiosko_clientes_styles
@@ -28,6 +33,17 @@ _logger = logging.getLogger(__name__)
 
 SIN_CONEXION_TOOLTIP = "Sin conexión: inscríbelo después."
 SOLO_EN_POS_TOOLTIP = "Cambiar de programa se hace en el POS."
+#: Cada cuánto se revisa una propuesta que espera respuesta (una consulta).
+REVISAR_PROPUESTA_MS = 15_000
+
+
+def aviso_de_respuesta(nombre: str, antes: "_Leido", ahora: "_Leido") -> str | None:
+    """Qué decirle a la empleada cuando la propuesta deja de estar pendiente."""
+    if not antes.pendiente or ahora.pendiente:
+        return None
+    if ahora.activa == antes.pendiente:
+        return f"✅ Aprobado: {nombre} ya es miembro de {ahora.activa}"
+    return f"La propuesta de {nombre} a {antes.pendiente} no se aprobó"
 
 
 @dataclass(frozen=True)
@@ -92,6 +108,9 @@ class ProgramaClienteMixin:
         bar.setVisible(False)
         self._programa_bar = bar
         self._programa_leido: _Leido | None = None
+        self._programa_timer = QTimer(bar)
+        self._programa_timer.setInterval(REVISAR_PROPUESTA_MS)
+        self._programa_timer.timeout.connect(self._revisar_propuesta)
         return bar
 
     def _pintar_programa_bar(self) -> None:
@@ -104,6 +123,7 @@ class ProgramaClienteMixin:
         bar.setVisible(bool(c))
         if not c:
             self._programa_leido = None
+            self._vigilar_propuesta(False)
             return
         leido = None
         if en_linea and cliente_id:
@@ -124,6 +144,30 @@ class ProgramaClienteMixin:
         self._btn_proponer_programa.setEnabled(estado.puede_proponer)
         self._btn_inscribir_club.setToolTip(estado.tooltip if not estado.puede_club else "")
         self._btn_proponer_programa.setToolTip(estado.tooltip if not estado.puede_proponer else "")
+        self._vigilar_propuesta(bool(en_linea and leido and leido.pendiente))
+
+    def _vigilar_propuesta(self, si: bool) -> None:
+        timer = getattr(self, "_programa_timer", None)
+        if timer is None:
+            return
+        if si and not timer.isActive():
+            timer.start()
+        elif not si and timer.isActive():
+            timer.stop()
+
+    def _revisar_propuesta(self) -> None:
+        """Vuelve a leer el programa del cliente ligado mientras espera respuesta."""
+        c = getattr(self, "_cliente", None)
+        antes = getattr(self, "_programa_leido", None)
+        if not c or antes is None or not antes.pendiente or int(c.get("id") or 0) != antes.cliente_id:
+            self._vigilar_propuesta(False)
+            return
+        ahora = self._leer_programa(antes.cliente_id)
+        if ahora is not None:
+            aviso = aviso_de_respuesta(str(c.get("nombre") or "El cliente"), antes, ahora)
+            if aviso:
+                self._flash_scan_hint(aviso)
+        self._pintar_programa_bar()
 
     def _leer_programa(self, cliente_id: int) -> _Leido | None:
         """Una consulta por cliente ligado (no en cada tecla). None si falla."""
