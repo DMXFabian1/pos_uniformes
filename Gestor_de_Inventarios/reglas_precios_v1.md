@@ -580,7 +580,7 @@ Aplicar por `tipo_pieza IN ('Pants 2pz','Pants 3pz')`, `tipo_prenda='Deportivo'`
 
 Excepciones activas:
 
-- `Técnica de San Bartolo` Secundaria: 2pz `650` en linea completa (2026-11-10); 3pz sigue la escalera `695 / 705 / 715`.
+- `Técnica 18 (San Bartolo)` Secundaria: 2pz `650` en linea completa (2026-11-10); 3pz sigue la escalera `695 / 705 / 715`.
 - `UVEG` Bachillerato: 2pz `690`, 3pz `790` en linea completa.
 - `CBTIS 148` Bachillerato 2pz: `300` linea completa — precio especial en caja.
 - `Vicente Guerrero` Preescolar 2pz tallas `4, 6, 8`: `89` — precio especial en caja.

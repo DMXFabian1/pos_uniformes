@@ -93,7 +93,7 @@ Colores: Azul Marino, Azul Rey, Bicolor, Doble Raya, Gris, Raya Roja, Rojo, Verd
 |---|---:|---:|
 | `Telesecundaria 454` | 650 | 750 |
 | `Telesecundaria 512` | 650 | 750 |
-| `Técnica de San Bartolo` | 650 | 695 / 705 / 715 |
+| `Técnica 18 (San Bartolo)` | 650 | 695 / 705 / 715 |
 
 ### Bachillerato
 

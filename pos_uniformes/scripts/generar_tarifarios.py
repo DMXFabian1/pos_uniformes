@@ -468,7 +468,7 @@ def page_pants_2pz(doc: Document) -> None:
         ("Excepciones — Sec. / Bach.", ["Escuela", "2 pzas", "3 pzas"],
          [["Telesecundaria 454", "$650", "$750"],
           ["Telesecundaria 512", "$650", "$750"],
-          ["Técnica de San Bartolo", "$650", "695/705/715"],
+          ["Técnica 18 (San Bartolo)", "$650", "695/705/715"],
           ["CECYTE", "$650", "$750"], ["Conalep", "$650", "$750"],
           ["UVEG", "$690", "$790"]]),
         ("Precios especiales en caja", ["Escuela", "Tallas", "2 pzas"],
