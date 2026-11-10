@@ -2,7 +2,8 @@
 pos_uniformes_sync/
 
 # Basura y artefactos locales
-.claude/
+.claude/*
+!.claude/skills/
 C:\\Meilisearch/
 *.db-shm
 *.db-wal
