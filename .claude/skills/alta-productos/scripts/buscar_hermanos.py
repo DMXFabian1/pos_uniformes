@@ -8,8 +8,8 @@ Uso (desde la raíz del repo, con el Python del proyecto):
         --pieza "Playera" --prenda Deportivo --nivel Secundaria --escuela "Técnica 18"
 
 Todos los filtros son opcionales y no distinguen mayúsculas ni acentos.
-Conexión: --db-url, o la configuración del proyecto (pos_uniformes.env / variables
-POS_UNIFORMES_DB_*). Para la caja: --db-url postgresql+psycopg://usuario:clave@host:5432/pos_uniformes
+Conexión: --db-url, --env-file (p. ej. el env de la caja, ver CLAUDE.md), o la
+configuración del proyecto (pos_uniformes.env / variables POS_UNIFORMES_DB_*).
 
 Imprime:
   1. Valores de catálogo que coinciden con lo pedido y CASI-DUPLICADOS
@@ -26,9 +26,10 @@ import difflib
 import sys
 import unicodedata
 from collections import Counter, defaultdict
-from pathlib import Path
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
+
+import _comun
 
 TALLA_ORDEN = ["2", "4", "6", "8", "10", "12", "14", "16", "18", "28", "30", "32", "34", "36",
                "38", "40", "42", "44", "46", "CH", "MD", "GD", "EXG", "UNI"]
@@ -63,16 +64,6 @@ def parecido(a: str, b: str) -> bool:
 def orden_talla(talla: str) -> tuple[int, str]:
     t = talla.strip().upper()
     return (TALLA_ORDEN.index(t), t) if t in TALLA_ORDEN else (len(TALLA_ORDEN), t)
-
-
-def resolver_db_url(cli_url: str | None) -> str:
-    if cli_url:
-        return cli_url
-    raiz = Path(__file__).resolve().parents[4]
-    sys.path.insert(0, str(raiz))
-    from pos_uniformes.utils.config import settings  # noqa: E402
-
-    return settings.database_url
 
 
 def cargar_catalogo(conn, tabla: str) -> list[str]:
@@ -244,16 +235,12 @@ def main() -> int:
     ap.add_argument("--categoria")
     ap.add_argument("--atributo")
     ap.add_argument("--limite", type=int, default=4, help="ejemplos de hermanos a mostrar")
-    ap.add_argument("--db-url")
+    _comun.agregar_argumentos_db(ap)
     args = ap.parse_args()
 
-    engine = create_engine(
-        resolver_db_url(args.db_url),
-        connect_args={"options": "-c default_transaction_read_only=on", "connect_timeout": 5},
-    )
+    engine = _comun.motor(args, solo_lectura=True)
     with engine.connect() as conn:
-        host = engine.url.host or "local"
-        print(f"DB: {host}/{engine.url.database} (solo lectura)\n")
+        print()
         seccion_catalogos(conn, vars(args))
         productos = agrupar(conn.execute(text(FILAS_SQL)).all())
         seccion_hermanos(productos, args, args.limite)

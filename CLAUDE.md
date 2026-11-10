@@ -45,6 +45,7 @@ Migraciones: Alembic en `pos_uniformes/migrations/versions/`. Se corren con `pyt
 
 - La caja (PostgreSQL de la PC de la tienda) es `server_db_host()` en `utils/config.py`. `main.py` **se conecta sola a producción** si la encuentra en la LAN y no hay `POS_UNIFORMES_DB_HOST` definido. Los generadores `*_db.py` de tarifarios también leen de ahí.
 - **Nunca escribir en la caja ni correr migraciones contra ella sin confirmar antes con Daniel**, mostrando primero un dry-run o el resumen de cambios. Leer sí está permitido.
+- En esta Mac, la configuración del proyecto apunta a la base **local** (que puede estar atrasada en migraciones). La conexión a la caja vive en `/Users/danielfabian/Documents/Playground 2/pos_uniformes/pos_uniformes.env`: pasarla con `--env-file` a los scripts de las skills, o con `set -a; . <ese env>; set +a` en la shell. No copiar sus valores a ningún archivo del repo.
 
 ## Reglas de arquitectura (de `pos_uniformes/docs/protocolo_cambios.md`)
 

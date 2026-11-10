@@ -1,56 +1,59 @@
 ---
 name: alta-productos
-description: Dar de alta productos nuevos en el catálogo del POS (uniformes de una escuela, piezas generales, accesorios) de forma coherente con los existentes — mismos valores de catálogo, patrón de nombre, tallas, precios por escalera, SKU automático y liga al uniforme. Usar cuando Daniel diga "da de alta…", "agrega el pants de la escuela X", "nueva escuela con su uniforme", "crea estos productos".
+description: Dar de alta productos nuevos en el catálogo del POS (uniformes de una escuela, piezas generales, accesorios), copiar el uniforme de una escuela a otra (con otros colores), o cambiar color/nombre de productos existentes — de forma coherente con el catálogo: mismos valores, patrón de nombre, tallas, precios por escalera, SKU automático, bitácora y liga al uniforme. Usar cuando Daniel diga "da de alta…", "agrega el pants de la escuela X", "nueva escuela igual a Y", "copia el uniforme de…", "cambia el color de…", "crea estos productos".
 ---
 
 # Alta de productos coherente con el catálogo
 
-Dos scripts hacen el trabajo pesado, para no explorar la base de datos a mano:
-- `scripts/buscar_hermanos.py`: **solo lectura**. Muestra valores de catálogo, casi-duplicados, productos hermanos con su patrón y lo que ya existe en la escuela.
-- `scripts/aplicar_alta.py`: crea por `CatalogService`, con bitácora y SKU automático. **Por defecto es ensayo** (hace todo y deshace al final); guarda solo con `--aplicar`.
+Scripts en `scripts/`, todos desde la raíz del repo con el Python del proyecto (`$PY`, ver `CLAUDE.md`):
 
-Correrlos desde la raíz del repo con el Python del proyecto (`$PY`, ver `CLAUDE.md`). Sin `--db-url` usan la configuración del proyecto, que puede ser **la caja**.
-
-## 1. Buscar hermanos (siempre primero)
-
-```bash
-"$PY" .claude/skills/alta-productos/scripts/buscar_hermanos.py --pieza "Pants 2pz" --prenda Deportivo --nivel Secundaria --escuela "Nombre escuela"
-```
-De la salida, tomar:
-- **Valores de catálogo:** usar **exactamente** los que existen (con su acento y mayúsculas). Si sale `NO EXISTE` con parecidos, casi siempre es uno de esos: preguntar a Daniel cuál, **nunca crear uno nuevo** por variar la escritura. Si avisa de casi-duplicados (por ejemplo `Basico` y `Básico`), usar el que tienen la mayoría de los hermanos y mencionarlo.
-- **Patrón:** el nombre sin escuela más común (por ejemplo «Pants 2pz Deportivo»; **el POS agrega la escuela solo**), además de marca, categoría, atributo, género y escudo dominantes.
-- **Tallas:** el juego de tallas más común para ese nivel.
-- **Precios:** el más común por talla, confirmado contra `Gestor_de_Inventarios/reglas_precios_v1.md`. Si la escuela tiene excepción en las reglas, gana la excepción. Si el precio pedido no encaja con ninguna regla, señalarlo.
-- **Lo que ya existe en la escuela:** si ya hay un producto igual, no duplicarlo. Proponer agregar las tallas que falten.
-
-## 2. Vista previa para Daniel
-
-Mostrar una tabla corta y **esperar su OK**:
-
-| Campo | Valor | De dónde sale |
+| Script | Qué hace | Escribe |
 |---|---|---|
-| Nombre | Pants 2pz Deportivo → «Pants 2pz Deportivo <Escuela>» | 6 de 8 hermanos |
-| Catálogo | Deportivo · Pants 2pz · Secundaria · Sin marca · atrib Deportivo · Unisex · Con Escudo | patrón dominante |
-| Tallas y precio | 10:595 12:595 14:605 16:605 CH:615 MD:615 GD:615 EXG:615 | escalera de secundaria |
-| Uniforme | grupo Deportivo | prenda Deportivo |
+| `buscar_hermanos.py` | Valores de catálogo, casi-duplicados, productos hermanos con su patrón y lo que ya tiene la escuela | No (solo lectura) |
+| `copiar_escuela.py` | Compara escuela origen con destino y **genera el plan**: altas, ediciones de color o nombre, piezas del uniforme | No (solo lectura) |
+| `aplicar_alta.py` | Ejecuta uno o varios planes **en una sola transacción**: altas, `editar` y `ligar_al_uniforme`, por `CatalogService` (bitácora, SKU de la secuencia). Ensayo por defecto; guarda solo con `--aplicar` | Sí |
 
-Grupos válidos para el uniforme: Diario (Oficial o Básico), Deportivo, Escolta, Accesorio y Otro. Un básico que es pants, playera, short o chamarra va a Deportivo.
+**Conexión:** sin opciones, usan la configuración del proyecto (en la Mac suele ser la base local). Para la caja, `--env-file` con el env que indica `CLAUDE.md`. El script imprime `⚠ PRODUCCIÓN / RED` cuando no es local. Nunca escribir en la caja sin el OK de Daniel.
 
-## 3. Ensayo y alta
+## Caso A — Escuela igual a otra (lo más común)
 
-Escribir el spec en un JSON temporal (fuera del repo, en el scratchpad). El formato está en el docstring de `aplicar_alta.py`:
+La escuela destino debe existir. Si no existe, se da de alta en el POS; los scripts no crean escuelas.
 ```bash
-"$PY" .claude/skills/alta-productos/scripts/aplicar_alta.py /ruta/alta.json            # ensayo: valida y muestra los SKU
-"$PY" .claude/skills/alta-productos/scripts/aplicar_alta.py /ruta/alta.json --aplicar  # solo con el OK de Daniel
+"$PY" .claude/skills/alta-productos/scripts/copiar_escuela.py --origen "Ignacio Allende" --destino "Ignacio Allende (Jaral)" \
+    --colores Rojo=Azul --color-de "Pants Suelto=Gris" --excluir Boina --salida /scratchpad/plan.json [--env-file …]
 ```
-- Si el destino es **la caja**, también el ensayo requiere avisar antes, porque abre una transacción en producción aunque la deshaga.
-- Si sale el error de migraciones faltantes: la base está atrasada respecto a la rama. No migrar la caja sin permiso. Para probar, usar una copia local (`createdb -T pos_uniformes pos_uniformes_prueba`, más `alembic upgrade head` con `POS_UNIFORMES_DB_NAME` apuntando a la copia) y borrarla al terminar.
-- Varios productos (una escuela completa): un JSON por producto, primero todos los ensayos y luego todos los `--aplicar`.
-- No se crean escuelas, marcas ni tipos desde aquí. Si hace falta uno nuevo y Daniel lo confirma, se crea en el POS (Catálogo) o con `CatalogService.crear_marca` o `crear_categoria`.
+- `--colores A=B` cambia el color en general; `--color-de PATRÓN=COLOR` fija el color de un producto (gana sobre `--colores`); `--excluir PATRÓN` deja productos fuera. Todos se pueden repetir.
+- El color cambia **también en el nombre** ("Suéter Botones M Rojo" → "… Azul"). Lo que el destino ya tiene sale como `YA ESTÁ` o `EDITAR`, nunca duplicado. Las piezas generales del uniforme (falda, pantalón de vestir) se ligan con su grupo y orden.
+- Revisar los avisos `⚠` (tallas que faltan en productos que ya existen, que no se agregan solas) y "Solo en el destino".
+- Correr el plan en ensayo con `aplicar_alta.py` (paso 3). Volver a correr `copiar_escuela.py` después de aplicar debe dar **0 cambios**.
 
-## 4. Después del alta
+## Caso B — Producto suelto
 
-- Ofrecer etiquetas o QR de los SKU nuevos (desde el POS: Inventario → etiqueta).
-- `productos.db` (Gestor) **no** se actualiza en automático y tiene su propio contador de SKU. Solo agregar ahí si Daniel lo pide, y usando el mismo SKU que asignó la caja.
-- Los tarifarios `*_db.py` toman el producto nuevo al regenerarlos (ver skill `cambio-precios-catalogo`, paso 5).
-- Anotar en el vault con la skill `actualizar-vault`: nota de catálogo y, si hubo excepción de precio, `Gestor de Precios/02`.
+1. **Buscar hermanos:**
+   ```bash
+   "$PY" .claude/skills/alta-productos/scripts/buscar_hermanos.py --pieza "Pants 2pz" --prenda Deportivo --nivel Secundaria --escuela "Nombre escuela"
+   ```
+   - **Valores de catálogo:** usar **exactamente** los que existen. Si sale `NO EXISTE` con parecidos (escuela incluida), preguntar a Daniel. **Nunca** crear uno nuevo por escribirlo distinto. Ante casi-duplicados (`Basico`/`Básico`), usar el de la mayoría y mencionarlo.
+   - **Patrón:** nombre sin escuela más común (el POS agrega la escuela), marca, categoría, atributo, género y escudo dominantes. Juego de tallas más común.
+   - **Precios:** el más común por talla, confirmado contra `Gestor_de_Inventarios/reglas_precios_v1.md` (gana la excepción de la escuela si la hay).
+   - **Lo que ya existe en la escuela:** no duplicar.
+2. Escribir el spec JSON en el scratchpad. El formato está en el docstring de `aplicar_alta.py`.
+
+## Editar color o nombre de productos existentes
+
+Bloque `editar` del plan: `{"editar": [{"producto_id": 596, "color": "Azul", "nombre": "Chaleco Azul"}]}`. Conserva SKU, precio, costo, stock mínimo y todos los campos del producto. El nombre va **sin** escuela (si la trae, el script la quita para que el POS no la duplique). Si el nombre lleva el color viejo, cambiar los dos.
+
+## 3. Vista previa, ensayo y aplicar
+
+1. Mostrar a Daniel la tabla de lo que cambia (altas con tallas y precios, ediciones antes → después, piezas del uniforme) y **esperar su OK**.
+2. Ensayo: `aplicar_alta.py plan.json [--env-file …]`. Todo va en una transacción: los SKU que se ven son los reales, y si algo falla no se guarda nada. En la caja, avisar antes de ensayar.
+3. Con el OK: el mismo comando con `--aplicar`. Verificar después con `buscar_hermanos.py --escuela …` o con `copiar_escuela.py`, que debe dar 0 cambios.
+
+Si sale "faltan migraciones": no migrar la caja sin permiso. Para probar, usar una copia local (`createdb -T pos_uniformes pos_uniformes_prueba`, `alembic upgrade head` con `POS_UNIFORMES_DB_NAME` apuntando a la copia, un `--env-file` hacia ella) y borrarla al terminar.
+
+## 4. Después
+
+- Ofrecer etiquetas o QR de los SKU nuevos (POS: Inventario → etiqueta). Si se cambió el color de productos con stock, avisar que las etiquetas físicas quedan con el color viejo.
+- `productos.db` (Gestor) **no** se actualiza solo y tiene su propio contador de SKU. Solo agregar ahí si Daniel lo pide, con el mismo SKU de la caja.
+- Los tarifarios `*_db.py` toman los cambios al regenerarse (skill `cambio-precios-catalogo`, paso 5).
+- Anotar con la skill `actualizar-vault`. Los cambios de escuelas van en `07 - Servicios - Catálogo e Inventario` y en `Gestor de Precios/02`.
