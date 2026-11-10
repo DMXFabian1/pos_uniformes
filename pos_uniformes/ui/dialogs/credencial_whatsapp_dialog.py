@@ -38,7 +38,9 @@ def _abrir_por_omision(url: str, parent: QWidget | None) -> bool:
 
 
 class CredencialWhatsappDialog(QDialog):
-    def __init__(self, parent: QWidget | None, envio: EnvioCredencial, *, abrir=None, proponer=None) -> None:
+    def __init__(
+        self, parent: QWidget | None, envio: EnvioCredencial, *, abrir=None, proponer=None, reenvio: bool = False
+    ) -> None:
         super().__init__(parent)
         kiosko_clientes_styles.aplicar(self)
         self.setWindowTitle("Credencial lista")
@@ -52,11 +54,11 @@ class CredencialWhatsappDialog(QDialog):
         ly = QVBoxLayout(self)
         ly.setContentsMargins(22, 20, 22, 18)
         ly.setSpacing(12)
-        titulo = QLabel("¡Cliente registrado!")
+        titulo = QLabel("Reenviar credencial" if reenvio else "¡Cliente registrado!")
         titulo.setObjectName("kcTitulo")
         ly.addWidget(titulo)
         subtitulo = QLabel(
-            f"<b>{escape(envio.nombre)}</b> · {escape(envio.codigo)}. Mándale su credencial por WhatsApp: "
+            f"<b>{escape(envio.nombre)}</b> · {escape(envio.codigo)}. {'Reenvíale' if reenvio else 'Mándale'} su credencial por WhatsApp: "
             "se abre su chat con el mensaje escrito, tú pegas la credencial (Ctrl+V) y das Enviar."
         )
         subtitulo.setObjectName("kcSubtitulo")

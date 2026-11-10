@@ -50,6 +50,19 @@ def mensaje_bienvenida(
     )
 
 
+def mensaje_reenvio(
+    nombre: str, codigo: str, negocio: str = NEGOCIO_POR_OMISION, programa: str | None = None
+) -> str:
+    """Para el cliente que perdió su credencial (Daniel, 2026-11-10)."""
+    pila = (nombre or "").strip().split(" ")[0] or "hola"
+    negocio = (negocio or "").strip() or NEGOCIO_POR_OMISION
+    miembro = f" Eres miembro de {programa}." if programa else ""
+    return (
+        f"¡Hola {pila}! Te reenviamos tu credencial de cliente de {negocio}.{miembro}\n\n"
+        f"Tu código es {codigo}. Muéstrala en tu próxima compra."
+    )
+
+
 def enlace_web(telefono_wa: str, mensaje: str) -> str:
     """WhatsApp Web con el chat del cliente y el texto ya escrito."""
     return f"https://web.whatsapp.com/send?phone={telefono_wa}&text={quote(mensaje)}"
@@ -68,7 +81,9 @@ class EnvioCredencial:
     programa: str | None = None
 
 
-def preparar(session, cliente_id: int, *, render=None, negocio: str | None = None) -> EnvioCredencial:
+def preparar(
+    session, cliente_id: int, *, render=None, negocio: str | None = None, reenvio: bool = False
+) -> EnvioCredencial:
     """Genera la credencial del cliente y arma el mensaje y los enlaces.
 
     `render(cliente) -> Path` es inyectable para las pruebas. Por omisión es
@@ -90,7 +105,8 @@ def preparar(session, cliente_id: int, *, render=None, negocio: str | None = Non
     if negocio is None:
         negocio = _nombre_del_negocio(session)
     programa = _programa_activo(session, int(cliente.id))
-    mensaje = mensaje_bienvenida(cliente.nombre, cliente.codigo_cliente, negocio, programa)
+    redactar = mensaje_reenvio if reenvio else mensaje_bienvenida
+    mensaje = redactar(cliente.nombre, cliente.codigo_cliente, negocio, programa)
     return EnvioCredencial(
         cliente_id=int(cliente.id),
         nombre=str(cliente.nombre),

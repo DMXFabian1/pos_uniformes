@@ -27,11 +27,16 @@ class ClienteRapidoMixin:
         if not self._en_linea():
             QMessageBox.information(self, "Cliente", SIN_CONEXION_MENSAJE)
             return
+        abierto: dict = {}
         dialogo = ClienteRapidoDialog(
             self,
             buscar=self._buscar_clientes_identidad,
             registrar=self._registrar_cliente_identidad,
+            reenviar=lambda c: self._ofrecer_credencial_whatsapp(
+                int(c.id), reenvio=True, encima=abierto.get("dialogo")
+            ),
         )
+        abierto["dialogo"] = dialogo
         if dialogo.exec() != int(QDialog.DialogCode.Accepted) or dialogo.elegido is None:
             return
         elegido = dialogo.elegido
@@ -39,31 +44,44 @@ class ClienteRapidoMixin:
         if getattr(dialogo, "es_nuevo", False):
             self._ofrecer_credencial_whatsapp(int(elegido.id))
 
-    def _ofrecer_credencial_whatsapp(self, cliente_id: int) -> None:
-        """Recién registrado: credencial lista para mandarla por WhatsApp.
+    def _ofrecer_credencial_whatsapp(self, cliente_id: int, *, reenvio: bool = False, encima=None) -> None:
+        """Credencial lista para mandarla por WhatsApp: al registrar al cliente
+        o, con `reenvio`, cuando se le borró (desde la búsqueda, `encima` de
+        ella).
 
         Si algo falla (sin teléfono, sin conexión, la imagen), se dice y ya:
-        el cliente ya quedó registrado y ligado a la venta."""
+        la venta sigue igual."""
+        padre = encima or self
         from pos_uniformes.database.connection import get_session
         from pos_uniformes.services.clientes import credencial_whatsapp_service as cws
         from pos_uniformes.ui.dialogs.credencial_whatsapp_dialog import CredencialWhatsappDialog
 
         try:
             with get_session() as session:
-                envio = cws.preparar(session, cliente_id)
+                envio = cws.preparar(session, cliente_id, reenvio=reenvio)
         except cws.SinTelefonoParaWhatsappError as exc:
-            QMessageBox.information(self, "Credencial", f"{exc}\n\nSe puede mandar después desde el POS.")
+            QMessageBox.information(padre, "Credencial", f"{exc}\n\nCorrige su teléfono en el POS para poder mandarla.")
             return
         except Exception as exc:  # noqa: BLE001
             _logger.exception("Credencial de bienvenida: no se pudo preparar la del cliente %s", cliente_id)
             if _es_error_de_red(exc):
                 self._avisar_sin_conexion()
                 return
-            QMessageBox.warning(self, "Credencial", f"No se pudo generar la credencial.\n\n{exc}")
+            QMessageBox.warning(padre, "Credencial", f"No se pudo generar la credencial.\n\n{exc}")
+            return
+        # La ventana de WhatsApp cuelga del kiosko, no de la búsqueda, para que
+        # siga viva cuando ésta se cierre.
+        from pos_uniformes.ui.helpers.abrir_consultas import abrir_whatsapp_web
+
+        def abrir(url, _padre):
+            return abrir_whatsapp_web(url, self)
+
+        if reenvio:
+            CredencialWhatsappDialog(padre, envio, abrir=abrir, reenvio=True).exec()
             return
         # «Proponer programa…» también aquí, al momento del alta (Daniel,
         # 2026-11-10). Para entonces el cliente ya está ligado a la venta.
-        CredencialWhatsappDialog(self, envio, proponer=self._on_proponer_programa).exec()
+        CredencialWhatsappDialog(padre, envio, abrir=abrir, proponer=self._on_proponer_programa).exec()
 
     def _buscar_clientes_identidad(self, texto: str) -> list[ClienteEncontrado]:
         from pos_uniformes.database.connection import get_session

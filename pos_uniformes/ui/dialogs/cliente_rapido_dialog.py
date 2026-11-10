@@ -44,6 +44,7 @@ from pos_uniformes.ui.styles import kiosko_clientes_styles
 
 Buscar = Callable[[str], list[ClienteEncontrado]]
 Registrar = Callable[[str, str, bool], ClienteEncontrado]
+Reenviar = Callable[[ClienteEncontrado], None]
 
 
 def etiqueta_cliente(c: ClienteEncontrado) -> str:
@@ -52,13 +53,18 @@ def etiqueta_cliente(c: ClienteEncontrado) -> str:
 
 
 class ClienteRapidoDialog(QDialog):
-    def __init__(self, parent: QWidget | None, *, buscar: Buscar, registrar: Registrar) -> None:
+    def __init__(
+        self, parent: QWidget | None, *, buscar: Buscar, registrar: Registrar, reenviar: Reenviar | None = None
+    ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Cliente")
         self.setModal(True)
         self.setMinimumWidth(520)
         self._buscar = buscar
         self._registrar = registrar
+        #: Reenvía la credencial del cliente elegido en la lista, sin ligarlo
+        #: a la venta ni cerrar (por si al cliente se le borró; 2026-11-10).
+        self._reenviar = reenviar
         self.elegido: ClienteEncontrado | None = None
         #: True si `elegido` se acaba de registrar aquí (no se eligió de la lista).
         self.es_nuevo = False
@@ -114,6 +120,13 @@ class ClienteRapidoDialog(QDialog):
         self.elegir_button.setAutoDefault(False)
         self.elegir_button.clicked.connect(self._on_elegir)
         acciones.addWidget(self.elegir_button)
+        self.reenviar_button = QPushButton("📲 Reenviar credencial")
+        self.reenviar_button.setObjectName("kcSecundario")
+        self.reenviar_button.setAutoDefault(False)
+        self.reenviar_button.setToolTip("Le manda otra vez su credencial por WhatsApp.")
+        self.reenviar_button.setVisible(reenviar is not None)
+        self.reenviar_button.clicked.connect(self._on_reenviar)
+        acciones.addWidget(self.reenviar_button)
         acciones.addStretch()
         layout.addLayout(acciones)
 
@@ -174,6 +187,7 @@ class ClienteRapidoDialog(QDialog):
 
     def _actualizar_botones(self) -> None:
         self.elegir_button.setEnabled(self.resultados.count() > 0)
+        self.reenviar_button.setEnabled(self.resultados.count() > 0)
         self._pila.setCurrentWidget(self.resultados if self.resultados.count() else self.vacio_label)
 
     def _avisar(self, titulo: str, mensaje: str) -> None:
@@ -203,6 +217,12 @@ class ClienteRapidoDialog(QDialog):
             return
         self.elegido = item.data(Qt.ItemDataRole.UserRole)
         self.accept()
+
+    def _on_reenviar(self) -> None:
+        item = self.resultados.currentItem()
+        if item is None or self._reenviar is None:
+            return
+        self._reenviar(item.data(Qt.ItemDataRole.UserRole))
 
     def _on_registrar(self) -> None:
         nombre = self.nombre_input.text().strip()
