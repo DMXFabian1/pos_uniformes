@@ -12,6 +12,9 @@ puedan comprar más barato según su esfuerzo.»
 - Tope al mes: hasta cierto importe (a precio de lista) compran con su
   nivel; de ahí en adelante, con el descuento base (5 %).
 - La promo 3pz no lleva el nivel: se queda con el base.
+- En uniformes el nivel llega a lo más a 10 % (Daniel, 2026-11-11): solo la
+  ropa que no es de uniforme (casual, temporada, accesorios, ropa interior)
+  alcanza el 15 o 20 %. Lo que no se sabe qué es cuenta como uniforme.
 - En el carrito se reparte renglón por renglón, en orden: el renglón que ya
   no cabe en lo que le queda del tope va con el base.
 
@@ -40,6 +43,16 @@ LLAVE_PCT = LLAVE_PCT_EMPLEADA
 
 #: Tope por omisión: importe a precio de lista por mes con su nivel.
 TOPE_POR_OMISION = Decimal("3000")
+
+#: Lo más que se descuenta en uniforme, aunque su nivel sea mayor.
+TOPE_PCT_UNIFORME = Decimal("10")
+
+#: Llave del renglón con el nombre de la categoría del producto.
+LLAVE_CATEGORIA = "categoria"
+
+#: Categorías que NO son uniforme (en minúsculas). Uniforme: Oficial,
+#: Deportivo, Uniformes, Escolta y Básico.
+CATEGORIAS_NO_UNIFORME = frozenset({"ropa casual", "temporada", "accesorio", "ropa interior", "deportivo casual"})
 
 #: Tope del % que se puede configurar: arriba de esto se vende abajo del costo.
 PCT_MAXIMO = Decimal("30")
@@ -134,6 +147,16 @@ def ultimo_dia(ref: date) -> date:
     return mes_siguiente(ref) - timedelta(days=1)
 
 
+def es_uniforme(item: Mapping) -> bool:
+    categoria = " ".join(str(item.get(LLAVE_CATEGORIA) or "").split()).lower()
+    return categoria not in CATEGORIAS_NO_UNIFORME
+
+
+def tope_del_renglon(item: Mapping, pct_nivel) -> Decimal:
+    pct = Decimal(str(pct_nivel))
+    return min(pct, TOPE_PCT_UNIFORME) if es_uniforme(item) else pct
+
+
 def importe_de(item: Mapping) -> Decimal:
     return (Decimal(str(item.get("precio", 0) or 0)) * int(item.get("cantidad", 0) or 0)).quantize(_CENT)
 
@@ -142,18 +165,20 @@ def repartir(items: Sequence[Mapping], *, pct_nivel, restante, pct_base=PCT_BASE
     """El % de empleada de cada renglón, en orden.
 
     `restante` None = sin tope. Un renglón lleva el nivel si no es promo 3pz y
-    su importe completo cabe en lo que queda del tope; si no, el base."""
+    su importe completo cabe en lo que queda del tope; si no, el base. En
+    uniforme el nivel se queda en `TOPE_PCT_UNIFORME`."""
     pct_nivel = Decimal(str(pct_nivel))
     pct_base = Decimal(str(pct_base))
     queda = None if restante is None else Decimal(str(restante))
     resultado: list[Decimal] = []
     for it in items:
-        if pct_nivel <= pct_base or es_promo_3pz(it):
+        pct_linea = tope_del_renglon(it, pct_nivel)
+        if pct_linea <= pct_base or es_promo_3pz(it):
             resultado.append(pct_base)
             continue
         importe = importe_de(it)
         if queda is None or importe <= queda:
-            resultado.append(pct_nivel)
+            resultado.append(pct_linea)
             if queda is not None:
                 queda -= importe
         else:
@@ -177,6 +202,14 @@ def importe_con_nivel(detalle: Iterable[Mapping], pct_base=PCT_BASE) -> Decimal:
 
 def fmt_pct(pct) -> str:
     return f"{Decimal(str(pct)).normalize():f} %"
+
+
+def fmt_nivel(pct) -> str:
+    """«15 % (10 % en uniforme)» cuando el nivel pasa el tope de uniforme."""
+    pct = Decimal(str(pct))
+    if pct > TOPE_PCT_UNIFORME:
+        return f"{fmt_pct(pct)} ({fmt_pct(TOPE_PCT_UNIFORME)} en uniforme)"
+    return fmt_pct(pct)
 
 
 @dataclass(frozen=True)
@@ -203,8 +236,8 @@ class EstadoCompradora:
         if not self.tiene_nivel:
             return f"{self.nombre}: {fmt_pct(PCT_BASE)}"
         if self.restante is None:
-            return f"{self.nombre}: {fmt_pct(self.porcentaje)}"
-        return f"{self.nombre}: {fmt_pct(self.porcentaje)} (le quedan ${self.restante:,.2f} este mes)"
+            return f"{self.nombre}: {fmt_nivel(self.porcentaje)}"
+        return f"{self.nombre}: {fmt_nivel(self.porcentaje)}, le quedan ${self.restante:,.2f} este mes"
 
 
 @dataclass(frozen=True)
@@ -221,9 +254,9 @@ class AvanceEmpleada:
     def texto(self) -> str:
         partes = []
         if self.pct_este_mes > PCT_BASE:
-            hoy = f"🏷 Este mes compras con {fmt_pct(self.pct_este_mes)}"
+            hoy = f"🏷 Este mes compras con {fmt_nivel(self.pct_este_mes)}"
             if self.restante_este_mes is not None:
-                hoy += f" (te quedan ${self.restante_este_mes:,.2f})"
+                hoy += f", te quedan ${self.restante_este_mes:,.2f}"
             partes.append(hoy)
         else:
             partes.append(f"🏷 Este mes compras con {fmt_pct(PCT_BASE)}")
@@ -332,6 +365,24 @@ def avance(session, employee_code: str, *, hoy: date | None = None) -> AvanceEmp
         siguiente=siguiente_nivel(com, lista),
         nombre_mes_siguiente=MESES[mes_siguiente(hoy).month - 1],
     )
+
+
+def categorias_por_sku(session, skus: Iterable[str]) -> dict[str, str]:
+    """El nombre de la categoría de cada SKU que exista en el catálogo."""
+    from sqlalchemy import select
+
+    from pos_uniformes.database.models import Categoria, Producto, Variante
+
+    skus = [s for s in {str(x) for x in skus} if s]
+    if not skus:
+        return {}
+    filas = session.execute(
+        select(Variante.sku, Categoria.nombre)
+        .join(Producto, Producto.id == Variante.producto_id)
+        .join(Categoria, Categoria.id == Producto.categoria_id)
+        .where(Variante.sku.in_(skus))
+    ).all()
+    return {str(sku): str(nombre or "") for sku, nombre in filas}
 
 
 def empleadas_activas(session) -> list[tuple[str, str]]:

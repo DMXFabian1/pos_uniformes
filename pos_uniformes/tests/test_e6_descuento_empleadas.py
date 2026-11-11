@@ -4,6 +4,7 @@
 - Sus propias compras no cuentan para la meta.
 - Tope al mes (precio de lista) con su nivel; de ahí, el 5 % base.
 - La promo 3pz se queda con el 5 % base.
+- En uniforme, a lo más 10 % (2026-11-11); la ropa casual llega a su nivel.
 
 Reglas puras, la Libreta en SQLite en memoria y el kiosko sin base.
 """
@@ -33,10 +34,12 @@ D = Decimal
 N = inc.Nivel
 NIVELES = [N(0, D("5")), N(150, D("10")), N(250, D("15")), N(350, D("20"))]
 
-PANTS = {"sku": "P1", "nombre": "Pants", "talla": "10", "precio": D("400"), "cantidad": 1}
-SUDADERA = {"sku": "S1", "nombre": "Sudadera", "talla": "12", "precio": D("600"), "cantidad": 1}
+CHAMARRA = {"sku": "C1", "nombre": "Chamarra", "talla": "M", "precio": D("400"), "cantidad": 1,
+            "categoria": "Ropa casual"}
+SUDADERA = {"sku": "S1", "nombre": "Sudadera", "talla": "12", "precio": D("600"), "cantidad": 1,
+            "categoria": "Básico"}
 PLAYERA_PROMO = {"sku": "PL", "nombre": "Playera promo", "talla": "8", "precio": D("100"), "cantidad": 1,
-                 "sports_uniform_role": "playera"}
+                 "sports_uniform_role": "playera", "categoria": "Deportivo"}
 
 
 def _local(y, m, d, h=12) -> datetime:
@@ -75,12 +78,22 @@ class ReglasTests(unittest.TestCase):
             inc.validar(NIVELES, -1)
 
     def test_repartir_respeta_tope_y_promo(self) -> None:
-        items = [PANTS, SUDADERA, PLAYERA_PROMO]
-        self.assertEqual(inc.repartir(items, pct_nivel=15, restante=None), [D("15"), D("15"), D("5")])
-        # Caben los pants (400); la sudadera (600) ya no cabe en los 500 que quedan.
+        items = [CHAMARRA, SUDADERA, PLAYERA_PROMO]
+        # La sudadera es uniforme: se queda en 10 % aunque su nivel sea 15.
+        self.assertEqual(inc.repartir(items, pct_nivel=15, restante=None), [D("15"), D("10"), D("5")])
+        self.assertEqual(inc.repartir(items, pct_nivel=20, restante=None), [D("20"), D("10"), D("5")])
+        self.assertEqual(inc.repartir(items, pct_nivel=10, restante=None), [D("10"), D("10"), D("5")])
+        # Cabe la chamarra (400); la sudadera (600) ya no cabe en los 500 que quedan.
         self.assertEqual(inc.repartir(items, pct_nivel=15, restante=D("500")), [D("15"), D("5"), D("5")])
         self.assertEqual(inc.repartir(items, pct_nivel=5, restante=None), [D("5"), D("5"), D("5")])
         self.assertEqual(inc.repartir(items, pct_nivel=15, restante=D("0")), [D("5"), D("5"), D("5")])
+
+    def test_que_es_uniforme(self) -> None:
+        for cat in ("Oficial", "Deportivo", "Uniformes", "Escolta", "Básico", "", None):
+            self.assertTrue(inc.es_uniforme({"categoria": cat}), cat)
+        self.assertTrue(inc.es_uniforme({}), "lo que no se sabe cuenta como uniforme")
+        for cat in ("Ropa casual", "Temporada", "Accesorio", "Ropa interior", "Deportivo casual", "  ropa  CASUAL "):
+            self.assertFalse(inc.es_uniforme({"categoria": cat}), cat)
 
     def test_importe_con_nivel(self) -> None:
         detalle = [
@@ -94,7 +107,7 @@ class ReglasTests(unittest.TestCase):
         av = inc.AvanceEmpleada(D("15"), D("1200"), 180, D("10"), N(250, D("15")), "diciembre")
         self.assertEqual(
             av.texto(),
-            "🏷 Este mes compras con 15 % (te quedan $1,200.00) · "
+            "🏷 Este mes compras con 15 % (10 % en uniforme), te quedan $1,200.00 · "
             "Vas en 180 comisiones: te faltan 70 para comprar con 15 % en diciembre",
         )
         tope = inc.AvanceEmpleada(D("5"), None, 400, D("20"), None, "enero")
@@ -102,7 +115,8 @@ class ReglasTests(unittest.TestCase):
         self.assertIn("el máximo, 20 %", tope.texto())
         e = inc.EstadoCompradora("VEND-3", "Ana", D("15"), D("3000"), D("2500"))
         self.assertEqual(e.restante, D("500.00"))
-        self.assertEqual(e.texto(), "Ana: 15 % (le quedan $500.00 este mes)")
+        self.assertEqual(e.texto(), "Ana: 15 % (10 % en uniforme), le quedan $500.00 este mes")
+        self.assertEqual(inc.EstadoCompradora("VEND-4", "Bety", D("10"), None, D("0")).texto(), "Bety: 10 %")
 
 
 class _Db(unittest.TestCase):
@@ -169,6 +183,20 @@ class BaseTests(_Db):
         with self.assertRaises(inc.NivelesInvalidos):
             inc.guardar(self.s, [N(5, D("5"))], 0)
 
+    def test_categorias_por_sku(self) -> None:
+        from pos_uniformes.database.models import Categoria, Marca, Producto, Variante
+
+        cat, marca = Categoria(nombre="Ropa casual"), Marca(nombre="Maximoda")
+        self.s.add_all([cat, marca])
+        self.s.flush()
+        prod = Producto(categoria_id=cat.id, marca_id=marca.id, nombre="Chamarra", nombre_base="Chamarra")
+        self.s.add(prod)
+        self.s.flush()
+        self.s.add(Variante(producto_id=prod.id, sku="C1", talla="M", color="Azul", precio_venta=D("400")))
+        self.s.flush()
+        self.assertEqual(inc.categorias_por_sku(self.s, ["C1", "NO", ""]), {"C1": "Ropa casual"})
+        self.assertEqual(inc.categorias_por_sku(self.s, []), {})
+
     def test_empleadas_activas(self) -> None:
         self.s.add_all([Empleada(codigo="VEND-3", nombre_completo="Ana"),
                         Empleada(codigo="VEND-9", nombre_completo="Baja", activo=False)])
@@ -230,7 +258,7 @@ class _Qt(unittest.TestCase):
         w = QuickSaleWidget(SimpleNamespace(offline_mode=False, _kiosk_lookup_from_cache=None, _db_online=True))
         w._employee_code = "VEND-1"
         w._employee_name = "Daniel"
-        w._items = [dict(PANTS), dict(SUDADERA), dict(PLAYERA_PROMO)]
+        w._items = [dict(CHAMARRA), dict(SUDADERA), dict(PLAYERA_PROMO)]
         w._discount_active = True
         w._compradora = compradora
         w._refresh_totals()
@@ -252,6 +280,31 @@ class KioskoTests(_Qt):
             w._apply_terminal_commission(D("340.00")) + w._apply_terminal_commission(D("570.00"))
             + w._apply_terminal_commission(D("95.00")),
         )
+
+    def test_en_uniforme_a_lo_mas_10(self) -> None:
+        w = self._kiosko(inc.EstadoCompradora("VEND-5", "Cristal", D("20"), None, D("0")))
+        # Chamarra 20 % (80) · sudadera de uniforme 10 % (60) · promo 5 % (5)
+        self.assertEqual(w._compute_totals()[1], D("145.00"))
+
+    def test_la_categoria_sale_del_catalogo(self) -> None:
+        w = self._kiosko()
+        w._items = [{"sku": "C1", "nombre": "Chamarra", "talla": "M", "precio": D("400"), "cantidad": 1},
+                    {"sku": "XX", "nombre": "Sin catálogo", "talla": "", "precio": D("100"), "cantidad": 1}]
+        w._compradora = inc.EstadoCompradora("VEND-5", "Cristal", D("20"), None, D("0"))
+        with patch.object(inc, "categorias_por_sku", return_value={"C1": "Ropa casual"}) as cats, \
+             patch("pos_uniformes.database.connection.get_session"):
+            w._compute_totals()
+            w._compute_totals()
+        cats.assert_called_once()  # una vez por SKU
+        self.assertEqual([it["desc_empleada_pct"] for it in w._items], [D("20"), D("10")])
+
+    def test_sin_conexion_la_categoria_cuenta_como_uniforme(self) -> None:
+        w = self._kiosko()
+        w._items = [{"sku": "C1", "nombre": "Chamarra", "talla": "M", "precio": D("400"), "cantidad": 1}]
+        w._compradora = inc.EstadoCompradora("VEND-5", "Cristal", D("20"), None, D("0"))
+        with patch("pos_uniformes.database.connection.get_session", side_effect=OSError("sin red")):
+            w._compute_totals()
+        self.assertEqual(w._items[0]["desc_empleada_pct"], D("10"))
 
     def test_sin_compradora_es_el_5_de_siempre(self) -> None:
         w = self._kiosko()

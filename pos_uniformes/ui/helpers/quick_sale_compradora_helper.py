@@ -107,9 +107,31 @@ class CompradoraEmpleadaMixin:
             for it in items:
                 it.pop(inc.LLAVE_PCT, None)
             return
+        self._poner_categorias(items)
         pcts = inc.repartir(items, pct_nivel=c.porcentaje, restante=c.restante)
         for it, pct in zip(items, pcts):
             it[inc.LLAVE_PCT] = pct
+
+    def _poner_categorias(self, items: list[dict]) -> None:
+        """La categoría de cada renglón (uniforme o no). Se pregunta a la base
+        una vez por SKU; sin conexión el renglón cuenta como uniforme."""
+        cache = self.__dict__.setdefault("_categorias_sku", {})
+        faltan = {str(it.get("sku") or "") for it in items if inc.LLAVE_CATEGORIA not in it} - set(cache)
+        faltan.discard("")
+        if faltan:
+            try:
+                from pos_uniformes.database.connection import get_session
+
+                with get_session() as session:
+                    encontradas = inc.categorias_por_sku(session, faltan)
+            except Exception:  # noqa: BLE001
+                _logger.warning("Sin conexión para las categorías: cuentan como uniforme", exc_info=True)
+                encontradas = {}
+            for sku in faltan:  # lo que no se encontró queda como uniforme (no se vuelve a preguntar)
+                cache[sku] = encontradas.get(sku, "")
+        for it in items:
+            if inc.LLAVE_CATEGORIA not in it and cache.get(str(it.get("sku") or "")):
+                it[inc.LLAVE_CATEGORIA] = cache[str(it.get("sku") or "")]
 
     def _hay_pct_por_renglon(self, items: list[dict]) -> bool:
         return any(it.get(inc.LLAVE_PCT) not in (None, "") for it in items)

@@ -69,7 +69,11 @@ class DescuentoEmpleadasDialog(QDialog):
         self.tope_input.setValue(float(tope or 0))
         tope_ly.addWidget(self.tope_input)
         ly.addLayout(tope_ly)
-        nota = QLabel(f"Pasando el tope, o en la promo 3pz, compran con el {inc.fmt_pct(inc.PCT_BASE)} de siempre.")
+        nota = QLabel(
+            f"En uniforme el descuento llega a lo más a {inc.fmt_pct(inc.TOPE_PCT_UNIFORME)}; los niveles "
+            "más altos aplican en ropa casual, temporada, accesorios y ropa interior. Pasando el tope, "
+            f"o en la promo 3pz, compran con el {inc.fmt_pct(inc.PCT_BASE)} de siempre."
+        )
         nota.setWordWrap(True)
         ly.addWidget(nota)
 
