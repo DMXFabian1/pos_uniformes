@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 import unittest
+from unittest.mock import patch
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
@@ -165,6 +166,14 @@ class PestanaTests(_ConBase):
         from PyQt6.QtWidgets import QWidget
 
         from pos_uniformes.ui.helpers import analytics_tablero as ui
+
+        # «Hoy» es el sábado de HOY, no el día en que corre la prueba: si no,
+        # la semana de HOY deja de ir «a medias» en cuanto pasa y la tarjeta ya
+        # no dice «(mismos días)».
+        cargar = tb.cargar
+        fijo = patch.object(tb, "cargar", side_effect=lambda *a, **kw: cargar(*a, **{"hoy": HOY, **kw}))
+        fijo.start()
+        self.addCleanup(fijo.stop)
 
         ventana = QWidget()
         raiz = ui.construir(ventana)

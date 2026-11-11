@@ -36,7 +36,7 @@ cd pos_uniformes
 ./dev.sh
 ```
 
-**Aviso (2026-11-10):** la suite completa con `-n 6` no termina en la Mac. Algunos procesos se caen con `Fatal Python error: Aborted` en `conftest.pytest_sessionfinish` → `quote_satellite_window._advertir_impresora_tickets_sin_elegir`. Hasta que se arregle, usar `--fast` más las pruebas del archivo tocado, y avisar a Daniel que la suite completa no corrió.
+**Suite completa (2026-11-11):** corre limpia desde `pos_uniformes/` (5171 pruebas, 0 fallas). Desde la raíz falla la colección de `test_pruebas_no_tocan_datos_reales.py`. El visor de PDF necesita `PyQt6.QtPdf`: desde PyQt6-WebEngine 6.140 viene aparte, en el paquete `PyQt6-Pdf` (`pip install PyQt6-Pdf`).
 
 Para ahorrar tokens, mandar la salida a un archivo y mostrar solo el resumen y los nombres de las pruebas que fallan.
 Migraciones: Alembic en `pos_uniformes/migrations/versions/`. Se corren con `python -m alembic upgrade head` desde `pos_uniformes/`.

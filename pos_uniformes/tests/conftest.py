@@ -114,17 +114,25 @@ def pytest_sessionfinish(session, exitstatus) -> None:
     if not _VENTANAS_SATELITE:
         return
     try:
-        from PyQt6.QtWidgets import QApplication
+        from unittest.mock import patch
+
+        from PyQt6.QtWidgets import QApplication, QMessageBox
 
         app = QApplication.instance()
-        for w in _VENTANAS_SATELITE:
-            try:
-                w.close()
-                w.deleteLater()
-            except Exception:  # noqa: BLE001
-                pass
-        if app is not None:
-            app.processEvents()
+        # Al procesar los eventos puede saltar un aviso diferido de la ventana
+        # (p. ej. «Falta elegir la impresora de tickets», a los 1.5 s). Un
+        # QMessageBox modal con Qt cerrándose tumbaba el proceso con «Fatal
+        # Python error: Aborted»; aquí los avisos no se muestran.
+        with patch.object(QMessageBox, "warning"), patch.object(QMessageBox, "information"), \
+             patch.object(QMessageBox, "critical"), patch.object(QMessageBox, "question"):
+            for w in _VENTANAS_SATELITE:
+                try:
+                    w.close()
+                    w.deleteLater()
+                except Exception:  # noqa: BLE001
+                    pass
+            if app is not None:
+                app.processEvents()
     except Exception:  # noqa: BLE001
         pass
     _VENTANAS_SATELITE.clear()
