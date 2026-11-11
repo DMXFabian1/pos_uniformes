@@ -422,7 +422,7 @@ class MonederoVentaMixin:
         items = [
             {"sku": it["sku"], "nombre": it["nombre"], "talla": it["talla"],
              "cantidad": int(it["cantidad"]), "precio": str(it["precio"]),
-             **self._marca_promo_para_libreta(it)}
+             **self._marca_promo_para_libreta(it), **self._marca_pct_empleada(it)}
             for it in self._items
         ]
         pct_mayoreo = self._pct_descuento_programa()
@@ -434,7 +434,7 @@ class MonederoVentaMixin:
             # Sin el monto de saldo: si se reescanea el QR tras un corte, el
             # saldo leído ya trae descontado el canje anterior y cambiaría.
             int(c["id"]), str(total), bool(tarjeta), bool(self._discount_active), str(pct_mayoreo or ""),
-            tuple((it["sku"], it["cantidad"], it["precio"]) for it in items),
+            tuple((it["sku"], it["cantidad"], it["precio"], it.get("desc_empleada_pct")) for it in items),
         )
         previa = getattr(self, "_monedero_op", None)
         if previa is None or previa[0] != huella:
@@ -457,6 +457,7 @@ class MonederoVentaMixin:
                         descuento_empleada=bool(self._discount_active),
                         origen=origen,
                         descuento_programa=pct_mayoreo,
+                        **self._datos_compradora_para_cola(),
                     )
                     cashback_monto = Decimal(cashback.monto) if cashback is not None else _CERO
                     # Lo que la base cobró de verdad (en un reintento es lo

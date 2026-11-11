@@ -214,6 +214,11 @@ class ConfiguracionNegocio(Base):
         nullable=False,
         default=Decimal("2000.00"),
     )
+    #: E6: importe a precio de lista que cada empleada puede comprar al mes con
+    #: su nivel de descuento (de ahí en adelante, el 5 %). 0 = sin tope.
+    tope_compra_empleada_mes: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), nullable=False, default=Decimal("3000.00"), server_default="3000"
+    )
     discount_basico: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("5.00"))
     discount_leal: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("10.00"))
     discount_profesor: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("15.00"))
@@ -560,6 +565,23 @@ class ProgramaTasaCambio(Base):
     despues: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
     usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id", ondelete="RESTRICT"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+
+
+class NivelDescuentoEmpleada(Base):
+    """E6: niveles del descuento de empleadas (Daniel, 2026-11-10).
+
+    Las comisiones de un mes dan el % con el que compra el mes siguiente
+    (incentivo_empleada_service)."""
+
+    __tablename__ = "nivel_descuento_empleada"
+    __table_args__ = (
+        CheckConstraint("comisiones_minimas >= 0", name="nivel_desc_emp_comisiones_validas"),
+        CheckConstraint("porcentaje >= 0 AND porcentaje <= 30", name="nivel_desc_emp_pct_valido"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    comisiones_minimas: Mapped[int] = mapped_column(Integer, nullable=False, unique=True)
+    porcentaje: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
 
 
 class MembresiaEvento(Base):
@@ -2423,6 +2445,9 @@ class LibretaVenta(Base):
     #: E5-A: % descontado por el programa del cliente (Mayorista que eligió
     #: descuento en vez de Monedero). Una venta con él no genera cashback.
     descuento_programa: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
+    #: E6: en una compra de empleada, quién compra (su nivel y su tope). Vacío
+    #: en las de antes y cuando el dueño no eligió a nadie (5 % de siempre).
+    compradora_code: Mapped[str | None] = mapped_column(String(40), nullable=True, index=True)
     monto_monedero: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), nullable=False, default=Decimal("0.00"), server_default="0"
     )

@@ -160,6 +160,7 @@ def registrar_operacion(
     operacion_uuid: str | None = None,
     acreditar_cashback: bool = True,
     descuento_programa: Decimal | None = None,
+    compradora_code: str | None = None,
 ) -> LibretaVenta:
     """Anota una operación. `items` = líneas del carrito de venta rápida.
 
@@ -187,6 +188,8 @@ def registrar_operacion(
             ),
             # E5-A: solo cuando viene marcada; el descuento de programa no le aplica.
             **({"promo_3pz": True} if it.get("promo_3pz") else {}),
+            # E6: el % de empleada de este renglón (su nivel o el 5 % base).
+            **({"desc_empleada_pct": str(it["desc_empleada_pct"])} if it.get("desc_empleada_pct") not in (None, "") else {}),
         }
         for it in items
     ]
@@ -210,6 +213,7 @@ def registrar_operacion(
         operacion_uuid=(str(operacion_uuid) if operacion_uuid else None),
         monto_monedero=Decimal("0.00"),
         descuento_programa=_pct_o_nada(descuento_programa),
+        compradora_code=(str(compradora_code).upper() if compradora_code and descuento_empleada else None),
     )
     if created_at is not None:
         entry.created_at = created_at
@@ -270,6 +274,7 @@ def registrar_venta_con_monedero(
     cliente: str | None = None,
     origen: str | None = None,
     descuento_programa: Decimal | None = None,
+    compradora_code: str | None = None,
 ) -> tuple[LibretaVenta, object, object]:
     """Venta pagada (en parte o toda) con saldo del monedero. EN LÍNEA.
 
@@ -314,6 +319,7 @@ def registrar_venta_con_monedero(
         operacion_uuid=operacion_uuid,
         acreditar_cashback=False,
         descuento_programa=descuento_programa,
+        compradora_code=compradora_code,
     )
     entry.monto_monedero = monto_monedero
     session.flush()
@@ -768,9 +774,6 @@ def cambiar_pago_tarjeta(session, operacion_id: int, tarjeta: bool):
     else:
         detalle = list(entry.detalle or [])
         if detalle:
-            factor_desc = (
-                Decimal("0.95") if entry.descuento_empleada else Decimal("1")
-            )
             desc_programa = getattr(entry, "descuento_programa", None)
             neto = Decimal("0.00")
             for line in detalle:
@@ -783,8 +786,10 @@ def cambiar_pago_tarjeta(session, operacion_id: int, tarjeta: bool):
                         line, empleada=(5 if entry.descuento_empleada else 0), programa=desc_programa
                     )
                     unit = dps.precio_con_descuento(unit, pct)
-                else:
-                    unit = (unit * factor_desc).quantize(Decimal("0.01"))
+                elif entry.descuento_empleada:
+                    # E6: el % que tuvo ese renglón (su nivel); las de antes, 5 %.
+                    pct = Decimal(str(line.get("desc_empleada_pct") or 5))
+                    unit = (unit * (Decimal("100") - pct) / Decimal("100")).quantize(Decimal("0.01"))
                 neto += aplicar_comision_terminal(unit) * int(line.get("cantidad", 0) or 0)
             neto = neto.quantize(Decimal("0.01"))
         else:

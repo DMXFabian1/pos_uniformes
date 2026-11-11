@@ -291,6 +291,7 @@ def _subir(session, entry: dict) -> None:
         items=list(entry.get("items", [])),
         monto_total=Decimal(str(entry.get("monto_total", "0"))),
         descuento_empleada=bool(entry.get("descuento_empleada", False)),
+        compradora_code=entry.get("compradora_code") or None,
         cliente=entry.get("cliente"),
         origen=entry.get("origen"),
         created_at=_fecha(entry),

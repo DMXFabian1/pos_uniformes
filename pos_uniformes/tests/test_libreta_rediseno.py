@@ -119,8 +119,8 @@ class LibretaDelDuenoTests(unittest.TestCase):
     def test_lo_de_caja_va_en_un_menu_y_dispara_lo_de_siempre(self) -> None:
         win = self._ventana()
         textos = [a.text() for a in win.libreta_caja_menu.actions() if a.text()]
-        self.assertEqual(len(textos), 6)
-        for palabra in ("retiro", "Cortes", "Pagos", "Equipo", "Caja y nómina", "Meta semanal"):
+        self.assertEqual(len(textos), 7)
+        for palabra in ("retiro", "Cortes", "Pagos", "Equipo", "Caja y nómina", "Meta semanal", "Descuento de empleadas"):
             self.assertTrue(any(palabra in t for t in textos), palabra)
         self.assertFalse(win.libreta_caja_menu_button.isHidden())
         self.assertFalse(win.libreta_print_button.isHidden())

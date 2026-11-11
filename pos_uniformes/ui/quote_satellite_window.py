@@ -1745,6 +1745,9 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_caja_menu.addAction("🎯  Meta semanal…").triggered.connect(
             lambda _c=False: self._libreta_pedir_meta()
         )
+        self.libreta_caja_menu.addAction("🏷  Descuento de empleadas…").triggered.connect(
+            lambda _c=False: self._libreta_descuento_empleadas()
+        )
         self.libreta_caja_menu_button = QPushButton("💼 Caja  ▾")
         self.libreta_caja_menu_button.setObjectName("libretaCajaBoton")
         self.libreta_caja_menu_button.setAutoDefault(False)
@@ -1820,6 +1823,14 @@ class QuoteSatelliteWindow(QMainWindow):
         meta_bar_ly.addWidget(self.libreta_meta_progress, 1)
         self.libreta_meta_bar.setLayout(meta_bar_ly)
         view_ly.addWidget(self.libreta_meta_bar)
+
+        # E6: con qué % compra ella este mes y cuánto le falta para el siguiente.
+        self.libreta_nivel_label = QLabel("")
+        self.libreta_nivel_label.setObjectName("libretaNivelDescuento")
+        self.libreta_nivel_label.setWordWrap(True)
+        self.libreta_nivel_label.setStyleSheet("font-size: 14px; font-weight: 600; padding: 4px 16px;")
+        self.libreta_nivel_label.setVisible(False)
+        view_ly.addWidget(self.libreta_nivel_label)
 
         self.libreta_status_label = QLabel("")
         self.libreta_status_label.setStyleSheet("font-size: 12px; color: #b9770e;")
@@ -2733,6 +2744,24 @@ class QuoteSatelliteWindow(QMainWindow):
         if dlg.exec() == QDialog.DialogCode.Accepted and "dia" in elegido:
             self._libreta_ver_fechas(elegido["dia"], elegido["dia"])
 
+    def _datos_nivel_libreta(self, session) -> str | None:
+        """E6: el texto de su nivel de descuento; sin el dato, nada."""
+        try:
+            from pos_uniformes.services import incentivo_empleada_service as inc
+
+            return inc.avance(session, self._libreta_code).texto()
+        except Exception:  # noqa: BLE001
+            logger.warning("Libreta: no se pudo leer el nivel de descuento", exc_info=True)
+            session.rollback()
+            return None
+
+    def _libreta_descuento_empleadas(self) -> None:
+        """E6: el dueño ajusta niveles y tope (menú Caja)."""
+        from pos_uniformes.ui.dialogs.descuento_empleadas_dialog import abrir_descuento_empleadas
+
+        if abrir_descuento_empleadas(self):
+            self._set_status("Niveles de descuento de empleadas guardados.")
+
     def _libreta_pedir_meta(self) -> None:
         """La meta semanal, desde el menú Caja (antes vivía en «Más opciones»)."""
         from PyQt6.QtWidgets import QInputDialog
@@ -2848,6 +2877,7 @@ class QuoteSatelliteWindow(QMainWindow):
         week_rows: list = []
         fuente_db = False
         ciclo_texto: str | None = None
+        nivel_texto: str | None = None
         afluencia_filas: list = []
         pendientes: list = []
         if probe_database_host(0.5):
@@ -2887,6 +2917,7 @@ class QuoteSatelliteWindow(QMainWindow):
                     )
                     if not self._libreta_is_owner:
                         ciclo_texto = self._datos_ciclo_libreta(session)
+                        nivel_texto = self._datos_nivel_libreta(session)
                     else:
                         afluencia_filas = self._cargar_afluencia_libreta(session, desde, hasta)
                         pendientes = self._cargar_pendientes_libreta(session)
@@ -2901,6 +2932,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_ciclo_banner.setVisible(bool(ciclo_texto))
         if ciclo_texto:
             self._pintar_ciclo_libreta(ciclo_texto)
+        self.libreta_nivel_label.setText(nivel_texto or "")
+        self.libreta_nivel_label.setVisible(bool(nivel_texto))
 
         if not fuente_db:
             week_rows = self._libreta_rows_locales(desde, hasta, employee_filter)

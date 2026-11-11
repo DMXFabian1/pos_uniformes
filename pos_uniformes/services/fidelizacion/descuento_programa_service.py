@@ -21,6 +21,9 @@ _CIEN = Decimal("100")
 #: Llaves con las que el carrito marca la promo 3pz.
 ROLES_PROMO_3PZ = ("base", "playera")
 LLAVE_PROMO = "promo_3pz"
+#: % de empleada de ese renglón (incentivo_empleada_service): si viene, manda
+#: sobre el `empleada` general.
+LLAVE_PCT_EMPLEADA = "desc_empleada_pct"
 
 
 def es_promo_3pz(item: Mapping) -> bool:
@@ -34,6 +37,8 @@ def _pct(valor) -> Decimal:
 def porcentaje_de_linea(item: Mapping, *, empleada=None, programa=None) -> Decimal:
     """El % que se descuenta en este renglón: el más alto de los que aplican."""
     pct = _pct(empleada)
+    if pct > 0 and item.get(LLAVE_PCT_EMPLEADA) not in (None, ""):
+        pct = _pct(item.get(LLAVE_PCT_EMPLEADA))
     if _pct(programa) > 0 and not es_promo_3pz(item):
         pct = max(pct, _pct(programa))
     return pct
