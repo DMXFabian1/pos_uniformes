@@ -229,7 +229,11 @@ class MonederoVentaMixin:
         return {dps.LLAVE_PROMO: True} if self._pct_descuento_programa() and dps.es_promo_3pz(item) else {}
 
     def _etiqueta_descuento_ticket(self) -> str:
-        return "Desc. mayoreo:" if self._pct_descuento_programa() else "Descuento:"
+        pct = self._pct_descuento_programa()
+        if not pct:
+            return "Descuento:"
+        # Con su % para que el cliente vea qué se le aplicó (Daniel, 2026-11-11).
+        return f"Desc. mayoreo {pct.normalize():f} %:"
 
     def _toggle_descuento_programa(self) -> None:
         c = self._cliente

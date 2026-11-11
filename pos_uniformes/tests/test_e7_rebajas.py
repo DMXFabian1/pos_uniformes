@@ -98,6 +98,10 @@ class ReglasTests(unittest.TestCase):
         self.assertEqual(reb.precio_unitario_ticket(it, "$350.00"), f"{reb.tachar('$450')} $350.00")
         self.assertEqual(reb.precio_unitario_ticket(PANTS, "$400.00"), "$400.00")
         self.assertEqual(reb.texto_ahorro_total([PANTS]), "")
+        # Daniel, 2026-11-11: el descuento de mayoreo se suma a lo ahorrado.
+        self.assertEqual(reb.texto_ahorro_total([_chamarra()], D("54")), "¡Hoy ahorraste $154!")
+        self.assertEqual(reb.texto_ahorro_total([PANTS], D("54")), "¡Hoy ahorraste $54!")
+        self.assertEqual(reb.texto_ahorro_total([PANTS], D("0")), "")
         self.assertEqual(reb.marca_para_libreta(it), {"rebaja": "oferta", "precio_normal": "450"})
         self.assertEqual(reb.marca_para_libreta(PANTS), {})
         self.assertEqual(reb.importe_rebajado([it, PANTS, {**it, "cantidad": 2}]), D("1050.00"))

@@ -179,12 +179,20 @@ def precio_unitario_ticket(item: Mapping, precio_fmt: str) -> str:
     return f"{tachar(fmt_corto(item[LLAVE_ANTES]))} {precio_fmt}"
 
 
-def texto_ahorro_total(items: Iterable[Mapping]) -> str:
-    """«¡Hoy ahorraste $75 en ofertas!» (vacío si no hubo ahorro)."""
-    total = ahorro_total(items)
-    if total <= 0:
+def texto_ahorro_total(items: Iterable[Mapping], otros_descuentos=0) -> str:
+    """El renglón de lo ahorrado; vacío si no hubo ahorro.
+
+    Solo ofertas:          «¡Hoy ahorraste $75 en ofertas!»
+    Con otro descuento     «¡Hoy ahorraste $129!»
+    (el de mayoreo):       (ofertas más el descuento, Daniel 2026-11-11)
+    """
+    en_ofertas = ahorro_total(items)
+    otros = max(Decimal(str(otros_descuentos or 0)), Decimal("0"))
+    if otros > 0:
+        return f"¡Hoy ahorraste {fmt_corto(en_ofertas + otros)}!"
+    if en_ofertas <= 0:
         return ""
-    return f"¡Hoy ahorraste {fmt_corto(total)} en ofertas!"
+    return f"¡Hoy ahorraste {fmt_corto(en_ofertas)} en ofertas!"
 
 
 def hay_liquidacion(items: Iterable[Mapping]) -> bool:

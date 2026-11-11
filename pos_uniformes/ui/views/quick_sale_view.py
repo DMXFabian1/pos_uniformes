@@ -3306,8 +3306,12 @@ class QuickSaleWidget(
         )
 
         secciones: list[list[str]] = []
-        if texto_ahorro_total(items):
-            secciones.append([tk_center(texto_ahorro_total(items))])
+        # El descuento de mayoreo también es ahorro del cliente; el de
+        # empleada no se cuenta aquí.
+        mayoreo = discount if (discount > 0 and self._pct_descuento_programa()) else 0
+        ahorrado = texto_ahorro_total(items, mayoreo)
+        if ahorrado:
+            secciones.append([tk_center(ahorrado)])
         if monedero:
             renglones_monedero = lineas_ticket_monedero(monedero, tk_row)
             if renglones_monedero:

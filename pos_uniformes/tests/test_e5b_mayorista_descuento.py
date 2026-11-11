@@ -203,8 +203,9 @@ class KioskoTests(_Qt):
         w._btn_descuento_programa.click()
         with patch.object(w, "_load_business_info", return_value=("Maximoda", "", "")):
             texto = w._build_venta_text()
-        self.assertIn("Desc. mayoreo:", texto)
+        self.assertIn("Desc. mayoreo 15 %:", texto)
         self.assertIn("60.00", texto)
+        self.assertIn("¡Hoy ahorraste $60!", texto)   # el mayoreo cuenta como ahorro
 
     def test_reimprimir_con_el_mayoreo_guardado(self) -> None:
         w = self._kiosko(descuento=None)
@@ -214,7 +215,7 @@ class KioskoTests(_Qt):
             texto = w.build_reprint_ticket(tipo="venta", detalle=detalle, cliente=None, employee_name="Fanny",
                                            descuento_empleada=False, created_at=datetime(2026, 11, 10, 12, 0),
                                            descuento_programa=D("15.00"))
-        self.assertIn("Desc. mayoreo:", texto)
+        self.assertIn("Desc. mayoreo 15 %:", texto)
         self.assertIn("440.00", texto)
         self.assertIsNone(w._pct_descuento_programa(), "después de reimprimir todo queda como estaba")
 
