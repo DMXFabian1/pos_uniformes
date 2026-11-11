@@ -3297,19 +3297,32 @@ class QuickSaleWidget(
         lines.append(tk_dbl_top())
         lines.append(tk_dbl_row("TOTAL A PAGAR:", f"${tk_fmt(total)}"))
         lines.append(tk_dbl_bot())
-        from pos_uniformes.services.rebaja_service import texto_ahorro_total
+        # Lo ahorrado, el Monedero y la leyenda de liquidación van en su propio
+        # recuadro bajo el total, como lo demás (Daniel, 2026-11-11).
+        from pos_uniformes.services.rebaja_service import (
+            LEYENDA_LIQUIDACION,
+            hay_liquidacion,
+            texto_ahorro_total,
+        )
 
+        secciones: list[list[str]] = []
         if texto_ahorro_total(items):
-            lines.append(texto_ahorro_total(items).center(_TW))
+            secciones.append([tk_center(texto_ahorro_total(items))])
         if monedero:
-            lines += lineas_ticket_monedero(monedero, tk_row)
+            renglones_monedero = lineas_ticket_monedero(monedero, tk_row)
+            if renglones_monedero:
+                secciones.append(renglones_monedero)
+        if not store_copy and hay_liquidacion(items):
+            secciones.append([tk_center(renglon) for renglon in LEYENDA_LIQUIDACION])
+        if secciones:
+            lines.append(tk_top())
+            for i, seccion in enumerate(secciones):
+                if i:
+                    lines.append(tk_mid())
+                lines.extend(seccion)
+            lines.append(tk_bot())
 
         if not store_copy:
-            from pos_uniformes.services.rebaja_service import LEYENDA_LIQUIDACION, hay_liquidacion
-
-            if hay_liquidacion(items):
-                lines.append("")
-                lines.extend(renglon.center(_TW) for renglon in LEYENDA_LIQUIDACION)
             self._append_terms(lines, self._TERMS_VENTA)
             lines.append("")
             lines.append("Gracias por su compra.".center(_TW))

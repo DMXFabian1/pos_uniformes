@@ -294,6 +294,30 @@ class KioskoTests(_Qt):
             if linea.startswith("│"):
                 self.assertEqual(reb.largo_visible(linea), 38, linea)
 
+    def test_lo_de_abajo_va_en_su_recuadro(self) -> None:
+        w = self._kiosko()
+        w._items = [_chamarra(), reb.aplicar({"sku": "S1", "nombre": "Sudadera", "talla": "10", "precio": D("300"),
+                                              "cantidad": 1}, LIQ_SUDADERA)]
+        with patch.object(w, "_load_business_info", return_value=("Maximoda", "", "")):
+            texto = w._build_venta_text(monedero={"cashback": D("9"), "saldo": D("46.42")})
+        abajo = texto.split("╝\n", 1)[1].split("\n\n", 1)[0].split("\n")
+        self.assertTrue(abajo[0].startswith("┌") and abajo[-1].startswith("└"), abajo)
+        self.assertIn("¡Hoy ahorraste $200 en ofertas!", abajo[1])
+        self.assertTrue(abajo[2].startswith("├"))
+        self.assertIn("Acumulado en esta compra:", abajo[3])
+        self.assertIn("Saldo en monedero:", abajo[4])
+        self.assertTrue(abajo[5].startswith("├"))
+        self.assertIn("sin cambios ni devoluciones", "\n".join(abajo[6:]))
+        for linea in abajo:
+            self.assertEqual(reb.largo_visible(linea), 38, linea)
+
+    def test_sin_nada_que_decir_no_hay_recuadro(self) -> None:
+        w = self._kiosko()
+        w._items = [dict(PANTS)]
+        with patch.object(w, "_load_business_info", return_value=("Maximoda", "", "")):
+            texto = w._build_venta_text()
+        self.assertFalse(texto.split("╝\n", 1)[1].lstrip("\n").startswith("┌"))
+
     def test_con_varias_piezas_va_el_precio_de_cada_una(self) -> None:
         w = self._kiosko()
         chamarras = _chamarra()
