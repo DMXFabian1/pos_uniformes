@@ -455,12 +455,13 @@ class ClienteEvento(Base):
 
 
 # -- E4: programas y membresías -------------------------------------------------
-# Una membresía es una etiqueta: no da descuento ni cambia precios (eso es E5).
+# E5-A (2026-11-10): cada programa abona un % al Monedero (`tasa_monedero`) y
+# Mayorista puede tomarlo como descuento en la compra (`permite_descuento`).
 # Un cliente tiene como máximo UNA membresía activa y UNA propuesta pendiente
 # (D1 ajustada); lo garantizan dos índices únicos parciales, no la pantalla.
 
 PROGRAMA_ESTADOS = ("borrador", "activo", "pausado", "cerrado")
-PROGRAMA_INGRESO_MODOS = ("directo_empleada", "aprobacion_dueno")
+PROGRAMA_INGRESO_MODOS = ("directo_empleada", "aprobacion_dueno", "automatico")
 MEMBRESIA_ESTADOS = ("pendiente", "activa", "rechazada", "expirada", "cancelada", "vencida", "reemplazada")
 
 
@@ -473,6 +474,7 @@ class Programa(Base):
     __table_args__ = (
         CheckConstraint(_en("estado", PROGRAMA_ESTADOS), name="programa_estado_valido"),
         CheckConstraint(_en("ingreso_modo", PROGRAMA_INGRESO_MODOS), name="programa_ingreso_modo_valido"),
+        CheckConstraint("tasa_monedero >= 0 AND tasa_monedero <= 100", name="programa_tasa_monedero_valida"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -486,6 +488,14 @@ class Programa(Base):
     #: Vacío = sin vencimiento (P-E4-3).
     vigencia_dias: Mapped[int | None] = mapped_column(Integer)
     orden: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    #: E5-A: % de cada compra que el miembro recibe en su Monedero.
+    tasa_monedero: Mapped[Decimal] = mapped_column(
+        Numeric(5, 2), nullable=False, default=Decimal("0"), server_default=sa_text("0")
+    )
+    #: E5-A: puede cambiar su % por descuento en la compra (Mayorista).
+    permite_descuento: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default=sa_text("false")
+    )
     creado_por_usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id", ondelete="RESTRICT"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at: Mapped[datetime] = mapped_column(
@@ -535,6 +545,21 @@ class Membresia(Base):
     )
 
     programa: Mapped["Programa"] = relationship()
+
+
+class ProgramaTasaCambio(Base):
+    """E5-A: bitácora de cada cambio del % de Monedero de un programa."""
+
+    __tablename__ = "programa_tasa_cambio"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    programa_id: Mapped[int] = mapped_column(
+        ForeignKey("programa.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    antes: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+    despues: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False)
+    usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id", ondelete="RESTRICT"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
 class MembresiaEvento(Base):
@@ -2395,6 +2420,9 @@ class LibretaVenta(Base):
     operacion_uuid: Mapped[str | None] = mapped_column(String(36))
     # Parte de monto_total pagada con saldo del monedero: no es efectivo ni
     # tarjeta, no entra al cajón ni genera cashback.
+    #: E5-A: % descontado por el programa del cliente (Mayorista que eligió
+    #: descuento en vez de Monedero). Una venta con él no genera cashback.
+    descuento_programa: Mapped[Decimal | None] = mapped_column(Numeric(5, 2), nullable=True)
     monto_monedero: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), nullable=False, default=Decimal("0.00"), server_default="0"
     )

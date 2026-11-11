@@ -4267,6 +4267,7 @@ class QuoteSatelliteWindow(QMainWindow):
             monto_total=getattr(row, "monto_total", None),
             monto_monedero=getattr(row, "monto_monedero", None),
             pago_tarjeta=bool(getattr(row, "pago_tarjeta", False)),
+            descuento_programa=getattr(row, "descuento_programa", None),
         )
         if not texto:
             QMessageBox.information(

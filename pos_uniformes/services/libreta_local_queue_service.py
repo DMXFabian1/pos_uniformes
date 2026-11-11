@@ -305,6 +305,7 @@ def _subir(session, entry: dict) -> None:
         ),
         cliente_id=_cliente_id_de(session, entry),
         operacion_uuid=entry.get("operacion_uuid") or None,
+        descuento_programa=entry.get("descuento_programa") or None,
     )
 
 

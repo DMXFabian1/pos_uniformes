@@ -65,7 +65,7 @@ def estado_para_barra(*, en_linea: bool, activa: str | None, activa_clave: str |
                                    "Ya hay una propuesta en curso para este cliente.")
     if activa:
         texto = f"★ Miembro {activa}"
-        if activa_clave == "CLUB":
+        if activa_clave in ("CLUB", "LEAL"):  # E5-A: desde Leal también se propone
             return EstadoBarraPrograma(texto, False, hay_empleada)
         return EstadoBarraPrograma(texto, False, False, SOLO_EN_POS_TOOLTIP)
     return EstadoBarraPrograma("★ Sin programa", hay_empleada, hay_empleada)

@@ -14,6 +14,7 @@ from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
+    QDoubleSpinBox,
     QFrame,
     QFormLayout,
     QHBoxLayout,
@@ -34,7 +35,8 @@ from pos_uniformes.ui.styles import clientes_styles
 
 _logger = logging.getLogger(__name__)
 
-COLUMNAS = ("Programa", "Estado", "Cómo se entra", "Tipo al aprobar", "Vigencia", "Miembros", "Propuestas")
+COLUMNAS = ("Programa", "Monedero", "Estado", "Cómo se entra", "Tipo al aprobar", "Vigencia", "Miembros", "Propuestas")
+_COL_ESTADO, _COL_MIEMBROS, _COL_PROPUESTAS = 2, 6, 7
 #: Color de la columna Estado: (fondo, letra).
 ESTADO_TONOS = {
     "Activo": ("#e5f2eb", "#245241"),
@@ -54,6 +56,9 @@ class EditarProgramaDialog(QDialog):
         self.setWindowTitle(f"Editar {fila.nombre}")
         self.setMinimumWidth(480)
         self.resultado: tuple[str, str, str] | None = None
+        #: E5-A: el % de Monedero elegido (None = sin cambio).
+        self.tasa_resultado: float | None = None
+        self._tasa_original = float(fila.tasa)
         ly = QVBoxLayout(self)
         ly.setContentsMargins(18, 18, 18, 14)
         ly.setSpacing(12)
@@ -73,6 +78,14 @@ class EditarProgramaDialog(QDialog):
         form.addRow("Nombre", self.nombre_input)
         form.addRow("Descripción", self.descripcion_input)
         form.addRow("Estado", self.estado_combo)
+        self.tasa_input = QDoubleSpinBox()
+        self.tasa_input.setRange(0, 100)
+        self.tasa_input.setDecimals(1)
+        self.tasa_input.setSingleStep(0.5)
+        self.tasa_input.setSuffix(" %")
+        self.tasa_input.setValue(self._tasa_original)
+        self.tasa_input.setToolTip("De cada compra, este % va al Monedero del miembro. Aplica desde que guardas.")
+        form.addRow("Monedero", self.tasa_input)
         form.addRow("Vigencia", QLabel(f"{fila.vigencia} (por ahora no se cambia)"))
         ly.addLayout(form)
         ayuda = QLabel(ESTADO_AYUDA)
@@ -98,6 +111,8 @@ class EditarProgramaDialog(QDialog):
             self.descripcion_input.toPlainText().strip(),
             str(self.estado_combo.currentData()),
         )
+        tasa = round(float(self.tasa_input.value()), 2)
+        self.tasa_resultado = None if abs(tasa - self._tasa_original) < 0.005 else tasa
         self.accept()
 
 
@@ -172,20 +187,20 @@ class ProgramasDialog(QDialog):
             self.descripcion.setText(f"No se pudieron leer los programas: {exc}")
         self.tabla.setRowCount(len(self.filas))
         for r, f in enumerate(self.filas):
-            for c, valor in enumerate((f.nombre, f.estado, f.ingreso, f.tipo_sugerido, f.vigencia,
+            for c, valor in enumerate((f.nombre, f.monedero, f.estado, f.ingreso, f.tipo_sugerido, f.vigencia,
                                        str(f.miembros), str(f.pendientes))):
                 item = QTableWidgetItem(valor)
                 if c == 0:
                     fuente = item.font()
                     fuente.setBold(True)
                     item.setFont(fuente)
-                if c == 1 and valor in ESTADO_TONOS:
+                if c == _COL_ESTADO and valor in ESTADO_TONOS:
                     fondo, letra = ESTADO_TONOS[valor]
                     item.setBackground(QColor(fondo))
                     item.setForeground(QColor(letra))
-                if c in (1, 5, 6):
+                if c in (1, _COL_ESTADO, _COL_MIEMBROS, _COL_PROPUESTAS):
                     item.setTextAlignment(int(Qt.AlignmentFlag.AlignCenter))
-                if c == 6 and f.pendientes:
+                if c == _COL_PROPUESTAS and f.pendientes:
                     item.setForeground(QColor("#8a5a00"))
                     fuente = item.font()
                     fuente.setBold(True)
@@ -225,10 +240,11 @@ class ProgramasDialog(QDialog):
         if dialogo.exec() != int(QDialog.DialogCode.Accepted) or dialogo.resultado is None:
             return
         nombre, descripcion, estado = dialogo.resultado
+        tasa = getattr(dialogo, "tasa_resultado", None)
         try:
             with self._session_factory() as session:
                 aps.editar_programa(session, usuario_id=self._usuario_id, clave=f.clave,
-                                    nombre=nombre, descripcion=descripcion, estado=estado)
+                                    nombre=nombre, descripcion=descripcion, estado=estado, tasa=tasa)
                 session.commit()
         except (ms.NoSePuede, PermissionError) as exc:
             QMessageBox.warning(self, "Programas", str(exc))

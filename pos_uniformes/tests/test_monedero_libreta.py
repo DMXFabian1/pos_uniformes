@@ -22,6 +22,7 @@ from pos_uniformes.database.models import Cliente, LibretaVenta, MonederoMovimie
 from pos_uniformes.services import libreta_local_queue_service as cola
 from pos_uniformes.services import libreta_service as lib
 from pos_uniformes.services import monedero_service as mon
+from pos_uniformes.tests._programa_de_prueba import inscribir, programa_de_prueba
 from pos_uniformes.services.corte_caja_service import resumir_periodo
 
 D = Decimal
@@ -87,6 +88,7 @@ class _Db(unittest.TestCase):
         self.s.flush()
         cfg = mon.guardar_config(self.s, tasa="10", habilitado=True, usuario_id=self.admin.id)
         cfg.vigente_desde = datetime(2020, 1, 1, tzinfo=UTC)
+        inscribir(self.s, self.cliente.id, programa_de_prueba(self.s, "10"))  # E5-A: 10 % por su programa
         self.s.flush()
         stock = patch.object(lib, "descontar_stock", return_value=0)
         stock.start()

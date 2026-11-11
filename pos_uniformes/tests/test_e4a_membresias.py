@@ -69,9 +69,10 @@ class _Base(unittest.TestCase):
 
 
 class ProgramasIniciales(_Base):
-    def test_tres_programas_activos(self) -> None:
+    def test_cuatro_programas_activos(self) -> None:
+        """E5-A (2026-11-10) agregó Maximoda Leal en segundo lugar."""
         progs = {p.clave: p for p in ms.programas_activos(self.s)}
-        self.assertEqual(list(progs), ["CLUB", "PROFESIONAL", "MAYORISTA"])
+        self.assertEqual(list(progs), ["CLUB", "LEAL", "PROFESIONAL", "MAYORISTA"])
         self.assertEqual(progs["CLUB"].ingreso_modo, ms.DIRECTO_EMPLEADA)
         self.assertEqual(progs["PROFESIONAL"].ingreso_modo, ms.APROBACION_DUENO)
         self.assertTrue(all(p.vigencia_dias is None for p in progs.values()), "sin vencimiento (P-E4-3)")

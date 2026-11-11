@@ -26,15 +26,18 @@ from pos_uniformes.database.connection import get_session
 from pos_uniformes.database.models import (
     Cliente,
     LibretaVenta,
+    Membresia,
     Monedero,
     MonederoAplicacion,
     MonederoConfig,
     MonederoMovimiento,
+    Programa,
     RolUsuario,
     Usuario,
 )
 from pos_uniformes.services import libreta_service as lib
 from pos_uniformes.services import monedero_service as mon
+from pos_uniformes.tests._programa_de_prueba import inscribir
 
 D = Decimal
 _SUFIJO = uuid.uuid4().hex[:8].upper()
@@ -53,6 +56,9 @@ class _Pg(unittest.TestCase):
             self.admin_id, self.cliente_id = admin.id, cliente.id
             cfg = mon.guardar_config(s, tasa="10", habilitado=True, usuario_id=admin.id, nota="test")
             self.config_id = cfg.id
+            # E5-A: el 10 % sale de su programa (Maximoda Leal, de la migración).
+            leal = s.scalars(select(Programa).where(Programa.clave == "LEAL")).one()
+            inscribir(s, cliente.id, leal)
             s.commit()
 
     def tearDown(self) -> None:
@@ -70,6 +76,7 @@ class _Pg(unittest.TestCase):
             s.execute(delete(Monedero).where(Monedero.cliente_id == self.cliente_id))
             s.execute(delete(LibretaVenta).where(LibretaVenta.cliente_id == self.cliente_id))
             s.execute(delete(MonederoConfig).where(MonederoConfig.id == self.config_id))
+            s.execute(delete(Membresia).where(Membresia.cliente_id == self.cliente_id))
             s.execute(delete(Cliente).where(Cliente.id == self.cliente_id))
             s.execute(delete(Usuario).where(Usuario.id == self.admin_id))
             s.commit()

@@ -159,6 +159,7 @@ def registrar_operacion(
     cliente_id: int | None = None,
     operacion_uuid: str | None = None,
     acreditar_cashback: bool = True,
+    descuento_programa: Decimal | None = None,
 ) -> LibretaVenta:
     """Anota una operación. `items` = líneas del carrito de venta rápida.
 
@@ -184,6 +185,8 @@ def registrar_operacion(
                     Decimal("0.01")
                 )
             ),
+            # E5-A: solo cuando viene marcada; el descuento de programa no le aplica.
+            **({"promo_3pz": True} if it.get("promo_3pz") else {}),
         }
         for it in items
     ]
@@ -206,6 +209,7 @@ def registrar_operacion(
         cliente_id=(int(cliente_id) if cliente_id is not None else None),
         operacion_uuid=(str(operacion_uuid) if operacion_uuid else None),
         monto_monedero=Decimal("0.00"),
+        descuento_programa=_pct_o_nada(descuento_programa),
     )
     if created_at is not None:
         entry.created_at = created_at
@@ -214,7 +218,15 @@ def registrar_operacion(
     descontar_stock(session, entry)
     if acreditar_cashback:
         acreditar_cashback_sin_bloquear(session, entry)
+        subir_de_programa_sin_bloquear(session, entry)
     return entry
+
+
+def _pct_o_nada(valor) -> Decimal | None:
+    if valor in (None, ""):
+        return None
+    pct = Decimal(str(valor)).quantize(Decimal("0.01"))
+    return pct if pct > 0 else None
 
 
 def acreditar_cashback_sin_bloquear(session, entry: LibretaVenta):
@@ -229,6 +241,16 @@ def acreditar_cashback_sin_bloquear(session, entry: LibretaVenta):
     except Exception:  # noqa: BLE001 — el cashback se repone; la venta no se pierde
         logger.exception("Monedero: no se acreditó el cashback de la venta %s", entry.id)
         return None
+
+
+def subir_de_programa_sin_bloquear(session, entry: LibretaVenta):
+    """E5-A: después del cashback, Club → Leal si ya juntó el gasto del año.
+    Va después a propósito: la venta que cruza el umbral abona como Club."""
+    if entry.cliente_id is None or str(entry.tipo) != "venta":
+        return None
+    from pos_uniformes.services.fidelizacion import subida_leal_service
+
+    return subida_leal_service.subir_sin_bloquear(session, entry)
 
 
 def registrar_venta_con_monedero(
@@ -247,6 +269,7 @@ def registrar_venta_con_monedero(
     descuento_empleada: bool = False,
     cliente: str | None = None,
     origen: str | None = None,
+    descuento_programa: Decimal | None = None,
 ) -> tuple[LibretaVenta, object, object]:
     """Venta pagada (en parte o toda) con saldo del monedero. EN LÍNEA.
 
@@ -290,6 +313,7 @@ def registrar_venta_con_monedero(
         cliente_id=cliente_id,
         operacion_uuid=operacion_uuid,
         acreditar_cashback=False,
+        descuento_programa=descuento_programa,
     )
     entry.monto_monedero = monto_monedero
     session.flush()
@@ -297,6 +321,7 @@ def registrar_venta_con_monedero(
         session, libreta_venta=entry, monto=monto_monedero, employee_code=entry.employee_code
     )
     cashback = acreditar_cashback_sin_bloquear(session, entry)
+    subir_de_programa_sin_bloquear(session, entry)
     return entry, canje, cashback
 
 
@@ -746,10 +771,20 @@ def cambiar_pago_tarjeta(session, operacion_id: int, tarjeta: bool):
             factor_desc = (
                 Decimal("0.95") if entry.descuento_empleada else Decimal("1")
             )
+            desc_programa = getattr(entry, "descuento_programa", None)
             neto = Decimal("0.00")
             for line in detalle:
                 unit = Decimal(str(line.get("precio", 0) or 0))
-                unit = (unit * factor_desc).quantize(Decimal("0.01"))
+                if desc_programa:
+                    # E5-A: por renglón gana el más alto; la promo 3pz no lleva el de programa.
+                    from pos_uniformes.services.fidelizacion import descuento_programa_service as dps
+
+                    pct = dps.porcentaje_de_linea(
+                        line, empleada=(5 if entry.descuento_empleada else 0), programa=desc_programa
+                    )
+                    unit = dps.precio_con_descuento(unit, pct)
+                else:
+                    unit = (unit * factor_desc).quantize(Decimal("0.01"))
                 neto += aplicar_comision_terminal(unit) * int(line.get("cantidad", 0) or 0)
             neto = neto.quantize(Decimal("0.01"))
         else:

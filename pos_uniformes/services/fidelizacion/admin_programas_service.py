@@ -15,11 +15,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from pos_uniformes.database.models import Empleada, Membresia, MembresiaEvento, Programa
+from pos_uniformes.database.models import Empleada, Membresia, MembresiaEvento, Programa, ProgramaTasaCambio
 from pos_uniformes.services.fidelizacion import membresia_service as ms
 
 ESTADOS_EDITABLES = ("activo", "pausado", "cerrado")
@@ -34,7 +35,19 @@ EVENTO_ETIQUETAS = {
     ms.EV_CAMBIO_PROGRAMA: "Cambio de programa",
     ms.EV_CANCELACION: "Sacado del programa",
 }
-INGRESO_ETIQUETAS = {ms.DIRECTO_EMPLEADA: "La empleada inscribe", ms.APROBACION_DUENO: "Lo aprueba el dueño"}
+INGRESO_ETIQUETAS = {
+    ms.DIRECTO_EMPLEADA: "La empleada inscribe",
+    ms.APROBACION_DUENO: "Lo aprueba el dueño",
+    "automatico": "Sube solo por lo que compra",
+}
+
+
+def texto_tasa(tasa) -> str:
+    """5 → «5 %», 12.5 → «12.5 %», 0 → «—»."""
+    tasa = Decimal(str(tasa or 0))
+    if tasa <= 0:
+        return "—"
+    return f"{tasa.normalize():f} %"
 
 
 # -- pestaña Fidelización -----------------------------------------------------------
@@ -127,6 +140,14 @@ class FilaPrograma:
     vigencia: str
     miembros: int
     pendientes: int
+    #: E5-A: % de cada compra que va al Monedero del miembro.
+    tasa: Decimal = Decimal("0")
+    permite_descuento: bool = False
+
+    @property
+    def monedero(self) -> str:
+        texto = texto_tasa(self.tasa)
+        return f"{texto} o descuento" if self.permite_descuento and texto != "—" else texto
 
 
 def listar_programas(session: Session, *, usuario_id: int) -> list[FilaPrograma]:
@@ -151,14 +172,28 @@ def listar_programas(session: Session, *, usuario_id: int) -> list[FilaPrograma]
             vigencia="Sin vencimiento" if p.vigencia_dias is None else f"{p.vigencia_dias} días",
             miembros=conteos.get((int(p.id), ms.ACTIVA), 0),
             pendientes=conteos.get((int(p.id), ms.PENDIENTE), 0),
+            tasa=Decimal(str(p.tasa_monedero or 0)),
+            permite_descuento=bool(p.permite_descuento),
         ))
     return filas
 
 
+def _validar_tasa(tasa) -> Decimal:
+    try:
+        valor = Decimal(str(tasa).replace("%", "").strip()).quantize(Decimal("0.01"))
+    except (InvalidOperation, ValueError) as exc:
+        raise ms.NoSePuede("El % de Monedero debe ser un número.") from exc
+    if valor < 0 or valor > 100:
+        raise ms.NoSePuede("El % de Monedero debe estar entre 0 y 100.")
+    return valor
+
+
 def editar_programa(session: Session, *, usuario_id: int, clave: str, nombre: str, descripcion: str,
-                    estado: str) -> Programa:
-    """Nombre, descripción y estado. Pausar o cerrar solo detiene las altas y
-    aprobaciones nuevas: quien ya es miembro lo sigue siendo."""
+                    estado: str, tasa=None) -> Programa:
+    """Nombre, descripción, estado y (E5-A) el % de Monedero. Pausar o cerrar
+    solo detiene las altas y aprobaciones nuevas: quien ya es miembro lo sigue
+    siendo. Un cambio de % aplica a las compras desde ese momento y queda en la
+    bitácora `programa_tasa_cambio`."""
     ms._admin(session, usuario_id)
     programa = ms.programa_por_clave(session, clave)
     if programa is None:
@@ -174,9 +209,26 @@ def editar_programa(session: Session, *, usuario_id: int, clave: str, nombre: st
     duplicado = session.scalar(select(Programa).where(func.lower(Programa.nombre) == nombre.lower(), Programa.id != programa.id))
     if duplicado is not None:
         raise ms.NoSePuede(f"Ya hay un programa que se llama {duplicado.nombre}.")
+    nueva_tasa = None if tasa is None else _validar_tasa(tasa)
     programa.nombre = nombre
     programa.descripcion = (descripcion or "").strip() or None
     programa.estado = estado
+    anterior = Decimal(str(programa.tasa_monedero or 0)).quantize(Decimal("0.01"))
+    if nueva_tasa is not None and nueva_tasa != anterior:
+        programa.tasa_monedero = nueva_tasa
+        session.add(ProgramaTasaCambio(programa_id=int(programa.id), antes=anterior, despues=nueva_tasa,
+                                       usuario_id=int(usuario_id)))
     session.add(programa)
     session.flush()
     return programa
+
+
+def cambios_de_tasa(session: Session, clave: str) -> list[ProgramaTasaCambio]:
+    """Bitácora de los cambios de % de un programa, el más reciente primero."""
+    programa = ms.programa_por_clave(session, clave)
+    if programa is None:
+        return []
+    return list(session.scalars(
+        select(ProgramaTasaCambio).where(ProgramaTasaCambio.programa_id == programa.id)
+        .order_by(ProgramaTasaCambio.created_at.desc(), ProgramaTasaCambio.id.desc())
+    ))

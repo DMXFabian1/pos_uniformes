@@ -268,6 +268,8 @@ class QuickSaleWidget(ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMix
         # Monedero: cliente identificado para esta venta (ver _identificar_cliente).
         self._cliente: dict | None = None
         self._usar_saldo = False
+        # E5-A: el Mayorista eligió descuento en vez de Monedero en esta venta.
+        self._usar_descuento_programa = False
         # Operaciones YA cobradas que no se pudieron anotar: la foto exacta
         # de cada una, para «Reintentar anotar» (ver _retener_anotacion).
         self._anotaciones_pendientes: list[dict] = []
@@ -908,8 +910,9 @@ class QuickSaleWidget(ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMix
         lineas_text = f"{len(self._items)} linea{'s' if len(self._items) != 1 else ''}"
         meta = f"{lineas_text}  ·  {pzas_text}" if self._items else "Sin piezas"
 
-        if self._discount_active and self._items:
-            meta += f"  ·  Desc. (-${discount:,.2f})"
+        if discount > 0 and self._items:
+            etiqueta = "Desc. mayoreo" if self._pct_descuento_programa() else "Desc."
+            meta += f"  ·  {etiqueta} (-${discount:,.2f})"
         canje = self._canje_actual(total)
         if canje > 0:
             meta += f"  ·  Saldo -${canje:,.2f}  ·  Por cobrar ${total - canje:,.2f}"
@@ -1106,7 +1109,16 @@ class QuickSaleWidget(ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMix
     def _compute_totals(self, items: list[dict] | None = None) -> tuple[Decimal, Decimal, Decimal]:
         items = self._items if items is None else items
         subtotal = Decimal(str(sum(it["precio"] * it["cantidad"] for it in items)))
-        if self._discount_active:
+        pct_programa = self._pct_descuento_programa()
+        if pct_programa:
+            # E5-A: precio de mayoreo; por renglón gana el más alto y la promo
+            # 3pz no lo lleva (descuento_programa_service).
+            from pos_uniformes.services.fidelizacion import descuento_programa_service as dps
+
+            discount = dps.descuento(
+                items, empleada=(self._DISCOUNT_PERCENT if self._discount_active else None), programa=pct_programa
+            )
+        elif self._discount_active:
             discount = (subtotal * self._DISCOUNT_PERCENT / Decimal("100")).quantize(Decimal("0.01"))
         else:
             discount = Decimal("0.00")
@@ -1186,10 +1198,18 @@ class QuickSaleWidget(ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMix
         if not pago_tarjeta:
             return total
         discount_factor = (Decimal("100") - self._DISCOUNT_PERCENT) / Decimal("100")
+        pct_programa = self._pct_descuento_programa()
         neto = Decimal("0.00")
         for it in self._items:
             unit = Decimal(str(it["precio"]))
-            if self._discount_active:
+            if pct_programa:
+                from pos_uniformes.services.fidelizacion import descuento_programa_service as dps
+
+                pct = dps.porcentaje_de_linea(
+                    it, empleada=(self._DISCOUNT_PERCENT if self._discount_active else None), programa=pct_programa
+                )
+                unit = dps.precio_con_descuento(unit, pct)
+            elif self._discount_active:
                 unit = (unit * discount_factor).quantize(Decimal("0.01"))
             unit = self._apply_terminal_commission(unit)
             neto += unit * int(it["cantidad"])
@@ -1271,6 +1291,7 @@ class QuickSaleWidget(ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMix
         total = Decimal(str(total)).quantize(Decimal("0.01"))
         neto = self._monto_neto_actual(total, pago_tarjeta=pago_tarjeta)
         origen = self._origen_satelite()
+        pct_programa = self._pct_descuento_programa()
         entradas = [
             {
                 "employee_code": str(self._employee_code or ""),
@@ -1284,6 +1305,7 @@ class QuickSaleWidget(ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMix
                         "talla": it["talla"],
                         "cantidad": int(it["cantidad"]),
                         "precio": str(it["precio"]),
+                        **self._marca_promo_para_libreta(it),
                     }
                     for it in self._items
                 ],
@@ -1291,6 +1313,7 @@ class QuickSaleWidget(ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMix
                 "monto_neto": str(neto),
                 "pago_tarjeta": bool(pago_tarjeta),
                 "descuento_empleada": bool(self._discount_active),
+                **({"descuento_programa": str(pct_programa)} if pct_programa else {}),
                 "origen": origen,
                 "created_at": datetime.now(_tz.utc).astimezone().isoformat(),
                 # Identidad persistente: la misma en cada reintento.
@@ -1847,6 +1870,7 @@ class QuickSaleWidget(ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMix
         # El cliente es de ESTA venta: la siguiente no hereda su monedero.
         self._cliente = None
         self._usar_saldo = False
+        self._usar_descuento_programa = False
         self._monedero_op = None
         self._refresh_items_table()
         self._refresh_totals()
@@ -2098,6 +2122,7 @@ class QuickSaleWidget(ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMix
         monto_total=None,
         monto_monedero=None,
         pago_tarjeta: bool = False,
+        descuento_programa=None,
     ) -> str | None:
         """Reconstruye el ticket de una operación YA registrada en la Libreta
         (para reimprimir si la impresora falló). No registra nada ni toca el
@@ -2119,6 +2144,7 @@ class QuickSaleWidget(ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMix
                 "color": "",
                 "precio": Decimal(str(line.get("precio", 0) or 0)),
                 "cantidad": int(line.get("cantidad", 0) or 0),
+                **({"promo_3pz": True} if line.get("promo_3pz") else {}),
             }
             for line in (detalle or [])
         ]
@@ -2130,9 +2156,12 @@ class QuickSaleWidget(ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMix
         respaldo = (
             self._items, self._discount_active, self._employee_name, self._employee_code
         )
+        respaldo_programa = getattr(self, "_descuento_programa_fijo", None)
         try:
             self._items = items
             self._discount_active = bool(descuento_empleada)
+            # E5-A: el % de mayoreo como quedó guardado, no el de hoy.
+            self._descuento_programa_fijo = Decimal(str(descuento_programa)) if descuento_programa else None
             self._employee_name = employee_name or self._employee_name
             if tipo == "venta":
                 canje = Decimal(str(monto_monedero or 0)).quantize(Decimal("0.01"))
@@ -2155,6 +2184,7 @@ class QuickSaleWidget(ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMix
             (
                 self._items, self._discount_active, self._employee_name, self._employee_code
             ) = respaldo
+            self._descuento_programa_fijo = respaldo_programa
 
     # ─── Gasto de la tienda ──────────────────────────────────────────────
 
@@ -3185,8 +3215,8 @@ class QuickSaleWidget(ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMix
             )
         )
         lines.append(tk_row("Subtotal:", f"${tk_fmt(subtotal)}"))
-        if self._discount_active:
-            lines.append(tk_row("Descuento:", f"-${tk_fmt(discount)}"))
+        if discount > 0:
+            lines.append(tk_row(self._etiqueta_descuento_ticket(), f"-${tk_fmt(discount)}"))
         # El total entre dos reglas dobles: es lo primero que se busca al
         # mirar el papel, y antes pesaba lo mismo que «Subtotal».
         # El total en su propio recuadro doble: es lo primero que se busca al
@@ -3284,8 +3314,8 @@ class QuickSaleWidget(ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMix
 
         lines.append(tk_mid())
         lines.append(tk_row("Subtotal:", f"${tk_fmt(subtotal)}"))
-        if self._discount_active:
-            lines.append(tk_row("Descuento:", f"-${tk_fmt(discount)}"))
+        if discount > 0:
+            lines.append(tk_row(self._etiqueta_descuento_ticket(), f"-${tk_fmt(discount)}"))
         lines.append(tk_dbl())
         lines.append(tk_row("TOTAL:", f"${tk_fmt(total)}"))
         lines.append(tk_mid())
@@ -3388,6 +3418,9 @@ class QuickSaleWidget(ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMix
         self._items.clear()
         self._discount_active = False
         self._discount_check.setChecked(False)
+        self._cliente = None
+        self._usar_saldo = False
+        self._usar_descuento_programa = False
         self._refresh_items_table()
         self._refresh_totals()
         self._sale_widget.setVisible(False)

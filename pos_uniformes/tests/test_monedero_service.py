@@ -27,6 +27,7 @@ from pos_uniformes.database.models import (
     Usuario,
 )
 from pos_uniformes.services import monedero_service as mon
+from pos_uniformes.tests._programa_de_prueba import inscribir, programa_de_prueba
 
 D = Decimal
 UTC = timezone.utc
@@ -83,10 +84,16 @@ class _Base(unittest.TestCase):
         self.otro = Cliente(codigo_cliente="CLI-000002", nombre="Bea Ruiz")
         self.s.add_all([self.admin, self.cajero, self.cliente, self.otro])
         self.s.flush()
+        # E5-A: el % es el del programa del cliente; la configuración general
+        # solo enciende o apaga el Monedero.
+        self.programa = programa_de_prueba(self.s, "0", clave="PRUEBA")
+        for c in (self.cliente, self.otro):
+            inscribir(self.s, c.id, self.programa)
 
     def _tasa(self, tasa="5", habilitado=True, desde=None):
         cfg = mon.guardar_config(self.s, tasa=tasa, habilitado=habilitado, usuario_id=self.admin.id)
         cfg.vigente_desde = desde or datetime(2020, 1, 1, tzinfo=UTC)
+        self.programa.tasa_monedero = D(tasa)
         self.s.flush()
         return cfg
 
@@ -138,8 +145,13 @@ class ConfiguracionTest(_Base):
             mon.guardar_config(self.s, tasa="101", habilitado=True, usuario_id=self.admin.id)
 
     def test_rige_la_tasa_vigente_cuando_se_hizo_la_venta(self):
+        """E5-A: rige el programa que tenía el cliente cuando compró (Club 5 %
+        hasta el 1 de abril, Leal 10 % desde entonces)."""
         self._tasa("5", desde=datetime(2026, 1, 1, tzinfo=UTC))
-        self._tasa("10", desde=datetime(2026, 4, 1, tzinfo=UTC))
+        cambio = datetime(2026, 4, 1, tzinfo=UTC)
+        club = self.s.scalars(select(mon.Membresia).where(mon.Membresia.cliente_id == self.cliente.id)).one()
+        club.estado, club.hasta = "reemplazada", cambio
+        inscribir(self.s, self.cliente.id, programa_de_prueba(self.s, "10"), desde=cambio)
         _, antes = self._cashback("100", cuando=datetime(2026, 3, 15, tzinfo=UTC))
         _, despues = self._cashback("100", cuando=datetime(2026, 4, 15, tzinfo=UTC))
         self.assertEqual((antes.monto, antes.tasa_snapshot), (D("5.00"), D("5.00")))

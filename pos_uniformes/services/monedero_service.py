@@ -35,16 +35,18 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import ROUND_DOWN, Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError
 
 from pos_uniformes.database.models import (
     Cliente,
     LibretaVenta,
+    Membresia,
     Monedero,
     MonederoAplicacion,
     MonederoConfig,
     MonederoMovimiento,
+    Programa,
     RolUsuario,
     Usuario,
 )
@@ -202,6 +204,58 @@ def tasa_vigente(session, momento: datetime | None = None) -> Decimal | None:
     if config is None or not config.habilitado:
         return None
     tasa = Decimal(str(config.tasa_cashback))
+    return tasa if tasa > 0 else None
+
+
+#: Estados en los que una membresía estuvo vigente en algún momento: la que
+#: sigue activa y las que terminaron (con `hasta`). Las propuestas pendientes o
+#: rechazadas nunca dieron programa.
+_ESTADOS_QUE_FUERON_VIGENTES = ("activa", "reemplazada", "cancelada", "vencida")
+
+
+def programa_en(session, cliente_id: int, momento: datetime | None = None) -> Programa | None:
+    """El programa del que el cliente era miembro en `momento` (o None)."""
+    momento = _ahora(momento)
+    return session.scalars(
+        select(Programa)
+        .join(Membresia, Membresia.programa_id == Programa.id)
+        .where(
+            Membresia.cliente_id == int(cliente_id),
+            Membresia.estado.in_(_ESTADOS_QUE_FUERON_VIGENTES),
+            Membresia.desde.is_not(None),
+            Membresia.desde <= momento,
+            or_(Membresia.hasta.is_(None), Membresia.hasta > momento),
+        )
+        .order_by(Membresia.desde.desc(), Membresia.id.desc())
+        .limit(1)
+    ).first()
+
+
+def tasa_para_cliente(session, cliente_id: int | None, momento: datetime | None = None) -> Decimal | None:
+    """E5-A (2026-11-10): el % que va al Monedero es el del programa del
+    cliente en `momento` (Club 5, Leal 10, Profesional 13, Mayorista 15).
+
+    None si el Monedero está apagado (la configuración general sigue siendo
+    el interruptor), si el cliente no tiene programa o si su programa da 0 %."""
+    if cliente_id is None or tasa_vigente(session, momento) is None:
+        return None
+    programa = programa_en(session, cliente_id, momento)
+    if programa is None:
+        return None
+    tasa = Decimal(str(programa.tasa_monedero or 0))
+    return tasa if tasa > 0 else None
+
+
+def descuento_disponible(session, cliente_id: int | None, momento: datetime | None = None) -> Decimal | None:
+    """E5-A: el % que el cliente puede tomar como descuento en lugar de
+    Monedero (solo programas con `permite_descuento`, hoy Mayorista). No
+    depende del interruptor del Monedero: es su precio de mayoreo."""
+    if cliente_id is None:
+        return None
+    programa = programa_en(session, cliente_id, momento)
+    if programa is None or not programa.permite_descuento:
+        return None
+    tasa = Decimal(str(programa.tasa_monedero or 0))
     return tasa if tasa > 0 else None
 
 
@@ -363,6 +417,8 @@ class ResumenCliente:
     proximo_vencimiento: datetime | None
     monto_proximo_vencimiento: Decimal
     tasa: Decimal | None
+    #: E5-A: % que puede tomar como descuento en vez de Monedero (Mayorista).
+    descuento_disponible: Decimal | None = None
 
     @property
     def puede_canjear(self) -> bool:
@@ -374,9 +430,11 @@ def resumen_cliente(session, cliente_id: int, momento: datetime | None = None) -
     if cliente is None:
         raise MonederoError("El cliente no existe.")
     monedero = monedero_de_cliente(session, cliente.id)
-    tasa = tasa_vigente(session, momento)
+    tasa = tasa_para_cliente(session, cliente.id, momento)
+    descuento = descuento_disponible(session, cliente.id, momento)
     if monedero is None:
-        return ResumenCliente(cliente.id, cliente.codigo_cliente, cliente.nombre, False, ACTIVO, _CERO, None, _CERO, tasa)
+        return ResumenCliente(cliente.id, cliente.codigo_cliente, cliente.nombre, False, ACTIVO, _CERO, None, _CERO,
+                              tasa, descuento)
     s = saldo(session, monedero.id, momento)
     return ResumenCliente(
         cliente.id,
@@ -388,6 +446,7 @@ def resumen_cliente(session, cliente_id: int, momento: datetime | None = None) -
         s.proximo_vencimiento,
         s.monto_proximo_vencimiento,
         tasa,
+        descuento,
     )
 
 
@@ -439,19 +498,22 @@ def acreditar_cashback(
 
     Devuelve el movimiento (el ya existente si se repite) o None si la venta
     no genera cashback: sin cliente, no es venta, cashback apagado en la
-    fecha de la venta, importe cero, o monedero bloqueado/cerrado.
-    La tasa es la vigente cuando se HIZO la venta (no al sincronizar), y queda
-    guardada en el movimiento."""
+    fecha de la venta, cliente sin programa, eligió descuento de programa
+    en vez de Monedero, importe cero, o monedero
+    bloqueado/cerrado. La tasa es la del programa del cliente cuando se HIZO
+    la venta (no al sincronizar), y queda guardada en el movimiento."""
     if libreta_venta is None or libreta_venta.cliente_id is None:
         return None
     if str(libreta_venta.tipo) != "venta":
         return None
+    if Decimal(str(getattr(libreta_venta, "descuento_programa", None) or 0)) > 0:
+        return None  # E5-A: eligió descuento en vez de Monedero
     llave = _llave_venta("cashback", libreta_venta)
     existente = _por_llave(session, llave)
     if existente is not None:
         return existente
     fecha_venta = _con_zona(libreta_venta.created_at) or _ahora(momento)
-    tasa = tasa_vigente(session, fecha_venta)
+    tasa = tasa_para_cliente(session, libreta_venta.cliente_id, fecha_venta)
     if tasa is None:
         return None
     base = importe_elegible(libreta_venta.monto_total, getattr(libreta_venta, "monto_monedero", None))

@@ -131,10 +131,12 @@ class MonederoVentaMixin:
             "estado": r.estado,
             "disponible": r.disponible,
             "tasa": r.tasa,
+            "descuento_disponible": getattr(r, "descuento_disponible", None),
             "proximo_vencimiento": r.proximo_vencimiento,
             "monto_proximo_vencimiento": r.monto_proximo_vencimiento,
         }
         self._usar_saldo = False
+        self._usar_descuento_programa = False
         self._refresh_totals()
         self._flash_scan_hint(f"Cliente: {r.nombre}")
 
@@ -147,9 +149,11 @@ class MonederoVentaMixin:
         self._cliente = {
             "id": None, "codigo": codigo, "nombre": codigo, "por_qr": True, "en_linea": False,
             "tiene_monedero": False, "estado": "activo", "disponible": _CERO, "tasa": None,
+            "descuento_disponible": None,
             "proximo_vencimiento": None, "monto_proximo_vencimiento": _CERO,
         }
         self._usar_saldo = False
+        self._usar_descuento_programa = False
         self._refresh_totals()
         self._flash_scan_hint("Sin conexión: el cashback se acreditará al sincronizar")
 
@@ -188,6 +192,7 @@ class MonederoVentaMixin:
     def _quitar_cliente(self) -> None:
         self._cliente = None
         self._usar_saldo = False
+        self._usar_descuento_programa = False
         self._refresh_totals()
 
     # ─── Cálculos ────────────────────────────────────────────────────────
@@ -205,10 +210,41 @@ class MonederoVentaMixin:
 
         return canje_ajustado(total, self._cliente["disponible"])
 
+    # ─── E5-A: Mayorista, descuento o Monedero ───────────────────────────
+
+    def _pct_descuento_programa(self) -> Decimal | None:
+        """El % de mayoreo de ESTA venta, o None si va al Monedero."""
+        fijo = getattr(self, "_descuento_programa_fijo", None)
+        if fijo:
+            return Decimal(str(fijo))
+        c = getattr(self, "_cliente", None)
+        if not c or not getattr(self, "_usar_descuento_programa", False):
+            return None
+        pct = c.get("descuento_disponible")
+        return Decimal(str(pct)) if pct else None
+
+    def _marca_promo_para_libreta(self, item: dict) -> dict:
+        """La Libreta necesita saber qué renglones no llevaron el de mayoreo."""
+        from pos_uniformes.services.fidelizacion import descuento_programa_service as dps
+
+        return {dps.LLAVE_PROMO: True} if self._pct_descuento_programa() and dps.es_promo_3pz(item) else {}
+
+    def _etiqueta_descuento_ticket(self) -> str:
+        return "Desc. mayoreo:" if self._pct_descuento_programa() else "Descuento:"
+
+    def _toggle_descuento_programa(self) -> None:
+        c = self._cliente
+        self._usar_descuento_programa = bool(
+            self._btn_descuento_programa.isChecked() and c and c.get("descuento_disponible")
+        )
+        self._refresh_totals()
+
     def _cashback_estimado(self, total: Decimal, canje: Decimal) -> Decimal:
         c = self._cliente
         if not c or not c.get("tasa") or c["estado"] != "activo":
             return _CERO
+        if self._pct_descuento_programa():
+            return _CERO  # eligió descuento: esta compra no suma Monedero
         from pos_uniformes.services.monedero_service import calcular_cashback, importe_elegible
 
         return calcular_cashback(importe_elegible(total, canje), c["tasa"])
@@ -259,6 +295,16 @@ class MonederoVentaMixin:
         self._btn_usar_saldo.setAutoDefault(False)
         self._btn_usar_saldo.clicked.connect(self._toggle_usar_saldo)
         ly.addWidget(self._btn_usar_saldo)
+        # E5-A: solo para programas que lo permiten (Mayorista).
+        self._btn_descuento_programa = QPushButton("🏷 Descuento")
+        self._btn_descuento_programa.setCheckable(True)
+        self._btn_descuento_programa.setAutoDefault(False)
+        self._btn_descuento_programa.setToolTip(
+            "Precio de mayoreo en esta compra. Si lo usas, esta compra no suma a su Monedero."
+        )
+        self._btn_descuento_programa.clicked.connect(self._toggle_descuento_programa)
+        self._btn_descuento_programa.setVisible(False)
+        ly.addWidget(self._btn_descuento_programa)
         btn_mov = QPushButton("Movimientos")
         btn_mov.setAutoDefault(False)
         btn_mov.clicked.connect(self._ver_movimientos)
@@ -293,7 +339,10 @@ class MonederoVentaMixin:
             if c.get("proximo_vencimiento") and c.get("monto_proximo_vencimiento", _CERO) > 0:
                 vence = c["proximo_vencimiento"].astimezone().strftime("%d/%m/%Y")
                 partes.append(f"<span style='color:#8a7a68'>${c['monto_proximo_vencimiento']:,.2f} vence {vence}</span>")
-        if self._items:
+        pct_mayoreo = self._pct_descuento_programa()
+        if pct_mayoreo:
+            partes.append(f"<b>Precio de mayoreo −{pct_mayoreo.normalize():f} %</b> · no suma Monedero")
+        if self._items and not pct_mayoreo:
             estimado = self._cashback_estimado(total, canje)
             if estimado > 0:
                 partes.append(f"Gana <b>${estimado:,.2f}</b>")
@@ -308,6 +357,13 @@ class MonederoVentaMixin:
         else:
             self._btn_usar_saldo.setToolTip("")
         self._btn_movimientos.setEnabled(bool(c["en_linea"] and c["tiene_monedero"]))
+        disponible = c.get("descuento_disponible") if c["en_linea"] else None
+        self._btn_descuento_programa.setVisible(bool(disponible))
+        if disponible:
+            from pos_uniformes.services.fidelizacion import descuento_programa_service as dps
+
+            self._btn_descuento_programa.setText(dps.texto_boton(disponible))
+            self._btn_descuento_programa.setChecked(bool(getattr(self, "_usar_descuento_programa", False)))
 
     def _toggle_usar_saldo(self) -> None:
         self._usar_saldo = bool(self._btn_usar_saldo.isChecked()) and self._puede_usar_saldo()
@@ -365,9 +421,11 @@ class MonederoVentaMixin:
             pass
         items = [
             {"sku": it["sku"], "nombre": it["nombre"], "talla": it["talla"],
-             "cantidad": int(it["cantidad"]), "precio": str(it["precio"])}
+             "cantidad": int(it["cantidad"]), "precio": str(it["precio"]),
+             **self._marca_promo_para_libreta(it)}
             for it in self._items
         ]
+        pct_mayoreo = self._pct_descuento_programa()
         # Identidad de ESTA venta: la misma en cada reintento del mismo cobro.
         # Si la red se cae mientras se confirma, no se sabe si la base alcanzó
         # a guardar; al reintentar con la misma identidad la base devuelve la
@@ -375,7 +433,7 @@ class MonederoVentaMixin:
         huella = (
             # Sin el monto de saldo: si se reescanea el QR tras un corte, el
             # saldo leído ya trae descontado el canje anterior y cambiaría.
-            int(c["id"]), str(total), bool(tarjeta), bool(self._discount_active),
+            int(c["id"]), str(total), bool(tarjeta), bool(self._discount_active), str(pct_mayoreo or ""),
             tuple((it["sku"], it["cantidad"], it["precio"]) for it in items),
         )
         previa = getattr(self, "_monedero_op", None)
@@ -398,6 +456,7 @@ class MonederoVentaMixin:
                         pago_tarjeta=bool(tarjeta),
                         descuento_empleada=bool(self._discount_active),
                         origen=origen,
+                        descuento_programa=pct_mayoreo,
                     )
                     cashback_monto = Decimal(cashback.monto) if cashback is not None else _CERO
                     # Lo que la base cobró de verdad (en un reintento es lo

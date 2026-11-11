@@ -262,8 +262,8 @@ class ProgramasUiTests(_ConMarca):
     def test_lista_y_edita(self) -> None:
         d = pd.ProgramasDialog(None, _Fabrica(self.s), usuario_id=self.admin.id)
         self.addCleanup(d.deleteLater)
-        self.assertEqual([d.tabla.item(r, 0).text() for r in range(3)],
-                         ["Maximoda Club", "Maximoda Profesional", "Maximoda Mayorista"])
+        self.assertEqual([d.tabla.item(r, 0).text() for r in range(4)],
+                         ["Maximoda Club", "Maximoda Leal", "Maximoda Profesional", "Maximoda Mayorista"])
 
         class _Editar:
             def __init__(self_inner, *a, **k):
@@ -275,7 +275,7 @@ class ProgramasUiTests(_ConMarca):
         d.tabla.selectRow(0)
         with patch.object(pd, "EditarProgramaDialog", _Editar):
             d.editar_button.click()
-        self.assertEqual((d.tabla.item(0, 0).text(), d.tabla.item(0, 1).text()), ("Maximoda Club Familiar", "Pausado"))
+        self.assertEqual((d.tabla.item(0, 0).text(), d.tabla.item(0, 2).text()), ("Maximoda Club Familiar", "Pausado"))
         self.assertEqual(ms.programa_por_clave(self.s, "CLUB").estado, "pausado")
 
     def test_el_dialogo_de_edicion_no_ofrece_borrar_ni_vigencia(self) -> None:
