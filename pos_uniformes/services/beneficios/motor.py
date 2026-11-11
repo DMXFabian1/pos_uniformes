@@ -146,6 +146,7 @@ class _Desc:
     importe: Decimal = CERO
     fuente: str | None = None
     piezas_nivel: int = 0
+    piezas_base: int = 0       # piezas con el % parejo de empleada (no las que ganó el mayoreo)
     consumo_tope: Decimal = CERO
 
 
@@ -196,6 +197,10 @@ def _descuentos(grupos: list[_Grupo], entrada: EntradaVenta, motivos_ticket: lis
 
     # Empleada
     modo_ticket = False
+    # Líneas que van al % parejo de empleada. El motivo EMPLEADA_BASE se pone al
+    # final, solo si el mayoreo no les gana (auditoría M1a: antes salía aunque
+    # la pieza se cobrara con mayoreo).
+    al_base: set[str] = set()
     pct_empleada: dict[str, tuple[Decimal, Decimal, int]] = {}  # uid -> (pct nivel, pct resto, piezas al nivel)
     fuente_emp = FUENTE_EMPLEADA
     if entrada.descuento_empleada:
@@ -223,7 +228,7 @@ def _descuentos(grupos: list[_Grupo], entrada: EntradaVenta, motivos_ticket: lis
                     pct_linea = r.tope_pct_uniforme
                     g.motivos.append(M.TOPE_UNIFORME_10)
                 if pct_linea <= base or pct_linea <= pct_mayoreo_de(g):
-                    g.motivos.append(M.EMPLEADA_BASE)
+                    al_base.add(g.linea_uid)
                     pct_empleada[g.linea_uid] = (base, base, 0)
                     continue
                 candidatas.append((g, pct_linea))
@@ -248,7 +253,7 @@ def _descuentos(grupos: list[_Grupo], entrada: EntradaVenta, motivos_ticket: lis
                 if not g.rebajada:
                     pct_empleada[g.linea_uid] = (pct_parejo, pct_parejo, 0)
                     if comp is not None:
-                        g.motivos.append(M.EMPLEADA_BASE)
+                        al_base.add(g.linea_uid)
 
     if modo_ticket:
         pct = r.pct_otra_persona if entrada.compradora is None else base
@@ -257,7 +262,9 @@ def _descuentos(grupos: list[_Grupo], entrada: EntradaVenta, motivos_ticket: lis
         partes = mayor_residuo(total_desc, [g.importe for g in con_desc], [g.clave for g in con_desc]) if con_desc else []
         motivos_ticket.append(M.DESCUENTO_TICKET_REPARTIDO)
         for g, parte in zip(con_desc, partes):
-            resultado[g.linea_uid] = _Desc(pct=pct, importe=parte, fuente=fuente_emp)
+            if g.linea_uid in al_base:
+                g.motivos.append(M.EMPLEADA_BASE)
+            resultado[g.linea_uid] = _Desc(pct=pct, importe=parte, fuente=fuente_emp, piezas_base=g.cantidad)
         return resultado
 
     for g in grupos:
@@ -274,6 +281,9 @@ def _descuentos(grupos: list[_Grupo], entrada: EntradaVenta, motivos_ticket: lis
         if resto:
             importe += _q(g.precio_unitario * resto * pct_b / CIEN)
         con_nivel_real = caben if fuente_a == fuente_emp and caben else 0
+        piezas_base = resto if resto and fuente_b == fuente_emp else 0
+        if g.linea_uid in al_base and piezas_base:
+            g.motivos.append(M.EMPLEADA_BASE)
         fuente = fuente_a if caben else fuente_b
         if caben and resto and fuente_a != fuente_b:
             fuente = fuente_emp if fuente_emp in (fuente_a, fuente_b) else fuente_a
@@ -288,6 +298,7 @@ def _descuentos(grupos: list[_Grupo], entrada: EntradaVenta, motivos_ticket: lis
             importe=importe,
             fuente=fuente,
             piezas_nivel=con_nivel_real,
+            piezas_base=piezas_base,
             consumo_tope=(g.base.precio_lista * con_nivel_real).quantize(CENT),
         )
     return resultado
@@ -455,7 +466,7 @@ def calcular(entrada: EntradaVenta) -> Calculo:
             importe=g.importe,
             clasificacion_al_vender=clasif,
             piezas_con_nivel=d.piezas_nivel,
-            piezas_al_base=(g.cantidad - d.piezas_nivel) if entrada.descuento_empleada and not g.rebajada else 0,
+            piezas_al_base=d.piezas_base,
             descuento=Descuento(pct=d.pct, importe=d.importe, fuente=d.fuente),
             cobrado_antes_redondeo=cobrados_pre[i],
             parte_redondeo=red.partes[i],
