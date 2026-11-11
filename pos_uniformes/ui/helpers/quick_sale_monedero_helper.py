@@ -257,6 +257,8 @@ class MonederoVentaMixin:
             return _CERO
         if self._pct_descuento_programa():
             return _CERO  # eligió descuento: esta compra no suma Monedero
+        if getattr(self, "_discount_active", False):
+            return _CERO  # D1: con descuento de empleada tampoco
         from pos_uniformes.services.monedero_service import calcular_cashback, importe_elegible
 
         # E7: lo que va en Oferta o Liquidación no suma Monedero.
@@ -369,9 +371,12 @@ class MonederoVentaMixin:
                 vence = c["proximo_vencimiento"].astimezone().strftime("%d/%m/%Y")
                 partes.append(f"<span style='color:#8a7a68'>${c['monto_proximo_vencimiento']:,.2f} vence {vence}</span>")
         pct_mayoreo = self._pct_descuento_programa()
+        con_empleada = bool(getattr(self, "_discount_active", False))
         if pct_mayoreo:
             partes.append(f"<b>Precio de mayoreo −{pct_mayoreo.normalize():f} %</b> · no suma Monedero")
-        if self._items and not pct_mayoreo:
+        elif con_empleada:
+            partes.append("<span style='color:#8a7a68'>con descuento de empleada no suma Monedero</span>")
+        if self._items and not pct_mayoreo and not con_empleada:
             estimado = self._cashback_estimado(total, canje)
             if estimado > 0:
                 partes.append(f"Gana <b>${estimado:,.2f}</b>")

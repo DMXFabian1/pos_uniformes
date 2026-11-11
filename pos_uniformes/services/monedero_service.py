@@ -504,7 +504,7 @@ def acreditar_cashback(
     Devuelve el movimiento (el ya existente si se repite) o None si la venta
     no genera cashback: sin cliente, no es venta, cashback apagado en la
     fecha de la venta, cliente sin programa, eligió descuento de programa
-    en vez de Monedero, importe cero, o monedero
+    en vez de Monedero, llevó descuento de empleada, importe cero, o monedero
     bloqueado/cerrado. La tasa es la del programa del cliente cuando se HIZO
     la venta (no al sincronizar), y queda guardada en el movimiento."""
     if libreta_venta is None or libreta_venta.cliente_id is None:
@@ -513,6 +513,10 @@ def acreditar_cashback(
         return None
     if Decimal(str(getattr(libreta_venta, "descuento_programa", None) or 0)) > 0:
         return None  # E5-A: eligió descuento en vez de Monedero
+    if getattr(libreta_venta, "descuento_empleada", False):
+        # D1 (Daniel, 2026-11-11): con descuento de empleada no se gana
+        # Monedero, igual que el Mayorista: o descuento o Monedero.
+        return None
     llave = _llave_venta("cashback", libreta_venta)
     existente = _por_llave(session, llave)
     if existente is not None:

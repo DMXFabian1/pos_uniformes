@@ -321,6 +321,19 @@ class TicketSinCanjeTest(_Base):
         w._cliente = _cliente(tiene_monedero=False, tasa=None)
         self.assertIsNone(w._monedero_para_ticket(D("450"), False))
 
+    def test_con_descuento_de_empleada_no_suma(self):
+        """D1 (Daniel, 2026-11-11): con descuento de empleada no hay Monedero."""
+        w = self._widget()
+        w._cliente = _cliente()
+        w._discount_active = True
+        self.assertEqual(w._cashback_estimado(D("450"), D("0")), D("0.00"))
+        info = w._monedero_para_ticket(D("450"), False)
+        self.assertEqual(info["cashback"], D("0.00"))
+        self.assertEqual(info["saldo"], D("37.42"))       # el saldo se sigue viendo
+        w._pintar_cliente_bar()
+        self.assertIn("no suma Monedero", w._cliente_label.text())
+        self.assertNotIn("Gana", w._cliente_label.text())
+
     def test_sin_cliente_nada(self):
         w = self._widget()
         w._cliente = None

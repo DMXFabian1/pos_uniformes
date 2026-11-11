@@ -734,6 +734,7 @@ def procesar(session_factory, enviar, vigilante: Vigilante | None = None) -> int
                         enviadas += enviar_pendientes(session, enviar)
                 enviadas += _descansos(session, enviar)
                 enviadas += _membresias(session, enviar)
+                enviadas += _abonos_faltantes(session, enviar)
     except Exception as exc:  # noqa: BLE001 — base sin migrar, sin red...
         _avisar_vuelta_fallida(exc)
         _vuelta_sin_base(exc, enviar)
@@ -824,6 +825,45 @@ def _membresias(session, enviar) -> int:
     for texto, botones in avisos:
         if not encolar(session, texto, botones):
             return 0
+    return enviar_pendientes(session, enviar)
+
+
+#: Cada cuánto se buscan ventas que se quedaron sin su abono de Monedero.
+MINUTOS_ENTRE_ABONOS_FALTANTES = 15
+_ultima_revision_abonos: datetime | None = None
+
+
+def _abonos_faltantes(session, enviar, ahora: datetime | None = None) -> int:
+    """D2 (Daniel, 2026-11-11): repone el Monedero de las ventas con cliente
+    que se quedaron sin abono (p. ej. falló al sincronizar). Corre cada
+    `MINUTOS_ENTRE_ABONOS_FALTANTES`; es idempotente, así que repetirlo no
+    abona dos veces. Si repone alguno, avisa a Daniel. Nunca tumba la vuelta."""
+    global _ultima_revision_abonos
+    ahora = ahora or datetime.now()
+    if (
+        _ultima_revision_abonos is not None
+        and ahora - _ultima_revision_abonos < timedelta(minutes=MINUTOS_ENTRE_ABONOS_FALTANTES)
+    ):
+        return 0
+    _ultima_revision_abonos = ahora
+    from pos_uniformes.services import monedero_service
+
+    try:
+        repuestos = monedero_service.acreditar_faltantes(session)
+        session.commit()
+    except Exception:  # noqa: BLE001 — base sin migrar: no tumba las alertas
+        logger.debug("Monedero: no se pudieron revisar los abonos faltantes", exc_info=True)
+        session.rollback()
+        return 0
+    if not repuestos:
+        return 0
+    logger.info("Monedero: se repusieron %s abonos que faltaban", repuestos)
+    texto = (
+        f"👛 Monedero: {repuestos} venta{'s' if repuestos != 1 else ''} con cliente "
+        f"se habían quedado sin su abono. Ya se repus{'ieron' if repuestos != 1 else 'o'}."
+    )
+    if not encolar(session, texto, ""):
+        return 0
     return enviar_pendientes(session, enviar)
 
 

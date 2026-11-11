@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import unittest
+import unittest.mock
 from datetime import date, datetime
 from decimal import Decimal
 from types import SimpleNamespace
@@ -153,3 +154,44 @@ class LasSolicitudesNoSeBarrenTests(unittest.TestCase):
                  patch("pos_uniformes.services.telegram_service.enviar_mensaje") as enviar:
                 modulo.avisar_a_daniel(None, SimpleNamespace(id=1))
             self.assertTrue(enviar.call_args.kwargs["conservar"], modulo.__name__)
+
+
+class AbonosFaltantesTests(unittest.TestCase):
+    """D2 (Daniel, 2026-11-11): cada 15 min se reponen los abonos de Monedero
+    que faltan, y si repone alguno avisa."""
+
+    def setUp(self) -> None:
+        al._ultima_revision_abonos = None
+        self.addCleanup(setattr, al, "_ultima_revision_abonos", None)
+        self.s = unittest.mock.MagicMock()
+        self.enviar = unittest.mock.MagicMock()
+
+    def _vuelta(self, ahora, repuestos):
+        with patch("pos_uniformes.services.monedero_service.acreditar_faltantes", return_value=repuestos) as af, \
+             patch.object(al, "encolar", return_value=True) as enc, \
+             patch.object(al, "enviar_pendientes", return_value=1):
+            al._abonos_faltantes(self.s, self.enviar, ahora=ahora)
+        return af, enc
+
+    def test_repone_y_avisa(self) -> None:
+        af, enc = self._vuelta(datetime(2026, 11, 11, 10, 0), 2)
+        af.assert_called_once()
+        self.assertIn("2 ventas", enc.call_args.args[1])
+        self.assertIn("Ya se repusieron", enc.call_args.args[1])
+
+    def test_sin_faltantes_no_avisa(self) -> None:
+        af, enc = self._vuelta(datetime(2026, 11, 11, 10, 0), 0)
+        af.assert_called_once()
+        enc.assert_not_called()
+
+    def test_corre_cada_15_minutos(self) -> None:
+        self._vuelta(datetime(2026, 11, 11, 10, 0), 0)
+        af, _ = self._vuelta(datetime(2026, 11, 11, 10, 10), 0)
+        af.assert_not_called()
+        af, _ = self._vuelta(datetime(2026, 11, 11, 10, 16), 0)
+        af.assert_called_once()
+
+    def test_si_falla_no_tumba_la_vuelta(self) -> None:
+        with patch("pos_uniformes.services.monedero_service.acreditar_faltantes", side_effect=RuntimeError("x")):
+            self.assertEqual(al._abonos_faltantes(self.s, self.enviar, ahora=datetime(2026, 11, 11, 10, 0)), 0)
+        self.s.rollback.assert_called_once()

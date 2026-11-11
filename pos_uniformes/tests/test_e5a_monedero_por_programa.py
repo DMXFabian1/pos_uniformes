@@ -104,6 +104,31 @@ class TasaPorProgramaTests(_Monedero):
         self._proponer("MAYORISTA")
         self.assertEqual(mon.tasa_para_cliente(self.s, self.cliente.id), D("5.00"))
 
+    def test_con_descuento_de_empleada_no_abona(self) -> None:
+        """D1 (Daniel, 2026-11-11): o descuento de empleada o Monedero."""
+        self._club()
+        venta = lib.registrar_operacion(
+            self.s, employee_code=self.lupita.codigo, employee_name="Lupita", tipo="venta", items=[],
+            monto_total=D("450"), origen="Entrada", cliente_id=self.cliente.id, descuento_empleada=True,
+            operacion_uuid=str(uuid.uuid4()), created_at=datetime.now(timezone.utc),
+        )
+        self.assertIsNone(self._cashback(venta))
+        self.assertEqual(mon.acreditar_faltantes(self.s), 0)   # la red de seguridad tampoco
+        self.assertIsNone(self._cashback(venta))
+
+    def test_los_abonos_faltantes_se_reponen_una_vez(self) -> None:
+        """D2: la venta que se quedó sin abono lo recibe, y solo una vez."""
+        self._club()
+        venta = lib.registrar_operacion(
+            self.s, employee_code=self.lupita.codigo, employee_name="Lupita", tipo="venta", items=[],
+            monto_total=D("450"), origen="Entrada", cliente_id=self.cliente.id, acreditar_cashback=False,
+            operacion_uuid=str(uuid.uuid4()), created_at=datetime.now(timezone.utc),
+        )
+        self.assertIsNone(self._cashback(venta))
+        self.assertEqual(mon.acreditar_faltantes(self.s), 1)
+        self.assertEqual(self._cashback(venta).monto, D("22.50"))
+        self.assertEqual(mon.acreditar_faltantes(self.s), 0)
+
     def test_monedero_apagado_no_abona_aunque_tenga_programa(self) -> None:
         self._club()
         self._encender(habilitado=False)
