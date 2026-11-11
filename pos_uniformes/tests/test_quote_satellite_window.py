@@ -2,19 +2,32 @@ from __future__ import annotations
 
 from decimal import Decimal
 import os
+import time
 from types import SimpleNamespace
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QElapsedTimer, Qt
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QFrame, QPushButton
 
 from pos_uniformes.services.active_filter_service import ActiveFilterToken
 from pos_uniformes.ui.helpers.flow_layout import FlowLayout
-from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+from pos_uniformes.ui.quote_satellite_window import SATELLITE_SEARCH_DEBOUNCE_MS, QuoteSatelliteWindow
+
+
+def _esperar_a(condicion, limite_ms: int = 10_000) -> bool:
+    """Corre el ciclo de eventos hasta que `condicion()` se cumpla (PyQt6 no
+    trae QTest.qWaitFor). El limite solo evita colgarse si nunca llega."""
+    reloj = QElapsedTimer()
+    reloj.start()
+    while not condicion():
+        if reloj.elapsed() > limite_ms:
+            return False
+        QTest.qWait(5)
+    return True
 
 
 class QuoteSatelliteWindowTests(unittest.TestCase):
@@ -22,28 +35,82 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
 
+    # El debounce se prueba sin margenes de reloj (2026-11-11). Antes:
+    # «programa dos veces, espera interval + 80 ms, cuenta 1». Con -n 6 el
+    # proceso podia no despertar a tiempo y contaba 0. Ahora:
+    # - un QTimer solo dispara cuando corre el ciclo de eventos, asi que
+    #   entre llamadas sin ciclo nada puede dispararse (se cuenta 0 exacto);
+    # - `time.sleep` deja pasar tiempo SIN correr el ciclo: sirve para ver
+    #   que reprogramar reinicia la cuenta (`remainingTime` vuelve a subir);
+    # - se espera con `qWaitFor` a que llegue el disparo (sincronizacion
+    #   explicita con `_esperar_a`, sin fijar cuanto tarda), y un QTimer de un solo disparo
+    #   inactivo ya no puede volver a disparar: el 1 es definitivo.
+
+    def _debounce_espiado(self, window):
+        timer = window.catalog_browser_debounce_timer
+        disparos: list[int] = []
+        reloj = QElapsedTimer()
+        timer.timeout.disconnect()
+        timer.timeout.connect(lambda: disparos.append(reloj.elapsed()))
+        return timer, disparos, reloj
+
     def test_catalog_search_refresh_uses_single_debounce_timer(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
-        callback = Mock()
-        window.catalog_browser_debounce_timer.timeout.disconnect()
-        window.catalog_browser_debounce_timer.timeout.connect(callback)
+        timer, disparos, reloj = self._debounce_espiado(window)
+        self.assertTrue(timer.isSingleShot())
+        self.assertEqual(timer.interval(), SATELLITE_SEARCH_DEBOUNCE_MS)
 
+        reloj.start()
         window._schedule_catalog_browser_refresh()
         window._schedule_catalog_browser_refresh()
-        QTest.qWait(window.catalog_browser_debounce_timer.interval() + 80)
 
-        self.assertEqual(callback.call_count, 1)
+        self.assertIs(window.catalog_browser_debounce_timer, timer)  # el mismo, no otro
+        self.assertTrue(timer.isActive())
+        self.assertEqual(disparos, [])  # sin ciclo de eventos no hay disparo
+        self.assertTrue(_esperar_a(lambda: len(disparos) >= 1))
+        self.assertFalse(timer.isActive())  # un solo disparo: ya no queda nada pendiente
+        QApplication.processEvents()
+        self.assertEqual(len(disparos), 1)
+        # Un QTimer «grueso» puede adelantarse hasta 5 %; nunca dispara antes.
+        self.assertGreaterEqual(disparos[0], int(timer.interval() * 0.95) - 1)
+
+    def test_catalog_search_refresh_restarts_debounce_on_each_event(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+        timer, disparos, reloj = self._debounce_espiado(window)
+
+        window._schedule_catalog_browser_refresh()
+        time.sleep(timer.interval() * 0.6 / 1000)  # pasa tiempo, el ciclo no corre
+        antes = timer.remainingTime()
+        self.assertLess(antes, timer.interval())
+        reloj.start()
+        window._schedule_catalog_browser_refresh()  # nueva tecla: reinicia
+        despues = timer.remainingTime()
+
+        self.assertGreater(despues, antes)
+        self.assertGreaterEqual(despues, int(timer.interval() * 0.95) - 1)
+        self.assertEqual(disparos, [])
+        self.assertTrue(_esperar_a(lambda: len(disparos) >= 1))
+        self.assertFalse(timer.isActive())
+        QApplication.processEvents()
+        self.assertEqual(len(disparos), 1)
+        # Cuenta desde la segunda llamada, no desde la primera.
+        self.assertGreaterEqual(disparos[0], int(timer.interval() * 0.95) - 1)
 
     def test_catalog_immediate_refresh_cancels_pending_debounce(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
         callback = Mock()
         window._run_catalog_browser_refresh = callback
-        window.catalog_browser_debounce_timer.stop()
+        timer, disparos, _ = self._debounce_espiado(window)
+        timer.stop()
 
         window._schedule_catalog_browser_refresh()
+        self.assertTrue(timer.isActive())
         window._handle_catalog_browser_filters_changed()
-        QTest.qWait(window.catalog_browser_debounce_timer.interval() + 80)
 
+        self.assertEqual(callback.call_count, 1)  # corrio al momento
+        self.assertFalse(timer.isActive())  # y el pendiente quedo cancelado
+        QApplication.processEvents()
+        self.assertEqual(disparos, [])
         self.assertEqual(callback.call_count, 1)
 
     def test_catalog_browser_limits_visible_rows_to_single_page(self) -> None:
