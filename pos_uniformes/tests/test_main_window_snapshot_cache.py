@@ -1280,14 +1280,23 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertIn(("second_select_all", Qt.FocusReason.OtherFocusReason), forward_calls)
 
     def test_catalog_search_refresh_uses_single_debounce_timer(self) -> None:
+        """Igual que la de inventario (2026-11-11): la espera fija «intervalo +
+        80 ms» falló con -n 6 (0 != 1). Se espera la señal real, con tope."""
         window = MainWindow(user_id=1)
+        self.addCleanup(_cerrar_ventana, window)
         callback = Mock()
         window._run_catalog_filter_refresh = callback
+        timer = window.catalog_filter_debounce_timer
+        disparos = QSignalSpy(timer.timeout)
 
         window._schedule_catalog_filter_refresh()
         window._schedule_catalog_filter_refresh()
-        QTest.qWait(window.catalog_filter_debounce_timer.interval() + 80)
+        self.assertTrue(timer.isActive())
+        self.assertEqual(callback.call_count, 0)  # sin ciclo de eventos no dispara
 
+        self.assertTrue(disparos.wait(5_000), "el debounce nunca disparó")
+        self.assertEqual(len(disparos), 1)
+        self.assertFalse(timer.isActive())  # single-shot: ya no puede volver a disparar
         self.assertEqual(callback.call_count, 1)
 
     def test_inventory_search_refresh_uses_single_debounce_timer(self) -> None:
@@ -1310,25 +1319,43 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertEqual(callback.call_count, 1)
 
     def test_catalog_immediate_refresh_cancels_pending_debounce(self) -> None:
+        """Sin espera fija (2026-11-11): corre al momento y el pendiente queda
+        cancelado; un timer inactivo ya no puede disparar."""
         window = MainWindow(user_id=1)
+        self.addCleanup(_cerrar_ventana, window)
         callback = Mock()
         window._run_catalog_filter_refresh = callback
+        timer = window.catalog_filter_debounce_timer
+        disparos = QSignalSpy(timer.timeout)
 
         window._schedule_catalog_filter_refresh()
+        self.assertTrue(timer.isActive())
         window._handle_catalog_filters_changed()
-        QTest.qWait(window.catalog_filter_debounce_timer.interval() + 80)
 
+        self.assertEqual(callback.call_count, 1)
+        self.assertFalse(timer.isActive())
+        QApplication.processEvents()
+        self.assertEqual(len(disparos), 0)
         self.assertEqual(callback.call_count, 1)
 
     def test_inventory_immediate_refresh_cancels_pending_debounce(self) -> None:
+        """Sin espera fija (2026-11-11): corre al momento y el pendiente queda
+        cancelado; un timer inactivo ya no puede disparar."""
         window = MainWindow(user_id=1)
+        self.addCleanup(_cerrar_ventana, window)
         callback = Mock()
         window._run_inventory_filter_refresh = callback
+        timer = window.inventory_filter_debounce_timer
+        disparos = QSignalSpy(timer.timeout)
 
         window._schedule_inventory_filter_refresh()
+        self.assertTrue(timer.isActive())
         window._handle_inventory_filters_changed()
-        QTest.qWait(window.inventory_filter_debounce_timer.interval() + 80)
 
+        self.assertEqual(callback.call_count, 1)
+        self.assertFalse(timer.isActive())
+        QApplication.processEvents()
+        self.assertEqual(len(disparos), 0)
         self.assertEqual(callback.call_count, 1)
 
     def test_catalog_type_filter_accepts_macro_value_without_accent(self) -> None:
