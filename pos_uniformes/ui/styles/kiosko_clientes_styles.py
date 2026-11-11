@@ -81,17 +81,30 @@ def build_kiosko_clientes_stylesheet() -> str:
             font-size: 15px;
             outline: 0;
         }}
+        /* Cada fila es una tarjeta propia (kcFila); el texto del renglón
+           queda solo para buscar y leer, sin pintarse debajo. */
         QListWidget#kcResultados::item {{
-            padding: 10px 12px;
-            margin: 2px 0;
-            border-radius: 12px;
-            color: {TEXTO};
+            padding: 0; margin: 3px 2px; border: none;
+            color: transparent; background: transparent;
         }}
-        QListWidget#kcResultados::item:hover {{ background: #fbf3e8; }}
-        QListWidget#kcResultados::item:selected {{
-            background: {SELECCION};
-            color: {TERRACOTA_OSCURO};
+        QListWidget#kcResultados::item:hover,
+        QListWidget#kcResultados::item:selected {{ background: transparent; color: transparent; }}
+        QFrame#kcFila {{
+            background: {TARJETA};
+            border: 1px solid #eadcc6;
+            border-radius: 14px;
         }}
+        QFrame#kcFila:hover {{ background: #fbf3e8; }}
+        QFrame#kcFila[sel="true"] {{ background: #fbefe6; border: 2px solid {TERRACOTA}; }}
+        QDialog#kcDialog QLabel#kcAvatar {{
+            background: {SELECCION}; color: {TERRACOTA_OSCURO};
+            border-radius: 21px; font-size: 15px; font-weight: 800;
+        }}
+        QDialog#kcDialog QLabel#kcFilaNombre {{ font-size: 16px; font-weight: 700; color: {TEXTO}; }}
+        QDialog#kcDialog QLabel#kcFilaDetalle {{ font-size: 13px; color: {TENUE}; }}
+        QDialog#kcDialog QLabel#kcFilaCheck {{ font-size: 18px; font-weight: 800; color: {TERRACOTA}; }}
+        QDialog#kcDialog QLabel#kcPista {{ font-size: 12px; color: {TENUE}; padding-left: 4px; }}
+        QDialog#kcDialog QLabel#kcPista[ok="true"] {{ color: #3d7a4a; font-weight: 700; }}
 
         QDialog#kcDialog QRadioButton#kcOpcion {{
             background: {TARJETA};
