@@ -17,6 +17,7 @@ Puro: no toca base, Qt, red ni producción.
 from __future__ import annotations
 
 import dataclasses
+import itertools
 import unittest
 import uuid
 from datetime import datetime, timezone
@@ -285,13 +286,17 @@ class A2Tests(unittest.TestCase):
 
 class TrazabilidadMayoreoTests(unittest.TestCase):
     def test_empate_gana_el_mayoreo_y_la_pieza_no_queda_al_base(self) -> None:
+        """A1: la pieza se cobró con mayoreo, así que no es «al base».
+        A3: aun así consume el tope (antes de A3 esta prueba esperaba consumo $0)."""
         c = calcular(venta([LineaEntrada(uid(1), "SC1", 1, D("200"), "Ropa casual")],
                            cliente=MAYORISTA, modalidad_mayorista="descuento", **con_nivel("15", "300")))
         [l] = c.lineas
         self.assertEqual((c.total, l.descuento.fuente, l.descuento.importe), (D("170.00"), "mayoreo", D("30.00")))
-        self.assertEqual((l.piezas_con_nivel, l.piezas_al_base, l.consumo_tope), (0, 0, D("0.00")))
+        self.assertEqual((l.piezas_con_nivel, l.piezas_al_base, l.consumo_tope), (0, 0, D("200.00")))
         self.assertNotIn(M.EMPLEADA_BASE, l.motivos)
+        self.assertNotIn(M.EMPLEADA_NIVEL, l.motivos)
         self.assertIn(M.GANA_MAYOREO, l.motivos)
+        self.assertIn(M.TOPE_CONSUMIDO_CON_MAYOREO, l.motivos)
 
     def test_empleada_sin_nivel_con_mayoreo_no_dice_empleada_base(self) -> None:
         c = calcular(venta([LineaEntrada(uid(1), "PO1", 2, D("180"))], cliente=MAYORISTA, modalidad_mayorista="descuento",
@@ -312,7 +317,96 @@ class TrazabilidadMayoreoTests(unittest.TestCase):
         c = calcular(venta([LineaEntrada(uid(1), "SC1", 2, D("200"), "Ropa casual")],
                            cliente=MAYORISTA, modalidad_mayorista="descuento", **con_nivel("20", "200")))
         [l] = c.lineas
-        self.assertEqual((l.descuento.importe, l.piezas_con_nivel, l.piezas_al_base), (D("70.00"), 1, 0))
+        self.assertEqual((l.descuento.importe, l.piezas_con_nivel, l.piezas_al_base, l.consumo_tope),
+                         (D("70.00"), 1, 0, D("200.00")))
+        self.assertEqual(l.motivos, (M.EMPLEADA_NIVEL, M.TOPE_MES_AGOTADO, M.GANA_EMPLEADA))
+
+
+# ═══ A3: Mayorista y empleada a la vez (decisión de Daniel, 11/11) ═══════
+
+
+def _hoy_mayoreo_y_empleada(items, pct_nivel, restante, pct_mayoreo) -> tuple[Decimal, Decimal]:
+    """Hoy: `repartir` en el orden de captura consume el tope por renglón aunque
+    después `porcentaje_de_linea` le dé el mayoreo. Devuelve (descuento, tope consumido)."""
+    items = [dict(it) for it in items]
+    pcts = inc.repartir(items, pct_nivel=D(pct_nivel), restante=D(restante))
+    consumo = sum((inc.importe_de(it) for it, p in zip(items, pcts) if p > inc.PCT_BASE), D("0"))
+    for it, p in zip(items, pcts):
+        it[inc.LLAVE_PCT] = p
+    return dps.descuento(items, empleada=D("5"), programa=D(pct_mayoreo)), consumo
+
+
+class A3Tests(unittest.TestCase):
+    """La pieza que cabe en el tope lo consume (C8, C9), aunque el mayoreo la gane.
+    El % cobrado es el mayor; el motivo y el consumo dicen lo que pasó."""
+
+    MAY = dict(cliente=MAYORISTA, modalidad_mayorista="descuento")
+
+    def test_uniforme_al_10_contra_mayoreo_15_consume_tope(self) -> None:
+        c = calcular(venta([LineaEntrada(uid(1), "PO1", 1, D("200"), "Oficial")], **self.MAY, **con_nivel("20", "300")))
+        [l] = c.lineas
+        self.assertEqual((l.descuento.importe, l.descuento.pct, l.descuento.fuente), (D("30.00"), D("15"), "mayoreo"))
+        self.assertEqual((l.consumo_tope, l.piezas_con_nivel, l.piezas_al_base), (D("200.00"), 0, 0))
+        self.assertEqual(l.motivos, (M.TOPE_UNIFORME_10, M.TOPE_CONSUMIDO_CON_MAYOREO, M.MAYOREO, M.GANA_MAYOREO))
+        self.assertTrue(c.descuento_aplicado)
+
+    def test_el_tope_consumido_por_el_mayoreo_ya_no_lo_usa_otra_linea(self) -> None:
+        """Tope $200. Uniforme $200 (10 % < mayoreo 15 %) y casual $150 (20 %).
+        Por C8 va primero el de mayor precio: el uniforme consume los $200 y la
+        casual ya no cabe → el mayor entre 5 % y 15 % = mayoreo. 30 + 22.50 = $52.50,
+        en cualquier orden. Hoy da lo mismo capturando el uniforme primero."""
+        uni = LineaEntrada(uid(1), "PO1", 1, D("200"), "Oficial")
+        cas = LineaEntrada(uid(2), "SC1", 1, D("150"), "Ropa casual")
+        for orden in ([uni, cas], [cas, uni]):
+            c = calcular(venta(orden, **self.MAY, **con_nivel("20", "200")))
+            self.assertEqual((c.descuento_total, c.consumo_tope_total, c.total), (D("52.50"), D("200.00"), D("297.50")))
+            po1, sc1 = c.lineas
+            self.assertIn(M.TOPE_CONSUMIDO_CON_MAYOREO, po1.motivos)
+            self.assertEqual((sc1.consumo_tope, sc1.descuento.fuente), (D("0.00"), "mayoreo"))
+            self.assertIn(M.TOPE_MES_AGOTADO, sc1.motivos)
+        hoy = _hoy_mayoreo_y_empleada(
+            [{"sku": "PO1", "precio": D("200"), "cantidad": 1, "categoria": "Oficial"},
+             {"sku": "SC1", "precio": D("150"), "cantidad": 1, "categoria": "Ropa casual"}], "20", "200", "15")
+        self.assertEqual(hoy, (D("52.50"), D("200")))
+
+    def test_igual_que_hoy_con_una_sola_pieza(self) -> None:
+        """Con una pieza no hay orden que cambie nada: descuento y tope consumido iguales a hoy."""
+        casos = 0
+        for categoria in ("Oficial", "Ropa casual", "Accesorio", ""):
+            for precio in ("59", "150", "200", "400"):
+                for nivel in ("10", "15", "20", "25"):
+                    for may in ("10", "15", "20"):
+                        for restante in ("0", "100", "200", "3000"):
+                            item = {"sku": "X", "precio": D(precio), "cantidad": 1, "categoria": categoria}
+                            hoy = _hoy_mayoreo_y_empleada([item], nivel, restante, may)
+                            cli = ClienteCtx(9, "MAYORISTA", D("15"), D(may))
+                            c = calcular(venta([LineaEntrada(uid(1), "X", 1, D(precio), categoria)], cliente=cli,
+                                               modalidad_mayorista="descuento", **con_nivel(nivel, restante)))
+                            with self.subTest(cat=categoria, precio=precio, nivel=nivel, may=may, restante=restante):
+                                self.assertEqual((c.descuento_total, c.consumo_tope_total), hoy)
+                            casos += 1
+        self.assertEqual(casos, 768)
+
+    def test_mismo_pct_dentro_y_fuera_del_tope_redondea_una_vez(self) -> None:
+        """2 × $12.90 accesorio, nivel 15 % = mayoreo 15 %, tope $15: una pieza cabe.
+        El mayoreo gana las dos; un solo redondeo: q(25.80 × 15 %) = q(3.87) = 3.87,
+        como hoy (no q(1.935) + q(1.935) = 3.88)."""
+        c = calcular(venta([LineaEntrada(uid(1), "AC2", 2, D("12.90"), "Accesorio")], **self.MAY, **con_nivel("15", "15")))
+        [l] = c.lineas
+        self.assertEqual((l.descuento.importe, l.consumo_tope, l.descuento.fuente), (D("3.87"), D("12.90"), "mayoreo"))
+        hoy = _hoy_mayoreo_y_empleada([{"sku": "AC2", "precio": D("12.90"), "cantidad": 2, "categoria": "Accesorio"}],
+                                      "15", "15", "15")
+        self.assertEqual(hoy[0], D("3.87"))
+
+    def test_determinista_en_cualquier_orden(self) -> None:
+        lineas = [LineaEntrada(uid(1), "PO1", 2, D("200"), "Oficial"), LineaEntrada(uid(2), "SC1", 1, D("150"), "Ropa casual"),
+                  LineaEntrada(uid(3), "AC1", 3, D("59"), "Accesorio"), LineaEntrada(uid(4), "B3", 1, D("300"), "Deportivo", promo_3pz=True)]
+        base = fotografia(venta(lineas, **self.MAY, **con_nivel("20", "450")), calcular(venta(lineas, **self.MAY, **con_nivel("20", "450"))))
+
+        for orden in itertools.permutations(lineas):
+            e = venta(list(orden), **self.MAY, **con_nivel("20", "450"))
+            self.assertEqual(fotografia(e, calcular(e))["calculo"], base["calculo"])
+        self.assertLessEqual(D(base["calculo"]["consumo_tope_total"]), D("450"))
 
 
 # ═══ 4. Fuente única: las reglas del motor siguen al código de hoy ══════

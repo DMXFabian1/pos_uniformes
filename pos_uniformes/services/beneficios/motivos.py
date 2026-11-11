@@ -56,3 +56,8 @@ LINEAS_AGRUPADAS = "LINEAS_AGRUPADAS_Q6"
 # No es un motivo de línea: es el código de `SkuConCategoriasIncompatibles`,
 # para que la sombra de M1b registre la discrepancia sin tocar la venta.
 SKU_CATEGORIAS_INCOMPATIBLES = "SKU_CATEGORIAS_INCOMPATIBLES"
+
+# ─── A3 (Daniel, 11/11): mayoreo y empleada a la vez ───
+# La pieza cupo en el tope y lo consumió (C8, C9, como hoy), pero el mayoreo
+# le dio un % igual o mayor que el del nivel y es el que se cobró.
+TOPE_CONSUMIDO_CON_MAYOREO = "TOPE_CONSUMIDO_CON_MAYOREO"

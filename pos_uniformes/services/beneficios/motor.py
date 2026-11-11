@@ -14,12 +14,15 @@ Orden de las reglas (§2.4 del diseño):
 2. Candidatos de descuento: mayoreo (C4, sin 3pz), empleada con su nivel y
    el máximo de uniforme, «otra persona» al 5 % parejo (R2).
 3. Tope de empleada por pieza (C8, C9, P4): primero el mayor precio de lista.
+   La pieza que cabe consume el tope aunque luego gane el mayoreo (A3).
 4. Gana el mayor; un descuento de $0 respeta la modalidad (C4).
 5. Redondeo R1 del ticket, repartido entre las líneas (I8, D2).
 6. Saldo (C2), repartido en proporción (Q2).
 7. Base y abono de Monedero (C2, C4, T9, D1 del código).
 8. Base de Leal (C1, C2).
 9. Comisión de tarjeta, una sola vez (T4).
+
+Un mismo SKU con categorías distintas se rechaza (A2, `contrato.py`).
 
 No incluye devoluciones (M4/M5) ni H1–H8.
 """
@@ -227,7 +230,9 @@ def _descuentos(grupos: list[_Grupo], entrada: EntradaVenta, motivos_ticket: lis
                 if _es_uniforme(g.base, entrada) and pct_linea > r.tope_pct_uniforme:
                     pct_linea = r.tope_pct_uniforme
                     g.motivos.append(M.TOPE_UNIFORME_10)
-                if pct_linea <= base or pct_linea <= pct_mayoreo_de(g):
+                # A3 (Daniel, 11/11): la pieza que cabe consume el tope aunque luego
+                # gane el mayoreo, como hoy (`incentivo_empleada_service.repartir`).
+                if pct_linea <= base:
                     al_base.add(g.linea_uid)
                     pct_empleada[g.linea_uid] = (base, base, 0)
                     continue
@@ -241,7 +246,12 @@ def _descuentos(grupos: list[_Grupo], entrada: EntradaVenta, motivos_ticket: lis
                     caben = min(g.cantidad, int(max(queda, CERO) // precio))
                     queda -= precio * caben
                 pct_empleada[g.linea_uid] = (pct_linea, base, caben)
-                g.motivos.append(M.EMPLEADA_NIVEL if caben else M.TOPE_MES_AGOTADO)
+                if caben:
+                    # Gana el mayor; en empate, el mayoreo (`_pct_y_fuente`).
+                    gana_mayoreo = pct_mayoreo_de(g) >= pct_linea
+                    g.motivos.append(M.TOPE_CONSUMIDO_CON_MAYOREO if gana_mayoreo else M.EMPLEADA_NIVEL)
+                else:
+                    g.motivos.append(M.TOPE_MES_AGOTADO)
                 if 0 < caben < g.cantidad:
                     g.motivos.append(M.TOPE_MES_AGOTADO)
         else:
@@ -276,10 +286,15 @@ def _descuentos(grupos: list[_Grupo], entrada: EntradaVenta, motivos_ticket: lis
         pct_a, fuente_a = _pct_y_fuente(p_nivel, pmay, fuente_emp)
         pct_b, fuente_b = _pct_y_fuente(p_resto, pmay, fuente_emp)
         importe = CERO
-        if caben:
-            importe += _q(g.precio_unitario * caben * pct_a / CIEN)
-        if resto:
-            importe += _q(g.precio_unitario * resto * pct_b / CIEN)
+        if caben and resto and pct_a == pct_b:
+            # Mismo % en toda la línea (con A3, el mayoreo gana las piezas dentro y
+            # fuera del tope): un solo redondeo, como hoy `dps.descuento` por renglón.
+            importe = _q(g.precio_unitario * g.cantidad * pct_a / CIEN)
+        else:
+            if caben:
+                importe += _q(g.precio_unitario * caben * pct_a / CIEN)
+            if resto:
+                importe += _q(g.precio_unitario * resto * pct_b / CIEN)
         con_nivel_real = caben if fuente_a == fuente_emp and caben else 0
         piezas_base = resto if resto and fuente_b == fuente_emp else 0
         if g.linea_uid in al_base and piezas_base:
@@ -299,7 +314,8 @@ def _descuentos(grupos: list[_Grupo], entrada: EntradaVenta, motivos_ticket: lis
             fuente=fuente,
             piezas_nivel=con_nivel_real,
             piezas_base=piezas_base,
-            consumo_tope=(g.base.precio_lista * con_nivel_real).quantize(CENT),
+            # A3: consume el tope toda pieza que cupo, la haya ganado el nivel o el mayoreo.
+            consumo_tope=(g.base.precio_lista * caben).quantize(CENT),
         )
     return resultado
 
