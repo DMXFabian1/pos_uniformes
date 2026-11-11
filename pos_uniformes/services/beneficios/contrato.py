@@ -37,6 +37,25 @@ class EntradaInvalida(ValueError):
     """La entrada no cumple el contrato. El texto dice qué campo y por qué."""
 
 
+class SkuConCategoriasIncompatibles(EntradaInvalida):
+    """A2 (Daniel, 2026-11-11): un mismo SKU llegó con categorías distintas.
+
+    En el catálogo un SKU tiene una sola categoría (`variante.sku` único y
+    `producto.categoria_id` único), así que dos categorías distintas en la misma
+    venta indican un origen mezclado. El motor no elige ni normaliza: rechaza la
+    entrada y conserva, por SKU, cada línea con la categoría tal como llegó.
+    """
+
+    codigo = "SKU_CATEGORIAS_INCOMPATIBLES"
+
+    def __init__(self, conflictos: tuple[tuple[str, tuple[tuple[str, str], ...]], ...]):
+        self.conflictos = conflictos
+        detalle = "; ".join(
+            f"{sku!r}: " + ", ".join(f"{uid} → {cat!r}" for uid, cat in lineas) for sku, lineas in conflictos
+        )
+        super().__init__(f"SKU con categorías incompatibles: {detalle}")
+
+
 # ─── Entradas ────────────────────────────────────────────────────────────
 
 
@@ -133,6 +152,22 @@ def _pct(nombre: str, valor) -> None:
         raise EntradaInvalida(f"{nombre} debe ir de 0 a 100")
 
 
+def _validar_categoria_unica_por_sku(lineas) -> None:
+    """A2: todas las líneas de un SKU traen la misma categoría, comparada tal
+    como llegó (sin normalizar). Las líneas sin SKU no se comparan."""
+    por_sku: dict[str, list[tuple[str, str]]] = {}
+    for linea in lineas:
+        if linea.sku is not None:
+            por_sku.setdefault(linea.sku, []).append((linea.linea_uid, linea.categoria))
+    conflictos = tuple(
+        (sku, tuple(sorted(filas)))
+        for sku, filas in sorted(por_sku.items())
+        if len({cat for _, cat in filas}) > 1
+    )
+    if conflictos:
+        raise SkuConCategoriasIncompatibles(conflictos)
+
+
 def validar(entrada: EntradaVenta) -> None:
     if not isinstance(entrada, EntradaVenta):
         raise EntradaInvalida("Se esperaba una EntradaVenta")
@@ -167,6 +202,7 @@ def validar(entrada: EntradaVenta) -> None:
             if linea.rebaja.tipo not in TIPOS_REBAJA:
                 raise EntradaInvalida(f"{donde}: rebaja de tipo desconocido")
             _importe(f"{donde}: precio rebajado", linea.rebaja.precio, puede_cero=False)
+    _validar_categoria_unica_por_sku(entrada.lineas)
     c = entrada.cliente
     if c is not None:
         _pct("tasa_monedero", c.tasa_monedero)

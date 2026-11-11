@@ -29,12 +29,14 @@ from pos_uniformes.services.beneficios.contrato import (
     Calculo,
     ClienteCtx,
     CompradoraCtx,
+    EntradaInvalida,
     EntradaVenta,
     LineaCalculo,
     LineaEntrada,
     Pago,
     Rebaja,
     ReglasCtx,
+    SkuConCategoriasIncompatibles,
 )
 from pos_uniformes.services.beneficios.fotografia import fotografia, huella
 from pos_uniformes.services.beneficios.motor import calcular
@@ -193,11 +195,14 @@ class AgrupacionAuditoriaTests(unittest.TestCase):
         lineas = [LineaEntrada(uid(1), "PO1", 1, D("180")),
                   LineaEntrada(uid(2), "PO1", 1, D("180"), rebaja=Rebaja("oferta", D("150"))),
                   LineaEntrada(uid(3), "PO1", 1, D("180"), promo_3pz=True),
-                  LineaEntrada(uid(4), "PO1", 1, D("180"), categoria="Ropa casual")]
+                  # A2: la categoría distinta ya no es una condición válida (ver A2Tests);
+                  # la cuarta variante es ahora una Liquidación.
+                  LineaEntrada(uid(4), "PO1", 1, D("180"), rebaja=Rebaja("liquidacion", D("90")))]
         a, b = calcular(venta(lineas, **self.MAY)), calcular(venta(lineas[::-1], **self.MAY))
         self.assertEqual(a, b)
         self.assertEqual([l.linea_uid for l in a.lineas], [uid(1), uid(2), uid(3), uid(4)])
-        self.assertEqual([l.descuento.importe for l in a.lineas], [D("27.00"), D("0.00"), D("0.00"), D("27.00")])
+        self.assertEqual([l.descuento.importe for l in a.lineas], [D("27.00"), D("0.00"), D("0.00"), D("0.00")])
+        self.assertEqual([l.clasificacion_al_vender for l in a.lineas], ["normal", "oferta", "3pz", "liquidacion"])
         self.assertTrue(all(len(l.lineas_origen) == 1 for l in a.lineas))
 
     def test_tope_con_nivel_agrupado_o_separado(self) -> None:
@@ -209,19 +214,70 @@ class AgrupacionAuditoriaTests(unittest.TestCase):
             [l] = c.lineas
             self.assertEqual((c.total, l.descuento.importe, l.piezas_con_nivel, l.piezas_al_base), (D("35.00"), D("3.87"), 1, 2))
 
-    def test_pendiente_mismo_sku_y_precio_con_categoria_distinta_lo_decide_el_uid(self) -> None:
-        """PENDIENTE DE DECISIÓN (auditoría M1a, hallazgo A2).
 
-        Un mismo SKU no debería llegar con dos categorías, pero si llega, el tope
-        lo toma la línea de `linea_uid` menor (I5) y el total cambia $18 según el
-        uid, que es aleatorio. Se fija aquí lo que hace hoy el motor para que un
-        cambio sea consciente."""
-        kw = con_nivel("20", "180")
-        uniforme_primero = calcular(venta([LineaEntrada(uid(1), "PO1", 1, D("180"), "Oficial"),
-                                           LineaEntrada(uid(2), "PO1", 1, D("180"), "Ropa casual")], **kw))
-        casual_primero = calcular(venta([LineaEntrada(uid(2), "PO1", 1, D("180"), "Oficial"),
-                                         LineaEntrada(uid(1), "PO1", 1, D("180"), "Ropa casual")], **kw))
-        self.assertEqual((uniforme_primero.total, casual_primero.total), (D("333.00"), D("315.00")))
+
+# ═══ A2: SKU con categorías incompatibles (decisión de Daniel, 11/11) ════
+
+
+class A2Tests(unittest.TestCase):
+    """Antes de A2 el tope lo tomaba la línea de uid menor y el total salía $333 o
+    $315 según un uid aleatorio. Ahora la entrada se rechaza y se conserva todo
+    para investigar; ningún importe se calcula ni se elige categoría."""
+
+    KW = con_nivel("20", "180")
+
+    def _rechazo(self, lineas, **kw) -> SkuConCategoriasIncompatibles:
+        with self.assertRaises(SkuConCategoriasIncompatibles) as ctx:
+            calcular(venta(lineas, **(kw or self.KW)))
+        return ctx.exception
+
+    def test_rechaza_e_identifica_sku_y_lineas(self) -> None:
+        e = self._rechazo([LineaEntrada(uid(2), "PO1", 1, D("180"), "Oficial"),
+                           LineaEntrada(uid(1), "PO1", 1, D("180"), "Ropa casual")])
+        self.assertIsInstance(e, EntradaInvalida)
+        self.assertEqual(e.codigo, M.SKU_CATEGORIAS_INCOMPATIBLES)
+        self.assertEqual(e.conflictos, (("PO1", ((uid(1), "Ropa casual"), (uid(2), "Oficial"))),))
+        for texto in ("PO1", uid(1), uid(2), "Oficial", "Ropa casual"):
+            self.assertIn(texto, str(e))
+
+    def test_no_depende_del_uid_ni_del_orden(self) -> None:
+        """Los dos casos que antes daban $333 y $315 ahora dan el mismo rechazo."""
+        a = self._rechazo([LineaEntrada(uid(1), "PO1", 1, D("180"), "Oficial"),
+                           LineaEntrada(uid(2), "PO1", 1, D("180"), "Ropa casual")])
+        b = self._rechazo([LineaEntrada(uid(2), "PO1", 1, D("180"), "Ropa casual"),
+                           LineaEntrada(uid(1), "PO1", 1, D("180"), "Oficial")])
+        self.assertEqual(a.conflictos, b.conflictos)
+
+    def test_no_normaliza_la_categoria(self) -> None:
+        """Se compara como llegó: vacío contra nombre, o mayúsculas distintas, también es incompatible."""
+        for otra in ("", "ropa casual", "Ropa  casual"):
+            e = self._rechazo([LineaEntrada(uid(1), "SC1", 1, D("400"), "Ropa casual"),
+                               LineaEntrada(uid(2), "SC1", 1, D("400"), otra)])
+            self.assertEqual(e.conflictos, (("SC1", ((uid(1), "Ropa casual"), (uid(2), otra))),))
+
+    def test_reporta_todos_los_sku_en_conflicto_y_todas_sus_lineas(self) -> None:
+        e = self._rechazo([LineaEntrada(uid(1), "B", 1, D("10"), "Oficial"), LineaEntrada(uid(2), "B", 2, D("10"), "Temporada"),
+                           LineaEntrada(uid(3), "B", 1, D("10"), "Oficial"), LineaEntrada(uid(4), "A", 1, D("10"), "Accesorio"),
+                           LineaEntrada(uid(5), "A", 1, D("10"), ""), LineaEntrada(uid(6), "C", 1, D("10"), "Oficial")])
+        self.assertEqual(e.conflictos, (
+            ("A", ((uid(4), "Accesorio"), (uid(5), ""))),
+            ("B", ((uid(1), "Oficial"), (uid(2), "Temporada"), (uid(3), "Oficial"))),
+        ))
+
+    def test_rechaza_en_cualquier_contexto(self) -> None:
+        lineas = [LineaEntrada(uid(1), "PO1", 1, D("180"), "Oficial"), LineaEntrada(uid(2), "PO1", 1, D("180"), "Deportivo")]
+        for kw in ({}, dict(cliente=CLUB), dict(cliente=MAYORISTA, modalidad_mayorista="descuento"),
+                   dict(origen_calculo="kiosko_sin_conexion"), dict(descuento_empleada=True)):
+            with self.subTest(kw=kw), self.assertRaises(SkuConCategoriasIncompatibles):
+                calcular(venta(lineas, **kw))
+
+    def test_lo_valido_sigue_pasando(self) -> None:
+        mismo = calcular(venta([LineaEntrada(uid(1), "PO1", 1, D("180"), "Oficial"),
+                                LineaEntrada(uid(2), "PO1", 1, D("180"), "Oficial")], **self.KW))
+        self.assertEqual(len(mismo.lineas), 1)
+        sin_sku = calcular(venta([LineaEntrada(uid(1), None, 1, D("180"), "Oficial"),
+                                  LineaEntrada(uid(2), None, 1, D("180"), "Ropa casual")], **self.KW))
+        self.assertEqual(len(sin_sku.lineas), 2)
 
 
 # ═══ Corrección: trazabilidad cuando gana el mayoreo ═════════════════════

@@ -13,6 +13,7 @@ from pos_uniformes.services.beneficios.contrato import (  # noqa: F401
     Pago,
     Rebaja,
     ReglasCtx,
+    SkuConCategoriasIncompatibles,
 )
 from pos_uniformes.services.beneficios.fotografia import fotografia, huella  # noqa: F401
 from pos_uniformes.services.beneficios.motor import VERSION_MOTOR, calcular  # noqa: F401

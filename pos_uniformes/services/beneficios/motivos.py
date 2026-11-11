@@ -51,3 +51,8 @@ SIN_CONEXION_EMPLEADA_BASE = "SIN_CONEXION_EMPLEADA_BASE"
 
 # ─── Agrupación (Q6, P3) ───
 LINEAS_AGRUPADAS = "LINEAS_AGRUPADAS_Q6"
+
+# ─── Entrada rechazada (A2, auditoría M1a) ───
+# No es un motivo de línea: es el código de `SkuConCategoriasIncompatibles`,
+# para que la sombra de M1b registre la discrepancia sin tocar la venta.
+SKU_CATEGORIAS_INCOMPATIBLES = "SKU_CATEGORIAS_INCOMPATIBLES"
