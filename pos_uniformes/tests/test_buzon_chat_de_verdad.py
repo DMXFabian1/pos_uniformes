@@ -28,6 +28,7 @@ class SeguirLoNuevoTests(_ConBase):
         d = self._ventana(yo)
         d.resize(1000, 500)
         d.show()
+        self.addCleanup(d.close)  # cada prueba cierra lo que abre
         _asentar()
         return d, d._scroll.verticalScrollBar()
 

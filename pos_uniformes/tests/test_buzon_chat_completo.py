@@ -131,6 +131,7 @@ class HistoriaTests(_ConBase):
         d = self._ventana("Caja", tramo=30)
         d.resize(1000, 500)
         d.show()
+        self.addCleanup(d.close)  # cada prueba cierra lo que abre
         _asentar()
         barra = d._scroll.verticalScrollBar()
         barra.setValue(0)
@@ -192,6 +193,7 @@ class LeidoEsLoQueSeVioTests(_ConBase):
         d = self._ventana("Caja")
         d.resize(1000, 500)
         d.show()
+        self.addCleanup(d.close)  # cada prueba cierra lo que abre
         _asentar()
         barra = d._scroll.verticalScrollBar()
         barra.setValue(40)

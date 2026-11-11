@@ -64,6 +64,8 @@ class RecalcularOcultoTests(unittest.TestCase):
         # El diálogo es hijo de la ventana: se guardan las dos hasta el final.
         self._vivos = getattr(self, "_vivos", []) + [ventana, dialogo]
         self.addCleanup(ventana.close)
+        # La ventana falsa nunca se muestra: cerrarla no cierra al diálogo.
+        self.addCleanup(dialogo.close)
         return ventana, dialogo
 
     def _assert_oculto(self, ventana, dialogo) -> None:

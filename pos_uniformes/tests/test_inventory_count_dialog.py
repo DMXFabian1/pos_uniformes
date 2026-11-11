@@ -75,6 +75,7 @@ class InventoryCountDialogTests(unittest.TestCase):
         )
         dialog = InventoryCountDialog()
         dialog.show()
+        self.addCleanup(dialog.close)  # cada prueba cierra lo que abre
 
         with (
             patch("pos_uniformes.ui.dialogs.inventory_count_dialog.get_session", _fake_session_context),
@@ -171,6 +172,7 @@ class InventoryCountDialogTests(unittest.TestCase):
             initial_context_label="Filas seleccionadas (1)",
         )
         dialog.show()
+        self.addCleanup(dialog.close)  # cada prueba cierra lo que abre
         dialog.batch_table.selectRow(0)
         dialog.batch_table.setFocus()
 
@@ -194,6 +196,7 @@ class InventoryCountDialogTests(unittest.TestCase):
             initial_context_label="Filas seleccionadas (1)",
         )
         dialog.show()
+        self.addCleanup(dialog.close)  # cada prueba cierra lo que abre
         counted_spin = dialog.batch_table.cellWidget(0, 3)
         self.assertIsNotNone(counted_spin)
         counted_line_edit = counted_spin.lineEdit()

@@ -334,6 +334,74 @@ def _sin_hilos_ni_dialogos_modales(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Cada prueba cierra los dialogos que abre (2026-11-11).
+#
+# Un dialogo que una prueba dejaba visible (el conteo fisico, el detalle del
+# dia de una empleada, el aviso de la Libreta) seguia vivo en ese proceso y la
+# prueba de higiene de otra seccion (`activeModalWidget() is None`) fallaba
+# segun el orden en que xdist repartia las pruebas.
+#
+# Esto NO los esconde: si una prueba deja un dialogo nuevo a la vista, se
+# cierra (para que la siguiente arranque limpia) y la prueba que lo dejo
+# FALLA con el nombre del dialogo. La higiene sigue viendo todo lo demas.
+# ---------------------------------------------------------------------------
+
+
+def _dialogos_visibles() -> dict:
+    if "PyQt6.QtWidgets" not in sys.modules:
+        return {}
+    from PyQt6 import sip
+    from PyQt6.QtWidgets import QApplication, QDialog
+
+    if QApplication.instance() is None:
+        return {}
+    visibles = {}
+    for w in QApplication.topLevelWidgets():
+        try:
+            if isinstance(w, QDialog) and w.isVisible():
+                visibles[int(sip.unwrapinstance(w))] = w
+        except RuntimeError:  # ya destruido del lado de C++
+            continue
+    return visibles
+
+
+def _describir_dialogo(w) -> str:
+    try:
+        return f"{type(w).__name__} «{w.windowTitle() or w.objectName() or 'sin título'}»"
+    except RuntimeError:
+        return type(w).__name__
+
+
+def cerrar_dialogos(dialogos) -> None:
+    """Cierra de verdad: `done` oculta aunque el dialogo ignore el close
+    (un QMessageBox sin boton de escape lo ignora)."""
+    for w in dialogos:
+        try:
+            w.done(0)
+            if w.isVisible():
+                w.hide()
+            w.deleteLater()
+        except RuntimeError:
+            continue
+
+
+@pytest.fixture(autouse=True)
+def _cada_prueba_cierra_sus_dialogos(request):
+    antes = set(_dialogos_visibles())
+    yield
+    nuevos = {k: w for k, w in _dialogos_visibles().items() if k not in antes}
+    if not nuevos:
+        return
+    nombres = ", ".join(sorted(_describir_dialogo(w) for w in nuevos.values()))
+    cerrar_dialogos(nuevos.values())
+    pytest.fail(
+        f"{request.node.nodeid} dejó abierto: {nombres}. "
+        "Cada prueba cierra los diálogos que abre.",
+        pytrace=False,
+    )
+
+
+# ---------------------------------------------------------------------------
 # Semilla minima de la base de prueba.
 #
 # Las ventanas resuelven su operador con `user_id=1` en el __init__. Contra la

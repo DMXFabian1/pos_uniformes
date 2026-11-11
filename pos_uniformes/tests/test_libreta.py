@@ -341,6 +341,14 @@ class QuickSaleLibretaHookTests(unittest.TestCase):
             # La impresión arrancó y la libreta falló: no debe tronar nada.
             routed.call_args.kwargs["on_printed"]()
         routed.assert_called_once()
+        # El aviso «Falta anotar la operación» sí sale (no es un estático
+        # parchado): se cierra aquí para no dejarlo modal en el proceso.
+        from PyQt6.QtWidgets import QMessageBox
+
+        avisos = [b for b in widget.findChildren(QMessageBox) if b.isVisible()]
+        self.assertEqual(len(avisos), 1)
+        for aviso in avisos:
+            aviso.done(0)
 
     def test_abono_se_registra_sin_comision(self) -> None:
         widget = self._make_widget()

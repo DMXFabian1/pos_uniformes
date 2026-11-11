@@ -873,6 +873,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             window._open_settings_employee_day_sales_dialog()
 
         self.assertIsNotNone(window.settings_employee_day_sales_dialog)
+        self.addCleanup(window.settings_employee_day_sales_dialog.close)  # cada prueba cierra lo que abre
         self.assertEqual(window.settings_employee_day_sales_table.rowCount(), 1)
         self.assertEqual(window.settings_employee_day_sales_status_label.text(), "Tickets confirmados del dia: 1")
         self.assertEqual(window.settings_employee_day_sales_table.item(0, 1).text(), "VTA-010")
@@ -910,6 +911,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             window._handle_view_settings_employee_day_sale_ticket()
 
         self.assertIsNotNone(window.settings_employee_sale_detail_dialog)
+        self.addCleanup(window.settings_employee_sale_detail_dialog.close)  # cada prueba cierra lo que abre
         self.assertEqual(
             window.settings_employee_sale_detail_status_label.text(),
             "Cliente: Maria | Piezas: 2 | Total: $199.00",
