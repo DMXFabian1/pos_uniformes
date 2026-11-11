@@ -25,6 +25,7 @@ from pos_uniformes.ui.dialogs.proponer_programa_dialog import ProponerProgramaDi
 from pos_uniformes.ui.helpers import quick_sale_programa_helper as ph
 from pos_uniformes.ui.helpers.quick_sale_programa_helper import estado_para_barra
 from pos_uniformes.ui.views.quick_sale_view import QuickSaleWidget
+from tests.conftest import conservar_hasta_el_final
 
 D = Decimal
 
@@ -103,7 +104,9 @@ class _Kiosko(_Base):
     def _widget(self, *, online=True, empleada=None):
         sat = SimpleNamespace(offline_mode=not online, _kiosk_lookup_from_cache=None, _db_online=online)
         w = QuickSaleWidget(sat)
-        self.addCleanup(w.deleteLater)
+        # No `deleteLater`: el aviso de 1.8 s de la barra de escaneo caía sobre
+        # el widget ya borrado y tumbaba el proceso de la prueba siguiente.
+        self.addCleanup(conservar_hasta_el_final, w)
         w._employee_code = empleada if empleada is not None else self.lupita.codigo
         w._items = [{"sku": "SKU1", "nombre": "Pants", "talla": "6", "color": "", "precio": D("450.00"), "cantidad": 2}]
         w._cliente = {"id": self.cliente.id, "codigo": self.cliente.codigo_cliente, "nombre": self.cliente.nombre,

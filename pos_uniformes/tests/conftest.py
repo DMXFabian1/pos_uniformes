@@ -113,6 +113,21 @@ def pytest_addoption(parser: pytest.Parser) -> None:
 _VENTANAS_SATELITE: list = []
 
 
+def conservar_hasta_el_final(widget) -> None:
+    """Cerrar un widget sin destruirlo hasta que termine la sesión.
+
+    El kiosko deja temporizadores sin dueño Qt: `_flash_scan_hint` programa
+    `QTimer.singleShot(1800, lambda: self._scan_hint.setText(...))`. Si una
+    prueba lo borra con `deleteLater` antes de los 1.8 s, la lambda cae sobre la
+    etiqueta ya destruida en la siguiente prueba que corra el ciclo de eventos,
+    y PyQt6 tumba el proceso (RuntimeError en un slot → Fatal: Aborted). Se vio
+    1 de cada 4-5 corridas completas con -n 6 (2026-11-11). Igual que las
+    ventanas satélite: se cierra ya, se libera al final.
+    """
+    widget.close()
+    _VENTANAS_SATELITE.append(widget)
+
+
 def pytest_sessionfinish(session, exitstatus) -> None:
     """Cierra las ventanas satelite que los tests dejaron vivas, con Qt aun
     despierto, para que no las mate el recolector a destiempo."""
