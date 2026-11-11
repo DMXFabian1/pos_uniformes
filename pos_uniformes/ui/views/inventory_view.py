@@ -123,6 +123,9 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     bulk_price_action = edit_menu.addAction("Precio masivo")
     bulk_price_action.setToolTip("Cambiar el precio a multiples presentaciones de una vez con una tabla editable")
     bulk_price_action.triggered.connect(window._handle_inventory_bulk_price_update)
+    rebajas_action = edit_menu.addAction("Ofertas y liquidación…")
+    rebajas_action.setToolTip("Poner prendas en Oferta o Liquidación: no se les suma ningún otro descuento")
+    rebajas_action.triggered.connect(window._handle_open_rebajas)
     window.inventory_edit_button.setMenu(edit_menu)
 
     stock_menu = QMenu(window)

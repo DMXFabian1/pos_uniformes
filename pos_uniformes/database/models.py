@@ -567,6 +567,41 @@ class ProgramaTasaCambio(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
 
+class RebajaProducto(Base):
+    """E7: una prenda en Oferta o Liquidación (Daniel, 2026-11-11).
+
+    `precio_venta` de la variante NO se toca: aquí va el precio rebajado y, al
+    terminar, la prenda vuelve sola a su precio. Una prenda rebajada no lleva
+    ningún otro descuento ni genera Monedero (rebaja_service).
+    """
+
+    __tablename__ = "rebaja_producto"
+    __table_args__ = (
+        CheckConstraint("tipo IN ('oferta', 'liquidacion')", name="rebaja_tipo_valido"),
+        CheckConstraint("precio > 0", name="rebaja_precio_positivo"),
+        Index(
+            "uq_rebaja_producto_activa_por_variante",
+            "variante_id",
+            unique=True,
+            postgresql_where=sa_text("activa"),
+            sqlite_where=sa_text("activa"),
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    variante_id: Mapped[int] = mapped_column(ForeignKey("variante.id", ondelete="CASCADE"), nullable=False, index=True)
+    tipo: Mapped[str] = mapped_column(String(20), nullable=False)
+    precio: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    #: Precio normal cuando se rebajó (para «Antes $…» y la bitácora).
+    precio_antes: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    #: Último día de la oferta (inclusive). Liquidación: sin fecha.
+    hasta: Mapped[date | None] = mapped_column(Date, nullable=True)
+    activa: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default=sa_text("true"))
+    usuario_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id", ondelete="SET NULL"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    terminada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
 class NivelDescuentoEmpleada(Base):
     """E6: niveles del descuento de empleadas (Daniel, 2026-11-10).
 

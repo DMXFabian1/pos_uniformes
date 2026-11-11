@@ -30,7 +30,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Iterable, Mapping, Sequence
 
-from pos_uniformes.services.fidelizacion.descuento_programa_service import LLAVE_PCT_EMPLEADA, es_promo_3pz
+from pos_uniformes.services.fidelizacion.descuento_programa_service import LLAVE_PCT_EMPLEADA, LLAVE_REBAJA, es_promo_3pz
 
 _CENT = Decimal("0.01")
 _CERO = Decimal("0")
@@ -172,6 +172,9 @@ def repartir(items: Sequence[Mapping], *, pct_nivel, restante, pct_base=PCT_BASE
     queda = None if restante is None else Decimal(str(restante))
     resultado: list[Decimal] = []
     for it in items:
+        if str(it.get(LLAVE_REBAJA) or "") in ("oferta", "liquidacion"):
+            resultado.append(_CERO)  # E7: rebajada, sin descuento y sin gastar su tope
+            continue
         pct_linea = tope_del_renglon(it, pct_nivel)
         if pct_linea <= pct_base or es_promo_3pz(it):
             resultado.append(pct_base)

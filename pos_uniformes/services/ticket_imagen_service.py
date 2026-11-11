@@ -94,19 +94,47 @@ def _marcador_de_imagen(linea: str) -> str | None:
     return None
 
 
+#: Tachado: este carácter después de una letra la tacha (U+0336). No ocupa
+#: casilla; se dibuja como una raya a media altura (2026-11-11).
+TACHADO = "\u0336"
+
+
+def partir_tachado(texto: str) -> tuple[str, set[int]]:
+    """El texto sin las marcas de tachado y en qué casillas iba la raya."""
+    plano: list[str] = []
+    tachadas: set[int] = set()
+    for c in texto:
+        if c == TACHADO:
+            if plano:
+                tachadas.add(len(plano) - 1)
+            continue
+        plano.append(c)
+    return "".join(plano), tachadas
+
+
 def _escribir_en_rejilla(painter, texto: str, x0: int, base: int, avance: float) -> None:
     """Un carácter por casilla, cada uno centrado en la suya.
 
     Es lo que hace una térmica de verdad y lo que mantiene cuadrados los
-    recuadros y los importes pegados a la derecha, venga la fuente que venga."""
+    recuadros y los importes pegados a la derecha, venga la fuente que venga.
+    Lo tachado (U+0336) lleva una raya encima, de casilla a casilla."""
     from PyQt6.QtGui import QFontMetricsF
 
     metrica = QFontMetricsF(painter.font())
+    texto, tachadas = partir_tachado(texto)
     for i, c in enumerate(texto[:COLUMNAS]):
         if c == " ":
             continue
         centro = x0 + i * avance + (avance - metrica.horizontalAdvance(c)) / 2
         painter.drawText(int(round(centro)), base, c)
+    if tachadas:
+        from PyQt6.QtGui import QColor
+
+        y_raya = int(round(base - metrica.xHeight() / 2)) - 1
+        grosor = max(2, int(round(metrica.height() / 12)))
+        for i in sorted(t for t in tachadas if t < COLUMNAS):
+            x = int(round(x0 + i * avance))
+            painter.fillRect(x, y_raya, int(round(avance)) + 1, grosor, QColor("black"))
 
 
 def _adornos_encendidos() -> bool:

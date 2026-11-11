@@ -517,6 +517,10 @@ def acreditar_cashback(
     if tasa is None:
         return None
     base = importe_elegible(libreta_venta.monto_total, getattr(libreta_venta, "monto_monedero", None))
+    # E7: lo cobrado en Oferta o Liquidación no genera Monedero.
+    from pos_uniformes.services.rebaja_service import importe_rebajado
+
+    base = max(base - importe_rebajado(getattr(libreta_venta, "detalle", None) or []), _CERO)
     monto = calcular_cashback(base, tasa)
     if monto <= 0:
         return None

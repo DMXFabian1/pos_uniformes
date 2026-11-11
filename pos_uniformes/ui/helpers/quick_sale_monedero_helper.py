@@ -53,10 +53,9 @@ def lineas_ticket_monedero(info: dict, tk_row) -> list[str]:
         lineas.append(tk_row(f"{metodo}:", f"${Decimal(str(info.get('por_cobrar') or 0)):,.2f}"))
     cashback = Decimal(str(info.get("cashback") or 0))
     if cashback > 0:
-        if info.get("cashback_pendiente"):
-            lineas.append(tk_row("Cashback (al sincronizar):", f"${cashback:,.2f}"))
-        else:
-            lineas.append(tk_row("Cashback ganado:", f"${cashback:,.2f}"))
+        # Si va por la cola se abona al sincronizar (segundos): al cliente se
+        # le dice igual lo que acumuló (Daniel, 2026-11-11).
+        lineas.append(tk_row("Acumulado en esta compra:", f"${cashback:,.2f}"))
     if info.get("saldo") is not None:
         lineas.append(tk_row("Saldo en monedero:", f"${Decimal(str(info['saldo'])):,.2f}"))
     return lineas
@@ -247,7 +246,9 @@ class MonederoVentaMixin:
             return _CERO  # eligió descuento: esta compra no suma Monedero
         from pos_uniformes.services.monedero_service import calcular_cashback, importe_elegible
 
-        return calcular_cashback(importe_elegible(total, canje), c["tasa"])
+        # E7: lo que va en Oferta o Liquidación no suma Monedero.
+        base = max(importe_elegible(total, canje) - self._importe_rebajado_carrito(), _CERO)
+        return calcular_cashback(base, c["tasa"])
 
     def _datos_cliente_para_cola(self, tipo: str, total: Decimal) -> dict:
         """Lo que la cola necesita para ligar la venta al cliente."""
@@ -262,14 +263,21 @@ class MonederoVentaMixin:
         }
 
     def _monedero_para_ticket(self, total: Decimal, tarjeta: bool) -> dict | None:
-        """Renglones del ticket de una venta SIN canje (va por la cola)."""
+        """Renglones del ticket de una venta SIN canje (va por la cola).
+
+        Si el cliente tiene Monedero: lo que acumuló en esta compra y cómo le
+        queda el saldo (el de al identificarlo más lo de hoy). Sin conexión el
+        saldo no se conoce y solo va lo acumulado."""
         c = self._cliente
         if not c:
             return None
         estimado = self._cashback_estimado(total, _CERO)
-        if estimado <= 0:
+        saldo = None
+        if c.get("en_linea") and c.get("tiene_monedero") and c.get("estado") == "activo":
+            saldo = Decimal(str(c.get("disponible") or 0)) + estimado
+        if estimado <= 0 and saldo is None:
             return None
-        return {"cashback": estimado, "cashback_pendiente": True}
+        return {"cashback": estimado, "cashback_pendiente": True, "saldo": saldo}
 
     # ─── Barra del cliente ───────────────────────────────────────────────
 
@@ -422,7 +430,8 @@ class MonederoVentaMixin:
         items = [
             {"sku": it["sku"], "nombre": it["nombre"], "talla": it["talla"],
              "cantidad": int(it["cantidad"]), "precio": str(it["precio"]),
-             **self._marca_promo_para_libreta(it), **self._marca_pct_empleada(it)}
+             **self._marca_promo_para_libreta(it), **self._marca_pct_empleada(it),
+             **self._marca_rebaja_para_libreta(it)}
             for it in self._items
         ]
         pct_mayoreo = self._pct_descuento_programa()

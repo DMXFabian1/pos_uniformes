@@ -188,6 +188,8 @@ def registrar_operacion(
             ),
             # E5-A: solo cuando viene marcada; el descuento de programa no le aplica.
             **({"promo_3pz": True} if it.get("promo_3pz") else {}),
+            # E7: Oferta o Liquidación, con su precio normal.
+            **({"rebaja": str(it["rebaja"]), "precio_normal": str(it.get("precio_normal") or "")} if it.get("rebaja") else {}),
             # E6: el % de empleada de este renglón (su nivel o el 5 % base).
             **({"desc_empleada_pct": str(it["desc_empleada_pct"])} if it.get("desc_empleada_pct") not in (None, "") else {}),
         }
@@ -788,7 +790,8 @@ def cambiar_pago_tarjeta(session, operacion_id: int, tarjeta: bool):
                     unit = dps.precio_con_descuento(unit, pct)
                 elif entry.descuento_empleada:
                     # E6: el % que tuvo ese renglón (su nivel); las de antes, 5 %.
-                    pct = Decimal(str(line.get("desc_empleada_pct") or 5))
+                    # E7: una prenda rebajada no llevó descuento.
+                    pct = Decimal("0") if line.get("rebaja") else Decimal(str(line.get("desc_empleada_pct") or 5))
                     unit = (unit * (Decimal("100") - pct) / Decimal("100")).quantize(Decimal("0.01"))
                 neto += aplicar_comision_terminal(unit) * int(line.get("cantidad", 0) or 0)
             neto = neto.quantize(Decimal("0.01"))

@@ -3475,6 +3475,18 @@ class MainWindow(QMainWindow):
         if panel.hubo_cambios:
             self._refresh_settings_clients()
 
+    def _handle_open_rebajas(self) -> None:
+        """E7: «Ofertas y liquidación» (solo ADMIN)."""
+        if self.current_role != RolUsuario.ADMIN:
+            QMessageBox.warning(self, "Sin permiso", "Solo ADMIN puede poner prendas en oferta o liquidación.")
+            return
+        from pos_uniformes.ui.dialogs.rebajas_dialog import RebajasDialog, imprimir_etiqueta_rebaja
+
+        RebajasDialog(
+            self, get_session, usuario_id=self.user_id,
+            imprimir=lambda fila: imprimir_etiqueta_rebaja(fila, self._print_image_path),
+        ).exec()
+
     def _handle_open_programas(self) -> None:
         """E4-D: ventana «Programas» (solo ADMIN)."""
         if self.current_role != RolUsuario.ADMIN:

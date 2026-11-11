@@ -51,6 +51,7 @@ from pos_uniformes.ui.helpers.ticket_routing_helper import route_tickets
 from pos_uniformes.ui.helpers.quick_sale_cliente_helper import ClienteRapidoMixin
 from pos_uniformes.ui.helpers.quick_sale_programa_helper import ProgramaClienteMixin
 from pos_uniformes.ui.helpers.quick_sale_compradora_helper import CompradoraEmpleadaMixin
+from pos_uniformes.ui.helpers.quick_sale_rebaja_helper import RebajaVentaMixin
 from pos_uniformes.ui.helpers.quick_sale_monedero_helper import (
     MonederoVentaMixin,
     lineas_ticket_monedero,
@@ -252,7 +253,7 @@ QPushButton#btnLogout:hover {{ color: {_DANGER}; border-color: {_DANGER}; }}
 
 
 class QuickSaleWidget(
-    ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMixin, CompradoraEmpleadaMixin, QWidget
+    ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMixin, CompradoraEmpleadaMixin, RebajaVentaMixin, QWidget
 ):
     #: Lo de hoy para el pie del gafete, leído en un hilo (el kiosko sin red no se congela).
     _pie_gafete_leido = pyqtSignal(object)
@@ -810,6 +811,8 @@ class QuickSaleWidget(
                 "precio": snap.price,
                 "cantidad": qty,
             }
+            # E7: en Oferta o Liquidación lleva su precio rebajado y la marca.
+            self._aplicar_rebaja(base_item)
             self._items.append(base_item)
 
         if promo_playera_item is not None:
@@ -873,6 +876,12 @@ class QuickSaleWidget(
         for row, item in enumerate(self._items):
             name_item = QTableWidgetItem(item["nombre"])
             name_item.setToolTip(f"SKU: {item['sku']}")
+            if item.get("rebaja"):
+                # E7: que se vea que va rebajada y que no lleva otro descuento.
+                from pos_uniformes.services.rebaja_service import ETIQUETAS, texto_renglon
+
+                name_item.setText(f"🔖 {ETIQUETAS.get(item['rebaja'], '')} · {item['nombre']}")
+                name_item.setToolTip(f"SKU: {item['sku']}\n{texto_renglon(item)}\nNo lleva otros descuentos ni Monedero.")
             self._items_table.setItem(row, 0, name_item)
             self._items_table.setItem(row, 1, QTableWidgetItem(item["talla"]))
 
@@ -1102,7 +1111,17 @@ class QuickSaleWidget(
     def _commission_items(self) -> list[dict]:
         """Items con el precio unitario ya descontado y redondeado."""
         return [
-            {**it, "precio": self._apply_terminal_commission(it["precio"])}
+            {
+                **it,
+                "precio": self._apply_terminal_commission(it["precio"]),
+                # E7: el «antes» de una oferta con la misma regla, para que el
+                # ahorro de la copia cuadre con lo que ahí se ve.
+                **(
+                    {"precio_normal": self._apply_terminal_commission(Decimal(str(it["precio_normal"])))}
+                    if it.get("rebaja") and it.get("precio_normal") not in (None, "")
+                    else {}
+                ),
+            }
             for it in self._items
         ]
 
@@ -1119,7 +1138,9 @@ class QuickSaleWidget(
         subtotal = Decimal(str(sum(it["precio"] * it["cantidad"] for it in items)))
         pct_programa = self._pct_descuento_programa()
         self._asignar_pct_empleada(items)
-        if pct_programa or (self._discount_active and self._hay_pct_por_renglon(items)):
+        if pct_programa or (
+            self._discount_active and (self._hay_pct_por_renglon(items) or self._hay_rebajados(items))
+        ):
             # E5-A: precio de mayoreo; por renglón gana el más alto y la promo
             # 3pz no lo lleva (descuento_programa_service).
             from pos_uniformes.services.fidelizacion import descuento_programa_service as dps
@@ -1209,7 +1230,9 @@ class QuickSaleWidget(
         discount_factor = (Decimal("100") - self._DISCOUNT_PERCENT) / Decimal("100")
         pct_programa = self._pct_descuento_programa()
         self._asignar_pct_empleada(self._items)
-        por_renglon = pct_programa or (self._discount_active and self._hay_pct_por_renglon(self._items))
+        por_renglon = pct_programa or (
+            self._discount_active and (self._hay_pct_por_renglon(self._items) or self._hay_rebajados(self._items))
+        )
         neto = Decimal("0.00")
         for it in self._items:
             unit = Decimal(str(it["precio"]))
@@ -1318,6 +1341,7 @@ class QuickSaleWidget(
                         "precio": str(it["precio"]),
                         **self._marca_promo_para_libreta(it),
                         **self._marca_pct_empleada(it),
+                        **self._marca_rebaja_para_libreta(it),
                     }
                     for it in self._items
                 ],
@@ -2159,6 +2183,8 @@ class QuickSaleWidget(
                 "precio": Decimal(str(line.get("precio", 0) or 0)),
                 "cantidad": int(line.get("cantidad", 0) or 0),
                 **({"promo_3pz": True} if line.get("promo_3pz") else {}),
+                # E7: si estaba en Oferta o Liquidación.
+                **({"rebaja": line["rebaja"], "precio_normal": line.get("precio_normal")} if line.get("rebaja") else {}),
                 # E6: el % de empleada que tuvo, no el de hoy.
                 **({"desc_empleada_pct": line["desc_empleada_pct"]} if line.get("desc_empleada_pct") else {}),
             }
@@ -3157,6 +3183,31 @@ class QuickSaleWidget(
             first = False
             for dl in textwrap.wrap(it["nombre"], width=_TIW) or [it["nombre"]]:
                 lines.append(tk_line(dl))
+            if it.get("rebaja"):
+                # E7: como en las tiendas grandes: la marca y el ahorro arriba,
+                # y el precio de antes tachado junto al de hoy (Daniel, 2026-11-11).
+                from pos_uniformes.services.rebaja_service import (
+                    largo_visible,
+                    precio_unitario_ticket,
+                    renglon_marca,
+                )
+
+                lines.append(tk_line(renglon_marca(it, _TIW)))
+                sub = it["precio"] * it["cantidad"]
+                # Con una pieza el precio de hoy ya es el importe: no se repite,
+                # solo va el de antes tachado (Daniel, 2026-11-11).
+                unitario = "" if it["cantidad"] == 1 else "$" + tk_fmt(it["precio"])
+                meta = f"{it['cantidad']} x {precio_unitario_ticket(it, unitario)}".rstrip()
+                if it["talla"]:
+                    meta = f"T.{it['talla']}  {meta}"
+                valor = f"${tk_fmt(sub)}"
+                hueco = _TIW - largo_visible(meta) - len(valor)
+                if hueco >= 1:
+                    lines.append(f"│ {meta}{' ' * hueco}{valor} │")
+                else:
+                    lines.append(f"│ {meta}{' ' * max(0, _TIW - largo_visible(meta))} │")
+                    lines.append(tk_line(valor.rjust(_TIW)))
+                continue
             # La talla viaja con el precio en el mismo renglón. Antes ocupaba
             # uno para ella sola: tres renglones por prenda, y un ticket de diez
             # prendas era una escalera de treinta. Dice lo mismo en dos.
@@ -3246,10 +3297,19 @@ class QuickSaleWidget(
         lines.append(tk_dbl_top())
         lines.append(tk_dbl_row("TOTAL A PAGAR:", f"${tk_fmt(total)}"))
         lines.append(tk_dbl_bot())
+        from pos_uniformes.services.rebaja_service import texto_ahorro_total
+
+        if texto_ahorro_total(items):
+            lines.append(texto_ahorro_total(items).center(_TW))
         if monedero:
             lines += lineas_ticket_monedero(monedero, tk_row)
 
         if not store_copy:
+            from pos_uniformes.services.rebaja_service import LEYENDA_LIQUIDACION, hay_liquidacion
+
+            if hay_liquidacion(items):
+                lines.append("")
+                lines.extend(renglon.center(_TW) for renglon in LEYENDA_LIQUIDACION)
             self._append_terms(lines, self._TERMS_VENTA)
             lines.append("")
             lines.append("Gracias por su compra.".center(_TW))
@@ -3390,6 +3450,8 @@ class QuickSaleWidget(
         def _unit(precio, it=None) -> Decimal:
             # E6: el % de su nivel en ese renglón; si no trae, el 5 % de siempre.
             pct = Decimal(str((it or {}).get("desc_empleada_pct") or self._DISCOUNT_PERCENT))
+            if (it or {}).get("rebaja"):
+                pct = Decimal("0")  # E7: en Oferta o Liquidación no lleva descuento
             unit = (Decimal(str(precio)) * (Decimal("100") - pct) / Decimal("100")).quantize(Decimal("0.01"))
             if terminal_commission:
                 unit = self._apply_terminal_commission(unit)

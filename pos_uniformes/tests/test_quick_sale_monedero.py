@@ -136,7 +136,8 @@ class CanjeTest(_Base):
         ticket = route.call_args.args[2][0]
         self.assertIn("Pagado con monedero", ticket)
         self.assertIn("413.00", ticket)
-        self.assertIn("Cashback ganado", ticket)
+        self.assertIn("Acumulado en esta compra", ticket)
+        self.assertIn(tk_row("Saldo en monedero:", "$21.07"), ticket)
         self.assertEqual(w._items, [])
         self.assertIsNone(w._cliente)
 
@@ -272,6 +273,36 @@ class ConfirmacionInciertaTest(_Base):
         self.assertIn("$413.00", ticket)
 
 
+class TicketSinCanjeTest(_Base):
+    """Daniel, 2026-11-11: el ticket dice cuánto acumuló y cómo queda el saldo."""
+
+    def test_acumulado_y_saldo(self):
+        w = self._widget()
+        w._cliente = _cliente()                       # 5 %, saldo 37.42
+        info = w._monedero_para_ticket(D("450"), False)
+        self.assertEqual(info["cashback"], D("22.50"))
+        self.assertEqual(info["saldo"], D("59.92"))
+        texto = "\n".join(helper.lineas_ticket_monedero(info, tk_row))
+        self.assertIn(tk_row("Acumulado en esta compra:", "$22.50"), texto)
+        self.assertIn(tk_row("Saldo en monedero:", "$59.92"), texto)
+
+    def test_sin_conexion_solo_lo_acumulado(self):
+        w = self._widget()
+        w._cliente = _cliente(en_linea=False, disponible=D("0"))
+        info = w._monedero_para_ticket(D("450"), False)
+        self.assertIsNone(info["saldo"])
+
+    def test_sin_monedero_nada(self):
+        w = self._widget()
+        w._cliente = _cliente(tiene_monedero=False, tasa=None)
+        self.assertIsNone(w._monedero_para_ticket(D("450"), False))
+
+    def test_sin_cliente_nada(self):
+        w = self._widget()
+        w._cliente = None
+        self.assertIsNone(w._monedero_para_ticket(D("450"), False))
+
+
 class VentasIgualesSeguidasTest(_Base):
     """WALLET-003: dos ventas iguales seguidas son dos ventas."""
 
@@ -302,13 +333,18 @@ class TicketTest(unittest.TestCase):
             tk_row,
         )
         texto = "\n".join(lineas)
-        for esperado in ("Pagado con monedero", "-$37.00", "Efectivo:", "$413.00", "Cashback ganado", "$21.07"):
+        for esperado in ("Pagado con monedero", "-$37.00", "Efectivo:", "$413.00", "Acumulado en esta compra", "$20.65", "$21.07"):
             self.assertIn(esperado, texto)
 
-    def test_pendiente_si_va_por_la_cola(self):
+    def test_por_la_cola_sin_saldo_conocido(self):
         texto = "\n".join(helper.lineas_ticket_monedero({"cashback": D("5"), "cashback_pendiente": True}, tk_row))
-        self.assertIn("al sincronizar", texto)
-        self.assertNotIn("monedero:", texto)
+        self.assertIn(tk_row("Acumulado en esta compra:", "$5.00"), texto)
+        self.assertNotIn("Saldo", texto)
+
+    def test_sin_cashback_no_hay_renglon_de_acumulado(self):
+        texto = "\n".join(helper.lineas_ticket_monedero({"cashback": D("0"), "saldo": D("12")}, tk_row))
+        self.assertNotIn("Acumulado", texto)
+        self.assertIn(tk_row("Saldo en monedero:", "$12.00"), texto)
 
 
 if __name__ == "__main__":

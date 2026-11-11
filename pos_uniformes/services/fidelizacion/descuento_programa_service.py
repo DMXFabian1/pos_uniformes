@@ -24,6 +24,8 @@ LLAVE_PROMO = "promo_3pz"
 #: % de empleada de ese renglón (incentivo_empleada_service): si viene, manda
 #: sobre el `empleada` general.
 LLAVE_PCT_EMPLEADA = "desc_empleada_pct"
+#: Prenda en Oferta o Liquidación (rebaja_service): no lleva ningún descuento.
+LLAVE_REBAJA = "rebaja"
 
 
 def es_promo_3pz(item: Mapping) -> bool:
@@ -35,7 +37,11 @@ def _pct(valor) -> Decimal:
 
 
 def porcentaje_de_linea(item: Mapping, *, empleada=None, programa=None) -> Decimal:
-    """El % que se descuenta en este renglón: el más alto de los que aplican."""
+    """El % que se descuenta en este renglón: el más alto de los que aplican.
+
+    Una prenda en Oferta o Liquidación no lleva ninguno (E7)."""
+    if str(item.get(LLAVE_REBAJA) or "") in ("oferta", "liquidacion"):
+        return Decimal("0")
     pct = _pct(empleada)
     if pct > 0 and item.get(LLAVE_PCT_EMPLEADA) not in (None, ""):
         pct = _pct(item.get(LLAVE_PCT_EMPLEADA))
