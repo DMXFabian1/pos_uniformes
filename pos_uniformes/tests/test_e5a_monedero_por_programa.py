@@ -81,12 +81,16 @@ class TasaPorProgramaTests(_Monedero):
         v = self._venta("500")
         self.assertIsNone(self._cashback(v))
         self.assertIsNone(mon.resumen_cliente(self.s, self.cliente.id).tasa)
+        self.assertIsNone(mon.resumen_cliente(self.s, self.cliente.id).programa)
 
     def test_club_abona_5(self) -> None:
         self._club()
         mov = self._cashback(self._venta("450"))
         self.assertEqual((mov.monto, mov.tasa_snapshot), (D("22.50"), D("5.00")))
         self.assertEqual(mon.resumen_cliente(self.s, self.cliente.id).tasa, D("5.00"))
+        # Para el ticket: el nombre del programa (Daniel, 2026-11-11).
+        self.assertEqual(mon.resumen_cliente(self.s, self.cliente.id).programa,
+                         ms.programa_por_clave(self.s, "CLUB").nombre)
 
     def test_profesional_13_y_mayorista_15(self) -> None:
         otro = self._cliente("Beto E5A")

@@ -138,6 +138,7 @@ class CanjeTest(_Base):
         self.assertIn("413.00", ticket)
         self.assertIn("Acumulado en esta compra", ticket)
         self.assertIn(tk_row("Saldo en monedero:", "$21.07"), ticket)
+        self.assertIn(tk_row("Cliente:", "Ana"), ticket)
         self.assertEqual(w._items, [])
         self.assertIsNone(w._cliente)
 
@@ -286,11 +287,34 @@ class TicketSinCanjeTest(_Base):
         self.assertIn(tk_row("Acumulado en esta compra:", "$22.50"), texto)
         self.assertIn(tk_row("Saldo en monedero:", "$59.92"), texto)
 
+    def test_nombre_y_nivel(self):
+        w = self._widget()
+        w._cliente = _cliente(programa="Maximoda Club")
+        texto = "\n".join(helper.lineas_ticket_monedero(w._monedero_para_ticket(D("450"), False), tk_row))
+        lineas = texto.split("\n")
+        self.assertEqual(lineas[0], tk_row("Cliente:", "Ana"))
+        self.assertEqual(lineas[1], tk_row("Nivel:", "Maximoda Club"))
+
+    def test_nombre_largo_cabe(self):
+        w = self._widget()
+        w._cliente = _cliente(nombre="María Guadalupe Hernández Rodríguez", programa="Maximoda Profesional")
+        lineas = helper.lineas_ticket_monedero(w._monedero_para_ticket(D("450"), False), tk_row)
+        self.assertEqual(len(lineas[0]), 38)
+        self.assertIn("María Guadalupe Hernández", lineas[0])
+
+    def test_sin_programa_no_hay_renglon_de_nivel(self):
+        w = self._widget()
+        w._cliente = _cliente()
+        texto = "\n".join(helper.lineas_ticket_monedero(w._monedero_para_ticket(D("450"), False), tk_row))
+        self.assertIn("Cliente:", texto)
+        self.assertNotIn("Nivel:", texto)
+
     def test_sin_conexion_solo_lo_acumulado(self):
         w = self._widget()
         w._cliente = _cliente(en_linea=False, disponible=D("0"))
         info = w._monedero_para_ticket(D("450"), False)
         self.assertIsNone(info["saldo"])
+        self.assertNotIn("cliente", info)   # solo se sabe el código
 
     def test_sin_monedero_nada(self):
         w = self._widget()

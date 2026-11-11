@@ -419,6 +419,8 @@ class ResumenCliente:
     tasa: Decimal | None
     #: E5-A: % que puede tomar como descuento en vez de Monedero (Mayorista).
     descuento_disponible: Decimal | None = None
+    #: Nombre del programa del cliente hoy («Maximoda Club»), para el ticket.
+    programa: str | None = None
 
     @property
     def puede_canjear(self) -> bool:
@@ -432,9 +434,11 @@ def resumen_cliente(session, cliente_id: int, momento: datetime | None = None) -
     monedero = monedero_de_cliente(session, cliente.id)
     tasa = tasa_para_cliente(session, cliente.id, momento)
     descuento = descuento_disponible(session, cliente.id, momento)
+    prog = programa_en(session, cliente.id, momento)
+    nombre_programa = prog.nombre if prog is not None else None
     if monedero is None:
         return ResumenCliente(cliente.id, cliente.codigo_cliente, cliente.nombre, False, ACTIVO, _CERO, None, _CERO,
-                              tasa, descuento)
+                              tasa, descuento, nombre_programa)
     s = saldo(session, monedero.id, momento)
     return ResumenCliente(
         cliente.id,
@@ -447,6 +451,7 @@ def resumen_cliente(session, cliente_id: int, momento: datetime | None = None) -
         s.monto_proximo_vencimiento,
         tasa,
         descuento,
+        nombre_programa,
     )
 
 

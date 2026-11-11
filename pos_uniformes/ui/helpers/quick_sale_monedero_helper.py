@@ -38,14 +38,22 @@ from PyQt6.QtWidgets import (
 _logger = logging.getLogger(__name__)
 
 _CERO = Decimal("0.00")
+#: Lo que cabe del nombre junto a «Cliente:» en el ticket de 38 columnas.
+_LARGO_NOMBRE = 25
 _RE_QR_CLIENTE = re.compile(r"CLI-[A-Z0-9]+")
 
 
 def lineas_ticket_monedero(info: dict, tk_row) -> list[str]:
     """Renglones del monedero bajo el total del ticket.
 
-    info: canje, por_cobrar, metodo, cashback, cashback_pendiente, saldo."""
+    info: cliente, nivel, canje, por_cobrar, metodo, cashback, cashback_pendiente, saldo."""
     lineas: list[str] = []
+    # Quién es y en qué nivel va (Daniel, 2026-11-11). El nombre se corta para
+    # que quepa en el renglón.
+    if info.get("cliente"):
+        lineas.append(tk_row("Cliente:", str(info["cliente"])[:_LARGO_NOMBRE]))
+    if info.get("nivel"):
+        lineas.append(tk_row("Nivel:", str(info["nivel"])[:_LARGO_NOMBRE]))
     canje = Decimal(str(info.get("canje") or 0))
     if canje > 0:
         lineas.append(tk_row("Pagado con monedero:", f"-${canje:,.2f}"))
@@ -131,6 +139,7 @@ class MonederoVentaMixin:
             "disponible": r.disponible,
             "tasa": r.tasa,
             "descuento_disponible": getattr(r, "descuento_disponible", None),
+            "programa": getattr(r, "programa", None),
             "proximo_vencimiento": r.proximo_vencimiento,
             "monto_proximo_vencimiento": r.monto_proximo_vencimiento,
         }
@@ -281,7 +290,15 @@ class MonederoVentaMixin:
             saldo = Decimal(str(c.get("disponible") or 0)) + estimado
         if estimado <= 0 and saldo is None:
             return None
-        return {"cashback": estimado, "cashback_pendiente": True, "saldo": saldo}
+        return {**self._cliente_para_ticket(), "cashback": estimado, "cashback_pendiente": True, "saldo": saldo}
+
+    def _cliente_para_ticket(self) -> dict:
+        """Nombre y nivel del cliente para la parte del Monedero del ticket.
+        Sin conexión solo se sabe el código: no se imprime."""
+        c = self._cliente
+        if not c or not c.get("en_linea"):
+            return {}
+        return {"cliente": c.get("nombre") or None, "nivel": c.get("programa") or None}
 
     # ─── Barra del cliente ───────────────────────────────────────────────
 
@@ -504,6 +521,7 @@ class MonederoVentaMixin:
             return
 
         info = {
+            **self._cliente_para_ticket(),
             "canje": canje,
             "por_cobrar": total - canje,
             "metodo": "Tarjeta" if tarjeta else "Efectivo",
