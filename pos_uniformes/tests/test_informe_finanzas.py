@@ -24,11 +24,18 @@ _TIENDA = ZoneInfo("America/Mexico_City")
 
 
 class InformeDeFinanzasTests(unittest.TestCase):
-    """Siembra unos movimientos conocidos y revisa que el informe los cuente."""
+    """Siembra unos movimientos conocidos y revisa que el informe los cuente.
+
+    `construir` suma las tablas ENTERAS, así que la prueba es hermética: todo
+    pasa en una transacción que se revierte. Dentro de ella se vacían las tres
+    tablas que el informe suma y se siembra lo conocido; el informe lee con la
+    misma sesión. Nada se escribe de verdad, y nada que otra prueba haya dejado
+    (o esté escribiendo) entra en la suma (2026-11-11)."""
 
     def setUp(self) -> None:
         self.session = get_session()
         self.addCleanup(self._limpiar)
+        self._vaciar_lo_que_el_informe_suma()
         ahora = datetime.now(timezone.utc)
         self.hoy = ahora
         self.mes_pasado = ahora - timedelta(days=40)
@@ -90,14 +97,16 @@ class InformeDeFinanzasTests(unittest.TestCase):
                 created_at=self.hoy,
             )
         )
-        self.session.commit()
+        self.session.flush()  # visible para `construir`; nunca se confirma
+
+    def _vaciar_lo_que_el_informe_suma(self) -> None:
+        for modelo in (CajaRetiro, LibretaCorte, LibretaVenta):
+            self.session.query(modelo).delete(synchronize_session=False)
+        self.session.flush()
 
     def _limpiar(self) -> None:
         try:
-            self.session.query(LibretaVenta).filter_by(employee_code=_MARCA).delete()
-            self.session.query(CajaRetiro).filter_by(motivo=_MARCA).delete()
-            self.session.query(LibretaCorte).filter_by(periodo_label=_MARCA).delete()
-            self.session.commit()
+            self.session.rollback()  # deshace la siembra y el vaciado
         finally:
             self.session.close()
 

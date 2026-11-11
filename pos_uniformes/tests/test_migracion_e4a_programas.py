@@ -16,6 +16,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
 from pos_uniformes.utils.config import settings
+from tests.base_por_trabajador import es_base_de_prueba_local
 
 REV_E1C0 = "15f0e6fd053a"
 REV_E4A = "7741ff4c020d"
@@ -24,7 +25,7 @@ _RAIZ_PAQUETE = Path(__file__).resolve().parents[1]
 
 def _url_local():
     url = make_url(settings.database_url)
-    if url.host not in {"127.0.0.1", "localhost", "::1"} or url.database != "pos_uniformes_test":
+    if not es_base_de_prueba_local(url):
         return None
     return url
 

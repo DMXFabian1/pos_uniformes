@@ -40,9 +40,14 @@ import pytest
 #     pytest pos_uniformes/tests --db-real
 # ---------------------------------------------------------------------------
 
+from tests import base_por_trabajador as _bpt
+
 _TEST_DB_HOST = "127.0.0.1"
-_TEST_DB_NAME = "pos_uniformes_test"
 _USA_BASE_REAL = "--db-real" in sys.argv
+# Con xdist, cada proceso usa su propia copia de `pos_uniformes_test` (ver
+# tests/base_por_trabajador.py): las pruebas que suman una tabla entera ya no
+# ven lo que otro proceso escribió. Sin xdist es `pos_uniformes_test`.
+_TEST_DB_NAME = _bpt.base_para_este_proceso()
 
 if not _USA_BASE_REAL:
     os.environ["POS_UNIFORMES_DB_HOST"] = _TEST_DB_HOST
@@ -155,6 +160,65 @@ def pytest_configure(config: pytest.Config) -> None:
             f"({host}/{nombre}). Se aborta para no tocar produccion.\n"
             "Si de verdad quieres correr contra esa base, usa --db-real."
         )
+
+    _preparar_base_por_proceso(config, settings)
+
+
+def _corre_con_trabajadores(config: pytest.Config) -> bool:
+    """¿Este es el controlador de una corrida con xdist?"""
+    if hasattr(config, "workerinput"):
+        return False
+    if not config.pluginmanager.hasplugin("xdist"):
+        return False
+    numero = getattr(config.option, "numprocesses", None)
+    return bool(numero) and getattr(config.option, "dist", "no") != "no"
+
+
+def _preparar_base_por_proceso(config: pytest.Config, settings) -> None:
+    corrida = os.environ[_bpt.ENV_CORRIDA]
+    url = settings.database_url
+    if hasattr(config, "workerinput"):
+        nombre = settings.db_name
+        if not _bpt.es_temporal_de_prueba(nombre):
+            return
+        try:
+            _bpt.crear_desde(url, nombre, _bpt.nombre_plantilla(corrida))
+        except Exception as exc:  # noqa: BLE001
+            raise pytest.UsageError(f"No se pudo crear la base de este proceso ({nombre}): {exc}") from exc
+        config._base_por_proceso = nombre
+    elif _corre_con_trabajadores(config):
+        plantilla = _bpt.nombre_plantilla(corrida)
+        try:
+            _bpt.limpiar(url)  # lo viejo de corridas que alguien mató
+            _bpt.crear_desde(url, plantilla, _bpt.BASE_FUENTE)
+        except Exception as exc:  # noqa: BLE001
+            raise pytest.UsageError(
+                f"No se pudo copiar {_bpt.BASE_FUENTE} para esta corrida: {exc}"
+            ) from exc
+        config._plantilla_de_corrida = plantilla
+
+
+def pytest_unconfigure(config: pytest.Config) -> None:
+    """Cada proceso borra su base; el controlador, la plantilla y lo que sobre."""
+    from pos_uniformes.utils.config import settings
+
+    nombre = getattr(config, "_base_por_proceso", None)
+    if nombre:
+        try:
+            from pos_uniformes.database.connection import engine
+
+            engine.dispose()
+        except Exception:  # noqa: BLE001
+            pass
+        try:
+            _bpt.borrar(settings.database_url, nombre)
+        except Exception:  # noqa: BLE001 — la limpia del controlador la alcanza
+            pass
+    if getattr(config, "_plantilla_de_corrida", None):
+        try:
+            _bpt.limpiar(settings.database_url, corrida=os.environ[_bpt.ENV_CORRIDA])
+        except Exception:  # noqa: BLE001 — la siguiente corrida la borra por vieja
+            pass
 
 
 def pytest_ignore_collect(collection_path: Path, config: pytest.Config) -> bool | None:

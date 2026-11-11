@@ -38,6 +38,7 @@ from pos_uniformes.services.calendario_empleadas_service import (
     cargar_horario,
     comisiones_desde_ultimo_pago,
 )
+from tests.base_por_trabajador import es_base_de_prueba_local
 
 _SUF = uuid.uuid4().hex[:6].upper()
 A, B, C = f"TSTA-{_SUF}", f"TSTB-{_SUF}", f"TSTC-{_SUF}"
@@ -46,7 +47,7 @@ ESPERA = 0.8  # lo que el primer hilo se queda con el candado
 
 def _verificar_base_local(s) -> None:
     url = s.get_bind().url
-    if url.host not in {"127.0.0.1", "localhost", "::1"} or url.database != "pos_uniformes_test":
+    if not es_base_de_prueba_local(url):
         raise unittest.SkipTest("Solo corre contra la base local pos_uniformes_test")
 
 

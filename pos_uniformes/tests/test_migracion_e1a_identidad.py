@@ -21,6 +21,7 @@ from sqlalchemy.engine import make_url
 
 from pos_uniformes.services.clientes.telefono import normalizar_telefono
 from pos_uniformes.utils.config import settings
+from tests.base_por_trabajador import es_base_de_prueba_local
 
 REV_ANTERIOR = "e2f3a4b5c6d7"
 REV_E1A = "e767eaf1db92"
@@ -61,7 +62,7 @@ _COLUMNAS_INTACTAS = (
 
 def _url_local():
     url = make_url(settings.database_url)
-    if url.host not in {"127.0.0.1", "localhost", "::1"} or url.database != "pos_uniformes_test":
+    if not es_base_de_prueba_local(url):
         return None
     return url
 

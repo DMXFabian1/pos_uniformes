@@ -27,12 +27,13 @@ from pos_uniformes.services import settings_cliente_admin_actions as acciones
 from pos_uniformes.ui.dialogs import cliente_admin_dialogs as dialogos
 from pos_uniformes.ui.main_window import MainWindow
 from pos_uniformes.utils.config import settings
+from tests.base_por_trabajador import es_base_de_prueba_local
 
 
 class _Base(unittest.TestCase):
     def setUp(self) -> None:
         url = make_url(settings.database_url)
-        if url.host not in {"127.0.0.1", "localhost", "::1"} or url.database != "pos_uniformes_test":
+        if not es_base_de_prueba_local(url):
             self.skipTest("Solo corre contra la base local de prueba.")
         self.engine = create_engine(url)
         self.addCleanup(self.engine.dispose)

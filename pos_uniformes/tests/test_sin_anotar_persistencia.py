@@ -48,6 +48,7 @@ from pos_uniformes.services import libreta_local_queue_service as cola
 from pos_uniformes.services import libreta_sin_anotar_service as sin_anotar
 from pos_uniformes.ui.views.quick_sale_view import QuickSaleWidget
 from pos_uniformes.utils import archivo_durable
+from tests.base_por_trabajador import es_base_de_prueba_local
 
 _MOD = "pos_uniformes.ui.views.quick_sale_view"
 _GUARDAR_REAL = cola._save_raw
@@ -416,7 +417,7 @@ def _base_local_postgres():
 
     with get_session() as s:
         url = s.get_bind().url
-        if url.host not in {"127.0.0.1", "localhost", "::1"} or url.database != "pos_uniformes_test":
+        if not es_base_de_prueba_local(url):
             raise unittest.SkipTest("Solo corre contra la base local pos_uniformes_test")
         if s.get_bind().dialect.name != "postgresql":
             raise unittest.SkipTest("requiere PostgreSQL")
