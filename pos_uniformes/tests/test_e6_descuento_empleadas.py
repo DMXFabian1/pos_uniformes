@@ -284,7 +284,10 @@ class KioskoTests(_Qt):
         self.assertEqual(w._compute_totals()[1], D("95.00"))
         # M2: el motor decide el % de cada pieza; la Libreta lo recibe por renglón.
         self.assertEqual(_pcts(w), [D("15"), D("5"), D("5")])
-        self.assertIn("Ana: 15 %", w._total_meta.text())
+        # Quién compra y con cuánto, a la vista (tarjeta de la caja, 2026-11-12).
+        self.assertIn("Ana", w._compradora_texto.text())
+        self.assertIn("15 %", w._compradora_texto.text())
+        self.assertEqual(w._filas_total["descuento"][1].text(), "Precio especial")
         # T4 (M2): la comisión, una vez sobre el total (antes, renglón por renglón).
         self.assertEqual(w._monto_neto_actual(D("1005"), pago_tarjeta=True), lib.aplicar_comision_terminal(D("1005")))
 
@@ -359,16 +362,42 @@ class KioskoTests(_Qt):
         self.assertIn("65.00", texto)
         self.assertIsNone(w._compradora)
 
-    def test_elegir_compradora(self) -> None:
+    def test_elegir_compradora_con_su_gafete(self) -> None:
         from PyQt6.QtWidgets import QDialog
 
         w = self._kiosko()
-        with patch.object(w, "_cargar_empleadas_compradoras", return_value=[("VEND-3", "Ana")]), \
+
+        def escanear(dlg):
+            w._dialogo_compradora_entrada.setText("EMP:VEND-1")      # el del dueño, no
+            w._dialogo_compradora_entrada.returnPressed.emit()
+            self.assertIn("dueño", w._dialogo_compradora_error.text())
+            w._dialogo_compradora_entrada.setText("EMP:VEND-3")
+            w._dialogo_compradora_entrada.returnPressed.emit()
+            return dlg.result()
+
+        with patch.object(w, "_cargar_empleadas_compradoras", return_value=[("VEND-3", "Ana"), ("VEND-4", "Bety")]), \
              patch.object(w, "_estado_de_compradora", return_value=ANA) as estado, \
-             patch.object(QDialog, "exec", return_value=QDialog.DialogCode.Accepted):
+             patch.object(QDialog, "exec", escanear):
             w._elegir_compradora()
         estado.assert_called_once_with("VEND-3", "Ana")
         self.assertIs(w._compradora, ANA)
+
+    def test_gafete_que_no_es_de_empleada(self) -> None:
+        from pos_uniformes.ui.helpers.quick_sale_compradora_helper import compradora_por_gafete
+
+        empleadas = [("VEND-3", "Ana")]
+        self.assertEqual(compradora_por_gafete("vend-3", empleadas), ("VEND-3", "Ana"))
+        self.assertIn("no es de una empleada", compradora_por_gafete("VEND-9", empleadas))
+        self.assertIn("dueño", compradora_por_gafete("VEND-1", empleadas))
+
+    def test_otra_persona_queda_el_5(self) -> None:
+        from PyQt6.QtWidgets import QDialog
+
+        w = self._kiosko(ANA)
+        with patch.object(w, "_cargar_empleadas_compradoras", return_value=[("VEND-3", "Ana")]), \
+             patch.object(QDialog, "exec", return_value=QDialog.DialogCode.Rejected):
+            w._elegir_compradora()
+        self.assertIsNone(w._compradora)
 
     def test_sin_conexion_queda_el_5(self) -> None:
         w = self._kiosko(ANA)

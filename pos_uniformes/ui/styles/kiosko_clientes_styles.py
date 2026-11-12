@@ -156,14 +156,14 @@ def aplicar(dialogo) -> None:
 
 #: La franja «Programa» de Venta Rápida, con la misma paleta.
 FRANJA_PROGRAMA = (
-    f"QFrame#programaBar {{ background: {TARJETA}; border: 1px solid #eadcc6;"
-    f" border-left: 4px solid {TERRACOTA}; border-radius: 12px; }}"
-    f"QLabel {{ font-size: 14px; font-weight: 700; color: {TERRACOTA_OSCURO}; background: transparent; }}"
-    f"QPushButton {{ font-size: 13px; font-weight: 700; padding: 6px 14px; border-radius: 10px;"
-    f" border: 1px solid #d9c3a5; background: {TARJETA}; color: {TERRACOTA_OSCURO}; }}"
-    f"QPushButton:hover {{ background: #fbf3e8; }}"
-    f"QPushButton#kcFranjaClub {{ background: {TERRACOTA}; color: #f9f4ea; border: 1px solid {TERRACOTA}; }}"
+    # El programa del cliente dentro de su ficha en la caja (más limpio, 2026-11-12).
+    f"QFrame#programaBar {{ background: #fdf4ec; border: none; border-radius: 12px; }}"
+    f"QLabel {{ font-size: 14px; font-weight: 800; color: {TERRACOTA_OSCURO}; background: transparent; }}"
+    f"QPushButton {{ font-size: 13px; font-weight: 700; padding: 6px 12px; border-radius: 10px;"
+    f" border: none; background: transparent; color: {TERRACOTA}; }}"
+    f"QPushButton:hover {{ background: #f8e6d8; }}"
+    f"QPushButton#kcFranjaClub {{ background: {TERRACOTA}; color: #f9f4ea; }}"
     f"QPushButton#kcFranjaClub:hover {{ background: #bb613c; }}"
     f"QPushButton:disabled, QPushButton#kcFranjaClub:disabled"
-    f" {{ background: #f3ece2; color: #b9aa98; border: 1px solid #e6dccd; }}"
+    f" {{ background: transparent; color: #c2b4a4; }}"
 )

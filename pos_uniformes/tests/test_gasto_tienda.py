@@ -75,8 +75,9 @@ class ElBotonTest(unittest.TestCase):
     def setUp(self) -> None:
         self.fuente = _VISTA.read_text(encoding="utf-8")
 
-    def test_el_boton_vive_junto_a_sin_codigo(self):
-        self.assertIn('QPushButton("🧾  Gasto")', self.fuente)
+    def test_el_gasto_vive_en_el_menu_de_la_caja(self):
+        # Desde 2026-11-12 está en el menú «⋯» de la caja.
+        self.assertIn('addAction("🧾  Gasto de la tienda")', self.fuente)
         self.assertIn("_on_gasto_tienda", self.fuente)
 
     def test_sin_gafete_se_le_dice(self):

@@ -25,7 +25,7 @@ import logging
 from dataclasses import dataclass
 
 from PyQt6.QtCore import Qt, QTimer
-from PyQt6.QtWidgets import QDialog, QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton
+from PyQt6.QtWidgets import QDialog, QFrame, QHBoxLayout, QLabel, QMessageBox, QPushButton, QVBoxLayout
 
 from pos_uniformes.ui.styles import kiosko_clientes_styles
 
@@ -89,12 +89,17 @@ class ProgramaClienteMixin:
         bar = QFrame()
         bar.setObjectName("programaBar")
         bar.setStyleSheet(kiosko_clientes_styles.FRANJA_PROGRAMA)
-        ly = QHBoxLayout()
-        ly.setContentsMargins(14, 6, 10, 6)
-        ly.setSpacing(8)
+        # Texto arriba y botones abajo (columna angosta de la caja, 2026-11-12).
+        caja = QVBoxLayout()
+        caja.setContentsMargins(14, 10, 10, 8)
+        caja.setSpacing(2)
         self._programa_label = QLabel("")
         self._programa_label.setTextFormat(Qt.TextFormat.PlainText)
-        ly.addWidget(self._programa_label, 1)
+        self._programa_label.setWordWrap(True)
+        caja.addWidget(self._programa_label)
+        ly = QHBoxLayout()
+        ly.setSpacing(8)
+        caja.addLayout(ly)
         self._btn_inscribir_club = QPushButton("★ Inscribir a Maximoda Club")
         self._btn_inscribir_club.setObjectName("kcFranjaClub")
         self._btn_inscribir_club.setAutoDefault(False)
@@ -104,7 +109,8 @@ class ProgramaClienteMixin:
         self._btn_proponer_programa.setAutoDefault(False)
         self._btn_proponer_programa.clicked.connect(self._on_proponer_programa)
         ly.addWidget(self._btn_proponer_programa)
-        bar.setLayout(ly)
+        ly.addStretch(1)
+        bar.setLayout(caja)
         bar.setVisible(False)
         self._programa_bar = bar
         self._programa_leido: _Leido | None = None

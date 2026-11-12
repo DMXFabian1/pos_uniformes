@@ -20,11 +20,13 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QMenu,
     QMessageBox,
     QPushButton,
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -188,70 +190,122 @@ QLabel#gateError {{
 """
 
 _SALE_STYLE = f"""
-QWidget#saleRoot {{ background: {_WARM_BG}; }}
+QWidget#saleRoot {{ background: #f6f0e8; }}
 
-QFrame#totalBar {{
-    background: {_CARD_BG}; border: 1.5px solid {_BORDER}; border-radius: 14px;
+QLabel#empAvatar {{
+    background: #6b1f3a; color: white; border-radius: 20px; font-size: 17px; font-weight: 800;
 }}
-QLabel#totalAmount {{
-    font-size: 38px; font-weight: 800; color: {_BRAND};
+QLabel#empBadge {{ font-size: 16px; font-weight: 800; color: {_TEXT}; }}
+QLabel#empSub {{ font-size: 12px; color: {_MUTED}; }}
+QLabel#topHint {{ font-size: 13px; color: {_MUTED}; }}
+QToolButton#btnMas {{
+    font-size: 22px; font-weight: 900; color: {_TEXT}; background: white;
+    border: 1px solid #ece2d6; border-radius: 20px; min-width: 40px; min-height: 40px;
 }}
-QLabel#totalMeta {{
-    font-size: 12px; color: {_MUTED}; font-weight: 500;
+QToolButton#btnMas::menu-indicator {{ image: none; width: 0; }}
+QToolButton#btnMas:pressed {{ background: #f1e8dc; }}
+QMenu#menuMas {{
+    background: white; border: 1px solid #ece2d6; border-radius: 12px; padding: 6px;
+    font-size: 15px; color: {_TEXT};
 }}
-QLabel#empBadge {{
-    font-size: 12px; color: {_BRAND}; font-weight: 500;
-    padding: 5px 14px; background: {_BRAND_LIGHT};
-    border: 1px solid {_BORDER}; border-radius: 14px;
+QMenu#menuMas::item {{ padding: 10px 18px; border-radius: 8px; }}
+QMenu#menuMas::item:selected {{ background: #f6eee4; }}
+QPushButton#btnLogout {{
+    font-size: 13px; font-weight: 700; padding: 0 18px; min-height: 40px;
+    background: white; color: {_MUTED}; border: 1px solid #ece2d6; border-radius: 18px;
 }}
+QPushButton#btnLogout:hover {{ color: {_DANGER}; border-color: {_DANGER}; }}
 
-QFrame#scanBar {{
-    background: {_CARD_BG}; border: 1.5px solid {_BORDER}; border-radius: 12px;
+QFrame#scanBar, QFrame#tableCard, QFrame#cajaTarjeta {{
+    background: white; border: 1px solid #efe6db; border-radius: 20px;
 }}
+QLabel#scanIcono {{ font-size: 26px; color: #b9a58f; background: transparent; }}
 QLineEdit#scanInput {{
-    font-size: 15px; padding: 12px 16px;
-    border: 1.5px solid {_BORDER}; border-radius: 10px;
-    background: {_WARM_BG}; color: {_TEXT};
+    font-size: 19px; padding: 10px 4px; border: none; background: transparent; color: {_TEXT};
 }}
-QLineEdit#scanInput:focus {{ border-color: {_BRAND}; background: white; }}
-QLabel#scanHint {{
-    font-size: 11px; color: {_MUTED}; font-style: italic;
+QSpinBox#qtySpin {{
+    font-size: 15px; font-weight: 700; padding: 4px 10px; border: 1px solid #ece2d6;
+    border-radius: 12px; background: #faf6f0; color: {_TEXT};
 }}
+QLabel#scanHint {{ font-size: 12px; color: {_MUTED}; font-style: italic; }}
+QPushButton#btnSuave {{
+    background: #f6eee4; color: #73341c; border: none; border-radius: 14px;
+    min-height: 44px; padding: 0 18px; font-size: 15px; font-weight: 800;
+}}
+QPushButton#btnSuave:pressed {{ background: #ecdfcf; }}
 
-QFrame#tableCard {{
-    background: {_CARD_BG}; border: 1.5px solid {_BORDER}; border-radius: 12px;
+QLabel#cajaTitulo {{
+    font-size: 12px; font-weight: 800; color: {_MUTED}; letter-spacing: 1.5px; background: transparent;
 }}
-
-QPushButton#btnPrimary {{
-    font-size: 14px; font-weight: 600; padding: 10px 24px;
-    background: {_BRAND}; color: white; border: none; border-radius: 10px;
-    min-height: 40px;
+QLabel#cajaNota {{ font-size: 13px; color: {_MUTED}; background: transparent; }}
+QPushButton#btnAgregarCliente {{
+    background: #faf6f0; color: #73341c; border: 1.5px dashed #d8c6b0; border-radius: 14px;
+    min-height: 50px; font-size: 16px; font-weight: 800;
 }}
-QPushButton#btnPrimary:hover {{ background: {_BRAND_DARK}; }}
-QPushButton#btnSecondary {{
-    font-size: 14px; font-weight: 500; padding: 10px 24px;
-    background: {_BRAND_LIGHT}; color: {_BRAND}; border: 1.5px solid {_BORDER};
-    border-radius: 10px; min-height: 40px;
-}}
-QPushButton#btnSecondary:hover {{ background: #ede0d0; }}
+QPushButton#btnAgregarCliente:pressed {{ background: #f1e8dc; }}
 QPushButton#btnDanger {{
-    font-size: 12px; font-weight: 500; padding: 8px 16px;
-    background: transparent; color: {_DANGER}; border: 1px solid {_DANGER};
-    border-radius: 8px;
+    font-size: 13px; font-weight: 700; padding: 6px 14px;
+    background: transparent; color: {_DANGER}; border: none; border-radius: 10px;
 }}
 QPushButton#btnDanger:hover {{ background: #fef0ee; }}
 QPushButton#btnGhost {{
     font-size: 12px; font-weight: 500; padding: 6px 10px;
     background: transparent; color: {_MUTED}; border: none;
 }}
-QPushButton#btnGhost:hover {{ color: {_DANGER}; }}
-QPushButton#btnLogout {{
-    font-size: 11px; font-weight: 500; padding: 5px 14px;
-    background: transparent; color: {_MUTED}; border: 1px solid {_BORDER};
-    border-radius: 14px;
+
+QFrame#totalBar {{
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #5a1830, stop:1 #84304c);
+    border: none; border-radius: 22px;
 }}
-QPushButton#btnLogout:hover {{ color: {_DANGER}; border-color: {_DANGER}; }}
+QLabel#totalTitulo {{
+    font-size: 12px; font-weight: 800; color: #e9c6d2; letter-spacing: 1.5px; background: transparent;
+}}
+QLabel#totalAmount {{
+    font-size: 46px; font-weight: 900; color: white; background: transparent;
+}}
+QLabel#totalMeta {{ font-size: 13px; color: #e2bccb; background: transparent; }}
+QLabel#totalFila, QLabel#totalFilaValor {{ font-size: 15px; color: #f6e3ea; background: transparent; }}
+QLabel#totalFilaValor {{ font-weight: 700; }}
+QPushButton#btnCobrar {{
+    background: white; color: #5a1830; border: none; border-radius: 16px;
+    font-size: 19px; font-weight: 900;
+}}
+QPushButton#btnCobrar:pressed {{ background: #f3e3e9; }}
+QPushButton#btnClaro {{
+    background: rgba(255, 255, 255, 0.12); color: white; border: 1px solid rgba(255, 255, 255, 0.35);
+    border-radius: 14px; min-height: 46px; font-size: 15px; font-weight: 700;
+}}
+QPushButton#btnClaro:pressed {{ background: rgba(255, 255, 255, 0.22); }}
+QPushButton#chipPrecioEspecial {{
+    background: rgba(255, 255, 255, 0.16); color: white; border: none; border-radius: 13px;
+    padding: 0 12px; min-height: 28px; font-size: 12px; font-weight: 700;
+}}
 """
+
+def _sombra(widget, *, fuerte: bool = False) -> None:
+    """Sombra suave bajo la tarjeta: lo que la hace ver «moderna» sin bordes duros."""
+    from PyQt6.QtGui import QColor
+    from PyQt6.QtWidgets import QGraphicsDropShadowEffect
+
+    efecto = QGraphicsDropShadowEffect(widget)
+    efecto.setBlurRadius(34 if fuerte else 26)
+    efecto.setOffset(0, 6 if fuerte else 4)
+    efecto.setColor(QColor(90, 40, 30, 60 if fuerte else 26))
+    widget.setGraphicsEffect(efecto)
+
+
+def _tarjeta_caja(titulo: str):
+    """Un recuadro blanco de la columna derecha de la caja, con su título."""
+    marco = QFrame()
+    marco.setObjectName("cajaTarjeta")
+    _sombra(marco)
+    ly = QVBoxLayout(marco)
+    ly.setContentsMargins(18, 14, 18, 16)
+    ly.setSpacing(10)
+    encabezado = QLabel(titulo)
+    encabezado.setObjectName("cajaTitulo")
+    ly.addWidget(encabezado)
+    return marco, ly
 
 
 def _totales_de_fotografia(foto: dict | None):
@@ -473,7 +527,8 @@ class QuickSaleWidget(
         self._employee_name = emp_name
         self._gate_widget.setVisible(False)
         self._sale_widget.setVisible(True)
-        self._emp_badge.setText(f"  {emp_name}  ")
+        self._emp_badge.setText(str(emp_name))
+        self._emp_avatar.setText((str(emp_name).strip()[:1] or "?").upper())
         self._items.clear()
         self._refresh_items_table()
         self._refresh_totals()
@@ -518,99 +573,94 @@ class QuickSaleWidget(
     # ─── Vista de venta ──────────────────────────────────────────────────
 
     def _build_sale_view(self) -> QWidget:
+        """La caja (rediseño 2026-11-12).
+
+        Daniel: «mejorar esta vista ya teniendo en cuenta todos los cambios»,
+        luego «que se vea más moderna» y «no me gustaría que las personas
+        ajenas vean que las empleadas tienen su descuento propio». A la
+        izquierda se trabaja (escanear y el carrito); a la derecha el cliente y
+        el total oscuro con el botón de cobrar. Lo de la tienda (gasto y el
+        precio especial de empleada) vive en el menú «⋯», y cuando hay precio
+        especial solo se ve una ficha discreta, sin nombre ni porcentaje."""
         root = QWidget()
         root.setObjectName("saleRoot")
         root.setStyleSheet(_SALE_STYLE)
         layout = QVBoxLayout()
-        layout.setContentsMargins(16, 14, 16, 14)
-        layout.setSpacing(12)
+        layout.setContentsMargins(18, 14, 18, 16)
+        layout.setSpacing(14)
 
-        # ── Barra superior: empleada + logout ──
+        # ── Barra superior: quién atiende, ayuda, menú y salir ──
         top_row = QHBoxLayout()
-        top_row.setSpacing(8)
+        top_row.setSpacing(10)
+        self._emp_avatar = QLabel("")
+        self._emp_avatar.setObjectName("empAvatar")
+        self._emp_avatar.setFixedSize(40, 40)
+        self._emp_avatar.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        top_row.addWidget(self._emp_avatar)
+        quien = QVBoxLayout()
+        quien.setSpacing(0)
         self._emp_badge = QLabel("")
         self._emp_badge.setObjectName("empBadge")
-        top_row.addWidget(self._emp_badge)
+        quien.addWidget(self._emp_badge)
+        atendiendo = QLabel("Atendiendo")
+        atendiendo.setObjectName("empSub")
+        quien.addWidget(atendiendo)
+        top_row.addLayout(quien)
         top_row.addStretch()
-        btn_logout = QPushButton("Cerrar sesion")
+        ayuda = QLabel("Escanea un producto, el QR de un cliente o el de un ticket")
+        ayuda.setObjectName("topHint")
+        top_row.addWidget(ayuda)
+        top_row.addSpacing(8)
+        self._btn_mas = QToolButton()
+        self._btn_mas.setObjectName("btnMas")
+        self._btn_mas.setText("⋯")
+        self._btn_mas.setToolTip("Más opciones")
+        self._btn_mas.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self._menu_mas = QMenu(self._btn_mas)
+        self._menu_mas.setObjectName("menuMas")
+        self._accion_gasto = self._menu_mas.addAction("🧾  Gasto de la tienda")
+        self._accion_gasto.triggered.connect(self._on_gasto_tienda)
+        self._accion_precio_especial = self._menu_mas.addAction("🔒  Precio especial")
+        self._accion_precio_especial.triggered.connect(lambda: self._discount_check.click())
+        self._btn_mas.setMenu(self._menu_mas)
+        top_row.addWidget(self._btn_mas)
+        btn_logout = QPushButton("Salir")
         btn_logout.setObjectName("btnLogout")
         btn_logout.clicked.connect(self._on_logout)
         top_row.addWidget(btn_logout)
         layout.addLayout(top_row)
 
-        # ── Total card ──
-        total_bar = QFrame()
-        total_bar.setObjectName("totalBar")
-        tb_layout = QHBoxLayout()
-        tb_layout.setContentsMargins(20, 14, 20, 14)
-        tb_layout.setSpacing(12)
+        columnas = QHBoxLayout()
+        columnas.setSpacing(16)
+        izquierda = QVBoxLayout()
+        izquierda.setSpacing(14)
+        derecha = QVBoxLayout()
+        derecha.setSpacing(14)
 
-        total_left = QVBoxLayout()
-        total_left.setSpacing(0)
-        self._total_meta = QLabel("0 piezas")
-        self._total_meta.setObjectName("totalMeta")
-        total_left.addWidget(self._total_meta)
-        self._total_label = QLabel("$0.00")
-        self._total_label.setObjectName("totalAmount")
-        total_left.addWidget(self._total_label)
-        tb_layout.addLayout(total_left)
-
-        tb_layout.addStretch()
-
-        btn_venta = QPushButton("Ticket Venta")
-        btn_venta.setObjectName("btnPrimary")
-        btn_venta.clicked.connect(self._on_ticket_venta)
-        tb_layout.addWidget(btn_venta)
-
-        btn_apartado = QPushButton("Ticket Apartado")
-        btn_apartado.setObjectName("btnSecondary")
-        btn_apartado.clicked.connect(self._on_ticket_apartado)
-        tb_layout.addWidget(btn_apartado)
-
-        btn_abono = QPushButton("Abono")
-        btn_abono.setObjectName("btnSecondary")
-        btn_abono.clicked.connect(self._on_abono)
-        tb_layout.addWidget(btn_abono)
-
-        btn_pedido = QPushButton("Enviar a preparar")
-        btn_pedido.setObjectName("btnGhost")
-        btn_pedido.setToolTip("Manda las piezas al tablero de pedidos del satélite para prepararlas")
-        btn_pedido.clicked.connect(self._on_enviar_pedido)
-        tb_layout.addWidget(btn_pedido)
-        # "Enviar a preparar" oculto (decisión de Daniel, 2026-09-02): no lo
-        # usa en su operación. El flujo y el tablero de pedidos siguen vivos;
-        # para restaurarlo basta quitar esta línea.
-        btn_pedido.setVisible(False)
-
-        total_bar.setLayout(tb_layout)
-        layout.addWidget(total_bar)
-        layout.addWidget(self._build_cliente_bar())
-        layout.addWidget(self._build_programa_bar())  # E4-C: programa del cliente
-
-        # ── Scan bar ──
+        # ── Izquierda: escanear ──
         scan_bar = QFrame()
         scan_bar.setObjectName("scanBar")
+        _sombra(scan_bar)
         sb_layout = QHBoxLayout()
-        sb_layout.setContentsMargins(14, 10, 14, 10)
-        sb_layout.setSpacing(8)
-
+        sb_layout.setContentsMargins(18, 10, 12, 10)
+        sb_layout.setSpacing(10)
+        icono = QLabel("⌕")
+        icono.setObjectName("scanIcono")
+        sb_layout.addWidget(icono)
         self._scan_input = QLineEdit()
         self._scan_input.setObjectName("scanInput")
-        self._scan_input.setPlaceholderText("Escanea o escribe el SKU...")
+        self._scan_input.setPlaceholderText("Escanea o escribe el SKU…")
         self._scan_input.returnPressed.connect(self._on_scan_and_add)
         sb_layout.addWidget(self._scan_input, 1)
 
         self._qty_spin = QSpinBox()
+        self._qty_spin.setObjectName("qtySpin")
         self._qty_spin.setMinimum(1)
         self._qty_spin.setMaximum(999)
         self._qty_spin.setValue(1)
-        self._qty_spin.setFixedWidth(64)
-        self._qty_spin.setMinimumHeight(42)
-        self._qty_spin.setStyleSheet(
-            f"QSpinBox {{ font-size: 14px; padding: 4px 8px; border: 1.5px solid {_BORDER}; "
-            f"border-radius: 10px; background: {_WARM_BG}; color: {_TEXT}; }}"
-            f"QSpinBox:focus {{ border-color: {_BRAND}; background: white; }}"
-        )
+        self._qty_spin.setPrefix("× ")
+        self._qty_spin.setFixedWidth(84)
+        self._qty_spin.setMinimumHeight(44)
         sb_layout.addWidget(self._qty_spin)
 
         self._scan_hint = QLabel(self._SCAN_HINT_DEFAULT)
@@ -631,42 +681,32 @@ class QuickSaleWidget(
         sb_layout.addWidget(self._btn_reintentar_anotar)
         # Venta de productos SIN código (listones, parches, arreglos...):
         # abre un diálogo táctil con teclado numérico para el precio.
-        self._btn_sin_codigo = QPushButton("➕  Sin código")
+        self._btn_sin_codigo = QPushButton("＋  Sin código")
+        self._btn_sin_codigo.setObjectName("btnSuave")
         self._btn_sin_codigo.setToolTip("Vender un producto que no tiene código de barras")
         self._btn_sin_codigo.setAutoDefault(False)
-        self._btn_sin_codigo.setStyleSheet(
-            "QPushButton { background: #f8f2e9; color: #73341c;"
-            "  border: 1.5px solid #ddd0c0; border-radius: 12px;"
-            "  min-height: 48px; padding: 0 18px; font-size: 15px; font-weight: 800; }"
-            "QPushButton:pressed { background: #e8dbc7; }"
-        )
         self._btn_sin_codigo.clicked.connect(self._on_producto_sin_codigo)
         sb_layout.addWidget(self._btn_sin_codigo)
-        # Gasto de la tienda (bolsas, un mandado, el agua): sale del cajón y
-        # el corte lo cuenta en «Gastos». Lo apunta quien esté atendiendo
-        # (Daniel, 2026-10-01); a él le llega el aviso al instante.
-        self._btn_gasto = QPushButton("🧾  Gasto")
-        self._btn_gasto.setToolTip("Apuntar un gasto de la tienda que salió del cajón")
-        self._btn_gasto.setAutoDefault(False)
-        self._btn_gasto.setStyleSheet(self._btn_sin_codigo.styleSheet())
-        self._btn_gasto.clicked.connect(self._on_gasto_tienda)
-        sb_layout.addWidget(self._btn_gasto)
-        self._btn_cliente = QPushButton("👛  Cliente")
-        self._btn_cliente.setToolTip("Buscar o registrar al cliente (para usar saldo, escanea su QR)")
-        self._btn_cliente.setAutoDefault(False)
-        self._btn_cliente.setStyleSheet(self._btn_sin_codigo.styleSheet())
-        self._btn_cliente.clicked.connect(self._on_cliente_rapido)  # E1-B: buscador y alta
-        sb_layout.addWidget(self._btn_cliente)
-
         scan_bar.setLayout(sb_layout)
-        layout.addWidget(scan_bar)
+        izquierda.addWidget(scan_bar)
 
-        # ── Tabla de items ──
+        # ── Izquierda: el carrito ──
         table_card = QFrame()
         table_card.setObjectName("tableCard")
+        _sombra(table_card)
         tc_layout = QVBoxLayout()
-        tc_layout.setContentsMargins(2, 2, 2, 2)
-        tc_layout.setSpacing(0)
+        tc_layout.setContentsMargins(18, 14, 18, 12)
+        tc_layout.setSpacing(6)
+        cabecera = QHBoxLayout()
+        titulo_carrito = QLabel("CARRITO")
+        titulo_carrito.setObjectName("cajaTitulo")
+        cabecera.addWidget(titulo_carrito)
+        cabecera.addStretch(1)
+        btn_clear = QPushButton("Vaciar")
+        btn_clear.setObjectName("btnDanger")
+        btn_clear.clicked.connect(self._on_clear_all)
+        cabecera.addWidget(btn_clear)
+        tc_layout.addLayout(cabecera)
 
         self._items_table = QTableWidget()
         self._items_table.setColumnCount(5)
@@ -675,12 +715,14 @@ class QuickSaleWidget(
         self._items_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._items_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._items_table.setShowGrid(False)
-        self._items_table.setAlternatingRowColors(True)
+        self._items_table.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         h = self._items_table.horizontalHeader()
         h.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        h.setDefaultAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        h.setHighlightSections(False)
         self._items_table.setColumnWidth(1, 70)
         self._items_table.setColumnWidth(2, 60)
-        self._items_table.setColumnWidth(3, 100)
+        self._items_table.setColumnWidth(3, 110)
         self._items_table.setColumnWidth(4, 172)
         # El alto de fila se fija al pintar (ver _refresh_items_table): el
         # auto-medido solo considera el texto, no el widget de botones.
@@ -689,40 +731,133 @@ class QuickSaleWidget(
         )
         self._items_table.setStyleSheet(f"""
             QTableWidget {{
-                background: white; border: none; font-size: 16px; color: {_TEXT};
+                background: transparent; border: none; font-size: 16px; color: {_TEXT};
             }}
             QTableWidget::item {{
-                padding: 8px 10px; border-bottom: 1px solid #f0e6db;
+                padding: 8px 10px; border-bottom: 1px solid #f1ebe3;
             }}
-            QTableWidget::item:alternate {{ background: {_WARM_BG}; }}
-            QTableWidget::item:selected {{ background: {_BRAND_LIGHT}; color: {_TEXT}; }}
+            QTableWidget::item:selected {{ background: #f7efe6; color: {_TEXT}; }}
+            QHeaderView {{ background: transparent; border: none; }}
             QHeaderView::section {{
-                background: {_WARM_BG}; color: {_MUTED}; font-weight: 600;
-                font-size: 12px; padding: 8px 10px; border: none;
-                border-bottom: 1.5px solid {_BORDER};
-                text-transform: uppercase;
+                background: transparent; color: {_MUTED}; font-weight: 700;
+                font-size: 11px; padding: 6px 10px; border: none;
+                border-bottom: 1px solid #ece2d6;
             }}
         """)
         tc_layout.addWidget(self._items_table)
         table_card.setLayout(tc_layout)
-        layout.addWidget(table_card, 1)
+        izquierda.addWidget(table_card, 1)
 
-        # ── Footer: limpiar + descuento ──
-        footer = QHBoxLayout()
-        footer.setSpacing(8)
-        btn_clear = QPushButton("Limpiar todo")
-        btn_clear.setObjectName("btnDanger")
-        btn_clear.clicked.connect(self._on_clear_all)
-        footer.addWidget(btn_clear)
-        footer.addStretch()
+        # ── Derecha: el cliente ──
+        cliente_card, cl_ly = _tarjeta_caja("CLIENTE")
+        self._sin_cliente = QWidget()
+        sc_ly = QVBoxLayout(self._sin_cliente)
+        sc_ly.setContentsMargins(0, 0, 0, 0)
+        sc_ly.setSpacing(6)
+        self._btn_cliente = QPushButton("＋  Agregar cliente")
+        self._btn_cliente.setObjectName("btnAgregarCliente")
+        self._btn_cliente.setToolTip("Buscar o registrar al cliente (para usar saldo, escanea su QR)")
+        self._btn_cliente.setAutoDefault(False)
+        self._btn_cliente.clicked.connect(self._on_cliente_rapido)  # E1-B: buscador y alta
+        sc_ly.addWidget(self._btn_cliente)
+        sin = QLabel("o escanea el QR de su credencial")
+        sin.setObjectName("cajaNota")
+        sin.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        sc_ly.addWidget(sin)
+        cl_ly.addWidget(self._sin_cliente)
+        cl_ly.addWidget(self._build_cliente_bar())
+        cl_ly.addWidget(self._build_programa_bar())  # E4-C: programa del cliente
+        derecha.addWidget(cliente_card)
+
+        # El interruptor del precio especial de empleada: la casilla de
+        # siempre (la usan los flujos de cobro y las pruebas), ya no a la vista.
         self._discount_check = QCheckBox("Descuento")
-        self._discount_check.setStyleSheet(
-            f"QCheckBox {{ font-size: 13px; color: {_BRAND}; font-weight: 500; }}"
-            f"QCheckBox::indicator {{ width: 18px; height: 18px; }}"
-        )
         self._discount_check.clicked.connect(self._on_discount_toggle)
-        footer.addWidget(self._discount_check)
-        layout.addLayout(footer)
+        self._discount_check.setVisible(False)
+        self._build_compradora_card()
+
+        derecha.addStretch(1)
+
+        # ── Derecha: total y cobrar (panel oscuro) ──
+        total_bar = QFrame()
+        total_bar.setObjectName("totalBar")
+        _sombra(total_bar, fuerte=True)
+        tb_layout = QVBoxLayout()
+        tb_layout.setContentsMargins(22, 18, 22, 20)
+        tb_layout.setSpacing(6)
+        cabeza_total = QHBoxLayout()
+        encabezado_total = QLabel("TOTAL")
+        encabezado_total.setObjectName("totalTitulo")
+        cabeza_total.addWidget(encabezado_total)
+        cabeza_total.addStretch(1)
+        cabeza_total.addWidget(self._chip_precio_especial)
+        tb_layout.addLayout(cabeza_total)
+        self._filas_total: dict[str, tuple[QWidget, QLabel, QLabel]] = {}
+
+        def _fila_total(clave: str) -> None:
+            fila_w = QWidget()
+            fila = QHBoxLayout(fila_w)
+            fila.setContentsMargins(0, 0, 0, 0)
+            etiqueta = QLabel("")
+            etiqueta.setObjectName("totalFila")
+            valor = QLabel("")
+            valor.setObjectName("totalFilaValor")
+            fila.addWidget(etiqueta)
+            fila.addStretch(1)
+            fila.addWidget(valor)
+            fila_w.setVisible(False)
+            tb_layout.addWidget(fila_w)
+            self._filas_total[clave] = (fila_w, etiqueta, valor)
+
+        _fila_total("subtotal")
+        _fila_total("descuento")
+        self._total_label = QLabel("$0.00")
+        self._total_label.setObjectName("totalAmount")
+        tb_layout.addWidget(self._total_label)
+        self._total_meta = QLabel("0 piezas")
+        self._total_meta.setObjectName("totalMeta")
+        self._total_meta.setWordWrap(True)
+        tb_layout.addWidget(self._total_meta)
+        # Con saldo del Monedero: lo que se usa y lo que de verdad se cobra.
+        _fila_total("saldo")
+        _fila_total("por_cobrar")
+        tb_layout.addSpacing(8)
+
+        btn_venta = QPushButton("Cobrar  ·  Ticket de venta")
+        btn_venta.setObjectName("btnCobrar")
+        btn_venta.setMinimumHeight(60)
+        btn_venta.clicked.connect(self._on_ticket_venta)
+        tb_layout.addWidget(btn_venta)
+        otros = QHBoxLayout()
+        otros.setSpacing(8)
+        btn_apartado = QPushButton("Apartado")
+        btn_apartado.setObjectName("btnClaro")
+        btn_apartado.clicked.connect(self._on_ticket_apartado)
+        otros.addWidget(btn_apartado, 1)
+        btn_abono = QPushButton("Abono")
+        btn_abono.setObjectName("btnClaro")
+        btn_abono.clicked.connect(self._on_abono)
+        otros.addWidget(btn_abono, 1)
+        btn_pedido = QPushButton("Enviar a preparar")
+        btn_pedido.setObjectName("btnGhost")
+        btn_pedido.setToolTip("Manda las piezas al tablero de pedidos del satélite para prepararlas")
+        btn_pedido.clicked.connect(self._on_enviar_pedido)
+        otros.addWidget(btn_pedido)
+        # "Enviar a preparar" oculto (decisión de Daniel, 2026-09-02): no lo
+        # usa en su operación. El flujo y el tablero de pedidos siguen vivos;
+        # para restaurarlo basta quitar esta línea.
+        btn_pedido.setVisible(False)
+        tb_layout.addLayout(otros)
+        total_bar.setLayout(tb_layout)
+        derecha.addWidget(total_bar)
+
+        columnas.addLayout(izquierda, 3)
+        panel = QWidget()
+        panel.setLayout(derecha)
+        panel.setMinimumWidth(400)
+        panel.setMaximumWidth(500)
+        columnas.addWidget(panel, 2)
+        layout.addLayout(columnas, 1)
 
         root.setLayout(layout)
         return root
@@ -961,17 +1096,48 @@ class QuickSaleWidget(
         lineas_text = f"{len(self._items)} linea{'s' if len(self._items) != 1 else ''}"
         meta = f"{lineas_text}  ·  {pzas_text}" if self._items else "Sin piezas"
 
-        if discount > 0 and self._items:
-            etiqueta = "Desc. mayoreo" if self._pct_descuento_programa() else "Desc."
-            meta += f"  ·  {etiqueta} (-${discount:,.2f})"
-            if self._texto_compradora():
-                meta += f"  ·  {self._texto_compradora()}"
+        # El descuento, quién compra y el saldo ya tienen su renglón en el
+        # desglose y su recuadro (2026-11-12): aquí solo líneas y piezas.
         canje = self._canje_actual(total)
-        if canje > 0:
-            meta += f"  ·  Saldo -${canje:,.2f}  ·  Por cobrar ${total - canje:,.2f}"
         self._total_meta.setText(meta)
+        self._pintar_desglose(subtotal, discount, canje, total)
         self._pintar_cliente_bar()
         self._pintar_programa_bar()
+        self._pintar_compradora_card()
+        sin_cliente = getattr(self, "_sin_cliente", None)
+        if sin_cliente is not None:
+            sin_cliente.setVisible(getattr(self, "_cliente", None) is None)
+
+    def _pintar_desglose(self, subtotal: Decimal, descuento: Decimal, canje: Decimal, total: Decimal) -> None:
+        """Las filas del total: subtotal, el descuento que aplique y el saldo usado."""
+        filas = getattr(self, "_filas_total", None)
+        if not filas:
+            return
+        hay = bool(self._items) and descuento > 0   # sin descuento, el subtotal es el total
+        w, etiqueta, valor = filas["subtotal"]
+        etiqueta.setText("Subtotal")
+        valor.setText(f"${subtotal:,.2f}")
+        w.setVisible(hay)
+        w, etiqueta, valor = filas["descuento"]
+        if self._pct_descuento_programa():
+            nombre = "Precio de mayoreo"
+        elif getattr(self, "_discount_active", False):
+            # Discreto (2026-11-12): el cliente que mira la pantalla no lee
+            # que es descuento de empleada ni de quién.
+            nombre = "Precio especial"
+        else:
+            nombre = "Descuento"
+        etiqueta.setText(nombre)
+        valor.setText(f"−${descuento:,.2f}")
+        w.setVisible(bool(self._items) and descuento > 0)
+        w, etiqueta, valor = filas["saldo"]
+        etiqueta.setText("Usa saldo del Monedero")
+        valor.setText(f"−${canje:,.2f}")
+        w.setVisible(bool(self._items) and canje > 0)
+        w, etiqueta, valor = filas["por_cobrar"]
+        etiqueta.setText("<b>Por cobrar</b>")
+        valor.setText(f"<b>${max(total - canje, Decimal('0')):,.2f}</b>")
+        w.setVisible(bool(self._items) and canje > 0)
 
     # Geometría del carrito: padding del ::item (stylesheet) y alto de botón.
     _PAD_ITEM_CARRITO = 8
@@ -1082,7 +1248,7 @@ class QuickSaleWidget(
 
     def _authorize_owner(self) -> bool:
         dlg = QDialog(self)
-        dlg.setWindowTitle("Autorizar descuento")
+        dlg.setWindowTitle("Autorizar precio especial")
         dlg.setFixedWidth(380)
         dlg.setStyleSheet(f"""
             QDialog {{ background: {_WARM_BG}; }}

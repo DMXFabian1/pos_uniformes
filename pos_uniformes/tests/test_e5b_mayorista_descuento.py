@@ -161,7 +161,7 @@ class KioskoTests(_Qt):
         self.assertEqual(w._compute_totals(), (D("500"), D("60.00"), D("440")))
         self.assertEqual(w._cashback_estimado(D("440"), D("0")), D("0"))
         self.assertIn("Precio de mayoreo", w._cliente_label.text())
-        self.assertIn("mayoreo", w._total_meta.text())
+        self.assertEqual(w._filas_total["descuento"][1].text(), "Precio de mayoreo")
         self.assertEqual(w._monto_neto_actual(D("440"), pago_tarjeta=True),
                          w._apply_terminal_commission(D("340.00")) + w._apply_terminal_commission(D("100")))
 

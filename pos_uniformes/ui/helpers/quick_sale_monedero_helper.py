@@ -329,29 +329,85 @@ class MonederoVentaMixin:
     # ─── Barra del cliente ───────────────────────────────────────────────
 
     def _build_cliente_bar(self) -> QFrame:
+        """La ficha del cliente en la caja (más «pro», Daniel 2026-11-12).
+
+        Arriba su inicial, nombre y código (y «Quitar»); luego dos datos
+        grandes, «Saldo» y «Gana en esta compra»; abajo las acciones. El texto
+        de siempre sigue armándose en `_cliente_label` (oculto) para las
+        pruebas y para quien lo lea por accesibilidad."""
         bar = QFrame()
         bar.setObjectName("clienteBar")
-        bar.setStyleSheet(
-            "QFrame#clienteBar { background: #fff7ec; border: 1.5px solid #e8d5bd; border-radius: 12px; }"
-            "QLabel { font-size: 14px; color: #2c2a27; }"
-            "QPushButton { font-size: 13px; font-weight: 600; padding: 6px 12px; border-radius: 8px;"
-            " border: 1px solid #d9c3a5; background: white; }"
-            "QPushButton:checked { background: #73341c; color: white; border-color: #73341c; }"
-            "QPushButton:disabled { color: #b9aa98; }"
-        )
-        ly = QHBoxLayout()
-        ly.setContentsMargins(14, 8, 10, 8)
-        ly.setSpacing(8)
+        bar.setStyleSheet(_FICHA_CLIENTE)
+        caja = QVBoxLayout()
+        caja.setContentsMargins(0, 0, 0, 0)
+        caja.setSpacing(12)
+
+        cabeza = QHBoxLayout()
+        cabeza.setSpacing(12)
+        self._cliente_inicial = QLabel("")
+        self._cliente_inicial.setObjectName("fcInicial")
+        self._cliente_inicial.setFixedSize(46, 46)
+        self._cliente_inicial.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        cabeza.addWidget(self._cliente_inicial)
+        quien = QVBoxLayout()
+        quien.setSpacing(1)
+        self._cliente_nombre = QLabel("")
+        self._cliente_nombre.setObjectName("fcNombre")
+        quien.addWidget(self._cliente_nombre)
+        self._cliente_codigo = QLabel("")
+        self._cliente_codigo.setObjectName("fcCodigo")
+        quien.addWidget(self._cliente_codigo)
+        cabeza.addLayout(quien, 1)
+        btn_quitar = QPushButton("Quitar")
+        btn_quitar.setObjectName("fcQuitar")
+        btn_quitar.setToolTip("Quitar al cliente de esta venta")
+        btn_quitar.setAutoDefault(False)
+        btn_quitar.clicked.connect(self._quitar_cliente)
+        cabeza.addWidget(btn_quitar, 0, Qt.AlignmentFlag.AlignTop)
+        caja.addLayout(cabeza)
+
+        datos = QHBoxLayout()
+        datos.setSpacing(10)
+
+        def _dato(titulo: str):
+            marco = QFrame()
+            marco.setObjectName("fcDato")
+            ly = QVBoxLayout(marco)
+            ly.setContentsMargins(14, 10, 14, 10)
+            ly.setSpacing(2)
+            t = QLabel(titulo)
+            t.setObjectName("fcDatoTitulo")
+            valor = QLabel("")
+            valor.setObjectName("fcDatoValor")
+            nota = QLabel("")
+            nota.setObjectName("fcDatoNota")
+            nota.setWordWrap(True)
+            for w in (t, valor, nota):
+                ly.addWidget(w)
+            datos.addWidget(marco, 1)
+            return marco, t, valor, nota
+
+        self._dato_saldo = _dato("SALDO")
+        self._dato_gana = _dato("GANA EN ESTA COMPRA")
+        caja.addLayout(datos)
+
         self._cliente_label = QLabel("")
         self._cliente_label.setTextFormat(Qt.TextFormat.RichText)
-        ly.addWidget(self._cliente_label, 1)
+        self._cliente_label.setVisible(False)
+        caja.addWidget(self._cliente_label)
+
+        ly = QHBoxLayout()
+        ly.setSpacing(8)
+        caja.addLayout(ly)
         self._btn_usar_saldo = QPushButton("Usar saldo")
+        self._btn_usar_saldo.setObjectName("fcPrincipal")
         self._btn_usar_saldo.setCheckable(True)
         self._btn_usar_saldo.setAutoDefault(False)
         self._btn_usar_saldo.clicked.connect(self._toggle_usar_saldo)
-        ly.addWidget(self._btn_usar_saldo)
+        ly.addWidget(self._btn_usar_saldo, 1)
         # E5-A: solo para programas que lo permiten (Mayorista).
         self._btn_descuento_programa = QPushButton("🏷 Descuento")
+        self._btn_descuento_programa.setObjectName("fcPrincipal")
         self._btn_descuento_programa.setCheckable(True)
         self._btn_descuento_programa.setAutoDefault(False)
         self._btn_descuento_programa.setToolTip(
@@ -359,17 +415,14 @@ class MonederoVentaMixin:
         )
         self._btn_descuento_programa.clicked.connect(self._toggle_descuento_programa)
         self._btn_descuento_programa.setVisible(False)
-        ly.addWidget(self._btn_descuento_programa)
+        ly.addWidget(self._btn_descuento_programa, 1)
         btn_mov = QPushButton("Movimientos")
+        btn_mov.setObjectName("fcSecundario")
         btn_mov.setAutoDefault(False)
         btn_mov.clicked.connect(self._ver_movimientos)
         self._btn_movimientos = btn_mov
-        ly.addWidget(btn_mov)
-        btn_quitar = QPushButton("Quitar")
-        btn_quitar.setAutoDefault(False)
-        btn_quitar.clicked.connect(self._quitar_cliente)
-        ly.addWidget(btn_quitar)
-        bar.setLayout(ly)
+        ly.addWidget(btn_mov, 1)
+        bar.setLayout(caja)
         bar.setVisible(False)
         self._cliente_bar = bar
         return bar
@@ -384,36 +437,65 @@ class MonederoVentaMixin:
             return
         _s, _d, total = self._compute_totals()
         canje = self._canje_actual(total)
-        partes = [f"👛 <b>{c['nombre']}</b> · {c['codigo']}"]
+        nombre = str(c["nombre"])
+        self._cliente_inicial.setText((nombre.strip()[:1] or "?").upper())
+        self._cliente_nombre.setText(nombre)
+        self._cliente_codigo.setText(str(c["codigo"]))
+        _m, _t, saldo_valor, saldo_nota = self._dato_saldo
+        _m2, _t2, gana_valor, gana_nota = self._dato_gana
+
+        partes = [f"👛 <b>{nombre}</b> · {c['codigo']}"]
+        saldo_nota.setText("")
         if not c["en_linea"]:
             partes.append("<span style='color:#9a5b00'>sin conexión: saldo no disponible</span>")
+            saldo_valor.setText("—")
+            saldo_nota.setText("Sin conexión")
         elif c["estado"] != "activo":
             partes.append(f"<span style='color:#a12'>monedero {c['estado']}</span>")
+            saldo_valor.setText("—")
+            saldo_nota.setText(f"Monedero {c['estado']}")
         else:
             partes.append(f"Saldo <b>${c['disponible']:,.2f}</b>")
+            saldo_valor.setText(f"${c['disponible']:,.2f}")
             if c.get("proximo_vencimiento") and c.get("monto_proximo_vencimiento", _CERO) > 0:
                 vence = c["proximo_vencimiento"].astimezone().strftime("%d/%m/%Y")
                 partes.append(f"<span style='color:#8a7a68'>${c['monto_proximo_vencimiento']:,.2f} vence {vence}</span>")
+                saldo_nota.setText(f"${c['monto_proximo_vencimiento']:,.2f} vence {vence}")
+        saldo_nota.setVisible(bool(saldo_nota.text()))
+
         pct_mayoreo = self._pct_descuento_programa()
         con_empleada = bool(getattr(self, "_discount_active", False))
+        gana_valor.setText("—")
+        gana_nota.setText("")
         if pct_mayoreo:
             partes.append(f"<b>Precio de mayoreo −{pct_mayoreo.normalize():f} %</b> · no suma Monedero")
+            gana_valor.setText(f"−{pct_mayoreo.normalize():f} %")
+            gana_nota.setText("Precio de mayoreo · no suma Monedero")
         elif con_empleada:
-            partes.append("<span style='color:#8a7a68'>con descuento de empleada no suma Monedero</span>")
+            partes.append("<span style='color:#8a7a68'>con precio especial no suma Monedero</span>")
+            gana_nota.setText("Con precio especial no suma")
         if self._items and not pct_mayoreo and not con_empleada:
             estimado = self._cashback_estimado(total, canje)
             if estimado > 0:
                 partes.append(f"Gana <b>${estimado:,.2f}</b>")
+                gana_valor.setText(f"${estimado:,.2f}")
                 con_tarjeta = self._cashback_estimado(total, canje, True)
                 if con_tarjeta != estimado:
                     # Regla B: la empleada sabe antes de cobrar cuánto gana con tarjeta.
-                    partes.append(f"<span style='color:#8a7a68'>con tarjeta ${con_tarjeta:,.2f}</span>")
+                    partes[-1] += f" · <span style='color:#8a7a68'>con tarjeta ${con_tarjeta:,.2f}</span>"
+                    gana_nota.setText(f"Con tarjeta ${con_tarjeta:,.2f}")
             elif not c.get("tasa") and c["en_linea"]:
                 partes.append("<span style='color:#8a7a68'>cashback no configurado</span>")
-        self._cliente_label.setText(" · ".join(partes))
+                gana_nota.setText("Cashback no configurado")
+        elif not self._items and not pct_mayoreo and not con_empleada:
+            gana_nota.setText("Escanea productos")
+        gana_nota.setVisible(bool(gana_nota.text()))
+        self._cliente_label.setText("<br>".join(partes))
+
         puede = self._puede_usar_saldo()
         self._btn_usar_saldo.setEnabled(puede)
         self._btn_usar_saldo.setChecked(self._usar_saldo and puede)
+        self._btn_usar_saldo.setText("✓  Usando saldo" if self._btn_usar_saldo.isChecked() else "Usar saldo")
         if c["en_linea"] and not c["por_qr"] and c["disponible"] > 0:
             self._btn_usar_saldo.setToolTip("Para usar saldo escanea el QR del cliente")
         else:
@@ -645,3 +727,34 @@ def mostrar_movimientos(parent, titulo: str, filas: list[tuple]) -> None:
     cerrar.clicked.connect(dlg.accept)
     ly.addWidget(cerrar, alignment=Qt.AlignmentFlag.AlignRight)
     dlg.exec()
+
+
+# La ficha del cliente en la caja (2026-11-12).
+_FICHA_CLIENTE = """
+QFrame#clienteBar { background: transparent; border: none; }
+QLabel { background: transparent; }
+QLabel#fcInicial {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 #b45a34, stop:1 #8a3a1f);
+    color: white; border-radius: 23px; font-size: 19px; font-weight: 800;
+}
+QLabel#fcNombre { font-size: 18px; font-weight: 800; color: #2c2118; }
+QLabel#fcCodigo { font-size: 12px; color: #9a8a7c; letter-spacing: 0.5px; }
+QPushButton#fcQuitar {
+    background: transparent; color: #9a8a7c; border: none; border-radius: 10px;
+    font-size: 13px; font-weight: 700; padding: 4px 8px;
+}
+QPushButton#fcQuitar:hover { color: #b23a2b; background: #fbeeea; }
+QFrame#fcDato { background: #faf6f0; border: 1px solid #f0e6d9; border-radius: 14px; }
+QLabel#fcDatoTitulo { font-size: 10px; font-weight: 800; color: #a08c76; letter-spacing: 1.2px; }
+QLabel#fcDatoValor { font-size: 22px; font-weight: 900; color: #2c2118; }
+QLabel#fcDatoNota { font-size: 12px; color: #9a8a7c; }
+QPushButton#fcPrincipal, QPushButton#fcSecundario {
+    min-height: 42px; border-radius: 12px; font-size: 14px; font-weight: 800; padding: 0 14px;
+}
+QPushButton#fcPrincipal { background: white; color: #8a3a1f; border: 1.5px solid #e2cdb6; }
+QPushButton#fcPrincipal:checked { background: #8a3a1f; color: white; border-color: #8a3a1f; }
+QPushButton#fcSecundario { background: white; color: #5c4d40; border: 1.5px solid #ece2d6; }
+QPushButton#fcPrincipal:disabled, QPushButton#fcSecundario:disabled {
+    background: #f6f1ea; color: #c2b4a4; border-color: #efe6db;
+}
+"""
