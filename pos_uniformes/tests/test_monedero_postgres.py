@@ -138,6 +138,27 @@ class InmutableTest(_Pg):
         with get_session() as s:
             self.assertIsNone(s.get(LibretaVenta, v.id))
 
+    def test_anula_aunque_su_saldo_se_uso_en_una_venta_ya_anulada(self):
+        """La #1623 de la caja (2026-11-12): su saldo pagó la #1624, que se borró."""
+        v = self._dar_saldo("200")
+        with get_session() as s:
+            v2 = lib.registrar_venta_con_monedero(
+                s, employee_code="TST-MON", employee_name="", items=[], monto_total=D("50"),
+                monto_monedero=D("7"), cliente_id=self.cliente_id, operacion_uuid=str(uuid.uuid4()),
+                origen="test-monedero",
+            )
+            s.commit()
+            v2_id = v2[0].id
+        with get_session() as s:
+            lib.anular_operacion_con_monedero(s, v2_id, usuario_id=self.admin_id, motivo="prueba")
+            s.commit()
+        with get_session() as s:
+            lib.anular_operacion_con_monedero(s, v.id, usuario_id=self.admin_id, motivo="prueba")
+            s.commit()
+        self.assertEqual(self._saldo(), D("0.00"))
+        with get_session() as s:
+            self.assertIsNone(s.get(LibretaVenta, v.id))
+
 
 class RestriccionesTest(_Pg):
     def test_monto_monedero_no_pasa_el_total(self):

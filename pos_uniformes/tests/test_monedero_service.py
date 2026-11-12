@@ -326,6 +326,31 @@ class AnulacionTest(_Base):
         self.assertEqual(r.devoluciones[0].expira_at.replace(tzinfo=UTC), credito.expira_at.replace(tzinfo=UTC))
         self.assertEqual(self._disponible(momento=luego), D("100.00"))
 
+    def _pagar_con_saldo_y_anular(self, saldo="7"):
+        """Otra venta paga con saldo y luego se anula: el saldo regresa."""
+        v2 = self._venta("50", monedero=saldo)
+        mon.canjear(self.s, libreta_venta=v2, monto=saldo, momento=T0)
+        mon.acreditar_cashback(self.s, libreta_venta=v2, momento=T0)
+        mon.anular_operacion(self.s, v2, usuario_id=self.admin.id, motivo="prueba", momento=T0)
+
+    def test_si_el_pago_con_ese_saldo_se_anulo_si_se_revierte(self):
+        """Daniel, 2026-11-12: la venta #1623 no se dejaba anular porque su
+        saldo se usó en la #1624, que ya se había borrado."""
+        v, _ = self._cashback("200")  # $20
+        self._pagar_con_saldo_y_anular("7")
+        self.assertEqual(self._disponible(), D("20.00"))
+        r = mon.anular_operacion(self.s, v, usuario_id=self.admin.id, motivo="venta de prueba", momento=T0)
+        self.assertEqual(r.cashback_revertido, D("20.00"))
+        self.assertEqual(self._disponible(), D("0.00"))
+
+    def test_si_lo_devuelto_se_volvio_a_gastar_bloquea(self):
+        v, _ = self._cashback("200")  # $20
+        self._pagar_con_saldo_y_anular("7")
+        mon.canjear(self.s, libreta_venta=self._venta("30"), monto="20", momento=T0)
+        with self.assertRaises(mon.CashbackYaGastado):
+            mon.anular_operacion(self.s, v, usuario_id=self.admin.id, motivo="x", momento=T0)
+        self.assertEqual(self._disponible(), D("0.00"))  # nada se movió
+
     def test_repetir_no_duplica(self):
         v, _ = self._cashback("200")
         mon.anular_operacion(self.s, v, usuario_id=self.admin.id, motivo="x", momento=T0)

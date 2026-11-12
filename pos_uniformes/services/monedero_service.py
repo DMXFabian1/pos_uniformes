@@ -670,6 +670,40 @@ def _consumido_por(session, credito_id: int) -> dict[str, Decimal]:
     return {tipo: _d(total) for tipo, total in filas}
 
 
+def _donde_quedo(session, credito: MonederoMovimiento, _nivel: int = 0) -> tuple[list[CreditoRestante], Decimal]:
+    """Dónde está hoy el saldo de un crédito y cuánto se gastó de verdad.
+
+    (Daniel, 2026-11-12) Si el cliente pagó con ese saldo y esa venta luego se
+    anuló, el dinero regresó como una `devolucion_canje` nueva: el crédito
+    original lo sigue viendo «gastado», pero el cliente lo tiene completo.
+    Aquí se sigue ese dinero hasta la devolución (y, si también se usó y se
+    devolvió, hasta la siguiente).
+
+    Devuelve los créditos con lo que les queda (el original primero) y lo que
+    se gastó sin regresar. Lo que venció o ya se revirtió no cuenta como
+    gastado."""
+    aplicaciones = session.execute(
+        select(MonederoAplicacion, MonederoMovimiento.tipo)
+        .join(MonederoMovimiento, MonederoMovimiento.id == MonederoAplicacion.debito_id)
+        .where(MonederoAplicacion.credito_id == int(credito.id))
+        .order_by(MonederoAplicacion.id)
+    ).all()
+    restante = (_d(credito.monto) - sum((_d(a.monto) for a, _t in aplicaciones), _CERO)).quantize(_CENT)
+    creditos = [CreditoRestante(credito, restante)] if restante > 0 else []
+    gastado = _CERO
+    for aplic, tipo in aplicaciones:
+        if tipo in (EXPIRACION, REVERSA_CASHBACK):
+            continue
+        devolucion = _por_llave(session, f"devolucion:{aplic.id}") if tipo == CANJE else None
+        if devolucion is None or _nivel >= 20:
+            gastado += _d(aplic.monto)
+            continue
+        mas, gastado_alla = _donde_quedo(session, devolucion, _nivel + 1)
+        creditos.extend(mas)
+        gastado += gastado_alla
+    return creditos, gastado.quantize(_CENT)
+
+
 @dataclass(frozen=True)
 class ResultadoAnulacion:
     reversas: list[MonederoMovimiento]
@@ -714,26 +748,24 @@ def anular_operacion(
         session.scalars(select(Monedero).where(Monedero.id == monedero_id).with_for_update()).first()
 
     # 1) Validar
-    planes: list[tuple[MonederoMovimiento, Decimal]] = []
+    planes: list[tuple[MonederoMovimiento, list[CreditoRestante]]] = []
     for mov in movimientos:
         if mov.tipo != CASHBACK or _por_llave(session, f"reversa:{mov.id}") is not None:
             continue
-        consumido = _consumido_por(session, mov.id)
-        gastado = sum((v for k, v in consumido.items() if k not in (EXPIRACION, REVERSA_CASHBACK)), _CERO)
+        creditos, gastado = _donde_quedo(session, mov)
         if gastado > 0:
             raise CashbackYaGastado(
                 f"El cliente ya usó ${gastado:,.2f} del cashback de esta venta. "
                 "Revertirlo dejaría su saldo en negativo: haz primero un ajuste autorizado."
             )
-        restante = (_d(mov.monto) - sum(consumido.values(), _CERO)).quantize(_CENT)
-        planes.append((mov, restante))
+        planes.append((mov, creditos))
 
     # 2) Escribir
     reversas: list[MonederoMovimiento] = []
-    for mov, restante in planes:
+    for mov, creditos in planes:
+        restante = sum((c.restante for c in creditos), _CERO).quantize(_CENT)
         if restante <= 0:
             continue  # ya venció: no queda nada que revertir
-        credito = CreditoRestante(mov, restante)
         reversa = _nuevo_movimiento(
             session,
             monedero_id=mov.monedero_id,
@@ -746,7 +778,7 @@ def anular_operacion(
             usuario_id=int(usuario_id),
             created_at=momento,
         )
-        _aplicar(session, reversa, restante, [credito])
+        _aplicar(session, reversa, restante, creditos)
         reversas.append(reversa)
 
     devoluciones: list[MonederoMovimiento] = []
