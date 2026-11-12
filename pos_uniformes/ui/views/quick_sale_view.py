@@ -1389,7 +1389,7 @@ class QuickSaleWidget(
                 "created_at": creado.astimezone().isoformat(),
                 # Identidad persistente: la misma en cada reintento.
                 "operacion_uuid": str(_uuid.uuid4()),
-                **self._datos_cliente_para_cola(tipo, total),
+                **self._datos_cliente_para_cola(tipo, total, bool(pago_tarjeta)),
             }
         ]
         if tipo == "apartado" and anticipo is not None and anticipo > 0:

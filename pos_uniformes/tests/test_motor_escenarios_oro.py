@@ -450,12 +450,15 @@ class BaseOroTests(_Monedero):
         )
 
     def test_e12_pago_mixto_saldo_y_tarjeta(self) -> None:
+        """CAMBIA (regla B, 2026-11-12): la parte con tarjeta ($413) deja $394.50
+        tras la comisión; el 5 % se da sobre eso."""
         self._con_saldo_37_42()
         venta, canje, abono = self._venta_con_saldo()
         self.assertEqual(canje.monto, D("-37.00"))
-        self.assertEqual((abono.monto, abono.base_calculo), (D("20.65"), D("413.00")))
+        self.assertEqual((abono.monto, abono.base_calculo), (D("19.72"), D("394.50")))
+        self.assertIn("(pago con tarjeta)", abono.motivo)
         self.assertEqual(venta.monto_neto, D("394.50"))
-        self.assertEqual(self._saldo(), D("21.07"))
+        self.assertEqual(self._saldo(), D("20.14"))
         self.assertEqual(abono.expira_at.year - abono.created_at.year, 1)
 
     def test_e12_repetir_la_venta_no_duplica(self) -> None:
@@ -466,7 +469,7 @@ class BaseOroTests(_Monedero):
         primera = lib.registrar_venta_con_monedero(self.s, **kw)
         segunda = lib.registrar_venta_con_monedero(self.s, **kw)
         self.assertEqual(primera[0].id, segunda[0].id)
-        self.assertEqual(self._saldo(), D("21.07"))
+        self.assertEqual(self._saldo(), D("20.14"))
 
     def test_e13_e14_solo_hay_anulacion_completa_y_borra_la_venta(self) -> None:
         """HOY: no hay devolución parcial; anular revierte todo y BORRA la venta (punto 10)."""
@@ -474,7 +477,7 @@ class BaseOroTests(_Monedero):
         venta, _canje, _abono = self._venta_con_saldo()
         venta_id = venta.id
         res = lib.anular_operacion_con_monedero(self.s, venta_id, usuario_id=self.admin.id, motivo="prueba de oro")
-        self.assertEqual(res.cashback_revertido, D("20.65"))
+        self.assertEqual(res.cashback_revertido, D("19.72"))
         self.assertEqual(res.saldo_devuelto, D("37.00"))
         self.assertEqual(self._saldo(), D("37.42"))
         self.s.expire_all()
@@ -483,8 +486,8 @@ class BaseOroTests(_Monedero):
 
     def test_e14_si_ya_gasto_el_abono_no_se_puede_anular(self) -> None:
         self._con_saldo_37_42()
-        venta, _c, _a = self._venta_con_saldo()                     # queda 0.42 + 20.65
-        self._venta_con_saldo(total="100", saldo="21", tarjeta=False)   # gasta 0.42 y 20.58 del abono
+        venta, _c, _a = self._venta_con_saldo()                     # queda 0.42 + 19.72
+        self._venta_con_saldo(total="100", saldo="20", tarjeta=False)   # gasta 0.42 y 19.58 del abono
         with self.assertRaises(mon.CashbackYaGastado):
             lib.anular_operacion_con_monedero(self.s, venta.id, usuario_id=self.admin.id, motivo="prueba de oro")
 

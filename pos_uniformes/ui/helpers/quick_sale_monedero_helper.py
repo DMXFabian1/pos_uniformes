@@ -46,7 +46,8 @@ _RE_QR_CLIENTE = re.compile(r"CLI-[A-Z0-9]+")
 def lineas_ticket_monedero(info: dict, tk_row) -> list[str]:
     """Renglones del monedero bajo el total del ticket.
 
-    info: cliente, nivel, canje, por_cobrar, metodo, cashback, cashback_pendiente, saldo."""
+    info: cliente, nivel, canje, por_cobrar, metodo, cashback, cashback_pendiente, saldo
+    y, si se pagó con tarjeta, tasa y base_tarjeta (regla B)."""
     lineas: list[str] = []
     # Quién es y en qué nivel va (Daniel, 2026-11-11). El nombre se corta para
     # que quepa en el renglón.
@@ -64,6 +65,12 @@ def lineas_ticket_monedero(info: dict, tk_row) -> list[str]:
         # Si va por la cola se abona al sincronizar (segundos): al cliente se
         # le dice igual lo que acumuló (Daniel, 2026-11-11).
         lineas.append(tk_row("Acumulado en esta compra:", f"${cashback:,.2f}"))
+        if info.get("base_tarjeta") is not None:
+            # Regla B (Daniel, 2026-11-12): con tarjeta se gana sobre lo que
+            # deja la terminal; el ticket lo dice para que no parezca error.
+            tasa = Decimal(str(info.get("tasa") or 0)).normalize()
+            base = Decimal(str(info["base_tarjeta"]))
+            lineas.append(tk_row(f"  {tasa:f} % sobre:", f"${base:,.2f} (tarjeta)"))
     if info.get("saldo") is not None:
         lineas.append(tk_row("Saldo en monedero:", f"${Decimal(str(info['saldo'])):,.2f}"))
     return lineas
@@ -251,7 +258,23 @@ class MonederoVentaMixin:
         )
         self._refresh_totals()
 
-    def _cashback_estimado(self, total: Decimal, canje: Decimal) -> Decimal:
+    def _base_cashback(self, total: Decimal, canje: Decimal, tarjeta: bool = False) -> Decimal:
+        """Sobre cuánto gana Monedero esta compra (la misma cuenta que el abono
+        del servidor)."""
+        from pos_uniformes.services.beneficios.motor import base_monedero_con_comision, neto_con_comision
+        from pos_uniformes.services.libreta_service import TERMINAL_COMMISSION_PERCENT
+        from pos_uniformes.services.monedero_service import importe_elegible
+
+        pagado = importe_elegible(total, canje)
+        # E7: lo que va en Oferta o Liquidación no suma Monedero.
+        base = max(pagado - self._importe_rebajado_carrito(), _CERO)
+        if tarjeta and pagado > 0:
+            # Regla B (Daniel, 2026-11-12): con tarjeta, sobre lo que deja la terminal.
+            comision = max(pagado - neto_con_comision(pagado, TERMINAL_COMMISSION_PERCENT), _CERO)
+            base = base_monedero_con_comision(base, pagado, comision)
+        return base
+
+    def _cashback_estimado(self, total: Decimal, canje: Decimal, tarjeta: bool = False) -> Decimal:
         c = self._cliente
         if not c or not c.get("tasa") or c["estado"] != "activo":
             return _CERO
@@ -259,18 +282,16 @@ class MonederoVentaMixin:
             return _CERO  # eligió descuento: esta compra no suma Monedero
         if getattr(self, "_discount_active", False):
             return _CERO  # D1: con descuento de empleada tampoco
-        from pos_uniformes.services.monedero_service import calcular_cashback, importe_elegible
+        from pos_uniformes.services.monedero_service import calcular_cashback
 
-        # E7: lo que va en Oferta o Liquidación no suma Monedero.
-        base = max(importe_elegible(total, canje) - self._importe_rebajado_carrito(), _CERO)
-        return calcular_cashback(base, c["tasa"])
+        return calcular_cashback(self._base_cashback(total, canje, tarjeta), c["tasa"])
 
-    def _datos_cliente_para_cola(self, tipo: str, total: Decimal) -> dict:
+    def _datos_cliente_para_cola(self, tipo: str, total: Decimal, tarjeta: bool = False) -> dict:
         """Lo que la cola necesita para ligar la venta al cliente."""
         c = self._cliente
         if not c:
             return {}
-        estimado = self._cashback_estimado(total, _CERO) if tipo == "venta" else _CERO
+        estimado = self._cashback_estimado(total, _CERO, tarjeta) if tipo == "venta" else _CERO
         return {
             "cliente_id": c["id"],
             "cliente_codigo": c["codigo"],
@@ -286,13 +307,16 @@ class MonederoVentaMixin:
         c = self._cliente
         if not c:
             return None
-        estimado = self._cashback_estimado(total, _CERO)
+        estimado = self._cashback_estimado(total, _CERO, tarjeta)
         saldo = None
         if c.get("en_linea") and c.get("tiene_monedero") and c.get("estado") == "activo":
             saldo = Decimal(str(c.get("disponible") or 0)) + estimado
         if estimado <= 0 and saldo is None:
             return None
-        return {**self._cliente_para_ticket(), "cashback": estimado, "cashback_pendiente": True, "saldo": saldo}
+        info = {**self._cliente_para_ticket(), "cashback": estimado, "cashback_pendiente": True, "saldo": saldo}
+        if tarjeta and estimado > 0:
+            info.update(tasa=c.get("tasa"), base_tarjeta=self._base_cashback(total, _CERO, True))
+        return info
 
     def _cliente_para_ticket(self) -> dict:
         """Nombre y nivel del cliente para la parte del Monedero del ticket.
@@ -380,6 +404,10 @@ class MonederoVentaMixin:
             estimado = self._cashback_estimado(total, canje)
             if estimado > 0:
                 partes.append(f"Gana <b>${estimado:,.2f}</b>")
+                con_tarjeta = self._cashback_estimado(total, canje, True)
+                if con_tarjeta != estimado:
+                    # Regla B: la empleada sabe antes de cobrar cuánto gana con tarjeta.
+                    partes.append(f"<span style='color:#8a7a68'>con tarjeta ${con_tarjeta:,.2f}</span>")
             elif not c.get("tasa") and c["en_linea"]:
                 partes.append("<span style='color:#8a7a68'>cashback no configurado</span>")
         self._cliente_label.setText(" · ".join(partes))
@@ -514,6 +542,12 @@ class MonederoVentaMixin:
                         **self._datos_compradora_para_cola(),
                     )
                     cashback_monto = Decimal(cashback.monto) if cashback is not None else _CERO
+                    # Regla B: la base con la que el servidor abonó (ya sin la comisión).
+                    base_tarjeta = (
+                        Decimal(str(cashback.base_calculo))
+                        if cashback is not None and tarjeta and getattr(cashback, "base_calculo", None) is not None
+                        else None
+                    )
                     # Lo que la base cobró de verdad (en un reintento es lo
                     # del primer intento, no lo que hoy calcula la pantalla).
                     canje = Decimal(str(_venta.monto_monedero or 0)).quantize(Decimal("0.01"))
@@ -555,6 +589,7 @@ class MonederoVentaMixin:
             "por_cobrar": total - canje,
             "metodo": "Tarjeta" if tarjeta else "Efectivo",
             "cashback": cashback_monto,
+            **({"tasa": cashback.tasa_snapshot, "base_tarjeta": base_tarjeta} if base_tarjeta is not None else {}),
             "saldo": saldo,
         }
         tickets: list[str] = []

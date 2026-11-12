@@ -102,7 +102,7 @@ class Pago:
 
 @dataclass(frozen=True)
 class ReglasCtx:
-    version: str = "2026-11-11"
+    version: str = "2026-11-12"  # regla B: Monedero sin la comisión de tarjeta
     pct_base_empleada: Decimal = Decimal("5")
     tope_pct_uniforme: Decimal = Decimal("10")
     categorias_no_uniforme: frozenset = frozenset(

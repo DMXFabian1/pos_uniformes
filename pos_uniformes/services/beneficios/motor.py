@@ -348,6 +348,23 @@ def neto_con_comision(monto: Decimal, pct_comision: Decimal) -> Decimal:
     return redondeo_tienda(con_comision)
 
 
+def base_monedero_con_comision(base: Decimal, pagado: Decimal, comision: Decimal) -> Decimal:
+    """Regla B (Daniel, 2026-11-12): con tarjeta, el Monedero se gana sobre lo
+    que de verdad entra. A la base se le quita la parte de la comisión que le
+    toca (comisión × base / lo pagado con dinero), truncado al centavo.
+
+    Pago de $1,000 con tarjeta → comisión $45 → base $955. Sin comisión, la
+    base no cambia. La usan el motor y el abono del servidor, para que el
+    ticket y el Monedero digan lo mismo."""
+    if base <= 0:
+        return CERO
+    if comision <= 0 or pagado <= 0:
+        return base.quantize(CENT)
+    quitar = comision if base >= pagado else comision * base / pagado
+    resto = (base - quitar).quantize(CENT, rounding=ROUND_DOWN)
+    return resto if resto > 0 else CERO
+
+
 # ─── Cálculo ─────────────────────────────────────────────────────────────
 
 
@@ -402,45 +419,7 @@ def calcular(entrada: EntradaVenta) -> Calculo:
             if p > 0:
                 g.motivos.append(M.SALDO_REPARTIDO)
 
-    # Paso 7: Monedero (C2, C4, T9; con descuento de empleada no hay Monedero).
-    tasa = cliente.tasa_monedero if cliente is not None and cliente.tasa_monedero else None
-    bloqueo = None
-    if tasa is None or tasa <= 0:
-        bloqueo = M.SIN_PROGRAMA
-    elif not cliente.activo:
-        bloqueo = M.CLIENTE_INACTIVO
-    elif modalidad == MODALIDAD_DESCUENTO and not sin_conexion:
-        bloqueo = M.MAYOREO_SIN_MONEDERO
-    elif entrada.descuento_empleada:
-        bloqueo = M.EMPLEADA_SIN_MONEDERO
-    if bloqueo:
-        motivos_ticket.append(bloqueo)
-    bases_mon = []
-    for g, cobrado, parte in zip(grupos, cobrados, partes_saldo):
-        bases_mon.append(CERO if (bloqueo or g.rebajada) else (cobrado - parte).quantize(CENT))
-    monedero = None
-    abonos = [CERO] * len(grupos)
-    if not bloqueo:
-        base_total = sum(bases_mon, CERO).quantize(CENT)
-        abono = (base_total * tasa / CIEN).quantize(CENT, rounding=ROUND_DOWN) if base_total > 0 else CERO
-        if abono > 0:
-            abonos = mayor_residuo(abono, bases_mon, claves)
-        monedero = MonederoCalculo(tasa=tasa, base=base_total, abono=abono)
-
-    # Paso 8: Leal (C1, C2).
-    bases_leal = []
-    for g, cobrado, parte in zip(grupos, cobrados, partes_saldo):
-        if entrada.descuento_empleada:
-            bases_leal.append(CERO)
-        elif g.rebajada:
-            g.motivos.append(M.REBAJA_SIN_LEAL)
-            bases_leal.append(CERO)
-        else:
-            bases_leal.append((cobrado - parte).quantize(CENT))
-    if entrada.descuento_empleada:
-        motivos_ticket.append(M.EMPLEADA_SIN_LEAL)
-
-    # Paso 9: pagos y comisión (T4, D6).
+    # Paso 9 (va antes del Monedero por la regla B): pagos y comisión (T4, D6).
     por_cobrar = (total - canje).quantize(CENT)
     if entrada.pagos:
         if any(p.medio == MEDIO_MONEDERO for p in entrada.pagos):
@@ -461,6 +440,51 @@ def calcular(entrada: EntradaVenta) -> Calculo:
     pagado_dinero = [(c - p).quantize(CENT) for c, p in zip(cobrados, partes_saldo)]
     comisiones = mayor_residuo(comision, pagado_dinero, claves) if comision > 0 else [CERO] * len(grupos)
     neto = (por_cobrar - comision).quantize(CENT)
+
+    # Paso 7: Monedero (C2, C4, T9; con descuento de empleada no hay Monedero).
+    tasa = cliente.tasa_monedero if cliente is not None and cliente.tasa_monedero else None
+    bloqueo = None
+    if tasa is None or tasa <= 0:
+        bloqueo = M.SIN_PROGRAMA
+    elif not cliente.activo:
+        bloqueo = M.CLIENTE_INACTIVO
+    elif modalidad == MODALIDAD_DESCUENTO and not sin_conexion:
+        bloqueo = M.MAYOREO_SIN_MONEDERO
+    elif entrada.descuento_empleada:
+        bloqueo = M.EMPLEADA_SIN_MONEDERO
+    if bloqueo:
+        motivos_ticket.append(bloqueo)
+    bases_mon = []
+    for g, cobrado, parte in zip(grupos, cobrados, partes_saldo):
+        bases_mon.append(CERO if (bloqueo or g.rebajada) else (cobrado - parte).quantize(CENT))
+    monedero = None
+    abonos = [CERO] * len(grupos)
+    if not bloqueo:
+        base_total = sum(bases_mon, CERO).quantize(CENT)
+        # Regla B: con tarjeta, se gana sobre lo que deja la terminal.
+        base_neta = base_monedero_con_comision(base_total, sum(pagado_dinero, CERO), comision)
+        if base_neta != base_total:
+            menos = mayor_residuo(base_total - base_neta, bases_mon, claves)
+            bases_mon = [(b - m).quantize(CENT) for b, m in zip(bases_mon, menos)]
+            base_total = base_neta
+            motivos_ticket.append(M.MONEDERO_SIN_COMISION)
+        abono = (base_total * tasa / CIEN).quantize(CENT, rounding=ROUND_DOWN) if base_total > 0 else CERO
+        if abono > 0:
+            abonos = mayor_residuo(abono, bases_mon, claves)
+        monedero = MonederoCalculo(tasa=tasa, base=base_total, abono=abono)
+
+    # Paso 8: Leal (C1, C2).
+    bases_leal = []
+    for g, cobrado, parte in zip(grupos, cobrados, partes_saldo):
+        if entrada.descuento_empleada:
+            bases_leal.append(CERO)
+        elif g.rebajada:
+            g.motivos.append(M.REBAJA_SIN_LEAL)
+            bases_leal.append(CERO)
+        else:
+            bases_leal.append((cobrado - parte).quantize(CENT))
+    if entrada.descuento_empleada:
+        motivos_ticket.append(M.EMPLEADA_SIN_LEAL)
 
     # Armar el resultado.
     lineas = []

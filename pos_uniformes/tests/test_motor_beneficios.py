@@ -436,10 +436,14 @@ class OroEmpleadaTests(unittest.TestCase):
 
 class OroSaldoYTarjetaTests(unittest.TestCase):
     def test_e12_saldo_y_tarjeta(self) -> None:
+        """CAMBIA (regla B, 2026-11-12): con tarjeta el Monedero se gana sobre lo
+        que deja la terminal: $413 − $18.50 de comisión = $394.50 → 5 % = $19.72."""
         c = calcular(venta([_Fabrica().linea("PO1", "150", 3)], cliente=CLUB, saldo_a_usar=D("37.42"),
                            saldo_disponible=D("37.42"), pago_tarjeta=True))
         self.assertEqual((c.saldo_usado, c.monedero.base, c.monedero.abono, c.neto_tienda),
-                         (D("37.00"), D("413.00"), D("20.65"), D("394.50")))
+                         (D("37.00"), D("394.50"), D("19.72"), D("394.50")))
+        self.assertIn(M.MONEDERO_SIN_COMISION, c.motivos_ticket)
+        self.assertEqual(sum(l.base_monedero for l in c.lineas), c.monedero.base)
         self.assertEqual(c.pagos, (Pago("tarjeta", D("413.00")), Pago("monedero", D("37.00"))))
         self.assertEqual(sum(l.comision_linea for l in c.lineas), c.comision_tarjeta)
 
@@ -457,11 +461,12 @@ class OroSaldoYTarjetaTests(unittest.TestCase):
             self.assertEqual(neto_con_comision(monto, D("4.5")), lib.aplicar_comision_terminal(monto))
 
     def test_t4_una_sola_vez_sobre_el_total(self) -> None:
-        """CAMBIA (T4): el kiosko hoy da $430.50 (por pieza); el motor, $430.00, como la Libreta."""
+        """CAMBIA (T4): el kiosko hoy da $430.50 (por pieza); el motor, $430.00, como la Libreta.
+        CAMBIA (regla B): el Monedero se gana sobre esos $430, no sobre $450."""
         c = calcular(venta([_Fabrica().linea("PO1", "150", 3)], cliente=CLUB, pago_tarjeta=True))
         self.assertEqual((c.total, c.neto_tienda), (D("450.00"), D("430.00")))
         self.assertEqual(c.neto_tienda, lib.neto_de_cobro(D("450"), D("0"), True))
-        self.assertEqual(c.monedero.abono, D("22.50"))   # la tarjeta no cambia el abono
+        self.assertEqual((c.monedero.base, c.monedero.abono), (D("430.00"), D("21.50")))
         self.assertIn(M.COMISION_UNICA, c.motivos_ticket)
 
     def test_pago_mixto_comision_solo_a_la_tarjeta(self) -> None:
@@ -684,7 +689,7 @@ class FotografiaTests(unittest.TestCase):
         self.assertEqual(a_json(a), a_json(b))
         self.assertEqual(huella(a), huella(b))
         self.assertEqual(a["version_motor"], VERSION_MOTOR)
-        self.assertEqual(a["version_reglas"], "2026-11-11")
+        self.assertEqual(a["version_reglas"], "2026-11-12")
 
     def test_importes_como_texto_y_campos_de_d6(self) -> None:
         e = self._entrada()

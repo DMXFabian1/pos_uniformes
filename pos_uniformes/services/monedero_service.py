@@ -144,6 +144,27 @@ def importe_elegible(monto_total, monto_monedero=None) -> Decimal:
     return elegible if elegible > _CERO else _CERO
 
 
+def base_sin_comision_tarjeta(libreta_venta, base) -> tuple[Decimal, bool]:
+    """Regla B (Daniel, 2026-11-12): si se pagó con tarjeta, el Monedero se
+    gana sobre lo que deja la terminal. Lo pagado con saldo no pasa por la
+    terminal, así que la comisión es solo sobre el resto. La misma cuenta
+    que el motor (`base_monedero_con_comision`), para que el ticket y el
+    abono digan lo mismo. Devuelve (base, si se le quitó comisión)."""
+    base = _d(base)
+    if not getattr(libreta_venta, "pago_tarjeta", False) or base <= 0:
+        return base, False
+    from pos_uniformes.services.beneficios.motor import base_monedero_con_comision
+    from pos_uniformes.services.libreta_service import aplicar_comision_terminal
+
+    pagado = importe_elegible(libreta_venta.monto_total, getattr(libreta_venta, "monto_monedero", None))
+    if pagado <= 0:
+        return base, False
+    comision = max(pagado - aplicar_comision_terminal(pagado), _CERO)
+    if comision <= 0:
+        return base, False
+    return base_monedero_con_comision(base, pagado, comision), True
+
+
 def calcular_cashback(importe, tasa) -> Decimal:
     """Cashback = importe × tasa %, truncado al centavo (nunca se da de más)."""
     if tasa is None:
@@ -530,6 +551,7 @@ def acreditar_cashback(
     from pos_uniformes.services.rebaja_service import importe_rebajado
 
     base = max(base - importe_rebajado(getattr(libreta_venta, "detalle", None) or []), _CERO)
+    base, con_tarjeta = base_sin_comision_tarjeta(libreta_venta, base)
     monto = calcular_cashback(base, tasa)
     if monto <= 0:
         return None
@@ -548,7 +570,10 @@ def acreditar_cashback(
         tasa_snapshot=tasa,
         base_calculo=base,
         expira_at=vencimiento_de(acreditado),
-        motivo=f"Cashback {tasa}% sobre ${base:,.2f} (venta {_ref_venta(libreta_venta)})",
+        motivo=(
+            f"Cashback {tasa}% sobre ${base:,.2f}"
+            f"{' (pago con tarjeta)' if con_tarjeta else ''} (venta {_ref_venta(libreta_venta)})"
+        ),
         employee_code=(libreta_venta.employee_code or None),
         origen=libreta_venta.origen,
         created_at=acreditado,

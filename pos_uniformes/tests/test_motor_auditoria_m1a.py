@@ -433,7 +433,7 @@ class FuenteUnicaReglasTests(unittest.TestCase):
         r = ReglasCtx()
         contenido = {f.name: getattr(r, f.name) for f in dataclasses.fields(r)}
         self.assertEqual(contenido, {
-            "version": "2026-11-11",
+            "version": "2026-11-12",
             "pct_base_empleada": D("5"),
             "tope_pct_uniforme": D("10"),
             "categorias_no_uniforme": frozenset({"ropa casual", "temporada", "accesorio", "ropa interior", "deportivo casual"}),

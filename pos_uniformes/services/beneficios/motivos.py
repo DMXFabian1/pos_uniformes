@@ -43,6 +43,8 @@ REBAJA_SIN_LEAL = "REBAJA_SIN_LEAL"
 
 # ─── Tarjeta (T4) ───
 COMISION_UNICA = "T4_COMISION_UNICA"
+# Regla B (Daniel, 2026-11-12): el Monedero se gana sobre lo que deja la terminal.
+MONEDERO_SIN_COMISION = "MONEDERO_SIN_COMISION"
 
 # ─── Sin conexión (C12) ───
 SIN_CONEXION_SIN_MAYOREO = "SIN_CONEXION_SIN_MAYOREO"
