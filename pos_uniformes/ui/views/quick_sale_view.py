@@ -722,11 +722,24 @@ class QuickSaleWidget(
             return True
         return bool(re.fullmatch(r"VEND-\d+", code))
 
+    _SCAN_HINT_MS = 1800
+
     def _flash_scan_hint(self, message: str) -> None:
         self._scan_hint.setText(message)
-        QTimer.singleShot(
-            1800, lambda: self._scan_hint.setText(self._SCAN_HINT_DEFAULT)
-        )
+        # El timer es hijo del widget: si el widget se destruye, el timer se va
+        # con él. Antes era `QTimer.singleShot(1800, lambda: …)` sin dueño Qt:
+        # con el widget ya borrado la lambda caía sobre la etiqueta destruida
+        # y PyQt6 tumbaba el proceso (2026-11-12). Un aviso nuevo reinicia la
+        # cuenta, así que ya no lo borra el temporizador del aviso anterior.
+        timer = getattr(self, "_scan_hint_timer", None)
+        if timer is None:
+            timer = self._scan_hint_timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.timeout.connect(self._restaurar_scan_hint)
+        timer.start(self._SCAN_HINT_MS)
+
+    def _restaurar_scan_hint(self) -> None:
+        self._scan_hint.setText(self._SCAN_HINT_DEFAULT)
 
     def _on_scan_and_add(self) -> None:
         sku = self._scan_input.text().strip().upper()
