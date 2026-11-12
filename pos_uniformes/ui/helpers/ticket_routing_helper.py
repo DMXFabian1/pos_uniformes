@@ -54,7 +54,7 @@ def route_tickets(
                 parent, title, tickets, unit_label=unit_label, alt_tickets=alt_tickets,
                 alt_checkbox_label=alt_checkbox_label, on_printed=on_printed, on_back=on_back,
                 destinos=otras, aqui_imprime=False,
-                enviar_a=lambda destino, textos: encolar_para(destino, textos, origen, tipo=tipo),
+                enviar_a=_enviar_y_vigilar(parent, otras, origen, tipo),
             )
             return
         # Sin diálogo no hay checkbox: al satélite siempre va el juego base.
@@ -67,6 +67,7 @@ def route_tickets(
     else:
         from pos_uniformes.ui.dialogs.printable_text_dialog import open_tickets_print_dialog
 
+        otras = otras_impresoras_de_tickets(tipo)
         open_tickets_print_dialog(
             parent,
             title,
@@ -77,8 +78,8 @@ def route_tickets(
             on_printed=on_printed,
             on_back=on_back,
             # Por si esta impresora falla: las otras PCs que imprimen esto.
-            destinos=otras_impresoras_de_tickets(tipo),
-            enviar_a=lambda destino, textos: encolar_para(destino, textos, origen, tipo=tipo),
+            destinos=otras,
+            enviar_a=_enviar_y_vigilar(parent, otras, origen, tipo),
         )
 
 
@@ -115,12 +116,65 @@ def _encolar(session, tickets: list[str], *, origen: str, destino: str | None, t
 
 def encolar_para(destino: str, tickets: list[str], origen: str, *, tipo=None) -> int:
     """Encola los tickets dirigidos a la PC `destino`. Devuelve cuántos."""
+    return len(encolar_para_ids(destino, tickets, origen, tipo=tipo))
+
+
+def encolar_para_ids(destino: str, tickets: list[str], origen: str, *, tipo=None) -> list[int]:
+    """Como `encolar_para`, pero devuelve los ids (para revisar si salieron)."""
     from pos_uniformes.database.connection import get_session
 
     with get_session() as session:
         creados = _encolar(session, tickets, origen=origen, destino=destino, tipo=tipo)
         session.commit()
-    return len(creados)
+        return [int(t.id) for t in creados]
+
+
+def _enviar_y_vigilar(parent: QWidget, otras: list[dict], origen: str, tipo):
+    """El `enviar_a` de la ventana: encola y, al rato, revisa que haya salido.
+
+    Si la otra PC no lo tomó (se apagó justo después de su último latido),
+    avisa aquí mismo en vez de dejar creer que salió (2026-11-12)."""
+
+    def enviar(destino: str, textos: list[str]) -> int:
+        ids = encolar_para_ids(destino, textos, origen, tipo=tipo)
+        nombre = next((d.get("nombre", "") for d in otras if d.get("identificador") == destino), "")
+        vigilar_envio(parent, ids, nombre)
+        return len(ids)
+
+    return enviar
+
+
+def vigilar_envio(parent: QWidget | None, ids: list[int], nombre_destino: str, *, segundos: int | None = None) -> None:
+    """Dentro de unos segundos revisa esos trabajos y avisa si no salieron.
+
+    El temporizador cuelga de `parent`: si esa ventana ya se cerró, no avisa
+    (y no truena). Sin `parent` no hay a quién avisar."""
+    if parent is None or not ids:
+        return
+    from PyQt6.QtCore import QTimer
+
+    from pos_uniformes.services import trabajos_service as svc
+
+    espera = svc.SEGUNDOS_PARA_REVISAR if segundos is None else segundos
+    timer = QTimer(parent)
+    timer.setSingleShot(True)
+
+    def revisar() -> None:
+        timer.deleteLater()
+        try:
+            from pos_uniformes.database.connection import get_session
+
+            with get_session() as session:
+                texto = svc.aviso_no_ha_salido(svc.sin_salir(session, ids), nombre_destino)
+        except Exception:  # noqa: BLE001 — sin base no se puede saber; no se inventa un aviso
+            return
+        if texto:
+            from PyQt6.QtWidgets import QMessageBox
+
+            QMessageBox.warning(parent, "Todavía no sale", texto)
+
+    timer.timeout.connect(revisar)
+    timer.start(int(espera * 1000))
 
 
 def _enviar_al_satelite(parent: QWidget, tickets: list[str], origen: str, *, tipo=None) -> bool:

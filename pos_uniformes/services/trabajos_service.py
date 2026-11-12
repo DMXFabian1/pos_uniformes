@@ -630,3 +630,48 @@ def _finalizar(
     trabajo.procesado_en = func.now()
     session.flush()
     return trabajo
+
+
+# ─── ¿Ya salió lo que mandé a otra PC? ───────────────────────────────────
+#
+# La ventana de imprimir solo deja elegir una PC que se reportó en los
+# últimos 2.5 min; si se apaga en ese hueco, el ticket se queda en su cola y
+# aquí decía «sale en unos segundos». El 2026-11-12 el corte #190 se fue al
+# Kiosko Principal un minuto y medio después de que se apagó, y Daniel: «quise
+# imprimir un corte en el pc principal y no me aparece». Quien manda revisa al
+# rato con esto y avisa.
+
+#: Segundos que se espera antes de revisar (la PC encendida lo toma en ~1 s).
+SEGUNDOS_PARA_REVISAR = 20
+
+
+def sin_salir(session: Session, ids: Iterable[int]) -> list[Trabajo]:
+    """De esos trabajos, los que nadie ha tomado o fallaron (PENDIENTE / ERROR)."""
+    ids = [int(i) for i in ids if i is not None]
+    if not ids:
+        return []
+    stmt = select(Trabajo).where(
+        Trabajo.id.in_(ids),
+        Trabajo.estado.in_([EstadoTrabajo.PENDIENTE, EstadoTrabajo.ERROR]),
+    ).order_by(Trabajo.id)
+    return list(session.scalars(stmt).all())
+
+
+def aviso_no_ha_salido(trabajos: Sequence[Trabajo], destino: str) -> str | None:
+    """El texto para avisar que no salió en `destino`, o None si todo salió."""
+    if not trabajos:
+        return None
+    destino = (destino or "").strip() or "la otra PC"
+    es_corte = any(t.tipo == TipoTrabajo.CORTE for t in trabajos)
+    que = "El corte" if es_corte else ("El ticket" if len(trabajos) == 1 else f"{len(trabajos)} tickets")
+    if all(t.estado == EstadoTrabajo.ERROR for t in trabajos):
+        return (
+            f"{que} no se pudo imprimir en {destino}: su impresora dio error.\n\n"
+            "Revisa que esté prendida y con papel; desde la cola de impresión se puede reintentar."
+        )
+    guardado = " El corte ya quedó guardado: no lo vuelvas a hacer." if es_corte else ""
+    return (
+        f"{que} todavía no sale: {destino} no lo ha tomado. Puede estar apagada o con el programa cerrado.\n\n"
+        f"No se pierde: se queda en su cola y sale solo en cuanto {destino} se prenda.{guardado}"
+    )
+
