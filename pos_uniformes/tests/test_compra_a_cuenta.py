@@ -134,6 +134,23 @@ class RegistrarTests(unittest.TestCase):
         self.assertEqual(cac.estados_en_libreta(self.s, [venta]), {venta.id: cac.AUTORIZADA})
         self.assertEqual(cac.etiqueta_libreta(cac.AUTORIZADA), "📅 A cuenta · autorizada")
 
+    def test_el_aviso_dice_que_se_llevo_y_la_lista_las_separa(self):
+        from pos_uniformes.services import telegram_prestamos_service as prs
+
+        folio = "abcdef12-0000-4000-8000-000000000001"
+        self._venta_empleada(folio)
+        p = cac.registrar(self.s, employee_code="VEND-3", nombre="Cristal", monto="332",
+                          opcion=cac.opciones_de_pago(SAB14, 7)[0], quien="VEND-1", folio=folio)
+        pr.pedir(self.s, employee_code="VEND-3", nombre="Cristal", monto="20", motivo="comida")
+        self.assertIn("Se llevó: Pantalón x1", prs.aviso_de_solicitud(p, session=self.s))
+        with patch("pos_uniformes.services.telegram_service.teclado", side_effect=lambda filas: filas):
+            texto, filas = prs.texto_y_botones(self.s)
+        self.assertLess(texto.index("💵 PRÉSTAMOS"), texto.index("🛍️ COMPRAS A CUENTA"))
+        self.assertNotIn("ticket", texto)
+        etiquetas = [e for fila in filas for e, _d in fila]
+        self.assertIn("✅ Cristal $332 a cuenta", etiquetas)
+        self.assertIn("✖️ Que lo pague", etiquetas)
+
     def test_si_no_la_autoriza_vuelve_a_ser_venta(self):
         folio = "abcdef12-0000-4000-8000-000000000001"
         venta = self._venta_empleada(folio)
@@ -168,9 +185,27 @@ class BotTests(unittest.TestCase):
         from pos_uniformes.services import telegram_prestamos_service as prs
 
         texto = prs.aviso_de_solicitud(self._compra())
-        self.assertIn("🛍️ Cristal compró a cuenta de su pago: $405.00", texto)
+        self.assertTrue(texto.startswith("🛍️ COMPRA A CUENTA · Cristal compró a cuenta de su pago: $405.00"))
         self.assertIn("Se le descuenta completo en su pago del sáb 14 nov.", texto)
+        self.assertIn("no entró dinero", texto)
         self.assertIn("la paga en caja", texto)
+        self.assertNotIn("retiro", texto)      # palabra de sistema: confundía (2026-11-12)
+        self.assertNotIn("ticket", texto)
+
+    def test_al_decidir_dice_que_pasa_con_el_cajon(self):
+        """Daniel, 2026-11-12: «queda medio confuso de entre y sale»."""
+        from pos_uniformes.services import telegram_prestamos_service as prs
+
+        si = prs.texto_al_decidir(self._compra(), True)
+        self.assertIn("Compra a cuenta autorizada: Cristal, $405.00", si)
+        self.assertIn("pago del sáb 14 nov", si)
+        self.assertIn("El cajón no cambia", si)
+        no = prs.texto_al_decidir(self._compra(), False)
+        self.assertIn("NO autorizada: Cristal paga $405.00 en caja", no)
+        self.assertIn("el corte sí espera esos $405.00", no)
+        prestamo = SimpleNamespace(id=8, employee_code="VEND-3", employee_name="Cristal", monto=D("20"), motivo="comida")
+        self.assertIn("Sale $20.00 del cajón", prs.texto_al_decidir(prestamo, True))
+        self.assertIn("Del cajón no sale nada", prs.texto_al_decidir(prestamo, False))
 
     def test_sus_botones(self):
         from pos_uniformes.services import telegram_prestamos_service as prs

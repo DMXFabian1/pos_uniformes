@@ -1,17 +1,24 @@
-"""Aprobar o rechazar préstamos desde el celular.
+"""Aprobar o rechazar préstamos y compras a cuenta desde el celular.
 
-Ella lo pide en la Libreta y a Daniel le llega el aviso; aquí vive lo que ve y
-lo que pasa cuando toca un botón.
+Ella lo pide en la Libreta (o compra a cuenta en la caja) y a Daniel le llega
+el aviso; aquí vive lo que ve y lo que pasa cuando toca un botón.
 
 El aviso **trae los botones** (Daniel, 02/10: "me gustaría al momento que me
 llegue el mensaje del bot decidir aprobarlo o no, no que solo me informe"). Y
 trae con qué decidir: cuánto lleva ganado, cuál es su tope, qué le quedaría de
-su próximo pago. Antes decía el monto y el motivo y mandaba a `/prestamos`, de
-modo que para contestar había que acordarse de un comando y volver a buscar a
-quién era — con el teléfono en la mano, en medio de otra cosa.
+su pago.
 
-Aprobar sigue sin estar a un toque desde el **tablero**: ahí no hay contexto.
-En el aviso sí lo hay, porque el aviso es de esa persona y de ese monto.
+Claridad (Daniel, 2026-11-12: «con las compras de las empleadas queda medio
+confuso de entre y sale»). Son dos cosas distintas y cada mensaje lo dice
+desde la primera línea:
+
+- 💵 PRÉSTAMO: si lo apruebas, **sale** dinero del cajón.
+- 🛍️ COMPRA A CUENTA: ya se llevó la mercancía y **no entró** dinero. El
+  cajón ya está cuadrado (la venta y su retiro se cancelan); si no la
+  autorizas, ella la paga en caja y entonces sí entra.
+
+Cada mensaje dice qué pasa con el cajón y de qué pago se descuenta, sin
+palabras de sistema («retiro», «ticket 9e9ad282») donde no hacen falta.
 """
 
 from __future__ import annotations
@@ -43,28 +50,83 @@ def _cuando(prestamo) -> str:
         return ""
 
 
+def _nombre(prestamo) -> str:
+    return str(prestamo.employee_name or prestamo.employee_code)
+
+
+def _pila(prestamo) -> str:
+    return _nombre(prestamo).split()[0]
+
+
+def _monto(prestamo) -> Decimal:
+    return Decimal(str(prestamo.monto))
+
+
+# ─── La lista (/prestamos) ───────────────────────────────────────────────
+
+
 def texto_y_botones(session: Session) -> tuple[str, str]:
-    """Lo que está esperando respuesta, con un botón por solicitud."""
+    """Lo que está esperando respuesta, separado en préstamos y compras."""
     from pos_uniformes.services import prestamos_service as pr
 
     pendientes = pr.pendientes(session)
     if not pendientes:
         return "No hay préstamos esperando respuesta. ✅", _teclado([[("‹ Menú", "m:raiz")]])
 
-    lineas = ["💵 Préstamos y compras a cuenta por responder:", ""]
+    prestamos = [p for p in pendientes if not _es_compra(p)]
+    compras = [p for p in pendientes if _es_compra(p)]
+    lineas: list[str] = []
     filas = []
-    for p in pendientes:
-        nombre = str(p.employee_name or p.employee_code)
-        monto = Decimal(str(p.monto))
-        cuando = _cuando(p)
-        lineas.append(f"· {'🛍️ ' if _es_compra(p) else ''}{nombre} — ${monto:,.2f}")
-        lineas.append(f"   {p.motivo}" + (f" · {cuando}" if cuando else ""))
-        filas.append([
-            (f"✅ {nombre} ${monto:,.0f}", f"{PREFIJO}ok:{p.id}"),
-            ("✖️", f"{PREFIJO}no:{p.id}"),
-        ])
+    if prestamos:
+        lineas.append("💵 PRÉSTAMOS · si los apruebas, sale dinero del cajón")
+        for p in prestamos:
+            cuando = _cuando(p)
+            lineas.append(f"· {_nombre(p)} — ${_monto(p):,.2f}")
+            lineas.append(f"   Para: {p.motivo}" + (f" · {cuando}" if cuando else ""))
+            filas.append([
+                (f"✅ {_nombre(p)} ${_monto(p):,.0f}", f"{PREFIJO}ok:{p.id}"),
+                ("✖️ No", f"{PREFIJO}no:{p.id}"),
+            ])
+    if compras:
+        if lineas:
+            lineas.append("")
+        lineas.append("🛍️ COMPRAS A CUENTA · ya se llevaron la mercancía, no entró dinero")
+        for p in compras:
+            lineas.append(f"· {_nombre(p)} — ${_monto(p):,.2f}")
+            lineas.append(f"   {_cuando_se_descuenta(p)}")
+            filas.append([
+                (f"✅ {_nombre(p)} ${_monto(p):,.0f} a cuenta", f"{PREFIJO}ok:{p.id}"),
+                ("✖️ Que lo pague", f"{PREFIJO}no:{p.id}"),
+            ])
     filas.append([("‹ Menú", "m:raiz")])
     return "\n".join(lineas), _teclado(filas)
+
+
+# ─── Lo que pasa al tocar un botón ───────────────────────────────────────
+
+
+def texto_al_decidir(prestamo, aprobado: bool) -> str:
+    """Lo que el bot contesta al decidir: qué pasó y qué pasa con el cajón."""
+    nombre, monto = _nombre(prestamo), _monto(prestamo)
+    if _es_compra(prestamo):
+        if aprobado:
+            return (
+                f"✅ Compra a cuenta autorizada: {nombre}, ${monto:,.2f}.\n"
+                f"• {_cuando_se_descuenta(prestamo)}\n"
+                "• El cajón no cambia: ese dinero nunca entró."
+            )
+        return (
+            f"✖️ Compra a cuenta NO autorizada: {nombre} paga ${monto:,.2f} en caja.\n"
+            f"• Ahora el corte sí espera esos ${monto:,.2f} en el cajón: cóbraselos.\n"
+            "• En su Libreta le sale el aviso."
+        )
+    if aprobado:
+        return (
+            f"✅ Préstamo aprobado: ${monto:,.2f} para {nombre}.\n"
+            f"• Sale ${monto:,.2f} del cajón (ya quedó anotado como retiro del cajón).\n"
+            "• Se le descuenta completo en su siguiente pago."
+        )
+    return f"✖️ Préstamo no aprobado: {nombre} no recibe los ${monto:,.2f}. Del cajón no sale nada."
 
 
 def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
@@ -85,29 +147,11 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
             if que == "ok":
                 p = pr.aprobar(session, prestamo_id, quien=quien)
                 aviso = "Aprobado"
-                if _es_compra(p):
-                    hecho = (
-                        f"✅ Autorizada la compra a cuenta de {p.employee_name or p.employee_code}: "
-                        f"${Decimal(str(p.monto)):,.2f}.\n{_cuando_se_descuenta(p)}"
-                    )
-                else:
-                    hecho = (
-                        f"✅ Aprobado: ${Decimal(str(p.monto)):,.2f} para "
-                        f"{p.employee_name or p.employee_code}.\n"
-                        "Ya quedó anotado como retiro del cajón, y se le descuenta "
-                        "completo en su siguiente pago."
-                    )
+                hecho = texto_al_decidir(p, True)
             elif que == "no":
                 p = pr.rechazar(session, prestamo_id, quien=quien)
                 aviso = "Rechazado"
-                if _es_compra(p):
-                    hecho = (
-                        f"✖️ Compra a cuenta no autorizada: {p.employee_name or p.employee_code} "
-                        f"paga ${Decimal(str(p.monto)):,.2f} en caja. Ya se quitó el retiro, "
-                        "así que el corte espera ese dinero."
-                    )
-                else:
-                    hecho = f"✖️ Rechazado el préstamo de {p.employee_name or p.employee_code}."
+                hecho = texto_al_decidir(p, False)
             else:
                 return "No conozco ese botón", "", ""
             session.commit()
@@ -126,18 +170,25 @@ def _es_compra(prestamo) -> bool:
     return es_compra(prestamo)
 
 
-def _cuando_se_descuenta(prestamo) -> str:
-    """«Se le descuenta del pago del sáb 14 nov.» (lo dice su motivo)."""
+def _fecha_del_pago(prestamo) -> str | None:
+    """«dom 22 nov» si el motivo de la compra lo dice."""
     motivo = str(prestamo.motivo or "")
     if "pago del " in motivo:
-        fecha = motivo.split("pago del ", 1)[1].split(" · ", 1)[0]
+        return motivo.split("pago del ", 1)[1].split(" · ", 1)[0]
+    return None
+
+
+def _cuando_se_descuenta(prestamo) -> str:
+    """«Se le descuenta completo en su pago del sáb 14 nov.»"""
+    fecha = _fecha_del_pago(prestamo)
+    if fecha:
         return f"Se le descuenta completo en su pago del {fecha}."
     return "Se le descuenta completo en su siguiente pago."
 
 
 def botones_de(prestamo) -> str:
     """Los dos botones de UNA solicitud, para colgarlos de su propio aviso."""
-    nombre = str(prestamo.employee_name or prestamo.employee_code).split()[0]
+    nombre = _pila(prestamo)
     if _es_compra(prestamo):
         return _teclado([
             [
@@ -155,52 +206,79 @@ def botones_de(prestamo) -> str:
     ])
 
 
-def aviso_de_solicitud(prestamo, *, session: Session | None = None) -> str:
-    """El mensaje que le llega a Daniel cuando alguien pide.
+# ─── El aviso que le llega a Daniel ──────────────────────────────────────
 
-    Con `session` trae además con qué decidir sin abrir nada: lo que lleva
-    ganado, su tope, y qué le quedaría del próximo pago. Sin ella se queda en
-    lo básico — el aviso tiene que salir aunque la consulta falle.
+
+def aviso_de_solicitud(prestamo, *, session: Session | None = None) -> str:
+    """El mensaje que le llega a Daniel cuando alguien pide o compra a cuenta.
+
+    Con `session` trae además con qué decidir sin abrir nada (lo que lleva
+    ganado, su tope, qué le quedaría del pago) y, en una compra, qué se
+    llevó. Sin ella se queda en lo básico: el aviso tiene que salir aunque la
+    consulta falle.
     """
-    nombre = str(prestamo.employee_name or prestamo.employee_code)
-    monto = Decimal(str(prestamo.monto))
+    nombre, monto = _nombre(prestamo), _monto(prestamo)
     if _es_compra(prestamo):
-        # Compra a cuenta de su pago (2026-11-12): ya se llevó la mercancía.
-        lineas = [
-            f"🛍️ {nombre} compró a cuenta de su pago: ${monto:,.2f}",
-            _cuando_se_descuenta(prestamo),
-        ]
+        lineas = [f"🛍️ COMPRA A CUENTA · {nombre} compró a cuenta de su pago: ${monto:,.2f}"]
+        llevo = _lo_que_se_llevo(prestamo, session)
+        if llevo:
+            lineas.append(f"Se llevó: {llevo}")
+        lineas.append(_cuando_se_descuenta(prestamo))
+        lineas.append("")
+        lineas.append("💰 El cajón ya está cuadrado: no entró dinero y no falta nada.")
+        lineas.append(f"• Si la autorizas: se le descuentan ${monto:,.2f} de ese pago.")
+        lineas.append(f"• Si no: ella la paga en caja y esos ${monto:,.2f} sí entran al cajón.")
         detalle = _contexto(prestamo, session)
         if detalle:
             lineas.append("")
             lineas.extend(detalle)
-        lineas.append("")
-        lineas.append("Ya se llevó la mercancía y el retiro del cajón ya está anotado.")
-        lineas.append("Si no la autorizas, se quita el retiro y la paga en caja.")
         return "\n".join(lineas)
     lineas = [
-        f"💵 {nombre} pide ${monto:,.2f} prestados",
+        f"💵 PRÉSTAMO · {nombre} pide ${monto:,.2f} prestados",
         f"Para: {prestamo.motivo}",
+        "",
+        f"💰 Si lo apruebas: sale del cajón hoy (${monto:,.2f}) y se le descuenta",
+        "completo en su siguiente pago.",
     ]
     detalle = _contexto(prestamo, session)
     if detalle:
         lineas.append("")
         lineas.extend(detalle)
-    lineas.append("")
-    lineas.append("Si lo apruebas sale del cajón hoy y se le descuenta completo")
-    lineas.append("en su siguiente pago.")
     return "\n".join(lineas)
 
 
+def _lo_que_se_llevo(prestamo, session: Session | None) -> str:
+    """«Pantalón x1», de la venta que va con la compra. Vacío si no se halla."""
+    if session is None:
+        return ""
+    try:
+        import re
+
+        from sqlalchemy import select
+
+        from pos_uniformes.database.models import LibretaVenta
+        from pos_uniformes.services.libreta_service import describir_detalle
+
+        m = re.search(r"ticket\s+([0-9a-fA-F]{8})", str(prestamo.motivo or ""))
+        if not m:
+            return ""
+        venta = session.scalars(
+            select(LibretaVenta).where(LibretaVenta.operacion_uuid.like(f"{m.group(1).lower()}%")).limit(1)
+        ).first()
+        return describir_detalle(list(venta.detalle or [])) if venta is not None else ""
+    except Exception:  # noqa: BLE001 — el aviso vale más que su adorno
+        return ""
+
+
 def _contexto(prestamo, session: Session | None) -> list[str]:
-    """Las tres cifras con las que se decide. Vacío si no se pudieron sacar."""
+    """Las cifras con las que se decide. Vacío si no se pudieron sacar."""
     if session is None:
         return []
     try:
         from pos_uniformes.services import prestamos_service as pr
 
         code = str(prestamo.employee_code)
-        monto = Decimal(str(prestamo.monto))
+        monto = _monto(prestamo)
         ganado = pr.ganado_hasta_hoy(session, code)
         tope = pr.tope_para(session, code)
         # Lo demás que ya tiene encima (otro pedido sin responder o uno
@@ -211,10 +289,13 @@ def _contexto(prestamo, session: Session | None) -> list[str]:
         return []
 
     lineas = [
-        f"Lleva ganado: ${ganado:,.2f}",
-        f"Puede pedir hasta: ${tope:,.2f}",
+        f"📊 Sus números ({_pila(prestamo)}):",
+        f"• Lleva ganado: ${ganado:,.2f}",
+        f"• Puede pedir hasta: ${tope:,.2f} (70 % de lo ganado)",
     ]
     if encima > 0:
-        lineas.append(f"Ya debe o tiene pedido: ${encima:,.2f} (aparte de este)")
-    lineas.append(f"Le quedarían: ${ganado - monto - debe:,.2f} de su próximo pago")
+        lineas.append(f"• Ya debe o tiene pedido: ${encima:,.2f} (aparte de este)")
+    # «Del pago siguiente» se descuenta de un pago que aún no gana: no se adivina.
+    if not getattr(prestamo, "cobrar_desde", None):
+        lineas.append(f"• Le quedarían: ${ganado - monto - debe:,.2f} de su próximo pago")
     return lineas

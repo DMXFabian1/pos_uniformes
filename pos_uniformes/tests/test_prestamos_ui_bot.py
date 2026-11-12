@@ -168,7 +168,8 @@ class LaPantallaDelCelularTest(_Base):
         self.assertIn("Fanny Ortiz — $1,500.00", texto)
         etiquetas = self._botones(botones)
         self.assertIn("✅ Fanny Ortiz $1,500", etiquetas)
-        self.assertIn("✖️", etiquetas)
+        self.assertIn("✖️ No", etiquetas)
+        self.assertIn("💵 PRÉSTAMOS · si los apruebas, sale dinero del cajón", texto)
 
     def test_aprobar_saca_el_dinero_del_cajon_una_sola_vez(self):
         p = self._pedir()
