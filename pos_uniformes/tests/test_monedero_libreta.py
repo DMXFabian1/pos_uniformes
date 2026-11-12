@@ -174,6 +174,34 @@ class VentaConMonederoTest(_Db):
         self.assertIsNone(self.s.get(LibretaVenta, v.id))
         self.assertEqual(self._saldo(), D("100.00"))
 
+    def test_borrar_desde_el_kiosko_anula_el_monedero_solo(self):
+        """Daniel, 2026-11-12: borrar en MOVIMIENTOS ya no manda al POS; se
+        anula ahí mismo (abono quitado, saldo devuelto) y se borra."""
+        v, *_ = self._con_saldo("450", "50")
+        with patch.object(lib, "devolver_stock", return_value=0):
+            existia, r = lib.borrar_desde_libreta(self.s, v.id, actor="VEND-1")
+        self.assertTrue(existia)
+        self.assertEqual((r.saldo_devuelto, r.cashback_revertido), (D("50.00"), D("40.00")))
+        self.assertIsNone(self.s.get(LibretaVenta, v.id))
+        self.assertEqual(self._saldo(), D("100.00"))
+        motivos = self.s.scalars(select(MonederoMovimiento.motivo)).all()
+        self.assertTrue(any("Libreta del kiosko (VEND-1)" in (m or "") for m in motivos))
+
+    def test_borrar_desde_el_kiosko_sin_monedero_borra_como_siempre(self):
+        v = self._venta("100")
+        with patch.object(lib, "devolver_stock", return_value=0):
+            self.assertEqual(lib.borrar_desde_libreta(self.s, v.id, actor="VEND-1"), (True, None))
+        self.s.flush()
+        self.assertIsNone(self.s.get(LibretaVenta, v.id))
+        self.assertEqual(lib.borrar_desde_libreta(self.s, 9999, actor="VEND-1"), (False, None))
+
+    def test_borrar_desde_el_kiosko_si_ya_gasto_el_abono_no_toca_nada(self):
+        v, *_ = self._con_saldo("450", "50")          # saldo 90 (50 viejo + 40 de esta)
+        self._con_saldo("100", "90")                    # gasta también el abono de la primera
+        with self.assertRaises(mon.CashbackYaGastado):
+            lib.borrar_desde_libreta(self.s, v.id, actor="VEND-1")
+        self.assertIsNotNone(self.s.get(LibretaVenta, v.id))
+
 
 class ColaOfflineTest(_Db):
     def _entry(self, **kw):

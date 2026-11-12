@@ -4357,15 +4357,25 @@ class QuoteSatelliteWindow(QMainWindow):
         )
         if confirmacion != QMessageBox.StandardButton.Yes:
             return
-        from pos_uniformes.services.libreta_service import eliminar_operacion
+        from pos_uniformes.services.libreta_service import borrar_desde_libreta
 
         try:
             with get_session() as session:
-                existia = eliminar_operacion(session, int(entry_id))
+                # Si movió el Monedero, se anula aquí mismo (Daniel, 2026-11-12).
+                existia, anulacion = borrar_desde_libreta(
+                    session, int(entry_id), actor=str(getattr(self, "_libreta_code", None) or "VEND-1")
+                )
                 session.commit()
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "No se pudo borrar", str(exc))
             return
+        if anulacion is not None and (anulacion.cashback_revertido or anulacion.saldo_devuelto):
+            QMessageBox.information(
+                self, "Monedero",
+                "La venta se borró y se corrigió el Monedero del cliente.\n\n"
+                f"Abono quitado: ${anulacion.cashback_revertido:,.2f}\n"
+                f"Saldo devuelto al cliente: ${anulacion.saldo_devuelto:,.2f}",
+            )
         self._set_status(
             "Registro borrado de la Libreta." if existia else "El registro ya no existía."
         )

@@ -749,8 +749,8 @@ class BorrarRegistroLibretaTests(unittest.TestCase):
         ), patch(
             "pos_uniformes.ui.quote_satellite_window.get_session", return_value=ctx
         ), patch(
-            "pos_uniformes.services.libreta_service.eliminar_operacion",
-            return_value=True,
+            "pos_uniformes.services.libreta_service.borrar_desde_libreta",
+            return_value=(True, None),
         ) as eliminar:
             QuoteSatelliteWindow._borrar_registro_libreta(fake)
         eliminar.assert_called_once()
@@ -767,7 +767,7 @@ class BorrarRegistroLibretaTests(unittest.TestCase):
             "pos_uniformes.ui.quote_satellite_window.QMessageBox.question",
             return_value=QMessageBox.StandardButton.No,
         ), patch(
-            "pos_uniformes.services.libreta_service.eliminar_operacion"
+            "pos_uniformes.services.libreta_service.borrar_desde_libreta"
         ) as eliminar:
             QuoteSatelliteWindow._borrar_registro_libreta(fake)
         eliminar.assert_not_called()

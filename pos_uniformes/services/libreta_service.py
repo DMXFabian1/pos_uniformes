@@ -695,6 +695,40 @@ def anular_operacion_con_monedero(session, operacion_id: int, *, usuario_id: int
     return resultado
 
 
+def borrar_desde_libreta(session, operacion_id: int, *, actor: str):
+    """El dueño borra un registro desde MOVIMIENTOS del kiosko (Daniel,
+    2026-11-12: «¿esto podemos hacerlo en automático?»).
+
+    Si la venta movió el Monedero, en vez de pedir ir al POS se anula aquí
+    mismo con la anulación del POS: se revierte el abono y se le devuelve
+    al cliente el saldo que usó, y luego se borra. La anulación queda a
+    nombre del administrador, con el gafete de quien la hizo en el motivo.
+    Si el cliente ya gastó el abono, se detiene (`CashbackYaGastado`).
+    No hace commit.
+
+    Devuelve (existía, ResultadoAnulacion | None)."""
+    from pos_uniformes.database.models import RolUsuario, Usuario
+    from pos_uniformes.services import monedero_service
+
+    entry = session.get(LibretaVenta, int(operacion_id))
+    if entry is None:
+        return False, None
+    if not monedero_service.tiene_movimientos(session, int(operacion_id)):
+        return _borrar_operacion(session, entry, int(operacion_id)), None
+    admin = session.scalars(
+        select(Usuario)
+        .where(Usuario.activo.is_(True), Usuario.rol == RolUsuario.ADMIN)
+        .order_by(Usuario.id)
+    ).first()
+    if admin is None:
+        raise monedero_service.SinPermiso("No hay un administrador activo para anular la venta del monedero.")
+    resultado = anular_operacion_con_monedero(
+        session, int(operacion_id), usuario_id=admin.id,
+        motivo=f"Borrada desde la Libreta del kiosko ({actor})",
+    )
+    return True, resultado
+
+
 def _borrar_operacion(session, entry: LibretaVenta, operacion_id: int) -> bool:
     try:
         devolver_stock(session, entry)   # lo que se llevó, regresa
