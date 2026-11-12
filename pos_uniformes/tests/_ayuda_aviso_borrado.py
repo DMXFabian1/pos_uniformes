@@ -1,4 +1,4 @@
-"""Ayuda de `test_kioskos_vivos`: NO se recolecta sola. Esa prueba la corre en
+"""Ayuda de `test_kioskos_vivos` y `test_aviso_escaneo_kiosko`: NO se recolecta sola. Cada una la corre en
 un pytest aparte, en un solo proceso y en este orden.
 
 La primera muestra el aviso breve de la barra de escaneo y BORRA el kiosko
