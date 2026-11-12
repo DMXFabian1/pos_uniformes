@@ -2486,6 +2486,11 @@ class LibretaVenta(Base):
     monto_monedero: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), nullable=False, default=Decimal("0.00"), server_default="0"
     )
+    #: M2 (T2): la fotografía del motor de beneficios con que se cobró:
+    #: entrada, cálculo del kiosko y lo que recalculó el servidor (T3). NULL
+    #: en las ventas de antes y en abonos/apartados sin motor.
+    calculo: Mapped[dict | None] = mapped_column(JSON().with_variant(JSONB(), "postgresql"), nullable=True)
+    version_reglas: Mapped[str | None] = mapped_column(String(20), nullable=True)
 
 
 _MONEDERO_TIPOS_CREDITO = "'cashback', 'devolucion_canje', 'ajuste_abono'"

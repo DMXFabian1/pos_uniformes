@@ -453,12 +453,30 @@ class MonederoVentaMixin:
             origen = get_satellite_id()
         except Exception:  # noqa: BLE001
             pass
+        # M2: el motor decide UNA vez (con el pago) y la fotografía viaja al
+        # servidor, que recalcula antes de cobrar el saldo (T3).
+        from datetime import datetime as _dt
+        from datetime import timezone as _tz
+
+        foto = None
+        renglones = self._items
+        try:
+            entrada, calculo = self._calculo_y_entrada(pago_tarjeta=bool(tarjeta), fecha=_dt.now(_tz.utc))
+        except Exception:  # noqa: BLE001 — sin motor, como antes
+            _logger.exception("Motor de beneficios: venta con saldo con el cálculo anterior")
+        else:
+            from pos_uniformes.services.beneficios_carrito import detalle_por_renglon
+
+            if calculo.total == total and calculo.saldo_usado == canje:
+                renglones = detalle_por_renglon(self._items, calculo)
+                foto = self._fotografia_motor(entrada, calculo)
         items = [
             {"sku": it["sku"], "nombre": it["nombre"], "talla": it["talla"],
              "cantidad": int(it["cantidad"]), "precio": str(it["precio"]),
+             **({"linea_uid": it["linea_uid"]} if it.get("linea_uid") else {}),
              **self._marca_promo_para_libreta(it), **self._marca_pct_empleada(it),
              **self._marca_rebaja_para_libreta(it)}
-            for it in self._items
+            for it in renglones
         ]
         pct_mayoreo = self._pct_descuento_programa()
         # Identidad de ESTA venta: la misma en cada reintento del mismo cobro.
@@ -492,6 +510,7 @@ class MonederoVentaMixin:
                         descuento_empleada=bool(self._discount_active),
                         origen=origen,
                         descuento_programa=pct_mayoreo,
+                        calculo=foto,
                         **self._datos_compradora_para_cola(),
                     )
                     cashback_monto = Decimal(cashback.monto) if cashback is not None else _CERO
@@ -517,6 +536,11 @@ class MonederoVentaMixin:
             elif _es_error_de_red(exc):
                 self._avisar_sin_conexion()
                 QMessageBox.warning(self, "Monedero", mon.MENSAJE_SIN_CONEXION)
+            elif type(exc).__name__ == "CalculoCambio":
+                # T3: el servidor calculó otro cobro; se ve antes de cobrar.
+                self._refrescar_contexto_motor()
+                self._refresh_totals()
+                QMessageBox.warning(self, "El total cambió", str(exc))
             elif isinstance(exc, (mon.MonederoError, PermissionError)):
                 QMessageBox.warning(self, "Monedero", str(exc))
                 self._identificar_cliente(c["codigo"], por_qr=c["por_qr"], cliente_id=c["id"])

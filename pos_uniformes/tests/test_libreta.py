@@ -294,8 +294,9 @@ class QuickSaleLibretaHookTests(unittest.TestCase):
         entry = encolar.call_args.args[0]
         self.assertTrue(entry["pago_tarjeta"])
         self.assertEqual(entry["monto_total"], "1030.00")
-        # 515 - 4.5% = 492.00 por pieza (regla de redondeo) × 2 = 984.00
-        self.assertEqual(entry["monto_neto"], "984.00")
+        # T4 (M2): 4.5 % una sola vez sobre $1,030 = $983.65 → $983.50 con la
+        # regla de redondeo (antes por pieza: 492.00 × 2 = 984.00).
+        self.assertEqual(entry["monto_neto"], "983.50")
 
     def test_reimpresion_no_duplica_registro(self) -> None:
         # Al arrancar la impresión el carrito se vacía, así que "volver a

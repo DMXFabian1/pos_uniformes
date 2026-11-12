@@ -161,6 +161,8 @@ def registrar_operacion(
     acreditar_cashback: bool = True,
     descuento_programa: Decimal | None = None,
     compradora_code: str | None = None,
+    calculo: dict | None = None,
+    recalcular_calculo: bool = True,
 ) -> LibretaVenta:
     """Anota una operación. `items` = líneas del carrito de venta rápida.
 
@@ -186,6 +188,8 @@ def registrar_operacion(
                     Decimal("0.01")
                 )
             ),
+            # M2 (D1): el renglón del carrito al que pertenece (la fotografía lo usa).
+            **({"linea_uid": str(it["linea_uid"])} if it.get("linea_uid") else {}),
             # E5-A: solo cuando viene marcada; el descuento de programa no le aplica.
             **({"promo_3pz": True} if it.get("promo_3pz") else {}),
             # E7: Oferta o Liquidación, con su precio normal.
@@ -217,6 +221,10 @@ def registrar_operacion(
         descuento_programa=_pct_o_nada(descuento_programa),
         compradora_code=(str(compradora_code).upper() if compradora_code and descuento_empleada else None),
     )
+    if calculo:
+        foto = recalcular_en_servidor(session, calculo, cliente_id=cliente_id)[0] if recalcular_calculo else calculo
+        entry.calculo = foto
+        entry.version_reglas = str(foto.get("version_reglas") or "")[:20] or None
     if created_at is not None:
         entry.created_at = created_at
     session.add(entry)
@@ -226,6 +234,25 @@ def registrar_operacion(
         acreditar_cashback_sin_bloquear(session, entry)
         subir_de_programa_sin_bloquear(session, entry)
     return entry
+
+
+def recalcular_en_servidor(session, calculo: dict, *, cliente_id: int | None = None) -> tuple[dict, dict]:
+    """M2 (T3): la fotografía del kiosko con lo que recalculó el servidor.
+
+    Nunca tumba una venta de la cola (el cliente ya pagó): si el recálculo
+    falla, la fotografía queda como la mandó el kiosko, con el error anotado.
+    Devuelve (fotografía, diferencias en el cobro)."""
+    from pos_uniformes.services import beneficios_servidor as servidor
+
+    try:
+        with session.begin_nested():
+            foto, dif = servidor.recalcular(session, calculo, cliente_id=cliente_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Motor: el servidor no pudo recalcular la venta")
+        return {**calculo, "servidor": {"error": f"{type(exc).__name__}: {exc}"[:300]}}, {}
+    if foto["servidor"]["diferencias"]:
+        logger.warning("Motor: el servidor calculó distinto que el kiosko: %s", foto["servidor"]["diferencias"])
+    return foto, dif
 
 
 def _pct_o_nada(valor) -> Decimal | None:
@@ -277,6 +304,7 @@ def registrar_venta_con_monedero(
     origen: str | None = None,
     descuento_programa: Decimal | None = None,
     compradora_code: str | None = None,
+    calculo: dict | None = None,
 ) -> tuple[LibretaVenta, object, object]:
     """Venta pagada (en parte o toda) con saldo del monedero. EN LÍNEA.
 
@@ -302,6 +330,14 @@ def registrar_venta_con_monedero(
     if previa is not None:
         movs = {m.tipo: m for m in monedero_service.movimientos_de_operacion(session, previa.id)}
         return previa, movs.get(monedero_service.CANJE), movs.get(monedero_service.CASHBACK)
+    if calculo:
+        # T3: antes de cobrar el saldo, el servidor recalcula; si el cobro
+        # cambia, no se cobra con el importe viejo (la empleada lo ve).
+        from pos_uniformes.services.beneficios_servidor import CalculoCambio, recalcular
+
+        calculo, dif = recalcular(session, calculo, cliente_id=cliente_id)
+        if dif:
+            raise CalculoCambio(dif)
     entry = registrar_operacion(
         session,
         employee_code=employee_code,
@@ -322,6 +358,8 @@ def registrar_venta_con_monedero(
         acreditar_cashback=False,
         descuento_programa=descuento_programa,
         compradora_code=compradora_code,
+        calculo=calculo,
+        recalcular_calculo=False,
     )
     entry.monto_monedero = monto_monedero
     session.flush()
@@ -760,43 +798,15 @@ def comisiones_ocultas(rows: list) -> int:
 def cambiar_pago_tarjeta(session, operacion_id: int, tarjeta: bool):
     """Corrección del dueño: la empleada olvidó marcar "pagó con tarjeta"
     (o lo marcó de más). Cambia la bandera y RECALCULA el neto con la
-    misma regla que la venta: 4.5% por producto sobre el precio cobrado
-    (ya con descuento de empleada si lo hubo), redondeado; efectivo → neto
-    = total. Devuelve el registro o None si no existe."""
+    misma regla que la venta. T4 (M2): la comisión va una sola vez sobre lo
+    cobrado con dinero (lo pagado con saldo no pasa por la terminal);
+    efectivo → neto = lo cobrado. Devuelve el registro o None si no existe."""
     entry = session.get(LibretaVenta, int(operacion_id))
     if entry is None:
         return None
     total = Decimal(str(entry.monto_total or 0)).quantize(Decimal("0.01"))
     monedero = Decimal(str(getattr(entry, "monto_monedero", 0) or 0))
-    if monedero > 0:
-        # Con saldo de monedero el cobro con dinero es solo el resto.
-        neto = neto_de_cobro(total, monedero, bool(tarjeta))
-    elif not tarjeta:
-        neto = total
-    else:
-        detalle = list(entry.detalle or [])
-        if detalle:
-            desc_programa = getattr(entry, "descuento_programa", None)
-            neto = Decimal("0.00")
-            for line in detalle:
-                unit = Decimal(str(line.get("precio", 0) or 0))
-                if desc_programa:
-                    # E5-A: por renglón gana el más alto; la promo 3pz no lleva el de programa.
-                    from pos_uniformes.services.fidelizacion import descuento_programa_service as dps
-
-                    pct = dps.porcentaje_de_linea(
-                        line, empleada=(5 if entry.descuento_empleada else 0), programa=desc_programa
-                    )
-                    unit = dps.precio_con_descuento(unit, pct)
-                elif entry.descuento_empleada:
-                    # E6: el % que tuvo ese renglón (su nivel); las de antes, 5 %.
-                    # E7: una prenda rebajada no llevó descuento.
-                    pct = Decimal("0") if line.get("rebaja") else Decimal(str(line.get("desc_empleada_pct") or 5))
-                    unit = (unit * (Decimal("100") - pct) / Decimal("100")).quantize(Decimal("0.01"))
-                neto += aplicar_comision_terminal(unit) * int(line.get("cantidad", 0) or 0)
-            neto = neto.quantize(Decimal("0.01"))
-        else:
-            neto = aplicar_comision_terminal(total)  # abonos: sobre el monto
+    neto = neto_de_cobro(total, monedero, bool(tarjeta))
     entry.pago_tarjeta = bool(tarjeta)
     entry.monto_neto = neto
     session.commit()

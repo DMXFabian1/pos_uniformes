@@ -99,9 +99,10 @@ class QuickSaleTicketDialogTests(unittest.TestCase):
             opd.call_args.kwargs["on_printed"]()
         tickets = opd.call_args.args[2]
         self.assertEqual(len(tickets), 2)
-        # 515.00 - 4.5% = 491.82 -> regla de redondeo -> 492.00
-        self.assertIn("$492.00", tickets[1])
-        self.assertNotIn("515.00", tickets[1])
+        # T4 (M2): la copia lleva los precios cobrados y, bajo el total, la
+        # comisión una sola vez: 515.00 - 4.5% = 491.82 -> redondeo -> 492.00.
+        self.assertIn(tk_row("Neto tienda:", "$492.00"), tickets[1])
+        self.assertIn(tk_row("Comisión terminal:", "-$23.00"), tickets[1])
         # El del cliente NO cambia.
         self.assertIn("$515.00", tickets[0])
         registrar.assert_called_once_with("venta", cliente=None, pago_tarjeta=True)
@@ -144,15 +145,16 @@ class QuickSaleTicketDialogTests(unittest.TestCase):
         self.assertIn("Gracias por su compra", customer)
         self.assertNotIn("COPIA TIENDA", customer)
 
-    def test_terminal_commission_discounts_each_product_rounded(self) -> None:
+    def test_terminal_commission_once_on_the_total(self) -> None:
+        """T4 (M2): antes cada precio de la copia llevaba la comisión; ahora el
+        total es el cobrado y la comisión va una sola vez debajo."""
         widget = self._make_widget()
         widget._discount_active = False
         with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")):
             copy = widget._build_venta_text(store_copy=True, terminal_commission=True)
         # 515.00 - 4.5% = 491.82 -> regla de redondeo (.82 > .69) -> 492.00
-        self.assertIn("$492.00", copy)
-        self.assertIn(tk_dbl_row("TOTAL A PAGAR:", "$492.00"), copy)
-        self.assertNotIn("515.00", copy)
+        self.assertIn(tk_dbl_row("TOTAL A PAGAR:", "$515.00"), copy)
+        self.assertIn(tk_row("Neto tienda:", "$492.00"), copy)
 
     def test_terminal_commission_on_employee_copy(self) -> None:
         widget = self._make_widget()
@@ -160,10 +162,11 @@ class QuickSaleTicketDialogTests(unittest.TestCase):
         with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")):
             normal = widget._build_employee_copy_text()
             with_commission = widget._build_employee_copy_text(terminal_commission=True)
-        # 515.00 - 5% empleada = 489.25; -4.5% terminal = 467.23 -> redondeo -> 467.50
+        # 515.00 - 5% empleada = 489.25 -> total 489.50; T4 (M2): la comisión
+        # una vez sobre el total: 489.50 - 4.5% = 467.47 -> redondeo -> 467.50
         self.assertIn("$489.25", normal)
-        self.assertIn("$467.50", with_commission)
-        self.assertNotIn("$489.25", with_commission)
+        self.assertNotIn("Neto tienda", normal)
+        self.assertIn(tk_row("Neto tienda:", "$467.50"), with_commission)
 
     def test_apartado_prints_two_copies_one_dialog(self) -> None:
         widget = self._make_widget()

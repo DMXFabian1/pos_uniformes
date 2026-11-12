@@ -160,29 +160,6 @@ class TopeEmpleadaTests(unittest.TestCase):
         self.assertEqual(dps.descuento(renglones, empleada=D("5")), D("60.00"))      # paga $340
         self.assertEqual(inc.importe_con_nivel(renglones), D("400.00"))
 
-    def test_e11_el_orden_cambia_el_total(self) -> None:
-        """HOY (D7): renglón por renglón en el orden del carrito."""
-        chamarra = sudadera_casual("280", sku="CH1")
-        sudadera = sudadera_casual("250", sku="SU1")
-        totales = {}
-        for nombre, carrito in (("chamarra_primero", [chamarra, sudadera]), ("sudadera_primero", [sudadera, chamarra])):
-            pcts = inc.repartir(carrito, pct_nivel=D("20"), restante=D("300"))
-            totales[nombre] = (pcts, D("530") - dps.descuento(con_pcts(carrito, pcts), empleada=D("5")))
-        self.assertEqual(totales["chamarra_primero"], ([D("20"), D("5")], D("461.50")))
-        self.assertEqual(totales["sudadera_primero"], ([D("20"), D("5")], D("466.00")))
-
-    def test_un_renglon_que_no_cabe_completo_va_todo_al_base(self) -> None:
-        """HOY (D7): «2 × $180» con $300 de tope va al 5 %; partido en dos renglones, uno cabe."""
-        junto = [dict(sudadera_casual("180"), cantidad=2)]
-        self.assertEqual(inc.repartir(junto, pct_nivel=D("20"), restante=D("300")), [D("5")])
-        partido = [sudadera_casual("180", sku="A"), sudadera_casual("180", sku="B")]
-        self.assertEqual(inc.repartir(partido, pct_nivel=D("20"), restante=D("300")), [D("20"), D("5")])
-
-    def test_un_renglon_posterior_mas_chico_si_cabe(self) -> None:
-        """HOY: no es «de ahí en adelante, base»: el que no cabe va al 5 % y el siguiente se vuelve a probar."""
-        carrito = [sudadera_casual("400", sku="A"), sudadera_casual("100", sku="B")]
-        self.assertEqual(inc.repartir(carrito, pct_nivel=D("20"), restante=D("300")), [D("5"), D("20")])
-
     def test_3pz_y_rebajas_no_gastan_tope(self) -> None:
         carrito = [promo_base(), pants_oferta(), sudadera_casual()]
         pcts = inc.repartir(carrito, pct_nivel=D("20"), restante=D("400"))
@@ -302,11 +279,53 @@ class KioskoMayoristaTests(_Kiosko):
         self.assertEqual(w._cashback_estimado(D("306"), D("0")), D("0.00"))
 
     def test_d6_descuento_sin_renglones_que_lo_reciban(self) -> None:
-        """HOY (D6, decisión C4 pendiente): sin descuento y sin Monedero."""
+        """CAMBIADA EN M2 por C4 (§6): sin abono (igual); la venta queda con
+        modalidad «descuento» y `descuento_aplicado = false`."""
         w = self._con_mayoreo(self._kiosko([promo_base(), promo_playera()], tasa="15", descuento="15"))
         self.assertEqual(w._compute_totals(), (D("450"), D("0.00"), D("450")))
-        self.assertEqual(w._pct_descuento_programa(), D("15"))     # la venta se anota «con descuento»
+        calculo = w._calculo_motor()
+        self.assertEqual(calculo.modalidad_mayorista_elegida, "descuento")
+        self.assertFalse(calculo.descuento_aplicado)
+        self.assertIsNone(calculo.monedero)
+        self.assertIn("MAYOREO_SIN_LINEAS_ELEGIBLES", calculo.motivos_ticket)
         self.assertEqual(w._cashback_estimado(D("450"), D("0")), D("0.00"))
+
+
+class KioskoTopeTests(_Kiosko):
+    """Escenario 11 y el tope por pieza, cobrados con el motor (M2: C8, C9, P4).
+
+    Antes de M2 estas pruebas fijaban `inc.repartir`, renglón por renglón en
+    el orden del carrito (D7). Cambiadas una por una según §6."""
+
+    def _empleada(self, items, *, restante="300", pct="20"):
+        w = self._kiosko(items, tasa=None)
+        w._cliente = None
+        w._discount_active = True
+        w._compradora = inc.EstadoCompradora("VEND-3", "Ana", D(pct), D("3000"), D("3000") - D(restante))
+        return w
+
+    def test_e11_el_orden_ya_no_cambia_el_total(self) -> None:
+        """CAMBIADA EN M2 por C8: antes $461.50 o $466.00 según el orden; ahora siempre $461.50."""
+        chamarra = sudadera_casual("280", sku="CH1")
+        sudadera = sudadera_casual("250", sku="SU1")
+        for carrito in ([chamarra, sudadera], [sudadera, chamarra]):
+            self.assertEqual(self._empleada(carrito)._compute_totals()[2], D("461.50"))
+
+    def test_un_renglon_que_no_cabe_completo_se_parte_por_pieza(self) -> None:
+        """CAMBIADA EN M2 por C9: antes «2 × $180» iba todo al 5 % y «1 + 1» daba 20 % y 5 %;
+        ahora los dos dan una pieza al 20 % y otra al 5 % ($315.00)."""
+        junto = [dict(sudadera_casual("180"), cantidad=2)]
+        partido = [sudadera_casual("180"), sudadera_casual("180")]
+        self.assertEqual(self._empleada(junto)._compute_totals()[2], D("315.00"))
+        self.assertEqual(self._empleada(partido)._compute_totals()[2], D("315.00"))
+
+    def test_un_renglon_posterior_mas_chico_si_cabe(self) -> None:
+        """CAMBIADA EN M2 por C8/C9: el mismo resultado ($400 al 5 %, $100 al 20 %), ahora por
+        precio y por pieza, en cualquier orden."""
+        a, b = sudadera_casual("400", sku="A"), sudadera_casual("100", sku="B")
+        for carrito in ([a, b], [b, a]):
+            w = self._empleada(carrito)
+            self.assertEqual(w._compute_totals(), (D("500"), D("40.00"), D("460")))
 
 
 class KioskoRebajasTests(_Kiosko):
@@ -370,9 +389,10 @@ class KioskoTarjetaTests(_Kiosko):
         self.assertEqual(w._monto_neto_actual(total, pago_tarjeta=False), D("450"))
 
     def test_d13_el_neto_depende_del_camino(self) -> None:
-        """HOY (D13): 3 × $150 con tarjeta da $430.50 en el kiosko (por pieza) y $430.00 en la Libreta."""
+        """CAMBIADA EN M2 por T4 (§6): antes 3 × $150 con tarjeta daba $430.50 en el
+        kiosko (por pieza) y $430.00 en la Libreta. Ahora $430.00 por cualquier camino."""
         w = self._kiosko([dict(playera(), precio=D("150"), cantidad=3)], tasa="5")
-        self.assertEqual(w._monto_neto_actual(D("450"), pago_tarjeta=True), D("430.50"))
+        self.assertEqual(w._monto_neto_actual(D("450"), pago_tarjeta=True), D("430.00"))
         self.assertEqual(lib.neto_de_cobro(D("450"), D("0"), True), D("430.00"))
 
 

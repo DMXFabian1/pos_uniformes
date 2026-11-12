@@ -52,6 +52,7 @@ from pos_uniformes.ui.helpers.quick_sale_cliente_helper import ClienteRapidoMixi
 from pos_uniformes.ui.helpers.quick_sale_programa_helper import ProgramaClienteMixin
 from pos_uniformes.ui.helpers.quick_sale_compradora_helper import CompradoraEmpleadaMixin
 from pos_uniformes.ui.helpers.quick_sale_rebaja_helper import RebajaVentaMixin
+from pos_uniformes.ui.helpers.quick_sale_motor_helper import MotorVentaMixin
 from pos_uniformes.ui.helpers.quick_sale_monedero_helper import (
     MonederoVentaMixin,
     lineas_ticket_monedero,
@@ -252,8 +253,26 @@ QPushButton#btnLogout:hover {{ color: {_DANGER}; border-color: {_DANGER}; }}
 """
 
 
+def _totales_de_fotografia(foto: dict | None):
+    """(subtotal, descuento_total, total) de la fotografía de una venta, o None."""
+    calc = (foto or {}).get("calculo") if isinstance(foto, dict) else None
+    if not calc:
+        return None
+    from types import SimpleNamespace
+
+    try:
+        return SimpleNamespace(
+            subtotal=Decimal(str(calc["subtotal"])),
+            descuento_total=Decimal(str(calc["descuento_total"])),
+            total=Decimal(str(calc["total"])),
+        )
+    except (KeyError, ArithmeticError, TypeError):
+        return None
+
+
 class QuickSaleWidget(
-    ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMixin, CompradoraEmpleadaMixin, RebajaVentaMixin, QWidget
+    ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMixin, CompradoraEmpleadaMixin, RebajaVentaMixin,
+    MotorVentaMixin, QWidget
 ):
     #: Lo de hoy para el pie del gafete, leído en un hilo (el kiosko sin red no se congela).
     _pie_gafete_leido = pyqtSignal(object)
@@ -1121,23 +1140,6 @@ class QuickSaleWidget(
 
         return aplicar_comision_terminal(Decimal(str(precio)))
 
-    def _commission_items(self) -> list[dict]:
-        """Items con el precio unitario ya descontado y redondeado."""
-        return [
-            {
-                **it,
-                "precio": self._apply_terminal_commission(it["precio"]),
-                # E7: el «antes» de una oferta con la misma regla, para que el
-                # ahorro de la copia cuadre con lo que ahí se ve.
-                **(
-                    {"precio_normal": self._apply_terminal_commission(Decimal(str(it["precio_normal"])))}
-                    if it.get("rebaja") and it.get("precio_normal") not in (None, "")
-                    else {}
-                ),
-            }
-            for it in self._items
-        ]
-
     @staticmethod
     def _round_total(total: Decimal) -> Decimal:
         # Delegado al servicio compartido: la regla de redondeo de la tienda
@@ -1147,7 +1149,26 @@ class QuickSaleWidget(
         return resolve_sale_rounding(total).collected_total
 
     def _compute_totals(self, items: list[dict] | None = None) -> tuple[Decimal, Decimal, Decimal]:
+        """(subtotal, descuento, total) del carrito, decididos por el motor (M2)."""
+        fijo = self._calculo_fijo
+        if fijo is not None:
+            return fijo.subtotal, fijo.descuento_total, fijo.total
         items = self._items if items is None else items
+        if self._reimpresion_legada:
+            return self._compute_totals_legado(items)
+        if not any(int(it.get("cantidad", 0) or 0) > 0 for it in items):
+            cero = Decimal("0.00")
+            return cero, cero, cero
+        try:
+            calculo = self._calculo_motor(items)
+        except Exception:  # noqa: BLE001 — el mostrador no se detiene
+            _logger.exception("Motor de beneficios: no se pudo calcular; se usa el cálculo anterior")
+            return self._compute_totals_legado(items)
+        return calculo.subtotal, calculo.descuento_total, calculo.total
+
+    def _compute_totals_legado(self, items: list[dict]) -> tuple[Decimal, Decimal, Decimal]:
+        """El cálculo de antes de M2: solo para reimprimir ventas sin
+        fotografía y como red si el motor rechaza un carrito."""
         subtotal = Decimal(str(sum(it["precio"] * it["cantidad"] for it in items)))
         pct_programa = self._pct_descuento_programa()
         self._asignar_pct_empleada(items)
@@ -1234,33 +1255,15 @@ class QuickSaleWidget(
     )
 
     def _monto_neto_actual(self, total: Decimal, *, pago_tarjeta: bool) -> Decimal:
-        """Neto tras la comisión de terminal: 4.5% por producto (redondeado
-        con la regla de la tienda) sobre el precio efectivamente cobrado —
-        con descuento de empleada, sobre el precio ya descontado. En
-        efectivo, igual al total."""
+        """Neto tras la comisión de terminal. T4 (M2): una sola vez, sobre lo
+        cobrado con tarjeta, igual que la Libreta (antes era por producto y
+        daba centavos distintos según el camino). En efectivo, el total."""
         if not pago_tarjeta:
             return total
-        discount_factor = (Decimal("100") - self._DISCOUNT_PERCENT) / Decimal("100")
-        pct_programa = self._pct_descuento_programa()
-        self._asignar_pct_empleada(self._items)
-        por_renglon = pct_programa or (
-            self._discount_active and (self._hay_pct_por_renglon(self._items) or self._hay_rebajados(self._items))
-        )
-        neto = Decimal("0.00")
-        for it in self._items:
-            unit = Decimal(str(it["precio"]))
-            if por_renglon:
-                from pos_uniformes.services.fidelizacion import descuento_programa_service as dps
+        from pos_uniformes.services.beneficios.motor import neto_con_comision
+        from pos_uniformes.services.libreta_service import TERMINAL_COMMISSION_PERCENT
 
-                pct = dps.porcentaje_de_linea(
-                    it, empleada=(self._DISCOUNT_PERCENT if self._discount_active else None), programa=pct_programa
-                )
-                unit = dps.precio_con_descuento(unit, pct)
-            elif self._discount_active:
-                unit = (unit * discount_factor).quantize(Decimal("0.01"))
-            unit = self._apply_terminal_commission(unit)
-            neto += unit * int(it["cantidad"])
-        return neto.quantize(Decimal("0.01"))
+        return neto_con_comision(Decimal(str(total)).quantize(Decimal("0.01")), TERMINAL_COMMISSION_PERCENT)
 
     # ─── Anotar en la Libreta ────────────────────────────────────────────
     # Cuatro cosas distintas que NO son la misma operación (auditoría
@@ -1334,9 +1337,25 @@ class QuickSaleWidget(
         import uuid as _uuid
         from datetime import timezone as _tz
 
-        _subtotal, _descuento, total = self._compute_totals()
-        total = Decimal(str(total)).quantize(Decimal("0.01"))
-        neto = self._monto_neto_actual(total, pago_tarjeta=pago_tarjeta)
+        creado = datetime.now(_tz.utc)
+        # M2: el motor decide UNA vez; de aquí salen el total, el neto (T4),
+        # los renglones y la fotografía (T2).
+        foto = None
+        renglones = self._items
+        try:
+            entrada, calculo = self._calculo_y_entrada(pago_tarjeta=pago_tarjeta, fecha=creado)
+        except Exception:  # noqa: BLE001 — el mostrador no se detiene
+            _logger.exception("Motor de beneficios: la venta se anota con el cálculo anterior")
+            _subtotal, _descuento, total = self._compute_totals_legado(self._items)
+            total = Decimal(str(total)).quantize(Decimal("0.01"))
+            neto = self._monto_neto_actual(total, pago_tarjeta=pago_tarjeta)
+        else:
+            from pos_uniformes.services.beneficios_carrito import detalle_por_renglon
+
+            total = calculo.total
+            neto = calculo.neto_tienda
+            renglones = detalle_por_renglon(self._items, calculo)
+            foto = self._fotografia_motor(entrada, calculo)
         origen = self._origen_satelite()
         pct_programa = self._pct_descuento_programa()
         entradas = [
@@ -1352,12 +1371,14 @@ class QuickSaleWidget(
                         "talla": it["talla"],
                         "cantidad": int(it["cantidad"]),
                         "precio": str(it["precio"]),
+                        **({"linea_uid": it["linea_uid"]} if it.get("linea_uid") else {}),
                         **self._marca_promo_para_libreta(it),
                         **self._marca_pct_empleada(it),
                         **self._marca_rebaja_para_libreta(it),
                     }
-                    for it in self._items
+                    for it in renglones
                 ],
+                **({"calculo": foto, "version_reglas": foto["version_reglas"]} if foto else {}),
                 "monto_total": str(total),
                 "monto_neto": str(neto),
                 "pago_tarjeta": bool(pago_tarjeta),
@@ -1365,7 +1386,7 @@ class QuickSaleWidget(
                 **self._datos_compradora_para_cola(),
                 **({"descuento_programa": str(pct_programa)} if pct_programa else {}),
                 "origen": origen,
-                "created_at": datetime.now(_tz.utc).astimezone().isoformat(),
+                "created_at": creado.astimezone().isoformat(),
                 # Identidad persistente: la misma en cada reintento.
                 "operacion_uuid": str(_uuid.uuid4()),
                 **self._datos_cliente_para_cola(tipo, total),
@@ -2174,6 +2195,7 @@ class QuickSaleWidget(
         monto_monedero=None,
         pago_tarjeta: bool = False,
         descuento_programa=None,
+        calculo: dict | None = None,
     ) -> str | None:
         """Reconstruye el ticket de una operación YA registrada en la Libreta
         (para reimprimir si la impresora falló). No registra nada ni toca el
@@ -2213,7 +2235,12 @@ class QuickSaleWidget(
         )
         respaldo_programa = getattr(self, "_descuento_programa_fijo", None)
         respaldo_compradora = self._compradora
+        respaldo_motor = (self._calculo_fijo, self._reimpresion_legada)
         try:
+            # M2: con fotografía, los importes son los que se cobraron; sin
+            # ella (ventas de antes), el cálculo de antes. Nunca las reglas de hoy.
+            self._calculo_fijo = _totales_de_fotografia(calculo)
+            self._reimpresion_legada = self._calculo_fijo is None
             self._compradora = None  # la reimpresión no recalcula niveles
             self._items = items
             self._discount_active = bool(descuento_empleada)
@@ -2243,6 +2270,7 @@ class QuickSaleWidget(
             ) = respaldo
             self._descuento_programa_fijo = respaldo_programa
             self._compradora = respaldo_compradora
+            self._calculo_fijo, self._reimpresion_legada = respaldo_motor
 
     # ─── Gasto de la tienda ──────────────────────────────────────────────
 
@@ -2688,8 +2716,12 @@ class QuickSaleWidget(
         if self._discount_active:
             wants_copy = True  # la COPIA EMPLEADA es automática
             card = self._ask_card_payment()
+            if not self._revisar_con_servidor():
+                return
         else:
             wants_copy, card, sin_ticket = self._ask_venta_options()
+            if not self._revisar_con_servidor():
+                return
             _s, _d, _t = self._compute_totals()
             if sin_ticket and self._canje_actual(_t) > 0:
                 # Con saldo la venta se confirma en línea antes de todo.
@@ -3252,11 +3284,13 @@ class QuickSaleWidget(
         mismo formato de articulos y totales, pero sin los datos que ve el
         cliente (encabezado del negocio, leyendas y agradecimiento).
 
-        terminal_commission=True (solo para la copia interna) muestra cada
-        precio unitario ya con el 6% de la terminal descontado y redondeado."""
+        terminal_commission=True (solo para la copia interna) agrega, bajo el
+        total, la comisión de la terminal y lo que le queda a la tienda. T4
+        (M2): la comisión va una sola vez sobre el total, como en la Libreta;
+        antes se descontaba precio por precio y no cuadraba."""
         biz_name, biz_phone, biz_addr = self._load_business_info()
         now = fecha_str or datetime.now().strftime("%d/%m/%Y %H:%M")
-        items = self._commission_items() if terminal_commission else self._items
+        items = self._items
         subtotal, discount, total = self._compute_totals(items)
 
         lines: list[str] = []
@@ -3310,6 +3344,8 @@ class QuickSaleWidget(
         lines.append(tk_dbl_top())
         lines.append(tk_dbl_row("TOTAL A PAGAR:", f"${tk_fmt(total)}"))
         lines.append(tk_dbl_bot())
+        if store_copy and terminal_commission:
+            lines += self._renglones_comision(total, monedero)
         # Lo ahorrado, el Monedero y la leyenda de liquidación van en su propio
         # recuadro bajo el total, como lo demás (Daniel, 2026-11-11).
         from pos_uniformes.services.rebaja_service import (
@@ -3475,17 +3511,41 @@ class QuickSaleWidget(
 
         return "\n".join(lines)
 
+    def _renglones_comision(self, total: Decimal, monedero: dict | None = None) -> list[str]:
+        """T4: la comisión de la terminal, una vez, sobre lo cobrado con
+        tarjeta (lo pagado con saldo no pasa por la terminal)."""
+        canje = Decimal(str((monedero or {}).get("canje") or 0))
+        con_tarjeta = max(Decimal(str(total)) - canje, Decimal("0.00"))
+        neto = self._monto_neto_actual(con_tarjeta, pago_tarjeta=True)
+        return [
+            tk_top(),
+            tk_row("Comisión terminal:", f"-${tk_fmt(con_tarjeta - neto)}"),
+            tk_row("Neto tienda:", f"${tk_fmt(neto)}"),
+            tk_bot(),
+        ]
+
     def _build_employee_copy_text(self, *, terminal_commission: bool = False) -> str:
+        """Copia para la empleada: cada renglón con el % que le tocó (M2: el
+        tope por pieza del motor parte el renglón en nivel y base) y el total
+        del motor. Con tarjeta, la comisión va una vez al final (T4)."""
         now = datetime.now().strftime("%d/%m/%Y %H:%M")
         def _unit(precio, it=None) -> Decimal:
             # E6: el % de su nivel en ese renglón; si no trae, el 5 % de siempre.
             pct = Decimal(str((it or {}).get("desc_empleada_pct") or self._DISCOUNT_PERCENT))
             if (it or {}).get("rebaja"):
                 pct = Decimal("0")  # E7: en Oferta o Liquidación no lleva descuento
-            unit = (Decimal(str(precio)) * (Decimal("100") - pct) / Decimal("100")).quantize(Decimal("0.01"))
-            if terminal_commission:
-                unit = self._apply_terminal_commission(unit)
-            return unit
+            return (Decimal(str(precio)) * (Decimal("100") - pct) / Decimal("100")).quantize(Decimal("0.01"))
+
+        renglones = self._items
+        total = None
+        try:
+            from pos_uniformes.services.beneficios_carrito import detalle_por_renglon
+
+            calculo = self._calculo_motor()
+            renglones = detalle_por_renglon(self._items, calculo)
+            total = calculo.total
+        except Exception:  # noqa: BLE001 — la copia sale aunque el motor falle
+            _logger.exception("Motor de beneficios: copia de empleada con el cálculo anterior")
 
         lines: list[str] = []
         lines.append("COPIA EMPLEADA".center(_TW))
@@ -3500,7 +3560,7 @@ class QuickSaleWidget(
 
         lines.append(tk_mid())
         first = True
-        for it in self._items:
+        for it in renglones:
             if not first:
                 lines.append(tk_mid())
             first = False
@@ -3516,14 +3576,15 @@ class QuickSaleWidget(
                 lines,
             )
 
-        raw_total = sum(
-            _unit(it["precio"], it) * it["cantidad"] for it in self._items
-        )
-        total = self._round_total(raw_total.quantize(Decimal("0.01")))
+        if total is None:
+            raw_total = sum(_unit(it["precio"], it) * it["cantidad"] for it in renglones)
+            total = self._round_total(Decimal(str(raw_total)).quantize(Decimal("0.01")))
 
         lines.append(tk_dbl())
         lines.append(tk_row("TOTAL:", f"${tk_fmt(total)}"))
         lines.append(tk_bot())
+        if terminal_commission:
+            lines += self._renglones_comision(total)
 
         return "\n".join(lines)
 

@@ -234,8 +234,10 @@ class LibretaTests(_Db):
                                     items=self.ITEMS, monto_total=D("435"), descuento_empleada=True,
                                     compradora_code="VEND-3")
         lib.cambiar_pago_tarjeta(self.s, v.id, True)
-        esperado = lib.aplicar_comision_terminal(D("340.00")) + lib.aplicar_comision_terminal(D("95.00"))
-        self.assertEqual(v.monto_neto, esperado)
+        # T4 (M2, Daniel 2026-11-11): la comisión va una sola vez sobre el
+        # total; antes era renglón por renglón (340 y 95 → $416.00).
+        self.assertEqual(v.monto_neto, lib.aplicar_comision_terminal(D("435.00")))
+        self.assertEqual(v.monto_neto, D("415.50"))
 
     def test_las_de_antes_siguen_con_5(self) -> None:
         v = lib.registrar_operacion(self.s, employee_code="VEND-1", employee_name="Daniel", tipo="venta",
@@ -265,6 +267,13 @@ class _Qt(unittest.TestCase):
         return w
 
 
+def _pcts(w):
+    """El % de empleada de cada renglón que va a la Libreta (M2: lo decide el motor)."""
+    from pos_uniformes.services.beneficios_carrito import detalle_por_renglon
+
+    return [D(str(r["desc_empleada_pct"])) for r in detalle_por_renglon(w._items, w._calculo_motor())]
+
+
 ANA = inc.EstadoCompradora("VEND-3", "Ana", D("15"), D("3000"), D("2500"))  # le quedan 500
 
 
@@ -273,13 +282,11 @@ class KioskoTests(_Qt):
         w = self._kiosko(ANA)
         # Pants 15 % (60) · sudadera ya no cabe: 5 % (30) · promo 5 % (5)
         self.assertEqual(w._compute_totals()[1], D("95.00"))
-        self.assertEqual([it["desc_empleada_pct"] for it in w._items], [D("15"), D("5"), D("5")])
+        # M2: el motor decide el % de cada pieza; la Libreta lo recibe por renglón.
+        self.assertEqual(_pcts(w), [D("15"), D("5"), D("5")])
         self.assertIn("Ana: 15 %", w._total_meta.text())
-        self.assertEqual(
-            w._monto_neto_actual(D("1005"), pago_tarjeta=True),
-            w._apply_terminal_commission(D("340.00")) + w._apply_terminal_commission(D("570.00"))
-            + w._apply_terminal_commission(D("95.00")),
-        )
+        # T4 (M2): la comisión, una vez sobre el total (antes, renglón por renglón).
+        self.assertEqual(w._monto_neto_actual(D("1005"), pago_tarjeta=True), lib.aplicar_comision_terminal(D("1005")))
 
     def test_en_uniforme_a_lo_mas_10(self) -> None:
         w = self._kiosko(inc.EstadoCompradora("VEND-5", "Cristal", D("20"), None, D("0")))
@@ -296,7 +303,7 @@ class KioskoTests(_Qt):
             w._compute_totals()
             w._compute_totals()
         cats.assert_called_once()  # una vez por SKU
-        self.assertEqual([it["desc_empleada_pct"] for it in w._items], [D("20"), D("10")])
+        self.assertEqual(_pcts(w), [D("20"), D("10")])
 
     def test_sin_conexion_la_categoria_cuenta_como_uniforme(self) -> None:
         w = self._kiosko()
@@ -304,7 +311,7 @@ class KioskoTests(_Qt):
         w._compradora = inc.EstadoCompradora("VEND-5", "Cristal", D("20"), None, D("0"))
         with patch("pos_uniformes.database.connection.get_session", side_effect=OSError("sin red")):
             w._compute_totals()
-        self.assertEqual(w._items[0]["desc_empleada_pct"], D("10"))
+            self.assertEqual(_pcts(w), [D("10")])
 
     def test_sin_compradora_es_el_5_de_siempre(self) -> None:
         w = self._kiosko()

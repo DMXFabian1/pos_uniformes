@@ -217,8 +217,8 @@ class LibretaYMonederoTests(unittest.TestCase):
         v = lib.registrar_operacion(self.s, employee_code="VEND-1", employee_name="Daniel", tipo="venta",
                                     items=self.ITEMS, monto_total=D("730"), descuento_empleada=True)
         lib.cambiar_pago_tarjeta(self.s, v.id, True)
-        esperado = lib.aplicar_comision_terminal(D("350")) + lib.aplicar_comision_terminal(D("380.00"))
-        self.assertEqual(v.monto_neto, esperado)
+        # T4 (M2): una sola comisión sobre lo cobrado.
+        self.assertEqual(v.monto_neto, lib.aplicar_comision_terminal(D("730")))
 
 
 class _Qt(unittest.TestCase):
@@ -255,10 +255,8 @@ class KioskoTests(_Qt):
         w._items = [_chamarra(), dict(PANTS)]
         w._discount_active = True
         self.assertEqual(w._compute_totals(), (D("750"), D("20.00"), D("730")))
-        self.assertEqual(
-            w._monto_neto_actual(D("730"), pago_tarjeta=True),
-            w._apply_terminal_commission(D("350")) + w._apply_terminal_commission(D("380.00")),
-        )
+        # T4 (M2): la comisión una vez sobre el total, no renglón por renglón.
+        self.assertEqual(w._monto_neto_actual(D("730"), pago_tarjeta=True), w._apply_terminal_commission(D("730")))
         self.assertIn("$350.00", w._build_employee_copy_text())
 
     def test_lo_que_va_a_la_libreta(self) -> None:
