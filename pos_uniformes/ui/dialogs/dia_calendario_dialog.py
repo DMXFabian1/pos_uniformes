@@ -35,42 +35,88 @@ logger = logging.getLogger(__name__)
 
 SEGUNDOS_VISIBLE = 45
 _MUTED = "#8a7358"
+# Estilo moderno, igual que la caja y el calendario (Daniel, 2026-11-12).
 _STYLES = (
-    "QDialog { background: #f4ede2; }"
-    "QLabel { color: #2c2a27; background: transparent; }"
-    "#diaTitulo { font-size: 20px; font-weight: 800; color: #73341c; }"
-    "#tarjeta { background: #ffffff; border: 1px solid #e2d0b6; border-radius: 14px; }"
-    "#tarjetaTitulo { font-size: 12px; font-weight: 800; color: #a0876f; }"
-    "#tarjetaTexto { font-size: 15px; font-weight: 700; color: #2c2a27; }"
-    "#pagoTitulo { font-size: 15px; font-weight: 800; color: #73341c; }"
-    "#pagoLinea { font-size: 15px; color: #2c2a27; }"
-    "#pagoTotal { font-size: 22px; font-weight: 800; color: #73341c; }"
+    "QDialog { background: #f6f0e8; }"
+    "QLabel { color: #2c2118; background: transparent; }"
+    "#diaHoy { background: #e8692f; color: white; border-radius: 12px; padding: 0 10px;"
+    "  min-height: 24px; font-size: 12px; font-weight: 800; }"
+    "#diaTitulo { font-size: 26px; font-weight: 900; color: #2c2118; }"
+    "#tarjeta { background: #ffffff; border: 1px solid #efe6db; border-radius: 18px; }"
+    "#tarjetaTitulo { font-size: 11px; font-weight: 800; color: #a08c76; letter-spacing: 1.2px; }"
+    "#tarjetaTexto { font-size: 16px; font-weight: 800; color: #2c2118; }"
+    "#tarjetaTexto[vacio=\"true\"] { color: #c2b4a4; font-weight: 600; }"
+    "#pagoTitulo { font-size: 16px; font-weight: 800; color: #2c2118; }"
+    "#pagoSub { font-size: 13px; color: #8a7a68; }"
+    "#pagoLinea { font-size: 15px; color: #3d2e22; }"
+    "#pagoTotal { font-size: 24px; font-weight: 900; color: #6b1f3a; }"
     "#pagoError { font-size: 13px; font-weight: 700; color: #b0341f; }"
-    "QLineEdit { background: #ffffff; color: #2c2a27; border: 2px solid #ddd0c0;"
-    "  border-radius: 12px; min-height: 44px; padding: 0 12px; font-size: 15px; }"
-    "QLineEdit:focus { border-color: #a84f2d; }"
-    "#cerrarBtn { background: #a84f2d; color: #ffffff; border: none; border-radius: 14px;"
+    "QLineEdit { background: #faf6f0; color: #2c2118; border: 1.5px solid #ece2d6;"
+    "  border-radius: 14px; min-height: 48px; padding: 0 16px; font-size: 16px; }"
+    "QLineEdit:focus { border-color: #6b1f3a; background: #ffffff; }"
+    "#cerrarBtn { background: #6b1f3a; color: #ffffff; border: none; border-radius: 16px;"
     "  min-height: 52px; font-size: 16px; font-weight: 800; }"
-    "#cerrarBtn:pressed { background: #8a4326; }"
-    "#ocultarBtn { background: #f8f2e9; color: #73341c; border: 1px solid #ddd0c0;"
-    "  border-radius: 12px; min-height: 40px; font-size: 14px; font-weight: 700; padding: 0 14px; }"
+    "#cerrarBtn:pressed { background: #561730; }"
+    "#ocultarBtn { background: #ffffff; color: #5c4d40; border: 1px solid #ece2d6;"
+    "  border-radius: 14px; min-height: 44px; font-size: 14px; font-weight: 700; padding: 0 16px; }"
+    "QTableWidget#tablaPagos { background: #ffffff; border: none; font-size: 14px; color: #2c2118;"
+    "  alternate-background-color: #faf6f0; gridline-color: transparent; }"
+    "QTableWidget#tablaPagos QHeaderView::section { background: transparent; color: #a08c76; border: none;"
+    "  border-bottom: 1px solid #ece2d6; font-size: 11px; font-weight: 800; padding: 6px; }"
 )
+
+# Cada tarjeta con su color y su emoji (más alegre, Daniel 2026-11-12):
+# los mismos del calendario.
+_COLORES = {
+    "DESCANSA": ("#ebe3ff", "#5130a3"),
+    "FALTÓ": ("#ffe0db", "#b02a17"),
+    "DÍA DE PAGO": ("#d9f5e3", "#1b7341"),
+    "CONTEOS": ("#ffe9cc", "#9a4a00"),
+}
+
+
+def _sombra(widget) -> None:
+    from PyQt6.QtGui import QColor
+    from PyQt6.QtWidgets import QGraphicsDropShadowEffect
+
+    efecto = QGraphicsDropShadowEffect(widget)
+    efecto.setBlurRadius(26)
+    efecto.setOffset(0, 4)
+    efecto.setColor(QColor(90, 40, 30, 26))
+    widget.setGraphicsEffect(efecto)
 
 
 def _tarjeta(titulo: str, texto: str) -> QFrame:
     caja = QFrame()
-    caja.setObjectName("tarjeta")
+    caja.setObjectName("tarjetaColor")
+    limpio = titulo.split("  ", 1)[-1].strip()
+    fondo, tinta = _COLORES.get(limpio, ("#ffffff", "#5c4d40"))
+    caja.setStyleSheet(f"QFrame#tarjetaColor {{ background: {fondo}; border: none; border-radius: 18px; }}")
     ly = QVBoxLayout(caja)
-    ly.setContentsMargins(14, 10, 14, 12)
-    ly.setSpacing(4)
+    ly.setContentsMargins(16, 14, 16, 16)
+    ly.setSpacing(6)
     t = QLabel(titulo)
     t.setObjectName("tarjetaTitulo")
+    t.setStyleSheet(f"color: {tinta};")
     ly.addWidget(t)
     x = QLabel(texto)
     x.setObjectName("tarjetaTexto")
+    vacio = texto in ("Nadie", "Ninguno")
+    x.setStyleSheet(f"color: {tinta};" + (" font-weight: 600;" if vacio else ""))
+    if vacio:
+        efecto_opaco(x)
     x.setWordWrap(True)
     ly.addWidget(x)
+    ly.addStretch(1)
     return caja
+
+
+def efecto_opaco(label: QLabel) -> None:
+    from PyQt6.QtWidgets import QGraphicsOpacityEffect
+
+    e = QGraphicsOpacityEffect(label)
+    e.setOpacity(0.45)
+    label.setGraphicsEffect(e)
 
 
 def texto_conteos(conteos: list) -> str:
@@ -97,16 +143,24 @@ class DiaCalendarioDialog(QDialog):
         self._hoy = hoy or date.today()
         self._session_factory = session_factory
         self.setWindowTitle(fecha_en_palabras(fecha))
-        self.setMinimumWidth(620)
+        self.setMinimumWidth(720)
         self.setStyleSheet(_STYLES)
 
         ly = QVBoxLayout(self)
-        ly.setContentsMargins(22, 20, 22, 18)
-        ly.setSpacing(12)
+        ly.setContentsMargins(26, 22, 26, 22)
+        ly.setSpacing(16)
 
-        titulo = QLabel(("Hoy · " if fecha == self._hoy else "") + fecha_en_palabras(fecha))
+        cabeza = QHBoxLayout()
+        cabeza.setSpacing(10)
+        titulo = QLabel("📅  " + fecha_en_palabras(fecha))
         titulo.setObjectName("diaTitulo")
-        ly.addWidget(titulo)
+        cabeza.addWidget(titulo)
+        if fecha == self._hoy:
+            hoy = QLabel("HOY")
+            hoy.setObjectName("diaHoy")
+            cabeza.addWidget(hoy, 0, Qt.AlignmentFlag.AlignVCenter)
+        cabeza.addStretch(1)
+        ly.addLayout(cabeza)
 
         resumen = self._cargar_resumen()
         fila = QHBoxLayout()
@@ -125,29 +179,38 @@ class DiaCalendarioDialog(QDialog):
         ly.addLayout(fila)
 
         # ── Consulta de pago con gafete ──────────────────────────────────
-        pago_titulo = QLabel(
-            "¿Cuánto llevas?  Escanea tu gafete para ver tu pago." if fecha == self._hoy
+        gafete = QFrame()
+        gafete.setObjectName("tarjeta")
+        _sombra(gafete)
+        g_ly = QVBoxLayout(gafete)
+        g_ly.setContentsMargins(18, 16, 18, 18)
+        g_ly.setSpacing(8)
+        pago_titulo = QLabel("💰  ¿Cuánto llevas?")
+        pago_titulo.setObjectName("pagoTitulo")
+        g_ly.addWidget(pago_titulo)
+        pago_sub = QLabel(
+            "Escanea tu gafete para ver tu pago." if fecha == self._hoy
             else "Escanea tu gafete para ver lo de ese día y lo que llevas hoy."
         )
-        pago_titulo.setObjectName("pagoTitulo")
-        ly.addWidget(pago_titulo)
+        pago_sub.setObjectName("pagoSub")
+        g_ly.addWidget(pago_sub)
         self.scan_input = QLineEdit()
-        self.scan_input.setPlaceholderText("Escanea tu gafete...")
+        self.scan_input.setPlaceholderText("Escanea tu gafete…")
         self.scan_input.returnPressed.connect(self._on_scan)
-        ly.addWidget(self.scan_input)
+        g_ly.addWidget(self.scan_input)
 
         self.error_label = QLabel("")
         self.error_label.setObjectName("pagoError")
         self.error_label.setVisible(False)
-        ly.addWidget(self.error_label)
+        g_ly.addWidget(self.error_label)
 
         self.pago_box = QFrame()
-        self.pago_box.setObjectName("tarjeta")
         self.pago_ly = QVBoxLayout(self.pago_box)
-        self.pago_ly.setContentsMargins(14, 10, 14, 12)
+        self.pago_ly.setContentsMargins(0, 8, 0, 0)
         self.pago_ly.setSpacing(4)
         self.pago_box.setVisible(False)
-        ly.addWidget(self.pago_box)
+        g_ly.addWidget(self.pago_box)
+        ly.addWidget(gafete)
 
         self._timer_ocultar = QTimer(self)
         self._timer_ocultar.setSingleShot(True)

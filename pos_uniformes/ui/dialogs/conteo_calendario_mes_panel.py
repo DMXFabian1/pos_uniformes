@@ -54,24 +54,68 @@ _MESES = [
     "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ]
 
+# Estilo moderno (Daniel, 2026-11-12: «misma temática moderna» que la caja):
+# fondo crema, el mes en una tarjeta blanca con sombra, días sin bordes duros
+# y hoy marcado en vino.
+VINO = "#6b1f3a"
+HOY = "#e8692f"
 _STYLES = (
-    "#mesNavBtn { background: #ffffff; border: 1.5px solid #e2d0b6; border-radius: 20px;"
-    "  color: #7b2d14; font-size: 15px; font-weight: 800; }"
-    "#mesNavBtn:hover { background: #f7ebdc; border-color: #c45425; }"
-    "#mesNavBtn:pressed { background: #e6d6bf; }"
-    "#mesTitulo { color: #7b2d14; font-size: 22px; font-weight: 800; background: transparent;"
-    "  letter-spacing: 0.5px; }"
-    "#diaCelda { background: #fffefb; border: 1px solid #eae0cf; border-radius: 14px; }"
-    "#diaCelda:hover { border: 1.5px solid #c45425; background: #fffaf3; }"
-    "#diaCelda[finde=\"true\"] { background: #f8f3ea; border-color: #e8ddcb; }"
-    "#diaCelda[ocupado=\"true\"] { background: #fffdf8; border-color: #dcc9ad; }"
-    "#diaCelda[hoy=\"true\"] { background: #fdf4ec; border: 2px solid #d1622f; }"
-    "#diaCelda[hoy=\"true\"]:hover { background: #fbeee1; }"
-    "#diaPista { color: #b3a08a; font-size: 11px; font-weight: 600; background: transparent; border: none; }"
+    "#mesNavBtn { background: #ffffff; border: 1px solid #ece2d6; border-radius: 20px;"
+    "  color: #2c2118; font-size: 18px; font-weight: 800; }"
+    "#mesNavBtn:hover { background: #f6eee4; }"
+    "#mesNavBtn:pressed { background: #ecdfcf; }"
+    "#mesHoyBtn { background: #ffffff; border: 1px solid #ece2d6; border-radius: 20px;"
+    "  color: #2c2118; font-size: 14px; font-weight: 800; padding: 0 18px; min-height: 40px; }"
+    "#mesHoyBtn:hover { background: #f6eee4; }"
+    "#mesTitulo { color: #2c2118; font-size: 30px; font-weight: 900; background: transparent; }"
+    "#mesTarjeta { background: #ffffff; border: 1px solid #efe6db; border-radius: 22px; }"
+    "#mesGrid { background: #ffffff; }"
+    "#diaCelda { background: #fbf8f4; border: 1.5px solid transparent; border-radius: 14px; }"
+    "#diaCelda:hover { border: 1.5px solid #e0cdb8; background: #fffdfa; }"
+    "#diaCelda[finde=\"true\"] { background: #eaf1fb; }"
+    "#diaCelda[finde=\"true\"]:hover { background: #f1f6fd; border: 1.5px solid #bcd0ec; }"
+    f"#diaCelda[hoy=\"true\"] {{ background: #fff3e8; border: 2px solid {HOY}; }}"
+    "#diaPista { color: #a8957f; font-size: 11px; font-weight: 700; background: transparent; border: none; }"
     "#mesVencidas { background: #fdecec; color: #c0392b; font-weight: 700;"
     "  border: 1px solid #f0c0bd; border-radius: 10px; padding: 8px 12px; }"
-    "#diaCabecera { color: #a0876f; font-size: 12px; font-weight: 800; background: transparent; }"
+    "#diaCabecera { color: #a8957f; font-size: 11px; font-weight: 800; letter-spacing: 1.5px;"
+    "  background: transparent; padding-bottom: 4px; }"
+    "#mesResumen { border-radius: 16px; padding: 0 14px; min-height: 32px; font-weight: 800; font-size: 13px; }"
+    "#mesLeyenda { color: #6b5a45; font-size: 13px; font-weight: 700; background: transparent; }"
 )
+
+# (fondo, texto, punto) de cada tipo de chip.
+# Más alegre (Daniel, 2026-11-12): pasteles vivos y los emojis de siempre.
+_COLOR_DESCANSO = ("#ebe3ff", "#5130a3", "🛌")
+_COLOR_PAGO = ("#d9f5e3", "#1b7341", "💵")
+_COLOR_FALTA = ("#ffe0db", "#b02a17", "❌")
+_COLOR_NOTA = ("#f3eee7", "#6b5a45", "📝")
+_COLOR_CONTEO = ("#ffe9cc", "#9a4a00", "📋")
+_COLOR_VENCIDA = ("#ffd9d3", "#b02a17", "🔴")
+_COLOR_PRONTO = ("#fff1bf", "#8a5a00", "🟡")
+_EMOJI_MES = ["", "🎉", "💘", "🌱", "🌷", "🌼", "☀️", "🏖️", "🎒", "🇲🇽", "🎃", "🍂", "🎄"]
+
+
+def _chip_qss(bg: str, fg: str) -> str:
+    return (
+        f"background: {bg}; color: {fg}; border: none; border-radius: 8px;"
+        " padding: 3px 8px; font-size: 12px; font-weight: 700;"
+    )
+
+
+def _texto_chip(emoji: str, texto: str) -> str:
+    return f"{emoji} {texto}"
+
+
+def _sombra(widget) -> None:
+    from PyQt6.QtGui import QColor
+    from PyQt6.QtWidgets import QGraphicsDropShadowEffect
+
+    efecto = QGraphicsDropShadowEffect(widget)
+    efecto.setBlurRadius(30)
+    efecto.setOffset(0, 4)
+    efecto.setColor(QColor(90, 40, 30, 28))
+    widget.setGraphicsEffect(efecto)
 
 
 def _default_session_factory() -> Session:
@@ -112,21 +156,13 @@ class ConteoCalendarioMesPanel(QWidget):
         layout.setSpacing(12)
 
         nav = QHBoxLayout()
-        prev_btn = QPushButton("◀")
-        prev_btn.setObjectName("mesNavBtn")
-        prev_btn.setFixedSize(40, 40)
-        prev_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        prev_btn.clicked.connect(lambda: self._cambiar_mes(-1))
-        next_btn = QPushButton("▶")
-        next_btn.setObjectName("mesNavBtn")
-        next_btn.setFixedSize(40, 40)
-        next_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        next_btn.clicked.connect(lambda: self._cambiar_mes(1))
+        nav.setSpacing(8)
         self._mes_label = QLabel("")
-        self._mes_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._mes_label.setObjectName("mesTitulo")
+        nav.addWidget(self._mes_label)
+        nav.addStretch()
         self._recordatorio_btn = QPushButton("➕ Recordatorio")
-        self._recordatorio_btn.setObjectName("mesNavBtn")
+        self._recordatorio_btn.setObjectName("mesHoyBtn")
         self._recordatorio_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._recordatorio_btn.clicked.connect(self._abrir_recordatorios)
         # Recordatorios RETIRADOS del calendario (pedido de Daniel 2026-09-04):
@@ -134,11 +170,25 @@ class ConteoCalendarioMesPanel(QWidget):
         # Libreta y esto quedaba redundante. Para revivirlos: borrar esta
         # línea y el early-return de refresh()/_agregar_recordatorio_en.
         self._recordatorio_btn.setVisible(False)
-        nav.addWidget(prev_btn)
-        nav.addStretch()
-        nav.addWidget(self._mes_label)
-        nav.addStretch()
         nav.addWidget(self._recordatorio_btn)
+        prev_btn = QPushButton("‹")
+        prev_btn.setObjectName("mesNavBtn")
+        prev_btn.setFixedSize(40, 40)
+        prev_btn.setToolTip("Mes anterior")
+        prev_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        prev_btn.clicked.connect(lambda: self._cambiar_mes(-1))
+        nav.addWidget(prev_btn)
+        self._hoy_btn = QPushButton("Hoy")
+        self._hoy_btn.setObjectName("mesHoyBtn")
+        self._hoy_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._hoy_btn.clicked.connect(self._ir_a_hoy)
+        nav.addWidget(self._hoy_btn)
+        next_btn = QPushButton("›")
+        next_btn.setObjectName("mesNavBtn")
+        next_btn.setFixedSize(40, 40)
+        next_btn.setToolTip("Mes siguiente")
+        next_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        next_btn.clicked.connect(lambda: self._cambiar_mes(1))
         nav.addWidget(next_btn)
         layout.addLayout(nav)
 
@@ -154,25 +204,52 @@ class ConteoCalendarioMesPanel(QWidget):
 
         sumario = QHBoxLayout()
         sumario.setSpacing(8)
-        _chip_qss = "border-radius: 13px; padding: 6px 14px; font-weight: 800; font-size: 13px;"
         self._chip_vencidas = QLabel("")
-        self._chip_vencidas.setStyleSheet(f"background: #fbe3e0; color: #b0341f; {_chip_qss}")
         self._chip_aldia = QLabel("")
-        self._chip_aldia.setStyleSheet(f"background: #e3f0e0; color: #2e7d32; {_chip_qss}")
         self._chip_mes = QLabel("")
-        self._chip_mes.setStyleSheet(f"background: #f1e5d1; color: #7b2d14; {_chip_qss}")
-        for c in (self._chip_vencidas, self._chip_aldia, self._chip_mes):
+        for c, (bg, fg, _p) in (
+            (self._chip_vencidas, _COLOR_VENCIDA),
+            (self._chip_aldia, _COLOR_PAGO),
+            (self._chip_mes, ("#ffe9cc", "#9a4a00", "")),
+        ):
+            c.setObjectName("mesResumen")
+            c.setStyleSheet(f"background: {bg}; color: {fg};")
             sumario.addWidget(c)
         sumario.addStretch()
+        leyenda = QLabel(
+            "   ".join(
+                _texto_chip(punto, nombre)
+                for nombre, (_b, _f, punto) in (
+                    ("Descansa", _COLOR_DESCANSO), ("Día de pago", _COLOR_PAGO),
+                    ("Faltó", _COLOR_FALTA), ("Conteo", _COLOR_CONTEO),
+                )
+            ) + "    🟦 Fin de semana"
+        )
+        leyenda.setObjectName("mesLeyenda")
+        sumario.addWidget(leyenda)
         layout.addLayout(sumario)
 
+        tarjeta = QFrame()
+        tarjeta.setObjectName("mesTarjeta")
+        _sombra(tarjeta)
+        t_ly = QVBoxLayout(tarjeta)
+        t_ly.setContentsMargins(16, 14, 16, 16)
         self._grid_host = QWidget()
+        self._grid_host.setObjectName("mesGrid")
         self._grid = QGridLayout(self._grid_host)
+        self._grid.setContentsMargins(0, 0, 0, 0)
         self._grid.setSpacing(8)
         # Columnas de ancho IGUAL (si no, la última se come todo el ancho).
         for c in range(7):
             self._grid.setColumnStretch(c, 1)
-        layout.addWidget(self._grid_host, 1)
+        t_ly.addWidget(self._grid_host)
+        layout.addWidget(tarjeta, 1)
+
+    def _ir_a_hoy(self) -> None:
+        if (self._anio, self._mes) == (self._hoy.year, self._hoy.month):
+            return
+        self._anio, self._mes = self._hoy.year, self._hoy.month
+        self._cambiar_mes(0)
 
     def _cambiar_mes(self, delta: int) -> None:
         mes = self._mes + delta
@@ -245,7 +322,7 @@ class ConteoCalendarioMesPanel(QWidget):
         DiaCalendarioDialog(self, fecha, session_factory=self._session_factory, hoy=self._hoy).exec()
 
     def _render(self) -> None:
-        self._mes_label.setText(f"{_MESES[self._mes]} {self._anio}")
+        self._mes_label.setText(f"{_EMOJI_MES[self._mes]}  {_MESES[self._mes]} {self._anio}")
 
         por_dia = agrupar_calendario_por_dia(self._estados, self._anio, self._mes)
         from pos_uniformes.services.recordatorio_service import (
@@ -259,7 +336,8 @@ class ConteoCalendarioMesPanel(QWidget):
         este_mes = sum(len(v) for v in por_dia.values())
         self._chip_vencidas.setText(f"🔴  {len(vencidas)} requieren conteo")
         self._chip_aldia.setText(f"🟢  {len(al_dia)} al día")
-        self._chip_mes.setText(f"📅  {este_mes} este mes")
+        self._chip_mes.setText(f"📅  {este_mes} conteos este mes")
+        self._chip_vencidas.setVisible(bool(vencidas))
         self._render_banner_proximos(proximos_recordatorios(self._recordatorios, self._hoy, dias=7))
 
         while self._grid.count():
@@ -271,8 +349,10 @@ class ConteoCalendarioMesPanel(QWidget):
             self._grid.setRowStretch(r, 0)  # reset (meses varían de 4 a 6 semanas)
 
         for col, nombre in enumerate(_DIAS_SEMANA):
-            cab = QLabel(nombre)
+            cab = QLabel(nombre.upper())
             cab.setObjectName("diaCabecera")
+            if col >= 5:
+                cab.setStyleSheet("color: #4a6c9b;")
             cab.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._grid.addWidget(cab, 0, col)
 
@@ -291,7 +371,7 @@ class ConteoCalendarioMesPanel(QWidget):
     @staticmethod
     def _celda_vacia() -> QWidget:
         celda = QFrame()
-        celda.setStyleSheet("QFrame { background: #f6f1e8; border: none; border-radius: 12px; }")
+        celda.setStyleSheet("QFrame { background: transparent; border: none; }")
         celda.setMinimumHeight(72)
         return celda
 
@@ -312,15 +392,15 @@ class ConteoCalendarioMesPanel(QWidget):
         celda.setToolTip(f"Toca para ver el detalle del {dia}")
         celda.setMinimumHeight(84)
         v = QVBoxLayout(celda)
-        v.setContentsMargins(10, 8, 10, 8)
+        v.setContentsMargins(8, 8, 8, 8)
         v.setSpacing(4)
         num = QLabel(str(dia))
         if es_hoy:
-            num.setFixedSize(26, 26)
+            num.setFixedSize(28, 28)
             num.setAlignment(Qt.AlignmentFlag.AlignCenter)
             num.setStyleSheet(
-                "background: #c45425; color: white; border-radius: 13px;"
-                " font-weight: 800; font-size: 12px;"
+                f"background: {HOY}; color: white; border-radius: 14px;"
+                " font-weight: 900; font-size: 13px;"
             )
             num_row = QHBoxLayout()
             num_row.setContentsMargins(0, 0, 0, 0)
@@ -329,8 +409,8 @@ class ConteoCalendarioMesPanel(QWidget):
             v.addLayout(num_row)
         else:
             num.setStyleSheet(
-                "font-weight: 800; font-size: 13px; background: transparent; border: none;"
-                f" color: {'#b3a08a' if es_finde else '#8a7358'};"
+                "font-weight: 800; font-size: 14px; background: transparent; border: none;"
+                f" padding-left: 4px; color: {'#4a6c9b' if es_finde else '#5c4d40'};"
             )
             v.addWidget(num)
         # Recordatorios primero (pagos/descansos/notas), luego lo que viene
@@ -364,15 +444,11 @@ class ConteoCalendarioMesPanel(QWidget):
 
     def _chip_empleada(self, tipo: str, nombre: str) -> QLabel:
         """Chip auto-sincronizado desde el calendario de la Libreta."""
-        icono = {"descanso": "🛌", "falta": "❌"}.get(tipo, "💵")
-        bg, fg = self._REC_COLORS.get(tipo, ("#eee", "#444"))
-        chip = QLabel(f"{icono} {nombre}")
+        bg, fg, punto = {"descanso": _COLOR_DESCANSO, "falta": _COLOR_FALTA}.get(tipo, _COLOR_PAGO)
+        chip = QLabel(_texto_chip(punto, nombre))
         que = {"descanso": "Descansa", "falta": "Faltó"}.get(tipo, "Día de pago de")
         chip.setToolTip(f"{que} {nombre} (viene del calendario de la Libreta)")
-        chip.setStyleSheet(
-            f"background: {bg}; color: {fg}; border: none; border-radius: 9px;"
-            " padding: 3px 8px; font-size: 11px; font-weight: 700;"
-        )
+        chip.setStyleSheet(_chip_qss(bg, fg))
         return chip
 
     def _chip_recordatorio(self, r, fecha, completado: bool) -> QLabel:
@@ -443,17 +519,14 @@ class ConteoCalendarioMesPanel(QWidget):
     @staticmethod
     def _chip(e) -> QLabel:
         if e.vencida:
-            bg, fg = "#fbe3e0", "#b0341f"
+            bg, fg, punto = _COLOR_VENCIDA
         elif e.dias_para_vencer is not None and e.dias_para_vencer <= 7:
-            bg, fg = "#fbeecb", "#a06a10"
+            bg, fg, punto = _COLOR_PRONTO
         else:
-            bg, fg = "#f1e5d1", "#7b2d14"
+            bg, fg, punto = _COLOR_CONTEO
         nombre = e.escuela_nombre
         texto = nombre if len(nombre) <= 15 else nombre[:14] + "…"
-        chip = QLabel(texto)
+        chip = QLabel(_texto_chip(punto, texto))
         chip.setToolTip(nombre)
-        chip.setStyleSheet(
-            f"background: {bg}; color: {fg}; border: none; border-radius: 7px;"
-            " padding: 2px 7px; font-size: 11px; font-weight: 700;"
-        )
+        chip.setStyleSheet(_chip_qss(bg, fg))
         return chip
