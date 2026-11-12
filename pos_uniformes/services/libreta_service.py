@@ -141,6 +141,17 @@ def comisiones_de_items(items: list[dict]) -> int:
     )
 
 
+def comisiones_de_operacion(items: list[dict], comisiones=None, descuento_empleada: bool = False) -> int:
+    """Las comisiones que cuenta una operación.
+
+    Una compra con precio especial (lo que compra una empleada) no paga
+    comisión a nadie (Daniel, 2026-11-12: «no quiero que le cuente como
+    comisión»): ni a la que la compró ni a la que la cobró."""
+    if descuento_empleada:
+        return 0
+    return comisiones_de_items(items) if comisiones is None else int(comisiones)
+
+
 def registrar_operacion(
     session,
     *,
@@ -206,7 +217,7 @@ def registrar_operacion(
         tipo=tipo,
         cliente=cliente,
         piezas=sum(line["cantidad"] for line in detalle),
-        comisiones=comisiones_de_items(items) if comisiones is None else int(comisiones),
+        comisiones=comisiones_de_operacion(items, comisiones, descuento_empleada),
         monto_total=monto_total,
         monto_neto=(
             monto_total if monto_neto is None else Decimal(str(monto_neto)).quantize(Decimal("0.01"))

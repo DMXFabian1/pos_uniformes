@@ -2878,6 +2878,7 @@ class QuoteSatelliteWindow(QMainWindow):
         employee_filter = None if self._libreta_is_owner else self._libreta_code
 
         week_rows: list = []
+        self._libreta_a_cuenta = {}   # se vuelve a leer en cada pintada
         fuente_db = False
         ciclo_texto: str | None = None
         nivel_avance = None
@@ -2929,6 +2930,7 @@ class QuoteSatelliteWindow(QMainWindow):
                         from pos_uniformes.services.corte_caja_service import ajustes_en_rango
 
                         self._libreta_ajuste = ajustes_en_rango(session, *self._libreta_ventana_mostrada())
+                        self._libreta_a_cuenta = self._compras_a_cuenta_libreta(session, week_rows)
                 fuente_db = True
             except Exception:  # noqa: BLE001
                 logger.exception("Libreta: fallo la consulta a la base")
@@ -4488,7 +4490,7 @@ class QuoteSatelliteWindow(QMainWindow):
             if not (desde <= created <= hasta):
                 continue
             items = list(entry.get("items", []))
-            from pos_uniformes.services.libreta_service import comisiones_de_items
+            from pos_uniformes.services.libreta_service import comisiones_de_operacion
 
             monto = _Dec(str(entry.get("monto_total", "0")))
             comisiones = entry.get("comisiones")
@@ -4500,8 +4502,8 @@ class QuoteSatelliteWindow(QMainWindow):
                     tipo=str(entry.get("tipo", "venta")),
                     cliente=entry.get("cliente"),
                     piezas=sum(int(it.get("cantidad", 0) or 0) for it in items),
-                    comisiones=(
-                        int(comisiones) if comisiones is not None else comisiones_de_items(items)
+                    comisiones=comisiones_de_operacion(
+                        items, comisiones, bool(entry.get("descuento_empleada", False))
                     ),
                     monto_total=monto,
                     monto_neto=_Dec(str(entry.get("monto_neto") or monto)),
@@ -4747,6 +4749,11 @@ class QuoteSatelliteWindow(QMainWindow):
                 tipo_txt += " (tarjeta)"
             if getattr(row, "privado", False):
                 tipo_txt = f"🔒 {tipo_txt}"  # este dinero no sale del corte
+            a_cuenta = getattr(self, "_libreta_a_cuenta", {}).get(getattr(row, "id", None))
+            if a_cuenta:
+                from pos_uniformes.services.compra_a_cuenta_service import etiqueta_libreta
+
+                tipo_txt = etiqueta_libreta(a_cuenta)   # no es dinero que entró
             if self._libreta_is_owner:
                 nombre = _nombre_de(row.employee_name or row.employee_code)
                 tipo_txt = f"{tipo_txt} — {nombre}"
@@ -4765,7 +4772,38 @@ class QuoteSatelliteWindow(QMainWindow):
             self.libreta_table.setItem(
                 i, 6, QTableWidgetItem(f"${Decimal(str(row.monto_total or 0)):,.2f}")
             )
+            if a_cuenta:
+                self._pintar_fila_a_cuenta(i)
         self._ajustar_alto_tabla_libreta()
+
+    #: La compra a cuenta de una empleada: azul y en cursiva, para que no se
+    #: lea como venta (el color del texto lo fija la hoja de estilo).
+    _A_CUENTA_FONDO = "#d3e3f8"
+
+    def _pintar_fila_a_cuenta(self, fila: int) -> None:
+        from PyQt6.QtGui import QBrush, QColor
+
+        fondo = QBrush(QColor(self._A_CUENTA_FONDO))
+        for col in range(self.libreta_table.columnCount()):
+            item = self.libreta_table.item(fila, col)
+            if item is None:
+                continue
+            item.setBackground(fondo)
+            letra = item.font()
+            letra.setItalic(True)
+            item.setFont(letra)
+            item.setToolTip("Compra de la empleada a cuenta de su pago: este dinero no entró al cajón.")
+
+    def _compras_a_cuenta_libreta(self, session, filas) -> dict:
+        """Qué ventas de las que se ven son compras a cuenta (nunca tumba la Libreta)."""
+        from pos_uniformes.services import compra_a_cuenta_service as cac
+
+        try:
+            with session.begin_nested():
+                return cac.estados_en_libreta(session, filas)
+        except Exception:  # noqa: BLE001
+            logger.exception("Libreta: no se pudieron marcar las compras a cuenta")
+            return {}
 
     def _cambiar_pagina_libreta(self, delta: int) -> None:
         self._libreta_pagina = max(0, getattr(self, "_libreta_pagina", 0) + delta)

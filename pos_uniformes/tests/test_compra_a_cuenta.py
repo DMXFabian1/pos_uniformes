@@ -112,6 +112,41 @@ class RegistrarTests(unittest.TestCase):
         with self.assertRaises(pr.NoSePuede):
             self._registrar(este, "401")
 
+    def _venta_empleada(self, folio, descuento=True):
+        from pos_uniformes.services import libreta_service as lib
+
+        return lib.registrar_operacion(
+            self.s, employee_code="VEND-3", employee_name="Cristal", tipo="venta",
+            items=[{"sku": "S1", "nombre": "Pantalón", "precio": "369", "cantidad": 1}],
+            monto_total=D("332"), descuento_empleada=descuento, compradora_code="VEND-3",
+            operacion_uuid=folio,
+        )
+
+    def test_la_libreta_sabe_cual_venta_es_a_cuenta_y_como_va(self):
+        """Daniel, 2026-11-12: «este dinero no entró… ¿puede verse de otro color?»"""
+        folio = "abcdef12-0000-4000-8000-000000000001"
+        venta = self._venta_empleada(folio)
+        otra = self._venta_empleada("99999999-0000-4000-8000-000000000002")   # pagó al momento
+        p = cac.registrar(self.s, employee_code="VEND-3", nombre="Cristal", monto="332",
+                          opcion=cac.opciones_de_pago(SAB14, 7)[0], quien="VEND-1", folio=folio)
+        self.assertEqual(cac.estados_en_libreta(self.s, [venta, otra]), {venta.id: cac.POR_AUTORIZAR})
+        pr.aprobar(self.s, p.id, quien="VEND-1")
+        self.assertEqual(cac.estados_en_libreta(self.s, [venta]), {venta.id: cac.AUTORIZADA})
+        self.assertEqual(cac.etiqueta_libreta(cac.AUTORIZADA), "📅 A cuenta · autorizada")
+
+    def test_si_no_la_autoriza_vuelve_a_ser_venta(self):
+        folio = "abcdef12-0000-4000-8000-000000000001"
+        venta = self._venta_empleada(folio)
+        p = cac.registrar(self.s, employee_code="VEND-3", nombre="Cristal", monto="332",
+                          opcion=cac.opciones_de_pago(SAB14, 7)[0], quien="VEND-1", folio=folio)
+        pr.rechazar(self.s, p.id, quien="VEND-1")
+        self.assertEqual(cac.estados_en_libreta(self.s, [venta]), {})
+
+    def test_lo_que_compra_una_empleada_no_da_comision(self):
+        """Daniel, 2026-11-12: «no quiero que le cuente como comisión»."""
+        self.assertEqual(self._venta_empleada("abcdef12-0000-4000-8000-000000000001").comisiones, 0)
+        self.assertEqual(self._venta_empleada("abcdef12-0000-4000-8000-000000000003", descuento=False).comisiones, 1)
+
     def test_el_del_pago_siguiente_se_salta_el_proximo(self):
         este, siguiente = cac.opciones_de_pago(SAB14, 7)
         for op, monto in ((este, "300"), (siguiente, "200")):

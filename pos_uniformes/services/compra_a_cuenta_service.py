@@ -24,6 +24,7 @@ pague, el corte marca ese faltante). «Del pago siguiente» guarda
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone  # noqa: F401
 from decimal import Decimal
@@ -101,6 +102,62 @@ def opciones_para(session, employee_code: str, hoy: date | None = None) -> tuple
 
 def es_compra(prestamo) -> bool:
     return str(getattr(prestamo, "motivo", "") or "").startswith(PREFIJO_MOTIVO)
+
+
+#: Cómo va la compra, tal como se ve en la Libreta del dueño.
+POR_AUTORIZAR, AUTORIZADA, DESCONTADA = "por autorizar", "autorizada", "descontada"
+_RE_TICKET = re.compile(r"ticket\s+([0-9a-fA-F]{8})")
+
+
+def estados_en_libreta(session, filas) -> dict[int, str]:
+    """De las ventas dadas, cuáles son compras a cuenta y cómo van.
+
+    (Daniel, 2026-11-12: «este dinero no entró… ¿puede verse de otro color
+    para saber que no es venta?») La venta se liga con su compra por el folio
+    del ticket que lleva el motivo («… · ticket 9e9ad282»). Una compra que
+    Daniel no autorizó ya no sale: ella la pagó en caja y es una venta normal.
+
+    Devuelve {id de la venta: POR_AUTORIZAR | AUTORIZADA | DESCONTADA}."""
+    from sqlalchemy import select
+
+    from pos_uniformes.database.models import PrestamoEmpleada
+
+    candidatas: dict[str, int] = {}
+    fechas = []
+    for f in filas or []:
+        folio = str(getattr(f, "operacion_uuid", "") or "")
+        if str(getattr(f, "tipo", "")) == "venta" and getattr(f, "descuento_empleada", False) and folio:
+            candidatas[folio[:8].lower()] = int(f.id)
+            if getattr(f, "created_at", None) is not None:
+                fechas.append(f.created_at)
+    if not candidatas:
+        return {}
+    consulta = select(PrestamoEmpleada).where(
+        PrestamoEmpleada.motivo.like(f"{PREFIJO_MOTIVO}%"),
+        PrestamoEmpleada.estado != pr.RECHAZADO,
+    )
+    if fechas:
+        # La compra se anota en el mismo momento que la venta.
+        consulta = consulta.where(
+            PrestamoEmpleada.created_at >= min(fechas) - timedelta(days=1),
+            PrestamoEmpleada.created_at <= max(fechas) + timedelta(days=1),
+        )
+    estados: dict[int, str] = {}
+    for p in session.scalars(consulta):
+        m = _RE_TICKET.search(str(p.motivo or ""))
+        venta_id = candidatas.get(m.group(1).lower()) if m else None
+        if venta_id is None:
+            continue
+        estado = str(p.estado)
+        estados[venta_id] = (
+            DESCONTADA if estado == pr.COBRADO else AUTORIZADA if estado == pr.APROBADO else POR_AUTORIZAR
+        )
+    return estados
+
+
+def etiqueta_libreta(estado: str) -> str:
+    """«📅 A cuenta · por autorizar»: lo que dice la columna Tipo."""
+    return f"📅 A cuenta · {estado}"
 
 
 def motivo_retiro(prestamo) -> str:
