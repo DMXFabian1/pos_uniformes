@@ -54,14 +54,14 @@ class RankingLibretaTests(unittest.TestCase):
             acreditar_cashback=False, **kw,
         )
 
-    def test_su_propia_compra_no_es_operacion_ni_comision(self):
+    def test_su_propia_compra_no_cuenta_operacion_piezas_ni_importe(self):
         """Daniel, 2026-11-12: lo que compra con precio especial no le cuenta."""
         self._op("VEND-4", "Stayce", "venta", [_item("Pantalón", 1, 369)], "332", descuento_empleada=True)
         self._op("VEND-4", "Stayce", "venta", [_item("Playera", 1, 180)], "180")
         [f] = rk.calcular(list(self.s.scalars(select(LibretaVenta))))
-        self.assertEqual((f.operaciones, f.puntos), (1, 1))
+        self.assertEqual((f.operaciones, f.puntos, f.piezas, f.ventas, f.importe_ventas), (1, 1, 1, 1, D("180.00")))
         [r] = lib.resumir_por_empleada(list(self.s.scalars(select(LibretaVenta))))
-        self.assertEqual((r.operaciones, r.comisiones), (1, 1))
+        self.assertEqual((r.operaciones, r.comisiones, r.piezas, r.monto_total), (1, 1, 1, D("180.00")))
 
     def _cargar(self):
         self.s.commit()

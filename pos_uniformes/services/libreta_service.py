@@ -567,13 +567,15 @@ def resumir_por_empleada(rows: list[LibretaVenta]) -> list[ResumenEmpleada]:
                 "monto": Decimal("0.00"),
             },
         )
-        if cuenta_como_operacion(row):
-            bucket["operaciones"] += 1
-        bucket["piezas"] += int(row.piezas or 0)
         bucket["comisiones"] += int(getattr(row, "comisiones", 0) or 0)
-        bucket["monto"] = (bucket["monto"] + Decimal(str(row.monto_total or 0))).quantize(
-            Decimal("0.01")
-        )
+        if cuenta_como_operacion(row):
+            # Su propia compra con precio especial no le suma operación, piezas
+            # ni importe (Daniel, 2026-11-12).
+            bucket["operaciones"] += 1
+            bucket["piezas"] += int(row.piezas or 0)
+            bucket["monto"] = (bucket["monto"] + Decimal(str(row.monto_total or 0))).quantize(
+                Decimal("0.01")
+            )
         if row.employee_name:
             bucket["name"] = row.employee_name
     return sorted(
