@@ -28,9 +28,9 @@ class ResumenDeHoyTests(unittest.TestCase):
         self.s = Session(engine)
         self.addCleanup(self.s.close)
 
-    def _mov(self, code, nombre, hora, *, tipo="venta", privado=False, dia=HOY):
+    def _mov(self, code, nombre, hora, *, tipo="venta", privado=False, dia=HOY, empleada=False):
         self.s.add(LibretaVenta(employee_code=code, employee_name=nombre, tipo=tipo, piezas=1,
-                                monto_total=Decimal("100"), privado=privado,
+                                monto_total=Decimal("100"), privado=privado, descuento_empleada=empleada,
                                 created_at=datetime.combine(dia, hora)))
         self.s.commit()
 
@@ -57,6 +57,14 @@ class ResumenDeHoyTests(unittest.TestCase):
         self._mov("VEND-4", "Fanny Ortiz", time(10, 6))
         r = gh.resumen_de_hoy(self.s, hoy=HOY)
         self.assertEqual(r.por_empleada, (("Fanny", 1),))
+
+    def test_su_propia_compra_no_es_operacion(self) -> None:
+        """Daniel, 2026-11-12: «tampoco quiero que le cuente como operación»."""
+        self._mov("VEND-4", "Stayce Chavarria", time(15, 31), empleada=True)
+        self._mov("VEND-5", "Cristal Torres", time(16, 5))
+        r = gh.resumen_de_hoy(self.s, hoy=HOY)
+        self.assertEqual(r.por_empleada, (("Cristal", 1),))
+        self.assertEqual(r.ultima, ("Cristal", "16:05"))
 
     def test_sin_nada_el_texto_va_vacio(self) -> None:
         r = gh.resumen_de_hoy(self.s, hoy=HOY)

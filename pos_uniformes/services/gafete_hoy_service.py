@@ -62,6 +62,9 @@ def resumen_de_hoy(session, *, hoy: date | None = None) -> ResumenHoy:
             LibretaVenta.created_at < datetime.combine(desde.date(), time.max),
             LibretaVenta.tipo.in_(TIPOS_QUE_CUENTAN),
             LibretaVenta.privado.is_(False),
+            # Lo que compra una empleada con precio especial no es operación
+            # de nadie (Daniel, 2026-11-12).
+            LibretaVenta.descuento_empleada.is_(False),
         )
         .order_by(LibretaVenta.created_at)
     ).all()

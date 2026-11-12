@@ -16,7 +16,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from pos_uniformes.database.connection import Base
@@ -53,6 +53,15 @@ class RankingLibretaTests(unittest.TestCase):
             created_at=datetime(DIA.year, DIA.month, DIA.day, hora, 0),
             acreditar_cashback=False, **kw,
         )
+
+    def test_su_propia_compra_no_es_operacion_ni_comision(self):
+        """Daniel, 2026-11-12: lo que compra con precio especial no le cuenta."""
+        self._op("VEND-4", "Stayce", "venta", [_item("Pantalón", 1, 369)], "332", descuento_empleada=True)
+        self._op("VEND-4", "Stayce", "venta", [_item("Playera", 1, 180)], "180")
+        [f] = rk.calcular(list(self.s.scalars(select(LibretaVenta))))
+        self.assertEqual((f.operaciones, f.puntos), (1, 1))
+        [r] = lib.resumir_por_empleada(list(self.s.scalars(select(LibretaVenta))))
+        self.assertEqual((r.operaciones, r.comisiones), (1, 1))
 
     def _cargar(self):
         self.s.commit()

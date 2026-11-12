@@ -141,6 +141,12 @@ def comisiones_de_items(items: list[dict]) -> int:
     )
 
 
+def cuenta_como_operacion(row) -> bool:
+    """¿Es una operación de la empleada? Su propia compra con precio especial
+    no (Daniel, 2026-11-12: «tampoco quiero que le cuente como operación»)."""
+    return not bool(getattr(row, "descuento_empleada", False))
+
+
 def comisiones_de_operacion(items: list[dict], comisiones=None, descuento_empleada: bool = False) -> int:
     """Las comisiones que cuenta una operación.
 
@@ -561,7 +567,8 @@ def resumir_por_empleada(rows: list[LibretaVenta]) -> list[ResumenEmpleada]:
                 "monto": Decimal("0.00"),
             },
         )
-        bucket["operaciones"] += 1
+        if cuenta_como_operacion(row):
+            bucket["operaciones"] += 1
         bucket["piezas"] += int(row.piezas or 0)
         bucket["comisiones"] += int(getattr(row, "comisiones", 0) or 0)
         bucket["monto"] = (bucket["monto"] + Decimal(str(row.monto_total or 0))).quantize(

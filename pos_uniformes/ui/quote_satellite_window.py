@@ -4561,10 +4561,13 @@ class QuoteSatelliteWindow(QMainWindow):
         # Alineadas con las filas de la tabla MOVIMIENTOS (para poder borrar).
         self._libreta_rows_pintadas = list(rows)
 
-        total_ops = len(rows)
+        from pos_uniformes.services.libreta_service import cuenta_como_operacion
+
+        # La compra de una empleada con precio especial no cuenta como operación.
+        total_ops = sum(1 for r in rows if cuenta_como_operacion(r))
         total_piezas = sum(int(r.piezas or 0) for r in rows)
         total_comisiones = sum(int(getattr(r, "comisiones", 0) or 0) for r in rows)
-        ventas_count = sum(1 for r in rows if str(r.tipo) == "venta")
+        ventas_count = sum(1 for r in rows if str(r.tipo) == "venta" and cuenta_como_operacion(r))
         apartados_count = sum(1 for r in rows if str(r.tipo) == "apartado")
         periodo = self._libreta_periodo_texto()
         cortes = resumir_por_dia(rows) if self._libreta_is_owner else []

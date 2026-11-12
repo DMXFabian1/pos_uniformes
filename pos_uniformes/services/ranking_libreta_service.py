@@ -63,7 +63,8 @@ def calcular(rows) -> list[FilaRanking]:
         tipo = str(getattr(row, "tipo", "") or "")
         # Los puntos se suman tal cual están guardados (los abonos valen 0).
         fila.puntos += int(getattr(row, "comisiones", 0) or 0)
-        if tipo in TIPOS_DE_VENTA:
+        if tipo in TIPOS_DE_VENTA and not getattr(row, "descuento_empleada", False):
+            # Su propia compra con precio especial no es operación suya (2026-11-12).
             fila.operaciones += 1
             fila.piezas += int(getattr(row, "piezas", 0) or 0)
         if tipo == "venta":
