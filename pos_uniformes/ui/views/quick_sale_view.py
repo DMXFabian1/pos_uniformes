@@ -3424,8 +3424,11 @@ class QuickSaleWidget(
             corto = fv.folio_corto(folio)
             lines.append("")
             if con_qr:
+                # El folio va escrito dentro del recuadro del QR (y en su
+                # respaldo, para la impresora que no pone dibujos).
                 lines.append(fv.marcador_qr(folio))
-            lines.append(f"Folio: {corto}".center(_TW))
+            else:
+                lines.append(f"Folio: {corto}".center(_TW))
         except Exception:  # noqa: BLE001 — un folio raro nunca detiene el ticket
             _logger.warning("Ticket: folio de venta inválido %r", folio, exc_info=True)
 

@@ -66,8 +66,8 @@ class FolioTests(unittest.TestCase):
 
         with Image.open(ruta) as img:
             ancho, alto = img.size
-        self.assertEqual(ancho, alto)
-        self.assertTrue(150 <= ancho <= 300)   # ~2–4 cm en la térmica de 576 puntos
+        self.assertEqual(ancho, fv.ANCHO_RECUADRO)   # el recuadro, dentro del papel de 576
+        self.assertTrue(180 <= alto <= 300)
 
     def test_un_marcador_qr_raro_no_da_imagen(self):
         self.assertIsNone(imagen_para_marcador("qr_VTA123"))
