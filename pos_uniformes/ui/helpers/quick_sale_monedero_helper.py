@@ -594,11 +594,14 @@ class MonederoVentaMixin:
         }
         tickets: list[str] = []
         if not sin_ticket:
-            tickets.append(self._build_venta_text(monedero=info))
+            # El folio (QR) es la identidad con la que quedó registrada.
+            tickets.append(self._build_venta_text(monedero=info, folio=operacion_uuid))
             if self._discount_active:
                 tickets.append(self._build_employee_copy_text(terminal_commission=tarjeta))
             elif con_copia:
-                tickets.append(self._build_venta_text(store_copy=True, terminal_commission=tarjeta, monedero=info))
+                tickets.append(self._build_venta_text(
+                    store_copy=True, terminal_commission=tarjeta, monedero=info, folio=operacion_uuid
+                ))
         # Ya quedó registrada: el carrito se vacía aunque no se imprima.
         self._vaciar_carrito()
         if sin_ticket:

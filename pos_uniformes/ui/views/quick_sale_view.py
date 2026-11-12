@@ -52,6 +52,7 @@ from pos_uniformes.ui.helpers.quick_sale_cliente_helper import ClienteRapidoMixi
 from pos_uniformes.ui.helpers.quick_sale_programa_helper import ProgramaClienteMixin
 from pos_uniformes.ui.helpers.quick_sale_compradora_helper import CompradoraEmpleadaMixin
 from pos_uniformes.ui.helpers.quick_sale_rebaja_helper import RebajaVentaMixin
+from pos_uniformes.ui.helpers.quick_sale_folio_helper import FolioVentaMixin
 from pos_uniformes.ui.helpers.quick_sale_motor_helper import MotorVentaMixin
 from pos_uniformes.ui.helpers.quick_sale_monedero_helper import (
     MonederoVentaMixin,
@@ -272,7 +273,7 @@ def _totales_de_fotografia(foto: dict | None):
 
 class QuickSaleWidget(
     ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMixin, CompradoraEmpleadaMixin, RebajaVentaMixin,
-    MotorVentaMixin, QWidget
+    MotorVentaMixin, FolioVentaMixin, QWidget
 ):
     #: Lo de hoy para el pie del gafete, leído en un hilo (el kiosko sin red no se congela).
     _pie_gafete_leido = pyqtSignal(object)
@@ -773,6 +774,12 @@ class QuickSaleWidget(
         if self._es_qr_cliente(sku):
             self._scan_input.clear()
             self._identificar_cliente(self._codigo_cliente_de(sku), por_qr=True)
+            self._scan_input.setFocus()
+            return
+        if self._es_folio_venta(sku):
+            # QR del ticket (o folio tecleado): enseña esa venta (2026-11-12).
+            self._scan_input.clear()
+            self._abrir_venta_por_folio(sku)
             self._scan_input.setFocus()
             return
         self.add_sku(sku, self._qty_spin.value())
@@ -1387,8 +1394,9 @@ class QuickSaleWidget(
                 **({"descuento_programa": str(pct_programa)} if pct_programa else {}),
                 "origen": origen,
                 "created_at": creado.astimezone().isoformat(),
-                # Identidad persistente: la misma en cada reintento.
-                "operacion_uuid": str(_uuid.uuid4()),
+                # Identidad persistente: la misma en cada reintento. En una
+                # venta con ticket es el folio que ya va impreso en el QR.
+                "operacion_uuid": self._tomar_folio_venta(tipo) or str(_uuid.uuid4()),
                 **self._datos_cliente_para_cola(tipo, total, bool(pago_tarjeta)),
             }
         ]
@@ -2196,6 +2204,7 @@ class QuickSaleWidget(
         pago_tarjeta: bool = False,
         descuento_programa=None,
         calculo: dict | None = None,
+        operacion_uuid: str | None = None,
     ) -> str | None:
         """Reconstruye el ticket de una operación YA registrada en la Libreta
         (para reimprimir si la impresora falló). No registra nada ni toca el
@@ -2259,7 +2268,7 @@ class QuickSaleWidget(
                         "metodo": "Tarjeta" if pago_tarjeta else "Efectivo",
                     }
                 return self._build_venta_text(
-                    fecha_str=fecha_str, reimpresion=True, monedero=monedero
+                    fecha_str=fecha_str, reimpresion=True, monedero=monedero, folio=operacion_uuid
                 )
             return self._build_apartado_text(
                 cliente or "", copy_label="CLIENTE", fecha_str=fecha_str, reimpresion=True
@@ -2705,7 +2714,18 @@ class QuickSaleWidget(
             return None
         return resultado
 
+    #: El folio de la venta que se está imprimiendo (lo toma la anotación).
+    _folio_venta: str | None = None
+
+    def _tomar_folio_venta(self, tipo: str) -> str | None:
+        """El folio ya impreso, una sola vez y solo para una venta."""
+        folio = self._folio_venta if tipo == "venta" else None
+        if folio:
+            self._folio_venta = None
+        return folio
+
     def _on_ticket_venta(self) -> None:
+        self._folio_venta = None
         if not self._items:
             QMessageBox.information(self, "Sin piezas", "Agrega piezas antes de generar ticket.")
             return
@@ -2739,11 +2759,17 @@ class QuickSaleWidget(
         if self._canje_actual(total_venta) > 0:
             self._cobrar_con_monedero(card, wants_copy)
             return
-        tickets = [self._build_venta_text(monedero=self._monedero_para_ticket(total_venta, card))]
+        # El folio (QR) se decide antes de imprimir y la Libreta guarda ese
+        # mismo como identidad de la venta (2026-11-12).
+        import uuid as _uuid
+
+        folio = str(_uuid.uuid4())
+        self._folio_venta = folio
+        tickets = [self._build_venta_text(monedero=self._monedero_para_ticket(total_venta, card), folio=folio)]
         if self._discount_active:
             tickets.append(self._build_employee_copy_text(terminal_commission=card))
         elif wants_copy:
-            tickets.append(self._build_venta_text(store_copy=True, terminal_commission=card))
+            tickets.append(self._build_venta_text(store_copy=True, terminal_commission=card, folio=folio))
         # La Libreta registra HASTA que la impresión realmente arranca:
         # cerrar el diálogo sin imprimir no anota nada.
         route_tickets(
@@ -3279,6 +3305,7 @@ class QuickSaleWidget(
         fecha_str: str | None = None,
         reimpresion: bool = False,
         monedero: dict | None = None,
+        folio: str | None = None,
     ) -> str:
         """Ticket de venta. Con store_copy=True genera la copia interna:
         mismo formato de articulos y totales, pero sin los datos que ve el
@@ -3375,6 +3402,7 @@ class QuickSaleWidget(
                 lines.extend(seccion)
             lines.append(tk_bot())
 
+        self._append_folio(lines, folio, con_qr=not store_copy)
         if not store_copy:
             self._append_terms(lines, self._TERMS_VENTA)
             lines.append("")
@@ -3382,6 +3410,24 @@ class QuickSaleWidget(
             self._append_temporada(lines)
 
         return "\n".join(lines)
+
+    @staticmethod
+    def _append_folio(lines: list[str], folio: str | None, *, con_qr: bool) -> None:
+        """El folio de la venta (Daniel, 2026-11-12): con el QR se encuentra
+        la venta para un cambio o para rastrearla. La copia del cliente lleva
+        el QR; la de la tienda, solo el folio escrito."""
+        if not folio:
+            return
+        try:
+            from pos_uniformes.services import folio_venta_service as fv
+
+            corto = fv.folio_corto(folio)
+            lines.append("")
+            if con_qr:
+                lines.append(fv.marcador_qr(folio))
+            lines.append(f"Folio: {corto}".center(_TW))
+        except Exception:  # noqa: BLE001 — un folio raro nunca detiene el ticket
+            _logger.warning("Ticket: folio de venta inválido %r", folio, exc_info=True)
 
     @staticmethod
     def _append_temporada(lines: list[str]) -> None:

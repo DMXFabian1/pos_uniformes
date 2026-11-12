@@ -104,6 +104,12 @@ hiddenimports += [
     "pos_uniformes.services.nomina_service",
     "pos_uniformes.services.pendientes_service",
     "pos_uniformes.services.dvr_settings_cache_service",
+    # QR del folio de la venta en el ticket (2026-11-12): se dibuja al imprimir.
+    "pos_uniformes.services.folio_venta_service",
+    "pos_uniformes.ui.helpers.quick_sale_folio_helper",
+    "pos_uniformes.ui.dialogs.venta_folio_dialog",
+    "qrcode",
+    "qrcode.image.pil",
     "PyQt6.QtMultimedia",
     "PyQt6.QtMultimediaWidgets",
     # pywin32: TODOS sus imports en el código son lazy (dentro de funciones),

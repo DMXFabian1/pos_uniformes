@@ -4303,6 +4303,8 @@ class QuoteSatelliteWindow(QMainWindow):
             descuento_programa=getattr(row, "descuento_programa", None),
             # M2: con fotografía, los importes que se cobraron.
             calculo=getattr(row, "calculo", None),
+            # El mismo folio (QR) que traía el ticket original.
+            operacion_uuid=getattr(row, "operacion_uuid", None),
         )
         if not texto:
             QMessageBox.information(

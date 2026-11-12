@@ -557,6 +557,14 @@ def imagen_para_marcador(nombre: str):
     limpio = "".join(c for c in solo if c.isalnum() or c == "_")
     if not limpio:
         return None
+    if limpio.startswith("qr_"):
+        # El QR del folio de la venta: se dibuja al momento (2026-11-12).
+        try:
+            from pos_uniformes.services.folio_venta_service import png_para_marcador
+
+            return png_para_marcador(limpio)
+        except Exception:  # noqa: BLE001 — sin QR, sale el folio escrito
+            return None
     for carpeta in (carpeta_dibujos(), carpeta_imagenes_ticket()):
         ruta = carpeta / f"{limpio}.png"
         if ruta.exists():
