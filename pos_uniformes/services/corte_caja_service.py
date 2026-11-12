@@ -177,7 +177,23 @@ def operaciones_del_periodo(session, desde: datetime | None, hasta: datetime) ->
         .where(LibretaVenta.created_at > desde, LibretaVenta.created_at <= hasta)
         .order_by(LibretaVenta.created_at.desc())
     )
-    return list(session.scalars(stmt).all())
+    return sin_compras_a_cuenta(session, list(session.scalars(stmt).all()))
+
+
+def sin_compras_a_cuenta(session, rows: list) -> list:
+    """Quita las compras a cuenta de las empleadas: no son venta del cajón.
+
+    (Daniel, 2026-11-12: «en el corte no quiero que aparezcan las compras a
+    cuenta ni que se descuenten de la venta».) Su retiro tampoco cuenta
+    (`retiros_service`). Si Daniel no la autoriza, vuelve a ser venta: ella
+    la paga en caja y entonces sí la espera el corte.
+
+    Si la consulta falla, falla el corte: quitar el retiro sin quitar su venta
+    daría un esperado falso."""
+    from pos_uniformes.services.compra_a_cuenta_service import estados_en_libreta
+
+    a_cuenta = estados_en_libreta(session, rows)
+    return [r for r in rows if getattr(r, "id", None) not in a_cuenta] if a_cuenta else rows
 
 
 def pagos_del_periodo(session, desde: datetime | None, hasta: datetime) -> Decimal:

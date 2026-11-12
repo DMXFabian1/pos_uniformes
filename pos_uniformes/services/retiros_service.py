@@ -114,10 +114,22 @@ def registrar_gasto(session, *, monto, motivo: str, employee_code: str):
     return retiro
 
 
+def _no_es_compra_a_cuenta(CajaRetiro):
+    """El retiro de una compra a cuenta no es dinero que salió: no va al corte.
+
+    (Daniel, 2026-11-12: «en el corte no quiero que aparezcan las compras a
+    cuenta ni que se descuenten de la venta».) Su venta también sale del
+    corte (`corte_caja_service.operaciones_del_periodo`): las dos se
+    cancelaban, así que el esperado no cambia."""
+    from pos_uniformes.services.compra_a_cuenta_service import PREFIJO_MOTIVO
+
+    return ~CajaRetiro.motivo.like(f"{PREFIJO_MOTIVO}%")
+
+
 def retiros_del_periodo(session, desde: datetime | None, hasta: datetime, *, solo_en_cajon: bool = True) -> list:
     from pos_uniformes.database.models import CajaRetiro
 
-    stmt = select(CajaRetiro).where(CajaRetiro.created_at <= hasta)
+    stmt = select(CajaRetiro).where(CajaRetiro.created_at <= hasta, _no_es_compra_a_cuenta(CajaRetiro))
     if solo_en_cajon:
         stmt = stmt.where(CajaRetiro.en_cajon.is_(True))
     if desde is not None:
@@ -129,7 +141,7 @@ def total_retiros(session, desde: datetime | None, hasta: datetime) -> Decimal:
     from pos_uniformes.database.models import CajaRetiro
 
     stmt = select(func.coalesce(func.sum(CajaRetiro.monto), 0)).where(
-        CajaRetiro.created_at <= hasta, CajaRetiro.en_cajon.is_(True)
+        CajaRetiro.created_at <= hasta, CajaRetiro.en_cajon.is_(True), _no_es_compra_a_cuenta(CajaRetiro)
     )
     if desde is not None:
         stmt = stmt.where(CajaRetiro.created_at > desde)

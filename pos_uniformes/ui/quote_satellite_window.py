@@ -4571,17 +4571,21 @@ class QuoteSatelliteWindow(QMainWindow):
         ventas_count = sum(1 for r in rows if str(r.tipo) == "venta" and cuenta_como_operacion(r))
         apartados_count = sum(1 for r in rows if str(r.tipo) == "apartado")
         periodo = self._libreta_periodo_texto()
-        cortes = resumir_por_dia(rows) if self._libreta_is_owner else []
+        # El dinero (cajón, tarjeta) no cuenta las compras a cuenta de las
+        # empleadas: no entró nada, igual que en el corte (2026-11-12).
+        a_cuenta = getattr(self, "_libreta_a_cuenta", {}) or {}
+        filas_dinero = [r for r in rows if getattr(r, "id", None) not in a_cuenta]
+        cortes = resumir_por_dia(filas_dinero) if self._libreta_is_owner else []
         self._libreta_last_cortes = cortes
 
         if self._libreta_is_owner:
-            total_monto = sum(Decimal(str(r.monto_total or 0)) for r in rows)
+            total_monto = sum(Decimal(str(r.monto_total or 0)) for r in filas_dinero)
             total_en_caja = sum((c.monto_en_caja for c in cortes), Decimal("0.00"))
             total_neto = sum((c.monto_neto_ventas for c in cortes), Decimal("0.00"))
             total_abonos = sum((c.monto_abonos for c in cortes), Decimal("0.00"))
             # Con monedero, por la terminal pasó solo el resto (no el total), y
             # lo pagado con saldo no es efectivo ni tarjeta.
-            ventas_rows = [r for r in rows if str(r.tipo) == "venta"]
+            ventas_rows = [r for r in filas_dinero if str(r.tipo) == "venta"]
             total_tarjeta = sum((pagos_de(r).tarjeta for r in ventas_rows), Decimal("0.00"))
             total_efectivo = sum((pagos_de(r).efectivo for r in ventas_rows), Decimal("0.00"))
             # Principio de Daniel (2026-09-06): la Libreta habla de dinero

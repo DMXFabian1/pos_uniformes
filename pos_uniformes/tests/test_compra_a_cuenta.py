@@ -151,6 +151,43 @@ class RegistrarTests(unittest.TestCase):
         self.assertIn("✅ Cristal $332 a cuenta", etiquetas)
         self.assertIn("✖️ Que lo pague", etiquetas)
 
+    def _corte(self):
+        from datetime import datetime
+
+        from pos_uniformes.services import corte_caja_service as cc
+        from pos_uniformes.services import retiros_service as rs
+
+        desde, hasta = datetime(2000, 1, 1), datetime(2100, 1, 1)
+        rows = cc.operaciones_del_periodo(self.s, desde, hasta)
+        return ([r.id for r in rows], [r.motivo for r in rs.retiros_del_periodo(self.s, desde, hasta)],
+                rs.total_retiros(self.s, desde, hasta))
+
+    def test_el_corte_no_ve_la_compra_a_cuenta_ni_su_retiro(self):
+        """Daniel, 2026-11-12: «en el corte no quiero que aparezcan las compras
+        a cuenta ni que se descuenten de la venta»."""
+        folio = "abcdef12-0000-4000-8000-000000000001"
+        compra = self._venta_empleada(folio)
+        otra = self._venta_empleada("99999999-0000-4000-8000-000000000002")   # pagó al momento
+        p = cac.registrar(self.s, employee_code="VEND-3", nombre="Cristal", monto="332",
+                          opcion=cac.opciones_de_pago(SAB14, 7)[0], quien="VEND-1", folio=folio)
+        from pos_uniformes.services import retiros_service as rs
+
+        rs.registrar_retiro(self.s, monto="50", motivo="Proveedor", creado_por="VEND-1")
+        ventas, retiros, total = self._corte()
+        self.assertEqual(ventas, [otra.id])
+        self.assertEqual((retiros, total), (["Proveedor"], D("50.00")))
+        pr.aprobar(self.s, p.id, quien="VEND-1")
+        self.assertEqual(self._corte()[0], [otra.id])
+        self.assertNotIn(compra.id, self._corte()[0])
+
+    def test_si_no_la_autoriza_el_corte_si_la_espera(self):
+        folio = "abcdef12-0000-4000-8000-000000000001"
+        compra = self._venta_empleada(folio)
+        p = cac.registrar(self.s, employee_code="VEND-3", nombre="Cristal", monto="332",
+                          opcion=cac.opciones_de_pago(SAB14, 7)[0], quien="VEND-1", folio=folio)
+        pr.rechazar(self.s, p.id, quien="VEND-1")
+        self.assertEqual(self._corte(), ([compra.id], [], D("0.00")))
+
     def test_si_no_la_autoriza_vuelve_a_ser_venta(self):
         folio = "abcdef12-0000-4000-8000-000000000001"
         venta = self._venta_empleada(folio)
