@@ -543,6 +543,7 @@ def open_tickets_print_dialog(
     destinos: "list[dict] | None" = None,
     enviar_a: "Callable[[str, list[str]], int] | None" = None,
     aqui_imprime: bool = True,
+    aqui_respaldo: bool = False,
 ) -> None:
     """Muestra uno o varios tickets en una sola vista.
 
@@ -550,6 +551,10 @@ def open_tickets_print_dialog(
     corte en una PC sin «Cortes de caja»), así que no hay ficha «Aquí»: se
     elige a qué PC mandarlo, con la primera encendida ya marcada (Daniel,
     2026-11-07: «el reimprimir corte también quiero que me dé a elegir»).
+
+    aqui_respaldo=True: un corte que esta PC no imprime, pero la PC de cortes
+    está apagada; la ficha «Aquí» sale marcada y dice que es de respaldo
+    (2026-11-12).
 
     destinos + enviar_a: las OTRAS PCs que imprimen tickets
     (`[{identificador, nombre, online}]`). Con alguna, sale «¿DÓNDE SE
@@ -732,7 +737,11 @@ def open_tickets_print_dialog(
             return btn
 
         if aqui_imprime:
-            _ficha(AQUI, "🖨  Aquí\nla impresora de esta PC").setChecked(True)
+            _ficha(
+                AQUI,
+                "🖨  Aquí, de respaldo\nla de cortes está apagada" if aqui_respaldo
+                else "🖨  Aquí\nla impresora de esta PC",
+            ).setChecked(True)
         for d in otras:
             _ficha(
                 d["identificador"],

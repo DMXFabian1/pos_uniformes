@@ -139,6 +139,22 @@ def puede_imprimir(tipo) -> bool:
     return nombre in impresoras_de_esta_pc()
 
 
+def imprimir_aqui_de_respaldo(tipo, otras: list[dict]) -> bool:
+    """¿Un corte que esta PC no imprime sale aquí porque no hay otra encendida?
+
+    Los cortes salen en la PC marcada para eso por privacidad (2026-10-07),
+    pero si esa PC está apagada el corte se quedaba en su cola y no salía en
+    ningún lado. Daniel, 2026-11-12: «en este momento cada PC tiene su propia
+    impresora, debería poder imprimir aunque el kiosko esté apagado». Solo el
+    corte, solo si esta PC tiene alguna impresora, y solo si ninguna de las que
+    imprimen cortes está encendida: con una encendida se sigue mandando allá.
+    """
+    nombre = str(getattr(tipo, "value", tipo) or "").strip().upper()
+    if nombre != "CORTE" or not impresoras_de_esta_pc():
+        return False
+    return not any(d.get("online") for d in (otras or []))
+
+
 def tipos_que_atiende():
     """Los `TipoTrabajo` que esta PC despacha de la cola, o None = todos.
 

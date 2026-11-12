@@ -35,6 +35,7 @@ def route_tickets(
 
     from pos_uniformes.database.models import TipoTrabajo
     from pos_uniformes.services.print_routing_cache_service import (
+        imprimir_aqui_de_respaldo,
         load_print_routing,
         puede_imprimir,
     )
@@ -47,6 +48,18 @@ def route_tickets(
         # 2026-11-07): la ventana sale sin la ficha «Aquí». Los tickets de venta
         # siguen yéndose solos a la cola: ahí no hay que decidir nada.
         otras = otras_impresoras_de_tickets(tipo) if tipo == TipoTrabajo.CORTE else []
+        if imprimir_aqui_de_respaldo(tipo, otras):
+            # La PC de cortes está apagada y esta tiene impresora: sale aquí
+            # (las apagadas se ven en gris, por si se prefiere esperar).
+            from pos_uniformes.ui.dialogs.printable_text_dialog import open_tickets_print_dialog
+
+            open_tickets_print_dialog(
+                parent, title, tickets, unit_label=unit_label, alt_tickets=alt_tickets,
+                alt_checkbox_label=alt_checkbox_label, on_printed=on_printed, on_back=on_back,
+                destinos=otras, aqui_respaldo=True,
+                enviar_a=_enviar_y_vigilar(parent, otras, origen, tipo),
+            )
+            return
         if otras:
             from pos_uniformes.ui.dialogs.printable_text_dialog import open_tickets_print_dialog
 
