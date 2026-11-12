@@ -75,24 +75,35 @@ class TarjetaTests(unittest.TestCase):
     def test_con_nivel_y_tope(self):
         t = self._tarjeta(_avance())
         self.assertFalse(t.isHidden())
-        self.assertEqual(t.pct.text(), "15 %")
-        self.assertIn("10 % en uniforme", t.detalle_pct.text())
+        self.assertEqual(t.pct.text(), "15\u00a0%")
+        self.assertIn("10\u00a0% en uniforme", t.detalle_pct.text())
         self.assertIn("$2,200.00", t.quedan.text())
         self.assertIn("$125.00", t.ahorro.text())
-        self.assertIn("te faltan 50 para comprar con 15 % en diciembre", t.avance.text())
-        self.assertEqual(t.barra_avance.value(), 800)
-        self.assertEqual(len(t.peldanos), 4)
+        self.assertEqual(t.titulo_sigue.text(), "PARA DICIEMBRE")
+        self.assertEqual((t.pista.comisiones, len(t.pista.niveles)), (200, 4))
+        t.resize(1000, 200)
+        t.grab()   # se pinta sin tronar
+
+    def test_si_va_para_menos_le_dice_cuanto_necesita_para_seguir(self):
+        from pos_uniformes.ui.widgets.nivel_empleada_tarjeta import frase_mes_siguiente
+
+        frase = frase_mes_siguiente(_avance(pct_este_mes=D("20"), comisiones_mes=124, pct_mes_siguiente=D("5"),
+                                            siguiente=N(150, D("10"))))
+        self.assertIn("vas para <b>5\u00a0%</b>", frase)
+        self.assertIn("Te faltan <b>26</b>", frase)
+        self.assertIn("Para seguir con 20\u00a0% necesitas 350", frase)
+        self.assertNotIn("Para seguir", frase_mes_siguiente(_avance()))
 
     def test_con_el_base(self):
         t = self._tarjeta(_avance(pct_este_mes=D("5"), restante_este_mes=D("3000"), ahorrado_mes=D("0")))
-        self.assertIn("5 % de siempre", t.quedan.text())
+        self.assertIn("Vende más", t.quedan.text())
         self.assertTrue(t.barra_tope.isHidden())
         self.assertIn("Aún no compras", t.ahorro.text())
 
     def test_al_maximo(self):
         t = self._tarjeta(_avance(comisiones_mes=400, siguiente=None, pct_mes_siguiente=D("20")))
-        self.assertIn("el máximo, 20 %", t.avance.text())
-        self.assertEqual(t.barra_avance.value(), 1000)
+        self.assertIn("ya tienes el máximo", t.avance.text())
+        self.assertIn("20\u00a0%", t.avance.text())
 
     def test_sin_dato_no_se_ve(self):
         t = self._tarjeta(_avance())
