@@ -107,9 +107,17 @@ def _tarjeta() -> tuple[QFrame, QVBoxLayout]:
 
 
 class VentaFolioDialog(QDialog):
-    def __init__(self, venta, parent=None, *, al_reimprimir: Callable[[], None] | None = None) -> None:
+    def __init__(
+        self,
+        venta,
+        parent=None,
+        *,
+        al_reimprimir: Callable[[], None] | None = None,
+        al_cambiar: Callable[[], None] | None = None,
+    ) -> None:
         super().__init__(parent)
         self._al_reimprimir = al_reimprimir
+        self._al_cambiar = al_cambiar
         datos = datos_de_venta(venta)
         self.setWindowTitle(f"Venta {datos['folio']}")
         self.setMinimumWidth(500)
@@ -219,6 +227,16 @@ class VentaFolioDialog(QDialog):
         )
         self.btn_cerrar.clicked.connect(self.reject)
         botones.addWidget(self.btn_cerrar)
+        # Cambio de prenda (Daniel, 2026-11-12): solo de ventas.
+        self.btn_cambiar = QPushButton("🔄  Hacer cambio")
+        self.btn_cambiar.setStyleSheet(
+            f"QPushButton {{ background: #ffffff; color: {VINO}; border: 2px solid {VINO};"
+            "  border-radius: 14px; min-height: 52px; padding: 0 22px; font-size: 16px; font-weight: 800; }"
+            "QPushButton:pressed { background: #f1e3e8; }"
+        )
+        self.btn_cambiar.setVisible(al_cambiar is not None and str(venta.tipo) == "venta")
+        self.btn_cambiar.clicked.connect(self._cambiar)
+        botones.addWidget(self.btn_cambiar, 1)
         self.btn_reimprimir = QPushButton("🖨  Reimprimir ticket")
         self.btn_reimprimir.setStyleSheet(
             f"QPushButton {{ background: {VINO}; color: #ffffff; border: none;"
@@ -230,6 +248,11 @@ class VentaFolioDialog(QDialog):
         self.btn_reimprimir.setDefault(True)
         botones.addWidget(self.btn_reimprimir, 1)
         ly.addLayout(botones)
+
+    def _cambiar(self) -> None:
+        self.accept()
+        if self._al_cambiar is not None:
+            self._al_cambiar()
 
     def _reimprimir(self) -> None:
         self.accept()

@@ -664,6 +664,7 @@ def eliminar_operacion(session, operacion_id: int) -> bool:
     entry = session.get(LibretaVenta, int(operacion_id))
     if entry is None:
         return False
+    _no_si_hay_cambios(session, entry)
     from pos_uniformes.services import monedero_service
 
     if monedero_service.tiene_movimientos(session, int(operacion_id)):
@@ -688,6 +689,7 @@ def anular_operacion_con_monedero(session, operacion_id: int, *, usuario_id: int
     entry = session.get(LibretaVenta, int(operacion_id))
     if entry is None:
         return None
+    _no_si_hay_cambios(session, entry)
     resultado = monedero_service.anular_operacion(session, entry, usuario_id=usuario_id, motivo=motivo)
     monedero_service.soltar_operacion(session, entry.id)
     _borrar_operacion(session, entry, int(operacion_id))
@@ -713,6 +715,7 @@ def borrar_desde_libreta(session, operacion_id: int, *, actor: str):
     entry = session.get(LibretaVenta, int(operacion_id))
     if entry is None:
         return False, None
+    _no_si_hay_cambios(session, entry)
     if not monedero_service.tiene_movimientos(session, int(operacion_id)):
         return _borrar_operacion(session, entry, int(operacion_id)), None
     admin = session.scalars(
@@ -727,6 +730,18 @@ def borrar_desde_libreta(session, operacion_id: int, *, actor: str):
         motivo=f"Borrada desde la Libreta del kiosko ({actor})",
     )
     return True, resultado
+
+
+class OperacionConCambios(ValueError):
+    """Un cambio, o una venta con cambios: no se borra (el texto se enseña)."""
+
+
+def _no_si_hay_cambios(session, entry: LibretaVenta) -> None:
+    from pos_uniformes.services.cambio_service import es_cambio_o_tiene_cambios
+
+    motivo = es_cambio_o_tiene_cambios(session, entry)
+    if motivo:
+        raise OperacionConCambios(motivo)
 
 
 def _borrar_operacion(session, entry: LibretaVenta, operacion_id: int) -> bool:
