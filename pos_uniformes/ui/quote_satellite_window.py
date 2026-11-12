@@ -3189,6 +3189,9 @@ class QuoteSatelliteWindow(QMainWindow):
                 pendientes = [(float(p.monto), str(p.motivo)) for p in pr.pendientes_de(session, code)]
                 por_cobrar = pr.total_por_cobrar(session, code)
                 disponible = pr.disponible_para(session, code)
+                from pos_uniformes.services import compra_a_cuenta_service as cac
+
+                no_autorizadas = [float(p.monto) for p in cac.rechazadas_recientes(session, code)]
         except Exception:  # noqa: BLE001 — sin servidor, mejor no ofrecerlo
             logger.exception("Libreta: no se pudo leer el préstamo")
             boton.setVisible(False)
@@ -3199,9 +3202,17 @@ class QuoteSatelliteWindow(QMainWindow):
         # le cabe otro en el 70% de lo ganado, el botón se queda.
         partes = []
         for monto_p, motivo_p in pendientes:
-            partes.append(f"💵 Pediste ${monto_p:,.2f} para «{motivo_p}». Daniel todavía no responde.")
+            if motivo_p.startswith("Compra a cuenta"):
+                # Compras a cuenta de su pago (2026-11-12): las autoriza Daniel.
+                partes.append(f"🛍️ Tu compra a cuenta de ${monto_p:,.2f} espera que Daniel la autorice.")
+            else:
+                partes.append(f"💵 Pediste ${monto_p:,.2f} para «{motivo_p}». Daniel todavía no responde.")
+        for monto_n in no_autorizadas:
+            partes.append(f"❌ Daniel no autorizó tu compra a cuenta de ${monto_n:,.2f}: págala en caja.")
         if por_cobrar:
-            partes.append(f"💵 Se te descontarán ${float(por_cobrar):,.2f} de tu siguiente pago.")
+            partes.append(
+                f"💵 Se te descontarán ${float(por_cobrar):,.2f} de tu pago (préstamos y compras a cuenta)."
+            )
         aviso.setText("\n".join(partes))
         aviso.setVisible(bool(partes))
         boton.setVisible(disponible > 0 or not partes)

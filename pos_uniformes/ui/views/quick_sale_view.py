@@ -2899,9 +2899,16 @@ class QuickSaleWidget(
         # la copia interna sale con la comisión descontada automáticamente y
         # la Libreta registra el neto — ya no hay checkbox en el diálogo de
         # impresión ni nada que apuntar a mano.
+        a_cuenta = None
         if self._discount_active:
             wants_copy = True  # la COPIA EMPLEADA es automática
-            card = self._ask_card_payment()
+            # 2026-11-12: con su nivel, la empleada puede dejarlo a cuenta de
+            # su pago (compra_a_cuenta_service); si no, efectivo o tarjeta.
+            forma = self._ask_pago_empleada()
+            if forma is None:
+                return
+            card = forma == "tarjeta"
+            a_cuenta = forma if not isinstance(forma, str) else None
             if not self._revisar_con_servidor():
                 return
         else:
@@ -2922,7 +2929,7 @@ class QuickSaleWidget(
                 self._scan_input.setFocus()
                 return
         _subtotal, _desc, total_venta = self._compute_totals()
-        if self._canje_actual(total_venta) > 0:
+        if a_cuenta is None and self._canje_actual(total_venta) > 0:
             self._cobrar_con_monedero(card, wants_copy)
             return
         # El folio (QR) se decide antes de imprimir y la Libreta guarda ese
@@ -2933,16 +2940,24 @@ class QuickSaleWidget(
         self._folio_venta = folio
         tickets = [self._build_venta_text(monedero=self._monedero_para_ticket(total_venta, card), folio=folio)]
         if self._discount_active:
-            tickets.append(self._build_employee_copy_text(terminal_commission=card))
+            tickets.append(self._build_employee_copy_text(terminal_commission=card, a_cuenta=a_cuenta))
         elif wants_copy:
             tickets.append(self._build_venta_text(store_copy=True, terminal_commission=card, folio=folio))
+
+        def _al_imprimir() -> None:
+            # A cuenta: primero el cargo a su pago (con el retiro del cajón);
+            # luego la venta se anota como siempre.
+            if a_cuenta is not None:
+                self._cargar_a_cuenta(a_cuenta, total_venta, folio)
+            self._registrar_y_vaciar("venta", pago_tarjeta=card)
+
         # La Libreta registra HASTA que la impresión realmente arranca:
         # cerrar el diálogo sin imprimir no anota nada.
         route_tickets(
             self,
             "Ticket de venta",
             tickets,
-            on_printed=lambda: self._registrar_y_vaciar("venta", pago_tarjeta=card),
+            on_printed=_al_imprimir,
             # "← Regresar": vuelve a la pregunta (copia / pago / sin ticket)
             # con el carrito intacto; nada se registró todavía.
             on_back=self._on_ticket_venta,
@@ -3739,7 +3754,7 @@ class QuickSaleWidget(
             tk_bot(),
         ]
 
-    def _build_employee_copy_text(self, *, terminal_commission: bool = False) -> str:
+    def _build_employee_copy_text(self, *, terminal_commission: bool = False, a_cuenta=None) -> str:
         """Copia para la empleada: cada renglón con el % que le tocó (M2: el
         tope por pieza del motor parte el renglón en nivel y base) y el total
         del motor. Con tarjeta, la comisión va una vez al final (T4)."""
@@ -3797,6 +3812,15 @@ class QuickSaleWidget(
 
         lines.append(tk_dbl())
         lines.append(tk_row("TOTAL:", f"${tk_fmt(total)}"))
+        if a_cuenta is not None:
+            # 2026-11-12: lo dejó a cuenta de su pago.
+            from pos_uniformes.services.compra_a_cuenta_service import fecha_corta
+
+            lines.append(tk_mid())
+            lines.append(tk_line("A CUENTA DE TU PAGO"))
+            lines.append(tk_line(f"Se descuenta el {fecha_corta(a_cuenta.fecha_pago)}"))
+            lines.append(tk_line("Por autorizar: si Daniel no la"))
+            lines.append(tk_line("autoriza, la pagas en caja."))
         lines.append(tk_bot())
         if terminal_commission:
             lines += self._renglones_comision(total)

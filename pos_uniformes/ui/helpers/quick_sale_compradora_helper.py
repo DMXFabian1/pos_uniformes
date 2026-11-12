@@ -12,9 +12,10 @@ Sin conexión, o si el dueño elige «Otra persona», queda el 5 % de siempre.
 from __future__ import annotations
 
 import logging
+from decimal import Decimal
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPushButton, QVBoxLayout, QWidget
 
 from pos_uniformes.services import incentivo_empleada_service as inc
 
@@ -133,6 +134,127 @@ class CompradoraEmpleadaMixin:
         self._dialogo_precio_especial = dlg
         if dlg.exec() == 2 and getattr(self, "_discount_active", False):
             self._discount_check.click()
+
+    # ─── Cómo paga: al momento o a cuenta de su pago (2026-11-12) ──────
+
+    def _opciones_a_cuenta(self, total) -> tuple[list, str | None]:
+        """Las opciones «de mi pago del…» y, si no se ofrecen, por qué."""
+        from pos_uniformes.services import compra_a_cuenta_service as cac
+
+        c = self._compradora
+        if c is None:
+            return [], None
+        try:
+            from pos_uniformes.database.connection import get_session
+
+            with get_session() as session:
+                opciones, disponible = cac.opciones_para(session, c.codigo)
+        except Exception:  # noqa: BLE001
+            _logger.warning("Compra a cuenta: no se pudieron leer sus pagos", exc_info=True)
+            return [], "Sin conexión con la PC principal: paga al momento."
+        if not opciones:
+            return [], "No tiene día de pago registrado: paga al momento."
+        razon = cac.por_que_no(c, total, disponible)
+        return ([] if razon else opciones), razon
+
+    def _ask_pago_empleada(self):
+        """«¿Cómo paga?»: "efectivo", "tarjeta" o la opción a cuenta elegida.
+        None si se cerró sin elegir."""
+        _s, _d, total = self._compute_totals()
+        if self._canje_actual(total) > 0:
+            return "tarjeta" if self._ask_card_payment() else "efectivo"
+        opciones, razon = self._opciones_a_cuenta(total)
+        if not opciones and razon is None:
+            return "tarjeta" if self._ask_card_payment() else "efectivo"
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Forma de pago")
+        dlg.setMinimumWidth(560)
+        dlg.setStyleSheet(
+            "QDialog { background: #f6f0e8; }"
+            "QLabel { color: #2c2118; background: transparent; }"
+            "QPushButton { border-radius: 14px; min-height: 60px; font-size: 17px; font-weight: 800; padding: 0 14px; }"
+            "QPushButton#efectivo { background: white; color: #73341c; border: 1.5px solid #e2cdb6; }"
+            "QPushButton#tarjeta { background: #a84f2d; color: white; border: none; }"
+            "QPushButton#cuenta { background: #ebe3ff; color: #4a2a99; border: 1.5px solid #cfc0f5; }"
+            "QPushButton:pressed { background: #ecdfcf; }"
+        )
+        ly = QVBoxLayout(dlg)
+        ly.setContentsMargins(24, 20, 24, 22)
+        ly.setSpacing(12)
+        titulo = QLabel(f"¿Cómo paga?  ·  ${Decimal(str(total)):,.2f}")
+        titulo.setStyleSheet("font-size: 20px; font-weight: 900;")
+        ly.addWidget(titulo)
+        respuesta: dict = {}
+
+        def _elegir(valor) -> None:
+            respuesta["forma"] = valor
+            dlg.accept()
+
+        fila = QHBoxLayout()
+        fila.setSpacing(10)
+        for texto, nombre, valor in (("💵  Efectivo", "efectivo", "efectivo"), ("💳  Tarjeta", "tarjeta", "tarjeta")):
+            b = QPushButton(texto)
+            b.setObjectName(nombre)
+            b.setAutoDefault(False)
+            b.clicked.connect(lambda _=False, v=valor: _elegir(v))
+            fila.addWidget(b, 1)
+        ly.addLayout(fila)
+
+        sub = QLabel("🧾  A CUENTA DE SU PAGO")
+        sub.setStyleSheet("font-size: 12px; font-weight: 800; color: #8a7a68; letter-spacing: 1.2px; margin-top: 6px;")
+        ly.addWidget(sub)
+        self._botones_a_cuenta = []
+        if opciones:
+            fila2 = QHBoxLayout()
+            fila2.setSpacing(10)
+            for op in opciones:
+                b = QPushButton(op.texto)
+                b.setObjectName("cuenta")
+                b.setAutoDefault(False)
+                b.clicked.connect(lambda _=False, v=op: _elegir(v))
+                fila2.addWidget(b, 1)
+                self._botones_a_cuenta.append(b)
+            ly.addLayout(fila2)
+            nota = QLabel(
+                "Se le descuenta completo ese día; su precio especial no cambia. "
+                "Daniel la autoriza por el bot: si no, la paga en caja."
+            )
+        else:
+            nota = QLabel(razon or "")
+        nota.setWordWrap(True)
+        nota.setStyleSheet("font-size: 13px; color: #8a7a68;")
+        ly.addWidget(nota)
+        self._dialogo_pago_empleada = dlg
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return None
+        return respuesta.get("forma")
+
+    def _cargar_a_cuenta(self, opcion, total, folio) -> bool:
+        """Deja la compra a cuenta de su pago. Si no se puede, avisa que se
+        cobre al momento (la venta se anota igual, en efectivo)."""
+        from pos_uniformes.services import compra_a_cuenta_service as cac
+
+        c = self._compradora
+        try:
+            from pos_uniformes.database.connection import get_session
+
+            with get_session() as session:
+                compra = cac.registrar(
+                    session, employee_code=c.codigo, nombre=c.nombre, monto=total, opcion=opcion,
+                    quien=self._OWNER_CODE, folio=folio,
+                )
+                session.commit()
+                # Daniel la autoriza desde el aviso del bot (2026-11-12).
+                cac.avisar_a_daniel(session, compra)
+            return True
+        except Exception as exc:  # noqa: BLE001
+            _logger.warning("Compra a cuenta: no se pudo registrar", exc_info=True)
+            QMessageBox.warning(
+                self, "A cuenta de su pago",
+                f"No se pudo dejar a cuenta de su pago:\n{exc}\n\nCóbrale al momento: la venta quedó en efectivo.",
+            )
+            return False
 
     # ─── Elegir ─────────────────────────────────────────────────────────
 

@@ -154,6 +154,54 @@ def lineas_de_ese_dia(session, vista: VistaPagos, fecha: date, hoy: date | None 
     ]
 
 
+@dataclass(frozen=True)
+class ReciboPago:
+    """El pago como recibo: conceptos con su monto, el total y las notas."""
+
+    filas: tuple[tuple[str, str], ...]
+    total: str
+    notas: tuple[str, ...]
+
+
+def recibo_pago(p: PagoVista, hoy: date | None = None) -> ReciboPago:
+    """Lo mismo que `lineas_pago`, acomodado para pintarlo como recibo
+    (Daniel, 2026-11-12: «se corta el texto del pago»)."""
+    hoy = hoy or date.today()
+    d = p.detalle
+    filas: list[tuple[str, str]] = []
+    notas: list[str] = []
+    if not p.configurado:
+        notas.append("⚠️ Sin horario configurado: pídele a Daniel que lo capture.")
+    if getattr(d, "por_dia", False):
+        dias = int(d.dias_trabajados or 0)
+        filas.append((f"{dias} {'día' if dias == 1 else 'días'} × ${Decimal(d.tarifa_dia):,.2f}",
+                      f"${Decimal(d.sueldo_base):,.2f}"))
+    else:
+        filas.append(("Sueldo", f"${Decimal(d.sueldo_base):,.2f}"))
+    filas.append((f"⭐ {d.comisiones} comisiones × ${Decimal(d.tarifa_comision):,.2f}",
+                  f"${Decimal(d.monto_comisiones):,.2f}"))
+    faltas = int(d.faltas or 0)
+    if faltas:
+        filas.append((f"❌ {faltas} {'falta' if faltas == 1 else 'faltas'}", f"−${Decimal(d.descuento_faltas):,.2f}"))
+    cubierto = Decimal(getattr(d, "prestamo_cubierto", 0) or 0)
+    if cubierto:
+        # Préstamos y compras a cuenta (2026-11-12) van juntos: los dos son
+        # lo que se le descuenta de su pago.
+        filas.append(("🏦 Préstamos y compras a cuenta", f"−${cubierto:,.2f}"))
+    sin_cubrir = Decimal(getattr(d, "prestamo_sin_cubrir", 0) or 0)
+    if sin_cubrir:
+        notas.append(f"🏦 No alcanzó: te siguen quedando ${sin_cubrir:,.2f} por descontar.")
+    if p.proximo_pago is not None:
+        if p.proximo_pago == hoy:
+            cuando = "hoy"
+        elif p.proximo_pago < hoy:
+            cuando = f"desde el {DIAS_ES[p.proximo_pago.weekday()]} {p.proximo_pago.day} (atrasado)"
+        else:
+            cuando = f"el {DIAS_ES[p.proximo_pago.weekday()]} {p.proximo_pago.day} de {MESES_ES[p.proximo_pago.month - 1]}"
+        notas.append(f"📅 Te toca cobrar {cuando}.")
+    return ReciboPago(tuple(filas), f"${Decimal(d.total):,.2f}", tuple(notas))
+
+
 def lineas_pago(p: PagoVista, hoy: date | None = None) -> list[str]:
     """Desglose en palabras llanas (mismo criterio que el ticket de pago)."""
     hoy = hoy or date.today()

@@ -18,7 +18,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from pos_uniformes.database.models import PrestamoEmpleada
@@ -148,24 +148,29 @@ def pendientes(session: Session) -> list[PrestamoEmpleada]:
     ).all())
 
 
-def por_cobrar(session: Session, employee_code: str) -> list[PrestamoEmpleada]:
-    """Lo aprobado que todavía no se le descuenta."""
-    return list(session.scalars(
-        select(PrestamoEmpleada).where(
-            PrestamoEmpleada.employee_code == str(employee_code),
-            PrestamoEmpleada.estado == APROBADO,
-        ).order_by(PrestamoEmpleada.id)
-    ).all())
+def por_cobrar(session: Session, employee_code: str, hasta=None) -> list[PrestamoEmpleada]:
+    """Lo aprobado que todavía no se le descuenta.
+
+    Con `hasta` (el día del pago) solo lo que ya toca descontar ese día: una
+    compra a cuenta «del pago siguiente» se salta los pagos anteriores a su
+    `cobrar_desde` (2026-11-12). Sin `hasta`, todo lo que debe."""
+    q = select(PrestamoEmpleada).where(
+        PrestamoEmpleada.employee_code == str(employee_code),
+        PrestamoEmpleada.estado == APROBADO,
+    )
+    if hasta is not None:
+        q = q.where(or_(PrestamoEmpleada.cobrar_desde.is_(None), PrestamoEmpleada.cobrar_desde <= hasta))
+    return list(session.scalars(q.order_by(PrestamoEmpleada.id)).all())
 
 
-def total_por_cobrar(session: Session, employee_code: str) -> Decimal:
+def total_por_cobrar(session: Session, employee_code: str, hasta=None) -> Decimal:
     """Cuánto se le descuenta en el siguiente pago.
 
     Si la base todavía no tiene la tabla (un kiosko que abrió antes de que
     corriera la migración), se devuelve cero: se le paga completo y el
     préstamo sigue esperando. Pagar de más se corrige; no poder pagar, no."""
     try:
-        prestamos = por_cobrar(session, employee_code)
+        prestamos = por_cobrar(session, employee_code, hasta)
     except Exception:  # noqa: BLE001 — base sin la tabla todavía
         session.rollback()
         return Decimal("0.00")
@@ -183,6 +188,13 @@ def aprobar(session: Session, prestamo_id: int, *, quien: str) -> PrestamoEmplea
     prestamo.resuelto_por = str(quien)
     prestamo.resuelto_at = _ahora()
     session.add(prestamo)
+
+    from pos_uniformes.services import compra_a_cuenta_service as cac
+
+    if cac.al_aprobar(session, prestamo):
+        # Compra a cuenta: el retiro salió cuando se vendió (2026-11-12).
+        session.flush()
+        return prestamo
 
     from pos_uniformes.services.retiros_service import registrar_retiro
 
@@ -225,6 +237,9 @@ def rechazar(session: Session, prestamo_id: int, *, quien: str) -> PrestamoEmple
     prestamo.resuelto_por = str(quien)
     prestamo.resuelto_at = _ahora()
     session.add(prestamo)
+    from pos_uniformes.services import compra_a_cuenta_service as cac
+
+    cac.al_rechazar(session, prestamo)   # sin autorizar se paga en caja
     session.flush()
     return prestamo
 
@@ -235,6 +250,7 @@ def marcar_cobrados(
     *,
     pago_id: int | None = None,
     cubierto: Decimal | None = None,
+    hasta=None,
 ) -> Decimal:
     """Al pagarle, los préstamos aprobados quedan saldados. Devuelve cuánto.
 
@@ -252,7 +268,7 @@ def marcar_cobrados(
     """
     restante = None if cubierto is None else max(Decimal(str(cubierto)), Decimal("0.00"))
     total = Decimal("0.00")
-    for p in por_cobrar(session, employee_code):
+    for p in por_cobrar(session, employee_code, hasta):
         monto = Decimal(str(p.monto))
         if restante is not None and restante <= 0:
             break   # el pago se acabó: lo demás sigue debiéndose
@@ -279,6 +295,7 @@ def marcar_cobrados(
             pago_id=pago_id,
             cobrado_at=_ahora(),
             created_at=p.created_at,
+            cobrar_desde=p.cobrar_desde,
         ))
         p.monto = (monto - parte).quantize(_CENT)
         session.add(p)

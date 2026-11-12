@@ -222,7 +222,8 @@ class DialogTests(unittest.TestCase):
             dlg.scan_input.returnPressed.emit()
         self.assertTrue(dlg.pago_box.isVisibleTo(dlg))
         textos = [w.text() for w in dlg.pago_box.findChildren(QLabel)]
-        self.assertIn("TOTAL HOY: $1,390.00", textos)
+        self.assertIn("TOTAL HOY", textos)
+        self.assertIn("$1,390.00", textos)
         self.assertEqual(dlg.scan_input.text(), "")
         self.assertTrue(dlg._timer_ocultar.isActive())
         dlg.ocultar_pago()
@@ -341,6 +342,36 @@ class OtrosMesesTests(unittest.TestCase):
         self.assertIn("12 comisiones en 5 ventas", textos)
         self.assertIn("TOTAL HOY", textos)     # lo de hoy sigue saliendo
         dlg._timer_ocultar.stop()
+
+
+class ReciboPagoTests(unittest.TestCase):
+    """El pago como recibo (Daniel, 2026-11-12: «se corta el texto del pago
+    y no dice si pidió préstamos»)."""
+
+    def _pago(self, **kw):
+        from dataclasses import replace
+
+        d = replace(_detalle("VEND-2", com=45, por_dia=True), **kw)
+        return svc.PagoVista("VEND-2", "Fanny López", d, date(2026, 9, 11), True)
+
+    def test_conceptos_con_su_monto_y_el_total(self) -> None:
+        r = svc.recibo_pago(self._pago(faltas=1), HOY)
+        self.assertEqual(r.filas[0], ("2 días × $216.67", "$1,300.00"))
+        self.assertEqual(r.filas[1], ("⭐ 45 comisiones × $2.00", "$90.00"))
+        self.assertEqual(r.filas[2], ("❌ 1 falta", "−$216.67"))
+        self.assertEqual(r.total, "$1,173.33")
+        self.assertIn("📅 Te toca cobrar el viernes 11 de septiembre.", r.notas)
+
+    def test_el_prestamo_se_ve(self) -> None:
+        r = svc.recibo_pago(self._pago(prestamos=Decimal("500.00")), HOY)
+        self.assertIn(("🏦 Préstamos y compras a cuenta", "−$500.00"), r.filas)
+        self.assertEqual(r.total, "$890.00")
+
+    def test_el_prestamo_que_no_alcanza(self) -> None:
+        r = svc.recibo_pago(self._pago(prestamos=Decimal("2000.00")), HOY)
+        self.assertIn(("🏦 Préstamos y compras a cuenta", "−$1,390.00"), r.filas)
+        self.assertEqual(r.total, "$0.00")
+        self.assertIn("🏦 No alcanzó: te siguen quedando $610.00 por descontar.", r.notas)
 
 
 if __name__ == "__main__":

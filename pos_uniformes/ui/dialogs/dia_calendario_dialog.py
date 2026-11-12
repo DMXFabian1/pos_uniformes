@@ -29,7 +29,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from pos_uniformes.services.dia_calendario_service import DIAS_ES, MESES_ES, fecha_en_palabras, lineas_pago
+from pos_uniformes.services.dia_calendario_service import DIAS_ES, MESES_ES, fecha_en_palabras, recibo_pago
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,13 @@ _STYLES = (
     "#pagoTitulo { font-size: 16px; font-weight: 800; color: #2c2118; }"
     "#pagoSub { font-size: 13px; color: #8a7a68; }"
     "#pagoLinea { font-size: 15px; color: #3d2e22; }"
-    "#pagoTotal { font-size: 24px; font-weight: 900; color: #6b1f3a; }"
+    "#recibo { background: #faf6f0; border: none; border-radius: 14px; }"
+    "#reciboRaya { background: #e6d9c8; border: none; }"
+    "#pagoLineaMonto { font-size: 15px; font-weight: 700; color: #2c2118; }"
+    "#pagoLineaMonto[resta=\"true\"] { color: #b02a17; }"
+    "#pagoTotal { font-size: 15px; font-weight: 900; color: #6b1f3a; letter-spacing: 1px; }"
+    "#pagoTotalMonto { font-size: 26px; font-weight: 900; color: #6b1f3a; }"
+    "#pagoNota { font-size: 14px; font-weight: 600; color: #5c4d40; }"
     "#pagoError { font-size: 13px; font-weight: 700; color: #b0341f; }"
     "QLineEdit { background: #faf6f0; color: #2c2118; border: 1.5px solid #ece2d6;"
     "  border-radius: 14px; min-height: 48px; padding: 0 16px; font-size: 16px; }"
@@ -336,15 +342,49 @@ class DiaCalendarioDialog(QDialog):
             enc = QLabel(f"{p.employee_name}")
             enc.setObjectName("pagoTitulo")
             self.pago_ly.addWidget(enc)
-            for linea in lineas_pago(p, self._hoy):
-                lab = QLabel(linea)
-                lab.setObjectName("pagoTotal" if linea.startswith("TOTAL") else "pagoLinea")
-                lab.setWordWrap(True)
-                self.pago_ly.addWidget(lab)
+            self.pago_ly.addWidget(self._recibo(recibo_pago(p, self._hoy)))
         self.pago_box.setVisible(True)
         self.ocultar_btn.setVisible(True)
         self._timer_ocultar.start(SEGUNDOS_VISIBLE * 1000)
         self.scan_input.setFocus()
+
+    def _recibo(self, recibo) -> QFrame:
+        """El pago como recibo: cada concepto con su monto a la derecha, una
+        raya, el total grande y abajo las notas (préstamo, cuándo cobra)."""
+        caja = QFrame()
+        caja.setObjectName("recibo")
+        ly = QVBoxLayout(caja)
+        ly.setContentsMargins(16, 12, 16, 14)
+        ly.setSpacing(8)
+
+        def _fila(concepto: str, monto: str, nombre: str) -> None:
+            fila = QHBoxLayout()
+            fila.setSpacing(12)
+            c = QLabel(concepto)
+            c.setObjectName(nombre)
+            c.setWordWrap(True)
+            m = QLabel(monto)
+            m.setObjectName(nombre + "Monto")
+            m.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            if monto.startswith("−"):
+                m.setProperty("resta", "true")
+            fila.addWidget(c, 1)
+            fila.addWidget(m)
+            ly.addLayout(fila)
+
+        for concepto, monto in recibo.filas:
+            _fila(concepto, monto, "pagoLinea")
+        raya = QFrame()
+        raya.setObjectName("reciboRaya")
+        raya.setFixedHeight(1)
+        ly.addWidget(raya)
+        _fila("TOTAL HOY", recibo.total, "pagoTotal")
+        for nota in recibo.notas:
+            n = QLabel(nota)
+            n.setObjectName("pagoNota")
+            n.setWordWrap(True)
+            ly.addWidget(n)
+        return caja
 
     def _tabla_todas(self, pagos: list) -> QTableWidget:
         cols = ("Empleada", "Base", "Comisiones", "Faltas", "Total hoy", "Le toca")

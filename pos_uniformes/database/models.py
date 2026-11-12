@@ -2870,6 +2870,9 @@ class PrestamoEmpleada(Base):
     #: El pago en el que se descontó (queda el rastro de dónde se cobró).
     pago_id: Mapped[int | None] = mapped_column(ForeignKey("empleada_pago.id", ondelete="SET NULL"))
     cobrado_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    #: Desde qué día se puede descontar (compras a cuenta «del pago
+    #: siguiente», 2026-11-12). None = en el siguiente pago.
+    cobrar_desde: Mapped[date | None] = mapped_column(Date)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

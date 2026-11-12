@@ -51,13 +51,13 @@ def texto_y_botones(session: Session) -> tuple[str, str]:
     if not pendientes:
         return "No hay préstamos esperando respuesta. ✅", _teclado([[("‹ Menú", "m:raiz")]])
 
-    lineas = ["💵 Préstamos por responder:", ""]
+    lineas = ["💵 Préstamos y compras a cuenta por responder:", ""]
     filas = []
     for p in pendientes:
         nombre = str(p.employee_name or p.employee_code)
         monto = Decimal(str(p.monto))
         cuando = _cuando(p)
-        lineas.append(f"· {nombre} — ${monto:,.2f}")
+        lineas.append(f"· {'🛍️ ' if _es_compra(p) else ''}{nombre} — ${monto:,.2f}")
         lineas.append(f"   {p.motivo}" + (f" · {cuando}" if cuando else ""))
         filas.append([
             (f"✅ {nombre} ${monto:,.0f}", f"{PREFIJO}ok:{p.id}"),
@@ -85,16 +85,29 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
             if que == "ok":
                 p = pr.aprobar(session, prestamo_id, quien=quien)
                 aviso = "Aprobado"
-                hecho = (
-                    f"✅ Aprobado: ${Decimal(str(p.monto)):,.2f} para "
-                    f"{p.employee_name or p.employee_code}.\n"
-                    "Ya quedó anotado como retiro del cajón, y se le descuenta "
-                    "completo en su siguiente pago."
-                )
+                if _es_compra(p):
+                    hecho = (
+                        f"✅ Autorizada la compra a cuenta de {p.employee_name or p.employee_code}: "
+                        f"${Decimal(str(p.monto)):,.2f}.\n{_cuando_se_descuenta(p)}"
+                    )
+                else:
+                    hecho = (
+                        f"✅ Aprobado: ${Decimal(str(p.monto)):,.2f} para "
+                        f"{p.employee_name or p.employee_code}.\n"
+                        "Ya quedó anotado como retiro del cajón, y se le descuenta "
+                        "completo en su siguiente pago."
+                    )
             elif que == "no":
                 p = pr.rechazar(session, prestamo_id, quien=quien)
                 aviso = "Rechazado"
-                hecho = f"✖️ Rechazado el préstamo de {p.employee_name or p.employee_code}."
+                if _es_compra(p):
+                    hecho = (
+                        f"✖️ Compra a cuenta no autorizada: {p.employee_name or p.employee_code} "
+                        f"paga ${Decimal(str(p.monto)):,.2f} en caja. Ya se quitó el retiro, "
+                        "así que el corte espera ese dinero."
+                    )
+                else:
+                    hecho = f"✖️ Rechazado el préstamo de {p.employee_name or p.employee_code}."
             else:
                 return "No conozco ese botón", "", ""
             session.commit()
@@ -107,9 +120,32 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
     return aviso, hecho + "\n\n" + texto, botones
 
 
+def _es_compra(prestamo) -> bool:
+    from pos_uniformes.services.compra_a_cuenta_service import es_compra
+
+    return es_compra(prestamo)
+
+
+def _cuando_se_descuenta(prestamo) -> str:
+    """«Se le descuenta del pago del sáb 14 nov.» (lo dice su motivo)."""
+    motivo = str(prestamo.motivo or "")
+    if "pago del " in motivo:
+        fecha = motivo.split("pago del ", 1)[1].split(" · ", 1)[0]
+        return f"Se le descuenta completo en su pago del {fecha}."
+    return "Se le descuenta completo en su siguiente pago."
+
+
 def botones_de(prestamo) -> str:
     """Los dos botones de UNA solicitud, para colgarlos de su propio aviso."""
     nombre = str(prestamo.employee_name or prestamo.employee_code).split()[0]
+    if _es_compra(prestamo):
+        return _teclado([
+            [
+                (f"✅ Autorizar a {nombre}", f"{PREFIJO}ok:{prestamo.id}"),
+                ("✖️ Que lo pague", f"{PREFIJO}no:{prestamo.id}"),
+            ],
+            [("💵 Ver todos", "m:prestamos")],
+        ])
     return _teclado([
         [
             (f"✅ Prestarle a {nombre}", f"{PREFIJO}ok:{prestamo.id}"),
@@ -128,6 +164,20 @@ def aviso_de_solicitud(prestamo, *, session: Session | None = None) -> str:
     """
     nombre = str(prestamo.employee_name or prestamo.employee_code)
     monto = Decimal(str(prestamo.monto))
+    if _es_compra(prestamo):
+        # Compra a cuenta de su pago (2026-11-12): ya se llevó la mercancía.
+        lineas = [
+            f"🛍️ {nombre} compró a cuenta de su pago: ${monto:,.2f}",
+            _cuando_se_descuenta(prestamo),
+        ]
+        detalle = _contexto(prestamo, session)
+        if detalle:
+            lineas.append("")
+            lineas.extend(detalle)
+        lineas.append("")
+        lineas.append("Ya se llevó la mercancía y el retiro del cajón ya está anotado.")
+        lineas.append("Si no la autorizas, se quita el retiro y la paga en caja.")
+        return "\n".join(lineas)
     lineas = [
         f"💵 {nombre} pide ${monto:,.2f} prestados",
         f"Para: {prestamo.motivo}",

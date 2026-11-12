@@ -184,7 +184,7 @@ def pago_pendiente(session, employee_code: str, hoy: date | None = None) -> Deta
     horario = cargar_horario(session, employee_code)
     comisiones = comisiones_desde_ultimo_pago(session, employee_code, horario)
     detalle = calcular_pago(horario, comisiones=comisiones, params=cargar_parametros(session), hasta=hoy)
-    prestamos = prestamos_service.total_por_cobrar(session, employee_code)
+    prestamos = prestamos_service.total_por_cobrar(session, employee_code, hoy)
     return replace(detalle, prestamos=prestamos) if prestamos else detalle
 
 
@@ -260,7 +260,7 @@ def registrar_pago_con_monto(session, employee_code: str, *, creado_por: str, fe
 
         session.flush()   # el pago necesita id para dejar el rastro
         prestamos_service.marcar_cobrados(
-            session, code, pago_id=int(pago.id), cubierto=detalle.prestamo_cubierto
+            session, code, pago_id=int(pago.id), cubierto=detalle.prestamo_cubierto, hasta=fecha
         )
     registrar_pago(session, code, fecha)  # commit incluido
     return pago
@@ -588,7 +588,7 @@ def avisos_de_pago(session, hoy: date | None = None, dias: int = 7) -> list[Avis
         # El préstamo tiene que ir AQUÍ y no solo en el pago: con este número
         # el corte decide cuánto se retira del cajón, y estimar de más deja
         # dinero apartado que nunca se le entrega (bug 2026-10-04).
-        prestamos = prestamos_service.total_por_cobrar(session, emp.codigo)
+        prestamos = prestamos_service.total_por_cobrar(session, emp.codigo, max(hoy, proximo or hoy))
         if prestamos:
             detalle = replace(detalle, prestamos=prestamos)
         avisos.append(
