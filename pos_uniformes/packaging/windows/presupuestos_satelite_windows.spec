@@ -110,6 +110,8 @@ hiddenimports += [
     "pos_uniformes.ui.dialogs.venta_folio_dialog",
     "pos_uniformes.services.cambio_service",
     "pos_uniformes.ui.dialogs.cambio_dialog",
+    "pos_uniformes.ui.widgets",
+    "pos_uniformes.ui.widgets.nivel_empleada_tarjeta",
     "qrcode",
     "qrcode.image.pil",
     "PyQt6.QtMultimedia",

@@ -1824,13 +1824,12 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_meta_bar.setLayout(meta_bar_ly)
         view_ly.addWidget(self.libreta_meta_bar)
 
-        # E6: con qué % compra ella este mes y cuánto le falta para el siguiente.
-        self.libreta_nivel_label = QLabel("")
-        self.libreta_nivel_label.setObjectName("libretaNivelDescuento")
-        self.libreta_nivel_label.setWordWrap(True)
-        self.libreta_nivel_label.setStyleSheet("font-size: 14px; font-weight: 600; padding: 4px 16px;")
-        self.libreta_nivel_label.setVisible(False)
-        view_ly.addWidget(self.libreta_nivel_label)
+        # E6: con qué % compra ella este mes, cuánto se ha ahorrado y cuánto le
+        # falta para el siguiente nivel (tarjeta desde 2026-11-12).
+        from pos_uniformes.ui.widgets.nivel_empleada_tarjeta import NivelEmpleadaTarjeta
+
+        self.libreta_nivel_tarjeta = NivelEmpleadaTarjeta()
+        view_ly.addWidget(self.libreta_nivel_tarjeta)
 
         self.libreta_status_label = QLabel("")
         self.libreta_status_label.setStyleSheet("font-size: 12px; color: #b9770e;")
@@ -2744,12 +2743,12 @@ class QuoteSatelliteWindow(QMainWindow):
         if dlg.exec() == QDialog.DialogCode.Accepted and "dia" in elegido:
             self._libreta_ver_fechas(elegido["dia"], elegido["dia"])
 
-    def _datos_nivel_libreta(self, session) -> str | None:
-        """E6: el texto de su nivel de descuento; sin el dato, nada."""
+    def _datos_nivel_libreta(self, session):
+        """E6: su avance de descuento (AvanceEmpleada); sin el dato, None."""
         try:
             from pos_uniformes.services import incentivo_empleada_service as inc
 
-            return inc.avance(session, self._libreta_code).texto()
+            return inc.avance(session, self._libreta_code)
         except Exception:  # noqa: BLE001
             logger.warning("Libreta: no se pudo leer el nivel de descuento", exc_info=True)
             session.rollback()
@@ -2877,7 +2876,7 @@ class QuoteSatelliteWindow(QMainWindow):
         week_rows: list = []
         fuente_db = False
         ciclo_texto: str | None = None
-        nivel_texto: str | None = None
+        nivel_avance = None
         afluencia_filas: list = []
         pendientes: list = []
         if probe_database_host(0.5):
@@ -2917,7 +2916,7 @@ class QuoteSatelliteWindow(QMainWindow):
                     )
                     if not self._libreta_is_owner:
                         ciclo_texto = self._datos_ciclo_libreta(session)
-                        nivel_texto = self._datos_nivel_libreta(session)
+                        nivel_avance = self._datos_nivel_libreta(session)
                     else:
                         afluencia_filas = self._cargar_afluencia_libreta(session, desde, hasta)
                         pendientes = self._cargar_pendientes_libreta(session)
@@ -2932,8 +2931,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_ciclo_banner.setVisible(bool(ciclo_texto))
         if ciclo_texto:
             self._pintar_ciclo_libreta(ciclo_texto)
-        self.libreta_nivel_label.setText(nivel_texto or "")
-        self.libreta_nivel_label.setVisible(bool(nivel_texto))
+        self.libreta_nivel_tarjeta.mostrar(nivel_avance)
 
         if not fuente_db:
             week_rows = self._libreta_rows_locales(desde, hasta, employee_filter)

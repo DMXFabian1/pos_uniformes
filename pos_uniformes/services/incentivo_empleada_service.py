@@ -203,6 +203,14 @@ def importe_con_nivel(detalle: Iterable[Mapping], pct_base=PCT_BASE) -> Decimal:
     ).quantize(_CENT)
 
 
+def ahorro_de(detalle: Iterable[Mapping], pct_base=PCT_BASE) -> Decimal:
+    """Lo que se ahorró en esa compra con su descuento (a precio de lista)."""
+    return sum(
+        (importe_de(line) * pct_de_renglon(line, pct_base) / 100 for line in detalle),
+        _CERO,
+    ).quantize(_CENT)
+
+
 def fmt_pct(pct) -> str:
     return f"{Decimal(str(pct)).normalize():f} %"
 
@@ -253,6 +261,24 @@ class AvanceEmpleada:
     pct_mes_siguiente: Decimal
     siguiente: Nivel | None
     nombre_mes_siguiente: str
+    # Para su tarjeta (Daniel, 2026-11-12: «que vean qué tanto descuento se
+    # van a llevar»).
+    tope: Decimal | None = None
+    usado: Decimal = _CERO
+    ahorrado_mes: Decimal = _CERO
+    niveles: tuple[Nivel, ...] = ()
+    nombre_mes: str = ""
+
+    @property
+    def progreso(self) -> float:
+        """De 0 a 1: cuánto lleva hacia el siguiente nivel (1 si ya está en el máximo)."""
+        if self.siguiente is None or self.siguiente.comisiones_minimas <= 0:
+            return 1.0
+        return max(0.0, min(1.0, self.comisiones_mes / self.siguiente.comisiones_minimas))
+
+    @property
+    def faltan(self) -> int:
+        return 0 if self.siguiente is None else max(self.siguiente.comisiones_minimas - self.comisiones_mes, 0)
 
     def texto(self) -> str:
         partes = []
@@ -342,6 +368,24 @@ def usado_del_mes(session, compradora_code: str, mes: date) -> Decimal:
     return sum((importe_con_nivel(f.detalle or []) for f in filas), _CERO).quantize(_CENT)
 
 
+def ahorrado_del_mes(session, compradora_code: str, mes: date) -> Decimal:
+    """Lo que se ha ahorrado ella con su descuento ese mes."""
+    from sqlalchemy import func, select
+
+    from pos_uniformes.database.models import LibretaVenta
+
+    desde, hasta = _ventana(mes)
+    filas = session.scalars(
+        select(LibretaVenta).where(
+            func.upper(LibretaVenta.compradora_code) == str(compradora_code).upper(),
+            LibretaVenta.descuento_empleada.is_(True),
+            LibretaVenta.created_at >= desde,
+            LibretaVenta.created_at <= hasta,
+        )
+    ).all()
+    return sum((ahorro_de(f.detalle or []) for f in filas), _CERO).quantize(_CENT)
+
+
 def estado_compradora(session, employee_code: str, nombre: str = "", *, hoy: date | None = None) -> EstadoCompradora:
     hoy = hoy or date.today()
     lista = niveles(session)
@@ -367,6 +411,11 @@ def avance(session, employee_code: str, *, hoy: date | None = None) -> AvanceEmp
         pct_mes_siguiente=Decimal(str(nivel_para(com, lista).porcentaje)),
         siguiente=siguiente_nivel(com, lista),
         nombre_mes_siguiente=MESES[mes_siguiente(hoy).month - 1],
+        tope=este.tope,
+        usado=este.usado,
+        ahorrado_mes=ahorrado_del_mes(session, employee_code, hoy),
+        niveles=tuple(lista),
+        nombre_mes=MESES[hoy.month - 1],
     )
 
 
