@@ -2184,6 +2184,10 @@ class QuoteSatelliteWindow(QMainWindow):
         for key in self._libreta_secciones:
             self._aplicar_seccion_libreta(key)  # flechas ▾/▸ y cuerpos según estado
         view_ly.addWidget(self.libreta_owner_panel, 1)
+        # Lo de la empleada, agrupado en dos columnas (2026-11-12).
+        from pos_uniformes.ui.helpers.libreta_empleada_grupos import agrupar
+
+        agrupar(self, view_ly)
         # El sobrante va abajo: sin esto los labels/tarjetas se estiraban
         # para llenar la página (la franja naranja gigante de la empleada).
         view_ly.addStretch(1)

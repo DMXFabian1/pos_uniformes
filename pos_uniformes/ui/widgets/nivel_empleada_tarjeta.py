@@ -19,7 +19,7 @@ from decimal import Decimal
 
 from PyQt6.QtCore import QRectF, Qt
 from PyQt6.QtGui import QColor, QFont, QPainter, QPen
-from PyQt6.QtWidgets import QFrame, QHBoxLayout, QLabel, QProgressBar, QSizePolicy, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QBoxLayout, QFrame, QHBoxLayout, QLabel, QProgressBar, QSizePolicy, QVBoxLayout, QWidget
 
 from pos_uniformes.services import incentivo_empleada_service as inc
 
@@ -203,11 +203,11 @@ class NivelEmpleadaTarjeta(QFrame):
         hoy.addStretch(1)
         ly.addLayout(hoy, 5)
 
-        separador = QFrame()
-        separador.setFixedWidth(1)
-        separador.setStyleSheet(f"background: {BORDE};")
+        self._separador = QFrame()
+        self._separador.setFixedWidth(1)
+        self._separador.setStyleSheet(f"background: {BORDE};")
         ly.addSpacing(22)
-        ly.addWidget(separador)
+        ly.addWidget(self._separador)
         ly.addSpacing(22)
 
         # ── El mes que entra ──
@@ -224,13 +224,33 @@ class NivelEmpleadaTarjeta(QFrame):
         sigue.addStretch(1)
         ly.addLayout(sigue, 7)
 
+        self._ly = ly
         self.setVisible(False)
+
+    def set_vertical(self, vertical: bool) -> None:
+        """Este mes arriba y el mes que entra abajo (en la columna angosta de
+        la Libreta agrupada)."""
+        self._ly.setDirection(QBoxLayout.Direction.TopToBottom if vertical else QBoxLayout.Direction.LeftToRight)
+        if vertical:
+            self._separador.setMinimumWidth(0)
+            self._separador.setMaximumWidth(16777215)
+            self._separador.setFixedHeight(1)
+            self._ly.setSpacing(0)
+        else:
+            self._separador.setMinimumHeight(0)
+            self._separador.setMaximumHeight(16777215)
+            self._separador.setFixedWidth(1)
+        self.pista.setMinimumWidth(260 if vertical else 320)
+        self._vertical = vertical
 
     def mostrar(self, av: inc.AvanceEmpleada | None) -> None:
         if av is None:
             self.setVisible(False)
             return
-        self.titulo.setText(f"ESTE MES · {(av.nombre_mes or 'este mes').upper()}")
+        mes = (av.nombre_mes or "este mes").upper()
+        # En la Libreta agrupada cada recuadro dice qué es: «MI PAGO», «MIS
+        # DESCANSOS»… y este, «MI DESCUENTO».
+        self.titulo.setText(f"🏷  MI DESCUENTO · {mes}" if getattr(self, "_vertical", False) else f"ESTE MES · {mes}")
         self.titulo_sigue.setText(f"PARA {av.nombre_mes_siguiente.upper()}")
         self.pct.setText(pct(av.pct_este_mes))
         if av.pct_este_mes > inc.TOPE_PCT_UNIFORME:
