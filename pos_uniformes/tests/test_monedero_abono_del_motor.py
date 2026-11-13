@@ -556,6 +556,21 @@ class MayoristaSinLineasAbonoRealTests(_Base):
         self.assertEqual(mon.acreditar_faltantes(self.s, momento=T0), 0)
         self.assertFalse(mon.tiene_movimientos(self.s, v.id))
 
+    def test_corregir_pago_con_tarjeta_no_lo_repone(self):
+        """2026-11-12: el dueño corrige «pagó con tarjeta» después de cobrar
+        (cambiar_pago_tarjeta no toca la fotografía). La elección de mayoreo
+        no depende del medio de pago: el bot de faltantes sigue sin abonar."""
+        from pos_uniformes.services.libreta_service import cambiar_pago_tarjeta
+
+        self._tasa("15")
+        e = EntradaVenta(_tres_pz(), FECHA, cliente=MAYORISTA, modalidad_mayorista="descuento")
+        v = self._venta_con_foto(e)
+        self.assertEqual(mon.acreditar_faltantes(self.s, momento=T0), 0)
+        cambiar_pago_tarjeta(self.s, v.id, True)
+        self.assertEqual(mon.base_cashback_de_venta(v), (D("0"), False))
+        self.assertEqual(mon.acreditar_faltantes(self.s, momento=T0), 0)
+        self.assertFalse(mon.tiene_movimientos(self.s, v.id))
+
     def test_el_mismo_mayorista_eligiendo_monedero_si_abona(self):
         self._tasa("15")
         e = EntradaVenta(_tres_pz(), FECHA, cliente=MAYORISTA, modalidad_mayorista="monedero")

@@ -187,12 +187,16 @@ def _base_del_calculo(calc: dict, libreta_venta) -> tuple[Decimal, bool] | None:
 
     parte = calc.get("monedero")
     if not isinstance(parte, dict) or parte.get("base") in (None, ""):
-        if parte is None and _bloqueo_elegido(calc) and _describe_la_venta(calc, libreta_venta):
+        if parte is None and _bloqueo_elegido(calc) and _mismo_total_y_saldo(calc, libreta_venta):
             # 2026-11-12, Daniel, a «Mayorista que eligió mayoreo y ninguna
             # prenda calificó: ¿gana Monedero o no?»: «no». El motor bloqueó
             # el Monedero por lo que se eligió (mayoreo, o precio de
             # empleada): base 0, no se cae a la cuenta de antes. Antes el
             # ticket decía «no suma Monedero» y el servidor abonaba igual.
+            # Aquí NO se pide el mismo medio de pago: la elección no depende
+            # de cómo se pagó, y el dueño puede corregir «pagó con tarjeta»
+            # después (cambiar_pago_tarjeta no toca la fotografía); si no,
+            # acreditar_faltantes le reponía el Monedero con la cuenta de antes.
             return _CERO, False
         return None
     if not _describe_la_venta(calc, libreta_venta):
@@ -236,13 +240,19 @@ def _con_tarjeta(calc: dict) -> bool:
     )
 
 
+def _mismo_total_y_saldo(calc: dict, libreta_venta) -> bool:
+    """Si el cálculo trae el mismo total y el mismo saldo que lo que se guardó
+    (sin mirar el medio de pago)."""
+    total, saldo = _d(calc.get("total")), _d(calc.get("saldo_usado"))
+    return total == _d(libreta_venta.monto_total) and saldo == _d(getattr(libreta_venta, "monto_monedero", None))
+
+
 def _describe_la_venta(calc: dict, libreta_venta) -> bool:
     """Si el cálculo es de ESTA venta: mismo total, mismo saldo y mismo medio
     de pago que lo que se guardó."""
-    total, saldo = _d(calc.get("total")), _d(calc.get("saldo_usado"))
-    if total != _d(libreta_venta.monto_total) or saldo != _d(getattr(libreta_venta, "monto_monedero", None)):
+    if not _mismo_total_y_saldo(calc, libreta_venta):
         return False
-    pagado = importe_elegible(total, saldo)
+    pagado = importe_elegible(_d(calc.get("total")), _d(calc.get("saldo_usado")))
     return not (pagado > 0 and _con_tarjeta(calc) != bool(getattr(libreta_venta, "pago_tarjeta", False)))
 
 
