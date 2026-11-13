@@ -74,8 +74,12 @@ def build_inventory_summary_view(
 def build_results_summary(visibles: int, total: int, piezas: int) -> str:
     """El pie en palabras de la tienda: «214 de 5,153 tallas · 18,420 piezas».
 
-    Las piezas no cuentan los conjuntos (ya están contados en sus piezas)."""
+    Las piezas no cuentan los conjuntos (ya están contados en sus piezas).
+    Si lo que se ve no tiene ninguna pieza (p. ej. solo negativos o agotadas),
+    se omiten: «3 de 20 tallas · 0 piezas» confunde con un negativo a la vista."""
     tallas = f"{visibles:,} de {total:,} tallas" if visibles != total else f"{total:,} {_plural(total, 'talla', 'tallas')}"
+    if piezas == 0 and visibles > 0:
+        return tallas
     return f"{tallas} · {piezas:,} {_plural(piezas, 'pieza', 'piezas')}"
 
 

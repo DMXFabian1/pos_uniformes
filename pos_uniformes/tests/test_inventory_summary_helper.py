@@ -109,7 +109,14 @@ class PieEnPalabrasDeLaTiendaTests(unittest.TestCase):
         from pos_uniformes.ui.helpers.inventory_summary_helper import build_results_summary
 
         self.assertEqual(build_results_summary(5153, 5153, 1), "5,153 tallas · 1 pieza")
-        self.assertEqual(build_results_summary(1, 1, 0), "1 talla · 0 piezas")
+        self.assertEqual(build_results_summary(1, 1, 0), "1 talla")
+
+    def test_sin_piezas_a_la_vista_no_dice_0_piezas(self) -> None:
+        from pos_uniformes.ui.helpers.inventory_summary_helper import build_results_summary
+
+        # Con la tarjeta «En negativo» solo hay tallas en −: «0 piezas» confunde.
+        self.assertEqual(build_results_summary(3, 20, 0), "3 de 20 tallas")
+        self.assertEqual(build_results_summary(0, 20, 0), "0 de 20 tallas · 0 piezas")
 
 
 if __name__ == "__main__":

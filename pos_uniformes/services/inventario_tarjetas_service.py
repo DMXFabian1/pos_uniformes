@@ -56,7 +56,7 @@ class TarjetaInfo:
 
 
 INFO_TARJETAS: dict[str, TarjetaInfo] = {
-    EN_NEGATIVO: TarjetaInfo(EN_NEGATIVO, "En negativo", "Se vendió sin contarse", "danger"),
+    EN_NEGATIVO: TarjetaInfo(EN_NEGATIVO, "En negativo", "Se vendió más de lo que había", "danger"),
     SE_ACABO: TarjetaInfo(SE_ACABO, "Se acabó", "Hay 0 en total", "muted"),
     QUEDAN_POCAS: TarjetaInfo(QUEDAN_POCAS, "Quedan pocas", f"De 1 a {UMBRAL_BAJO}, o bajo su mínimo", "warning"),
     SIN_CONTAR: TarjetaInfo(SIN_CONTAR, "Sin contar al día", f"Nunca, o hace más de {DIAS_CONTEO_AL_DIA} días", "neutral"),
@@ -64,7 +64,7 @@ INFO_TARJETAS: dict[str, TarjetaInfo] = {
 
 #: Lo que dice cada tarjeta al pasar el mouse: el criterio completo.
 AVISO_TARJETAS: dict[str, str] = {
-    EN_NEGATIVO: "El total (tienda + bodega + piso) es menor que 0: se vendió algo que no se había contado.",
+    EN_NEGATIVO: "El total (tienda + bodega + piso) es menor que 0: se vendió más de lo que el sistema tenía.",
     SE_ACABO: "El total (tienda + bodega + piso) es exactamente 0.",
     QUEDAN_POCAS: f"Quedan de 1 a {UMBRAL_BAJO} piezas, o menos que el mínimo de la talla.",
     SIN_CONTAR: f"Nunca se ha contado, o su último conteo fue hace más de {DIAS_CONTEO_AL_DIA} días.",

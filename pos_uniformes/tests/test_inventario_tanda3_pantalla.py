@@ -258,8 +258,10 @@ class InventarioTanda3PantallaTests(unittest.TestCase):
         self.assertEqual(numeros, {"negativo": "2", "se_acabo": "1", "pocas": "1", "sin_contar": "2"})
         self.assertTrue(window.inventory_clear_filters_button.isHidden())
 
+        self.assertEqual(pantalla.tarjetas["negativo"].nota.text(), "Se vendió más de lo que había")
         pantalla.tarjetas["negativo"].tocada.emit("negativo")
         self.assertEqual(self._visibles(window), [1, 6])
+        self.assertEqual(pantalla.subtitulo.text(), "2 de 6 tallas")
         self.assertTrue(pantalla.tarjetas["negativo"].esta_prendida())
         self.assertFalse(window.inventory_clear_filters_button.isHidden())
         # Las demás tarjetas siguen contando sobre todo lo filtrado, no solo lo de la tocada.
