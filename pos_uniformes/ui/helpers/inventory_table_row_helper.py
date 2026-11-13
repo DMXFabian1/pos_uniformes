@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pos_uniformes.services.inventario_existencia_service import (
     AGOTADO,
     BAJO_MINIMO,
+    NEGATIVO,
     clasificar_existencia,
     texto_existencia,
     tono_existencia,
@@ -92,7 +93,7 @@ def _format_ultimo_conteo(ultimo_conteo_at: datetime | None) -> str:
 def _build_inventory_row_tone(*, clase: str, variant_active: bool) -> str | None:
     if not variant_active:
         return "muted"
-    if clase == AGOTADO:
+    if clase in (NEGATIVO, AGOTADO):
         return "danger"
     if clase == BAJO_MINIMO:
         return "warning"

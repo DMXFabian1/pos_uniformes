@@ -97,6 +97,28 @@ class InventoryOverviewHelperTests(unittest.TestCase):
         self.assertEqual(view.product_label, "Playera deportiva | Patria | Deportivo | Playera")
         self.assertNotIn("#4", view.product_label)
 
+    def test_ficha_marca_negativo_en_rojo(self) -> None:
+        view = build_inventory_overview_view(
+            sku="SKU-009",
+            product_name="Pants",
+            product_active=True,
+            variant_active=True,
+            stock_actual=-1,
+            apartado_cantidad=0,
+            talla="8",
+            color="Azul",
+            precio_venta=Decimal("299.00"),
+            origen_etiqueta="NUEVO",
+            escuela_nombre="General",
+            tipo_prenda_nombre="Deportivo",
+            tipo_pieza_nombre="Pants 2pz",
+            movement_type=None,
+            movement_quantity=None,
+            movement_date="",
+        )
+        self.assertEqual(view.stock_badge.text, "Negativo")
+        self.assertEqual(view.stock_badge.tone, "danger")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
+from pos_uniformes.services.inventario_existencia_service import coincide_filtro_existencia
 from pos_uniformes.ui.helpers.catalog_product_form_mode_helper import UNIFORM_CATEGORIES
 from pos_uniformes.ui.helpers.listing_visibility_helper import (
     matches_active_state,
@@ -91,16 +92,7 @@ def _matches_inventory_use_filter(category_name: str, use_filter: str) -> bool:
 
 
 def _matches_inventory_stock_filter(stock_actual: int, stock_filter: str, *, stock_minimo: int | None = None) -> bool:
-    if stock_minimo is not None and stock_minimo < 0:
-        return not stock_filter or stock_filter == "available"
-    below_min = stock_minimo is not None and stock_actual < stock_minimo
-    return (
-        not stock_filter
-        or (stock_filter == "zero" and stock_actual == 0)
-        or (stock_filter == "low" and 0 < stock_actual <= 3)
-        or (stock_filter == "available" and stock_actual > 0)
-        or (stock_filter == "below_min" and below_min)
-    )
+    return coincide_filtro_existencia(stock_actual, stock_filter, stock_minimo=stock_minimo)
 
 
 def _matches_inventory_conteo_filter(ultimo_conteo_at: object, conteo_filter: str) -> bool:

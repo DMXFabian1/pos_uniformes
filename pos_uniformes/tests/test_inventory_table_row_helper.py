@@ -102,6 +102,26 @@ class InventoryTableRowHelperTests(unittest.TestCase):
         self.assertEqual(view.stock_tone, "positive")
         self.assertIsNone(view.row_tone)
 
+    def test_negativo_en_rojo(self) -> None:
+        view = build_inventory_table_row_view(
+            {
+                "variante_id": 4,
+                "sku": "SKU-004",
+                "producto_nombre_base": "Pants",
+                "talla": "8",
+                "color": "Azul",
+                "stock_actual": -2,
+                "apartado_cantidad": 0,
+                "variante_activa": True,
+                "qr_exists": True,
+                "ultimo_conteo_at": None,
+                "stock_minimo": None,
+            }
+        )
+        self.assertEqual(view.values[4], "\u22122 Negativo")
+        self.assertEqual(view.stock_tone, "danger")
+        self.assertEqual(view.row_tone, "danger")
+
 
 if __name__ == "__main__":
     unittest.main()

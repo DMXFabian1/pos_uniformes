@@ -1418,6 +1418,7 @@ class MainWindow(QMainWindow):
         self.inventory_clear_filters_button = QPushButton("Limpiar filtros")
         self.inventory_previous_page_button = QPushButton("Anterior")
         self.inventory_next_page_button = QPushButton("Siguiente")
+        self.inventory_negative_counter = QLabel("En negativo: 0")
         self.inventory_out_counter = QLabel("Agotados: 0")
         self.inventory_low_counter = QLabel("Bajo stock: 0")
         self.inventory_qr_pending_counter = QLabel("Sin QR: 0")
@@ -7950,6 +7951,11 @@ class MainWindow(QMainWindow):
             total_rows=len(inventory_snapshot_rows),
             visible_rows=self.inventory_filtered_rows,
             active_filter_labels=self._inventory_active_filter_labels(),
+        )
+        self._set_badge_state(
+            self.inventory_negative_counter,
+            summary_view.negative_counter.text,
+            summary_view.negative_counter.tone,
         )
         self._set_badge_state(self.inventory_out_counter, summary_view.out_counter.text, summary_view.out_counter.tone)
         self._set_badge_state(self.inventory_low_counter, summary_view.low_counter.text, summary_view.low_counter.tone)

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pos_uniformes.services.inventario_existencia_service import contar_existencias
+
 @dataclass(frozen=True)
 class InventoryCounterState:
     text: str
@@ -13,6 +15,7 @@ class InventoryCounterState:
 @dataclass(frozen=True)
 class InventorySummaryView:
     results_summary: str
+    negative_counter: InventoryCounterState
     out_counter: InventoryCounterState
     low_counter: InventoryCounterState
     qr_pending_counter: InventoryCounterState
@@ -28,14 +31,20 @@ def build_inventory_summary_view(
     total_stock = sum(int(row["stock_actual"]) for row in visible_rows)
     reserved_count = sum(1 for row in visible_rows if int(row["apartado_cantidad"]) > 0)
     fallback_count = sum(1 for row in visible_rows if bool(row.get("fallback_importacion")))
-    count_out = sum(1 for row in visible_rows if int(row["stock_actual"]) == 0)
-    count_low = sum(1 for row in visible_rows if 0 < int(row["stock_actual"]) <= 3)
+    conteo = contar_existencias(visible_rows)
+    count_negative = conteo.negativos
+    count_out = conteo.agotados
+    count_low = conteo.bajos
     count_missing_qr = sum(1 for row in visible_rows if not bool(row.get("qr_exists")))
     count_inactive = sum(1 for row in visible_rows if not bool(row.get("variante_activa")))
     return InventorySummaryView(
         results_summary=(
             f"{len(visible_rows)}/{total_rows} resultados | stock {total_stock} | "
             f"ap. {reserved_count} | fallbacks {fallback_count}"
+        ),
+        negative_counter=InventoryCounterState(
+            text=f"En negativo: {count_negative}",
+            tone="danger" if count_negative else "positive",
         ),
         out_counter=InventoryCounterState(
             text=f"Agotados: {count_out}",

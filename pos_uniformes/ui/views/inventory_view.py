@@ -328,6 +328,7 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_status_filter_combo.addItem("Inactivas", "inactive")
     window.inventory_stock_filter_combo.clear()
     window.inventory_stock_filter_combo.addItem("Stock: todos", "")
+    window.inventory_stock_filter_combo.addItem("En negativo", "negative")
     window.inventory_stock_filter_combo.addItem("Agotado", "zero")
     window.inventory_stock_filter_combo.addItem("Bajo", "low")
     window.inventory_stock_filter_combo.addItem("Disponible", "available")
@@ -393,6 +394,7 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     counters_row = QHBoxLayout()
     counters_row.setSpacing(6)
     for counter in (
+        window.inventory_negative_counter,
         window.inventory_out_counter,
         window.inventory_low_counter,
         window.inventory_qr_pending_counter,
