@@ -221,21 +221,21 @@ def base_cashback_de_venta(libreta_venta) -> tuple[Decimal, bool]:
     saldo daba base $0 en vez de $50, y el ticket decía otra cosa.
 
     Primero el cálculo del servidor (con el cliente y el saldo de la base),
-    luego el del kiosko. Sin fotografía que sirva, la cuenta de antes.
+    luego el del kiosko. Sin fotografía que sirva (venta vieja, cobrada con
+    el cálculo de respaldo, de otro total/saldo/medio de pago, o dañada), la
+    cuenta de antes (`base_cashback_legada`).
 
-    Lo único que cambia es el doble descuento de saldo + rebaja. Por eso la
-    base del motor solo manda cuando se usó saldo, y nunca queda por debajo
-    de la cuenta de antes: sin saldo, las dos cuentas solo difieren en los
-    centavos del redondeo de la tienda (R1) que le tocan a una prenda
-    rebajada (el motor los deja fuera de la base; antes contaban). Eso es
-    decisión de Daniel; mientras tanto nadie gana ni un centavo distinto."""
-    legada = base_cashback_legada(libreta_venta)
-    if _d(getattr(libreta_venta, "monto_monedero", None)) <= 0:
-        return legada
+    La base del motor manda SIEMPRE que haya fotografía, con o sin saldo
+    (2026-11-12). Sin saldo, las dos cuentas solo difieren en los centavos
+    del redondeo de la tienda (R1) que le tocan a una prenda rebajada: el
+    motor los deja fuera de la base y la cuenta de antes los contaba.
+    Daniel decidió: «los centavos no ganan». Por eso ya no hay max() contra
+    la cuenta de antes: el ticket (que imprime la base del motor) y el abono
+    dicen lo mismo."""
     del_motor = _base_de_la_fotografia(libreta_venta)
-    if del_motor is None or del_motor[0] <= legada[0]:
-        return legada
-    return del_motor
+    if del_motor is not None:
+        return del_motor
+    return base_cashback_legada(libreta_venta)
 
 
 def _base_de_la_fotografia(libreta_venta) -> tuple[Decimal, bool] | None:

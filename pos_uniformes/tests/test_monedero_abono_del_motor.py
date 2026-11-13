@@ -10,12 +10,17 @@ servidor restaba dos veces el saldo que caía en las prendas rebajadas:
     servidor: base $0   → abono $0.00  (200 − 100 de saldo − 100 rebajado)
 
 Ahora el servidor toma la base de la fotografía del motor (la tasa sigue
-siendo la suya) y el kiosko también. Lo que se cuida aquí:
+siendo la suya) y el kiosko también. Desde 2026-11-12 la base del motor
+manda SIEMPRE que haya fotografía, con o sin saldo: Daniel decidió «los
+centavos no ganan» (los del redondeo R1 que caen en una prenda rebajada ya
+no suman Monedero). Lo que se cuida aquí:
 - el ejemplo da $2.50 en el ticket y en el abono;
-- en todas las demás ventas (sin saldo + rebaja juntos) el abono nuevo es
-  IGUAL al de antes: no cambia lo que gana nadie salvo el doble descuento;
+- con fotografía la base es la del motor; sin saldo, sin rebaja y con un
+  solo medio de pago es la misma que la de antes;
+- sin saldo con rebaja solo cambian los centavos del redondeo;
 - la venta sin fotografía (vieja o de respaldo) sigue con la cuenta de antes;
-- con tarjeta la comisión se quita una sola vez;
+- con tarjeta la comisión se quita una sola vez, y en un pago mixto solo
+  sobre lo pagado con tarjeta;
 - el abono se compara y se anota en el recálculo del servidor, sin frenar
   el cobro.
 """
@@ -101,8 +106,10 @@ class EjemploDelDobleDescuentoTests(unittest.TestCase):
         self.assertEqual(mon.calcular_cashback(mon.base_cashback_de_venta(fila)[0], D("5")), D("2.50"))
 
 
-class EquivalenciaConLaCuentaDeAntesTests(unittest.TestCase):
-    """Fuera del caso saldo + rebaja, la base nueva es la de antes."""
+class LaBaseEsLaDelMotorTests(unittest.TestCase):
+    """Con fotografía la base es la del motor; frente a la cuenta de antes
+    solo cambian el doble descuento (saldo + rebaja) y los centavos del
+    redondeo en prendas rebajadas."""
 
     N = 1500
 
@@ -117,32 +124,39 @@ class EquivalenciaConLaCuentaDeAntesTests(unittest.TestCase):
 
     def test_catalogo_aleatorio(self):
         rng = random.Random(20261112)
-        comparadas = cambiaron = 0
+        comparadas = cambiaron = redondeo = 0
         for _ in range(self.N):
             entrada = EntradaVenta(tuple(_carrito_aleatorio(rng)), FECHA, **self._contexto(rng))
             c = calcular(entrada)
             fila = _fila(entrada, c)
             nueva, _ = mon.base_cashback_de_venta(fila)
             vieja, _ = mon.base_cashback_legada(fila)
-            hay_rebaja = any(l.rebaja for l in entrada.lineas)
+            rebajadas = [l for l in c.lineas if l.clasificacion_al_vender in ("oferta", "liquidacion")]
             with self.subTest(entrada=entrada):
-                if c.monedero is not None and c.saldo_usado > 0:
-                    self.assertEqual(nueva, max(c.monedero.base, vieja))
-                if c.saldo_usado > 0 and hay_rebaja:
-                    # El único caso que cambia: nunca gana menos que antes.
-                    self.assertGreaterEqual(nueva, vieja)
+                if c.monedero is None:
+                    # Sin la parte del Monedero en la foto: la cuenta de antes.
+                    self.assertEqual(nueva, vieja)
+                    continue
+                self.assertEqual(nueva, c.monedero.base)
+                if c.saldo_usado > 0 and rebajadas:
                     cambiaron += nueva != vieja
                     continue
                 comparadas += 1
-                self.assertEqual(nueva, vieja)
-                tasa = (entrada.cliente.tasa_monedero if entrada.cliente else None) or D("5")
-                self.assertEqual(mon.calcular_cashback(nueva, tasa), mon.calcular_cashback(vieja, tasa))
-        self.assertGreater(comparadas, 1000)
+                if not rebajadas:
+                    self.assertEqual(nueva, vieja)
+                else:
+                    # «Los centavos no ganan»: solo el redondeo de las rebajadas.
+                    centavos = sum((abs(l.parte_redondeo) for l in rebajadas), D("0"))
+                    self.assertLessEqual(abs(nueva - vieja), centavos + D("0.01"))
+                    redondeo += nueva != vieja
+        self.assertGreater(comparadas, 600)
         self.assertGreater(cambiaron, 0)   # el caso del doble descuento sí aparece
+        self.assertGreater(redondeo, 0)    # y el de los centavos también
 
     def test_catalogo_completo_pieza_por_pieza(self):
-        """Cada prenda del catálogo, normal, en Oferta y en Liquidación, en
-        efectivo y con tarjeta, sin saldo: igual que antes."""
+        """Cada prenda del catálogo, normal, en Oferta y en Liquidación (a
+        precio entero, sin centavos de redondeo), en efectivo y con tarjeta,
+        sin saldo: igual que antes."""
         for n, (sku, precio, cat) in enumerate(CATALOGO, start=1):
             for rebaja in (None, "oferta", "liquidacion"):
                 for tarjeta in (False, True):
@@ -160,28 +174,52 @@ class EquivalenciaConLaCuentaDeAntesTests(unittest.TestCase):
 
 class RedondeoEnPrendaRebajadaTests(unittest.TestCase):
     """Cuando el redondeo de la tienda (R1) le toca a una prenda rebajada, el
-    motor deja esos centavos fuera de la base (o los suma, si redondea hacia
-    abajo); la cuenta de antes los contaba. Pendiente de Daniel: mientras
-    tanto, sin saldo, se respeta la de antes (nadie gana distinto)."""
+    motor deja esos centavos fuera de la base; la cuenta de antes los
+    contaba. Daniel (2026-11-12): «los centavos no ganan». Manda el motor,
+    con o sin saldo."""
 
-    def test_los_centavos_del_redondeo_siguen_contando(self):
-        e = EntradaVenta((_linea(1, "100"), _linea(2, "60", oferta="38.70")), FECHA, cliente=LEAL)
+    def _venta(self, **kw):
+        e = EntradaVenta((_linea(1, "100"), _linea(2, "60", oferta="38.70")), FECHA, cliente=LEAL, **kw)
         c = calcular(e)
         rebajada = [l for l in c.lineas if l.clasificacion_al_vender == "oferta"][0]
         self.assertGreater(rebajada.parte_redondeo, 0)
+        return e, c
+
+    def test_sin_saldo_los_centavos_no_ganan(self):
+        e, c = self._venta()
+        self.assertEqual(c.saldo_usado, D("0"))
         fila = _fila(e, c)
         legada = mon.base_cashback_legada(fila)
-        self.assertLess(c.monedero.base, legada[0])
-        self.assertEqual(mon.base_cashback_de_venta(fila), legada)
+        self.assertLess(c.monedero.base, legada[0])          # antes contaban
+        self.assertEqual(mon.base_cashback_de_venta(fila), (c.monedero.base, False))
+        self.assertEqual(mon.calcular_cashback(mon.base_cashback_de_venta(fila)[0], D("10")), c.monedero.abono)
+
+    def test_con_tarjeta_tambien(self):
+        e, c = self._venta(pago_tarjeta=True)
+        fila = _fila(e, c)
+        self.assertEqual(mon.base_cashback_de_venta(fila), (c.monedero.base, True))
+
+    def test_sin_fotografia_cuenta_de_antes(self):
+        e, c = self._venta()
+        fila = _fila(e, c, con_foto=False)
+        self.assertEqual(mon.base_cashback_de_venta(fila), mon.base_cashback_legada(fila))
+        self.assertGreater(mon.base_cashback_de_venta(fila)[0], c.monedero.base)
 
 
 class SinFotografiaTests(unittest.TestCase):
-    def test_sin_saldo_manda_la_cuenta_de_antes(self):
+    def test_sin_saldo_tambien_manda_la_fotografia(self):
+        """2026-11-12: ya no hay «sin saldo = cuenta de antes»."""
         e = EntradaVenta((_linea(1, "300"),), FECHA, cliente=CLUB)
         c = calcular(e)
         fila = _fila(e, c)
-        fila.calculo["calculo"]["monedero"] = {"base": "999.00"}
-        self.assertEqual(mon.base_cashback_de_venta(fila), (D("300.00"), False))
+        fila.calculo["calculo"]["monedero"] = {"base": "250.00"}
+        self.assertEqual(mon.base_cashback_de_venta(fila), (D("250.00"), False))
+
+    def test_sin_saldo_y_sin_fotografia_cuenta_de_antes(self):
+        e = EntradaVenta((_linea(1, "300"), _linea(2, "60", oferta="38.70")), FECHA, cliente=CLUB)
+        fila = _fila(e, calcular(e), con_foto=False)
+        # $338.70 → R1 $339.00, menos lo rebajado ($38.70): los centavos cuentan.
+        self.assertEqual(mon.base_cashback_de_venta(fila), (D("300.30"), False))
 
     def test_venta_vieja_sigue_igual(self):
         fila = SimpleNamespace(
@@ -239,6 +277,26 @@ class TarjetaTests(unittest.TestCase):
         self.assertTrue(con_tarjeta)
         self.assertEqual(base, c.monedero.base)
         self.assertLess(base, D("100.00"))   # se le quitó la comisión
+
+    def test_pago_mixto_comision_solo_sobre_la_tarjeta(self):
+        """Efectivo + tarjeta con fotografía: la comisión es solo sobre lo
+        pagado con tarjeta (regla B). La cuenta de antes, que solo sabe
+        «hubo tarjeta», se la quitaba a todo."""
+        from pos_uniformes.services.beneficios.contrato import Pago
+
+        e = EntradaVenta(
+            (_linea(1, "1000"),), FECHA, cliente=ClienteCtx(15, "PRO", D("13"), None), pago_tarjeta=True,
+            pagos=(Pago("efectivo", D("500")), Pago("tarjeta", D("500"))),
+        )
+        c = calcular(e)
+        self.assertGreater(c.comision_tarjeta, 0)
+        fila = _fila(e, c)
+        base, con_tarjeta = mon.base_cashback_de_venta(fila)
+        self.assertTrue(con_tarjeta)
+        self.assertEqual(base, c.monedero.base)
+        self.assertEqual(base, D("1000.00") - c.comision_tarjeta)   # solo la de los $500
+        self.assertEqual(mon.base_cashback_legada(fila), (D("955.00"), True))
+        self.assertGreater(base, D("955.00"))
 
     def test_fotografia_de_antes_de_la_regla_b(self):
         """Un kiosko con el motor viejo no le quitaba la comisión a la base:
@@ -353,6 +411,32 @@ class TicketDelKioskoTests(unittest.TestCase):
             self.assertEqual(w._cashback_estimado(D("200.00"), D("100.00")), D("2.50"))
             # Un total que no es el del motor: la cuenta de antes.
             self.assertEqual(w._cashback_estimado(D("500.00"), D("0")), D("20.00"))
+
+    def test_sin_saldo_los_centavos_no_ganan_en_el_ticket(self):
+        """El «Gana $X» sin saldo sale de la base del motor (2026-11-12)."""
+        from pos_uniformes.ui.views.quick_sale_view import QuickSaleWidget
+
+        w = QuickSaleWidget(SimpleNamespace(offline_mode=False, _kiosk_lookup_from_cache=None, _db_online=True))
+        w._employee_code = "VEND-2"
+        w._items = [
+            {"sku": "SKU1", "nombre": "Playera", "talla": "8", "color": "", "precio": D("100.00"), "cantidad": 1,
+             "linea_uid": str(uuid.UUID(int=1))},
+            {"sku": "SKU2", "nombre": "Pants", "talla": "8", "color": "", "precio": D("38.70"), "cantidad": 1,
+             "linea_uid": str(uuid.UUID(int=2)), "rebaja": "oferta", "precio_normal": D("60.00")},
+        ]
+        w._cliente = {
+            "id": 9, "codigo": "CLI-000009", "nombre": "Ana", "por_qr": True, "en_linea": True,
+            "tiene_monedero": True, "estado": "activo", "disponible": D("0"), "tasa": D("10"),
+            "proximo_vencimiento": None, "monto_proximo_vencimiento": D("0"),
+        }
+        w._usar_saldo = False
+        with unittest.mock.patch.object(w, "_en_linea", return_value=True):
+            c = w._calculo_motor()
+            self.assertEqual(c.saldo_usado, D("0"))
+            legada = w._base_cashback_legada(c.total, D("0"))
+            self.assertLess(c.monedero.base, legada)
+            self.assertEqual(w._base_cashback(c.total, D("0")), c.monedero.base)
+            self.assertEqual(w._cashback_estimado(c.total, D("0")), c.monedero.abono)
 
 if __name__ == "__main__":
     unittest.main()

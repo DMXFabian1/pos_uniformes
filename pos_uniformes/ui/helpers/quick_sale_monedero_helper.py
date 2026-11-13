@@ -285,14 +285,15 @@ class MonederoVentaMixin:
 
     def _base_cashback(self, total: Decimal, canje: Decimal, tarjeta: bool = False) -> Decimal:
         """Sobre cuánto gana Monedero esta compra, con la misma regla que el
-        abono del servidor (`monedero_service.base_cashback_de_venta`): con
-        saldo, la del motor (sin el doble descuento de saldo + rebaja), nunca
-        menos que la cuenta de antes; sin saldo, la cuenta de antes."""
-        legada = self._base_cashback_legada(total, canje, tarjeta)
-        if Decimal(str(canje or 0)) <= 0:
-            return legada
+        abono del servidor (`monedero_service.base_cashback_de_venta`): la
+        base del motor del carrito siempre que exista y corresponda a este
+        total y saldo, con o sin saldo (2026-11-12, Daniel: «los centavos no
+        ganan»: los del redondeo que caen en una prenda rebajada no suman).
+        Sin cálculo del motor, la cuenta de antes."""
         del_motor = self._base_cashback_del_motor(total, canje, tarjeta)
-        return max(legada, del_motor) if del_motor is not None else legada
+        if del_motor is not None:
+            return del_motor
+        return self._base_cashback_legada(total, canje, tarjeta)
 
     def _base_cashback_legada(self, total: Decimal, canje: Decimal, tarjeta: bool = False) -> Decimal:
         """La cuenta de antes del motor (cobrado − saldo − rebajado)."""
