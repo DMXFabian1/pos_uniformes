@@ -73,8 +73,12 @@ def base_leal_de_venta(venta) -> Decimal:
 
     - Compra con descuento de empleada: 0 (el motor tampoco le da base Leal).
     - Con fotografía del motor (`calculo`): su `base_leal_total`.
-    - Ventas de antes, sin fotografía: la regla equivalente aproximada,
-      monto_total − lo pagado con saldo − lo cobrado en prendas rebajadas.
+    - Ventas de antes, sin fotografía: la regla equivalente aproximada. Lo
+      normal (monto_total − lo cobrado en prendas rebajadas) menos la parte
+      del saldo que le toca a lo normal. El motor reparte el saldo entre
+      todas las líneas en proporción a lo cobrado (2026-11-12): restar el
+      saldo completo además de lo rebajado restaba dos veces el saldo que
+      cayó en prendas rebajadas.
     Nunca negativa, en centavos."""
     if bool(getattr(venta, "descuento_empleada", False)):
         return _CERO
@@ -83,7 +87,9 @@ def base_leal_de_venta(venta) -> Decimal:
         total = Decimal(str(getattr(venta, "monto_total", 0) or 0))
         monedero = Decimal(str(getattr(venta, "monto_monedero", 0) or 0))
         rebajado = rebaja_service.importe_rebajado(getattr(venta, "detalle", None) or [])
-        base = total - monedero - rebajado
+        normal = min(max(total - rebajado, _CERO), total)
+        saldo_en_normal = (monedero * normal / total) if total > 0 else _CERO
+        base = normal - min(saldo_en_normal, normal)
     return max(base, _CERO).quantize(_CENT)
 
 

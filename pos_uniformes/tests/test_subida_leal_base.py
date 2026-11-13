@@ -4,7 +4,7 @@ Antes `gasto_del_periodo` sumaba `monto_total` completo: $3,000 en
 Liquidación, pagados con saldo del Monedero o comprados con descuento de
 empleada subían a Leal. Ahora cuenta la «base Leal» de cada venta: la que
 guardó el motor en su fotografía o, en las ventas de antes, la regla
-aproximada (total − saldo − lo rebajado; 0 si fue compra de empleada).
+aproximada (lo normal menos su parte del saldo; 0 si fue compra de empleada).
 
 Parte pura (sin base) y parte con la base local de prueba
 (`pos_uniformes_test`), en una transacción que se revierte.
@@ -17,6 +17,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from pos_uniformes.services import beneficios_carrito as bc
 from pos_uniformes.services import libreta_service as lib
@@ -62,6 +63,16 @@ class BaseLealPuraTests(unittest.TestCase):
 
     def test_sin_fotografia_lo_pagado_con_saldo_no_cuenta(self) -> None:
         self.assertEqual(leal.base_leal_de_venta(venta("450", monedero="37")), D("413.00"))
+
+    def test_sin_fotografia_el_saldo_se_reparte_como_el_motor(self) -> None:
+        """2026-11-12: $600 normal + $400 rebajado, $400 pagados con saldo.
+        El motor reparte el saldo: a lo normal le tocan 240 → base 360 (antes
+        la regla daba 1000 − 400 − 400 = 200)."""
+        detalle = [{"precio_unitario": "600", "cantidad": 1, "subtotal": "600"},
+                   {"precio_unitario": "400", "cantidad": 1, "subtotal": "400", "rebaja": "liquidacion"}]
+        with patch.object(leal.rebaja_service, "importe_rebajado", return_value=D("400")):
+            self.assertEqual(leal.base_leal_de_venta(venta("1000", monedero="400", detalle=detalle)),
+                             D("360.00"))
 
     def test_compra_de_empleada_no_cuenta(self) -> None:
         self.assertEqual(leal.base_leal_de_venta(venta("450", empleada=True)), D("0.00"))
@@ -143,7 +154,9 @@ class GastoDelPeriodoTests(_Monedero):
         v = self._venta("380")
         v.detalle, v.monto_monedero, v.calculo = detalle, D("30"), None
         self.s.flush()
-        self.assertEqual(self._gasto(), D("150.00"))   # 380 − 30 − 200
+        # Lo normal es 180 (380 − 200 de Liquidación); del saldo de 30 le
+        # toca 30 × 180/380 = 14.21, como lo repartiría el motor.
+        self.assertEqual(self._gasto(), D("165.79"))
 
     def test_apartados_y_abonos_no_cuentan(self) -> None:
         self._club()
