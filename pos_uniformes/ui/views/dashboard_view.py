@@ -48,7 +48,7 @@ def build_dashboard_tab(window: "MainWindow") -> QWidget:
     window.dashboard_products_card = window._create_kpi_card(
         "Productos",
         window.kpi_products_value,
-        "Consulta visible para caja",
+        "Catalogo a la venta",
         window.dashboard_products_context_label,
     )
     kpi_grid.addWidget(window.dashboard_products_card, 0, 1)
@@ -62,7 +62,7 @@ def build_dashboard_tab(window: "MainWindow") -> QWidget:
     window.dashboard_sales_card = window._create_kpi_card(
         "Ventas",
         window.kpi_sales_value,
-        "Documentos registrados",
+        "Ventas de hoy (Libreta)",
         window.dashboard_sales_context_label,
     )
     kpi_grid.addWidget(window.dashboard_sales_card, 0, 3)
@@ -123,25 +123,10 @@ def build_dashboard_tab(window: "MainWindow") -> QWidget:
     future_alerts_layout.addStretch(1)
     future_alerts_box.setLayout(future_alerts_layout)
 
-    manual_promo_box = QGroupBox("Promos manuales")
-    manual_promo_box.setObjectName("infoCard")
-    manual_promo_layout = QVBoxLayout()
-    manual_promo_layout.setSpacing(6)
-    manual_promo_intro = QLabel("Vigila autorizaciones manuales del dia.")
-    manual_promo_intro.setObjectName("inventorySubtitle")
-    window.dashboard_manual_promo_label.setWordWrap(True)
-    window.dashboard_manual_promo_label.setObjectName("analyticsFlagCard")
-    manual_promo_layout.addWidget(manual_promo_intro)
-    manual_promo_layout.addWidget(window.dashboard_manual_promo_label)
-    manual_promo_layout.addStretch(1)
-    manual_promo_box.setLayout(manual_promo_layout)
-    window.dashboard_manual_promo_box = manual_promo_box
-
     side_stack = QVBoxLayout()
     side_stack.setSpacing(10)
     side_stack.addWidget(alerts_box)
     side_stack.addWidget(future_alerts_box)
-    side_stack.addWidget(manual_promo_box)
 
     info_row = QHBoxLayout()
     info_row.setSpacing(10)

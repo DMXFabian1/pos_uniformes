@@ -1,4 +1,9 @@
-"""Resumen visible del dashboard principal."""
+"""Resumen visible del dashboard principal.
+
+2026-11-12 (Daniel: «la caja antigua ya no es de utilidad, todo lo demás
+corre en libreta y kioskos» → «Pantallas con datos viejos»): las ventas y lo
+cobrado salen de la Libreta (`services/resumen_pos_service.py`), ya no de la
+tabla `venta` de la Caja antigua. Lo cobrado solo lo ve el ADMIN."""
 
 from __future__ import annotations
 
@@ -52,7 +57,8 @@ def build_dashboard_status_view(
     variantes: int,
     stock_total: int,
     compras: int,
-    ventas: int,
+    ventas_hoy: int,
+    ventas_mes: int,
     is_admin: bool,
 ) -> DashboardStatusView:
     metrics_parts: tuple[str, ...]
@@ -64,27 +70,39 @@ def build_dashboard_status_view(
             f"Presentaciones: {variantes}",
             f"Stock total: {stock_total}",
             f"Compras: {compras}",
-            f"Ventas: {ventas}",
+            f"Ventas hoy: {ventas_hoy}",
+            f"Ventas del mes: {ventas_mes}",
         )
     else:
         metrics_parts = (
             f"Productos: {productos}",
             f"Presentaciones: {variantes}",
             f"Stock total: {stock_total}",
-            f"Ventas: {ventas}",
+            f"Ventas hoy: {ventas_hoy}",
+            f"Ventas del mes: {ventas_mes}",
         )
     return DashboardStatusView(metrics_text=" | ".join(metrics_parts))
 
 
 def build_dashboard_operations_view(
     *,
-    ventas_confirmadas: int,
-    ingresos: Decimal,
+    ventas_hoy: int,
+    cobrado_hoy: Decimal,
+    ventas_mes: int,
+    cobrado_mes: Decimal,
     compras_confirmadas: Decimal,
     stock_bajo: int,
     is_admin: bool,
 ) -> DashboardOperationsView:
-    primary_text = f"Ventas confirmadas: {ventas_confirmadas} | Ingreso confirmado: ${ingresos}"
+    # Solo dinero real, sin sumar apartados (Libreta, 2026-11-12). El dinero
+    # solo lo ve el ADMIN.
+    if is_admin:
+        primary_text = (
+            f"Hoy: {ventas_hoy} ventas · cobrado ${cobrado_hoy:,.2f} | "
+            f"Mes: {ventas_mes} ventas · cobrado ${cobrado_mes:,.2f}"
+        )
+    else:
+        primary_text = f"Hoy: {ventas_hoy} ventas | Mes: {ventas_mes} ventas"
     if is_admin:
         secondary_text = (
             f"Compras confirmadas: ${compras_confirmadas} | "
@@ -100,8 +118,8 @@ def build_dashboard_future_alerts_view(*, is_admin: bool) -> DashboardFutureAler
         return DashboardFutureAlertsView(
             title_text="Zona reservada para futuras notificaciones del negocio.",
             body_text=(
-                "Aqui podran aparecer avisos de stock critico, respaldos automaticos, "
-                "caja abierta demasiado tiempo y otras incidencias operativas."
+                "Aqui podran aparecer avisos de stock critico, respaldos automaticos "
+                "y otras incidencias operativas."
             ),
         )
     return DashboardFutureAlertsView(
@@ -119,8 +137,9 @@ def build_dashboard_kpi_cards_view(
     productos: int,
     variantes: int,
     stock_total: int,
-    ventas: int,
-    ventas_confirmadas: int,
+    ventas_hoy: int,
+    ventas_mes: int,
+    apartados_hoy: int,
     stock_bajo: int,
     is_admin: bool,
 ) -> DashboardKpiCardsView:
@@ -132,7 +151,7 @@ def build_dashboard_kpi_cards_view(
         stock_tone = "warning"
     else:
         stock_tone = "positive"
-    sales_tone = "positive" if ventas_confirmadas > 0 else "neutral"
+    sales_tone = "positive" if ventas_hoy > 0 else "neutral"
 
     return DashboardKpiCardsView(
         users=DashboardKpiCardView(
@@ -141,7 +160,7 @@ def build_dashboard_kpi_cards_view(
             tone=users_tone,
         ),
         products=DashboardKpiCardView(
-            subtitle_text="Catalogo visible para caja",
+            subtitle_text="Catalogo a la venta",
             detail_text=f"{variantes} presentaciones activas para consulta.",
             tone=products_tone,
         ),
@@ -155,8 +174,8 @@ def build_dashboard_kpi_cards_view(
             tone=stock_tone,
         ),
         sales=DashboardKpiCardView(
-            subtitle_text="Documentos registrados",
-            detail_text=f"{ventas_confirmadas} ventas confirmadas dentro de {ventas} documentos.",
+            subtitle_text="Ventas de hoy (Libreta)",
+            detail_text=f"{ventas_mes} ventas en el mes | {apartados_hoy} apartados hoy.",
             tone=sales_tone,
         ),
     )

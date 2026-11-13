@@ -590,5 +590,45 @@ class SinCargarDatosInicialesTests(unittest.TestCase):
             importlib.import_module("pos_uniformes.services.bootstrap_service")
 
 
+
+class ResumenDesdeLaLibretaTests(unittest.TestCase):
+    """2026-11-12, «Pantallas con datos viejos»: la pestaña Resumen ya no lee
+    la tabla `venta` de la Caja antigua. Ventas y cobrado de hoy y del mes
+    salen de la Libreta (`resumen_pos_service`, probado en
+    test_resumen_pos_service.py) y el bloque «Promos manuales» (leía una
+    tabla en la que nadie escribe) se quitó."""
+
+    def setUp(self) -> None:
+        self.ventana = MainWindow(user_id=1)
+
+    def tearDown(self) -> None:
+        _cerrar(self.ventana)
+
+    def test_ya_no_hay_bloque_de_promos_manuales(self) -> None:
+        from PyQt6.QtWidgets import QGroupBox
+
+        titulos = {g.title() for g in self.ventana.findChildren(QGroupBox)}
+        self.assertNotIn("Promos manuales", titulos)
+        for atributo in ("dashboard_manual_promo_box", "dashboard_manual_promo_label"):
+            self.assertFalse(hasattr(self.ventana, atributo), atributo)
+
+    def test_el_resumen_lee_la_libreta_y_no_la_caja_antigua(self) -> None:
+        import inspect
+
+        fuente = inspect.getsource(MainWindow._refresh_summary)
+        self.assertIn("resumen_pos_service.cargar", fuente)
+        self.assertNotIn("Venta.", fuente)
+        self.assertNotIn("ManualPromoService", fuente)
+
+    def test_el_resumen_se_pinta_sin_tronar(self) -> None:
+        from pos_uniformes.database.connection import get_session
+
+        with get_session() as session:
+            self.ventana._refresh_summary(session)
+        self.assertTrue(self.ventana.kpi_sales_value.text().isdigit())
+        self.assertIn("Ventas hoy:", self.ventana.metrics_label.text())
+        self.assertIn("ventas en el mes", self.ventana.dashboard_sales_context_label.text())
+
+
 if __name__ == "__main__":
     unittest.main()

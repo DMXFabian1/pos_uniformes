@@ -126,6 +126,7 @@ from pos_uniformes.ui.helpers.settings_employee_ranking_helper import build_libr
 from pos_uniformes.services.client_service import ClientService
 from pos_uniformes.services.employee_identity_service import EmployeeIdentityService
 from pos_uniformes.services import conjunto_service
+from pos_uniformes.services import resumen_pos_service
 from pos_uniformes.services.catalog_service import CatalogService
 from pos_uniformes.services.catalog_snapshot_service import load_catalog_snapshot_rows
 from pos_uniformes.services.catalog_mutation_service import (
@@ -159,7 +160,6 @@ from pos_uniformes.services.inventory_snapshot_service import (
     invalidate_inventory_qr_exists_cache,
     load_inventory_snapshot_rows,
 )
-from pos_uniformes.services.manual_promo_service import ManualPromoService
 from pos_uniformes.services.presupuesto_service import PresupuestoService
 from pos_uniformes.services.quote_snapshot_service import (
     build_quote_history_input_rows,
@@ -1257,7 +1257,6 @@ class MainWindow(QMainWindow):
         self.dashboard_products_card: QFrame | None = None
         self.dashboard_stock_card: QFrame | None = None
         self.dashboard_sales_card: QFrame | None = None
-        self.dashboard_manual_promo_box: QWidget | None = None
         self.dashboard_help_box: QWidget | None = None
         self.products_quick_setup_box: QWidget | None = None
 
@@ -1578,7 +1577,6 @@ class MainWindow(QMainWindow):
         self.settings_business_demo_button = QPushButton("Ver credencial demo")
         self.settings_marketing_status_label = QLabel("Sin configuración cargada.")
         self.settings_marketing_summary_label = QLabel("Sin resumen disponible.")
-        self.dashboard_manual_promo_label = QLabel("Sin promociones manuales hoy.")
         self.settings_marketing_review_days_spin = QSpinBox()
         self.settings_marketing_leal_spend_spin = QDoubleSpinBox()
         self.settings_marketing_save_button = QPushButton("Guardar reglas")
@@ -7098,8 +7096,6 @@ class MainWindow(QMainWindow):
 
         if self.dashboard_users_card is not None:
             self.dashboard_users_card.setVisible(is_admin)
-        if self.dashboard_manual_promo_box is not None:
-            self.dashboard_manual_promo_box.setVisible(is_admin)
         if self.dashboard_help_box is not None:
             self.dashboard_help_box.setTitle("Flujo sugerido" if is_admin else "Flujo rapido de caja")
         self.analytics_label.setVisible(is_admin)
@@ -7131,13 +7127,6 @@ class MainWindow(QMainWindow):
                 .where(conjunto_service.filtro_sin_conjuntos())
                 .scalar_subquery(),
                 select(func.count(Compra.id)).scalar_subquery(),
-                select(func.count(Venta.id)).scalar_subquery(),
-                select(func.count(Venta.id))
-                .where(Venta.estado == EstadoVenta.CONFIRMADA)
-                .scalar_subquery(),
-                select(func.coalesce(func.sum(Venta.total), 0))
-                .where(Venta.estado == EstadoVenta.CONFIRMADA)
-                .scalar_subquery(),
                 select(func.coalesce(func.sum(Compra.total), 0))
                 .where(Compra.estado == EstadoCompra.CONFIRMADA)
                 .scalar_subquery(),
@@ -7153,15 +7142,14 @@ class MainWindow(QMainWindow):
         variantes = summary_row[3] or 0
         stock_total = summary_row[4] or 0
         compras = summary_row[5] or 0
-        ventas = summary_row[6] or 0
-        ventas_confirmadas = summary_row[7] or 0
-        ingresos = summary_row[8] or Decimal("0.00")
-        compras_confirmadas = summary_row[9] or Decimal("0.00")
-        stock_bajo = summary_row[10] or 0
+        compras_confirmadas = summary_row[6] or Decimal("0.00")
+        stock_bajo = summary_row[7] or 0
         layaway_alerts_snapshot = load_layaway_alerts_snapshot(session, today=date.today())
-        manual_promo_summary = ManualPromoService.summarize_today(session, limit=4)
 
         is_admin = self.current_role == RolUsuario.ADMIN
+        # Ventas y cobrado desde la Libreta (2026-11-12): la tabla `venta` es
+        # de la Caja antigua y ya no crece.
+        resumen_libreta = resumen_pos_service.cargar(session, incluir_privados=is_admin)
         status_view = build_dashboard_status_view(
             usuarios=usuarios,
             proveedores=proveedores,
@@ -7169,12 +7157,15 @@ class MainWindow(QMainWindow):
             variantes=variantes,
             stock_total=stock_total,
             compras=compras,
-            ventas=ventas,
+            ventas_hoy=resumen_libreta.hoy.ventas,
+            ventas_mes=resumen_libreta.mes.ventas,
             is_admin=is_admin,
         )
         operations_view = build_dashboard_operations_view(
-            ventas_confirmadas=ventas_confirmadas,
-            ingresos=Decimal(ingresos),
+            ventas_hoy=resumen_libreta.hoy.ventas,
+            cobrado_hoy=resumen_libreta.hoy.cobrado,
+            ventas_mes=resumen_libreta.mes.ventas,
+            cobrado_mes=resumen_libreta.mes.cobrado,
             compras_confirmadas=Decimal(compras_confirmadas),
             stock_bajo=stock_bajo,
             is_admin=is_admin,
@@ -7185,8 +7176,9 @@ class MainWindow(QMainWindow):
             productos=productos,
             variantes=variantes,
             stock_total=stock_total,
-            ventas=ventas,
-            ventas_confirmadas=ventas_confirmadas,
+            ventas_hoy=resumen_libreta.hoy.ventas,
+            ventas_mes=resumen_libreta.mes.ventas,
+            apartados_hoy=resumen_libreta.hoy.apartados,
             stock_bajo=stock_bajo,
             is_admin=is_admin,
         )
@@ -7195,7 +7187,7 @@ class MainWindow(QMainWindow):
         self.kpi_users_value.setText(str(usuarios))
         self.kpi_products_value.setText(str(productos))
         self.kpi_stock_value.setText(str(stock_total))
-        self.kpi_sales_value.setText(str(ventas))
+        self.kpi_sales_value.setText(str(resumen_libreta.hoy.ventas))
         self.dashboard_users_context_label.setText(kpi_cards_view.users.detail_text)
         self.dashboard_products_context_label.setText(kpi_cards_view.products.detail_text)
         self.dashboard_stock_context_label.setText(kpi_cards_view.stock.detail_text)
@@ -7256,26 +7248,6 @@ class MainWindow(QMainWindow):
             label.style().unpolish(label)
             label.style().polish(label)
             label.update()
-        if manual_promo_summary.total_hoy <= 0:
-            self.dashboard_manual_promo_label.setText("Sin promociones manuales autorizadas hoy.")
-            self.dashboard_manual_promo_label.setProperty("tone", "neutral")
-        else:
-            recent_lines = []
-            for item in manual_promo_summary.recientes:
-                actor = item.usuario.nombre_completo if item.usuario is not None else (item.rol_usuario or "Usuario")
-                folio = item.folio_venta or "Sin folio"
-                promo = self._format_discount_label(Decimal(str(item.porcentaje_promocion or Decimal("0.00"))))
-                recent_lines.append(f"{actor} · {folio} · {promo}")
-            self.dashboard_manual_promo_label.setText(
-                f"Promos manuales hoy: {manual_promo_summary.total_hoy}\n" + "\n".join(recent_lines)
-            )
-            self.dashboard_manual_promo_label.setProperty(
-                "tone",
-                "warning" if manual_promo_summary.total_hoy <= 3 else "danger",
-            )
-        self.dashboard_manual_promo_label.style().unpolish(self.dashboard_manual_promo_label)
-        self.dashboard_manual_promo_label.style().polish(self.dashboard_manual_promo_label)
-        self.dashboard_manual_promo_label.update()
 
     def _invalidate_listing_snapshot_caches(
         self,
