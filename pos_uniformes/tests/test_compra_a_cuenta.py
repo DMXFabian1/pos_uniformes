@@ -180,6 +180,19 @@ class RegistrarTests(unittest.TestCase):
         self.assertEqual(self._corte()[0], [otra.id])
         self.assertNotIn(compra.id, self._corte()[0])
 
+    def test_el_resumen_de_telegram_cuadra_con_el_corte(self):
+        """Revisión de deuda, 2026-11-12: /resumen contaba la compra a cuenta
+        como efectivo que entró, y no cuadraba con el corte."""
+        from pos_uniformes.services import resumen_diario_service as rd
+
+        folio = "abcdef12-0000-4000-8000-000000000001"
+        self._venta_empleada(folio)
+        self._venta_empleada("99999999-0000-4000-8000-000000000002")   # pagó al momento
+        cac.registrar(self.s, employee_code="VEND-3", nombre="Cristal", monto="332",
+                      opcion=cac.opciones_de_pago(SAB14, 7)[0], quien="VEND-1", folio=folio)
+        d = rd.recolectar(self.s, todo_el_dia=True)
+        self.assertEqual(d.efectivo, D("332.00"))   # solo la que sí pagó
+
     def test_si_no_la_autoriza_el_corte_si_la_espera(self):
         folio = "abcdef12-0000-4000-8000-000000000001"
         compra = self._venta_empleada(folio)

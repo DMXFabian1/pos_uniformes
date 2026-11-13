@@ -178,7 +178,11 @@ def _payload_dueno(db: Session) -> dict:
         db.rollback()
         inicio_corte = None
     consulta_desde = inicio_corte if inicio_corte is not None and inicio_corte < desde else desde
+    from pos_uniformes.services.corte_caja_service import sin_compras_a_cuenta
+
     rows = desde_el_corte(listar_operaciones(db, desde=consulta_desde, hasta=hasta), inicio_corte)
+    # Como el corte: la compra a cuenta no es efectivo (revisión, 2026-11-12).
+    rows = sin_compras_a_cuenta(db, rows)
     cortes_hoy = resumir_por_dia(rows)
     nombres = {
         str(e.codigo).upper(): (e.nombre_completo or e.codigo)

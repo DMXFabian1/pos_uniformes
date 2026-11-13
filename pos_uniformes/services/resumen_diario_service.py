@@ -286,7 +286,12 @@ def recolectar(session, hoy: date | None = None, *, todo_el_dia: bool = False) -
 
     from pos_uniformes.services.libreta_service import desde_el_corte
 
+    from pos_uniformes.services.corte_caja_service import sin_compras_a_cuenta
+
     rows = desde_el_corte(listar_operaciones(session, desde=desde, hasta=hasta), d.inicio_corte, hoy)
+    # Como el corte: la compra a cuenta de una empleada no es efectivo que
+    # entró; sin esto /resumen y el corte no cuadraban (revisión, 2026-11-12).
+    rows = sin_compras_a_cuenta(session, rows)
     r = resumir_periodo(rows)
     d.operaciones, d.piezas = r.operaciones, r.piezas
     d.ventas, d.abonos, d.apartados, d.efectivo, d.tarjeta = r.ventas, r.abonos, r.apartados, r.efectivo, r.tarjeta
