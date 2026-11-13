@@ -365,6 +365,11 @@ from pos_uniformes.ui.helpers.inventory_selection_helper import (
     normalize_inventory_variant_id,
 )
 from pos_uniformes.ui.helpers.inventory_summary_helper import INVENTORY_SEARCH_LIMIT, build_inventory_summary_view
+from pos_uniformes.ui.helpers.inventory_alta_texts import (
+    TITULO_ERROR_LOTE,
+    mensaje_talla_creada,
+    mensaje_tallas_creadas,
+)
 from pos_uniformes.ui.helpers.inventory_help_texts import aplicar_ayudas_inventario
 from pos_uniformes.ui.helpers.inventory_toggle_helper import (
     confirmacion_desactivar_prenda,
@@ -5537,9 +5542,9 @@ class MainWindow(QMainWindow):
                 "Producto creado",
                 (
                     f"Producto '{nombre}' creado correctamente.\n\n"
-                    f"Ya dejaste {total_variants} presentaciones sugeridas con tallas y colores.\n"
+                    f"Ya dejaste {total_variants} tallas sugeridas con sus colores.\n"
                     f"SKU previstos: {sku_preview}\n\n"
-                    "Quieres crearlas ahora por lote?"
+                    "¿Quieres crearlas ahora todas juntas?"
                 ),
             )
             if reply == QMessageBox.StandardButton.Yes:
@@ -5565,32 +5570,22 @@ class MainWindow(QMainWindow):
                             stock_initial=int(batch_data["stock_inicial"]),
                         )
                     except Exception as exc:  # noqa: BLE001
-                        QMessageBox.critical(self, "Presentaciones fallidas", str(exc))
+                        QMessageBox.critical(self, TITULO_ERROR_LOTE, str(exc))
                         return
                     self.refresh_all()
                     if first_variant_id is not None:
                         self._set_combo_value(self.inventory_variant_combo, first_variant_id)
-                    message = f"Se crearon {created_count} presentaciones para '{nombre}'."
-                    if created_skus:
-                        preview_skus = ", ".join(created_skus[:8])
-                        if len(created_skus) > 8:
-                            preview_skus += f", ... (+{len(created_skus) - 8})"
-                        message += (
-                            f"\n\nSKU creados:\n{preview_skus}"
-                            f"\nRango: {created_skus[0]} -> {created_skus[-1]}"
-                        )
-                    if errors:
-                        preview_errors = "\n".join(errors[:4])
-                        if len(errors) > 4:
-                            preview_errors += f"\n... y {len(errors) - 4} mas."
-                        message += f"\n\nIncidencias:\n{preview_errors}"
-                    QMessageBox.information(self, "Tallas creadas", message)
+                    QMessageBox.information(
+                        self,
+                        "Tallas creadas",
+                        mensaje_tallas_creadas(nombre, created_count, created_skus, errors),
+                    )
                 return
 
         reply = QMessageBox.question(
             self,
             "Producto creado",
-            f"Producto '{nombre}' creado correctamente.\n\nQuieres agregar su primera presentacion ahora?",
+            f"Producto '{nombre}' creado correctamente.\n\n¿Quieres agregar su primera talla ahora?",
         )
         if reply == QMessageBox.StandardButton.Yes and created_product_id is not None:
             result = self._create_or_edit_presentation(
@@ -5600,11 +5595,7 @@ class MainWindow(QMainWindow):
             if result is not None:
                 sku, variant_id = result
                 self.refresh_all()
-                QMessageBox.information(
-                    self,
-                    "Talla creada",
-                    f"Se agregó la primera talla de la prenda con SKU '{sku}'.",
-                )
+                QMessageBox.information(self, "Talla creada", self._mensaje_talla_creada(variant_id, sku))
 
     def _handle_create_variant(self) -> None:
         if self.current_role != RolUsuario.ADMIN:
@@ -5618,7 +5609,7 @@ class MainWindow(QMainWindow):
         sku, variant_id = result
         self.refresh_all()
         self._set_combo_value(self.inventory_variant_combo, variant_id)
-        QMessageBox.information(self, "Talla creada", f"Talla '{sku.upper()}' creada correctamente.")
+        QMessageBox.information(self, "Talla creada", self._mensaje_talla_creada(variant_id, sku))
 
     def _handle_duplicate_variant(self) -> None:
         if self.current_role != RolUsuario.ADMIN:
@@ -5646,7 +5637,14 @@ class MainWindow(QMainWindow):
         sku, variant_id = result
         self.refresh_all()
         self._set_combo_value(self.inventory_variant_combo, variant_id)
-        QMessageBox.information(self, "Talla duplicada", f"Talla '{sku.upper()}' creada correctamente.")
+        QMessageBox.information(self, "Talla duplicada", self._mensaje_talla_creada(variant_id, sku))
+
+    def _mensaje_talla_creada(self, variant_id: object, sku: object) -> str:
+        try:
+            fila = find_catalog_row_by_variant_id(self._load_inventory_snapshot_rows(), variant_id)
+        except Exception:  # noqa: BLE001
+            fila = None
+        return mensaje_talla_creada(fila, sku)
 
     def _handle_catalog_selection(self) -> None:
         row = resolve_catalog_row(self.catalog_rows, self.catalog_table.currentRow())

@@ -84,6 +84,19 @@ class InventarioTanda2PantallaTests(unittest.TestCase):
         aviso.assert_called_once()
         self.assertNotIn("QR", aviso.call_args.args[2])
 
+    def test_alta_de_talla_nombra_la_talla_y_la_prenda(self) -> None:
+        window = self._ventana()
+        window.current_role = RolUsuario.ADMIN
+        window._create_or_edit_presentation = Mock(return_value=("SKU000004", 7))
+        window.refresh_all = Mock()
+        window._set_combo_value = Mock()
+        window._load_inventory_snapshot_rows = Mock(
+            return_value=[{"variante_id": 7, "talla": "10", "color": "Azul", "producto_nombre_base": "Pants"}]
+        )
+        with patch.object(QMessageBox, "information") as aviso:
+            window._handle_create_variant()
+        self.assertEqual(aviso.call_args.args[2], "Talla 10 (Azul) de «Pants» lista.")
+
     # ── Sin Apartado ni Estado; la desactivada en gris ──────────────────
 
     def test_sin_columnas_apartado_ni_estado(self) -> None:
