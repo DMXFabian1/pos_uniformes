@@ -69,6 +69,14 @@ class DatosResumen:
     inicio_corte: datetime | None = None
 
     @property
+    def hubo_movimiento(self) -> bool:
+        """¿Pasó algo en el periodo? No basta con `operaciones`: desde
+        2026-11-12 la compra de una empleada con precio especial no cuenta
+        como operación, pero su dinero sí entró. Un día con solo esa compra
+        no debe decir «ninguna venta» y esconder el efectivo."""
+        return bool(self.operaciones or self.ventas or self.abonos or self.apartados_n)
+
+    @property
     def periodo(self) -> str:
         """«desde el corte de ayer a las 16:56», o «hoy»."""
         from pos_uniformes.services.libreta_service import etiqueta_desde_el_corte
@@ -97,7 +105,7 @@ def formatear(d: DatosResumen) -> str:
     lineas = [f"📒 RESUMEN DEL DÍA · {fecha}", ""]
 
     lineas.append("💰 VENTAS" + (f" ({d.periodo})" if d.inicio_corte is not None else ""))
-    if d.operaciones:
+    if d.hubo_movimiento:
         lineas.append(f"• {d.operaciones} operaciones · {d.piezas} piezas")
         lineas.append(f"• Ventas: {_pesos(d.ventas)}")
         if d.abonos:
@@ -138,13 +146,13 @@ def formatear(d: DatosResumen) -> str:
         # que todavía no haya corte de hoy es lo normal, no una alarma. Antes
         # salía «❗ SIN CORTE HOY» casi a diario (el viernes ya pasaban las 24 h
         # desde el del jueves) y enseñaba a ignorar el ❗ (auditoría 2026-11-07).
-        lineas.append("• Todavía no hay corte de hoy." if d.operaciones else "• Sin corte hoy (no hubo ventas).")
-    elif d.ultimo_corte_fecha is not None and d.operaciones:
+        lineas.append("• Todavía no hay corte de hoy." if d.hubo_movimiento else "• Sin corte hoy (no hubo ventas).")
+    elif d.ultimo_corte_fecha is not None and d.hubo_movimiento:
         lineas.append(f"• ❗ AYER NO HUBO CORTE. El último fue el {d.ultimo_corte_fecha:%d/%m}.")
     else:
         if d.horas_sin_corte is None:
             lineas.append("• Sin corte hoy (nunca se ha hecho uno).")
-        elif not d.operaciones and d.horas_sin_corte >= 24:
+        elif not d.hubo_movimiento and d.horas_sin_corte >= 24:
             # Sin ventas hoy no había nada que cortar HOY: sin el ❗, pero se
             # dice desde cuándo, por si lo de ayer sigue sin corte (2026-10-10).
             lineas.append(f"• Sin corte hoy (no hubo ventas). El último fue hace {d.horas_sin_corte / 24:.1f} días.")
@@ -219,7 +227,7 @@ def texto_hoy(d: DatosResumen, *, quien_esta: list[str] | None = None, ahora=Non
         lineas.append(f"(dinero {d.periodo})")
     lineas.append("")
 
-    if not d.operaciones:
+    if not d.hubo_movimiento:
         lineas.append(
             f"Ninguna venta {d.periodo}." if d.inicio_corte is not None
             else "Todavía no se registra ninguna venta."
@@ -253,7 +261,12 @@ def recolectar(session, hoy: date | None = None, *, todo_el_dia: bool = False) -
     """Lee todo lo del día. Cada bloque es defensivo: si una tabla no existe
     (base sin migrar) ese bloque se omite y el resto sale igual."""
     from pos_uniformes.services.corte_caja_service import resumir_periodo
-    from pos_uniformes.services.libreta_service import listar_operaciones, resumir_por_empleada, ventana_hoy
+    from pos_uniformes.services.libreta_service import (
+        cuenta_como_operacion,
+        listar_operaciones,
+        resumir_por_empleada,
+        ventana_hoy,
+    )
 
     nombres_por_codigo(session)   # los códigos salen como nombres en todo el resumen
 
@@ -295,7 +308,9 @@ def recolectar(session, hoy: date | None = None, *, todo_el_dia: bool = False) -
     r = resumir_periodo(rows)
     d.operaciones, d.piezas = r.operaciones, r.piezas
     d.ventas, d.abonos, d.apartados, d.efectivo, d.tarjeta = r.ventas, r.abonos, r.apartados, r.efectivo, r.tarjeta
-    d.apartados_n = sum(1 for row in rows if str(getattr(row, "tipo", "")) == "apartado")
+    # Con la regla única (2026-11-12): el apartado de una empleada con precio
+    # especial no cuenta como apartado nuevo.
+    d.apartados_n = sum(1 for row in rows if cuenta_como_operacion(row, ("apartado",)))
     d.por_empleada = [
         (_nombre_de(e.employee_name or e.employee_code, corto=True), e.operaciones, e.comisiones)
         for e in resumir_por_empleada(rows)

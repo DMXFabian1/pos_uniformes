@@ -80,14 +80,21 @@ class EstadoCaja:
 
 def resumir_periodo(rows: list) -> ResumenPeriodo:
     """Suma las operaciones de la Libreta de un periodo (mismas reglas que
-    el corte por día: tarjeta no está en caja, apartado no es dinero)."""
-    from pos_uniformes.services.libreta_service import pagos_de
+    el corte por día: tarjeta no está en caja, apartado no es dinero).
+
+    Operaciones y piezas siguen la regla única de la Libreta
+    (`libreta_service.cuenta_como_operacion`, 2026-11-12): la compra de una
+    empleada con precio especial no cuenta. Su DINERO sí: entró al cajón o
+    a la terminal, y el corte lo espera. (Las compras a cuenta ya vienen
+    quitadas por `sin_compras_a_cuenta`.)"""
+    from pos_uniformes.services.libreta_service import cuenta_como_operacion, pagos_de
 
     operaciones = piezas = 0
     ventas = abonos = apartados = tarjeta = efectivo = tarjeta_neto = monedero = Decimal("0.00")
     for row in rows:
-        operaciones += 1
-        piezas += int(row.piezas or 0)
+        if cuenta_como_operacion(row):
+            operaciones += 1
+            piezas += int(row.piezas or 0)
         monto = _d(row.monto_total)
         tipo = str(row.tipo)
         if tipo == "apartado":
