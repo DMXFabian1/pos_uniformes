@@ -70,6 +70,46 @@ class CatalogFormPayloadHelperTests(unittest.TestCase):
             validate_catalog_product_presentations_step(has_variant_intent=True, missing_prices=["CH"])
         )
 
+    def test_precio_unico_en_cero_no_lista_todas_las_tallas(self) -> None:
+        from pos_uniformes.ui.helpers.catalog_form_payload_helper import (
+            invalid_catalog_prices,
+            non_numeric_catalog_prices,
+        )
+
+        precios = {t: "0" for t in ("2", "4", "6", "8", "10", "12", "14", "16", "18")}
+        mensaje = validate_catalog_product_presentations_step(
+            has_variant_intent=True, missing_prices=[], invalid_prices=invalid_catalog_prices(precios),
+            non_numeric_prices=non_numeric_catalog_prices(precios), price_mode="single",
+        )
+        self.assertEqual(mensaje, "El precio único tiene que ser mayor que $0: corrígelo en «Capturar precio».")
+        mensaje = validate_catalog_product_presentations_step(
+            has_variant_intent=True, missing_prices=[], invalid_prices=invalid_catalog_prices(precios),
+            price_mode="manual",
+        )
+        self.assertIn("Revisa: 2, 4, 6, 8, 10, 12, 14, 16…", mensaje)
+
+    def test_precio_con_signo_o_comas_dice_que_escriba_solo_el_numero(self) -> None:
+        from pos_uniformes.ui.helpers.catalog_form_payload_helper import (
+            invalid_catalog_prices,
+            non_numeric_catalog_prices,
+        )
+
+        precios = {"CH": "$199", "MD": "1,200", "GD": "nan"}
+        self.assertEqual(invalid_catalog_prices(precios), [])
+        self.assertEqual(non_numeric_catalog_prices(precios), ["CH", "MD", "GD"])
+        mensaje = validate_catalog_product_presentations_step(
+            has_variant_intent=True, missing_prices=[], invalid_prices=[],
+            non_numeric_prices=non_numeric_catalog_prices({"CH": "$199"}), price_mode="single",
+        )
+        self.assertIn("no es un número", mensaje)
+        self.assertNotIn("$0", mensaje)
+        self.assertIn(
+            "solo el número",
+            validate_catalog_variant_submission(
+                {"producto_id": 1, "talla": "CH", "precio": "$199"}, require_stock=False
+            ),
+        )
+
     def test_validate_catalog_product_submission_reuses_base_validation(self) -> None:
         payload = build_catalog_product_dialog_payload(
             mode_key="uniform",

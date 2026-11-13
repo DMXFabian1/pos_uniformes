@@ -29,21 +29,39 @@ def validate_catalog_product_base_step(
     return None
 
 
+def _parse_price(raw_price: object) -> Decimal | None:
+    """El precio como número, o None si el texto no es un número («$199», «1,200»)."""
+    try:
+        value = Decimal(str(raw_price or "").strip())
+    except InvalidOperation:
+        return None
+    return value if value.is_finite() else None
+
+
+def non_numeric_catalog_prices(prices_by_size: dict[str, str]) -> list[str]:
+    """Tallas cuyo precio no es un número (lleva «$», comas o letras)."""
+    return [
+        str(size)
+        for size, raw_price in prices_by_size.items()
+        if str(raw_price or "").strip() and _parse_price(raw_price) is None
+    ]
+
+
 def invalid_catalog_prices(prices_by_size: dict[str, str]) -> list[str]:
-    """Tallas cuyo precio está en $0, es negativo o no es un número."""
+    """Tallas cuyo precio es un número en $0 o negativo."""
     invalid: list[str] = []
     for size, raw_price in prices_by_size.items():
-        text = str(raw_price or "").strip()
-        if not text:
-            continue
-        try:
-            value = Decimal(text)
-        except InvalidOperation:
-            invalid.append(str(size))
-            continue
-        if value <= 0:
+        value = _parse_price(raw_price)
+        if value is not None and value <= 0:
             invalid.append(str(size))
     return invalid
+
+
+SOLO_NUMERO = "Escribe solo el número, por ejemplo 199 (sin $ ni comas)."
+
+
+def _preview_sizes(sizes: list[str]) -> str:
+    return ", ".join(sizes[:8]) + ("…" if len(sizes) > 8 else "")
 
 
 def validate_catalog_product_presentations_step(
@@ -51,16 +69,22 @@ def validate_catalog_product_presentations_step(
     has_variant_intent: bool,
     missing_prices: list[str],
     invalid_prices: list[str] | None = None,
+    non_numeric_prices: list[str] | None = None,
+    price_mode: str = "",
 ) -> str | None:
     if has_variant_intent and missing_prices:
         return "Todavia faltan precios para algunas tallas o bloques. Revisa ese paso antes de continuar."
-    if has_variant_intent and invalid_prices:
-        return (
-            "El precio no puede quedar en $0 ni ser negativo. Revisa: "
-            + ", ".join(invalid_prices[:8])
-            + ("…" if len(invalid_prices) > 8 else "")
-            + "."
-        )
+    if not has_variant_intent:
+        return None
+    unico = price_mode == "single"
+    if non_numeric_prices:
+        if unico:
+            return f"El precio único no es un número. {SOLO_NUMERO} Corrígelo en «Capturar precio»."
+        return f"{SOLO_NUMERO} Revisa: {_preview_sizes(non_numeric_prices)}."
+    if invalid_prices:
+        if unico:
+            return "El precio único tiene que ser mayor que $0: corrígelo en «Capturar precio»."
+        return f"El precio no puede quedar en $0 ni ser negativo. Revisa: {_preview_sizes(invalid_prices)}."
     return None
 
 
@@ -162,6 +186,8 @@ def validate_catalog_variant_submission(
         return "Captura una talla."
     if not str(payload.get("precio") or "").strip():
         return "Captura el precio de venta."
+    if non_numeric_catalog_prices({"precio": str(payload.get("precio"))}):
+        return f"El precio de venta no es un número. {SOLO_NUMERO}"
     if invalid_catalog_prices({"precio": str(payload.get("precio"))}):
         return "El precio de venta no puede quedar en $0 ni ser negativo."
     if require_stock and int(payload.get("stock_inicial") or 0) < 0:

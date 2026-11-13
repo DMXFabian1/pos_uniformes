@@ -65,6 +65,7 @@ from pos_uniformes.ui.dialogs.quisiste_decir_dialog import (
 from pos_uniformes.ui.helpers.catalog_form_payload_helper import (
     build_catalog_product_dialog_payload,
     invalid_catalog_prices,
+    non_numeric_catalog_prices,
     validate_catalog_product_presentations_step,
     validate_catalog_product_submission,
 )
@@ -1804,6 +1805,8 @@ def build_catalog_product_dialog(
                 has_variant_intent=has_variant_intent,
                 missing_prices=missing_prices,
                 invalid_prices=invalid_catalog_prices(price_map),
+                non_numeric_prices=non_numeric_catalog_prices(price_map),
+                price_mode=str(price_mode_combo.currentData() or "single"),
             )
             if feedback is not None:
                 QMessageBox.warning(dialog, "Paso 3 incompleto", feedback)
