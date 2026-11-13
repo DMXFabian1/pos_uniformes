@@ -157,6 +157,51 @@ class InventarioTanda3PantallaTests(unittest.TestCase):
             ultimas[1].trigger()
         window._handle_delete_product.assert_called_once_with()
 
+    def test_eliminar_con_varias_tallas_elegidas_no_borra_sin_confirmacion_escrita(self) -> None:
+        window = self._ventana()
+        menu = window.inventory_more_button.menu()
+        talla, prenda = [a for a in menu.actions() if not a.isSeparator()][-2:]
+        window._handle_delete_variant = Mock()
+        window._handle_delete_product = Mock()
+        tabla = window.inventory_table
+        tabla.selectRow(1)
+        tabla.selectionModel().select(
+            tabla.model().index(2, 0), QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows
+        )
+        self.assertEqual(len(window._selected_inventory_variant_ids()), 2)
+        with patch("pos_uniformes.ui.helpers.inventario_pantalla.QInputDialog.getText") as escribir, patch.object(
+            QMessageBox, "information"
+        ) as aviso:
+            talla.trigger()
+            prenda.trigger()
+        escribir.assert_not_called()
+        self.assertIn("una sola talla", aviso.call_args.args[2])
+        window._handle_delete_variant.assert_not_called()
+        window._handle_delete_product.assert_not_called()
+
+    def test_eliminar_sin_talla_elegida_solo_avisa(self) -> None:
+        window = self._ventana()
+        window._clear_inventory_table_selection()
+        window._handle_delete_variant = Mock()
+        with patch("pos_uniformes.ui.helpers.inventario_pantalla.QInputDialog.getText") as escribir, patch.object(
+            QMessageBox, "information"
+        ) as aviso:
+            window.inventario_pantalla.eliminar("talla")
+        escribir.assert_not_called()
+        aviso.assert_called_once()
+        window._handle_delete_variant.assert_not_called()
+
+    def test_eliminar_la_talla_pide_su_codigo_de_la_fila_actual(self) -> None:
+        window = self._ventana()
+        window._handle_delete_variant = Mock()
+        window.inventario_pantalla.seleccionar(3)
+        with patch(
+            "pos_uniformes.ui.helpers.inventario_pantalla.QInputDialog.getText", return_value=("sku000003", True)
+        ) as escribir:
+            window.inventario_pantalla.eliminar("talla")
+        self.assertIn("SKU000003", escribir.call_args.args[2])
+        window._handle_delete_variant.assert_called_once_with()
+
     def test_calendario_y_mercancia_por_nombrar_tambien_en_el_menu(self) -> None:
         window = self._ventana()
         acciones = self._todas_las_acciones(window.inventory_more_button.menu())

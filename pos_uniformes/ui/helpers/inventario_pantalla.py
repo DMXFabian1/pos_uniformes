@@ -748,15 +748,27 @@ class InventarioPantalla(QObject):
         return True
 
     def eliminar(self, que: str) -> None:
-        """«Eliminar» con confirmación fuerte: hay que escribir el nombre (o el código de la talla)."""
-        fila = self.fila_de(self.variante_actual())
+        """«Eliminar» con confirmación fuerte: hay que escribir el nombre (o el código de la talla).
+
+        El manejador de siempre borra la fila ACTUAL de la tabla, así que la
+        confirmación se pide sobre esa misma fila y nunca se le llama sin ella.
+        """
+        w = self.window
         manejador = "_handle_delete_product" if que == "prenda" else "_handle_delete_variant"
+        titulo = "Eliminar toda la prenda" if que == "prenda" else "Eliminar esta talla"
+        if len(w._selected_inventory_variant_ids()) > 1:
+            QMessageBox.information(w, titulo, "Elige una sola talla para eliminar.")
+            return
+        objetivo = w._inventory_table_variant_id_at_row(w.inventory_table.currentRow())
+        if objetivo is None:
+            QMessageBox.information(w, titulo, "Elige primero la talla en la lista.")
+            return
+        fila = self.fila_de(objetivo) or w._selected_catalog_row()
         if fila is None:
-            self._llamar(manejador)  # el manejador de siempre avisa que falta elegir
+            QMessageBox.information(w, titulo, "Elige primero la talla en la lista.")
             return
         if que == "prenda":
             esperado = str(fila.get("producto_nombre_base") or fila.get("producto_nombre") or "")
-            titulo = "Eliminar toda la prenda"
             texto = (
                 f"Esto borra para siempre «{esperado}» con todas sus tallas.\n"
                 "Si solo quieres que no se venda, mejor desactívala.\n\n"
@@ -764,9 +776,8 @@ class InventarioPantalla(QObject):
             )
         else:
             esperado = str(fila.get("sku") or "")
-            titulo = "Eliminar esta talla"
             texto = (
-                f"Esto borra para siempre la talla {fila.get('talla', '')} de «{fila.get('producto_nombre_base', '')}».\n"
+                f"Esto borra para siempre la talla {fila.get('talla', '')} de «{fila.get('producto_nombre_base') or fila.get('producto_nombre', '')}».\n"
                 "Si solo quieres que no se venda, mejor desactívala.\n\n"
                 f"Para confirmar, escribe su código ({esperado}):"
             )
