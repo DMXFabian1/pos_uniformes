@@ -206,6 +206,99 @@ class InventarioTanda5PantallaTests(unittest.TestCase):
         aviso.assert_called_once()
         window._prompt_inventory_bulk_price_data.assert_not_called()
 
+    # ── C. Aviso de precio que baja ──────────────────────────────────────
+
+    def _precios(self, nuevos: dict[int, str]):
+        """Ventana ADMIN con el diálogo de «Precios en lote» ya contestado y la base de mentiras."""
+        from unittest.mock import patch
+
+        window = self._ventana()
+        window._prompt_inventory_bulk_price_data = Mock(return_value={
+            "tipo_fuente": "SELECCION", "tipo_operacion": "FIJO", "referencia": "LOTE-1", "motivo": "", "observacion": "",
+            "items": [{"variante_id": vid, "precio_nuevo": precio, "estado": "OK"} for vid, precio in nuevos.items()],
+        })
+        window.refresh_all = Mock()
+        aplicar = Mock(return_value={"total_filas": len(nuevos), "aplicadas": 1, "suben": 0, "bajan": 1, "sin_cambios": 0})
+        parches = [
+            patch("pos_uniformes.ui.helpers.inventario_acciones.get_session"),
+            patch("pos_uniformes.ui.helpers.inventario_acciones.CatalogService.aplicar_cambio_masivo_precio", aplicar),
+            patch("pos_uniformes.ui.helpers.inventario_acciones.QMessageBox.information"),
+        ]
+        for parche in parches:
+            parche.start()
+            self.addCleanup(parche.stop)
+        return window, aplicar
+
+    def test_aviso_rojo_con_cancelar_por_defecto_y_cancelar_no_cambia_nada(self) -> None:
+        from unittest.mock import patch
+
+        from PyQt6.QtWidgets import QMessageBox
+
+        window, aplicar = self._precios({3: "250", 4: "300"})
+        vistas = []
+        with patch.object(QMessageBox, "exec", new=lambda caja: vistas.append(caja) or 0):
+            window._handle_inventory_bulk_price_update()
+        self.assertEqual(len(vistas), 1)
+        caja = vistas[0]
+        self.assertEqual(caja.defaultButton().text(), "Cancelar")
+        self.assertIs(caja.escapeButton(), caja.defaultButton())
+        self.assertIn("1 precio baja", caja.text())
+        self.assertIn("SKU000003 · talla 8: baja de $289 a $250", caja.text())
+        self.assertNotIn("SKU000004", caja.text())  # sube: no se avisa
+        self.assertIn("#b3261e", caja.text())
+        aplicar.assert_not_called()
+        window.refresh_all.assert_not_called()
+
+    def test_confirmar_la_baja_si_aplica(self) -> None:
+        from unittest.mock import patch
+
+        from PyQt6.QtWidgets import QMessageBox
+
+        from pos_uniformes.ui.helpers.inventario_acciones import TEXTO_CONFIRMAR_BAJA
+
+        window, aplicar = self._precios({3: "250"})
+
+        def elegir_bajar(caja) -> int:
+            next(b for b in caja.buttons() if b.text() == TEXTO_CONFIRMAR_BAJA).click()
+            return 0
+
+        with patch.object(QMessageBox, "exec", new=elegir_bajar):
+            window._handle_inventory_bulk_price_update()
+        aplicar.assert_called_once()
+        self.assertEqual(aplicar.call_args.kwargs["precios_por_variante"], [(3, Decimal("250"))])
+
+    def test_si_nada_baja_el_flujo_queda_igual(self) -> None:
+        from unittest.mock import patch
+
+        from PyQt6.QtWidgets import QMessageBox
+
+        window, aplicar = self._precios({3: "310", 4: "289"})
+        vistas = []
+        with patch.object(QMessageBox, "exec", new=lambda caja: vistas.append(caja) or 0):
+            window._handle_inventory_bulk_price_update()
+        self.assertEqual(vistas, [])
+        aplicar.assert_called_once()
+
+    def test_la_barra_de_lote_usa_el_mismo_camino(self) -> None:
+        window = self._ventana()
+        window._handle_inventory_bulk_price_update = Mock()
+        window.inventario_pantalla.barra_lote.precio.setEnabled(True)
+        window.inventario_pantalla.barra_lote.precio.click()
+        window._handle_inventory_bulk_price_update.assert_called_once_with()
+
+    def test_muchas_bajas_se_resumen(self) -> None:
+        from pos_uniformes.services.inventario_precio_lote_service import MAXIMO_RENGLONES, precios_que_bajan
+        from pos_uniformes.ui.helpers.inventario_acciones import armar_aviso_bajas
+
+        filas = [_fila(i, 1, precio="300") for i in range(1, 31)]
+        bajas = precios_que_bajan([(i, "250") for i in range(1, 31)], filas)
+        caja, _ = armar_aviso_bajas(None, bajas)
+        self.addCleanup(caja.deleteLater)
+        self.assertIn("30 precios bajan", caja.text())
+        self.assertIn(f"… y {30 - MAXIMO_RENGLONES} más", caja.text())
+        self.assertEqual(caja.text().count("baja de"), MAXIMO_RENGLONES)
+        self.assertNotIn("Show", " ".join(b.text() for b in caja.buttons()))
+
     # ── 1366 px ──────────────────────────────────────────────────────────
 
     def test_a_1366_nada_cortado_ni_scroll_de_mas(self) -> None:

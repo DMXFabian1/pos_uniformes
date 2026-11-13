@@ -5,6 +5,9 @@
 lote y las pruebas por nombre) pero delegan aquí. El código se movió tal
 cual, sin cambiar lo que hace; los diálogos `_prompt_inventory_*` siguen en
 la ventana.
+
+Tanda 5 (comportamiento nuevo, en su propio commit): «Precios en lote» avisa
+en rojo si algún precio baja (`armar_aviso_bajas`) y pide confirmar.
 """
 
 from __future__ import annotations
@@ -14,12 +17,19 @@ from decimal import Decimal
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
-from PyQt6.QtWidgets import QMessageBox
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QMessageBox, QPushButton, QWidget
 
 from pos_uniformes.database.connection import get_session
 from pos_uniformes.database.models import RolUsuario, Usuario, Variante
 from pos_uniformes.services.catalog_service import CatalogService
 from pos_uniformes.services.inventario_service import AjusteMasivoFilaInput, InventarioService
+from pos_uniformes.services.inventario_precio_lote_service import (
+    BajaDePrecio,
+    precios_que_bajan,
+    renglones_bajas,
+    titulo_bajas,
+)
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
@@ -165,6 +175,11 @@ def cambiar_precios_en_lote(window: "MainWindow") -> None:
         QMessageBox.warning(window, "Sin filas", "No hay filas validas para actualizar precio en el lote.")
         return
 
+    # Tanda 5: si algún precio baja, aviso en rojo y Cancelar por defecto.
+    bajas = precios_que_bajan(items, window.inventory_filtered_rows)
+    if bajas and not confirmar_bajas_de_precio(window, bajas):
+        return
+
     reference = str(data["referencia"]).strip()
     motive = str(data["motivo"]).strip() or "Cambio masivo de precio desde interfaz POS."
     note = str(data["observacion"]).strip() or None
@@ -264,3 +279,52 @@ def conteo_fisico_viejo(window: "MainWindow") -> None:
         "Conteo aplicado",
         f"Conteo {reference} aplicado correctamente. Filas ajustadas: {len(conteos)}.",
     )
+
+
+
+# ── Aviso de precio que baja (tanda 5) ─────────────────────────────────────
+
+ROJO = "#b3261e"
+TEXTO_CONFIRMAR_BAJA = "Sí, bajar precios"
+
+
+def armar_aviso_bajas(parent: QWidget | None, bajas: list[BajaDePrecio]) -> tuple[QMessageBox, QPushButton]:
+    """El aviso en rojo con la lista; Cancelar es el botón por defecto (y Esc)."""
+    from html import escape
+
+    caja = QMessageBox(parent)
+    caja.setObjectName("invAvisoBaja")
+    caja.setIcon(QMessageBox.Icon.Warning)
+    caja.setWindowTitle("Hay precios que bajan")
+    caja.setTextFormat(Qt.TextFormat.RichText)
+    renglones = "<br>".join(escape(r) for r in renglones_bajas(bajas))
+    caja.setText(
+        f"<p style='color:{ROJO}; font-weight:800; font-size:15px'>{escape(titulo_bajas(len(bajas)))}</p>"
+        f"<p style='color:{ROJO}; font-weight:600'>{renglones}</p>"
+        "<p>La regla de la tienda es no bajar precios salvo que el dueño lo marque.<br>"
+        "¿Los bajas de todos modos?</p>"
+    )
+    bajar = caja.addButton(TEXTO_CONFIRMAR_BAJA, QMessageBox.ButtonRole.DestructiveRole)
+    bajar.setObjectName("invBajarPrecios")
+    cancelar = caja.addButton(QMessageBox.StandardButton.Cancel)
+    cancelar.setText("Cancelar")
+    cancelar.setObjectName("invCancelarBaja")
+    # Cancelar se ve como la acción principal; bajar, como peligro (letra roja, sin relleno).
+    caja.setStyleSheet(
+        "QPushButton#invCancelarBaja { background: #6b1f3a; color: white; border: none; border-radius: 12px;"
+        " min-height: 40px; padding: 0 22px; font-weight: 800; }"
+        "QPushButton#invCancelarBaja:hover { background: #84284a; }"
+        f"QPushButton#invBajarPrecios {{ background: transparent; color: {ROJO}; border: 1px solid #efc4ba;"
+        " border-radius: 12px; min-height: 40px; padding: 0 18px; font-weight: 700; }"
+        "QPushButton#invBajarPrecios:hover { background: #fef0ee; }"
+    )
+    caja.setDefaultButton(cancelar)
+    caja.setEscapeButton(cancelar)
+    return caja, bajar
+
+
+def confirmar_bajas_de_precio(parent: QWidget | None, bajas: list[BajaDePrecio]) -> bool:
+    """True solo si eligieron «Sí, bajar precios»; cerrar o Cancelar no cambia nada."""
+    caja, bajar = armar_aviso_bajas(parent, bajas)
+    caja.exec()
+    return caja.clickedButton() is bajar
