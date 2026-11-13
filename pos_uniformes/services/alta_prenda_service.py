@@ -59,7 +59,7 @@ from pos_uniformes.services.inventario_service import InventarioService
 
 ORIGEN_POS = "Alta desde POS"
 ORIGEN_CLAUDE = "Claude (skill alta-productos)"
-REFERENCIA_ENTRADA = "ALTA-ENTRADA"
+REFERENCIA_ENTRADA = CatalogService.REFERENCIA_ALTA_ENTRADA
 SIN_COLOR = "Sin color"
 
 

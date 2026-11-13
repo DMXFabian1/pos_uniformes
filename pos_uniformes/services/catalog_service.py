@@ -1018,31 +1018,51 @@ class CatalogService:
         return resumen
 
     #: Movimientos que no traban el borrado de una talla en 0: la entrada al
-    #: dar de alta y sus correcciones. Se borran con la talla (y la bitácora
+    #: dar de alta (referencia `REFERENCIA_ALTA_ENTRADA`) y los ajustes a mano
+    #: hechos después para corregirla. Se borran con la talla (y la bitácora
     #: lo dice).
     _MOVIMIENTOS_CORREGIBLES = frozenset({
         TipoMovimientoInventario.AJUSTE_ENTRADA,
         TipoMovimientoInventario.AJUSTE_SALIDA,
     })
+    #: La referencia de la existencia inicial que pone el motor del alta.
+    REFERENCIA_ALTA_ENTRADA = "ALTA-ENTRADA"
+    #: Referencias de movimientos que nunca se borran con la talla: el stock
+    #: calculado de un conjunto (sus ventas viven en las piezas) y la Libreta.
+    _REFERENCIAS_QUE_TRABAN = ("derivado:", "libreta:")
+
+    @classmethod
+    def _solo_entrada_del_alta(cls, movimientos: list) -> bool:
+        """True si todos los movimientos son la entrada del alta y ajustes a
+        mano posteriores (sus correcciones). Una talla vieja con años de
+        ajustes (merma, robo) o un conjunto con movimientos `derivado:` no
+        entra aquí: su historial no se borra."""
+        altas = [m_id for m_id, _t, ref in movimientos if (ref or "") == cls.REFERENCIA_ALTA_ENTRADA]
+        if not altas:
+            return False
+        primera = min(altas)
+        for m_id, tipo, ref in movimientos:
+            if tipo not in cls._MOVIMIENTOS_CORREGIBLES or m_id < primera:
+                return False
+            if any(marca in (ref or "") for marca in cls._REFERENCIAS_QUE_TRABAN):
+                return False
+        return True
 
     @staticmethod
     def _validar_variante_eliminable(session: Session, variante: Variante) -> None:
         if variante.stock_actual != 0:
             raise ValueError("No se puede eliminar una presentacion con stock. Primero deja el stock en 0.")
 
-        # Lo que entró al dar de alta (o se contó a mano) y se corrigió a 0 no
-        # traba el borrado: Daniel, 2026-11-13, «la existencia inicial entra
-        # como entrada normal, se puede corregir y la talla se puede borrar».
-        # Antes cualquier movimiento la dejaba imposible de borrar (hallazgo 8).
-        # Ventas, compras, apartados, conteos, lotes o bodega sí la traban.
-        tipos = set(
-            session.scalars(
-                select(MovimientoInventario.tipo_movimiento)
-                .where(MovimientoInventario.variante_id == variante.id)
-                .distinct()
-            ).all()
-        )
-        if tipos - CatalogService._MOVIMIENTOS_CORREGIBLES:
+        # Lo que entró al dar de alta y se corrigió a 0 no traba el borrado:
+        # Daniel, 2026-11-13, «la existencia inicial entra como entrada
+        # normal, se puede corregir y la talla se puede borrar». Cualquier
+        # otro movimiento (ventas, ajustes viejos, stock calculado de un
+        # conjunto, Libreta) sí la traba, igual que antes.
+        movimientos = session.execute(
+            select(MovimientoInventario.id, MovimientoInventario.tipo_movimiento, MovimientoInventario.referencia)
+            .where(MovimientoInventario.variante_id == variante.id)
+        ).all()
+        if movimientos and not CatalogService._solo_entrada_del_alta(movimientos):
             raise ValueError("No se puede eliminar una presentacion con movimientos de inventario. Desactiva en su lugar.")
         from pos_uniformes.database.models import (
             AjusteInventarioLoteDetalle,
@@ -1078,7 +1098,10 @@ class CatalogService:
         ) or 0
         if not cuantos:
             return ""
-        return f" Se borran con ella {cuantos} movimiento(s) de entrada y corrección que dejaban la existencia en 0."
+        return (
+            f" Se borran con ella {cuantos} movimiento(s): la entrada del alta y sus correcciones,"
+            " que dejaban la existencia en 0."
+        )
 
     @classmethod
     def eliminar_variante(cls, session: Session, usuario: Usuario, variante: Variante) -> None:

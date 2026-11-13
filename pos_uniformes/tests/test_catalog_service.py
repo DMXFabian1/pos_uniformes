@@ -427,6 +427,58 @@ class BorrarTallaConEntradaTests(_ConBase):
         self.s.flush()
         self.assertIsNone(self.s.get(Producto, p.id))
 
+    def test_ajustes_viejos_sin_entrada_del_alta_si_traban(self) -> None:
+        """Una talla vieja con ajustes a mano (merma, robo) no pierde su historial."""
+        from pos_uniformes.services.inventario_service import InventarioService
+
+        p = self._producto("Short", None)
+        v = self._talla(p, "4")
+        InventarioService.registrar_ajuste_manual(self.s, v, 2, self.admin, referencia="CONTEO")
+        InventarioService.registrar_ajuste_manual(self.s, v, -2, self.admin, referencia="MERMA")
+        self.s.flush()
+        with self.assertRaisesRegex(ValueError, "movimientos de inventario"):
+            C.eliminar_variante(self.s, self.admin, v)
+
+    def test_un_ajuste_antes_de_la_entrada_del_alta_traba(self) -> None:
+        from pos_uniformes.services.inventario_service import InventarioService
+
+        p = self._producto("Short", None)
+        v = self._talla(p, "4")
+        InventarioService.registrar_ajuste_manual(self.s, v, 1, self.admin, referencia="CONTEO")
+        self._entrada(v, -1)
+        self.s.flush()
+        with self.assertRaisesRegex(ValueError, "movimientos de inventario"):
+            C.eliminar_variante(self.s, self.admin, v)
+
+    def test_stock_calculado_de_un_conjunto_traba(self) -> None:
+        """Las tallas de un conjunto con receta solo tienen movimientos
+        `derivado:` (sus ventas viven en las piezas): no se borran."""
+        from pos_uniformes.services.inventario_service import InventarioService
+
+        p = self._producto("Short", None)
+        v = self._talla(p, "4")
+        self._entrada(v, 1)
+        InventarioService.registrar_ajuste_manual(self.s, v, -1, self.admin, referencia="derivado:7")
+        self.s.flush()
+        with self.assertRaisesRegex(ValueError, "movimientos de inventario"):
+            C.eliminar_variante(self.s, self.admin, v)
+        w = self._talla(p, "6")
+        InventarioService.registrar_ajuste_manual(self.s, w, 3, self.admin, referencia="derivado:7")
+        InventarioService.registrar_ajuste_manual(self.s, w, -3, self.admin, referencia="derivado:7")
+        self.s.flush()
+        with self.assertRaisesRegex(ValueError, "movimientos de inventario"):
+            C.eliminar_variante(self.s, self.admin, w)
+
+    def test_la_bitacora_dice_lo_que_se_borro(self) -> None:
+        p = self._producto("Short", None)
+        v = self._talla(p, "4")
+        self._entrada(v, 2)
+        self._entrada(v, -2)
+        C.eliminar_variante(self.s, self.admin, v)
+        self.s.flush()
+        obs = self.s.scalars(select(CambioCatalogo.observacion).order_by(CambioCatalogo.id.desc())).first()
+        self.assertIn("la entrada del alta y sus correcciones", obs)
+
     def test_una_venta_si_traba_el_borrado(self) -> None:
         from pos_uniformes.services.inventario_service import InventarioService
 
