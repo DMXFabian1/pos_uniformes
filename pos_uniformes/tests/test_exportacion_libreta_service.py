@@ -96,6 +96,39 @@ class ExportacionLibretaTests(unittest.TestCase):
         _, detalle = ex.cargar(self.s, *self._periodo())
         self.assertEqual(detalle[0]["subtotal_linea"], Decimal("200.00"))
 
+    def test_el_cambio_resta_lo_que_regresa(self) -> None:
+        # Revisión 2026-11-12: la prenda que regresa no es venta.
+        self._anotar("cambio", "120", detalle=[
+            {"cambio": "entra", "sku": "X", "nombre": "↩ Regresa: X", "precio": "200", "cantidad": 1},
+            {"cambio": "sale", "sku": "Y", "nombre": "→ Se lleva: Y", "precio": "320", "cantidad": 1},
+        ])
+        _, detalle = ex.cargar(self.s, *self._periodo())
+        self.assertEqual([f["sentido"] for f in detalle], ["entra", "sale"])
+        self.assertEqual(sum(f["cantidad"] for f in detalle), 0)
+        self.assertEqual(sum(f["subtotal_linea"] for f in detalle), Decimal("120.00"))
+
+    def test_una_venta_normal_no_tiene_sentido_ni_compra_a_cuenta(self) -> None:
+        self._anotar("venta", "300")
+        ventas, detalle = ex.cargar(self.s, *self._periodo())
+        self.assertEqual(ventas[0]["compra_a_cuenta"], "")
+        self.assertEqual(detalle[0]["sentido"], "")
+        self.assertEqual(detalle[0]["cantidad"], 1)
+
+    def test_la_compra_a_cuenta_se_marca(self) -> None:
+        from pos_uniformes.database.models import PrestamoEmpleada
+        from pos_uniformes.services import prestamos_service as pr
+
+        self._anotar("venta", "300")
+        a_cuenta = self._anotar("venta", "500", descuento_empleada=True)
+        self.s.add(PrestamoEmpleada(
+            employee_code="VEND-4", employee_name="Fanny", monto=Decimal("500"), motivo="Compra a cuenta",
+            estado=pr.APROBADO, tipo=pr.TIPO_COMPRA, libreta_venta_id=a_cuenta.id,
+        ))
+        self.s.commit()
+        ventas, _ = ex.cargar(self.s, *self._periodo())
+        self.assertEqual(ventas[0]["compra_a_cuenta"], "")
+        self.assertTrue(ventas[1]["compra_a_cuenta"])
+
 
 if __name__ == "__main__":
     unittest.main()

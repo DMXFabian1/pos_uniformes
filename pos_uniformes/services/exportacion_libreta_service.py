@@ -16,6 +16,13 @@ Ahora salen de `libreta_venta`, con los mismos nombres de hoja:
 - **07_detalle_ventas**: una fila por línea de producto guardada en
   `detalle` (los abonos no traen prendas).
 
+Revisión (2026-11-12): en un cambio de prenda, la columna «sentido» dice si
+la pieza entra (regresa) o sale (se la lleva), y lo que entra va con
+cantidad y subtotal negativos, para que sumar la hoja no cuente dos prendas
+vendidas. La hoja 06 marca en «compra_a_cuenta» las compras a cuenta de las
+empleadas (`compra_a_cuenta_service.estados_en_libreta`), que el corte no
+cuenta como dinero.
+
 El export lo usa el dueño en el POS: incluye las operaciones privadas.
 """
 
@@ -33,11 +40,14 @@ def _d(valor) -> Decimal:
         return Decimal("0.00")
 
 
-def filas_ventas(rows) -> list[dict[str, object]]:
-    """Hoja 06_ventas: una fila por operación de la Libreta (puro)."""
+def filas_ventas(rows, a_cuenta: dict | None = None) -> list[dict[str, object]]:
+    """Hoja 06_ventas: una fila por operación de la Libreta (puro).
+
+    `a_cuenta`: {id de la venta: estado} de las compras a cuenta."""
     from pos_uniformes.services.employee_sales_history_service import folio_de_operacion
     from pos_uniformes.services.libreta_service import cuenta_como_operacion
 
+    a_cuenta = a_cuenta or {}
     filas: list[dict[str, object]] = []
     for row in rows or []:
         filas.append(
@@ -58,6 +68,7 @@ def filas_ventas(rows) -> list[dict[str, object]]:
                 "pago_tarjeta": bool(getattr(row, "pago_tarjeta", False)),
                 "privado": bool(getattr(row, "privado", False)),
                 "compra_empleada": bool(getattr(row, "descuento_empleada", False)),
+                "compra_a_cuenta": a_cuenta.get(getattr(row, "id", None)) or "",
                 "origen": getattr(row, "origen", None),
             }
         )
@@ -66,6 +77,7 @@ def filas_ventas(rows) -> list[dict[str, object]]:
 
 def filas_detalle(rows) -> list[dict[str, object]]:
     """Hoja 07_detalle_ventas: una fila por línea de producto (puro)."""
+    from pos_uniformes.services.cambio_service import ENTRA
     from pos_uniformes.services.employee_sales_history_service import folio_de_operacion
 
     filas: list[dict[str, object]] = []
@@ -78,11 +90,15 @@ def filas_detalle(rows) -> list[dict[str, object]]:
             subtotal = (
                 _d(linea.get("subtotal")) if linea.get("subtotal") is not None else (precio * cantidad).quantize(_CENT)
             )
+            sentido = str(linea.get("cambio") or "")
+            if sentido == ENTRA:   # la prenda regresa: no es venta
+                cantidad, subtotal = -cantidad, -subtotal
             filas.append(
                 {
                     "operacion_id": row.id,
                     "folio": folio_de_operacion(row),
                     "tipo": str(getattr(row, "tipo", None) or "venta"),
+                    "sentido": sentido,
                     "cliente": str(getattr(row, "cliente", None) or "").strip() or "Mostrador",
                     "sku": str(linea.get("sku") or "").strip() or None,
                     "producto": str(linea.get("nombre") or "").strip() or None,
@@ -101,6 +117,7 @@ def cargar(session, desde, hasta, *, cliente_id=None) -> tuple[list[dict[str, ob
     from sqlalchemy import select
 
     from pos_uniformes.database.models import LibretaVenta
+    from pos_uniformes.services.compra_a_cuenta_service import estados_en_libreta
 
     stmt = (
         select(LibretaVenta)
@@ -110,4 +127,4 @@ def cargar(session, desde, hasta, *, cliente_id=None) -> tuple[list[dict[str, ob
     if cliente_id not in (None, ""):
         stmt = stmt.where(LibretaVenta.cliente_id == int(cliente_id))
     rows = list(session.scalars(stmt).all())
-    return filas_ventas(rows), filas_detalle(rows)
+    return filas_ventas(rows, estados_en_libreta(session, rows)), filas_detalle(rows)
