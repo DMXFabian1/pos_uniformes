@@ -63,7 +63,8 @@ En la **principal** (modo satélite):
 3. Abrir **Ctrl+Shift+Q** en el satélite: el trabajo aparece como **Impreso**,
    con su origen.
 4. Repetir con **Ticket Apartado** (deben salir las 2 copias) y con una venta
-   con descuento (ticket + copia de empleada).
+   con descuento de empleada (solo el ticket de venta; sin copia de empleada
+   desde 2026-11-12).
 
 **Qué revisar:** que el corte (autocut) separe cada ticket, y que el contenido
 sea idéntico al de imprimir local.
