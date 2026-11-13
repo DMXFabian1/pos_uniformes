@@ -155,7 +155,7 @@ def contar_existencias(filas: Iterable[Mapping[str, object]]) -> ConteoExistenci
         if es_fila_virtual(fila):
             continue
         stock = int(fila["stock_actual"])
-        piezas += stock
+        piezas += max(0, stock)  # un negativo no resta piezas que sí están
         clase = clasificar_existencia(stock, stock_minimo=_minimo(fila.get("stock_minimo")))
         if clase == NEGATIVO:
             negativos += 1

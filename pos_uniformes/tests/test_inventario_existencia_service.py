@@ -108,6 +108,11 @@ class ContarExistenciasTests(unittest.TestCase):
         self.assertEqual((conteo.negativos, conteo.agotados, conteo.bajos), (0, 0, 0))
         self.assertEqual(conteo.piezas, 4)
 
+    def test_un_negativo_no_resta_piezas(self) -> None:
+        # Tanda 3: el encabezado decía «−6 piezas» viendo solo negativos.
+        conteo = contar_existencias([_fila(5), _fila(-2), _fila(-4)])
+        self.assertEqual((conteo.piezas, conteo.negativos), (5, 2))
+
     def test_chamarra_sin_receta_si_se_cuenta(self) -> None:
         conteo = contar_existencias([_fila(0, pieza="Chamarra"), _fila(2, pieza="Pants 3pz")])
         self.assertEqual((conteo.agotados, conteo.bajos, conteo.piezas), (1, 1, 2))
