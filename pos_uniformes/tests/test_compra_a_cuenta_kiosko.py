@@ -68,12 +68,32 @@ class KioskoTests(unittest.TestCase):
 
     def test_si_falla_avisa_que_la_copia_no_vale_y_la_anota_en_efectivo(self):
         w = self._kiosko()
-        _reg, anotadas, aviso = self._correr(w, side_effect=RuntimeError("sin red"))
+        with patch.object(cac, "compra_de_folio", return_value=None):
+            _reg, anotadas, aviso = self._correr(w, side_effect=RuntimeError("sin red"))
         self.assertIn("NO vale", aviso.call_args.args[2])
         # Misma foto, mismo folio del ticket: la venta no se pierde ni se duplica.
         self.assertEqual([e["operacion_uuid"] for e in anotadas[0]], [FOLIO])
         self.assertFalse(anotadas[0][0]["pago_tarjeta"])
         self.assertEqual(w._items, [])
+
+    def test_si_lanza_pero_la_compra_si_quedo_no_dice_que_cobre(self):
+        w = self._kiosko()
+        with patch.object(cac, "compra_de_folio", return_value=object()):
+            _reg, anotadas, aviso = self._correr(w, side_effect=RuntimeError("se cortó la respuesta"))
+        aviso.assert_not_called()
+        self.assertEqual((anotadas, w._items), ([], []))
+
+    def test_si_no_se_puede_armar_un_solo_aviso_y_el_carrito_se_queda(self):
+        w = self._kiosko()
+        opcion = cac.opciones_de_pago(SAB14, 7)[0]
+        with patch.object(w, "_armar_anotacion", side_effect=RuntimeError("carrito raro")), \
+             patch.object(w, "_registrar_y_vaciar") as normal, \
+             patch("pos_uniformes.ui.helpers.quick_sale_compradora_helper.QMessageBox.warning") as aviso:
+            self.assertTrue(w._anotar_a_cuenta(opcion))
+        normal.assert_not_called()
+        self.assertEqual(aviso.call_count, 1)
+        self.assertIn("NO vale", aviso.call_args.args[2])
+        self.assertEqual(len(w._items), 1)
 
     def test_antes_de_imprimir_revisa_que_quepa(self):
         w = self._kiosko()

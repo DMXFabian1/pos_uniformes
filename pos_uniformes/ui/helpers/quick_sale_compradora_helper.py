@@ -265,8 +265,14 @@ class CompradoraEmpleadaMixin:
         Si no se pudo (sin conexión o error) NO queda a cuenta: se avisa que
         la copia que lo dice no vale y que se cobre al momento, y la venta se
         anota como siempre (en efectivo, por la cola) con el mismo folio del
-        ticket. Devuelve False solo si ni siquiera se pudo armar la venta (y
-        entonces quien llama la anota por la vía normal)."""
+        ticket. Antes de decir «cóbrale» se busca si la compra sí quedó (el
+        commit pudo entrar aunque la respuesta no llegara): si quedó, es a
+        cuenta y no se le cobra (revisión 2026-11-12).
+
+        Siempre devuelve True: si ni siquiera se pudo armar la venta, avisa
+        una sola vez y deja el carrito para cobrarla al momento; antes
+        devolvía False y la vía normal salía con un segundo aviso («ya
+        pagó, no le cobres») que contradecía al primero."""
         from pos_uniformes.services import compra_a_cuenta_service as cac
 
         c = self._compradora
@@ -278,10 +284,10 @@ class CompradoraEmpleadaMixin:
             _logger.exception("Compra a cuenta: no se pudo armar la venta")
             QMessageBox.warning(
                 self, "A cuenta de su pago",
-                "No se pudo dejar a cuenta de su pago. La copia que dice «a cuenta» NO vale: "
-                "cóbrale al momento.",
+                "No se pudo dejar a cuenta de su pago ni anotar la venta. La copia que dice "
+                "«a cuenta» NO vale: cóbrale al momento. El carrito se queda para cobrarla.",
             )
-            return False
+            return True
         compra = None
         try:
             from pos_uniformes.database.connection import get_session
@@ -299,6 +305,8 @@ class CompradoraEmpleadaMixin:
         except Exception as exc:  # noqa: BLE001
             _logger.warning("Compra a cuenta: no se pudo registrar", exc_info=True)
             if compra is None:
+                compra = self._compra_que_si_quedo(entradas[0].get("operacion_uuid"))
+            if compra is None:
                 QMessageBox.warning(
                     self, "A cuenta de su pago",
                     f"No se pudo dejar a cuenta de su pago:\n{exc}\n\n"
@@ -311,6 +319,21 @@ class CompradoraEmpleadaMixin:
                 return True
         self._vaciar_carrito()
         return True
+
+    def _compra_que_si_quedo(self, folio):
+        """¿Quedó la compra a cuenta aunque `registrar_venta_a_cuenta` lanzó?
+        (revisión 2026-11-12). Con conexión nueva; None si no quedó o si no
+        se puede saber (entonces se avisa que se cobre, como antes)."""
+        from pos_uniformes.services import compra_a_cuenta_service as cac
+
+        try:
+            from pos_uniformes.database.connection import get_session
+
+            with get_session() as session:
+                return cac.compra_de_folio(session, folio)
+        except Exception:  # noqa: BLE001
+            _logger.warning("Compra a cuenta: no se pudo revisar si quedó", exc_info=True)
+            return None
 
     # ─── Elegir ─────────────────────────────────────────────────────────
 
