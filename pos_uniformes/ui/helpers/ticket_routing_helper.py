@@ -9,7 +9,11 @@ Default = local, así que sin configurar nada el comportamiento no cambia.
 
 from __future__ import annotations
 
+import logging
+
 from PyQt6.QtWidgets import QWidget
+
+logger = logging.getLogger(__name__)
 
 
 def route_tickets(
@@ -151,14 +155,44 @@ def _enviar_y_vigilar(parent: QWidget, otras: list[dict], origen: str, tipo):
     def enviar(destino: str, textos: list[str]) -> int:
         ids = encolar_para_ids(destino, textos, origen, tipo=tipo)
         nombre = next((d.get("nombre", "") for d in otras if d.get("identificador") == destino), "")
-        vigilar_envio(parent, ids, nombre)
+        vigilar_envio(parent, ids, nombre, imprimir_aqui=_imprimir_aqui_si_se_puede(parent))
         return len(ids)
 
     return enviar
 
 
-def vigilar_envio(parent: QWidget | None, ids: list[int], nombre_destino: str, *, segundos: int | None = None) -> None:
+def _imprimir_aqui_si_se_puede(parent: QWidget | None):
+    """Cómo imprimir aquí lo que no salió allá, o None si esta PC no tiene
+    ninguna impresora (entonces el aviso no lo ofrece)."""
+    try:
+        from pos_uniformes.services.print_routing_cache_service import impresoras_de_esta_pc
+
+        if not impresoras_de_esta_pc():
+            return None
+    except Exception:  # noqa: BLE001 — sin saberlo, no se ofrece
+        return None
+
+    def imprimir(textos: list[str]) -> None:
+        from pos_uniformes.ui.dialogs.printable_text_dialog import open_tickets_print_dialog
+
+        open_tickets_print_dialog(parent, "Imprimir aquí", textos)
+
+    return imprimir
+
+
+def vigilar_envio(
+    parent: QWidget | None,
+    ids: list[int],
+    nombre_destino: str,
+    *,
+    segundos: int | None = None,
+    imprimir_aqui=None,
+) -> None:
     """Dentro de unos segundos revisa esos trabajos y avisa si no salieron.
+
+    `imprimir_aqui(textos)`: si se da (esta PC tiene impresora), el aviso
+    ofrece «Imprimir aquí y cancelar el de allá»; cancelar va primero, para
+    que el de allá no salga después también (2026-11-12).
 
     El temporizador cuelga de `parent`: si esa ventana ya se cerró, no avisa
     (y no truena). Sin `parent` no hay a quién avisar."""
@@ -181,10 +215,36 @@ def vigilar_envio(parent: QWidget | None, ids: list[int], nombre_destino: str, *
                 texto = svc.aviso_no_ha_salido(svc.sin_salir(session, ids), nombre_destino)
         except Exception:  # noqa: BLE001 — sin base no se puede saber; no se inventa un aviso
             return
-        if texto:
-            from PyQt6.QtWidgets import QMessageBox
+        if not texto:
+            return
+        from PyQt6.QtWidgets import QMessageBox
 
+        if imprimir_aqui is None:
             QMessageBox.warning(parent, "Todavía no sale", texto)
+            return
+        caja = QMessageBox(parent)
+        caja.setIcon(QMessageBox.Icon.Warning)
+        caja.setWindowTitle("Todavía no sale")
+        caja.setText(texto + "\n\n¿Lo imprimes aquí? Se cancela el de allá para que no salga dos veces.")
+        aqui = caja.addButton("🖨  Imprimir aquí y cancelar allá", QMessageBox.ButtonRole.AcceptRole)
+        caja.addButton("Esperar", QMessageBox.ButtonRole.RejectRole)
+        caja.exec()
+        if caja.clickedButton() is not aqui:
+            return
+        try:
+            from pos_uniformes.database.connection import get_session
+
+            with get_session() as session:
+                textos = svc.cancelar_los_que_no_salieron(session, ids)
+                session.commit()
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Impresión: no se pudo cancelar el envío a %s", nombre_destino)
+            QMessageBox.warning(parent, "No se pudo cancelar", f"No se pudo cancelar el de allá: no se imprime aquí para que no salga dos veces.\n\n{exc}")
+            return
+        if textos:
+            imprimir_aqui(textos)
+        else:
+            QMessageBox.information(parent, "Ya salió", f"{nombre_destino} lo tomó justo ahora: no se imprime aquí.")
 
     timer.timeout.connect(revisar)
     timer.start(int(espera * 1000))
@@ -199,12 +259,16 @@ def _enviar_al_satelite(parent: QWidget, tickets: list[str], origen: str, *, tip
         with get_session() as session:
             creados = _encolar(session, tickets, origen=origen, destino=None, tipo=tipo)
             session.commit()
+            ids = [int(t.id) for t in creados]
         n = len(creados)
         QMessageBox.information(
             parent,
             "Enviado al satélite",
             f"{n} {'ticket' if n == 1 else 'tickets'} en cola para imprimir en el satélite.",
         )
+        # Sin destino también se revisa: con el servidor de impresión apagado
+        # se enteraban hasta la alerta de los 15 min (2026-11-12).
+        vigilar_envio(parent, ids, "la PC que imprime")
         return True
     except Exception as exc:  # noqa: BLE001
         QMessageBox.warning(

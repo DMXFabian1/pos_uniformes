@@ -43,7 +43,7 @@ def maybe_route_label_to_satellite(
         imagen = Path(image_path).read_bytes()
         _, origen = load_print_routing()
         with get_session() as session:
-            svc.enviar_etiqueta(
+            trabajo = svc.enviar_etiqueta(
                 session,
                 imagen,
                 sku=sku,
@@ -52,12 +52,17 @@ def maybe_route_label_to_satellite(
                 origen=origen,
             )
             session.commit()
+            trabajo_id = int(trabajo.id)
         QMessageBox.information(
             parent,
             "Enviado al satélite",
             f"Etiqueta de {sku or 'producto'} ({copies} copia(s)) "
             "en cola para imprimir en el satélite.",
         )
+        # Si nadie la toma (la PC de etiquetas apagada), se avisa (2026-11-12).
+        from pos_uniformes.ui.helpers.ticket_routing_helper import vigilar_envio
+
+        vigilar_envio(parent, [trabajo_id], "la PC de etiquetas")
     except Exception as exc:  # noqa: BLE001
         QMessageBox.warning(
             parent,

@@ -76,6 +76,34 @@ class SinSalirTests(unittest.TestCase):
         self.assertIn("su impresora dio error", texto)
 
 
+class CancelarLosQueNoSalieronTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.s = _session()
+
+    def tearDown(self) -> None:
+        self.s.close()
+
+    def _trabajo(self, estado, texto):
+        t = svc.encolar(self.s, TipoTrabajo.CORTE, {"texto": texto}, destino="kiosko")
+        t.estado = estado
+        self.s.flush()
+        return t
+
+    def test_cancela_lo_pendiente_y_devuelve_su_texto(self) -> None:
+        pend = self._trabajo(EstadoTrabajo.PENDIENTE, "CORTE 190")
+        imprimiendo = self._trabajo(EstadoTrabajo.EN_PROCESO, "OTRO")
+        hecho = self._trabajo(EstadoTrabajo.HECHO, "VIEJO")
+        textos = svc.cancelar_los_que_no_salieron(self.s, [pend.id, imprimiendo.id, hecho.id])
+        self.assertEqual(textos, ["CORTE 190"])
+        self.assertEqual(pend.estado, EstadoTrabajo.CANCELADO)
+        self.assertEqual(imprimiendo.estado, EstadoTrabajo.EN_PROCESO)   # ya se está imprimiendo
+        self.assertEqual(hecho.estado, EstadoTrabajo.HECHO)
+
+    def test_una_etiqueta_se_llama_etiqueta(self) -> None:
+        t = svc.encolar(self.s, TipoTrabajo.ETIQUETA, {"sku": "X"})
+        self.assertIn("La etiqueta todavía no sale", svc.aviso_no_ha_salido([t], "la PC de etiquetas"))
+
+
 class VigilarEnvioTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -102,6 +130,7 @@ class VigilarEnvioTests(unittest.TestCase):
 
         avisos: list = []
         with patch("pos_uniformes.database.connection.get_session", _sesion), \
+                patch.object(rt, "_imprimir_aqui_si_se_puede", lambda parent: None), \
                 patch("PyQt6.QtWidgets.QMessageBox.warning", lambda p, titulo, texto: avisos.append((titulo, texto))):
             enviar = rt._enviar_y_vigilar(
                 self.ventana, [{"identificador": "bfaf", "nombre": "Kiosko Principal", "online": True}],
@@ -137,6 +166,24 @@ class VigilarEnvioTests(unittest.TestCase):
             rt.vigilar_envio(self.ventana, ids, "Kiosko Principal")
             self._esperar(avisos, 0.3)
         self.assertEqual(avisos, [])
+
+    def test_imprimir_aqui_cancela_alla_y_lo_imprime(self) -> None:
+        from PyQt6.QtWidgets import QMessageBox
+
+        @contextmanager
+        def _sesion():
+            yield self.s
+
+        impresos: list = []
+        with patch("pos_uniformes.database.connection.get_session", _sesion), \
+                patch.object(QMessageBox, "exec", lambda caja: 0), \
+                patch.object(QMessageBox, "clickedButton",
+                             lambda caja: next(b for b in caja.buttons() if "Imprimir aquí" in b.text())):
+            ids = rt.encolar_para_ids("bfaf", ["CORTE 190"], "principal", tipo=TipoTrabajo.CORTE)
+            rt.vigilar_envio(self.ventana, ids, "Kiosko Principal", segundos=0, imprimir_aqui=impresos.extend)
+            self._esperar(impresos)
+        self.assertEqual(impresos, ["CORTE 190"])
+        self.assertEqual(svc.sin_salir(self.s, ids), [])   # el de allá quedó cancelado
 
     def test_sin_ventana_no_hace_nada(self) -> None:
         rt.vigilar_envio(None, [1], "Kiosko")  # no truena

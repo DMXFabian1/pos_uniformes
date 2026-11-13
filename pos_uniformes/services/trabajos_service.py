@@ -663,7 +663,12 @@ def aviso_no_ha_salido(trabajos: Sequence[Trabajo], destino: str) -> str | None:
         return None
     destino = (destino or "").strip() or "la otra PC"
     es_corte = any(t.tipo == TipoTrabajo.CORTE for t in trabajos)
-    que = "El corte" if es_corte else ("El ticket" if len(trabajos) == 1 else f"{len(trabajos)} tickets")
+    if es_corte:
+        que = "El corte"
+    elif all(t.tipo == TipoTrabajo.ETIQUETA for t in trabajos):
+        que = "La etiqueta" if len(trabajos) == 1 else f"{len(trabajos)} etiquetas"
+    else:
+        que = "El ticket" if len(trabajos) == 1 else f"{len(trabajos)} tickets"
     if all(t.estado == EstadoTrabajo.ERROR for t in trabajos):
         return (
             f"{que} no se pudo imprimir en {destino}: su impresora dio error.\n\n"
@@ -674,4 +679,30 @@ def aviso_no_ha_salido(trabajos: Sequence[Trabajo], destino: str) -> str | None:
         f"{que} todavía no sale: {destino} no lo ha tomado. Puede estar apagada o con el programa cerrado.\n\n"
         f"No se pierde: se queda en su cola y sale solo en cuanto {destino} se prenda.{guardado}"
     )
+
+
+def cancelar_los_que_no_salieron(session: Session, ids: Iterable[int]) -> list[str]:
+    """Cancela los que nadie ha tomado (o fallaron) y devuelve sus textos.
+
+    Para «Imprimir aquí y cancelar el de allá»: sin cancelar, el de allá
+    saldría después, aunque fuera al día siguiente, y un corte saldría dos
+    veces o en la PC que no debía (revisión de deuda, 2026-11-12). Los que ya
+    se están imprimiendo (EN_PROCESO) no se tocan ni se devuelven."""
+    ids = [int(i) for i in ids if i is not None]
+    if not ids:
+        return []
+    stmt = (
+        select(Trabajo)
+        .where(Trabajo.id.in_(ids), Trabajo.estado.in_([EstadoTrabajo.PENDIENTE, EstadoTrabajo.ERROR]))
+        .order_by(Trabajo.id)
+        .with_for_update(skip_locked=True)
+    )
+    textos = []
+    for trabajo in session.scalars(stmt).all():
+        trabajo.estado = EstadoTrabajo.CANCELADO
+        texto = str((trabajo.contenido or {}).get("texto") or "")
+        if texto.strip():
+            textos.append(texto)
+    session.flush()
+    return textos
 
