@@ -1351,6 +1351,15 @@ def _accion_peligro(menu: QMenu, texto: str, alHacer: Callable[[], object], avis
     return accion
 
 
+def _conteos_por_jornada(window: "MainWindow") -> Callable[[], object]:
+    def abrir() -> None:
+        from pos_uniformes.ui.helpers import inventario_acciones
+
+        inventario_acciones.abrir_conteos_por_jornada(window)
+
+    return abrir
+
+
 def armar_menu_mas(window: "MainWindow", pantalla: InventarioPantalla) -> QMenu:
     """Todo lo de los menús viejos Nuevo/Editar/Existencias/Etiquetas/Más, agrupado."""
 
@@ -1381,8 +1390,10 @@ def armar_menu_mas(window: "MainWindow", pantalla: InventarioPantalla) -> QMenu:
             "Corregir a mano cuántas hay de una talla, con su motivo")
     _accion(existencias, "Ajuste en lote", llamar("_handle_inventory_bulk_adjustment"),
             "Corregir la existencia de varias tallas a la vez")
-    _accion(existencias, "Conteo físico", llamar("_handle_inventory_count"),
-            "Contar las piezas y corregir las diferencias contra lo que dice el sistema")
+    # Tanda 5: el «Conteo físico» viejo no dejaba rastro en las jornadas; se queda
+    # escondido (`_handle_inventory_count` sigue vivo) y aquí van las jornadas.
+    _accion(existencias, "Conteos por jornada", _conteos_por_jornada(window),
+            "Cada escuela con su último conteo: comparar, revisar y sacar el pedido (se cuenta en el kiosko)")
 
     precios = _submenu(menu, "💲  Precios")
     _accion(precios, "Precios en lote", llamar("_handle_inventory_bulk_price_update"),

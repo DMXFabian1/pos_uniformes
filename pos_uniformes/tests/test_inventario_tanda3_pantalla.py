@@ -67,7 +67,7 @@ ACCIONES_VIEJAS = {
     "_handle_inventory_bulk_price_update": "Precios en lote",
     "_handle_open_rebajas": "Ofertas y liquidación…",
     "_handle_purchase": "Registrar entrada",
-    "_handle_inventory_count": "Conteo físico",
+    # «Conteo físico» se cambió por «Conteos por jornada» en la tanda 5 (ver test_inventario_tanda5_pantalla).
     "_handle_inventory_adjustment": "Corregir existencia",
     "_handle_inventory_bulk_adjustment": "Ajuste en lote",
     "_handle_inventory_print_label": "Imprimir las elegidas",

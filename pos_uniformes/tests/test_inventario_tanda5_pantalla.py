@@ -179,6 +179,45 @@ class InventarioTanda5PantallaTests(unittest.TestCase):
         self.assertTrue(pantalla.ficha.pedidas.isHidden())
         self.assertFalse(pantalla.ficha.venta.isHidden())
 
+    # ── D. «Conteos por jornada» ─────────────────────────────────────────
+
+    @staticmethod
+    def _acciones(menu) -> dict:
+        acciones = {}
+        for accion in menu.actions():
+            if accion.menu() is not None:
+                acciones.update(InventarioTanda5PantallaTests._acciones(accion.menu()))
+            elif not accion.isSeparator():
+                acciones[accion.text().split("  ")[-1]] = accion
+        return acciones
+
+    def test_menu_trae_conteos_por_jornada_y_ya_no_el_conteo_fisico(self) -> None:
+        from unittest.mock import patch
+
+        window = self._ventana()
+        acciones = self._acciones(window.inventory_more_button.menu())
+        self.assertIn("Conteos por jornada", acciones)
+        self.assertNotIn("Conteo físico", acciones)
+        # El diálogo viejo sigue vivo, escondido.
+        self.assertTrue(callable(window._handle_inventory_count))
+        window._handle_inventory_count = Mock()
+        with patch("pos_uniformes.ui.dialogs.conteo_historial_dialog.abrir_historial_conteos") as abrir:
+            acciones["Conteos por jornada"].trigger()
+        abrir.assert_called_once_with(window)
+        window._handle_inventory_count.assert_not_called()
+
+    def test_conteos_por_jornada_solo_admin(self) -> None:
+        from unittest.mock import patch
+
+        window = self._ventana(rol=RolUsuario.CAJERO)
+        acciones = self._acciones(window.inventory_more_button.menu())
+        with patch("pos_uniformes.ui.dialogs.conteo_historial_dialog.abrir_historial_conteos") as abrir, patch(
+            "pos_uniformes.ui.helpers.inventario_acciones.QMessageBox.warning"
+        ) as aviso:
+            acciones["Conteos por jornada"].trigger()
+        abrir.assert_not_called()
+        aviso.assert_called_once()
+
     # ── E. main_window solo conecta ──────────────────────────────────────
 
     def test_los_manejadores_movidos_delegan_en_inventario_acciones(self) -> None:

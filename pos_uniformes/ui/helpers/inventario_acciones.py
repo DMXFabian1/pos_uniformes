@@ -328,3 +328,24 @@ def confirmar_bajas_de_precio(parent: QWidget | None, bajas: list[BajaDePrecio])
     caja, bajar = armar_aviso_bajas(parent, bajas)
     caja.exec()
     return caja.clickedButton() is bajar
+
+
+
+# ── Conteos por jornada (tanda 5) ──────────────────────────────────────────
+
+
+def abrir_conteos_por_jornada(window: "MainWindow") -> None:
+    """«⋯ → Existencias → Conteos por jornada»: la ventana del dueño para los conteos.
+
+    Decisión 3 de Daniel: el «Conteo físico» viejo del POS no dejaba rastro en
+    las jornadas; ahora se abre el Historial de conteos (el mismo del kiosko):
+    cada escuela con su último conteo, comparar contra el anterior, revisar y
+    sacar el pedido. Contar se sigue haciendo por jornada en el kiosko. El
+    diálogo viejo se queda escondido (`_handle_inventory_count`).
+    """
+    if window.current_role != RolUsuario.ADMIN:
+        QMessageBox.warning(window, "Sin permisos", "Solo ADMIN puede ver los conteos por jornada.")
+        return
+    from pos_uniformes.ui.dialogs.conteo_historial_dialog import abrir_historial_conteos
+
+    abrir_historial_conteos(window)
