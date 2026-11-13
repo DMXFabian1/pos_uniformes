@@ -110,5 +110,18 @@ class SugerirTests(unittest.TestCase):
         self.assertEqual(ps.validar("245"), D("245"))
 
 
+class OrigenDeTests(unittest.TestCase):
+    def test_se_recalcula_al_editar(self) -> None:
+        from pos_uniformes.services.precio_sugerido_service import origen_de
+
+        D = Decimal
+        self.assertEqual(origen_de(D(295), D(295), D(290), "a mano"), "como las demás")
+        self.assertEqual(origen_de(D(290), D(295), D(290), "como las demás"), "del modelo")
+        self.assertEqual(origen_de(D(299), D(295), D(290), "como las demás"), "a mano")
+        self.assertEqual(origen_de(None, D(295), None, "a mano"), "falta precio")
+        # Sin moda ni modelo para comparar, se respeta el que traía.
+        self.assertEqual(origen_de(D(70), None, None, "a mano"), "a mano")
+
+
 if __name__ == "__main__":
     unittest.main()

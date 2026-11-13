@@ -145,11 +145,11 @@ def main() -> int:
                 plan = alta.planear(session, spec, saltar_skus=saltar, usos=usos)
                 saltar += len(plan.tallas)
                 planes[i] = plan
-                for aviso in plan.avisos:
+                for aviso in plan.todos_los_avisos:
                     print(f"⚠ {plan.nombre}: {aviso}")
                 if plan.receta_texto:
                     print(f"  {plan.nombre}: {plan.receta_texto}")
-            errores = [f"{p.nombre or p.nombre_sin_escuela}: {e}" for p in planes.values() for e in p.errores]
+            errores = [f"{p.nombre or p.nombre_sin_escuela}: {e}" for p in planes.values() for e in p.todos_los_errores]
             if errores:
                 print("\nERROR: el plan no se puede aplicar. No se guardó nada.")
                 for e in errores:

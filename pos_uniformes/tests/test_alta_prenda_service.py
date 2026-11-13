@@ -94,12 +94,43 @@ class PlanTests(_Base):
         self.assertEqual((gd.precio, gd.origen_precio), (D(290), "a mano"))
         self.assertEqual(gd.aviso, "Queda más bajo que en las demás escuelas ($295).")
         self.assertEqual(gd.sugerencia_5_9, D(295))
-        self.assertEqual(plan.errores, [])  # avisa, no frena
-        self.assertTrue(any("más bajo" in a for a in plan.avisos))
+        self.assertTrue(plan.puede_aplicar)  # avisa, no frena
+        # Un solo aviso visible: en su talla, no repetido en los de la prenda.
+        self.assertFalse(any("más bajo" in a for a in plan.avisos))
+        self.assertEqual([a for a in plan.todos_los_avisos if "más bajo" in a],
+                         ["Talla GD: queda más bajo que en las demás escuelas ($295)."])
+
+    def test_editar_un_precio_y_volver_a_completar(self) -> None:
+        plan = self.pants_suelto_jaral()
+        gd = next(t for t in plan.tallas if t.talla == "GD")
+        self.assertEqual((gd.origen_precio, gd.moda, gd.prendas_con_moda), ("como las demás", D(295), 4))
+        gd.precio = D(290)
+        alta.completar(self.s, plan)
+        self.assertEqual(gd.origen_precio, "a mano")
+        self.assertEqual(gd.aviso, "Queda más bajo que en las demás escuelas ($295).")
+        gd.precio = gd.moda  # «volver al de las demás»
+        alta.completar(self.s, plan)
+        self.assertEqual((gd.origen_precio, gd.aviso), ("como las demás", ""))
+
+    def test_sin_precio_un_solo_error_por_talla(self) -> None:
+        plan = self.pants_suelto_jaral()
+        plan.tallas[0].precio = None
+        alta.completar(self.s, plan)
+        self.assertEqual(plan.tallas[0].error, "Falta el precio.")
+        self.assertEqual(plan.errores, [])
+        self.assertEqual(plan.todos_los_errores, ["Talla 4: falta el precio."])
+        self.assertFalse(plan.puede_aplicar)
+
+    def test_el_aviso_sin_modelo_sobrevive_a_completar(self) -> None:
+        plan = alta.planear_desde_modelo(self.s, JARAL, "Mochila", nombre="Mochila",
+                                         confirmados=["Mochila"])
+        self.assertTrue(plan.avisos and plan.avisos[0].startswith("No hay otra Mochila"), plan.avisos)
+        alta.completar(self.s, plan)
+        self.assertTrue(plan.avisos[0].startswith("No hay otra Mochila"))
 
     def test_precio_en_cero_frena(self) -> None:
         plan = self.pants_suelto_jaral(precios_a_mano={"4": 0})
-        self.assertIn("Talla 4: el precio no puede quedar en $0.", plan.errores)
+        self.assertIn("Talla 4: el precio no puede quedar en $0.", plan.todos_los_errores)
         with self.assertRaises(alta.AltaNoValida):
             alta.aplicar(self.s, plan, self.admin)
 

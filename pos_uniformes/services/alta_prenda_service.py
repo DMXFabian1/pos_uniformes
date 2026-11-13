@@ -75,13 +75,26 @@ class AltaNoValida(ValueError):
 
 @dataclass
 class TallaPlan:
+    """Una talla del plan. Sus avisos viven aquí y no se repiten en
+    `PlanPrenda.avisos` (que son los de toda la prenda)."""
+
     talla: str
     precio: Decimal | None
     origen_precio: str = precios.ORIGEN_A_MANO
     llegan: int = 0
     costo: Decimal | None = None
+    #: El precio del modelo para esta talla (para recalcular «de dónde»).
+    precio_modelo: Decimal | None = None
+    # Calculado por `completar`:
+    #: El que más se repite en la base y en cuántas prendas («volver al de
+    #: las demás: $295, en 41 prendas»).
+    moda: Decimal | None = None
+    prendas_con_moda: int = 0
     sugerencia_5_9: Decimal | None = None
+    #: Ámbar, no frena («Queda más bajo que en las demás escuelas ($295).»).
     aviso: str = ""
+    #: Frena («Falta el precio.», «El precio no puede quedar en $0.»).
+    error: str = ""
     sku: str = ""  # previsto (el real sale del ensayo)
 
 
@@ -112,17 +125,31 @@ class PlanPrenda:
     confirmados: tuple[str, ...] = ()
     #: Origen propio para la bitácora (gana sobre el de `aplicar`).
     origen: str | None = None
+    #: Avisos y errores que pone quien arma el plan (sin modelo, lote) y que
+    #: `completar` conserva cada vez que se vuelve a llamar.
+    avisos_fijos: list[str] = field(default_factory=list)
+    errores_fijos: list[str] = field(default_factory=list)
     # Calculado por `completar`:
     escuela_id: int | None = None
     nombre: str = ""
     grupo_previsto: str | None = None
     receta_texto: str = ""
+    #: De toda la prenda (los de cada talla están en `TallaPlan.aviso/error`).
     avisos: list[str] = field(default_factory=list)
     errores: list[str] = field(default_factory=list)
 
     @property
     def puede_aplicar(self) -> bool:
-        return not self.errores
+        return not self.todos_los_errores
+
+    @property
+    def todos_los_errores(self) -> list[str]:
+        """Los de la prenda y los de cada talla, en texto (para la skill)."""
+        return list(self.errores) + [f"Talla {t.talla}: {_minuscula(t.error)}" for t in self.tallas if t.error]
+
+    @property
+    def todos_los_avisos(self) -> list[str]:
+        return list(self.avisos) + [f"Talla {t.talla}: {_minuscula(t.aviso)}" for t in self.tallas if t.aviso]
 
     @property
     def es_conjunto(self) -> bool:
@@ -158,6 +185,10 @@ class PlanPrenda:
         if self.escuela and self.ligar:
             texto += f" Quedan en su uniforme {self.grupo or self.grupo_previsto or ''}".rstrip() + "."
         return texto
+
+
+def _minuscula(texto: str) -> str:
+    return texto[:1].lower() + texto[1:]
 
 
 def origen_bitacora(plan: PlanPrenda, origen: str | None = None) -> str:
@@ -322,23 +353,26 @@ def _revisar_tallas_y_color(plan: PlanPrenda, usos: _Usos) -> None:
 
 
 def _revisar_precios(plan: PlanPrenda, usos: _Usos) -> None:
+    """Cada talla: la moda de la base, de dónde sale su precio (se recalcula
+    si se editó), su sugerencia 5/9, su aviso y su error. Nada se repite en
+    `plan.avisos`."""
     pieza_id = _id_de(usos.session, TipoPieza, plan.tipo_pieza)
     nivel_id = _id_de(usos.session, NivelEducativo, plan.nivel)
     conteos = usos.precios(pieza_id, nivel_id, plan.escuela_id)
-    bajos = []
     for t in plan.tallas:
         t.precio = precios.dinero(t.precio)
-        la_moda = precios.moda(conteos.get(t.talla)) if conteos.get(t.talla) else None
-        t.aviso = precios.aviso_precio(t.precio, la_moda)
-        t.sugerencia_5_9 = precios._sugerencia(t.precio, la_moda)
+        contador = conteos.get(t.talla)
+        t.moda = precios.moda(contador) if contador else None
+        t.prendas_con_moda = int(contador.get(t.moda, 0)) if contador and t.moda is not None else 0
+        t.origen_precio = precios.origen_de(t.precio, t.moda, t.precio_modelo, t.origen_precio)
+        t.sugerencia_5_9 = precios._sugerencia(t.precio, t.moda)
+        t.aviso, t.error = "", ""
         if t.precio is None:
-            plan.errores.append(f"Falta el precio de la talla {t.talla}.")
+            t.error = "Falta el precio."
         elif t.precio <= 0:
-            plan.errores.append(f"Talla {t.talla}: el precio no puede quedar en $0.")
-        elif la_moda is not None and t.precio < la_moda:
-            bajos.append(f"{t.talla} (${t.precio:.0f}, las demás ${la_moda:.0f})")
-    if bajos:
-        plan.avisos.append("Queda más bajo que en las demás escuelas: " + ", ".join(bajos) + ".")
+            t.error = "El precio no puede quedar en $0."
+        else:
+            t.aviso = precios.aviso_precio(t.precio, t.moda)
 
 
 @dataclass(frozen=True)
@@ -435,7 +469,7 @@ def completar(session: Session, plan: PlanPrenda, *, saltar_skus: int = 0, usos:
     avisos y errores. No escribe nada. `saltar_skus`: cuántos SKU ya se
     reservaron los planes anteriores del mismo lote."""
     usos = usos or _Usos(session)
-    plan.avisos, plan.errores = [], []
+    plan.avisos, plan.errores = list(plan.avisos_fijos), list(plan.errores_fijos)
     _revisar_valores(plan, usos)
     plan.escuela_id = _id_de(session, Escuela, plan.escuela)
     _revisar_tallas_y_color(plan, usos)
@@ -637,7 +671,8 @@ def planear_desde_modelo(
         color=color_final,
         tallas=[
             TallaPlan(talla=s.talla, precio=s.precio, origen_precio=s.origen,
-                      llegan=llegan.get(s.talla, 0), costo=costos.get(s.talla))
+                      llegan=llegan.get(s.talla, 0), costo=costos.get(s.talla),
+                      precio_modelo=(m.precios.get(s.talla) if m else None))
             for s in sugeridos
         ],
         grupo=m.grupo_uniforme if m else None,
@@ -645,11 +680,9 @@ def planear_desde_modelo(
         modelo_nombre=m.nombre if m else None,
         modelo_texto=hermanas.texto,
         confirmados=tuple(confirmados),
+        avisos_fijos=[hermanas.texto] if m is None else [],
     )
-    completar(session, plan, saltar_skus=saltar_skus, usos=usos)
-    if m is None:
-        plan.avisos.insert(0, hermanas.texto)
-    return plan
+    return completar(session, plan, saltar_skus=saltar_skus, usos=usos)
 
 
 def planear_varias_escuelas(
@@ -667,7 +700,8 @@ def planear_varias_escuelas(
     nombres = [p.nombre for p in planes]
     for p in planes:
         if p.nombre and nombres.count(p.nombre) > 1:
-            p.errores.append(f"«{p.nombre}» está dos veces en el lote.")
+            p.errores_fijos.append(f"«{p.nombre}» está dos veces en el lote.")
+            p.errores.append(p.errores_fijos[-1])
     return planes
 
 
@@ -835,7 +869,7 @@ def _crear(session: Session, plan: PlanPrenda, usuario: Usuario, origen: str | N
 def _errores(planes: Sequence[PlanPrenda]) -> str:
     errores = []
     for p in planes:
-        for e in p.errores:
+        for e in p.todos_los_errores:
             errores.append(f"{p.nombre or p.nombre_sin_escuela}: {e}" if len(planes) > 1 else e)
     return "\n".join(errores)
 

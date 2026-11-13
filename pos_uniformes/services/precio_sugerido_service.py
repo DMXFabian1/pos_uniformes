@@ -225,6 +225,27 @@ def aviso_precio(precio: Decimal | None, la_moda: Decimal | None) -> str:
     return ""
 
 
+def origen_de(
+    precio: Decimal | None,
+    la_moda: Decimal | None,
+    precio_modelo: Decimal | None,
+    origen_actual: str = ORIGEN_A_MANO,
+) -> str:
+    """Puro: de dónde sale un precio después de editarlo. Igual al que más
+    se repite → «como las demás»; igual al del modelo → «del modelo»; si ya
+    no coincide con ninguno, «a mano». Un origen que no se puede comprobar
+    (sin moda ni modelo, como en un plan de la skill) se respeta."""
+    if precio is None:
+        return ORIGEN_FALTA
+    if la_moda is not None and precio == la_moda:
+        return ORIGEN_COMO_LAS_DEMAS
+    if precio_modelo is not None and precio == precio_modelo:
+        return ORIGEN_DEL_MODELO
+    if origen_actual in (ORIGEN_COMO_LAS_DEMAS, ORIGEN_DEL_MODELO, ORIGEN_FALTA):
+        return ORIGEN_A_MANO
+    return origen_actual
+
+
 def sugerir(
     session: Session,
     tipo_pieza_id: int | None,
