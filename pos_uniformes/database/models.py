@@ -2873,6 +2873,18 @@ class PrestamoEmpleada(Base):
     #: Desde qué día se puede descontar (compras a cuenta «del pago
     #: siguiente», 2026-11-12). None = en el siguiente pago.
     cobrar_desde: Mapped[date | None] = mapped_column(Date)
+    #: 'prestamo' | 'compra_cuenta' (2026-11-12). Antes se sabía por el texto
+    #: del motivo; ahora la compra a cuenta se reconoce por esta columna.
+    tipo: Mapped[str] = mapped_column(
+        String(20), nullable=False, default="prestamo", server_default="prestamo", index=True
+    )
+    #: La venta de la Libreta de una compra a cuenta (antes: el folio en el motivo).
+    libreta_venta_id: Mapped[int | None] = mapped_column(
+        ForeignKey("libreta_venta.id", ondelete="SET NULL"), index=True
+    )
+    #: La parte cobrada de un pago parcial apunta al préstamo del que salió
+    #: (antes: «(parte del #N)» en el motivo).
+    origen_id: Mapped[int | None] = mapped_column(ForeignKey("prestamo_empleada.id", ondelete="SET NULL"))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
@@ -3125,6 +3137,12 @@ class CajaRetiro(Base):
     motivo: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     creado_por: Mapped[str] = mapped_column(String(40), nullable=False, default="")
     en_cajon: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    #: El préstamo o la compra a cuenta que sacó este dinero (2026-11-12).
+    #: El corte deja fuera SOLO el retiro de una compra a cuenta no rechazada,
+    #: por esta columna; un retiro manual con el mismo texto sí cuenta.
+    prestamo_id: Mapped[int | None] = mapped_column(
+        ForeignKey("prestamo_empleada.id", ondelete="SET NULL"), index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
