@@ -63,6 +63,7 @@ from pos_uniformes.ui.helpers.quick_sale_monedero_helper import (
 from pos_uniformes.ui.helpers.quick_sale_sports_uniform_helper import (
     adapt_cache_row,
     build_promo_playera_item,
+    find_promo_playera_row,
     load_playera_candidates_from_rows,
     mark_promo_base_item,
     restore_promo_playera_after_base_removed,
@@ -998,14 +999,11 @@ class QuickSaleWidget(
 
         if promo_playera_item is not None:
             mark_promo_base_item(base_item, playera_sku=str(promo_playera_item["sku"]))
-            existing_playera = next(
-                (
-                    it
-                    for it in self._items
-                    if it["sku"] == promo_playera_item["sku"]
-                    and it.get("sports_uniform_role") == "playera"
-                ),
-                None,
+            # Un renglón de playera por pants base: si dos pants comparten
+            # playera, cada uno lleva la suya (así, si uno queda rebajado,
+            # solo su playera pierde la promo).
+            existing_playera = find_promo_playera_row(
+                self._items, playera_sku=str(promo_playera_item["sku"]), base_sku=snap.sku
             )
             if existing_playera:
                 existing_playera["cantidad"] += 1

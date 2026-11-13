@@ -456,6 +456,7 @@ def _fila(sku, producto, precio):
 
 _FILAS_3PZ = {
     "P2-001": _fila("P2-001", "Pants 2pz Deportivo", "250.00"),
+    "P2-002": dict(_fila("P2-002", "Pants 2pz Deportivo", "250.00"), talla="8"),
     "PLY-001": _fila("PLY-001", "Playera Deportiva", "180.00"),
 }
 
@@ -517,6 +518,29 @@ class Promo3pzReglaTests(unittest.TestCase):
         self.assertEqual(otro["sports_uniform_role"], "base")
 
 
+class Promo3pzRenglonPorBaseTests(unittest.TestCase):
+    """Un renglón de playera por pants base (2026-11-12)."""
+
+    def test_busca_la_playera_de_ese_pants(self) -> None:
+        from pos_uniformes.ui.helpers.quick_sale_sports_uniform_helper import find_promo_playera_row
+
+        suya = _playera_promo()
+        ajena = dict(_playera_promo(), sports_uniform_base_sku="P2-002")
+        items = [ajena, suya]
+        self.assertIs(find_promo_playera_row(items, playera_sku="ply-001", base_sku="P2-001"), suya)
+        self.assertIs(find_promo_playera_row(items, playera_sku="PLY-001", base_sku="P2-002"), ajena)
+        self.assertIsNone(find_promo_playera_row(items, playera_sku="PLY-001", base_sku="P2-003"))
+
+    def test_quitar_un_pants_solo_regresa_su_playera(self) -> None:
+        from pos_uniformes.ui.helpers.quick_sale_sports_uniform_helper import restore_promo_playera_after_base_removed
+
+        suya = _playera_promo()
+        ajena = dict(_playera_promo(), sports_uniform_base_sku="P2-002")
+        quitado = _pants_3pz(sports_uniform_role="base", sports_uniform_playera_sku="PLY-001")
+        self.assertTrue(restore_promo_playera_after_base_removed([suya, ajena], quitado))
+        self.assertEqual((suya["precio"], ajena["precio"]), (D("180.00"), D("100.00")))
+
+
 class Promo3pzKioskoTests(_Qt):
     def _kiosko_3pz(self, rebajas=None):
         from pos_uniformes.ui.views.quick_sale_view import QuickSaleWidget
@@ -537,13 +561,71 @@ class Promo3pzKioskoTests(_Qt):
         w._rebajas_leidas_en = 10**12
         return w
 
-    def _resolucion_3pz(self):
+    def _resolucion_3pz(self, pants="P2-001"):
         from pos_uniformes.ui.helpers.quick_sale_sports_uniform_helper import adapt_cache_row
         from pos_uniformes.ui.helpers.sale_sports_uniform_helper import SaleSportsUniformResolution
 
         return SaleSportsUniformResolution(
-            variants=(adapt_cache_row(_FILAS_3PZ["P2-001"]), adapt_cache_row(_FILAS_3PZ["PLY-001"])),
+            variants=(adapt_cache_row(_FILAS_3PZ[pants]), adapt_cache_row(_FILAS_3PZ["PLY-001"])),
             composed_as_three_pieces=True, selected_playera_sku="PLY-001")
+
+    def _escanear_y_que_la_lista_se_recargue(self, w, sku, rebajas):
+        """El camino real: la lista de rebajas se recarga mientras la empleada
+        tiene abierto el diálogo de la playera."""
+        from PyQt6.QtWidgets import QMessageBox
+
+        def dialogo(*_a, **_k):
+            w._rebajas = dict(rebajas)
+            return self._resolucion_3pz(sku)
+
+        with patch("pos_uniformes.ui.views.quick_sale_view.resolve_sale_scan_variants", side_effect=dialogo), \
+                patch.object(QMessageBox, "information") as aviso:
+            self.assertTrue(w.add_sku(sku))
+        return aviso
+
+    def test_la_lista_se_recarga_durante_el_dialogo(self) -> None:
+        w = self._kiosko_3pz()
+        aviso = self._escanear_y_que_la_lista_se_recargue(w, "P2-001", {"P2-001": OFERTA_PANTS_3PZ})
+        pants, playera = w._items
+        self.assertEqual((pants["precio"], pants["rebaja"]), (D("175"), "oferta"))
+        self.assertNotIn("sports_uniform_role", pants)
+        self.assertEqual((playera["precio"], playera["nombre"]), (D("180.00"), "Playera Deportiva"))
+        self.assertEqual(aviso.call_args[0][2], "La playera va a precio normal: el pants ya está en Oferta.")
+
+    def test_dos_pants_con_la_misma_playera_cada_uno_lleva_la_suya(self) -> None:
+        w = self._kiosko_3pz()
+        self._escanear_y_que_la_lista_se_recargue(w, "P2-001", {})
+        oferta_p2 = reb.RebajaVigente("P2-002", reb.OFERTA, D("175"), D("250"), None)
+        self._escanear_y_que_la_lista_se_recargue(w, "P2-002", {"P2-002": oferta_p2})
+        p1, ply1, p2, ply2 = w._items
+        self.assertEqual((p1["sports_uniform_role"], ply1["precio"], ply1["cantidad"]), ("base", D("100.00"), 1))
+        self.assertEqual((p2["rebaja"], ply2["precio"], ply2["cantidad"]), ("oferta", D("180.00"), 1))
+        self.assertNotIn("sports_uniform_role", p2)
+
+    def test_al_reves_solo_pierde_la_promo_la_playera_del_pants_rebajado(self) -> None:
+        w = self._kiosko_3pz()
+        self._escanear_y_que_la_lista_se_recargue(w, "P2-001", {"P2-001": OFERTA_PANTS_3PZ})
+        self._escanear_y_que_la_lista_se_recargue(w, "P2-002", {"P2-001": OFERTA_PANTS_3PZ})
+        p1, ply1, p2, ply2 = w._items
+        self.assertEqual((p1["rebaja"], ply1["precio"]), ("oferta", D("180.00")))
+        self.assertEqual((p2["sports_uniform_role"], ply2["precio"], ply2["cantidad"]), ("base", D("100.00"), 1))
+
+    def test_quitar_pieza_a_pieza_el_pants_rebajado_deja_la_playera_como_estaba(self) -> None:
+        w = self._kiosko_3pz({"P2-001": OFERTA_PANTS_3PZ})
+        w.add_sku("PLY-001")
+        with patch("pos_uniformes.ui.views.quick_sale_view.resolve_sale_scan_variants"):
+            w.add_sku("P2-001")
+        w._on_remove(1)
+        (playera,) = w._items
+        self.assertEqual(playera["precio"], D("180.00"))
+
+    def test_el_cambio_marca_el_pants_2pz_deportivo(self) -> None:
+        from pos_uniformes.services.cambio_service import LLAVE_PANTS_3PZ
+
+        w = self._kiosko_3pz({"P2-001": OFERTA_PANTS_3PZ})
+        pants = w._producto_para_cambio("P2-001")
+        self.assertEqual((pants["precio"], pants["rebaja"], pants.get(LLAVE_PANTS_3PZ)), (D("175"), "oferta", True))
+        self.assertNotIn(LLAVE_PANTS_3PZ, w._producto_para_cambio("PLY-001"))
 
     def test_pants_en_oferta_no_ofrece_la_promo(self) -> None:
         w = self._kiosko_3pz({"P2-001": OFERTA_PANTS_3PZ})

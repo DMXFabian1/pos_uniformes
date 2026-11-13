@@ -54,7 +54,13 @@ class RebajaVentaMixin:
     def _aviso_si_pants_rebajado(self, sku: str, existente: dict | None) -> str:
         """Vacío si la promo 3pz se puede ofrecer con este pants; si no, el
         aviso para la empleada. El renglón que ya está en el carrito manda;
-        si es nuevo, la lista de rebajas."""
+        si es nuevo, la lista de rebajas.
+
+        Que mande el renglón es a propósito: la pieza que se vuelve a escanear
+        se suma a ese renglón con su precio, así que la promo sigue lo que el
+        renglón dice y E7 queda consistente. (Si la lista se recargó y ese
+        pants ya está en Oferta, la pieza nueva se cobra al precio del
+        renglón: eso ya pasaba antes y no es de la promo 3pz.)"""
         from pos_uniformes.services import sports_uniform_pricing_service as spp
 
         pants = existente

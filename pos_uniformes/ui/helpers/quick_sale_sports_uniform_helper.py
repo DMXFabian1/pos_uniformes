@@ -116,6 +116,35 @@ def mark_promo_base_item(item: dict[str, object], *, playera_sku: str) -> None:
     item["sports_uniform_playera_sku"] = str(playera_sku or "").strip().upper()
 
 
+def _base_de_la_playera(item: dict[str, object]) -> str:
+    return str(item.get("sports_uniform_base_sku") or "").strip().upper()
+
+
+def find_promo_playera_row(
+    items: list[dict[str, object]],
+    *,
+    playera_sku: str,
+    base_sku: str,
+) -> dict[str, object] | None:
+    """El renglón de la playera en promo de ESE pants base (o None).
+
+    Un renglón por pants base (2026-11-12, E7 «Sí, que no aplique»): si dos
+    pants distintos comparten playera, cada uno lleva la suya. Así, si uno
+    queda en Oferta o Liquidación, solo su playera regresa a precio normal."""
+    playera_sku = str(playera_sku or "").strip().upper()
+    base_sku = str(base_sku or "").strip().upper()
+    return next(
+        (
+            it
+            for it in items
+            if str(it.get("sku") or "").strip().upper() == playera_sku
+            and str(it.get("sports_uniform_role") or "") == "playera"
+            and _base_de_la_playera(it) in ("", base_sku)
+        ),
+        None,
+    )
+
+
 def restore_promo_playera_after_base_removed(
     items: list[dict[str, object]],
     removed_item: dict[str, object],
@@ -136,6 +165,9 @@ def restore_promo_playera_after_base_removed(
         if str(item.get("sku") or "").strip().upper() != playera_sku:
             continue
         if str(item.get("sports_uniform_role") or "") != "playera":
+            continue
+        # Solo la playera de ESE pants (la de otro pants sigue en promo).
+        if _base_de_la_playera(item) not in ("", str(removed_item.get("sku") or "").strip().upper()):
             continue
         if "precio_base" not in item:
             continue

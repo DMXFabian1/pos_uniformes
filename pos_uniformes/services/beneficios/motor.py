@@ -377,7 +377,12 @@ def _marcar_3pz_con_pants_rebajado(grupos: list[_Grupo], motivos_ticket: list[st
     de la playera ni qué playera va con qué pants, así que aquí solo queda la
     huella: una línea que llega rebajada y marcada como promo 3pz es un pants
     base rebajado. Cada línea 3pz de esa venta y el ticket llevan el motivo
-    `3PZ_CON_PANTS_REBAJADO` en la fotografía. Los importes no cambian."""
+    `3PZ_CON_PANTS_REBAJADO` en la fotografía. Los importes no cambian.
+
+    Es una huella gruesa a propósito: como el motor no sabe qué playera va
+    con qué pants, en una venta con dos conjuntos 3pz (uno rebajado y otro
+    no) también se marcan las líneas del conjunto bueno. Sirve para encontrar
+    la venta en la auditoría, no para decir cuál playera estuvo mal."""
     if not any(g.rebajada and g.es_3pz for g in grupos):
         return
     for g in grupos:
