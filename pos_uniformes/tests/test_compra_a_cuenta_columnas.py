@@ -258,5 +258,48 @@ class PermisoDelRetiroTests(_Base):
         self.assertEqual(self.s.scalars(select(CajaRetiro)).all(), [])
 
 
+class RevisionTests(_Base):
+    """Hallazgos de la revisión (2026-11-12)."""
+
+    def test_si_falla_el_aviso_despues_del_commit_no_lanza(self):
+        self.s.commit()
+        with patch.object(rs, "avisar_retiro", side_effect=RuntimeError("se cayó la red")):
+            p = cac.registrar_venta_a_cuenta(self.s, entrada=self._entrada(), employee_code="VEND-3",
+                                             nombre="Cristal", opcion=self.este, creado_por="VEND-2")
+        self.assertEqual((p.tipo, p.estado), (pr.TIPO_COMPRA, pr.PEDIDO))
+        self.assertEqual(cac.compra_de_folio(self.s, FOLIO).id, p.id)
+        self.assertIsNone(cac.compra_de_folio(self.s, "otro-folio"))
+        self.assertIsNone(cac.compra_de_folio(self.s, None))
+
+    def _compra_de_kiosko_viejo(self):
+        """Como la dejaba el código anterior a las columnas: sin tipo (queda
+        'prestamo' por el default) y con su retiro sin prestamo_id."""
+        venta = self._venta()
+        p = PrestamoEmpleada(employee_code="VEND-3", employee_name="Cristal", monto=D("332"),
+                             motivo="Compra a cuenta · pago del sáb 14 nov · ticket abcdef12", estado=pr.PEDIDO)
+        self.s.add(p)
+        self.s.flush()
+        self.s.add(CajaRetiro(monto=D("332"), motivo=f"Compra a cuenta de Cristal · #{p.id}", creado_por="VEND-2",
+                              created_at=datetime.now().astimezone()))
+        self.s.flush()
+        return p, venta
+
+    def test_compra_de_kiosko_viejo_autorizada_no_saca_otro_retiro(self):
+        p, venta = self._compra_de_kiosko_viejo()
+        self.assertTrue(cac.es_compra(p))
+        pr.aprobar(self.s, p.id, quien="VEND-1")
+        self.assertEqual((p.tipo, p.libreta_venta_id), (pr.TIPO_COMPRA, venta.id))
+        retiros = self.s.scalars(select(CajaRetiro)).all()
+        self.assertEqual([(r.motivo, r.prestamo_id) for r in retiros],
+                         [(f"Compra a cuenta de Cristal · #{p.id}", p.id)])
+        self.assertEqual(self._corte(), ([], [], D("0.00")))
+
+    def test_compra_de_kiosko_viejo_rechazada_quita_su_retiro(self):
+        p, venta = self._compra_de_kiosko_viejo()
+        pr.rechazar(self.s, p.id, quien="VEND-1")
+        self.assertEqual(self.s.scalars(select(CajaRetiro)).all(), [])
+        self.assertEqual(self._corte()[0], [venta.id])   # la venta cuenta: ella la paga en caja
+
+
 if __name__ == "__main__":
     unittest.main()

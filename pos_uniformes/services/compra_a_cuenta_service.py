@@ -100,9 +100,59 @@ def opciones_para(session, employee_code: str, hoy: date | None = None) -> tuple
     return opciones_de_pago(proximo, ciclo), pr.disponible_para(session, employee_code, hoy)
 
 
+#: Así empieza el motivo que escribe `registrar` (y el que escribía el
+#: código anterior a las columnas). Solo se usa para reconocer las compras
+#: que apunta un kiosko viejo; ver `es_compra`.
+_MOTIVO_DE_COMPRA = f"{PREFIJO_MOTIVO} · pago del "
+
+
 def es_compra(prestamo) -> bool:
-    """Por la columna `tipo` (2026-11-12), ya no por el texto del motivo."""
-    return getattr(prestamo, "tipo", None) == pr.TIPO_COMPRA
+    """Por la columna `tipo` (2026-11-12), ya no por el texto del motivo.
+
+    Excepción mientras haya kioskos o satélites con el código anterior
+    (revisión 2026-11-12): el preflight los deja arrancar con la base
+    adelante, y esos insertan la compra sin `tipo` (queda 'prestamo' por el
+    server_default) y su retiro sin `prestamo_id`. Si no se reconociera,
+    al autorizarla saldría un SEGUNDO retiro «Préstamo a X» y al rechazarla
+    se quedaría el suyo. Por eso un 'prestamo' cuyo motivo tiene la forma
+    exacta que solo escribe la compra a cuenta («Compra a cuenta · pago del
+    …») también cuenta; `adoptar_si_es_vieja` le pone sus columnas."""
+    tipo = getattr(prestamo, "tipo", None)
+    if tipo == pr.TIPO_COMPRA:
+        return True
+    return tipo in (None, pr.TIPO_PRESTAMO) and str(getattr(prestamo, "motivo", "") or "").startswith(
+        _MOTIVO_DE_COMPRA
+    )
+
+
+def adoptar_si_es_vieja(session, prestamo) -> None:
+    """Le pone sus columnas a una compra que apuntó un kiosko con el código
+    anterior (revisión 2026-11-12): `tipo`, su retiro (el de texto exacto
+    `motivo_retiro`, todavía sin `prestamo_id`) y su venta (por el ticket del
+    motivo, solo si hay UNA venta con ese folio). Idempotente; no cambia
+    montos ni estados, solo liga lo que ya existe."""
+    if not es_compra(prestamo) or getattr(prestamo, "tipo", None) == pr.TIPO_COMPRA:
+        return
+    import re
+
+    from sqlalchemy import select
+
+    from pos_uniformes.database.models import CajaRetiro, LibretaVenta
+
+    prestamo.tipo = pr.TIPO_COMPRA
+    session.add(prestamo)
+    for retiro in session.scalars(
+        select(CajaRetiro).where(CajaRetiro.prestamo_id.is_(None), CajaRetiro.motivo == motivo_retiro(prestamo))
+    ).all():
+        retiro.prestamo_id = prestamo.id
+    m = re.search(r"ticket ([0-9a-fA-F]{8})", str(prestamo.motivo or ""))
+    if prestamo.libreta_venta_id is None and m:
+        ventas = session.scalars(
+            select(LibretaVenta.id).where(LibretaVenta.operacion_uuid.like(f"{m.group(1)}%")).limit(2)
+        ).all()
+        if len(ventas) == 1:
+            prestamo.libreta_venta_id = ventas[0]
+    session.flush()
 
 
 #: Cómo va la compra, tal como se ve en la Libreta del dueño.
@@ -258,12 +308,41 @@ def registrar_venta_a_cuenta(session, *, entrada: dict, employee_code: str, nomb
     except Exception:
         session.rollback()
         raise
-    from pos_uniformes.services.retiros_service import avisar_retiro
+    # Ya quedó guardada: desde aquí nada puede lanzar (revisión 2026-11-12).
+    # Si el aviso del retiro fallara (se cayó la red justo después del
+    # commit), el kiosko diría «cóbrale al momento» de una compra que sí
+    # quedó a cuenta, y se la cobrarían dos veces.
+    try:
+        from pos_uniformes.services.retiros_service import avisar_retiro
 
-    retiro = session.scalars(select(CajaRetiro).where(CajaRetiro.prestamo_id == compra.id)).first()
-    if retiro is not None:
-        avisar_retiro(session, retiro)
+        retiro = session.scalars(select(CajaRetiro).where(CajaRetiro.prestamo_id == compra.id)).first()
+        if retiro is not None:
+            avisar_retiro(session, retiro)
+    except Exception:  # noqa: BLE001 — la compra ya quedó guardada
+        import logging
+
+        logging.getLogger(__name__).warning("Compra a cuenta: no se pudo avisar el retiro", exc_info=True)
     return compra
+
+
+def compra_de_folio(session, folio: str | None):
+    """La compra a cuenta (no rechazada) ligada a la venta con ese folio, o
+    None (revisión 2026-11-12). El kiosko la busca cuando
+    `registrar_venta_a_cuenta` lanzó: el commit pudo entrar aunque la
+    respuesta no llegara, y entonces la compra SÍ quedó a cuenta."""
+    if not folio:
+        return None
+    from sqlalchemy import select
+
+    from pos_uniformes.database.models import LibretaVenta, PrestamoEmpleada
+
+    return session.scalars(
+        select(PrestamoEmpleada)
+        .join(LibretaVenta, LibretaVenta.id == PrestamoEmpleada.libreta_venta_id)
+        .where(LibretaVenta.operacion_uuid == str(folio), PrestamoEmpleada.tipo == pr.TIPO_COMPRA,
+               PrestamoEmpleada.estado != pr.RECHAZADO)
+        .order_by(PrestamoEmpleada.id).limit(1)
+    ).first()
 
 
 def puede_dejarse_a_cuenta(session, employee_code: str, monto) -> str | None:
@@ -277,6 +356,7 @@ def puede_dejarse_a_cuenta(session, employee_code: str, monto) -> str | None:
 
 def al_aprobar(session, prestamo) -> bool:
     """True si es una compra: su retiro ya salió al venderla, no otro."""
+    adoptar_si_es_vieja(session, prestamo)
     return es_compra(prestamo)
 
 
@@ -285,6 +365,7 @@ def al_rechazar(session, prestamo) -> None:
     corte espera ese dinero. Se encuentra por `prestamo_id` (2026-11-12)."""
     if not es_compra(prestamo):
         return
+    adoptar_si_es_vieja(session, prestamo)
     from sqlalchemy import select
 
     from pos_uniformes.database.models import CajaRetiro
