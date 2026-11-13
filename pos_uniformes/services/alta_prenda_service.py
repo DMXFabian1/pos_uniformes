@@ -36,6 +36,7 @@ from types import SimpleNamespace
 from typing import Iterable, Mapping, Sequence
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import IntegrityError, InvalidRequestError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from pos_uniformes.database.models import (
@@ -995,8 +996,9 @@ def ensayar(
     origen: str = ORIGEN_POS,
 ) -> ResultadoAlta:
     """Hace el alta dentro de un savepoint y la deshace: devuelve exactamente
-    lo que se crearía (SKU, recetas, grupo del uniforme). No lanza errores:
-    los devuelve en `error`.
+    lo que se crearía (SKU, recetas, grupo del uniforme). No lanza errores
+    de datos ni de la base (valor sin confirmar, permiso, duplicado porque
+    otra caja guardó lo mismo): los devuelve en `error`.
 
     Toma el contador de SKU con candado mientras dura la transacción de quien
     llama: hay que cerrar (rollback/commit) la sesión después."""
@@ -1012,9 +1014,20 @@ def ensayar(
         resultado = ResultadoAlta(productos=creados, ensayo=True)
     except (ValueError, PermissionError) as exc:
         resultado = ResultadoAlta(ensayo=True, error=str(exc))
+    except IntegrityError:
+        resultado = ResultadoAlta(
+            ensayo=True,
+            error="Ya hay algo guardado igual (otra caja lo dio de alta mientras tanto): vuelve a revisar la prenda.",
+        )
+    except SQLAlchemyError as exc:
+        resultado = ResultadoAlta(ensayo=True, error=f"La base no dejó hacer el ensayo: {exc.__class__.__name__}.")
     finally:
-        if punto.is_active:
+        # También tras un error de flush (savepoint DEACTIVE, is_active=False):
+        # si no se deshace aquí, la sesión queda inservible para quien llama.
+        try:
             punto.rollback()
+        except InvalidRequestError:
+            pass  # ya estaba cerrado
         if pendiente_antes is None:
             session.info.pop(_MEILI_PENDIENTE, None)
     return resultado

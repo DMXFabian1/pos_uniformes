@@ -252,6 +252,41 @@ class EnsayoTests(_Base):
         self.assertFalse(r.ok)
         self.assertIn("$0", r.error)
 
+    def test_ensayo_con_un_duplicado_de_la_base_no_lanza(self) -> None:
+        """Otra caja guardó lo mismo entre el plan y el ensayo."""
+        from sqlalchemy.exc import IntegrityError
+
+        plan = self.pants_suelto_jaral()
+        antes = self.foto()
+        with patch.object(alta, "_crear", side_effect=IntegrityError("INSERT", {}, Exception("duplicado"))):
+            r = alta.ensayar(self.s, plan, self.admin)
+        self.assertFalse(r.ok)
+        self.assertIn("otra caja", r.error)
+        self.assertEqual(self.foto(), antes)
+        self.assertTrue(alta.ensayar(self.s, plan, self.admin).ok)  # la sesión sigue usable
+
+    def test_ensayo_con_un_integrity_error_de_verdad_no_lanza(self) -> None:
+        """Un IntegrityError real al hacer flush dentro del savepoint (un SKU
+        que ya existe): se devuelve como error y la sesión sigue usable."""
+        from pos_uniformes.services import uniforme_service
+
+        plan = self.pants_suelto_jaral()
+        otra = self.caja.productos[("Miguel Hidalgo", "Playera")]
+        antes = self.foto()
+
+        def choca(session, *a, **kw):
+            session.add(Variante(producto_id=otra.id, sku="SKU000001", talla="XXG", color="Sin color",
+                                 precio_venta=D(250), stock_actual=0))
+            session.flush()
+
+        with patch.object(uniforme_service, "agregar_pieza", side_effect=choca):
+            r = alta.ensayar(self.s, plan, self.admin)
+        self.assertFalse(r.ok)
+        self.assertIn("otra caja", r.error)
+        # Sin rollback de quien llama: el savepoint ya se deshizo.
+        self.assertEqual(self.foto(), antes)
+        self.assertTrue(alta.ensayar(self.s, plan, self.admin).ok)
+
     def test_jaral_completo_copiando_de_sus_hermanas(self) -> None:
         """El alta del 10-nov repetida sin guardar: pants suelto gris, suéter y chaleco azules."""
         planes = [
