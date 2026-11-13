@@ -629,6 +629,28 @@ class ResumenDesdeLaLibretaTests(unittest.TestCase):
         self.assertIn("Ventas hoy:", self.ventana.metrics_label.text())
         self.assertIn("ventas en el mes", self.ventana.dashboard_sales_context_label.text())
 
+    def test_la_cajera_no_ve_cobrado_ni_privadas(self) -> None:
+        # Revisión 2026-11-12: quien no es ADMIN pide las cifras sin las
+        # operaciones privadas y no ve dinero en el Resumen.
+        from decimal import Decimal
+        from unittest.mock import patch
+
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.database.models import RolUsuario
+        from pos_uniformes.services import resumen_pos_service as rp
+
+        cifras = rp.CifrasPeriodo(operaciones=2, ventas=2, piezas=3, cobrado=Decimal("777.00"))
+        self.ventana.current_role = RolUsuario.CAJERO
+        with patch.object(rp, "cargar", return_value=rp.ResumenPos(hoy=cifras, mes=cifras)) as cargar:
+            with get_session() as session:
+                self.ventana._refresh_summary(session)
+        self.assertFalse(cargar.call_args.kwargs["incluir_privados"])
+        self.assertEqual(self.ventana.kpi_sales_value.text(), "2")
+        for etiqueta in (self.ventana.analytics_label, self.ventana.dashboard_operations_label,
+                         self.ventana.metrics_label):
+            self.assertNotIn("cobrado", etiqueta.text().lower())
+            self.assertNotIn("777", etiqueta.text())
+
 
 
 class ExportDeAnaliticaDesdeLaLibretaTests(unittest.TestCase):
