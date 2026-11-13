@@ -113,8 +113,9 @@ QMenu#invMenu::item:disabled {{ color: #b4aba0; }}
 QMenu#invMenu::separator {{ height: 1px; background: {LINEA}; margin: 4px 8px; }}
 
 /* ── Buscador grande sin bordes ── */
-QFrame#invBuscador {{ background: {TARJETA}; border: 1px solid {TARJETA_BORDE}; border-radius: 20px; }}
-QLabel#invBuscadorIcono {{ font-size: 24px; color: #b9a58f; }}
+QFrame#invBuscador {{ background: {TARJETA}; border: 2px solid {TARJETA_BORDE}; border-radius: 20px; }}
+QFrame#invBuscador[foco="si"] {{ border: 2px solid {VINO}; }}
+QLabel#invBuscadorIcono {{ font-size: 18px; color: #b9a58f; }}
 QLineEdit#invBuscar {{
     font-size: 18px; padding: 8px 4px; border: none; background: transparent; color: {TEXTO};
 }}

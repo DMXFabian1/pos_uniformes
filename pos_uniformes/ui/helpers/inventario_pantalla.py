@@ -96,6 +96,25 @@ def _etiqueta(texto: str, nombre: str, *, envolver: bool = False) -> QLabel:
     return label
 
 
+class MarcaFoco(QObject):
+    """Pone `foco="si"` en el marco mientras su campo tiene el foco (la hoja
+    lo pinta con borde vino), como `cliBuscar:focus` en Clientes."""
+
+    def __init__(self, marco: QWidget, campo: QWidget) -> None:
+        super().__init__(marco)
+        self.marco = marco
+        marco.setProperty("foco", "no")
+        campo.installEventFilter(self)
+
+    def eventFilter(self, objeto: QObject, evento: QEvent) -> bool:  # noqa: N802 - API de Qt
+        if evento.type() in (QEvent.Type.FocusIn, QEvent.Type.FocusOut):
+            valor = "si" if evento.type() == QEvent.Type.FocusIn else "no"
+            if self.marco.property("foco") != valor:
+                self.marco.setProperty("foco", valor)
+                _repulir(self.marco)
+        return False
+
+
 # ── Tarjeta que filtra ───────────────────────────────────────────────────
 
 
@@ -483,6 +502,10 @@ class InventarioPantalla(QObject):
             tarjeta.mostrar(self.conteo.de(llave), prendida=self.tarjeta == llave)
         self._refrescar_filtros()
         self.paginas.setText(texto_paginacion(len(w.inventory_filtered_rows), w.inventory_page_index, _tamano_pagina()))
+        # Con una sola página las flechas no sirven: no se enseñan.
+        varias = len(w.inventory_filtered_rows) > _tamano_pagina()
+        w.inventory_previous_page_button.setVisible(varias)
+        w.inventory_next_page_button.setVisible(varias)
         self._marcar_orden()
         if not self._seleccionando:
             self._seleccionar_si_es_codigo()

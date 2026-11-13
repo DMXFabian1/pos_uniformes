@@ -12,6 +12,7 @@ from unittest.mock import Mock, patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtCore import QEvent, QItemSelectionModel
+from PyQt6.QtGui import QFocusEvent
 from PyQt6.QtWidgets import QApplication, QMessageBox, QTabWidget
 
 from pos_uniformes.ui.helpers.inventario_pantalla import LOTE, TALLA, VACIA
@@ -387,6 +388,25 @@ class InventarioTanda3PantallaTests(unittest.TestCase):
         self.assertEqual(window.inventario_pantalla.paginas.text(), "Mostrando 6 tallas")
         self.assertEqual(window.inventory_previous_page_button.text(), "◀")
         self.assertTrue(window.inventory_pagination_label.isHidden())
+        # Una sola página: sin flechas apagadas de adorno.
+        self.assertTrue(window.inventory_previous_page_button.isHidden())
+        self.assertTrue(window.inventory_next_page_button.isHidden())
+
+    def test_con_varias_paginas_salen_las_flechas(self) -> None:
+        window = self._ventana([_fila(i, 3, talla=str(i)) for i in range(1, 121)])
+        self.assertFalse(window.inventory_previous_page_button.isHidden())
+        self.assertFalse(window.inventory_next_page_button.isHidden())
+        self.assertIn("de 120", window.inventario_pantalla.paginas.text())
+
+    def test_el_buscador_marca_el_foco(self) -> None:
+        window = self._ventana()
+        marco = window.inventario_pantalla.foco_buscador.marco
+        entrada = window.inventory_search_input
+        self.assertEqual(marco.property("foco"), "no")
+        QApplication.sendEvent(entrada, QFocusEvent(QEvent.Type.FocusIn))
+        self.assertEqual(marco.property("foco"), "si")
+        QApplication.sendEvent(entrada, QFocusEvent(QEvent.Type.FocusOut))
+        self.assertEqual(marco.property("foco"), "no")
 
     # ── F. Ficha en sus tres estados ────────────────────────────────────
 

@@ -23,6 +23,7 @@ from pos_uniformes.ui.helpers.flow_layout import FlowLayout
 from pos_uniformes.ui.helpers.inventario_pantalla import (
     TEXTO_PROXIMAMENTE,
     InventarioPantalla,
+    MarcaFoco,
     armar_menu_mas,
 )
 from pos_uniformes.ui.helpers.inventario_tabla_helper import ALTO_FILA, DelegadoConTono
@@ -167,11 +168,13 @@ def _encabezado(window: "MainWindow", pantalla: InventarioPantalla) -> QHBoxLayo
     caja = QHBoxLayout(barra)
     caja.setContentsMargins(16, 2, 10, 2)
     caja.setSpacing(8)
-    icono = QLabel("⌕")
+    icono = QLabel("🔎")
     icono.setObjectName("invBuscadorIcono")
     caja.addWidget(icono)
     entrada = window.inventory_search_input
     entrada.setObjectName("invBuscar")
+    # Borde vino mientras el buscador tiene el foco (al tabular se sabe dónde está).
+    pantalla.foco_buscador = MarcaFoco(barra, entrada)
     entrada.setPlaceholderText("Busca o escanea: prenda, escuela, talla, color o código")
     entrada.setClearButtonEnabled(True)
     caja.addWidget(entrada, 1)
