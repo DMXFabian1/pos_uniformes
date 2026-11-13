@@ -32,12 +32,15 @@ class ClientService:
             # tipo se busca en el catálogo (`ClienteTipo` por
             # `tipo_cliente_id`, el que manda), no en el enum viejo, que no
             # tiene «docente» ni «institución».
-            tipo_coincide = select(ClienteTipo.id).where(
-                or_(
-                    func.lower(ClienteTipo.nombre).like(like_term),
-                    func.lower(ClienteTipo.clave).like(like_term),
-                )
-            )
+            coincidencias_tipo = [
+                func.lower(ClienteTipo.nombre).like(like_term),
+                func.lower(ClienteTipo.clave).like(like_term),
+            ]
+            if normalized_search in "profesor":
+                # «profesor» era el nombre viejo de Docente: se sigue
+                # encontrando (antes casaba con el enum PROFESOR).
+                coincidencias_tipo.append(ClienteTipo.clave == "DOCENTE")
+            tipo_coincide = select(ClienteTipo.id).where(or_(*coincidencias_tipo))
             statement = statement.where(
                 or_(
                     func.lower(Cliente.codigo_cliente).like(like_term),
@@ -137,7 +140,7 @@ class ClientService:
         admin_user: Usuario,
         client: Cliente,
         nombre: str,
-        tipo_cliente: TipoCliente = TipoCliente.GENERAL,
+        tipo_cliente: TipoCliente | None = None,
         descuento_preferente: Decimal = Decimal("0.00"),
         telefono: str = "",
         notas: str = "",
@@ -160,17 +163,21 @@ class ClientService:
         # misma regla que el alta y la aprobación de programas: no da nivel,
         # descuento ni programa, deja su evento, y si el tipo llega del enum
         # viejo (que no tiene Institución), MAYORISTA respeta a Institución.
-        clave = (tipo_clave or "").strip().upper() or identidad_service.clave_desde_enum(tipo_cliente)
-        identidad_service.aplicar_tipo(
-            session,
-            client,
-            clave,
-            usuario_id=getattr(admin_user, "id", None),
-            respetar_institucion=not tipo_clave,
-            origen=identidad_service.ORIGEN_POS_ADMIN,
-        )
-        # El enum viejo queda coherente (nadie vivo lo lee; se retira en la etapa R).
-        client.tipo_cliente = identidad_service.enum_desde_clave(clave) if tipo_clave else tipo_cliente
+        # Sin `tipo_clave` ni `tipo_cliente` el tipo no se toca (antes el
+        # enum valía GENERAL por omisión y una edición sin tipo bajaba al
+        # cliente a General con un evento `cambio_tipo` falso).
+        if tipo_clave or tipo_cliente is not None:
+            clave = (tipo_clave or "").strip().upper() or identidad_service.clave_desde_enum(tipo_cliente)
+            identidad_service.aplicar_tipo(
+                session,
+                client,
+                clave,
+                usuario_id=getattr(admin_user, "id", None),
+                respetar_institucion=not tipo_clave,
+                origen=identidad_service.ORIGEN_POS_ADMIN,
+            )
+            # El enum viejo queda coherente (nadie vivo lo lee; se retira en la etapa R).
+            client.tipo_cliente = identidad_service.enum_desde_clave(clave) if tipo_clave else tipo_cliente
         client.telefono = telefono.strip() or None
         client.telefono_normalizado = normalizar_telefono(client.telefono)
         client.notas = notas.strip() or None

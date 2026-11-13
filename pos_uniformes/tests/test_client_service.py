@@ -64,6 +64,14 @@ class EditarTipoTests(_Base):
         self._editar(c, tipo_cliente=TipoCliente.PROFESOR)
         self.assertEqual(self._cambios(c), [])
 
+    def test_editar_sin_tipo_no_toca_el_tipo(self) -> None:
+        """2026-11-12: sin `tipo_clave` ni `tipo_cliente` el tipo se queda;
+        antes el enum valía GENERAL por omisión y bajaba al cliente."""
+        c = self._alta("26", "DOCENTE")
+        self._editar(c)
+        self.assertEqual(self._clave(c), "DOCENTE")
+        self.assertEqual(self._cambios(c), [])
+
     def test_mayorista_del_enum_respeta_institucion(self) -> None:
         """El enum viejo no tiene Institución: la misma regla que al aprobar
         Maximoda Mayorista (Institución se queda Institución)."""
@@ -100,6 +108,14 @@ class BuscarPorTipoTests(_Base):
                 encontrados = {c.id for c in ClientService.list_clients(self.s, texto)}
                 self.assertIn(esperado.id, encontrados)
                 self.assertNotIn(general.id, encontrados)
+
+    def test_profesor_sigue_encontrando_a_los_docentes(self) -> None:
+        """2026-11-12: «profesor» era el nombre viejo (enum PROFESOR)."""
+        docente = self._alta("35", "DOCENTE")
+        general = self._alta("36")
+        encontrados = {c.id for c in ClientService.list_clients(self.s, "Profesor")}
+        self.assertIn(docente.id, encontrados)
+        self.assertNotIn(general.id, encontrados)
 
     def test_sigue_buscando_por_nombre(self) -> None:
         c = self._alta("34")
