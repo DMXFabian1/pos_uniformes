@@ -57,11 +57,19 @@ def _entradas(session, desde: datetime, *, solo_empleada: str | None = None) -> 
 
     `solo_empleada` limita todo a un codigo (lo usan las pruebas para no
     depender de lo demas que haya en la base)."""
-    from sqlalchemy import func, literal_column, select
+    from sqlalchemy import case, func, literal_column, select
 
     from pos_uniformes.database import models as m
+    from pos_uniformes.services.libreta_service import TIPOS_OPERACION
 
     lv = m.LibretaVenta
+    # Un abono NO es operacion (Daniel, 2026-11-12: «no cuentan como
+    # operacion»). Este informe es de dinero: los renglones con dinero se
+    # llaman «cobros» (ventas y abonos) y las «ops» de mes y empleada son
+    # venta + apartado, como en el corte y la Libreta.
+    es_operacion = lv.tipo.in_(TIPOS_OPERACION)
+    ops = func.coalesce(func.sum(case((es_operacion, 1), else_=0)), 0)
+    piezas_ops = func.coalesce(func.sum(case((es_operacion, lv.piezas), else_=0)), 0)
     cobrado, recibido = _dinero(lv)
     filtro = [lv.created_at >= desde]
     if solo_empleada:
@@ -88,7 +96,7 @@ def _entradas(session, desde: datetime, *, solo_empleada: str | None = None) -> 
             *filtro, lv.tipo == "apartado"
         )
     ).one()
-    lineas.append(f"Operaciones cobradas : {operaciones:,} ({piezas:,} piezas)")
+    lineas.append(f"Cobros               : {operaciones:,} ({piezas:,} piezas)")
     lineas.append(f"Cobrado              : {_pesos(total)}")
     lineas.append(f"Recibido de verdad   : {_pesos(neto)}")
     if total and total != neto:
@@ -118,10 +126,10 @@ def _entradas(session, desde: datetime, *, solo_empleada: str | None = None) -> 
             ).where(*filtro, no_apartado, condicion, lv.monto_total > lv.monto_monedero)
         ).one()
         parte = f" ({t / total * 100:.0f}%)" if total else ""
-        lineas.append(f"{etiqueta:<9} {_pesos(t):>14}{parte:<7} neto {_pesos(n):>14}  {c:,} ops")
+        lineas.append(f"{etiqueta:<9} {_pesos(t):>14}{parte:<7} neto {_pesos(n):>14}  {c:,} cobros")
     if monedero:
         lineas.append(
-            f"{'Monedero':<9} {_pesos(monedero):>14}{'':<7} (saldo de clientes, no es dinero)  {ops_monedero:,} ops"
+            f"{'Monedero':<9} {_pesos(monedero):>14}{'':<7} (saldo de clientes, no es dinero)  {ops_monedero:,} cobros"
         )
 
     lineas += _sub("por tipo de operacion")
@@ -136,7 +144,7 @@ def _entradas(session, desde: datetime, *, solo_empleada: str | None = None) -> 
         .group_by(lv.tipo)
         .order_by(func.sum(cobrado).desc())
     ):
-        lineas.append(f"{(tipo or '?'):<9} {_pesos(t):>14}        neto {_pesos(n):>14}  {c:,} ops")
+        lineas.append(f"{(tipo or '?'):<9} {_pesos(t):>14}        neto {_pesos(n):>14}  {c:,} cobros")
     if ops_apartados:
         lineas.append(
             f"{'apartado':<9} {'-':>14}        valor {_pesos(valor_apartados):>13}  {ops_apartados:,} ops"
@@ -154,11 +162,11 @@ def _entradas(session, desde: datetime, *, solo_empleada: str | None = None) -> 
             mes_col,
             func.coalesce(func.sum(cobrado), 0),
             func.coalesce(func.sum(recibido), 0),
-            func.count(),
-            func.coalesce(func.sum(lv.piezas), 0),
+            ops,
+            piezas_ops,
         )
-        # Ops y piezas de todo (el apartado tambien mueve piezas); su dinero
-        # ya vale cero en _dinero.
+        # Ops y piezas de venta y apartado (el apartado tambien mueve piezas;
+        # su dinero ya vale cero en _dinero). El abono no (2026-11-12).
         .where(*filtro)
         .group_by(mes_col)
         .order_by(mes_col)
@@ -175,7 +183,7 @@ def _entradas(session, desde: datetime, *, solo_empleada: str | None = None) -> 
             lv.employee_code,
             func.max(lv.employee_name),
             func.coalesce(func.sum(cobrado), 0),
-            func.count(),
+            ops,
             func.coalesce(func.sum(lv.comisiones), 0),
         )
         .where(*filtro)

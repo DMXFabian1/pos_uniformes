@@ -188,8 +188,8 @@ class MonederoYApartadosEnElInformeTests(unittest.TestCase):
         self.assertNotIn("Se quedo la terminal", texto)   # el monedero NO es comisión
         self.assertIn("Pagado con monedero  : $30.00", texto)
         self.assertIn("$70.00", self._renglon(texto, "Efectivo"))
-        self.assertIn("1 ops", self._renglon(texto, "Efectivo"))
-        self.assertIn("0 ops", self._renglon(texto, "Tarjeta"))
+        self.assertIn("1 cobros", self._renglon(texto, "Efectivo"))
+        self.assertIn("0 cobros", self._renglon(texto, "Tarjeta"))
 
     def test_30_monedero_70_tarjeta(self) -> None:
         from pos_uniformes.services.libreta_service import neto_de_cobro
@@ -212,8 +212,8 @@ class MonederoYApartadosEnElInformeTests(unittest.TestCase):
         self.assertIn("Recibido de verdad   : $0.00", texto)
         self.assertNotIn("Se quedo la terminal", texto)
         self.assertIn("Pagado con monedero  : $100.00", texto)
-        self.assertIn("0 ops", self._renglon(texto, "Efectivo"))   # no entró por el cajón
-        self.assertIn("0 ops", self._renglon(texto, "Tarjeta"))
+        self.assertIn("0 cobros", self._renglon(texto, "Efectivo"))   # no entró por el cajón
+        self.assertIn("0 cobros", self._renglon(texto, "Tarjeta"))
 
     def test_desgloses_cuadran_con_el_encabezado(self) -> None:
         self._op("venta", "100.00", "70.00", monedero="30.00")
@@ -238,7 +238,7 @@ class MonederoYApartadosEnElInformeTests(unittest.TestCase):
     def test_apartado_sin_abono_no_es_dinero(self) -> None:
         self._op("apartado", "1000.00", "1000.00", piezas=3, comisiones=2)
         texto = self._informe()
-        self.assertIn("Operaciones cobradas : 0", texto)
+        self.assertIn("Cobros               : 0", texto)
         self.assertIn("Cobrado              : $0.00", texto)
         self.assertIn("Recibido de verdad   : $0.00", texto)
         self.assertIn("Apartados hechos     : 1 por $1,000.00", texto)
@@ -250,7 +250,7 @@ class MonederoYApartadosEnElInformeTests(unittest.TestCase):
         self._op("apartado", "1000.00", "1000.00", piezas=3, comisiones=2)
         self._op("venta", "100.00", "100.00", piezas=1, comisiones=1)
         texto = self._informe()
-        self.assertIn("Operaciones cobradas : 1 (1 piezas)", texto)   # el encabezado no cambia
+        self.assertIn("Cobros               : 1 (1 piezas)", texto)   # el encabezado no cambia
         self.assertIn("Cobrado              : $100.00", texto)
         self.assertIn("Recibido de verdad   : $100.00", texto)
         self.assertNotIn("Se quedo la terminal", texto)
@@ -266,14 +266,21 @@ class MonederoYApartadosEnElInformeTests(unittest.TestCase):
         self._op("abono", "400.00", "400.00", piezas=0, comisiones=0)
         self._op("abono", "300.00", "286.50", tarjeta=True, piezas=0, comisiones=0)   # liquida con tarjeta
         texto = self._informe()
-        self.assertIn("Operaciones cobradas : 3", texto)
+        self.assertIn("Cobros               : 3", texto)
         self.assertIn("Cobrado              : $1,000.00", texto)    # no $2,000
         self.assertIn("Recibido de verdad   : $986.50", texto)
         self.assertIn("Se quedo la terminal : $13.50", texto)
         abono = self._renglon(texto, "abono ")
         self.assertIn("$1,000.00", abono)
-        self.assertIn("3 ops", abono)
-        self.assertIn("$1,000.00", self._renglon(texto, "Prueba informe"))
+        self.assertIn("3 cobros", abono)
+        quien = self._renglon(texto, "Prueba informe")
+        self.assertIn("$1,000.00", quien)
+        # Un abono no es operación (Daniel, 2026-11-12): solo el apartado.
+        self.assertIn("   1 ops", quien)
+        mes = self._renglon(texto, f"{datetime.now(_TIENDA):%Y-%m}")
+        self.assertIn("    1 ops", mes)
+        self.assertIn("     3 pz", mes)
+        self.assertNotIn("Operaciones cobradas", texto)
 
 
 if __name__ == "__main__":
