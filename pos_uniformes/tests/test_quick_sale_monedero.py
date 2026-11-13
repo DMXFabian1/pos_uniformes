@@ -142,6 +142,27 @@ class CanjeTest(_Base):
         self.assertEqual(w._items, [])
         self.assertIsNone(w._cliente)
 
+    def test_empleada_con_saldo_sin_copia(self):
+        """Daniel, 2026-11-12: «no necesito la copia del ticket». Aunque la
+        venta con saldo pida copia, una compra de empleada imprime solo el
+        ticket de venta."""
+        w = self._widget()
+        w._cliente = _cliente()
+        w._usar_saldo = True
+        w._discount_active = True
+        session = MagicMock()
+        with patch.object(w, "_load_business_info", return_value=("MAXIMODA", "", "")), \
+             patch("pos_uniformes.database.connection.get_session", self._session_ctx(session)), \
+             patch("pos_uniformes.services.libreta_service.registrar_venta_con_monedero",
+                   return_value=(SimpleNamespace(monto_monedero=D("37.00")), MagicMock(), None)), \
+             patch("pos_uniformes.services.monedero_service.resumen_cliente",
+                   return_value=SimpleNamespace(disponible=D("0"))), \
+             patch("pos_uniformes.ui.helpers.ticket_routing_helper.route_tickets") as route:
+            w._cobrar_con_monedero(False, True)
+        tickets = route.call_args.args[2]
+        self.assertEqual(len(tickets), 1)
+        self.assertNotIn("COPIA", tickets[0])
+
     def _cobrar_con_motor(self, calculo_y_entrada):
         w = self._widget()
         w._cliente = _cliente()

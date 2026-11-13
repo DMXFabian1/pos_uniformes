@@ -342,14 +342,16 @@ class KioskoTests(_Qt):
         self.assertEqual(w._compute_totals()[1], D("0.00"))
         self.assertTrue(all("desc_empleada_pct" not in it for it in w._items))
 
-    def test_la_copia_de_empleada(self) -> None:
+    def test_el_ticket_de_venta_lleva_su_descuento(self) -> None:
+        """Sin copia de empleada (2026-11-12): el ticket de venta dice el
+        total con el % de su nivel."""
         w = self._kiosko(ANA)
-        w._compute_totals()
-        texto = w._build_employee_copy_text()
-        self.assertIn("Compra:", texto)
-        self.assertIn("Ana (15 %)", texto)
-        self.assertIn("340.00", texto)
-        self.assertIn("570.00", texto)
+        _sub, desc, total = w._compute_totals()
+        with patch.object(w, "_load_business_info", return_value=("Maximoda", "", "")):
+            texto = w._build_venta_text()
+        self.assertGreater(desc, 0)
+        self.assertIn(f"-${desc:,.2f}", texto)
+        self.assertIn(f"${total:,.2f}", texto)
 
     def test_reimprimir_con_el_pct_guardado(self) -> None:
         w = self._kiosko()

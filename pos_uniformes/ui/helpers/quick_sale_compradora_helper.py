@@ -233,9 +233,9 @@ class CompradoraEmpleadaMixin:
     def _revisar_a_cuenta(self, total) -> bool:
         """Justo antes de imprimir (2026-11-12): ¿todavía le cabe a cuenta?
 
-        La copia de la empleada dice «A CUENTA DE TU PAGO» y sale de la
-        impresora ANTES de anotar nada. Si no cabe o no hay conexión, no se
-        imprime: se avisa y el carrito se queda para cobrarla al momento."""
+        Si no cabe o no hay conexión, no se imprime el ticket ni se anota
+        nada: se avisa y el carrito se queda para cobrarla al momento, en vez
+        de enterarse hasta después de imprimir."""
         from pos_uniformes.services import compra_a_cuenta_service as cac
 
         c = self._compradora
@@ -263,7 +263,7 @@ class CompradoraEmpleadaMixin:
         propio de la compra a cuenta; ya no se pasa el código del dueño.
 
         Si no se pudo (sin conexión o error) NO queda a cuenta: se avisa que
-        la copia que lo dice no vale y que se cobre al momento, y la venta se
+        se cobre al momento, y la venta se
         anota como siempre (en efectivo, por la cola) con el mismo folio del
         ticket. Antes de decir «cóbrale» se busca si la compra sí quedó (el
         commit pudo entrar aunque la respuesta no llegara): si quedó, es a
@@ -284,8 +284,8 @@ class CompradoraEmpleadaMixin:
             _logger.exception("Compra a cuenta: no se pudo armar la venta")
             QMessageBox.warning(
                 self, "A cuenta de su pago",
-                "No se pudo dejar a cuenta de su pago ni anotar la venta. La copia que dice "
-                "«a cuenta» NO vale: cóbrale al momento. El carrito se queda para cobrarla.",
+                "No se pudo dejar a cuenta de su pago ni anotar la venta: "
+                "cóbrale al momento. El carrito se queda para cobrarla.",
             )
             return True
         compra = None
@@ -310,7 +310,7 @@ class CompradoraEmpleadaMixin:
                 QMessageBox.warning(
                     self, "A cuenta de su pago",
                     f"No se pudo dejar a cuenta de su pago:\n{exc}\n\n"
-                    "La copia que dice «a cuenta» NO vale: cóbrale al momento. "
+                    "NO quedó a cuenta: cóbrale al momento. "
                     "La venta quedó anotada en efectivo.",
                 )
                 retenidas_antes = len(self._anotaciones_pendientes)

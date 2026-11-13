@@ -330,12 +330,23 @@ class CajaTests(unittest.TestCase):
             forma = w._ask_pago_empleada()
         self.assertEqual((visto["botones"], forma), ([], "efectivo"))
 
-    def test_la_copia_dice_que_fue_a_cuenta(self):
+    def test_a_cuenta_solo_sale_el_ticket_de_venta(self):
+        """Daniel, 2026-11-12: «no necesito la copia del ticket». Ningún
+        papel dice «a cuenta»: si la anotación falla, la pantalla manda y no
+        hay copia que la contradiga."""
         w = self._kiosko()
-        texto = w._build_employee_copy_text(a_cuenta=cac.opciones_de_pago(SAB14, 7)[0])
-        self.assertIn("A CUENTA DE TU PAGO", texto)
-        self.assertIn("Se descuenta el sáb 14 nov", texto)
-        self.assertIn("Por autorizar", texto)
+        w._discount_active = True
+        opcion = cac.opciones_de_pago(SAB14, 7)[0]
+        with patch.object(w, "_ask_pago_empleada", return_value=opcion), \
+             patch.object(w, "_revisar_con_servidor", return_value=True), \
+             patch.object(w, "_revisar_a_cuenta", return_value=True), \
+             patch.object(w, "_load_business_info", return_value=("MAXIMODA", "", "")), \
+             patch("pos_uniformes.ui.views.quick_sale_view.route_tickets") as rt:
+            w._on_ticket_venta()
+        tickets = rt.call_args.args[2]
+        self.assertEqual(len(tickets), 1)
+        self.assertNotIn("A CUENTA", tickets[0].upper().replace("TICKET DE VENTA", ""))
+        self.assertNotIn("COPIA", tickets[0])
 
 
 if __name__ == "__main__":

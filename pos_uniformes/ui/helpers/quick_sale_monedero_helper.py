@@ -723,9 +723,8 @@ class MonederoVentaMixin:
         if not sin_ticket:
             # El folio (QR) es la identidad con la que quedó registrada.
             tickets.append(self._build_venta_text(monedero=info, folio=operacion_uuid))
-            if self._discount_active:
-                tickets.append(self._build_employee_copy_text(terminal_commission=tarjeta))
-            elif con_copia:
+            # Compra de empleada: sin COPIA EMPLEADA (2026-11-12).
+            if con_copia and not self._discount_active:
                 tickets.append(self._build_venta_text(
                     store_copy=True, terminal_commission=tarjeta, monedero=info, folio=operacion_uuid
                 ))

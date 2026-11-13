@@ -107,22 +107,27 @@ class QuickSaleTicketDialogTests(unittest.TestCase):
         self.assertIn("$515.00", tickets[0])
         registrar.assert_called_once_with("venta", cliente=None, pago_tarjeta=True)
 
-    def test_venta_with_discount_prints_two_tickets_one_dialog(self) -> None:
+    def test_compra_de_empleada_sin_copia(self) -> None:
+        """Daniel, 2026-11-12: «no necesito la copia del ticket». La compra
+        de una empleada imprime solo el ticket de venta; la Libreta ya la
+        registra (y si quedó a cuenta)."""
         widget = self._make_widget()
         widget._discount_active = True
-        with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")), \
-                patch.object(widget, "_ask_venta_options") as ask, \
-                patch.object(widget, "_ask_card_payment", return_value=False), \
-                patch(f"{_MOD}.route_tickets") as opd:
-            widget._on_ticket_venta()
-        # Un solo dialogo, dos tickets -> un solo clic en Imprimir.
-        opd.assert_called_once()
-        tickets = opd.call_args.args[2]
-        self.assertEqual(len(tickets), 2)
-        # Con descuento, la copia interna sigue siendo la de la empleada
-        # (automática — solo se pregunta la forma de pago).
-        self.assertIn("COPIA EMPLEADA", tickets[1])
-        ask.assert_not_called()
+        for tarjeta in (False, True):
+            with self.subTest(tarjeta=tarjeta), \
+                    patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")), \
+                    patch.object(widget, "_ask_venta_options") as ask, \
+                    patch.object(widget, "_ask_pago_empleada", return_value="tarjeta" if tarjeta else "efectivo"), \
+                    patch.object(widget, "_revisar_con_servidor", return_value=True), \
+                    patch(f"{_MOD}.route_tickets") as opd:
+                widget._on_ticket_venta()
+            opd.assert_called_once()
+            tickets = opd.call_args.args[2]
+            self.assertEqual(len(tickets), 1)
+            self.assertIn("Ticket de venta", tickets[0])
+            self.assertNotIn("COPIA", tickets[0])
+            ask.assert_not_called()
+        self.assertFalse(hasattr(widget, "_build_employee_copy_text"))
 
     def test_store_copy_hides_customer_facing_data(self) -> None:
         widget = self._make_widget()
@@ -155,18 +160,6 @@ class QuickSaleTicketDialogTests(unittest.TestCase):
         # 515.00 - 4.5% = 491.82 -> regla de redondeo (.82 > .69) -> 492.00
         self.assertIn(tk_dbl_row("TOTAL A PAGAR:", "$515.00"), copy)
         self.assertIn(tk_row("Neto tienda:", "$492.00"), copy)
-
-    def test_terminal_commission_on_employee_copy(self) -> None:
-        widget = self._make_widget()
-        widget._discount_active = True
-        with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")):
-            normal = widget._build_employee_copy_text()
-            with_commission = widget._build_employee_copy_text(terminal_commission=True)
-        # 515.00 - 5% empleada = 489.25 -> total 489.50; T4 (M2): la comisión
-        # una vez sobre el total: 489.50 - 4.5% = 467.47 -> redondeo -> 467.50
-        self.assertIn("$489.25", normal)
-        self.assertNotIn("Neto tienda", normal)
-        self.assertIn(tk_row("Neto tienda:", "$467.50"), with_commission)
 
     def test_apartado_prints_two_copies_one_dialog(self) -> None:
         widget = self._make_widget()

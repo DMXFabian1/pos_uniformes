@@ -2905,7 +2905,10 @@ class QuickSaleWidget(
         # impresión ni nada que apuntar a mano.
         a_cuenta = None
         if self._discount_active:
-            wants_copy = True  # la COPIA EMPLEADA es automática
+            # Sin COPIA EMPLEADA desde 2026-11-12 (Daniel: «no necesito la
+            # copia del ticket»): la Libreta ya registra la compra, el neto y
+            # si quedó a cuenta, y así ningún papel contradice a la pantalla.
+            wants_copy = False
             # 2026-11-12: con su nivel, la empleada puede dejarlo a cuenta de
             # su pago (compra_a_cuenta_service); si no, efectivo o tarjeta.
             forma = self._ask_pago_empleada()
@@ -2936,7 +2939,8 @@ class QuickSaleWidget(
         if a_cuenta is None and self._canje_actual(total_venta) > 0:
             self._cobrar_con_monedero(card, wants_copy)
             return
-        # 2026-11-12: la copia dice «a cuenta»; si ya no cabe, no se imprime.
+        # 2026-11-12: si ya no le cabe a cuenta se sabe antes de imprimir, y
+        # la empleada elige efectivo o tarjeta sin rehacer el ticket.
         if a_cuenta is not None and not self._revisar_a_cuenta(total_venta):
             return
         # El folio (QR) se decide antes de imprimir y la Libreta guarda ese
@@ -2946,9 +2950,7 @@ class QuickSaleWidget(
         folio = str(_uuid.uuid4())
         self._folio_venta = folio
         tickets = [self._build_venta_text(monedero=self._monedero_para_ticket(total_venta, card), folio=folio)]
-        if self._discount_active:
-            tickets.append(self._build_employee_copy_text(terminal_commission=card, a_cuenta=a_cuenta))
-        elif wants_copy:
+        if wants_copy:
             tickets.append(self._build_venta_text(store_copy=True, terminal_commission=card, folio=folio))
 
         def _al_imprimir() -> None:
@@ -3760,79 +3762,6 @@ class QuickSaleWidget(
             tk_row("Neto tienda:", f"${tk_fmt(neto)}"),
             tk_bot(),
         ]
-
-    def _build_employee_copy_text(self, *, terminal_commission: bool = False, a_cuenta=None) -> str:
-        """Copia para la empleada: cada renglón con el % que le tocó (M2: el
-        tope por pieza del motor parte el renglón en nivel y base) y el total
-        del motor. Con tarjeta, la comisión va una vez al final (T4)."""
-        now = datetime.now().strftime("%d/%m/%Y %H:%M")
-        def _unit(precio, it=None) -> Decimal:
-            # E6: el % de su nivel en ese renglón; si no trae, el 5 % de siempre.
-            pct = Decimal(str((it or {}).get("desc_empleada_pct") or self._DISCOUNT_PERCENT))
-            if (it or {}).get("rebaja"):
-                pct = Decimal("0")  # E7: en Oferta o Liquidación no lleva descuento
-            return (Decimal(str(precio)) * (Decimal("100") - pct) / Decimal("100")).quantize(Decimal("0.01"))
-
-        renglones = self._items
-        total = None
-        try:
-            from pos_uniformes.services.beneficios_carrito import detalle_por_renglon
-
-            calculo = self._calculo_motor()
-            renglones = detalle_por_renglon(self._items, calculo)
-            total = calculo.total
-        except Exception:  # noqa: BLE001 — la copia sale aunque el motor falle
-            _logger.exception("Motor de beneficios: copia de empleada con el cálculo anterior")
-
-        lines: list[str] = []
-        lines.append("COPIA EMPLEADA".center(_TW))
-
-        lines.append(tk_top())
-        tk_field("Fecha:", now, lines)
-        tk_field("Atendió:", self._employee_name or self._employee_code or "", lines)
-        if self._compradora is not None:
-            from pos_uniformes.services.incentivo_empleada_service import fmt_pct
-
-            tk_field("Compra:", f"{self._compradora.nombre} ({fmt_pct(self._compradora.porcentaje)})", lines)
-
-        lines.append(tk_mid())
-        first = True
-        for it in renglones:
-            if not first:
-                lines.append(tk_mid())
-            first = False
-            unit = _unit(it["precio"], it)
-            sub = (unit * it["cantidad"]).quantize(Decimal("0.01"))
-            for dl in textwrap.wrap(it["nombre"], width=_TIW) or [it["nombre"]]:
-                lines.append(tk_line(dl))
-            if it["talla"]:
-                lines.append(tk_line(f"Talla: {it['talla']}"))
-            tk_product_price(
-                f"{it['cantidad']} x ${tk_fmt(unit)}",
-                f"${tk_fmt(sub)}",
-                lines,
-            )
-
-        if total is None:
-            raw_total = sum(_unit(it["precio"], it) * it["cantidad"] for it in renglones)
-            total = self._round_total(Decimal(str(raw_total)).quantize(Decimal("0.01")))
-
-        lines.append(tk_dbl())
-        lines.append(tk_row("TOTAL:", f"${tk_fmt(total)}"))
-        if a_cuenta is not None:
-            # 2026-11-12: lo dejó a cuenta de su pago.
-            from pos_uniformes.services.compra_a_cuenta_service import fecha_corta
-
-            lines.append(tk_mid())
-            lines.append(tk_line("A CUENTA DE TU PAGO"))
-            lines.append(tk_line(f"Se descuenta el {fecha_corta(a_cuenta.fecha_pago)}"))
-            lines.append(tk_line("Por autorizar: si Daniel no la"))
-            lines.append(tk_line("autoriza, la pagas en caja."))
-        lines.append(tk_bot())
-        if terminal_commission:
-            lines += self._renglones_comision(total)
-
-        return "\n".join(lines)
 
     def _on_logout(self) -> None:
         self._employee_code = None

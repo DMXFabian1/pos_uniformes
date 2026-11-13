@@ -1,8 +1,8 @@
 """El kiosko deja la compra a cuenta en una sola transacción (2026-11-12).
 
 `_al_imprimir` usa `compra_a_cuenta_service.registrar_venta_a_cuenta`; si
-falla, avisa que la copia «a cuenta» no vale y anota la venta en efectivo
-con el mismo folio. Antes de imprimir revisa que todavía le quepa.
+falla, avisa que NO quedó a cuenta y que se cobre al momento, y anota la
+venta en efectivo con el mismo folio. Antes de imprimir revisa que todavía le quepa.
 """
 
 from __future__ import annotations
@@ -66,11 +66,12 @@ class KioskoTests(unittest.TestCase):
         self.assertEqual((anotadas, w._items), ([], []))
         aviso.assert_not_called()
 
-    def test_si_falla_avisa_que_la_copia_no_vale_y_la_anota_en_efectivo(self):
+    def test_si_falla_avisa_que_se_cobre_y_la_anota_en_efectivo(self):
         w = self._kiosko()
         with patch.object(cac, "compra_de_folio", return_value=None):
             _reg, anotadas, aviso = self._correr(w, side_effect=RuntimeError("sin red"))
-        self.assertIn("NO vale", aviso.call_args.args[2])
+        self.assertIn("NO quedó a cuenta: cóbrale al momento", aviso.call_args.args[2])
+        self.assertNotIn("copia", aviso.call_args.args[2])   # ya no hay copia (2026-11-12)
         # Misma foto, mismo folio del ticket: la venta no se pierde ni se duplica.
         self.assertEqual([e["operacion_uuid"] for e in anotadas[0]], [FOLIO])
         self.assertFalse(anotadas[0][0]["pago_tarjeta"])
@@ -92,7 +93,7 @@ class KioskoTests(unittest.TestCase):
             self.assertTrue(w._anotar_a_cuenta(opcion))
         normal.assert_not_called()
         self.assertEqual(aviso.call_count, 1)
-        self.assertIn("NO vale", aviso.call_args.args[2])
+        self.assertIn("cóbrale al momento", aviso.call_args.args[2])
         self.assertEqual(len(w._items), 1)
 
     def test_antes_de_imprimir_revisa_que_quepa(self):

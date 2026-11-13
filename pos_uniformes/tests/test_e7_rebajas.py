@@ -257,7 +257,12 @@ class KioskoTests(_Qt):
         self.assertEqual(w._compute_totals(), (D("750"), D("20.00"), D("730")))
         # T4 (M2): la comisión una vez sobre el total, no renglón por renglón.
         self.assertEqual(w._monto_neto_actual(D("730"), pago_tarjeta=True), w._apply_terminal_commission(D("730")))
-        self.assertIn("$350.00", w._build_employee_copy_text())
+        # Sin copia de empleada (2026-11-12): el ticket de venta lleva el
+        # precio rebajado y el total con el 5 % solo en lo que no es rebaja.
+        with patch.object(w, "_load_business_info", return_value=("MAXIMODA", "", "")):
+            texto = w._build_venta_text()
+        self.assertIn("350.00", texto)
+        self.assertIn("730.00", texto)
 
     def test_lo_que_va_a_la_libreta(self) -> None:
         w = self._kiosko()
