@@ -190,6 +190,17 @@ class RegistrarTests(unittest.TestCase):
         self._venta_empleada("99999999-0000-4000-8000-000000000002")   # pagó al momento
         cac.registrar(self.s, employee_code="VEND-3", nombre="Cristal", monto="332",
                       opcion=cac.opciones_de_pago(SAB14, 7)[0], quien="VEND-1", folio=folio)
+        # SQLite guarda la hora en UTC y compara sin zona: después de las 18:00
+        # de México la fila ya «es mañana». Se fija a mediodía de hoy.
+        from datetime import datetime
+        from sqlalchemy import update
+
+        from pos_uniformes.database.models import CajaRetiro, LibretaVenta
+
+        mediodia = datetime.combine(date.today(), datetime.min.time()).replace(hour=12)
+        for modelo in (LibretaVenta, CajaRetiro):
+            self.s.execute(update(modelo).values(created_at=mediodia))
+        self.s.flush()
         d = rd.recolectar(self.s, todo_el_dia=True)
         self.assertEqual(d.efectivo, D("332.00"))   # solo la que sí pagó
 
