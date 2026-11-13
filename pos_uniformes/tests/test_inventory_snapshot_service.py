@@ -162,5 +162,52 @@ class SnapshotEsConjuntoSqlTests(unittest.TestCase):
         self.assertFalse(filas[idc]["es_conjunto"])
 
 
+class SnapshotRebajasSqlTests(unittest.TestCase):
+    """Tanda 2: el precio rebajado llega a las filas con UNA consulta, no una por talla."""
+
+    def test_oferta_vigente_en_su_fila_sin_consultas_por_talla(self) -> None:
+        from datetime import date, timedelta
+
+        from sqlalchemy import create_engine, event
+        from sqlalchemy.orm import Session
+
+        from pos_uniformes.database.connection import Base
+        from pos_uniformes.database.models import Categoria, Marca, Producto, RebajaProducto, Variante
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        with Session(engine) as s:
+            cat, marca = Categoria(nombre="Uniformes"), Marca(nombre="G")
+            s.add_all([cat, marca])
+            s.flush()
+            p = Producto(nombre="Pants 2pz", nombre_base="Pants 2pz", categoria_id=cat.id, marca_id=marca.id)
+            s.add(p)
+            s.flush()
+            variantes = [
+                Variante(producto_id=p.id, sku=f"PZ{t}", talla=str(t), color="Marino", precio_venta=250, stock_actual=1)
+                for t in (6, 8, 10, 12, 14)
+            ]
+            s.add_all(variantes)
+            s.flush()
+            s.add_all([
+                RebajaProducto(variante_id=variantes[0].id, tipo="oferta", precio=175, precio_antes=250),
+                # vencida: no cuenta
+                RebajaProducto(variante_id=variantes[1].id, tipo="oferta", precio=150, precio_antes=250,
+                               hasta=date.today() - timedelta(days=1)),
+            ])
+            s.commit()
+
+            consultas: list[str] = []
+            event.listen(engine, "before_cursor_execute", lambda *a: consultas.append(a[2]))
+            filas = {f["sku"]: f for f in load_inventory_snapshot_rows(s)}
+
+        self.assertEqual(filas["PZ6"]["rebaja_tipo"], "oferta")
+        self.assertEqual(filas["PZ6"]["rebaja_precio"], Decimal("175"))
+        self.assertIsNone(filas["PZ8"]["rebaja_tipo"])
+        self.assertIsNone(filas["PZ10"]["rebaja_tipo"])
+        selects = [c for c in consultas if c.lstrip().upper().startswith("SELECT")]
+        self.assertEqual(len(selects), 2, selects)  # el listado + las rebajas
+
+
 if __name__ == "__main__":
     unittest.main()

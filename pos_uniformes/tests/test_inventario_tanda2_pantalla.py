@@ -128,6 +128,38 @@ class InventarioTanda2PantallaTests(unittest.TestCase):
         self.assertEqual(celda.text(), "Bodega 6 · Piso 2")
         self.assertEqual(celda.toolTip(), "Tienda 4 · Bodega 6 · Piso 2")
 
+    # ── Precio con su oferta ────────────────────────────────────────────
+
+    def test_columna_precio_con_oferta_y_precio_normal_al_pasar_el_mouse(self) -> None:
+        from decimal import Decimal
+
+        from pos_uniformes.ui.helpers.inventory_table_row_helper import build_inventory_table_row_views
+
+        window = self._ventana()
+        encabezados = self._encabezados(window)
+        columna = encabezados.index("Precio")
+        fila = {
+            "variante_id": 5, "sku": "SKU-5", "producto_nombre_base": "Pants", "talla": "10", "color": "Azul",
+            "stock_actual": 2, "variante_activa": True, "ultimo_conteo_at": None, "stock_minimo": None,
+            "precio_venta": Decimal("250"), "rebaja_tipo": "oferta", "rebaja_precio": Decimal("175"),
+        }
+        window.inventory_table.setRowCount(1)
+        window._populate_inventory_table_rows(build_inventory_table_row_views([fila]))
+        celda = window.inventory_table.item(0, columna)
+        self.assertEqual(celda.text(), "Oferta $175")
+        self.assertEqual(celda.toolTip(), "Precio normal $250")
+
+    def test_al_cerrar_ofertas_se_refresca_el_listado(self) -> None:
+        window = self._ventana()
+        window.current_role = RolUsuario.ADMIN
+        window._invalidate_listing_snapshot_caches = Mock()
+        window._handle_inventory_filters_changed = Mock()
+        with patch("pos_uniformes.ui.dialogs.rebajas_dialog.RebajasDialog") as dialogo:
+            window._handle_open_rebajas()
+        dialogo.return_value.exec.assert_called_once()
+        window._invalidate_listing_snapshot_caches.assert_called_once_with(catalog=False, inventory=True)
+        window._handle_inventory_filters_changed.assert_called_once_with()
+
 
 if __name__ == "__main__":
     unittest.main()

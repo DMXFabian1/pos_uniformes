@@ -2631,6 +2631,9 @@ class MainWindow(QMainWindow):
             self, get_session, usuario_id=self.user_id,
             imprimir=lambda fila: imprimir_etiqueta_rebaja(fila, self._print_image_path),
         ).exec()
+        # La columna «Precio» de Inventario muestra «Oferta $X»: que se vea al cerrar.
+        self._invalidate_listing_snapshot_caches(catalog=False, inventory=True)
+        self._handle_inventory_filters_changed()
 
     def _handle_open_programas(self) -> None:
         """E4-D: ventana «Programas» (solo ADMIN)."""

@@ -28,7 +28,7 @@ class InventoryTableRowHelperTests(unittest.TestCase):
         self.assertEqual(view.variant_id, 8)
         self.assertEqual(
             view.values,
-            ("SKU-008", "Pants Deportivo", "16", "Azul Marino", "2 Bajo", "Tienda", "Nunca"),
+            ("SKU-008", "Pants Deportivo", "16", "Azul Marino", "2 Bajo", "Tienda", "—", "Nunca"),
         )
         # Desactivada: toda la fila en gris (también la cifra) y lo dice al pasar el mouse.
         self.assertEqual(view.row_tone, "muted")
@@ -54,7 +54,7 @@ class InventoryTableRowHelperTests(unittest.TestCase):
             }
         )
         self.assertIsNone(view.tooltip)
-        self.assertEqual(len(view.values), 7)
+        self.assertEqual(len(view.values), 8)
 
     def test_build_inventory_table_row_views_for_multiple_rows(self) -> None:
         views = build_inventory_table_row_views(
@@ -118,6 +118,21 @@ class InventoryTableRowHelperTests(unittest.TestCase):
         self.assertEqual(dict(view.cell_tooltips)[5], "Bodega 7 · Piso 3")
         self.assertEqual(view.stock_tone, "positive")
         self.assertIsNone(view.row_tone)
+
+    def test_precio_normal_y_con_oferta(self) -> None:
+        from decimal import Decimal
+
+        base = {
+            "variante_id": 7, "sku": "SKU-7", "producto_nombre_base": "Pants 2pz", "talla": "10",
+            "color": "Marino", "stock_actual": 3, "variante_activa": True, "ultimo_conteo_at": None,
+            "stock_minimo": None, "precio_venta": Decimal("250.00"),
+        }
+        normal = build_inventory_table_row_view(base)
+        self.assertEqual(normal.values[6], "$250")
+        self.assertNotIn(6, dict(normal.cell_tooltips))
+        oferta = build_inventory_table_row_view({**base, "rebaja_tipo": "oferta", "rebaja_precio": Decimal("175")})
+        self.assertEqual(oferta.values[6], "Oferta $175")
+        self.assertEqual(dict(oferta.cell_tooltips)[6], "Precio normal $250")
 
     def test_negativo_en_rojo(self) -> None:
         view = build_inventory_table_row_view(

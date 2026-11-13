@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 
 from pos_uniformes.services.inventario_donde_service import texto_donde, texto_donde_completo
+from pos_uniformes.services.inventario_precio_service import aviso_precio, texto_precio
 from pos_uniformes.services.inventario_existencia_service import (
     AGOTADO,
     BAJO_MINIMO,
@@ -18,10 +19,11 @@ from pos_uniformes.services.inventario_existencia_service import (
 
 
 INVENTORY_TABLE_HEADERS = (
-    "SKU", "Producto", "Talla", "Color", "Stock", "Dónde", "Ult. conteo",
+    "SKU", "Producto", "Talla", "Color", "Stock", "Dónde", "Precio", "Ult. conteo",
 )
 COLUMNA_STOCK = INVENTORY_TABLE_HEADERS.index("Stock")
 COLUMNA_DONDE = INVENTORY_TABLE_HEADERS.index("Dónde")
+COLUMNA_PRECIO = INVENTORY_TABLE_HEADERS.index("Precio")
 
 #: Sin columna «Estado» (tanda 2): la talla desactivada se ve en gris y lo dice al pasar el mouse.
 TEXTO_DESACTIVADA = "Desactivada: no se vende. Actívala desde su ficha."
@@ -69,13 +71,15 @@ def build_inventory_table_row_view(row: dict[str, object]) -> InventoryTableRowV
             row["color"],
             texto_existencia(stock_total, stock_minimo=stock_minimo_int, virtual=virtual),
             texto_donde(stock_total, stock_bodega, stock_piso, conjunto=virtual),
+            texto_precio(row),
             conteo_text,
         ),
         row_tone=row_tone,
         stock_tone=stock_tone,
         tooltip=None if activa else TEXTO_DESACTIVADA,
-        cell_tooltips=(
+        cell_tooltips=_cell_tooltips(
             (COLUMNA_DONDE, texto_donde_completo(stock_total, stock_bodega, stock_piso, conjunto=virtual)),
+            (COLUMNA_PRECIO, aviso_precio(row)),
         ),
     )
 
@@ -105,3 +109,7 @@ def _build_inventory_row_tone(*, clase: str, variant_active: bool) -> str | None
     if clase == BAJO_MINIMO:
         return "warning"
     return None
+
+
+def _cell_tooltips(*pares: tuple[int, str | None]) -> tuple[tuple[int, str], ...]:
+    return tuple((columna, texto) for columna, texto in pares if texto)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
 
 from pos_uniformes.services.search_filter_service import (
@@ -10,17 +11,34 @@ from pos_uniformes.services.search_filter_service import (
     attach_row_search_cache,
 )
 
+from pos_uniformes.services.inventario_precio_service import adjuntar_rebajas
 from pos_uniformes.services.talla_orden_service import clave_talla
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 
 
+logger = logging.getLogger(__name__)
+
+
 def load_inventory_snapshot_rows(session) -> list[dict[str, object]]:
-    return ordenar_filas_inventario(
-        [
-            _build_inventory_snapshot_row(raw_row)
-            for raw_row in _execute_inventory_snapshot_query(session)
-        ]
-    )
+    rows = [
+        _build_inventory_snapshot_row(raw_row)
+        for raw_row in _execute_inventory_snapshot_query(session)
+    ]
+    # Ofertas y liquidaciones vigentes: UNA consulta para todo el listado.
+    adjuntar_rebajas(rows, _rebajas_vigentes(session))
+    return ordenar_filas_inventario(rows)
+
+
+def _rebajas_vigentes(session) -> dict:
+    """Si la base local no tiene la tabla de rebajas, el listado sale igual."""
+    from pos_uniformes.services.rebaja_service import vigentes_por_sku
+
+    try:
+        with session.begin_nested():
+            return vigentes_por_sku(session)
+    except Exception:  # noqa: BLE001
+        logger.warning("Inventario: no se pudieron leer las ofertas vigentes", exc_info=True)
+        return {}
 
 
 def clave_orden_inventario(row: dict[str, object]) -> tuple[object, ...]:
