@@ -28,13 +28,30 @@ class InventoryTableRowHelperTests(unittest.TestCase):
         self.assertEqual(view.variant_id, 8)
         self.assertEqual(
             view.values,
-            ("SKU-008", "Pants Deportivo", "16", "Azul Marino", "2 Bajo", "", "", 1, "INACTIVA", "Nunca"),
+            ("SKU-008", "Pants Deportivo", "16", "Azul Marino", "2 Bajo", "", "", "Nunca"),
         )
+        # Desactivada: toda la fila en gris (también la cifra) y lo dice al pasar el mouse.
         self.assertEqual(view.row_tone, "muted")
-        self.assertEqual(view.stock_tone, "warning")
-        self.assertEqual(view.committed_tone, "reserved")
-        self.assertEqual(view.status_tone, "muted")
+        self.assertEqual(view.stock_tone, "muted")
+        self.assertIn("Desactivada", view.tooltip)
         self.assertFalse(hasattr(view, "qr_tone"))
+
+    def test_sin_columnas_apartado_ni_estado(self) -> None:
+        from pos_uniformes.ui.helpers.inventory_table_row_helper import INVENTORY_TABLE_HEADERS
+
+        self.assertNotIn("Apartado", INVENTORY_TABLE_HEADERS)
+        self.assertNotIn("Estado", INVENTORY_TABLE_HEADERS)
+        self.assertNotIn("QR", INVENTORY_TABLE_HEADERS)
+
+    def test_activa_no_lleva_aviso(self) -> None:
+        view = build_inventory_table_row_view(
+            {
+                "variante_id": 9, "sku": "S", "producto_nombre_base": "P", "talla": "8", "color": "Azul",
+                "stock_actual": 5, "variante_activa": True, "ultimo_conteo_at": None, "stock_minimo": None,
+            }
+        )
+        self.assertIsNone(view.tooltip)
+        self.assertEqual(len(view.values), 8)
 
     def test_build_inventory_table_row_views_for_multiple_rows(self) -> None:
         views = build_inventory_table_row_views(

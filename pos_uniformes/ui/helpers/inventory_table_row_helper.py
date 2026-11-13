@@ -17,11 +17,12 @@ from pos_uniformes.services.inventario_existencia_service import (
 
 
 INVENTORY_TABLE_HEADERS = (
-    "SKU", "Producto", "Talla", "Color", "Stock", "Piso", "Almacén", "Apartado", "Estado", "Ult. conteo",
+    "SKU", "Producto", "Talla", "Color", "Stock", "Piso", "Almacén", "Ult. conteo",
 )
 COLUMNA_STOCK = INVENTORY_TABLE_HEADERS.index("Stock")
-COLUMNA_APARTADO = INVENTORY_TABLE_HEADERS.index("Apartado")
-COLUMNA_ESTADO = INVENTORY_TABLE_HEADERS.index("Estado")
+
+#: Sin columna «Estado» (tanda 2): la talla desactivada se ve en gris y lo dice al pasar el mouse.
+TEXTO_DESACTIVADA = "Desactivada: no se vende. Actívala desde su ficha."
 
 
 @dataclass(frozen=True)
@@ -30,8 +31,7 @@ class InventoryTableRowView:
     values: tuple[object, ...]
     row_tone: str | None
     stock_tone: str
-    committed_tone: str | None
-    status_tone: str
+    tooltip: str | None = None
 
 
 def build_inventory_table_row_views(visible_rows: list[dict[str, object]]) -> tuple[InventoryTableRowView, ...]:
@@ -43,18 +43,17 @@ def build_inventory_table_row_view(row: dict[str, object]) -> InventoryTableRowV
     stock_total = int(row["stock_actual"])
     stock_bodega = int(row.get("stock_bodega", 0))
     stock_piso = int(row.get("stock_piso", 0))
-    committed_value = int(row["apartado_cantidad"])
     stock_minimo = row.get("stock_minimo")
     stock_minimo_int = int(stock_minimo) if stock_minimo is not None else None
     virtual = es_fila_virtual(row)
     clase = clasificar_existencia(stock_total, stock_minimo=stock_minimo_int, virtual=virtual)
-    stock_tone = tono_existencia(stock_total, stock_minimo=stock_minimo_int, virtual=virtual)
+    activa = bool(row["variante_activa"])
+    # Desactivada: toda la fila en gris, también la cifra.
+    stock_tone = tono_existencia(stock_total, stock_minimo=stock_minimo_int, virtual=virtual) if activa else "muted"
     row_tone = _build_inventory_row_tone(
         clase=clase,
-        variant_active=bool(row["variante_activa"]),
+        variant_active=activa,
     )
-    status_text = "ACTIVA" if row["variante_activa"] else "INACTIVA"
-    status_tone = "positive" if row["variante_activa"] else "muted"
     conteo_raw = row.get("ultimo_conteo_at")
     conteo_text = _format_ultimo_conteo(conteo_raw if isinstance(conteo_raw, datetime) else None)
     return InventoryTableRowView(
@@ -67,14 +66,11 @@ def build_inventory_table_row_view(row: dict[str, object]) -> InventoryTableRowV
             texto_existencia(stock_total, stock_minimo=stock_minimo_int, virtual=virtual),
             stock_piso if stock_piso > 0 else "",
             stock_bodega if stock_bodega > 0 else "",
-            committed_value,
-            status_text,
             conteo_text,
         ),
         row_tone=row_tone,
         stock_tone=stock_tone,
-        committed_tone="reserved" if committed_value > 0 else None,
-        status_tone=status_tone,
+        tooltip=None if activa else TEXTO_DESACTIVADA,
     )
 
 

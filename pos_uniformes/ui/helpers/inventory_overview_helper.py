@@ -84,7 +84,6 @@ def build_inventory_overview_view(
     variant_active: bool,
     stock_actual: int,
     stock_minimo: int | None = None,
-    apartado_cantidad: int,
     talla: str,
     color: str,
     precio_venta: Decimal | str | int | float,
@@ -109,21 +108,27 @@ def build_inventory_overview_view(
     return InventoryOverviewView(
         overview_label=sku,
         product_label=clean_product_name,
-        status_badge=InventoryBadgeState(
-            text="ACTIVA" if variant_active else "INACTIVA",
-            tone="positive" if variant_active else "muted",
-        ),
+        status_badge=_estado_badge(product_active=product_active, variant_active=variant_active),
         stock_badge=InventoryBadgeState(
             text=stock_status.capitalize(),
             tone=stock_tone,
         ),
         stock_hint_label=f"Talla {talla} | Color {color} | Precio {precio_venta} | {origen_etiqueta}",
-        meta_label=f"Stock actual {stock_actual} | Apartado {apartado_cantidad} | Escuela {escuela_nombre}",
+        meta_label=f"Stock actual {stock_actual} | Escuela {escuela_nombre}",
         last_movement_label=last_movement_label,
         catalog_selection_label=(
             f"{sku} | {clean_product_name} | {tipo_prenda_nombre} | {tipo_pieza_nombre} | "
-            f"precio {precio_venta} | stock {stock_actual} | apartado {apartado_cantidad}"
+            f"precio {precio_venta} | stock {stock_actual}"
         ),
         toggle_product_label="Activar prod." if not product_active else "Desactivar prod.",
         toggle_variant_label="Activar var." if not variant_active else "Desactivar var.",
     )
+
+
+def _estado_badge(*, product_active: bool, variant_active: bool) -> InventoryBadgeState:
+    """Sin columna «Estado» en la tabla: la ficha dice si se vende o no."""
+    if not product_active:
+        return InventoryBadgeState(text="Prenda desactivada", tone="muted")
+    if not variant_active:
+        return InventoryBadgeState(text="Desactivada", tone="muted")
+    return InventoryBadgeState(text="Activa", tone="positive")

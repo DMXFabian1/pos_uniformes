@@ -366,8 +366,6 @@ from pos_uniformes.ui.helpers.inventory_selection_helper import (
 )
 from pos_uniformes.ui.helpers.inventory_summary_helper import INVENTORY_SEARCH_LIMIT, build_inventory_summary_view
 from pos_uniformes.ui.helpers.inventory_table_row_helper import (
-    COLUMNA_APARTADO as INVENTORY_COLUMNA_APARTADO,
-    COLUMNA_ESTADO as INVENTORY_COLUMNA_ESTADO,
     COLUMNA_STOCK as INVENTORY_COLUMNA_STOCK,
     build_inventory_table_row_views,
 )
@@ -7865,21 +7863,19 @@ class MainWindow(QMainWindow):
         for row_index, row_view in enumerate(table_row_views):
             for column_index, value in enumerate(row_view.values):
                 self.inventory_table.setItem(row_index, column_index, _table_item(value))
-            if row_view.row_tone is not None:
+            if row_view.row_tone is not None or row_view.tooltip:
                 for column_index in range(len(row_view.values)):
                     item = self.inventory_table.item(row_index, column_index)
-                    if item is not None:
+                    if item is None:
+                        continue
+                    if row_view.row_tone is not None:
                         _set_table_row_tint(item, row_view.row_tone)
+                    if row_view.tooltip:
+                        item.setToolTip(row_view.tooltip)
             self.inventory_table.item(row_index, 0).setData(Qt.ItemDataRole.UserRole, row_view.variant_id)
             stock_item = self.inventory_table.item(row_index, INVENTORY_COLUMNA_STOCK)
-            committed_item = self.inventory_table.item(row_index, INVENTORY_COLUMNA_APARTADO)
-            status_item = self.inventory_table.item(row_index, INVENTORY_COLUMNA_ESTADO)
             if stock_item is not None:
                 _set_table_badge_style(stock_item, row_view.stock_tone)
-            if committed_item is not None and row_view.committed_tone is not None:
-                _set_table_badge_style(committed_item, row_view.committed_tone)
-            if status_item is not None:
-                _set_table_badge_style(status_item, row_view.status_tone)
 
     def _schedule_inventory_filter_refresh(self) -> None:
         self.inventory_filter_debounce_timer.start()
@@ -8893,7 +8889,6 @@ class MainWindow(QMainWindow):
                         variant_active=overview_snapshot.variant_active,
                         stock_actual=overview_snapshot.stock_actual,
                         stock_minimo=overview_snapshot.stock_minimo,
-                        apartado_cantidad=overview_snapshot.apartado_cantidad,
                         talla=overview_snapshot.talla,
                         color=overview_snapshot.color,
                         precio_venta=overview_snapshot.precio_venta,

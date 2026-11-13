@@ -1267,9 +1267,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             row_tone=None,
             variant_id=2,
             stock_tone="positive",
-            committed_tone="warning",
-            status_tone="positive",
-            qr_tone="positive",
+            tooltip=None,
         )
         summary_view = SimpleNamespace(
             negative_counter=SimpleNamespace(text="0", tone="positive"),
@@ -1316,9 +1314,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             row_tone=None,
             variant_id=0,
             stock_tone="positive",
-            committed_tone="warning",
-            status_tone="positive",
-            qr_tone="positive",
+            tooltip=None,
         )
         summary_view = SimpleNamespace(
             negative_counter=SimpleNamespace(text="0", tone="positive"),
@@ -1634,9 +1630,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             row_tone=None,
             variant_id=variant_on_page1,
             stock_tone="positive",
-            committed_tone=None,
-            status_tone="positive",
-            qr_tone="positive",
+            tooltip=None,
         )
         summary_view = SimpleNamespace(
             negative_counter=SimpleNamespace(text="0", tone="positive"),
@@ -1676,9 +1670,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             row_tone=None,
             variant_id=0,
             stock_tone="positive",
-            committed_tone=None,
-            status_tone="positive",
-            qr_tone="positive",
+            tooltip=None,
         )
         summary_view = SimpleNamespace(
             negative_counter=SimpleNamespace(text="0", tone="positive"),

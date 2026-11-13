@@ -84,6 +84,28 @@ class InventarioTanda2PantallaTests(unittest.TestCase):
         aviso.assert_called_once()
         self.assertNotIn("QR", aviso.call_args.args[2])
 
+    # ── Sin Apartado ni Estado; la desactivada en gris ──────────────────
+
+    def test_sin_columnas_apartado_ni_estado(self) -> None:
+        encabezados = self._encabezados(self._ventana())
+        self.assertNotIn("Apartado", encabezados)
+        self.assertNotIn("Estado", encabezados)
+
+    def test_desactivada_se_pinta_en_gris_con_aviso(self) -> None:
+        from pos_uniformes.ui.helpers.inventory_table_row_helper import build_inventory_table_row_views
+
+        window = self._ventana()
+        fila = {
+            "variante_id": 3, "sku": "SKU-3", "producto_nombre_base": "Pants", "talla": "10", "color": "Azul",
+            "stock_actual": 4, "variante_activa": False, "ultimo_conteo_at": None, "stock_minimo": None,
+        }
+        vistas = build_inventory_table_row_views([fila])
+        window.inventory_table.setRowCount(1)
+        window._populate_inventory_table_rows(vistas)
+        celda = window.inventory_table.item(0, 1)
+        self.assertIn("Desactivada", celda.toolTip())
+        self.assertEqual(celda.foreground().color().name(), "#7a6d60")
+
 
 if __name__ == "__main__":
     unittest.main()

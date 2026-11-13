@@ -36,7 +36,6 @@ class InventoryOverviewHelperTests(unittest.TestCase):
             product_active=True,
             variant_active=False,
             stock_actual=2,
-            apartado_cantidad=1,
             talla="CH",
             color="Azul",
             precio_venta=Decimal("199.00"),
@@ -51,7 +50,7 @@ class InventoryOverviewHelperTests(unittest.TestCase):
 
         self.assertEqual(view.overview_label, "SKU-001")
         self.assertEqual(view.product_label, "Playera deportiva")
-        self.assertEqual(view.status_badge.text, "INACTIVA")
+        self.assertEqual(view.status_badge.text, "Desactivada")
         self.assertEqual(view.status_badge.tone, "muted")
         self.assertEqual(view.stock_badge.text, "Bajo")
         self.assertEqual(view.stock_badge.tone, "warning")
@@ -61,7 +60,7 @@ class InventoryOverviewHelperTests(unittest.TestCase):
         )
         self.assertEqual(
             view.meta_label,
-            "Stock actual 2 | Apartado 1 | Escuela General",
+            "Stock actual 2 | Escuela General",
         )
         self.assertEqual(
             view.last_movement_label,
@@ -69,7 +68,7 @@ class InventoryOverviewHelperTests(unittest.TestCase):
         )
         self.assertEqual(
             view.catalog_selection_label,
-            "SKU-001 | Playera deportiva | Deportivo | Playera | precio 199.00 | stock 2 | apartado 1",
+            "SKU-001 | Playera deportiva | Deportivo | Playera | precio 199.00 | stock 2",
         )
         self.assertEqual(view.toggle_product_label, "Desactivar prod.")
         self.assertEqual(view.toggle_variant_label, "Activar var.")
@@ -81,7 +80,6 @@ class InventoryOverviewHelperTests(unittest.TestCase):
             product_active=True,
             variant_active=True,
             stock_actual=5,
-            apartado_cantidad=0,
             talla="14",
             color="Azul",
             precio_venta=Decimal("199.00"),
@@ -104,7 +102,6 @@ class InventoryOverviewHelperTests(unittest.TestCase):
             product_active=True,
             variant_active=True,
             stock_actual=-1,
-            apartado_cantidad=0,
             talla="8",
             color="Azul",
             precio_venta=Decimal("299.00"),
@@ -127,7 +124,6 @@ class InventoryOverviewHelperTests(unittest.TestCase):
             product_active=True,
             variant_active=True,
             stock_actual=stock,
-            apartado_cantidad=0,
             talla="10",
             color="Rojo",
             precio_venta=Decimal("450.00"),
@@ -147,6 +143,29 @@ class InventoryOverviewHelperTests(unittest.TestCase):
         cero = self._ficha_3pz(0, es_conjunto=True)
         self.assertEqual((cero.stock_badge.text, cero.stock_badge.tone), ("Agotado", "danger"))
         self.assertEqual(self._ficha_3pz(2, es_conjunto=False).stock_badge.text, "Bajo")
+
+class FichaDiceSiSeVendeTests(unittest.TestCase):
+    """Tanda 2: sin columna «Estado», la ficha dice «Desactivada»."""
+
+    def _ficha(self, *, product_active: bool, variant_active: bool):
+        return build_inventory_overview_view(
+            sku="SKU-9", product_name="Pants", product_active=product_active, variant_active=variant_active,
+            stock_actual=3, talla="10", color="Azul", precio_venta=Decimal("320"), origen_etiqueta="NUEVO",
+            escuela_nombre="General", tipo_prenda_nombre="-", tipo_pieza_nombre="-",
+            movement_type=None, movement_quantity=None, movement_date="",
+        )
+
+    def test_activa(self) -> None:
+        self.assertEqual(self._ficha(product_active=True, variant_active=True).status_badge.text, "Activa")
+
+    def test_talla_desactivada(self) -> None:
+        badge = self._ficha(product_active=True, variant_active=False).status_badge
+        self.assertEqual((badge.text, badge.tone), ("Desactivada", "muted"))
+
+    def test_prenda_desactivada_gana(self) -> None:
+        badge = self._ficha(product_active=False, variant_active=True).status_badge
+        self.assertEqual((badge.text, badge.tone), ("Prenda desactivada", "muted"))
+
 
 if __name__ == "__main__":
     unittest.main()
