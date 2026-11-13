@@ -294,8 +294,10 @@ class InventarioTanda5PantallaTests(unittest.TestCase):
         self.assertEqual(caja.defaultButton().text(), "Cancelar")
         self.assertIs(caja.escapeButton(), caja.defaultButton())
         self.assertIn("1 precio baja", caja.text())
-        self.assertIn("SKU000003 · talla 8: baja de $289 a $250", caja.text())
-        self.assertNotIn("SKU000004", caja.text())  # sube: no se avisa
+        self.assertIn("Pants 2pz Muestra · talla 8: baja de $289 a $250", caja.text())
+        self.assertNotIn("talla 10", caja.text())  # la 4 (talla 10) sube: no se avisa
+        self.assertEqual(caja.icon(), QMessageBox.Icon.NoIcon)  # sin el triángulo del sistema
+        self.assertIn("🔻", caja.text())
         self.assertIn("#b3261e", caja.text())
         aplicar.assert_not_called()
         window.refresh_all.assert_not_called()
@@ -369,7 +371,7 @@ class InventarioTanda5PantallaTests(unittest.TestCase):
         from pos_uniformes.services.inventario_precio_lote_service import MAXIMO_RENGLONES, precios_que_bajan
         from pos_uniformes.ui.helpers.inventario_acciones import armar_aviso_bajas
 
-        filas = [_fila(i, 1, precio="300") for i in range(1, 31)]
+        filas = [_fila(i, 1, precio="300", producto=f"Prenda {i}") for i in range(1, 31)]
         bajas = precios_que_bajan([(i, "250") for i in range(1, 31)], filas)
         caja, _ = armar_aviso_bajas(None, bajas)
         self.addCleanup(caja.deleteLater)

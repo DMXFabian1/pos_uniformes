@@ -2,7 +2,7 @@
 
 Regla de oro de la tienda: **nunca bajar precios** salvo que el dueño lo
 marque. Decisión de Daniel (2026-11-13): no se bloquea; antes de aplicar se
-avisa en rojo «SKU · talla: baja de $X a $Y» y se pide confirmar, con
+avisa en rojo «Prenda · talla: baja de $X a $Y» (agrupado por prenda) y se pide confirmar, con
 Cancelar por defecto. Si nada baja, el flujo queda igual que antes.
 
 Puro: recibe los pares (variante_id, precio nuevo) del diálogo y las filas
@@ -45,9 +45,43 @@ class BajaDePrecio:
     antes: Decimal
     despues: Decimal
 
+    @property
+    def nombre(self) -> str:
+        """La prenda (nadie reconoce un SKU de memoria); el SKU solo si no hay nombre."""
+        return self.prenda or self.sku
+
     def texto(self) -> str:
+        """«Bata infantil Jardín Arcoíris · talla 4: baja de $320 a $260»."""
         talla = f" · talla {self.talla}" if self.talla else ""
-        return f"{self.sku}{talla}: baja de {fmt_corto(self.antes)} a {fmt_corto(self.despues)}"
+        return f"{self.nombre}{talla}: baja de {fmt_corto(self.antes)} a {fmt_corto(self.despues)}"
+
+
+def _texto_tallas(tallas: list[str]) -> str:
+    """«talla 4», «tallas 4 y 6», «tallas 4, 6 y 8», «tallas 4 a 14 (6 tallas)»."""
+    tallas = [t for t in tallas if t]
+    if not tallas:
+        return ""
+    if len(tallas) == 1:
+        return f"talla {tallas[0]}"
+    if len(tallas) <= 3:
+        return "tallas " + ", ".join(tallas[:-1]) + f" y {tallas[-1]}"
+    return f"tallas {tallas[0]} a {tallas[-1]} ({len(tallas)} tallas)"
+
+
+def agrupar_bajas(bajas: list[BajaDePrecio]) -> list[str]:
+    """Un renglón por prenda y precio: «Bata Jardín (tallas 4 a 14 (6 tallas)): baja de $320 a $260».
+
+    En el orden en que aparecen en el lote.
+    """
+    grupos: dict[tuple[str, Decimal, Decimal], list[str]] = {}
+    for baja in bajas:
+        grupos.setdefault((baja.nombre, baja.antes, baja.despues), []).append(baja.talla)
+    renglones = []
+    for (nombre, antes, despues), tallas in grupos.items():
+        tallas_texto = _texto_tallas(tallas)
+        cabeza = f"{nombre} · {tallas_texto}" if tallas_texto else nombre
+        renglones.append(f"{cabeza}: baja de {fmt_corto(antes)} a {fmt_corto(despues)}")
+    return renglones
 
 
 def leer_precios_actuales(session, variante_ids: Iterable[object]) -> dict[int, dict[str, object]]:
@@ -146,9 +180,10 @@ def titulo_bajas(cuantas: int) -> str:
 
 
 def renglones_bajas(bajas: list[BajaDePrecio], *, maximo: int = MAXIMO_RENGLONES) -> list[str]:
-    """«SKU · talla: baja de $X a $Y», resumido con «… y N más» si son muchas."""
-    renglones = [baja.texto() for baja in bajas[:maximo]]
-    resto = len(bajas) - maximo
+    """«Prenda · tallas: baja de $X a $Y» agrupado por prenda y precio, con «… y N más» si son muchos."""
+    agrupados = agrupar_bajas(bajas)
+    renglones = agrupados[:maximo]
+    resto = len(agrupados) - maximo
     if resto > 0:
         renglones.append(f"… y {resto:,} más")
     return renglones

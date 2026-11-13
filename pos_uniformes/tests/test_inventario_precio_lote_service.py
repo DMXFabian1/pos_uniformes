@@ -15,9 +15,9 @@ from pos_uniformes.services.inventario_precio_lote_service import (
 )
 
 
-def _fila(vid: int, precio: object, talla: str = "8") -> dict:
+def _fila(vid: int, precio: object, talla: str = "8", prenda: str = "Pants 2pz Muestra") -> dict:
     return {"variante_id": vid, "sku": f"SKU{vid:06d}", "talla": talla, "precio_venta": precio,
-            "producto_nombre_base": "Pants 2pz Muestra"}
+            "producto_nombre_base": prenda}
 
 
 class PreciosQueBajanTests(unittest.TestCase):
@@ -26,8 +26,8 @@ class PreciosQueBajanTests(unittest.TestCase):
         items = [(3, Decimal("249.50")), (1, Decimal("300")), (2, Decimal("289.00")), (4, Decimal("90"))]
         bajas = precios_que_bajan(items, filas)
         self.assertEqual([b.variante_id for b in bajas], [3, 4])
-        self.assertEqual(bajas[0].texto(), "SKU000003 · talla 8: baja de $250 a $249.50")
-        self.assertEqual(bajas[1].texto(), "SKU000004 · talla 8: baja de $100 a $90")
+        self.assertEqual(bajas[0].texto(), "Pants 2pz Muestra · talla 8: baja de $250 a $249.50")
+        self.assertEqual(bajas[1].texto(), "Pants 2pz Muestra · talla 8: baja de $100 a $90")
 
     def test_si_nada_baja_lista_vacia(self) -> None:
         filas = [_fila(1, "289"), _fila(2, None)]
@@ -35,10 +35,25 @@ class PreciosQueBajanTests(unittest.TestCase):
 
     def test_sin_talla_no_deja_el_punto_suelto(self) -> None:
         bajas = precios_que_bajan([(1, "100")], [_fila(1, "120", talla="")])
-        self.assertEqual(bajas[0].texto(), "SKU000001: baja de $120 a $100")
+        self.assertEqual(bajas[0].texto(), "Pants 2pz Muestra: baja de $120 a $100")
+
+    def test_sin_nombre_de_prenda_usa_el_sku(self) -> None:
+        bajas = precios_que_bajan([(1, "100")], [_fila(1, "120", prenda="")])
+        self.assertEqual(bajas[0].texto(), "SKU000001 · talla 8: baja de $120 a $100")
+
+    def test_agrupa_por_prenda_y_precio(self) -> None:
+        filas = [_fila(i, "320", talla=str(2 * i + 2), prenda="Bata infantil Jardín Arcoíris") for i in range(1, 7)]
+        filas += [_fila(10, "300", talla="8", prenda="Pants Colegio"), _fila(11, "300", talla="10", prenda="Pants Colegio")]
+        filas += [_fila(12, "250", talla="12", prenda="Pants Colegio")]
+        items = [(i, "260") for i in range(1, 7)] + [(10, "280"), (11, "280"), (12, "240")]
+        self.assertEqual(renglones_bajas(precios_que_bajan(items, filas)), [
+            "Bata infantil Jardín Arcoíris · tallas 4 a 14 (6 tallas): baja de $320 a $260",
+            "Pants Colegio · tallas 8 y 10: baja de $300 a $280",
+            "Pants Colegio · talla 12: baja de $250 a $240",
+        ])
 
     def test_resumido_si_son_muchas(self) -> None:
-        filas = [_fila(i, "300") for i in range(1, 21)]
+        filas = [_fila(i, "300", prenda=f"Prenda {i}") for i in range(1, 21)]
         bajas = precios_que_bajan([(i, "250") for i in range(1, 21)], filas)
         renglones = renglones_bajas(bajas)
         self.assertEqual(len(renglones), MAXIMO_RENGLONES + 1)

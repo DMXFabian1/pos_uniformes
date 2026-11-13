@@ -421,12 +421,13 @@ def armar_aviso_bajas(
 
     caja = QMessageBox(parent)
     caja.setObjectName("invAvisoBaja")
-    caja.setIcon(QMessageBox.Icon.Warning)
+    # Sin el triángulo del sistema: la norma del POS usa emojis como iconos.
+    caja.setIcon(QMessageBox.Icon.NoIcon)
     caja.setWindowTitle("Hay precios que bajan")
     caja.setTextFormat(Qt.TextFormat.RichText)
     renglones = "<br>".join(escape(r) for r in renglones_bajas(bajas))
     caja.setText(
-        f"<p style='color:{ROJO}; font-weight:800; font-size:15px'>{escape(titulo_bajas(len(bajas)))}</p>"
+        f"<p style='color:{ROJO}; font-weight:800; font-size:15px'>🔻 {escape(titulo_bajas(len(bajas)))}</p>"
         f"<p style='color:{ROJO}; font-weight:600'>{renglones}</p>"
         f"{_nota_cambiaron(cambiaron)}"
         "<p>La regla de la tienda es no bajar precios salvo que el dueño lo marque.<br>"
