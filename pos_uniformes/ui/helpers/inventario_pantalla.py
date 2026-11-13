@@ -54,12 +54,24 @@ from pos_uniformes.services.inventario_prenda_service import (
     texto_paginacion_prendas,
 )
 from pos_uniformes.services.rebaja_service import ETIQUETAS as ETIQUETAS_REBAJA, fmt_corto
+from pos_uniformes.services.demanda_service import cargar_pedidas, texto_pedidas
+from pos_uniformes.services.inventario_ritmo_service import (
+    DIAS_PARA_ACABARSE,
+    SE_ACABO_Y_SE_VENDE,
+    SE_VA_A_ACABAR as ESTADO_SE_VA_A_ACABAR,
+    CacheVentas,
+    cargar_vendidas,
+    pedidas_de_fila,
+    poner_datos_de_venta,
+    ritmo_de_fila,
+)
 from pos_uniformes.services.inventario_tarjetas_service import (
     AVISO_TARJETAS,
     EN_NEGATIVO,
     INFO_TARJETAS,
     QUEDAN_POCAS,
     SE_ACABO,
+    SE_VA_A_ACABAR,
     TARJETAS,
     ConteoTarjetas,
     contar_tarjetas,
@@ -67,6 +79,7 @@ from pos_uniformes.services.inventario_tarjetas_service import (
     filtrar_por_tarjeta,
     motivo_para_atender,
     para_atender,
+    tono_para_atender,
 )
 from pos_uniformes.services.inventario_vista_service import (
     BLOQUEAR,
@@ -326,6 +339,31 @@ class FichaInventario(QFrame):
         self.atender_caja = QVBoxLayout()
         self.atender_caja.setSpacing(0)
         layout.addLayout(self.atender_caja)
+        # Tanda 5: «Se va a acabar» no es tarjeta (no caben cinco a 1366 px);
+        # se cuenta aquí y desde aquí se filtra la lista.
+        self.acabarse = QFrame()
+        self.acabarse.setObjectName("invAcabarse")
+        caja = QHBoxLayout(self.acabarse)
+        caja.setContentsMargins(12, 7, 8, 7)
+        caja.setSpacing(8)
+        textos = QVBoxLayout()
+        textos.setSpacing(1)
+        self.acabarse_titulo = _etiqueta("", "invAcabarseTitulo")
+        self.acabarse_nota = _etiqueta(
+            f"Con lo que se vende, no llegan a {DIAS_PARA_ACABARSE} días",
+            "invAcabarseNota",
+        )
+        textos.addWidget(self.acabarse_titulo)
+        textos.addWidget(self.acabarse_nota)
+        caja.addLayout(textos, 1)
+        self.acabarse_boton = QPushButton("Verlas")
+        self.acabarse_boton.setObjectName("invAcabarseBoton")
+        self.acabarse_boton.setCursor(Qt.CursorShape.PointingHandCursor)
+        caja.addWidget(self.acabarse_boton, 0, Qt.AlignmentFlag.AlignVCenter)
+        self.acabarse.setToolTip(AVISO_TARJETAS[SE_VA_A_ACABAR])
+        self.acabarse.setVisible(False)
+        layout.addSpacing(2)
+        layout.addWidget(self.acabarse)
         layout.addStretch(1)
         self.atender_botones: list[FilaAtender] = []
         self.atender_ids: list[object] = []
@@ -390,6 +428,16 @@ class FichaInventario(QFrame):
         self.contada = self._linea(lineas, 1, "CONTADA")
         self.movimiento = self._linea(lineas, 2, "ÚLTIMO MOV.")
         self.movimiento.setToolTip("Último movimiento de esta talla")
+        # Tanda 5: ritmo de la Libreta y lo que pidieron estando agotada.
+        self.venta = self._linea(lineas, 3, "VENTA")
+        self.venta.setToolTip("Lo vendido en la Libreta en los últimos 30 días y para cuánto alcanza lo que hay")
+        self.venta_titulo = lineas.itemAtPosition(3, 0).widget()
+        self.pedidas = self._linea(lineas, 4, "")
+        self.pedidas.setObjectName("invFichaAlerta")
+        self.pedidas.setToolTip("Veces que en el kiosko tocaron esta talla estando agotada (solo lo ve el ADMIN)")
+        self.pedidas_titulo = lineas.itemAtPosition(4, 0).widget()
+        for widget in (self.venta, self.venta_titulo, self.pedidas, self.pedidas_titulo):
+            widget.setVisible(False)
         layout.addLayout(lineas)
 
         self.acciones = QGridLayout()
@@ -520,6 +568,10 @@ class InventarioPantalla(QObject):
         self._sku_escaneado = ""
         self._seleccionando = False
         self.tarjetas: dict[str, TarjetaFiltro] = {}
+        # Tanda 5: ventas de la Libreta (30 días) y demanda no atendida, leídas
+        # a lo más una vez cada 5 minutos; si fallan, la pantalla sigue sin ellas.
+        self.cache_ventas = CacheVentas(cargar_vendidas, nombre="las ventas de la Libreta")
+        self.cache_demanda = CacheVentas(cargar_pedidas, nombre="la demanda no atendida")
         # Tanda 4: vista «Por prenda». La vista elegida se recuerda mientras
         # la ventana esté abierta (la sesión); no se guarda en disco.
         self.vista = POR_TALLA
@@ -556,6 +608,14 @@ class InventarioPantalla(QObject):
             tarjeta = TarjetaFiltro(llave)
             tarjeta.tocada.connect(self.tocar_tarjeta)
             self.tarjetas[llave] = tarjeta
+        # Ficha del filtro «Se va a acabar» junto a los filtros (solo cuando está puesto).
+        self.chip_acabarse = QPushButton("⏳  Solo las que se van a acabar  ✕")
+        self.chip_acabarse.setObjectName("invChipFiltro")
+        self.chip_acabarse.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.chip_acabarse.setToolTip(f"{AVISO_TARJETAS[SE_VA_A_ACABAR]}\nTócala para quitar este filtro.")
+        self.chip_acabarse.setVisible(False)
+        self.chip_acabarse.clicked.connect(lambda: self.tocar_tarjeta(SE_VA_A_ACABAR))
+        self.ficha.acabarse_boton.clicked.connect(lambda: self.tocar_tarjeta(SE_VA_A_ACABAR))
         self._armar_acciones_ficha()
 
     # ── Avisos de la ventana ─────────────────────────────────────────────
@@ -567,6 +627,7 @@ class InventarioPantalla(QObject):
         """Filas ya filtradas por la ventana → cuenta tarjetas, filtra por la tocada y ordena."""
         ahora = self.ahora()
         self.filas_base = filas
+        self._poner_datos_de_venta(filas)
         self.conteo = contar_tarjetas(filas, ahora=ahora)
         visibles = filtrar_por_tarjeta(filas, self.tarjeta, ahora=ahora)
         if self.por_prenda():
@@ -580,6 +641,22 @@ class InventarioPantalla(QObject):
 
     def por_prenda(self) -> bool:
         return self.vista == POR_PRENDA
+
+    def ve_demanda(self) -> bool:
+        """«La pidieron…» solo para ADMIN en el POS principal (nota 35:
+        `EXISTENCIA_CONFIABLE` sigue apagado para lo que ven las empleadas)."""
+        from pos_uniformes.database.models import RolUsuario
+
+        return getattr(self.window, "current_role", None) == RolUsuario.ADMIN
+
+    def _poner_datos_de_venta(self, filas: list) -> None:
+        """Ritmo y demanda en cada fila; sin ellos (o si fallan) la pantalla sigue igual."""
+        try:
+            vendidas = self.cache_ventas.obtener()
+            pedidas = self.cache_demanda.obtener() if self.ve_demanda() else None
+            poner_datos_de_venta(filas, vendidas, pedidas)
+        except Exception:  # noqa: BLE001 — un dato de más nunca tumba la pestaña
+            poner_datos_de_venta(filas, None, None)
 
     def paginar(self, pagina: int, tamano: int, variante_id: object = None) -> CatalogPaginationView:
         """«Por prenda»: la página cuenta prendas y lleva todas sus tallas.
@@ -613,6 +690,7 @@ class InventarioPantalla(QObject):
         self.aviso_busqueda.setVisible(bool(aviso))
         for llave, tarjeta in self.tarjetas.items():
             tarjeta.mostrar(self.conteo.de(llave), prendida=self.tarjeta == llave)
+        self.chip_acabarse.setVisible(self.tarjeta == SE_VA_A_ACABAR)
         self._refrescar_filtros()
         if self.por_prenda():
             pagina = self.pagina_prendas or paginar_prendas(self.grupos, 0, _tamano_pagina())
@@ -976,17 +1054,33 @@ class InventarioPantalla(QObject):
                     str(fila.get("producto_nombre_base") or fila.get("producto_nombre") or ""),
                     texto_talla_color(fila),
                     motivo_para_atender(fila),
-                    "danger" if int(fila.get("stock_actual") or 0) < 0 else "muted",
+                    tono_para_atender(fila),
                     f"Código {fila.get('sku', '')}",
                 )
                 nueva.tocada.connect(self.seleccionar)
                 ficha.atender_caja.addWidget(nueva)
                 ficha.atender_botones.append(nueva)
         if urgentes:
-            ficha.atender_nota.setText("Lo más urgente de lo que estás viendo. Toca una para abrir su ficha.")
+            ficha.atender_nota.setText("Lo más urgente de lo que ves. Toca una para abrirla.")
         else:
             ficha.atender_nota.setText("Nada en negativo ni agotado en lo que estás viendo.")
+        self._mostrar_acabarse()
         ficha.paginas.setCurrentIndex(VACIA)
+
+    def _mostrar_acabarse(self) -> None:
+        """«⏳ N se van a acabar · Verlas» (o «Ver todas» si ya está puesto)."""
+        ficha = self.ficha
+        prendido = self.tarjeta == SE_VA_A_ACABAR
+        cuantas = self.conteo.acabarse
+        ficha.acabarse.setVisible(cuantas > 0 or prendido)
+        if cuantas == 1:
+            ficha.acabarse_titulo.setText("⏳  1 talla se va a acabar")
+        else:
+            ficha.acabarse_titulo.setText(f"⏳  {cuantas:,} tallas se van a acabar")
+        ficha.acabarse_boton.setText("Ver todas" if prendido else "Verlas")
+        ficha.acabarse_boton.setToolTip(
+            "Quitar este filtro" if prendido else "Ver en la lista solo las que se van a acabar"
+        )
 
     def _mostrar_talla(self, fila: Mapping[str, object]) -> None:
         ficha = self.ficha
@@ -1016,8 +1110,26 @@ class InventarioPantalla(QObject):
             ficha.movimiento.setText(movimiento.replace("Último movimiento: ", ""))
         else:
             ficha.movimiento.setText("—")
+        self._mostrar_venta(fila)
         self._habilitar_acciones()
         ficha.paginas.setCurrentIndex(TALLA)
+
+    def _mostrar_venta(self, fila: Mapping[str, object]) -> None:
+        """«Se vende ~3 por semana · alcanza para 5 días» y «La pidieron 4 veces en 30 días»."""
+        ficha = self.ficha
+        ritmo = ritmo_de_fila(fila)
+        if ritmo is not None:
+            ficha.venta.setText(ritmo.texto())
+            tono = {ESTADO_SE_VA_A_ACABAR: "warning", SE_ACABO_Y_SE_VENDE: "danger"}.get(ritmo.estado or "", "")
+            ficha.venta.setProperty("tono", tono)
+            _repulir(ficha.venta)
+        for widget in (ficha.venta, ficha.venta_titulo):
+            widget.setVisible(ritmo is not None)
+        pedidas = texto_pedidas(pedidas_de_fila(fila))
+        agotada = int(fila.get("stock_actual") or 0) <= 0
+        ficha.pedidas.setText(f"{pedidas} y no había" if pedidas and agotada else pedidas)
+        for widget in (ficha.pedidas, ficha.pedidas_titulo):
+            widget.setVisible(bool(pedidas))
 
     def _mostrar_lote(self, elegidas: list) -> None:
         ids = set(elegidas)
@@ -1346,4 +1458,7 @@ def _estado_existencia(fila: Mapping[str, object], ahora: datetime) -> tuple[str
         if en_tarjeta(fila, llave, ahora=ahora):
             info = INFO_TARJETAS[llave]
             return info.tono, info.titulo
+    ritmo = ritmo_de_fila(fila)
+    if ritmo is not None and ritmo.estado == ESTADO_SE_VA_A_ACABAR:
+        return "warning", "Se va a acabar"
     return "", ""

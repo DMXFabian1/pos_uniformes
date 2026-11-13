@@ -231,6 +231,21 @@ QLabel#invAtenderTitulo {{ font-size: 13px; font-weight: 700; color: {TEXTO}; }}
 QLabel#invAtenderTalla {{ font-size: 12px; color: {TEXTO}; }}
 QLabel#invAtenderMotivo {{ font-size: 12px; color: {TENUE}; }}
 QLabel#invAtenderMotivo[tono="danger"] {{ color: #b3261e; font-weight: 700; }}
+QLabel#invAtenderMotivo[tono="warning"] {{ color: #a35a00; font-weight: 700; }}
+/* Tanda 5: «⏳ N tallas se van a acabar · Verlas» y su ficha de filtro */
+QFrame#invAcabarse {{ background: #fdf6e6; border: 1px solid #efd98f; border-radius: 12px; }}
+QLabel#invAcabarseTitulo {{ font-size: 13px; font-weight: 800; color: #8a5a00; }}
+QLabel#invAcabarseNota {{ font-size: 12px; color: {TENUE}; }}
+QPushButton#invAcabarseBoton {{
+    background: {TARJETA}; color: #8a5a00; border: 1px solid #efd98f; border-radius: 10px;
+    padding: 0 12px; min-height: 30px; font-size: 13px; font-weight: 700;
+}}
+QPushButton#invAcabarseBoton:hover {{ background: #fbf0cf; }}
+QPushButton#invChipFiltro {{
+    background: #fbf0cf; color: #8a5a00; border: 1px solid #efd98f; border-radius: 14px;
+    padding: 0 12px; min-height: 28px; font-size: 12px; font-weight: 700;
+}}
+QPushButton#invChipFiltro:hover {{ background: #f6e4ae; }}
 QLabel#invNota {{ background: #faf6f0; color: {TENUE}; border-radius: 12px; padding: 10px 12px; font-size: 13px; }}
 QFrame#invFichaTotal {{
     background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {VINO_OSCURO}, stop:1 #84304c);
@@ -243,6 +258,9 @@ QLabel#invFichaDatoValor {{ font-size: 30px; font-weight: 900; color: white; }}
 QLabel#invFichaDatoNota {{ font-size: 12px; color: #f0d6df; }}
 QLabel#invChip {{ border-radius: 10px; padding: 3px 10px; font-size: 12px; font-weight: 700; }}
 QLabel#invFichaLinea {{ font-size: 13px; color: {TEXTO}; }}
+QLabel#invFichaLinea[tono="warning"] {{ color: #a35a00; font-weight: 700; }}
+QLabel#invFichaLinea[tono="danger"] {{ color: #b3261e; font-weight: 700; }}
+QLabel#invFichaAlerta {{ font-size: 13px; color: #b3261e; font-weight: 700; }}
 QLabel#invFichaEtiqueta {{ font-size: 11px; font-weight: 800; color: {TENUE}; letter-spacing: 1px; }}
 QPushButton#invAccion {{
     background: {TARJETA}; color: {CAFE}; border: 1px solid {BORDE}; border-radius: 12px;

@@ -421,6 +421,10 @@ def _tabla(window: "MainWindow", pantalla: InventarioPantalla) -> QFrame:
     por_prenda.clicked.connect(lambda: pantalla.cambiar_vista(POR_PRENDA))
     pantalla.segmento_grupo = grupo
     pie.addLayout(segmento)
+    # Tanda 5: el filtro «Se va a acabar» (sin tarjeta) se ve y se quita aquí;
+    # en la fila de filtros ya no cabe a 1366 px junto a «Quitar filtros».
+    pie.addSpacing(10)
+    pie.addWidget(pantalla.chip_acabarse)
     pie.addStretch(1)
     pie.addWidget(pantalla.paginas)
     anterior = window.inventory_previous_page_button
