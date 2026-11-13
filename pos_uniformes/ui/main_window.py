@@ -7872,6 +7872,10 @@ class MainWindow(QMainWindow):
                         _set_table_row_tint(item, row_view.row_tone)
                     if row_view.tooltip:
                         item.setToolTip(row_view.tooltip)
+            for column_index, tooltip in row_view.cell_tooltips:
+                item = self.inventory_table.item(row_index, column_index)
+                if item is not None:
+                    item.setToolTip(tooltip)
             self.inventory_table.item(row_index, 0).setData(Qt.ItemDataRole.UserRole, row_view.variant_id)
             stock_item = self.inventory_table.item(row_index, INVENTORY_COLUMNA_STOCK)
             if stock_item is not None:

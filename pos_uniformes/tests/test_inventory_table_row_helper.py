@@ -28,7 +28,7 @@ class InventoryTableRowHelperTests(unittest.TestCase):
         self.assertEqual(view.variant_id, 8)
         self.assertEqual(
             view.values,
-            ("SKU-008", "Pants Deportivo", "16", "Azul Marino", "2 Bajo", "", "", "Nunca"),
+            ("SKU-008", "Pants Deportivo", "16", "Azul Marino", "2 Bajo", "Tienda", "Nunca"),
         )
         # Desactivada: toda la fila en gris (también la cifra) y lo dice al pasar el mouse.
         self.assertEqual(view.row_tone, "muted")
@@ -42,6 +42,9 @@ class InventoryTableRowHelperTests(unittest.TestCase):
         self.assertNotIn("Apartado", INVENTORY_TABLE_HEADERS)
         self.assertNotIn("Estado", INVENTORY_TABLE_HEADERS)
         self.assertNotIn("QR", INVENTORY_TABLE_HEADERS)
+        self.assertIn("Dónde", INVENTORY_TABLE_HEADERS)
+        self.assertNotIn("Piso", INVENTORY_TABLE_HEADERS)
+        self.assertNotIn("Almacén", INVENTORY_TABLE_HEADERS)
 
     def test_activa_no_lleva_aviso(self) -> None:
         view = build_inventory_table_row_view(
@@ -51,7 +54,7 @@ class InventoryTableRowHelperTests(unittest.TestCase):
             }
         )
         self.assertIsNone(view.tooltip)
-        self.assertEqual(len(view.values), 8)
+        self.assertEqual(len(view.values), 7)
 
     def test_build_inventory_table_row_views_for_multiple_rows(self) -> None:
         views = build_inventory_table_row_views(
@@ -110,8 +113,9 @@ class InventoryTableRowHelperTests(unittest.TestCase):
             }
         )
         self.assertEqual(view.values[4], "10 OK")
-        self.assertEqual(view.values[5], 3)
-        self.assertEqual(view.values[6], 7)
+        # Piso y Almacén se juntan en «Dónde»; el reparto completo va en el aviso.
+        self.assertEqual(view.values[5], "Bodega 7 · Piso 3")
+        self.assertEqual(dict(view.cell_tooltips)[5], "Bodega 7 · Piso 3")
         self.assertEqual(view.stock_tone, "positive")
         self.assertIsNone(view.row_tone)
 
@@ -145,6 +149,7 @@ class InventoryTableRowHelperTests(unittest.TestCase):
         self.assertEqual((cero.values[4], cero.stock_tone, cero.row_tone), ("0 Agotado", "danger", "danger"))
         dos = build_inventory_table_row_view({**base, "stock_actual": 2})
         self.assertEqual((dos.values[4], dos.stock_tone), ("2 Conjunto", "neutral"))
+        self.assertEqual(dos.values[5], "—")  # se arma con piezas: no tiene lugar propio
 
 if __name__ == "__main__":
     unittest.main()

@@ -1268,6 +1268,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             variant_id=2,
             stock_tone="positive",
             tooltip=None,
+            cell_tooltips=(),
         )
         summary_view = SimpleNamespace(
             negative_counter=SimpleNamespace(text="0", tone="positive"),
@@ -1315,6 +1316,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             variant_id=0,
             stock_tone="positive",
             tooltip=None,
+            cell_tooltips=(),
         )
         summary_view = SimpleNamespace(
             negative_counter=SimpleNamespace(text="0", tone="positive"),
@@ -1631,6 +1633,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             variant_id=variant_on_page1,
             stock_tone="positive",
             tooltip=None,
+            cell_tooltips=(),
         )
         summary_view = SimpleNamespace(
             negative_counter=SimpleNamespace(text="0", tone="positive"),
@@ -1671,6 +1674,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             variant_id=0,
             stock_tone="positive",
             tooltip=None,
+            cell_tooltips=(),
         )
         summary_view = SimpleNamespace(
             negative_counter=SimpleNamespace(text="0", tone="positive"),

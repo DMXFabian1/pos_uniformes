@@ -106,6 +106,28 @@ class InventarioTanda2PantallaTests(unittest.TestCase):
         self.assertIn("Desactivada", celda.toolTip())
         self.assertEqual(celda.foreground().color().name(), "#7a6d60")
 
+    # ── «Dónde» junta Piso y Almacén ────────────────────────────────────
+
+    def test_donde_en_una_columna_con_el_reparto_al_pasar_el_mouse(self) -> None:
+        from pos_uniformes.ui.helpers.inventory_table_row_helper import build_inventory_table_row_views
+
+        window = self._ventana()
+        encabezados = self._encabezados(window)
+        self.assertIn("Dónde", encabezados)
+        self.assertNotIn("Piso", encabezados)
+        self.assertNotIn("Almacén", encabezados)
+        fila = {
+            "variante_id": 4, "sku": "SKU-4", "producto_nombre_base": "Pants", "talla": "10", "color": "Azul",
+            "stock_actual": 12, "stock_bodega": 6, "stock_piso": 2, "variante_activa": True,
+            "ultimo_conteo_at": None, "stock_minimo": None,
+        }
+        window.inventory_table.setRowCount(1)
+        window._populate_inventory_table_rows(build_inventory_table_row_views([fila]))
+        columna = encabezados.index("Dónde")
+        celda = window.inventory_table.item(0, columna)
+        self.assertEqual(celda.text(), "Bodega 6 · Piso 2")
+        self.assertEqual(celda.toolTip(), "Tienda 4 · Bodega 6 · Piso 2")
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from pos_uniformes.services.inventario_donde_service import texto_donde, texto_donde_completo
 from pos_uniformes.services.inventario_existencia_service import (
     AGOTADO,
     BAJO_MINIMO,
@@ -17,9 +18,10 @@ from pos_uniformes.services.inventario_existencia_service import (
 
 
 INVENTORY_TABLE_HEADERS = (
-    "SKU", "Producto", "Talla", "Color", "Stock", "Piso", "Almacén", "Ult. conteo",
+    "SKU", "Producto", "Talla", "Color", "Stock", "Dónde", "Ult. conteo",
 )
 COLUMNA_STOCK = INVENTORY_TABLE_HEADERS.index("Stock")
+COLUMNA_DONDE = INVENTORY_TABLE_HEADERS.index("Dónde")
 
 #: Sin columna «Estado» (tanda 2): la talla desactivada se ve en gris y lo dice al pasar el mouse.
 TEXTO_DESACTIVADA = "Desactivada: no se vende. Actívala desde su ficha."
@@ -32,6 +34,8 @@ class InventoryTableRowView:
     row_tone: str | None
     stock_tone: str
     tooltip: str | None = None
+    #: (columna, texto) que gana sobre `tooltip` en esa celda.
+    cell_tooltips: tuple[tuple[int, str], ...] = ()
 
 
 def build_inventory_table_row_views(visible_rows: list[dict[str, object]]) -> tuple[InventoryTableRowView, ...]:
@@ -64,13 +68,15 @@ def build_inventory_table_row_view(row: dict[str, object]) -> InventoryTableRowV
             row["talla"],
             row["color"],
             texto_existencia(stock_total, stock_minimo=stock_minimo_int, virtual=virtual),
-            stock_piso if stock_piso > 0 else "",
-            stock_bodega if stock_bodega > 0 else "",
+            texto_donde(stock_total, stock_bodega, stock_piso, conjunto=virtual),
             conteo_text,
         ),
         row_tone=row_tone,
         stock_tone=stock_tone,
         tooltip=None if activa else TEXTO_DESACTIVADA,
+        cell_tooltips=(
+            (COLUMNA_DONDE, texto_donde_completo(stock_total, stock_bodega, stock_piso, conjunto=virtual)),
+        ),
     )
 
 
