@@ -57,7 +57,7 @@ class BajaDePrecio:
 
 
 def _texto_tallas(tallas: list[str]) -> str:
-    """«talla 4», «tallas 4 y 6», «tallas 4, 6 y 8», «tallas 4 a 14 (6 tallas)»."""
+    """«talla 4», «tallas 4 y 6», «tallas 4, 6 y 8», «6 tallas (4 a 14)»."""
     tallas = [t for t in tallas if t]
     if not tallas:
         return ""
@@ -65,11 +65,11 @@ def _texto_tallas(tallas: list[str]) -> str:
         return f"talla {tallas[0]}"
     if len(tallas) <= 3:
         return "tallas " + ", ".join(tallas[:-1]) + f" y {tallas[-1]}"
-    return f"tallas {tallas[0]} a {tallas[-1]} ({len(tallas)} tallas)"
+    return f"{len(tallas)} tallas ({tallas[0]} a {tallas[-1]})"
 
 
 def agrupar_bajas(bajas: list[BajaDePrecio]) -> list[str]:
-    """Un renglón por prenda y precio: «Bata Jardín (tallas 4 a 14 (6 tallas)): baja de $320 a $260».
+    """Un renglón por prenda y precio: «Bata Jardín · 6 tallas (4 a 14): baja de $320 a $260».
 
     En el orden en que aparecen en el lote.
     """

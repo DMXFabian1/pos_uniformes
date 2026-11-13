@@ -47,7 +47,7 @@ class PreciosQueBajanTests(unittest.TestCase):
         filas += [_fila(12, "250", talla="12", prenda="Pants Colegio")]
         items = [(i, "260") for i in range(1, 7)] + [(10, "280"), (11, "280"), (12, "240")]
         self.assertEqual(renglones_bajas(precios_que_bajan(items, filas)), [
-            "Bata infantil Jardín Arcoíris · tallas 4 a 14 (6 tallas): baja de $320 a $260",
+            "Bata infantil Jardín Arcoíris · 6 tallas (4 a 14): baja de $320 a $260",
             "Pants Colegio · tallas 8 y 10: baja de $300 a $280",
             "Pants Colegio · talla 12: baja de $250 a $240",
         ])
