@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
+    QButtonGroup,
     QFrame,
     QHBoxLayout,
     QHeaderView,
@@ -393,8 +394,18 @@ def _tabla(window: "MainWindow", pantalla: InventarioPantalla) -> QFrame:
     por_prenda.setEnabled(False)
     por_prenda.setToolTip(TEXTO_PROXIMAMENTE)
     pantalla.segmento = (por_talla, por_prenda)
-    pie.addWidget(por_talla)
-    pie.addWidget(por_prenda)
+    # Una sola pieza: pegados (sin espacio) y exclusivos, así «Por talla» no se apaga.
+    grupo = QButtonGroup(tarjeta)
+    grupo.setExclusive(True)
+    segmento = QHBoxLayout()
+    segmento.setSpacing(0)
+    for boton in (por_talla, por_prenda):
+        boton.setCheckable(True)
+        grupo.addButton(boton)
+        segmento.addWidget(boton)
+    por_talla.setChecked(True)
+    pantalla.segmento_grupo = grupo
+    pie.addLayout(segmento)
     pie.addStretch(1)
     pie.addWidget(pantalla.paginas)
     anterior = window.inventory_previous_page_button

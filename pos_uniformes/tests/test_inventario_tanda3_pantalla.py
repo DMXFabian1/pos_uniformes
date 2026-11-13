@@ -345,6 +345,10 @@ class InventarioTanda3PantallaTests(unittest.TestCase):
         self.assertTrue(por_talla.isChecked())
         self.assertFalse(por_prenda.isEnabled())
         self.assertIn("Próximamente", por_prenda.toolTip())
+        # Tocar «Por talla» otra vez no la apaga: siempre queda una vista marcada.
+        por_talla.click()
+        self.assertTrue(por_talla.isChecked())
+        self.assertTrue(window.inventario_pantalla.segmento_grupo.exclusive())
 
     # ── E. Tabla ────────────────────────────────────────────────────────
 
