@@ -425,5 +425,253 @@ class DialogoYEtiquetaTests(_Qt):
         self.assertTrue(dlg.hubo_cambios)
 
 
+# ─── Promo 3pz con el pants rebajado (Daniel, 2026-11-12: «Sí, que no aplique») ───
+#
+# Si el pants base de la promo está en Oferta o Liquidación, la promo no
+# aplica: la playera va a su precio normal y, como prenda normal, lleva sus
+# descuentos y Monedero de siempre.
+
+OFERTA_PANTS_3PZ = reb.RebajaVigente("P2-001", reb.OFERTA, D("175"), D("250"), None)
+LIQ_PANTS_3PZ = reb.RebajaVigente("P2-001", reb.LIQUIDACION, D("150"), D("250"), None)
+OFERTA_PLAYERA_3PZ = reb.RebajaVigente("PLY-001", reb.OFERTA, D("160"), D("180"), None)
+
+
+def _pants_3pz(rebaja=None, **extra):
+    it = {"sku": "P2-001", "nombre": "Pants 2pz Deportivo", "talla": "6", "color": "Rojo", "precio": D("250"),
+          "cantidad": 1, **extra}
+    return reb.aplicar(it, rebaja) if rebaja is not None else it
+
+
+def _playera_promo():
+    from pos_uniformes.ui.helpers.quick_sale_sports_uniform_helper import adapt_cache_row, build_promo_playera_item
+
+    return build_promo_playera_item(adapt_cache_row(_FILAS_3PZ["PLY-001"]), base_sku="P2-001")
+
+
+def _fila(sku, producto, precio):
+    return {"sku": sku, "producto_nombre": producto, "producto_nombre_base": producto, "producto_descripcion": "",
+            "escuela_nombre": "Colegio Mexico", "tipo_prenda_nombre": "", "tipo_pieza_nombre": "", "talla": "6",
+            "color": "Rojo", "precio_venta": precio, "producto_activo": True, "variante_activo": True}
+
+
+_FILAS_3PZ = {
+    "P2-001": _fila("P2-001", "Pants 2pz Deportivo", "250.00"),
+    "PLY-001": _fila("PLY-001", "Playera Deportiva", "180.00"),
+}
+
+
+class Promo3pzReglaTests(unittest.TestCase):
+    def test_la_promo_aplica_solo_si_el_pants_no_esta_rebajado(self) -> None:
+        from pos_uniformes.services import sports_uniform_pricing_service as spp
+
+        self.assertTrue(spp.promo_3pz_aplica(_pants_3pz()))
+        self.assertTrue(spp.promo_3pz_aplica(None))
+        self.assertFalse(spp.promo_3pz_aplica(_pants_3pz(OFERTA_PANTS_3PZ)))
+        self.assertFalse(spp.promo_3pz_aplica(_pants_3pz(LIQ_PANTS_3PZ)))
+
+    def test_el_aviso_dice_por_que(self) -> None:
+        from pos_uniformes.services import sports_uniform_pricing_service as spp
+
+        self.assertEqual(spp.aviso_promo_3pz_no_aplica(_pants_3pz(OFERTA_PANTS_3PZ)),
+                         "La playera va a precio normal: el pants ya está en Oferta.")
+        self.assertEqual(spp.aviso_promo_3pz_no_aplica(_pants_3pz(LIQ_PANTS_3PZ)),
+                         "La playera va a precio normal: el pants ya está en Liquidación.")
+
+    def test_pants_rebajado_regresa_la_playera_a_precio_normal(self) -> None:
+        from pos_uniformes.services import sports_uniform_pricing_service as spp
+
+        pants = _pants_3pz(OFERTA_PANTS_3PZ, sports_uniform_role="base", sports_uniform_playera_sku="PLY-001")
+        playera = _playera_promo()
+        self.assertEqual(playera["precio"], D("100.00"))
+        avisos, regresadas = spp.quitar_promo_3pz_de_pants_rebajados([pants, playera])
+        self.assertEqual(avisos, ["La playera va a precio normal: el pants ya está en Oferta."])
+        self.assertEqual(regresadas, [playera])
+        self.assertEqual((playera["precio"], playera["nombre"]), (D("180.00"), "Playera Deportiva"))
+        for llave in ("sports_uniform_role", "sports_uniform_base_sku", "precio_base"):
+            self.assertNotIn(llave, playera)
+        self.assertNotIn("sports_uniform_role", pants)
+        self.assertFalse(dps.es_promo_3pz(pants) or dps.es_promo_3pz(playera))
+        # El pants sigue rebajado.
+        self.assertEqual((pants["precio"], pants["rebaja"]), (D("175"), "oferta"))
+
+    def test_con_el_pants_a_precio_normal_no_cambia_nada(self) -> None:
+        from pos_uniformes.services import sports_uniform_pricing_service as spp
+
+        pants = _pants_3pz(sports_uniform_role="base", sports_uniform_playera_sku="PLY-001")
+        playera = _playera_promo()
+        antes = (dict(pants), dict(playera))
+        self.assertEqual(spp.quitar_promo_3pz_de_pants_rebajados([pants, playera]), ([], []))
+        self.assertEqual((pants, playera), antes)
+
+    def test_solo_la_playera_de_ese_pants(self) -> None:
+        from pos_uniformes.services import sports_uniform_pricing_service as spp
+
+        pants = _pants_3pz(OFERTA_PANTS_3PZ, sports_uniform_role="base", sports_uniform_playera_sku="PLY-001")
+        otro = {"sku": "P2-002", "nombre": "Pants 2pz Deportivo", "precio": D("250"), "cantidad": 1,
+                "sports_uniform_role": "base", "sports_uniform_playera_sku": "PLY-002"}
+        suya = _playera_promo()
+        ajena = dict(_playera_promo(), sku="PLY-002", sports_uniform_base_sku="P2-002")
+        spp.quitar_promo_3pz_de_pants_rebajados([pants, otro, suya, ajena])
+        self.assertEqual(suya["precio"], D("180.00"))
+        self.assertEqual(ajena["precio"], D("100.00"))
+        self.assertEqual(otro["sports_uniform_role"], "base")
+
+
+class Promo3pzKioskoTests(_Qt):
+    def _kiosko_3pz(self, rebajas=None):
+        from pos_uniformes.ui.views.quick_sale_view import QuickSaleWidget
+
+        filas = _FILAS_3PZ
+        satelite = SimpleNamespace(
+            offline_mode=True,
+            _kiosk_lookup_from_cache=lambda sku: SimpleNamespace(
+                sku=sku, product_name=filas[sku]["producto_nombre"], size_label="6", color_label="Rojo",
+                price=D(filas[sku]["precio_venta"])),
+            _find_row_by_sku=lambda sku: filas.get(sku),
+            catalog_snapshot_rows=list(filas.values()),
+        )
+        w = QuickSaleWidget(satelite)
+        w._employee_code = "VEND-2"
+        w._employee_name = "Ana"
+        w._rebajas = dict(rebajas or {})
+        w._rebajas_leidas_en = 10**12
+        return w
+
+    def _resolucion_3pz(self):
+        from pos_uniformes.ui.helpers.quick_sale_sports_uniform_helper import adapt_cache_row
+        from pos_uniformes.ui.helpers.sale_sports_uniform_helper import SaleSportsUniformResolution
+
+        return SaleSportsUniformResolution(
+            variants=(adapt_cache_row(_FILAS_3PZ["P2-001"]), adapt_cache_row(_FILAS_3PZ["PLY-001"])),
+            composed_as_three_pieces=True, selected_playera_sku="PLY-001")
+
+    def test_pants_en_oferta_no_ofrece_la_promo(self) -> None:
+        w = self._kiosko_3pz({"P2-001": OFERTA_PANTS_3PZ})
+        with patch("pos_uniformes.ui.views.quick_sale_view.resolve_sale_scan_variants") as resolver:
+            self.assertTrue(w.add_sku("P2-001"))
+        resolver.assert_not_called()
+        (pants,) = w._items
+        self.assertEqual((pants["precio"], pants["rebaja"]), (D("175"), "oferta"))
+        self.assertNotIn("sports_uniform_role", pants)
+        self.assertEqual(w._scan_hint.text(), "La playera va a precio normal: el pants ya está en Oferta.")
+
+    def test_pants_a_precio_normal_si_ofrece_la_promo(self) -> None:
+        w = self._kiosko_3pz()
+        with patch("pos_uniformes.ui.views.quick_sale_view.resolve_sale_scan_variants",
+                   return_value=self._resolucion_3pz()):
+            self.assertTrue(w.add_sku("P2-001"))
+        self.assertEqual([it["precio"] for it in w._items], [D("250"), D("100.00")])
+
+    def test_playera_primero_y_luego_el_pants_en_oferta(self) -> None:
+        w = self._kiosko_3pz({"P2-001": OFERTA_PANTS_3PZ})
+        with patch("pos_uniformes.ui.views.quick_sale_view.resolve_sale_scan_variants") as resolver:
+            self.assertTrue(w.add_sku("PLY-001"))
+            self.assertTrue(w.add_sku("P2-001"))
+        resolver.assert_not_called()
+        playera, pants = w._items
+        self.assertEqual(playera["precio"], D("180.00"))
+        self.assertEqual(pants["precio"], D("175"))
+
+    def test_otra_pieza_del_mismo_pants_rebajado_tampoco(self) -> None:
+        w = self._kiosko_3pz({"P2-001": LIQ_PANTS_3PZ})
+        with patch("pos_uniformes.ui.views.quick_sale_view.resolve_sale_scan_variants") as resolver:
+            w.add_sku("P2-001")
+            w.add_sku("P2-001")
+        resolver.assert_not_called()
+        (pants,) = w._items
+        self.assertEqual(pants["cantidad"], 2)
+        self.assertIn("Liquidación", w._scan_hint.text())
+
+    def test_si_el_pants_queda_rebajado_la_playera_regresa_a_precio_normal(self) -> None:
+        from PyQt6.QtWidgets import QMessageBox
+
+        w = self._kiosko_3pz()
+        with patch("pos_uniformes.ui.views.quick_sale_view.resolve_sale_scan_variants",
+                   return_value=self._resolucion_3pz()):
+            w.add_sku("P2-001")
+        # La rebaja le llega al renglón del pants (p. ej. la lista se recargó).
+        reb.aplicar(w._items[0], OFERTA_PANTS_3PZ)
+        with patch.object(QMessageBox, "information") as aviso:
+            w._on_add_one(0)
+        pants, playera = w._items
+        self.assertEqual(playera["precio"], D("180.00"))
+        self.assertNotIn("(promo 3pz)", playera["nombre"])
+        self.assertNotIn("sports_uniform_role", pants)
+        self.assertIn("el pants ya está en Oferta", aviso.call_args[0][2])
+        # La playera ya es prenda normal: el 5 % de empleada sí le toca.
+        w._discount_active = True
+        _sub, descuento, _total = w._compute_totals()
+        self.assertEqual(descuento, D("9.00"))
+
+    def test_la_playera_que_regresa_toma_su_propia_oferta(self) -> None:
+        from PyQt6.QtWidgets import QMessageBox
+
+        w = self._kiosko_3pz({"PLY-001": OFERTA_PLAYERA_3PZ})
+        with patch("pos_uniformes.ui.views.quick_sale_view.resolve_sale_scan_variants",
+                   return_value=self._resolucion_3pz()):
+            w.add_sku("P2-001")
+        self.assertEqual(w._items[1]["precio"], D("100.00"))
+        reb.aplicar(w._items[0], OFERTA_PANTS_3PZ)
+        with patch.object(QMessageBox, "information"):
+            w._on_add_one(0)
+        _pants, playera = w._items
+        self.assertEqual((playera["precio"], playera.get("rebaja")), (D("160"), "oferta"))
+
+    def test_quitar_el_pants_rebajado_deja_la_playera_como_estaba(self) -> None:
+        w = self._kiosko_3pz({"P2-001": OFERTA_PANTS_3PZ})
+        w.add_sku("PLY-001")
+        with patch("pos_uniformes.ui.views.quick_sale_view.resolve_sale_scan_variants"):
+            w.add_sku("P2-001")
+        w._on_delete_line(1)
+        (playera,) = w._items
+        self.assertEqual(playera["precio"], D("180.00"))
+
+    def test_reproduccion_club_monedero_sobre_la_playera_a_precio_normal(self) -> None:
+        """Antes: pants en Oferta $175 + playera promo $100 → base $100, abono $5.
+        Ahora la playera va a $180 y es la base del Monedero."""
+        from pos_uniformes.services import beneficios_carrito as bc
+        from pos_uniformes.services.beneficios.motor import calcular
+
+        w = self._kiosko_3pz({"P2-001": OFERTA_PANTS_3PZ})
+        with patch("pos_uniformes.ui.views.quick_sale_view.resolve_sale_scan_variants"):
+            w.add_sku("P2-001")
+            w.add_sku("PLY-001")
+        entrada = bc.entrada_desde_carrito(
+            w._items, fecha_venta=datetime(2026, 11, 12, tzinfo=UTC),
+            cliente={"id": 1, "programa": "club", "tasa": D("5"), "estado": "activo"})
+        c = calcular(entrada)
+        self.assertEqual(c.total, D("355.00"))
+        self.assertEqual((c.monedero.base, c.monedero.abono), (D("180.00"), D("9.00")))
+        self.assertEqual(sorted(l.clasificacion_al_vender for l in c.lineas), ["normal", "oferta"])
+
+
+class Promo3pzMotorTests(unittest.TestCase):
+    """Defensa del motor: si aun así llega una promo 3pz con el pants base
+    rebajado, los importes no cambian pero queda el motivo en la fotografía."""
+
+    def _calculo(self, pants):
+        from pos_uniformes.services import beneficios_carrito as bc
+        from pos_uniformes.services.beneficios import motivos as M
+        from pos_uniformes.services.beneficios.motor import calcular
+
+        items = [pants, _playera_promo()]
+        c = calcular(bc.entrada_desde_carrito(
+            items, fecha_venta=datetime(2026, 11, 12, tzinfo=UTC),
+            cliente={"id": 1, "programa": "club", "tasa": D("5"), "estado": "activo"}))
+        return c, M.TRES_PZ_CON_PANTS_REBAJADO
+
+    def test_queda_el_motivo_con_el_pants_rebajado(self) -> None:
+        c, motivo = self._calculo(_pants_3pz(OFERTA_PANTS_3PZ, sports_uniform_role="base"))
+        self.assertIn(motivo, c.motivos_ticket)
+        self.assertTrue(all(motivo in l.motivos for l in c.lineas))
+        # Los importes, como antes: el kiosko es quien regresa la playera.
+        self.assertEqual((c.total, c.monedero.base, c.monedero.abono), (D("275.00"), D("100.00"), D("5.00")))
+
+    def test_sin_rebaja_no_hay_motivo(self) -> None:
+        c, motivo = self._calculo(_pants_3pz(sports_uniform_role="base"))
+        self.assertNotIn(motivo, c.motivos_ticket)
+        self.assertFalse(any(motivo in l.motivos for l in c.lineas))
+
+
 if __name__ == "__main__":
     unittest.main()

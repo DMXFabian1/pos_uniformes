@@ -11,13 +11,13 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from pos_uniformes.services.sports_uniform_pricing_service import THREE_PIECE_PLAYERA_PRICE
+from pos_uniformes.services.sports_uniform_pricing_service import PROMO_NAME_SUFFIX, THREE_PIECE_PLAYERA_PRICE
 from pos_uniformes.ui.helpers.sale_sports_uniform_helper import (
     belongs_to_same_school,
     is_deportivo_playera_variant,
 )
 
-_PROMO_NAME_SUFFIX = " (promo 3pz)"
+_PROMO_NAME_SUFFIX = PROMO_NAME_SUFFIX
 
 # Piezas que son deportivas POR DEFINICIÓN aunque el nombre no diga
 # "deportivo" (ej. "Pants 2pz Punto Verde"). El cache no trae tipo_uniforme,

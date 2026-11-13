@@ -49,6 +49,32 @@ class RebajaVentaMixin:
         if rebaja is not None:
             reb.aplicar(item, rebaja)
 
+    # ─── Promo 3pz con el pants rebajado (Daniel, 2026-11-12: «Sí, que no aplique») ───
+
+    def _aviso_si_pants_rebajado(self, sku: str, existente: dict | None) -> str:
+        """Vacío si la promo 3pz se puede ofrecer con este pants; si no, el
+        aviso para la empleada. El renglón que ya está en el carrito manda;
+        si es nuevo, la lista de rebajas."""
+        from pos_uniformes.services import sports_uniform_pricing_service as spp
+
+        pants = existente
+        if pants is None:
+            pants = {"sku": sku}
+            self._aplicar_rebaja(pants)
+        return "" if spp.promo_3pz_aplica(pants) else spp.aviso_promo_3pz_no_aplica(pants)
+
+    def _revisar_promo_3pz(self) -> list[str]:
+        """Si un pants base de la promo quedó rebajado, su playera regresa a
+        su precio normal (con su propia rebaja, si la tiene). Devuelve los
+        avisos para la empleada."""
+        from pos_uniformes.services import sports_uniform_pricing_service as spp
+
+        avisos, regresadas = spp.quitar_promo_3pz_de_pants_rebajados(getattr(self, "_items", []) or [])
+        for playera in regresadas:
+            if not reb.es_rebajado(playera):
+                self._aplicar_rebaja(playera)
+        return avisos
+
     def _hay_rebajados(self, items: list[dict]) -> bool:
         return any(reb.es_rebajado(it) for it in items)
 

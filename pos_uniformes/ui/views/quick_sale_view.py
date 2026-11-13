@@ -947,9 +947,17 @@ class QuickSaleWidget(
             qty = 1
 
         # ── Promo 3pz: pants 2pz deportivo puede llevar playera a $100 ──
+        # Salvo que el pants esté en Oferta o Liquidación (E7, Daniel
+        # 2026-11-12: «Sí, que no aplique»): ahí la playera va a precio normal.
         promo_playera_item: dict | None = None
+        existing = next((it for it in self._items if it["sku"] == snap.sku), None)
         base_adapter = adapt_cache_row(self._find_satellite_row(snap.sku))
+        aviso_rebajado = ""
         if base_adapter is not None and is_deportivo_two_piece_variant(base_adapter):
+            aviso_rebajado = self._aviso_si_pants_rebajado(snap.sku, existing)
+        if aviso_rebajado:
+            self._flash_scan_hint(aviso_rebajado)
+        elif base_adapter is not None and is_deportivo_two_piece_variant(base_adapter):
             try:
                 resolution = resolve_sale_scan_variants(
                     self,
@@ -970,7 +978,6 @@ class QuickSaleWidget(
                     resolution.variants[1], base_sku=snap.sku
                 )
 
-        existing = next((it for it in self._items if it["sku"] == snap.sku), None)
         if existing:
             existing["cantidad"] += qty
             base_item = existing
@@ -1005,9 +1012,18 @@ class QuickSaleWidget(
             else:
                 self._items.append(promo_playera_item)
 
+        self._refrescar_carrito_con_promo_3pz()
+        return True
+
+    def _refrescar_carrito_con_promo_3pz(self) -> None:
+        """Repinta el carrito. Antes, si un pants base de la promo 3pz quedó
+        en Oferta o Liquidación, su playera regresa a precio normal y la
+        empleada ve por qué (Daniel, 2026-11-12: «Sí, que no aplique»)."""
+        avisos = self._revisar_promo_3pz()
         self._refresh_items_table()
         self._refresh_totals()
-        return True
+        if avisos:
+            QMessageBox.information(self, "Promo 3pz", "\n".join(avisos))
 
     def _lookup_sku(self, sku: str):
         """El catálogo en memoria primero; Postgres solo si el SKU no está.
@@ -1198,8 +1214,7 @@ class QuickSaleWidget(
     def _on_add_one(self, row: int) -> None:
         if 0 <= row < len(self._items):
             self._items[row]["cantidad"] += 1
-            self._refresh_items_table()
-            self._refresh_totals()
+            self._refrescar_carrito_con_promo_3pz()
 
     def _on_delete_line(self, row: int) -> None:
         """Elimina la línea completa (todas sus piezas de un golpe)."""
@@ -1208,8 +1223,7 @@ class QuickSaleWidget(
             message = restore_promo_playera_after_base_removed(self._items, removed)
             if message:
                 QMessageBox.information(self, "Promo 3pz", message)
-            self._refresh_items_table()
-            self._refresh_totals()
+            self._refrescar_carrito_con_promo_3pz()
 
     def _on_remove(self, row: int) -> None:
         if 0 <= row < len(self._items):
@@ -1223,8 +1237,7 @@ class QuickSaleWidget(
                 message = restore_promo_playera_after_base_removed(self._items, removed)
                 if message:
                     QMessageBox.information(self, "Promo 3pz", message)
-            self._refresh_items_table()
-            self._refresh_totals()
+            self._refrescar_carrito_con_promo_3pz()
 
     # ─── Descuento ───────────────────────────────────────────────────────
 
