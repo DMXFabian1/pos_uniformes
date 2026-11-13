@@ -43,7 +43,6 @@ if (Test-Path $zipPath) {
     tests.test_quote_feedback_helper `
     tests.test_quote_kiosk_lookup_helper `
     tests.test_quote_satellite_filter_helper `
-    tests.test_quote_selection_helper `
     tests.test_quote_snapshot_service `
     tests.test_quote_text_service `
     tests.test_quote_whatsapp_service `

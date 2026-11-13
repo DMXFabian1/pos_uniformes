@@ -224,45 +224,6 @@ def _build_main_window_shell_styles() -> str:
                 padding: 9px 12px;
                 font-weight: 700;
             }
-            #quoteFormLabel {
-                background: transparent;
-                border: none;
-                color: #7a4f39;
-                padding: 0;
-                font-size: 12px;
-                font-weight: 800;
-            }
-            #quoteDetailCard {
-                background: #fdfcf9;
-                border: 1px solid #ddd4c8;
-                border-radius: 14px;
-            }
-            #quoteDetailTitle {
-                background: transparent;
-                border: none;
-                color: #3f2c23;
-                font-size: 18px;
-                font-weight: 900;
-                padding: 0;
-            }
-            #quoteDetailMetaText {
-                background: transparent;
-                border: none;
-                color: #61564d;
-                font-size: 12px;
-                font-weight: 700;
-                line-height: 1.35em;
-                padding: 0;
-            }
-            #quoteDetailNotesText {
-                background: transparent;
-                border: none;
-                color: #6a6057;
-                font-size: 12px;
-                font-weight: 600;
-                line-height: 1.35em;
-                padding: 0;
-            }
             #settingsLaunchCard {
                 background: #fdfaf6;
                 border: 1px solid #ddd0c0;
