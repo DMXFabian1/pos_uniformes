@@ -145,10 +145,6 @@ from pos_uniformes.services.history_snapshot_service import (
     HistorySnapshotFilters,
     load_history_snapshot_rows,
 )
-from pos_uniformes.services.inventario_service import (
-    AjusteMasivoFilaInput,
-    InventarioService,
-)
 from pos_uniformes.services.inventory_label_service import (
     load_inventory_label_context,
     render_inventory_label,
@@ -445,6 +441,7 @@ from pos_uniformes.ui.helpers.inventory_label_windows_print_helper import print_
 from pos_uniformes.ui.views.analytics_view import build_analytics_tab
 from pos_uniformes.ui.views.dashboard_view import build_dashboard_tab
 from pos_uniformes.ui.views.history_view import build_history_tab
+from pos_uniformes.ui.helpers import inventario_acciones
 from pos_uniformes.ui.helpers.inventario_tabla_helper import pintar_filas_inventario
 from pos_uniformes.ui.views.inventory_view import build_inventory_tab
 from pos_uniformes.ui.views.products_view import build_products_tab
@@ -5975,175 +5972,13 @@ class MainWindow(QMainWindow):
         return f"{preview_head} ... (+{len(preview_list) - 4}) | rango {preview_list[0]} -> {preview_list[-1]}"
 
     def _handle_inventory_adjustment(self) -> None:
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede ajustar inventario.")
-            return
-
-        try:
-            data = self._prompt_inventory_adjustment_data()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "Datos incompletos", str(exc))
-            return
-        if data is None:
-            return
-
-        variante_id = data["variante_id"]
-        if not variante_id:
-            QMessageBox.warning(self, "Datos incompletos", "Selecciona una presentacion.")
-            return
-
-        signed_quantity = int(data["cantidad"])
-        if signed_quantity == 0:
-            QMessageBox.information(self, "Sin cambios", "El stock final coincide con el stock actual.")
-            return
-        reference = str(data["referencia"]).strip() or f"ADJ-{uuid4().hex[:8].upper()}"
-        note = str(data["observacion"]).strip() or None
-        target_stock = int(data.get("stock_final", 0))
-
-        try:
-            with get_session() as session:
-                user = session.get(Usuario, self.user_id)
-                variante = session.get(Variante, int(variante_id))
-                if user is None or variante is None:
-                    raise ValueError("Usuario o presentacion no encontrada.")
-                InventarioService.registrar_ajuste_manual(
-                    session=session,
-                    variante=variante,
-                    cantidad=signed_quantity,
-                    usuario=user,
-                    referencia=reference,
-                    observacion=note,
-                )
-                session.commit()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Ajuste fallido", str(exc))
-            return
-
-        self.refresh_all()
-        self._set_combo_value(self.inventory_variant_combo, variante_id)
-        QMessageBox.information(
-            self,
-            "Inventario actualizado",
-            f"Ajuste {reference} aplicado correctamente. Stock final: {target_stock}.",
-        )
+        inventario_acciones.corregir_existencia(self)
 
     def _handle_inventory_bulk_adjustment(self) -> None:
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede ajustar inventario en lote.")
-            return
-
-        try:
-            data = self._prompt_inventory_bulk_adjustment_data()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "Ajuste masivo no disponible", str(exc))
-            return
-        if data is None:
-            return
-
-        items = [
-            AjusteMasivoFilaInput(variante_id=int(item["variante_id"]), valor_capturado=int(item["valor"]))
-            for item in data.get("items", [])
-        ]
-        if not items:
-            QMessageBox.warning(self, "Sin filas", "No hay filas para ajustar en el lote.")
-            return
-
-        reference = str(data["referencia"]).strip()
-        motive = str(data["motivo"]).strip() or "Ajuste masivo desde interfaz POS."
-        note = str(data["observacion"]).strip() or None
-
-        try:
-            with get_session() as session:
-                user = session.get(Usuario, self.user_id)
-                if user is None:
-                    raise ValueError("Usuario no encontrado.")
-                lote, preview = InventarioService.aplicar_ajuste_masivo(
-                    session=session,
-                    usuario=user,
-                    tipo_fuente=str(data["tipo_fuente"]),
-                    tipo_ajuste=str(data["tipo_ajuste"]),
-                    referencia=reference,
-                    motivo=motive,
-                    observacion=note,
-                    filas_input=items,
-                )
-                session.commit()
-                lote_id = int(lote.id)
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Ajuste masivo fallido", str(exc))
-            return
-
-        self.refresh_all()
-        QMessageBox.information(
-            self,
-            "Ajuste masivo aplicado",
-            (
-                f"Lote {reference} aplicado correctamente.\n"
-                f"ID lote: {lote_id}\n"
-                f"Filas: {preview.total_filas}\n"
-                f"Validas: {preview.filas_validas}\n"
-                f"Unidades +: {preview.unidades_positivas}\n"
-                f"Unidades -: {preview.unidades_negativas}"
-            ),
-        )
+        inventario_acciones.corregir_existencias_en_lote(self)
 
     def _handle_inventory_bulk_price_update(self) -> None:
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede actualizar precios en lote.")
-            return
-
-        try:
-            data = self._prompt_inventory_bulk_price_data()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "Precio masivo no disponible", str(exc))
-            return
-        if data is None:
-            return
-
-        items = [
-            (int(item["variante_id"]), Decimal(str(item["precio_nuevo"])))
-            for item in data.get("items", [])
-            if str(item.get("estado", "")) != "ERROR"
-        ]
-        if not items:
-            QMessageBox.warning(self, "Sin filas", "No hay filas validas para actualizar precio en el lote.")
-            return
-
-        reference = str(data["referencia"]).strip()
-        motive = str(data["motivo"]).strip() or "Cambio masivo de precio desde interfaz POS."
-        note = str(data["observacion"]).strip() or None
-
-        try:
-            with get_session() as session:
-                user = session.get(Usuario, self.user_id)
-                if user is None:
-                    raise ValueError("Usuario no encontrado.")
-                resumen = CatalogService.aplicar_cambio_masivo_precio(
-                    session=session,
-                    usuario=user,
-                    referencia=reference,
-                    motivo=motive,
-                    observacion=note,
-                    precios_por_variante=items,
-                )
-                session.commit()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Precio masivo fallido", str(exc))
-            return
-
-        self.refresh_all()
-        QMessageBox.information(
-            self,
-            "Precio masivo aplicado",
-            (
-                f"Lote {reference} aplicado correctamente.\n"
-                f"Filas: {resumen['total_filas']}\n"
-                f"Actualizadas: {resumen['aplicadas']}\n"
-                f"Suben: {resumen['suben']}\n"
-                f"Bajan: {resumen['bajan']}\n"
-                f"Sin cambios: {resumen['sin_cambios']}"
-            ),
-        )
+        inventario_acciones.cambiar_precios_en_lote(self)
 
     def _handle_open_conteo_calendario(self) -> None:
         if self.current_role != RolUsuario.ADMIN:
@@ -6193,66 +6028,7 @@ class MainWindow(QMainWindow):
         prompt_uniforme_escuela_admin(self)
 
     def _handle_inventory_count(self) -> None:
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede realizar conteos fisicos.")
-            return
-
-        try:
-            data = self._prompt_inventory_count_data()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "Conteo no disponible", str(exc))
-            return
-        if data is None:
-            return
-
-        conteos = list(data.get("conteos", []))
-        if not conteos:
-            QMessageBox.information(self, "Sin diferencias", "No se detectaron diferencias entre sistema y conteo.")
-            return
-
-        reference = str(data["referencia"]).strip() or f"CONTEO-{uuid4().hex[:8].upper()}"
-        note = str(data["observacion"]).strip() or "Conteo fisico desde interfaz POS."
-        todos_variante_ids: list[int] = [int(v) for v in data.get("todos_variante_ids", [])]
-
-        try:
-            with get_session() as session:
-                user = session.get(Usuario, self.user_id)
-                if user is None:
-                    raise ValueError("Usuario no encontrado.")
-                now = datetime.now(tz=timezone.utc)
-                applied_ids: set[int] = set()
-                for row in conteos:
-                    variante = session.get(Variante, int(row["variante_id"]))
-                    if variante is None:
-                        raise ValueError("Presentacion no encontrada durante el conteo.")
-                    InventarioService.registrar_ajuste_manual(
-                        session=session,
-                        variante=variante,
-                        cantidad=int(row["delta"]),
-                        usuario=user,
-                        referencia=reference,
-                        observacion=(
-                            f"{note} Stock sistema {row['stock_sistema']} -> contado {row['stock_contado']}."
-                        ),
-                    )
-                    variante.ultimo_conteo_at = now
-                    applied_ids.add(int(row["variante_id"]))
-                for variante_id in todos_variante_ids:
-                    if variante_id not in applied_ids:
-                        v = session.get(Variante, variante_id)
-                        if v is not None:
-                            v.ultimo_conteo_at = now
-                session.commit()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Conteo fallido", str(exc))
-            return
-
-        self.refresh_all()
-        QMessageBox.information(
-            self,
-            "Conteo aplicado",
-            f"Conteo {reference} aplicado correctamente. Filas ajustadas: {len(conteos)}.",
-        )
+        inventario_acciones.conteo_fisico_viejo(self)
 
     def _handle_generate_all_qr(self) -> None:
         selected_variant_ids = self._selected_inventory_variant_ids()

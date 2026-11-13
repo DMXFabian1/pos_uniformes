@@ -179,6 +179,33 @@ class InventarioTanda5PantallaTests(unittest.TestCase):
         self.assertTrue(pantalla.ficha.pedidas.isHidden())
         self.assertFalse(pantalla.ficha.venta.isHidden())
 
+    # ── E. main_window solo conecta ──────────────────────────────────────
+
+    def test_los_manejadores_movidos_delegan_en_inventario_acciones(self) -> None:
+        from unittest.mock import patch
+
+        window = self._ventana()
+        movidos = {
+            "_handle_inventory_adjustment": "corregir_existencia",
+            "_handle_inventory_bulk_adjustment": "corregir_existencias_en_lote",
+            "_handle_inventory_bulk_price_update": "cambiar_precios_en_lote",
+            "_handle_inventory_count": "conteo_fisico_viejo",
+        }
+        for metodo, funcion in movidos.items():
+            with patch(f"pos_uniformes.ui.helpers.inventario_acciones.{funcion}") as doble:
+                getattr(window, metodo)()
+            doble.assert_called_once_with(window)
+
+    def test_sin_permiso_no_se_abre_nada(self) -> None:
+        from unittest.mock import patch
+
+        window = self._ventana(rol=RolUsuario.CAJERO)
+        window._prompt_inventory_bulk_price_data = Mock()
+        with patch("pos_uniformes.ui.helpers.inventario_acciones.QMessageBox.warning") as aviso:
+            window._handle_inventory_bulk_price_update()
+        aviso.assert_called_once()
+        window._prompt_inventory_bulk_price_data.assert_not_called()
+
     # ── 1366 px ──────────────────────────────────────────────────────────
 
     def test_a_1366_nada_cortado_ni_scroll_de_mas(self) -> None:
