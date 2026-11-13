@@ -42,8 +42,12 @@ RECETAS_POR_TIPO = {
 }
 
 
-def _tipo_pieza(p: Producto) -> str:
+def tipo_pieza(p: Producto) -> str:
+    """El tipo de pieza de una prenda («Pants 3pz», «Playera»…), o ""."""
     return str(p.tipo_pieza.nombre if p.tipo_pieza is not None else "").strip()
+
+
+_tipo_pieza = tipo_pieza  # nombre viejo, lo usan otros módulos
 
 
 def es_conjunto(producto: Producto) -> bool:
@@ -297,6 +301,20 @@ def empata_en_tallas(session: Session, conjunto: Producto, pieza: Producto) -> b
     if not del_conjunto:
         return True   # sin tallas propias no hay con qué comparar
     return bool(del_conjunto & _tallas_de(session, pieza.id))
+
+
+def piezas_que_faltan(session: Session, escuela_id: int | None, tipo_conjunto: str, nombre: str = "") -> list[str]:
+    """Solo lee: qué tipos de pieza de la receta de `tipo_conjunto` no tiene
+    la escuela (entre las mismas candidatas que usa `proponer_receta`). Sirve
+    para avisar en el plan de un conjunto nuevo antes de crearlo."""
+    from types import SimpleNamespace
+
+    plantilla = RECETAS_POR_TIPO.get(str(tipo_conjunto or "").strip())
+    if not plantilla:
+        return []
+    candidatas = _candidatas(session, SimpleNamespace(escuela_id=escuela_id, nombre=nombre or ""))
+    tipos = {tipo_pieza(p) for p in candidatas}
+    return [tipo for tipo, _c in plantilla if tipo not in tipos]
 
 
 def proponer_receta(session: Session, conjunto: Producto) -> dict:

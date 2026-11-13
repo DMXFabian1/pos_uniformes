@@ -275,6 +275,32 @@ class AplicarTests(_Base):
         self.assertEqual(r.productos[0].recetas, ())
         self.assertTrue(any("falta Pants 2pz" in a for a in r.productos[0].avisos))
 
+    def test_conjunto_con_existencia_propia_no_pierde_su_existencia(self) -> None:
+        """Hallazgo de revisión: completar la receta sincroniza la existencia
+        del conjunto con la de sus piezas; si tenía juegos contados propios
+        se perdían. Ahora no se toca y se avisa."""
+        from pos_uniformes.services.inventario_service import InventarioService
+
+        chamarra = self.caja.productos[(JARAL, "Chamarra")]
+        talla10 = next(v for v in chamarra.variantes if v.talla == "10")
+        InventarioService.registrar_ajuste_manual(self.s, talla10, 12, self.admin, referencia="CONTEO")
+        self.s.commit()
+        plan = self.pants_suelto_jaral(color="Gris")
+        self.assertEqual(plan.receta_texto, "")
+        aviso = "«Chamarra Deportiva Ignacio Allende (Jaral)» tiene 12 en existencia propia"
+        self.assertTrue(any(a.startswith(aviso) for a in plan.avisos), plan.avisos)
+        r = alta.aplicar(self.s, plan, self.admin, commit=True)
+        self.assertEqual(r.productos[0].recetas, ())
+        self.assertTrue(any(a.startswith(aviso) for a in r.productos[0].avisos))
+        self.assertEqual(self._receta("Chamarra"), [])
+        self.s.refresh(talla10)
+        self.assertEqual(talla10.stock_actual, 12)
+
+    def test_el_plan_de_un_conjunto_dice_que_pieza_le_falta(self) -> None:
+        plan = alta.planear_desde_modelo(self.s, "Técnica 18", "Chamarra", nivel="Secundaria")
+        self.assertIn("falta Pants 2pz", plan.receta_texto)
+        self.assertEqual(plan.errores, [])
+
     def test_nunca_baja_un_precio_que_ya_existe(self) -> None:
         precios_antes = dict(self.s.execute(select(Variante.id, Variante.precio_venta)).all())
         planes = alta.planear_varias_escuelas(self.s, ["Miguel Hidalgo", "Justo Sierra", "Benito Juárez"], "Suéter",

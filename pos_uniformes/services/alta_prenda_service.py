@@ -49,6 +49,7 @@ from pos_uniformes.database.models import (
     TipoPieza,
     TipoPrenda,
     Usuario,
+    Variante,
 )
 from pos_uniformes.services import catalogo_valores_service as valores
 from pos_uniformes.services import conjunto_service, hermanos_service, uniforme_service
@@ -340,22 +341,78 @@ def _revisar_precios(plan: PlanPrenda, usos: _Usos) -> None:
         plan.avisos.append("Queda más bajo que en las demás escuelas: " + ", ".join(bajos) + ".")
 
 
+@dataclass(frozen=True)
+class RecetasDeLaEscuela:
+    """Qué pasa con los conjuntos (Pants 3pz, Chamarra) de la escuela al dar
+    de alta una de sus piezas. Una sola regla para el plan y para `aplicar`."""
+
+    #: Sin receta y sin existencia propia: su receta se completa.
+    completar: tuple[Producto, ...] = ()
+    #: Sin receta pero con existencia propia: NO se tocan (armar su receta
+    #: pondría su existencia en la calculada de sus piezas y se perdería lo
+    #: contado). Se avisa.
+    con_existencia: tuple[tuple[Producto, int], ...] = ()
+
+    def avisos(self) -> list[str]:
+        return [
+            f"«{c.nombre}» tiene {n} en existencia propia: su receta no se arma sola para no perderla. "
+            "Ármala en Uniformes por escuela."
+            for c, n in self.con_existencia
+        ]
+
+
+def recetas_de_la_escuela(session: Session, escuela_id: int | None, tipo_pieza: str | None) -> RecetasDeLaEscuela:
+    """Los conjuntos activos de la escuela cuya receta lleva `tipo_pieza` y
+    todavía no tienen receta (una receta que ya existe no se pisa). Tres
+    consultas, nada por fila."""
+    if escuela_id is None or not tipo_pieza:
+        return RecetasDeLaEscuela()
+    candidatos = [
+        c for c in _conjuntos_de_la_escuela(session, escuela_id)
+        if tipo_pieza in {t for t, _ in conjunto_service.RECETAS_POR_TIPO.get(conjunto_service.tipo_pieza(c), ())}
+    ]
+    if not candidatos:
+        return RecetasDeLaEscuela()
+    ids = [int(c.id) for c in candidatos]
+    con_receta = set(
+        session.scalars(
+            select(ConjuntoComponente.conjunto_id).where(ConjuntoComponente.conjunto_id.in_(ids)).distinct()
+        ).all()
+    )
+    existencia: dict[int, list[int]] = {}
+    for pid, stock in session.execute(
+        select(Variante.producto_id, Variante.stock_actual).where(
+            Variante.producto_id.in_(ids), Variante.activo.is_(True)
+        )
+    ).all():
+        existencia.setdefault(int(pid), []).append(int(stock or 0))
+    completar, con_existencia = [], []
+    for c in candidatos:
+        if c.id in con_receta:
+            continue  # ajustada a mano o ya armada: no se pisa
+        stocks = existencia.get(int(c.id), [])
+        if any(stocks):
+            con_existencia.append((c, sum(x for x in stocks if x > 0)))
+        else:
+            completar.append(c)
+    return RecetasDeLaEscuela(tuple(completar), tuple(con_existencia))
+
+
 def _receta_prevista(session: Session, plan: PlanPrenda) -> str:
     if plan.es_conjunto:
+        faltan = conjunto_service.piezas_que_faltan(session, plan.escuela_id, plan.tipo_pieza or "", plan.nombre)
+        if faltan:
+            return (
+                f"Receta {plan.tipo_pieza}: no se puede armar todavía, falta {', '.join(faltan)} "
+                "en la escuela (la prenda sí se crea)."
+            )
         return f"Receta {plan.tipo_pieza}: se propone con las piezas de la escuela."
-    if plan.escuela_id is None or not plan.tipo_pieza:
+    recetas = recetas_de_la_escuela(session, plan.escuela_id, plan.tipo_pieza)
+    plan.avisos.extend(recetas.avisos())
+    if not recetas.completar:
         return ""
-    afectados = []
-    for c in _conjuntos_de_la_escuela(session, plan.escuela_id):
-        plantilla = conjunto_service.RECETAS_POR_TIPO.get(conjunto_service._tipo_pieza(c), ())
-        if plan.tipo_pieza not in {tipo for tipo, _ in plantilla}:
-            continue
-        if _tiene_receta(session, c.id):
-            continue
-        afectados.append(conjunto_service._tipo_pieza(c))
-    if not afectados:
-        return ""
-    return "Receta " + " y ".join(sorted(set(afectados))) + ": se completa."
+    tipos = sorted({conjunto_service.tipo_pieza(c) for c in recetas.completar})
+    return "Receta " + " y ".join(tipos) + ": se completa."
 
 
 def _conjuntos_de_la_escuela(session: Session, escuela_id: int) -> list[Producto]:
@@ -370,14 +427,6 @@ def _conjuntos_de_la_escuela(session: Session, escuela_id: int) -> list[Producto
             )
             .order_by(Producto.id)
         ).all()
-    )
-
-
-def _tiene_receta(session: Session, producto_id: int) -> bool:
-    return bool(
-        session.scalar(
-            select(func.count(ConjuntoComponente.id)).where(ConjuntoComponente.conjunto_id == int(producto_id))
-        )
     )
 
 
@@ -698,21 +747,15 @@ def _marca(session: Session, plan: PlanPrenda, usuario: Usuario) -> Marca:
 
 def _recetas(session: Session, producto: Producto, plan: PlanPrenda, avisos: list[str]) -> list[str]:
     """Propone la receta del conjunto nuevo, o completa las de los conjuntos de
-    la escuela que no tenían. Una receta que ya existe no se toca."""
+    la escuela que no tenían (`recetas_de_la_escuela`). Una receta que ya
+    existe no se toca, ni la de un conjunto con existencia propia."""
     hechas: list[str] = []
     if conjunto_service.es_conjunto(producto):
         candidatos = [producto]
-    elif producto.escuela_id is not None and plan.tipo_pieza:
-        candidatos = []
-        for c in _conjuntos_de_la_escuela(session, producto.escuela_id):
-            plantilla = conjunto_service.RECETAS_POR_TIPO.get(conjunto_service._tipo_pieza(c), ())
-            if plan.tipo_pieza not in {tipo for tipo, _ in plantilla}:
-                continue
-            if _tiene_receta(session, c.id):
-                continue  # ajustada a mano o ya armada: no se pisa
-            candidatos.append(c)
     else:
-        candidatos = []
+        recetas = recetas_de_la_escuela(session, producto.escuela_id, plan.tipo_pieza)
+        candidatos = list(recetas.completar)
+        avisos.extend(recetas.avisos())
     for c in candidatos:
         prop = conjunto_service.proponer_receta(session, c)
         if prop["componentes"]:
@@ -867,6 +910,7 @@ __all__ = [
     "AltaNoValida",
     "PlanPrenda",
     "ProductoCreado",
+    "RecetasDeLaEscuela",
     "ResultadoAlta",
     "TallaCreada",
     "TallaPlan",
@@ -879,4 +923,5 @@ __all__ = [
     "planear",
     "planear_desde_modelo",
     "planear_varias_escuelas",
+    "recetas_de_la_escuela",
 ]
