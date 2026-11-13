@@ -24,6 +24,12 @@ Reglas que eligió Daniel (2026-11-12):
 Lo que se lleva vale el precio de hoy (con su Oferta o Liquidación si la
 tiene). Lo que paga de diferencia se redondea como cualquier cobro (R1).
 
+6. (2026-11-12, Daniel: «Sí, que no aplique») Promo 3pz y E7: la playera a
+   $100 solo va con un pants base que no está rebajado. Si en el cambio se
+   regresa el pants base de la promo y se lleva un Pants 2pz deportivo en
+   Oferta o Liquidación, la playera que se queda pierde la promo: se cobra la
+   diferencia contra su precio normal (`cargo_promo_3pz`).
+
 En la Libreta queda una operación tipo «cambio»: su monto es la diferencia
 que entró al cajón (el corte la cuenta como dinero de venta), sin piezas ni
 comisiones (no es una venta nueva). El stock se mueve con su referencia: lo
@@ -88,6 +94,8 @@ class RenglonVendido:
     valor_pieza: Decimal    # lo que pagó por pieza (con descuentos y redondeo)
     rebajada: bool          # Oferta/Liquidación: no generó Monedero
     liquidacion: bool = False   # vendida en Liquidación: sin cambio (salvo el dueño)
+    rol_3pz: str = ""           # "base" | "playera" de la promo 3pz, o vacío
+    precio_normal: Decimal | None = None   # de la playera en promo: su precio de hoy
 
     @property
     def disponibles(self) -> int:
@@ -144,6 +152,81 @@ def cambios_de_venta(session, venta) -> list[LibretaVenta]:
     return [f for f in filas if ((f.calculo or {}).get("cambio") or {}).get("venta_id") == venta.id]
 
 
+# ─── Promo 3pz en el cambio (E7, 2026-11-12: «Sí, que no aplique») ───────
+
+#: La marca que el kiosko le pone a lo que se lleva cuando es un Pants 2pz
+#: deportivo (el que puede ser base de la promo 3pz).
+LLAVE_PANTS_3PZ = "pants_2pz_deportivo"
+BASE_3PZ, PLAYERA_3PZ = "base", "playera"
+MENSAJE_PROMO_3PZ = "La playera iba en promo con ese pants: el pants nuevo está en {}, la playera se cobra a precio normal."
+
+
+def roles_promo_3pz(detalle: list[dict], calculo: dict | None) -> list[str]:
+    """Qué renglón de la venta fue el pants base y cuál la playera de la promo.
+
+    La Libreta marca `promo_3pz` solo con mayoreo; la fotografía del motor
+    (`calculo.entrada.lineas`) lo trae siempre, ligado por `linea_uid`. La
+    playera se reconoce por su nombre («… (promo 3pz)»). Sin ninguna de las
+    dos marcas, el renglón no es de la promo."""
+    from pos_uniformes.services.sports_uniform_pricing_service import PROMO_NAME_SUFFIX
+
+    lineas = (((calculo or {}).get("entrada") or {}).get("lineas")) or []
+    uids_3pz = {str(l.get("linea_uid")) for l in lineas if isinstance(l, dict) and l.get("promo_3pz")}
+    roles = []
+    for l in detalle:
+        playera = str(l.get("nombre") or "").endswith(PROMO_NAME_SUFFIX)
+        es_3pz = playera or bool(l.get("promo_3pz")) or (bool(l.get("linea_uid")) and str(l["linea_uid"]) in uids_3pz)
+        roles.append(PLAYERA_3PZ if playera else BASE_3PZ if es_3pz else "")
+    return roles
+
+
+def _pants_rebajados_que_lleva(lleva: list[dict]) -> int:
+    from pos_uniformes.services.rebaja_service import es_rebajado
+
+    return sum(int(it.get("cantidad", 0) or 0) for it in lleva if it.get(LLAVE_PANTS_3PZ) and es_rebajado(it))
+
+
+def cargo_promo_3pz(renglones: list[RenglonVendido], regresa: dict[int, int], lleva: list[dict]) -> Decimal:
+    """Lo que se cobra porque la playera de la promo pierde la promo (pura).
+
+    Por cada pants base que regresa y se cambia por un Pants 2pz deportivo
+    rebajado, una playera en promo que se queda se cobra a su precio normal:
+    la diferencia contra lo que pagó por ella. Si se regresa el pants por uno
+    a precio normal (o la playera también regresa), no cambia nada."""
+    bases = sum(int(q) for i, q in regresa.items()
+                if 0 <= int(i) < len(renglones) and renglones[int(i)].rol_3pz == BASE_3PZ)
+    piezas = min(bases, _pants_rebajados_que_lleva(lleva))
+    cargo = _CERO
+    for r in renglones:
+        if piezas <= 0:
+            break
+        if r.rol_3pz != PLAYERA_3PZ or r.precio_normal is None:
+            continue
+        k = min(piezas, max(r.disponibles - int(regresa.get(r.renglon, 0)), 0))
+        piezas -= k
+        cargo += max(r.precio_normal - r.valor_pieza, _CERO) * k
+    return cargo.quantize(_CENT)
+
+
+def aviso_promo_3pz(renglones: list[RenglonVendido], regresa: dict[int, int], lleva: list[dict]) -> str:
+    """El texto corto para la empleada cuando hay cargo de la promo 3pz."""
+    from pos_uniformes.services.rebaja_service import ETIQUETAS, LLAVE, es_rebajado
+
+    if cargo_promo_3pz(renglones, regresa, lleva) <= 0:
+        return ""
+    pants = next(it for it in lleva if it.get(LLAVE_PANTS_3PZ) and es_rebajado(it))
+    return MENSAJE_PROMO_3PZ.format(ETIQUETAS.get(str(pants.get(LLAVE) or ""), "Oferta"))
+
+
+def _precios_normales(session, skus: set[str]) -> dict[str, Decimal]:
+    from pos_uniformes.database.models import Variante
+
+    if not skus:
+        return {}
+    filas = session.execute(select(Variante.sku, Variante.precio_venta).where(Variante.sku.in_(skus))).all()
+    return {str(sku): _d(precio) for sku, precio in filas}
+
+
 def renglones_vendidos(session, venta) -> list[RenglonVendido]:
     ya: dict[int, int] = {}
     for c in cambios_de_venta(session, venta):
@@ -152,13 +235,19 @@ def renglones_vendidos(session, venta) -> list[RenglonVendido]:
                 r = int(l.get("renglon", -1))
                 ya[r] = ya.get(r, 0) + int(l.get("cantidad", 0) or 0)
     valores = valores_por_pieza(venta)
+    detalle = list(venta.detalle or [])
+    roles = roles_promo_3pz(detalle, venta.calculo if isinstance(venta.calculo, dict) else None)
+    normales = _precios_normales(
+        session, {str(l.get("sku", "")) for l, rol in zip(detalle, roles) if rol == PLAYERA_3PZ}
+    )
     return [
         RenglonVendido(
             renglon=i, sku=str(l.get("sku", "")), nombre=str(l.get("nombre", "")), talla=str(l.get("talla", "")),
             vendidas=int(l.get("cantidad", 0) or 0), ya_cambiadas=ya.get(i, 0), valor_pieza=valores[i],
             rebajada=bool(l.get("rebaja")), liquidacion=vendida_en_liquidacion(l),
+            rol_3pz=roles[i], precio_normal=normales.get(str(l.get("sku", ""))) if roles[i] == PLAYERA_3PZ else None,
         )
-        for i, l in enumerate(venta.detalle or [])
+        for i, l in enumerate(detalle)
     ]
 
 
@@ -173,19 +262,23 @@ class Cuenta:
     valor_lleva: Decimal         # lo nuevo, a precio de hoy
     a_pagar: Decimal             # lo que paga de diferencia (redondeado)
     a_favor: Decimal             # lo que va a su Monedero
+    cargo_promo_3pz: Decimal = _CERO   # la playera que pierde la promo 3pz (E7)
 
 
-def cuenta(valor_regresa: Decimal, cashback_quitado: Decimal, valor_lleva: Decimal) -> Cuenta:
+def cuenta(valor_regresa: Decimal, cashback_quitado: Decimal, valor_lleva: Decimal,
+           cargo_promo_3pz: Decimal = _CERO) -> Cuenta:
     from pos_uniformes.services.beneficios.reparto import redondeo_tienda
 
     valor_regresa = valor_regresa.quantize(_CENT)
     cashback_quitado = min(cashback_quitado.quantize(_CENT), valor_regresa)
     reconocido = valor_regresa - cashback_quitado
     valor_lleva = valor_lleva.quantize(_CENT)
-    diferencia = valor_lleva - reconocido
+    cargo_promo_3pz = max(cargo_promo_3pz.quantize(_CENT), _CERO)
+    diferencia = valor_lleva + cargo_promo_3pz - reconocido
     a_pagar = redondeo_tienda(diferencia) if diferencia > 0 else _CERO
     a_favor = -diferencia if diferencia < 0 else _CERO
-    return Cuenta(valor_regresa, cashback_quitado, reconocido, valor_lleva, max(a_pagar, _CERO), a_favor)
+    return Cuenta(valor_regresa, cashback_quitado, reconocido, valor_lleva, max(a_pagar, _CERO), a_favor,
+                  cargo_promo_3pz)
 
 
 def cashback_proporcional(abono: Decimal, ya_quitado: Decimal, renglones: list[RenglonVendido],
@@ -240,7 +333,8 @@ def preparar(session, venta, regresa: dict[int, int], lleva: list[dict]) -> tupl
             )
     valor_regresa = sum((renglones[i].valor_pieza * q for i, q in regresa.items()), Decimal(0))
     quitar = cashback_a_quitar(session, venta, renglones, regresa)
-    return renglones, cuenta(valor_regresa, quitar, _valor_lleva(lleva))
+    cargo = cargo_promo_3pz(renglones, regresa, lleva)
+    return renglones, cuenta(valor_regresa, quitar, _valor_lleva(lleva), cargo)
 
 
 def dias_desde(venta, momento: datetime | None = None) -> int:
@@ -391,6 +485,7 @@ def registrar_cambio(
             "a_pagar": str(c.a_pagar),
             "a_favor": str(c.a_favor),
             "autorizo_dueno": bool(autorizo_dueno),
+            **({"cargo_promo_3pz": str(c.cargo_promo_3pz)} if c.cargo_promo_3pz > 0 else {}),
         }},
         created_at=momento,
     )

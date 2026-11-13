@@ -109,7 +109,25 @@ class FolioVentaMixin:
         }
         self._aplicar_rebaja(item)
         item.pop("cantidad", None)
+        # Promo 3pz (E7, 2026-11-12: «Sí, que no aplique»): si es un Pants 2pz
+        # deportivo rebajado y regresa el pants de la promo, la playera que se
+        # queda se cobra a precio normal (cambio_service.cargo_promo_3pz).
+        if self._es_pants_2pz_deportivo(snap.sku):
+            from pos_uniformes.services.cambio_service import LLAVE_PANTS_3PZ
+
+            item[LLAVE_PANTS_3PZ] = True
         return item
+
+    def _es_pants_2pz_deportivo(self, sku: str) -> bool:
+        from pos_uniformes.ui.helpers.quick_sale_sports_uniform_helper import adapt_cache_row
+        from pos_uniformes.ui.helpers.sale_sports_uniform_helper import is_deportivo_two_piece_variant
+
+        try:
+            adaptado = adapt_cache_row(self._find_satellite_row(sku))
+            return adaptado is not None and bool(is_deportivo_two_piece_variant(adaptado))
+        except Exception:  # noqa: BLE001 — sin el catálogo en memoria, se trata como prenda normal
+            _logger.debug("Cambio: no se pudo saber si %s es Pants 2pz deportivo", sku, exc_info=True)
+            return False
 
     def _elegir_cliente_para_cambio(self, padre):
         from PyQt6.QtWidgets import QDialog
@@ -242,6 +260,9 @@ class FolioVentaMixin:
         if c.cashback_quitado > 0:
             lines.append(tk_row("Monedero ganado:", f"-${tk_fmt(c.cashback_quitado)}"))
         lines.append(tk_row("Se lleva:", f"${tk_fmt(c.valor_lleva)}"))
+        cargo_3pz = getattr(c, "cargo_promo_3pz", None) or Decimal("0")
+        if cargo_3pz > 0:
+            lines.append(tk_row("Playera sin promo 3pz:", f"${tk_fmt(cargo_3pz)}"))
         lines.append(tk_mid())
         if c.a_pagar > 0:
             forma = "tarjeta" if r.cambio.pago_tarjeta else "efectivo"

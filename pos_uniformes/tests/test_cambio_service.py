@@ -237,5 +237,84 @@ class NoSeBorraTests(_Base):
         self.assertTrue(lib.eliminar_operacion(self.s, venta.id))
 
 
+class Promo3pzTests(_Base):
+    """E7 y la promo 3pz en el cambio (Daniel, 2026-11-12: «Sí, que no
+    aplique»): si regresa el pants base de la promo y se lleva un Pants 2pz
+    deportivo rebajado, la playera que se queda se cobra a precio normal."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.v[1].precio_venta = Decimal("180.00")     # la playera, a precio normal
+        self.s.flush()
+
+    def _venta_3pz(self, con_foto=True):
+        venta = self._venta([
+            self._linea(self.v[0], "250", linea_uid="u-pants"),
+            {**self._linea(self.v[1], "100", linea_uid="u-playera"), "nombre": "Playera Deportiva (promo 3pz)"},
+        ], "350")
+        if con_foto:
+            venta.calculo = {"entrada": {"lineas": [
+                {"linea_uid": "u-pants", "promo_3pz": True}, {"linea_uid": "u-playera", "promo_3pz": True},
+            ]}}
+            self.s.flush()
+        return venta
+
+    def _pants(self, rebaja="oferta", precio="175", deportivo=True):
+        it = {"sku": self.v[2].sku, "nombre": "Pants 2pz Deportivo", "talla": "8", "cantidad": 1, "precio": precio}
+        if rebaja:
+            it.update(rebaja=rebaja, precio_normal="250")
+        if deportivo:
+            it[cs.LLAVE_PANTS_3PZ] = True
+        return it
+
+    def test_roles_desde_la_fotografia_o_la_marca(self):
+        detalle = [{"linea_uid": "a"}, {"nombre": "Playera (promo 3pz)"}, {"promo_3pz": True}, {"linea_uid": "z"}]
+        foto = {"entrada": {"lineas": [{"linea_uid": "a", "promo_3pz": True}, {"linea_uid": "z"}]}}
+        self.assertEqual(cs.roles_promo_3pz(detalle, foto), ["base", "playera", "base", ""])
+        self.assertEqual(cs.roles_promo_3pz(detalle, None), ["", "playera", "base", ""])
+
+    def test_pants_por_uno_en_oferta_cobra_la_playera_a_precio_normal(self):
+        venta = self._venta_3pz()
+        renglones = cs.renglones_vendidos(self.s, venta)
+        self.assertEqual([r.rol_3pz for r in renglones], ["base", "playera"])
+        self.assertEqual(renglones[1].precio_normal, D("180.00"))
+        self.assertEqual(cs.cargo_promo_3pz(renglones, {0: 1}, [self._pants()]), D("80.00"))
+        self.assertEqual(cs.aviso_promo_3pz(renglones, {0: 1}, [self._pants()]),
+                         "La playera iba en promo con ese pants: el pants nuevo está en Oferta, "
+                         "la playera se cobra a precio normal.")
+        r = self._cambio(venta, {0: 1}, [self._pants()])
+        # 175 + 80 − 250: antes quedaban $75 a favor.
+        self.assertEqual((r.cuenta.cargo_promo_3pz, r.cuenta.a_pagar, r.cuenta.a_favor), (D("80.00"), D("5.00"), D("0.00")))
+        self.assertEqual(r.cambio.calculo["cambio"]["cargo_promo_3pz"], "80.00")
+
+    def test_en_liquidacion_tambien(self):
+        renglones = cs.renglones_vendidos(self.s, self._venta_3pz())
+        self.assertEqual(cs.cargo_promo_3pz(renglones, {0: 1}, [self._pants("liquidacion", "150")]), D("80.00"))
+        self.assertIn("Liquidación", cs.aviso_promo_3pz(renglones, {0: 1}, [self._pants("liquidacion", "150")]))
+
+    def test_sin_cargo_si_no_aplica(self):
+        renglones = cs.renglones_vendidos(self.s, self._venta_3pz())
+        casos = {
+            "pants a precio normal": ({0: 1}, [self._pants(rebaja=None, precio="250")]),
+            "lo rebajado no es pants 2pz deportivo": ({0: 1}, [self._pants(deportivo=False)]),
+            "la playera también regresa": ({0: 1, 1: 1}, [self._pants()]),
+            "no regresa el pants": ({1: 1}, [self._pants()]),
+        }
+        for caso, (regresa, lleva) in casos.items():
+            with self.subTest(caso):
+                self.assertEqual(cs.cargo_promo_3pz(renglones, regresa, lleva), D("0.00"))
+                self.assertEqual(cs.aviso_promo_3pz(renglones, regresa, lleva), "")
+
+    def test_venta_sin_fotografia_ni_marca_no_se_sabe_cual_es_el_pants(self):
+        renglones = cs.renglones_vendidos(self.s, self._venta_3pz(con_foto=False))
+        self.assertEqual([r.rol_3pz for r in renglones], ["", "playera"])
+        self.assertEqual(cs.cargo_promo_3pz(renglones, {0: 1}, [self._pants()]), D("0.00"))
+
+    def test_la_cuenta_suma_el_cargo(self):
+        c = cs.cuenta(D("250"), D("0"), D("175"), D("80"))
+        self.assertEqual((c.a_pagar, c.a_favor, c.cargo_promo_3pz), (D("5.00"), D("0.00"), D("80.00")))
+        self.assertEqual(cs.cuenta(D("250"), D("0"), D("175")).a_favor, D("75.00"))
+
+
 if __name__ == "__main__":
     unittest.main()

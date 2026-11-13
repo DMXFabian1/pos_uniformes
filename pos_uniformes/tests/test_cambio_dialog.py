@@ -52,6 +52,21 @@ class CambioDialogTests(_Qt):
         args.update(kw)
         return CambioDialog(**args)
 
+    def test_pants_de_la_promo_por_uno_en_oferta_cobra_la_playera(self):
+        """E7 y la promo 3pz (2026-11-12: «Sí, que no aplique»)."""
+        renglones = [
+            cs.RenglonVendido(0, "P2", "Pants 2pz Deportivo", "8", 1, 0, D("250"), False, rol_3pz="base"),
+            cs.RenglonVendido(1, "PLY", "Playera (promo 3pz)", "8", 1, 0, D("100"), False, rol_3pz="playera",
+                              precio_normal=D("180")),
+        ]
+        dlg = self._dialogo(renglones=renglones)
+        dlg._mover(0, +1)
+        dlg.agregar({"sku": "P2-10", "nombre": "Pants 2pz Deportivo", "talla": "10", "precio": D("175"),
+                     "rebaja": "oferta", "precio_normal": D("250"), cs.LLAVE_PANTS_3PZ: True})
+        self.assertEqual(dlg.calcular().cargo_promo_3pz, D("80.00"))
+        self.assertTrue(dlg.resultado.text().startswith("Paga"))
+        self.assertIn("la playera se cobra a precio normal", dlg.nota.text())
+
     def test_sin_regresar_nada_no_se_puede(self):
         dlg = self._dialogo()
         self.assertFalse(dlg.btn_hacer.isEnabled())

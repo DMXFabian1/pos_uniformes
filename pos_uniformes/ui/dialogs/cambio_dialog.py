@@ -364,7 +364,8 @@ class CambioDialog(QDialog):
         valor_regresa = sum((self._renglones[i].valor_pieza * q for i, q in self.regresa.items()), Decimal(0))
         quitar = cs.cashback_proporcional(self._abono, self._ya, self._renglones, self.regresa)
         valor_lleva = sum((Decimal(str(it["precio"])) * it["cantidad"] for it in self.lleva), Decimal(0))
-        return cs.cuenta(valor_regresa, quitar, valor_lleva)
+        cargo = cs.cargo_promo_3pz(self._renglones, self.regresa, self.lleva)
+        return cs.cuenta(valor_regresa, quitar, valor_lleva, cargo)
 
     def _pintar(self) -> None:
         for i, etiqueta in self._cantidades.items():
@@ -402,6 +403,9 @@ class CambioDialog(QDialog):
             notas.append("La venta no tiene cliente: elígelo o regístralo para abonarle lo que queda a favor.")
         if self._abono > 0 and c.cashback_quitado > 0:
             notas.append("Se le quita el Monedero que ganó por lo que regresa.")
+        if c.cargo_promo_3pz > 0:
+            notas.append(f"{cs.aviso_promo_3pz(self._renglones, self.regresa, self.lleva)} "
+                         f"(+{_dinero(c.cargo_promo_3pz)})")
         self.nota.setText(" ".join(notas))
         self.nota.setVisible(bool(notas))
         self._pintar_plazo()
