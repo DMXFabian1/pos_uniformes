@@ -630,5 +630,38 @@ class ResumenDesdeLaLibretaTests(unittest.TestCase):
         self.assertIn("ventas en el mes", self.ventana.dashboard_sales_context_label.text())
 
 
+
+class ExportDeAnaliticaDesdeLaLibretaTests(unittest.TestCase):
+    """2026-11-12, «Pantallas con datos viejos»: las hojas 06 y 07 del export
+    de Analítica salen de la Libreta (`exportacion_libreta_service`, probado
+    en test_exportacion_libreta_service.py), con los mismos nombres."""
+
+    def test_las_hojas_06_y_07_ya_no_leen_la_tabla_venta(self) -> None:
+        import inspect
+
+        fuente = inspect.getsource(MainWindow._handle_export_analytics)
+        self.assertIn("exportacion_libreta_service.cargar", fuente)
+        self.assertNotIn("select(Venta)", fuente)
+        self.assertNotIn("EstadoVenta", fuente)
+        for hoja in ("06_ventas", "07_detalle_ventas", "02_apartados_resumen"):
+            self.assertIn(hoja, fuente)
+
+    def test_el_export_se_genera_con_las_hojas_de_la_libreta(self) -> None:
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+
+        ventana = MainWindow(user_id=1)
+        self.addCleanup(_cerrar, ventana)
+        with tempfile.TemporaryDirectory() as carpeta, patch.object(
+            MainWindow, "_analytics_export_dir", staticmethod(lambda: Path(carpeta))
+        ), patch("pos_uniformes.ui.main_window.QMessageBox") as caja:
+            ventana._handle_export_analytics()
+            caja.critical.assert_not_called()
+            generados = {p.name for p in Path(carpeta).rglob("*.json")}
+        self.assertIn("06_ventas.json", generados)
+        self.assertIn("07_detalle_ventas.json", generados)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -70,7 +70,6 @@ from pos_uniformes.database.models import (
     Escuela,
     EstadoPresupuesto,
     EstadoCompra,
-    EstadoVenta,
     Marca,
     MovimientoInventario,
     NivelEducativo,
@@ -81,7 +80,6 @@ from pos_uniformes.database.models import (
     TipoPrenda,
     Usuario,
     Variante,
-    Venta,
 )
 from pos_uniformes.services.active_filter_service import (
     build_active_filter_labels,
@@ -126,6 +124,7 @@ from pos_uniformes.ui.helpers.settings_employee_ranking_helper import build_libr
 from pos_uniformes.services.client_service import ClientService
 from pos_uniformes.services.employee_identity_service import EmployeeIdentityService
 from pos_uniformes.services import conjunto_service
+from pos_uniformes.services import exportacion_libreta_service
 from pos_uniformes.services import resumen_pos_service
 from pos_uniformes.services.catalog_service import CatalogService
 from pos_uniformes.services.catalog_snapshot_service import load_catalog_snapshot_rows
@@ -8142,55 +8141,11 @@ class MainWindow(QMainWindow):
         selected_client_id = self.analytics_client_combo.currentData()
         try:
             with get_session() as session:
-                sales_statement = (
-                    select(Venta)
-                    .where(
-                        Venta.estado == EstadoVenta.CONFIRMADA,
-                        Venta.confirmada_at.is_not(None),
-                        Venta.confirmada_at >= period_start,
-                        Venta.confirmada_at < period_end,
-                    )
-                    .order_by(Venta.confirmada_at.asc())
+                # 06 y 07 desde la Libreta (2026-11-12): la tabla `venta` es de
+                # la Caja antigua y ya no crece. Ver exportacion_libreta_service.
+                sales_rows, detail_rows = exportacion_libreta_service.cargar(
+                    session, period_start, period_end, cliente_id=selected_client_id
                 )
-                if selected_client_id not in {None, ""}:
-                    sales_statement = sales_statement.where(Venta.cliente_id == int(selected_client_id))
-                sales = list(session.scalars(sales_statement))
-
-                sales_rows: list[dict[str, object]] = []
-                detail_rows: list[dict[str, object]] = []
-                for sale in sales:
-                    sales_rows.append(
-                        {
-                            "venta_id": sale.id,
-                            "folio": sale.folio,
-                            "cliente_id": sale.cliente_id,
-                            "cliente": sale.cliente.nombre if sale.cliente is not None else "Mostrador",
-                            "codigo_cliente": sale.cliente.codigo_cliente if sale.cliente is not None else None,
-                            "usuario": sale.usuario.username if sale.usuario else None,
-                            "estado": sale.estado.value,
-                            "subtotal": sale.subtotal,
-                            "total": sale.total,
-                            "observacion": sale.observacion,
-                            "confirmada_at": sale.confirmada_at,
-                        }
-                    )
-                    for detalle in sale.detalles:
-                        detail_rows.append(
-                            {
-                                "venta_id": sale.id,
-                                "folio": sale.folio,
-                                "cliente": sale.cliente.nombre if sale.cliente is not None else "Mostrador",
-                                "sku": detalle.variante.sku if detalle.variante else (detalle.sku_snapshot or None),
-                                "producto": (
-                                    sanitize_product_display_name(detalle.variante.producto.nombre)
-                                    if detalle.variante is not None and detalle.variante.producto is not None
-                                    else (detalle.descripcion_snapshot or None)
-                                ),
-                                "cantidad": detalle.cantidad,
-                                "precio_unitario": detalle.precio_unitario,
-                                "subtotal_linea": detalle.subtotal_linea,
-                            }
-                        )
 
                 top_products_rows = build_table_export_rows(
                     self.top_products_table,
