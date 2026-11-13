@@ -301,6 +301,20 @@ class InventarioTanda2PantallaTests(unittest.TestCase):
         self.assertEqual(window.toggle_variant_button.text(), "Desactivar esta talla…")
         self.assertEqual(window.toggle_product_button.text(), "Desactivar toda la prenda…")
 
+    def test_avisos_al_pasar_el_mouse_en_palabras_de_la_tienda(self) -> None:
+        from pos_uniformes.ui.helpers.inventory_help_texts import AYUDAS_INVENTARIO
+
+        window = self._ventana()
+        self.assertEqual(
+            window.inventory_print_label_button.toolTip(),
+            "Con una talla elegida imprime su etiqueta; con varias, las imprime en lote.",
+        )
+        for nombre, texto in AYUDAS_INVENTARIO.items():
+            aviso = getattr(window, nombre).toolTip()
+            self.assertEqual(aviso, texto, nombre)
+            for jerga in ("presentacion", "presentación", "siguiente fase", "preview", "stock", "mas precision"):
+                self.assertNotIn(jerga, aviso.lower(), nombre)
+
 
 if __name__ == "__main__":
     unittest.main()

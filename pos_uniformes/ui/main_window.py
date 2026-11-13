@@ -365,6 +365,7 @@ from pos_uniformes.ui.helpers.inventory_selection_helper import (
     normalize_inventory_variant_id,
 )
 from pos_uniformes.ui.helpers.inventory_summary_helper import INVENTORY_SEARCH_LIMIT, build_inventory_summary_view
+from pos_uniformes.ui.helpers.inventory_help_texts import aplicar_ayudas_inventario
 from pos_uniformes.ui.helpers.inventory_toggle_helper import (
     confirmacion_desactivar_prenda,
     confirmacion_desactivar_talla,
@@ -1771,8 +1772,6 @@ class MainWindow(QMainWindow):
         help_map = {
             self.category_button: "Abre una ventana para crear una categoria nueva.",
             self.brand_button: "Abre una ventana para crear una marca nueva.",
-            self.inventory_category_button: "Abre una ventana para crear una categoria nueva desde Inventario.",
-            self.inventory_brand_button: "Abre una ventana para crear una marca nueva desde Inventario.",
             self.product_button: "Abre una ventana para registrar un producto nuevo y, si quieres, su primera presentacion.",
             self.variant_button: "Abre una ventana para crear una presentacion nueva con talla, color, precio y SKU.",
             self.update_product_button: "Edita los datos generales del producto seleccionado.",
@@ -1781,13 +1780,6 @@ class MainWindow(QMainWindow):
             self.toggle_variant_button: "Activa o desactiva solo esta talla (pregunta antes de desactivar).",
             self.delete_product_button: "Elimina el producto si no tiene stock ni historial operativo.",
             self.delete_variant_button: "Elimina la presentacion si no tiene stock ni historial operativo.",
-            self.purchase_button: "Registra entrada de mercancia para la presentacion seleccionada.",
-            self.inventory_adjust_button: "Corrige el stock final de la presentacion seleccionada para conteos o diferencias.",
-            self.inventory_count_button: "Abre un conteo fisico para capturar existencias y aplicar diferencias en bloque.",
-            self.inventory_bulk_adjust_button: "Aplica un lote de ajustes masivos con preview, validacion y auditoria por movimiento.",
-            self.inventory_bulk_price_button: "Actualiza precios por lote con preview, aumentos, descuentos y auditoria de catalogo.",
-            self.inventory_print_label_button: "Abre la impresion de etiquetas para la presentacion seleccionada. La logica completa se integrara en la siguiente fase.",
-            self.inventory_generate_all_qr_button: "Genera codigos QR en lote para las presentaciones seleccionadas en Inventario.",
             self.inventory_new_button: "Dar de alta una prenda, una talla o un color.",
             self.inventory_edit_button: "Editar la prenda o la talla elegida, su foto o sus precios.",
             self.inventory_stock_button: "Registrar una entrada, contar o corregir cuántas hay.",
@@ -1839,15 +1831,12 @@ class MainWindow(QMainWindow):
             "Separa el catalogo entre uniforme escolar y ropa normal segun la categoria real del producto."
         )
         self.catalog_clear_filters_button.setToolTip("Limpia todos los filtros del catálogo y muestra nuevamente todo el catálogo.")
-        self.inventory_search_input.setToolTip(
-            "Busca por producto, color, talla, marca, escuela o SKU. Si quieres mas precision, tambien acepta prefijos como sku:, producto: o color:."
-        )
-        self.inventory_clear_filters_button.setToolTip("Limpia todos los filtros del inventario y muestra nuevamente todas las presentaciones.")
         self.inventory_table.setToolTip(
             "Elige una talla para ver su ficha. Ctrl/Cmd + clic elige varias, Shift un rango, "
             "Esc limpia y doble clic edita."
         )
         self.movements_table.setToolTip("Historial de movimientos de inventario con filtros por fecha, SKU y tipo.")
+        aplicar_ayudas_inventario(self)
 
     def _create_page_help_button(self, page_key: str) -> QPushButton:
         button = QPushButton("Ayuda")

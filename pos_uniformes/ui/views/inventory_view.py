@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from pos_uniformes.ui.helpers.flow_layout import FlowLayout
+from pos_uniformes.ui.helpers.inventory_help_texts import AYUDA_IMPRIMIR_ETIQUETA
 from pos_uniformes.ui.helpers.inventory_table_row_helper import INVENTORY_TABLE_HEADERS
 from pos_uniformes.ui.helpers.inventory_toggle_helper import etiqueta_boton_prenda, etiqueta_boton_talla
 
@@ -240,9 +241,7 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     side_layout.addLayout(state_row)
     side_layout.addWidget(window.inventory_print_label_button)
     window.inventory_print_label_button.clicked.connect(window._handle_inventory_print_label)
-    window.inventory_print_label_button.setToolTip(
-        "Con una talla elegida imprime su etiqueta; con varias, las imprime en lote."
-    )
+    window.inventory_print_label_button.setToolTip(AYUDA_IMPRIMIR_ETIQUETA)
     window.inventory_generate_all_qr_button.clicked.connect(window._handle_generate_all_qr)
     window.inventory_variant_combo.currentIndexChanged.connect(window._refresh_inventory_selection_panel)
     side_box.setLayout(side_layout)
