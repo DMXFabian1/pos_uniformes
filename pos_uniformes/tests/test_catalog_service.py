@@ -162,6 +162,34 @@ class NombreAlGuardarTests(_ConBase):
                 self.assertEqual(previa_edicion, p.nombre)
 
 
+class PrecioTests(_ConBase):
+    def test_cero_o_vacio_no_se_guarda(self) -> None:
+        p = self._producto("Bata", None)
+        for precio in (Decimal("0"), Decimal("0.00"), None, "", "  "):
+            with self.subTest(precio=precio):
+                with self.assertRaises(ValueError):
+                    C.crear_variante(self.s, self.admin, p, None, "Unitalla", "Sin color", precio)
+        self.assertEqual(self.s.scalars(select(Variante)).all(), [])
+
+    def test_editar_a_cero_no_se_puede(self) -> None:
+        v = self._talla(self._producto("Bata", None), "Unitalla", "75")
+        with self.assertRaisesRegex(ValueError, r"\$0"):
+            C.actualizar_variante(self.s, self.admin, v, v.producto, v.sku, "Unitalla", "Sin color", Decimal("0"))
+
+    def test_una_talla_vieja_en_cero_se_puede_editar_sin_tocar_el_precio(self) -> None:
+        v = self._talla(self._producto("Bata", None), "Unitalla", "75")
+        v.precio_venta = Decimal("0")
+        C.actualizar_variante(self.s, self.admin, v, v.producto, v.sku, "Unitalla", "Blanco", Decimal("0"))
+        self.assertEqual(v.color, "Blanco")
+
+    def test_validar_precio(self) -> None:
+        self.assertEqual(C.validar_precio_venta("245"), Decimal("245"))
+        with self.assertRaises(ValueError):
+            C.validar_precio_venta("-1")
+        with self.assertRaises(ValueError):
+            C.validar_precio_venta("abc")
+
+
 class SkuConCandadoTests(_ConBase):
     def _sentencias_del_contador(self, accion) -> list:
         vistas = []

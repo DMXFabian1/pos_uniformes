@@ -299,6 +299,26 @@ class CatalogService:
         return normalized.quantize(Decimal("0.01"))
 
     @staticmethod
+    def validar_precio_venta(precio: object, *, anterior: object | None = None) -> Decimal:
+        """El precio de venta tiene que ser mayor que $0.
+
+        Al editar, un precio que ya estaba en $0 y no se toca se respeta
+        (`anterior`), para no trabar otros cambios de una talla vieja."""
+        try:
+            valor = Decimal(str(precio).strip()) if precio is not None and str(precio).strip() else None
+        except Exception as exc:  # noqa: BLE001
+            raise ValueError("El precio de venta no es un número válido.") from exc
+        if valor is None:
+            raise ValueError("Falta el precio de venta.")
+        if valor < 0:
+            raise ValueError("El precio de venta no puede ser negativo.")
+        if valor == 0:
+            if anterior is not None and Decimal(str(anterior)) == 0:
+                return valor
+            raise ValueError("El precio de venta no puede quedar en $0.")
+        return valor
+
+    @staticmethod
     def _parse_legacy_sku_number(sku: str) -> int | None:
         normalized = (sku or "").strip().upper()
         if not normalized.startswith(CatalogService.SKU_PREFIX):
@@ -662,14 +682,14 @@ class CatalogService:
         stock_inicial: int = 0,
     ) -> Variante:
         cls._validar_admin(usuario)
+        cls.validar_precio_venta(precio_venta)
         talla = talla.strip()
         color = color.strip() or "Sin color"
         sku = cls.normalizar_o_generar_sku(session, producto, sku, talla, color)
 
         if not sku or not talla or not color:
             raise ValueError("SKU, talla y color son obligatorios.")
-        if precio_venta < 0:
-            raise ValueError("El precio de venta no puede ser negativo.")
+        precio_venta = cls.validar_precio_venta(precio_venta)
         if costo_referencia is not None and costo_referencia < 0:
             raise ValueError("El costo de referencia no puede ser negativo.")
         if stock_inicial < 0:
@@ -752,8 +772,7 @@ class CatalogService:
 
         if not sku or not talla or not color:
             raise ValueError("SKU, talla y color son obligatorios.")
-        if precio_venta < 0:
-            raise ValueError("El precio de venta no puede ser negativo.")
+        precio_venta = cls.validar_precio_venta(precio_venta, anterior=variante.precio_venta)
         if costo_referencia is not None and costo_referencia < 0:
             raise ValueError("El costo de referencia no puede ser negativo.")
         if variante.origen_legacy and sku != variante.sku:
