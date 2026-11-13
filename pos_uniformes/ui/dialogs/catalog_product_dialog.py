@@ -55,6 +55,7 @@ from pos_uniformes.services.catalogo_valores_service import (
     CAMPO_TIPO_PRENDA,
     contar_usos,
     depurar_opciones,
+    forma_oficial_talla,
 )
 from pos_uniformes.ui.dialogs.quisiste_decir_dialog import (
     Campo,
@@ -1040,8 +1041,14 @@ def build_catalog_product_dialog(
         update_capture_summary()
 
     def sync_variant_options(template_entry: dict[str, object] | None, *, apply_defaults: bool) -> None:
-        suggested_sizes = normalize_values(template_entry.get("tallas")) if template_entry else []
-        suggested_colors = normalize_values(template_entry.get("colores")) if template_entry else []
+        # Las plantillas pueden traer escrituras viejas («Uni», «Blanca»): se
+        # pasan a su forma oficial para que sí queden marcadas en la lista.
+        suggested_sizes = depurar_opciones(
+            CAMPO_TALLA, normalize_values(template_entry.get("tallas")) if template_entry else []
+        )
+        suggested_colors = depurar_opciones(
+            CAMPO_COLOR, normalize_values(template_entry.get("colores")) if template_entry else []
+        )
         available_sizes = depurar_opciones(
             CAMPO_TALLA,
             suggested_sizes,
@@ -1295,10 +1302,13 @@ def build_catalog_product_dialog(
         if not isinstance(template_entry, dict):
             return
         defaults = step_template_defaults("presentation", template_entry)
-        variant_sizes_button.set_selected_values(list(defaults.get("sizes", [])))
+        variant_sizes_button.set_selected_values(
+            depurar_opciones(CAMPO_TALLA, [str(v) for v in defaults.get("sizes", [])])
+        )
         prices = defaults.get("prices")
         if isinstance(prices, dict) and prices:
-            price_value_store["manual"] = dict(prices)
+            # Las llaves van en la forma oficial, igual que las tallas («Uni» → «Unitalla»).
+            price_value_store["manual"] = {forma_oficial_talla(k): v for k, v in prices.items()}
             price_mode_state["manual_override"] = True
             target_index = price_mode_combo.findData("manual")
             if target_index >= 0:

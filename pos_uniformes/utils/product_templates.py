@@ -117,10 +117,10 @@ PRESENTATION_STEP_TEMPLATES: list[dict[str, object]] = [
     # ── Accesorios ──
     {"label": "Malla escolar", "sizes": ["0-0", "0-2", "3-5", "6-8", "9-12", "13-18", "CH-MD", "GD-EXG", "Dama"], "prices": {"0-0": "109", "0-2": "109", "3-5": "109", "6-8": "109", "9-12": "129", "13-18": "139", "CH-MD": "139", "GD-EXG": "139", "Dama": "139"}},
     {"label": "Calceta escolar", "sizes": ["0-0", "0-2", "3-5", "6-8", "9-12", "13-18"], "prices": {"0-0": "49", "0-2": "49", "3-5": "49", "6-8": "49", "9-12": "49", "13-18": "49"}},
-    {"label": "Boina escolta", "sizes": ["Uni"], "prices": {"Uni": "80"}},
-    {"label": "Corbata / corbatín / moño", "sizes": ["Uni"], "prices": {"Uni": "70"}},
-    {"label": "Bata infantil", "sizes": ["Uni"], "prices": {"Uni": "65"}},
-    {"label": "Unitalla accesorio", "sizes": ["Uni"], "prices": {"Uni": "70"}},
+    {"label": "Boina escolta", "sizes": ["Unitalla"], "prices": {"Unitalla": "80"}},
+    {"label": "Corbata / corbatín / moño", "sizes": ["Unitalla"], "prices": {"Unitalla": "70"}},
+    {"label": "Bata infantil", "sizes": ["Unitalla"], "prices": {"Unitalla": "65"}},
+    {"label": "Unitalla accesorio", "sizes": ["Unitalla"], "prices": {"Unitalla": "70"}},
 ]
 
 

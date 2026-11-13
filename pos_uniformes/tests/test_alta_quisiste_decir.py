@@ -316,6 +316,37 @@ class DialogoProductoTests(_ConBase):
         self.assertEqual(payload["tallas"], ["CH", "Unitalla"])
         self.assertEqual(payload["colores"], ["Blanco"])
 
+    def test_plantilla_con_uni_marca_unitalla_con_su_precio(self) -> None:
+        # «Boina escolta» trae talla «Uni» y precio {"Uni": 80}: debe quedar
+        # Unitalla marcada y con sus $80, no sin tallas ni «faltan precios».
+        pregunta = PreguntaFalsa()
+        estado = {}
+
+        def pasos(d):
+            self._llenar(d, escuela="ESTV 154", precio="1")
+            combo = next(c for c in d.findChildren(QComboBox) if c.findText("Boina escolta") >= 0)
+            combo.setCurrentIndex(combo.findText("Boina escolta"))
+            next(b for b in d.findChildren(QPushButton) if b.text() == "Aplicar presentaciones").click()
+            estado["tallas"] = set(d.findChild(QPushButton, "altaTallas").selected_values())
+            d.findChild(QPushButton, "altaGuardar").click()
+
+        # Una plantilla vieja (o de fuera) con «Uni» también se normaliza.
+        vieja = {"label": "Boina escolta", "sizes": ["Uni"], "prices": {"Uni": "80"}}
+        with patch.object(
+            cpd, "load_step_product_templates", lambda paso: [dict(vieja)] if paso == "presentation" else []
+        ):
+            payload = self._abrir(pasos, pregunta)
+        self.assertEqual(estado["tallas"], {"Unitalla"})
+        self.assertEqual(payload["tallas"], ["Unitalla"])
+        self.assertEqual(payload["precio_modo"], "manual")
+        self.assertEqual(payload["precios_por_talla"], {"Unitalla": "80"})
+
+    def test_las_plantillas_ya_no_traen_uni(self) -> None:
+        from pos_uniformes.utils.product_templates import PRESENTATION_STEP_TEMPLATES
+
+        for plantilla in PRESENTATION_STEP_TEMPLATES:
+            self.assertNotIn("Uni", plantilla.get("sizes", []), plantilla["label"])
+
     def test_precio_en_cero_no_deja_guardar(self) -> None:
         pregunta = PreguntaFalsa()
         estado = {}
