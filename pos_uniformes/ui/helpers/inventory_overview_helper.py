@@ -13,11 +13,12 @@ from pos_uniformes.services.inventario_existencia_service import (
     NEGATIVO,
     VIRTUAL,
     clasificar_existencia,
+    es_conjunto_o_virtual,
     tono_existencia,
 )
 
 _ESTADO_FICHA = {
-    VIRTUAL: "virtual",
+    VIRTUAL: "conjunto",
     NEGATIVO: "negativo",
     AGOTADO: "agotado",
     BAJO_MINIMO: "bajo",
@@ -96,9 +97,10 @@ def build_inventory_overview_view(
     movement_date: str,
 ) -> InventoryOverviewView:
     clean_product_name = sanitize_product_display_name(product_name)
-    clase = clasificar_existencia(stock_actual, stock_minimo=stock_minimo)
+    virtual = es_conjunto_o_virtual(tipo_pieza_nombre=tipo_pieza_nombre, stock_minimo=stock_minimo)
+    clase = clasificar_existencia(stock_actual, stock_minimo=stock_minimo, virtual=virtual)
     stock_status = _ESTADO_FICHA.get(clase, "saludable")
-    stock_tone = tono_existencia(stock_actual, stock_minimo=stock_minimo)
+    stock_tone = tono_existencia(stock_actual, stock_minimo=stock_minimo, virtual=virtual)
     if movement_type is None or movement_quantity is None:
         last_movement_label = "Sin movimientos registrados."
     else:

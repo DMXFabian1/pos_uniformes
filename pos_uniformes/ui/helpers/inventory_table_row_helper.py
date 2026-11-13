@@ -10,6 +10,7 @@ from pos_uniformes.services.inventario_existencia_service import (
     BAJO_MINIMO,
     NEGATIVO,
     clasificar_existencia,
+    es_fila_virtual,
     texto_existencia,
     tono_existencia,
 )
@@ -38,8 +39,9 @@ def build_inventory_table_row_view(row: dict[str, object]) -> InventoryTableRowV
     committed_value = int(row["apartado_cantidad"])
     stock_minimo = row.get("stock_minimo")
     stock_minimo_int = int(stock_minimo) if stock_minimo is not None else None
-    clase = clasificar_existencia(stock_total, stock_minimo=stock_minimo_int)
-    stock_tone = tono_existencia(stock_total, stock_minimo=stock_minimo_int)
+    virtual = es_fila_virtual(row)
+    clase = clasificar_existencia(stock_total, stock_minimo=stock_minimo_int, virtual=virtual)
+    stock_tone = tono_existencia(stock_total, stock_minimo=stock_minimo_int, virtual=virtual)
     row_tone = _build_inventory_row_tone(
         clase=clase,
         variant_active=bool(row["variante_activa"]),
@@ -57,7 +59,7 @@ def build_inventory_table_row_view(row: dict[str, object]) -> InventoryTableRowV
             row["producto_nombre_base"],
             row["talla"],
             row["color"],
-            texto_existencia(stock_total, stock_minimo=stock_minimo_int),
+            texto_existencia(stock_total, stock_minimo=stock_minimo_int, virtual=virtual),
             stock_piso if stock_piso > 0 else "",
             stock_bodega if stock_bodega > 0 else "",
             committed_value,

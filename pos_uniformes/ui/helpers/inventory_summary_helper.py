@@ -28,10 +28,10 @@ def build_inventory_summary_view(
     visible_rows: list[dict[str, object]],
     active_filter_labels: list[str],
 ) -> InventorySummaryView:
-    total_stock = sum(int(row["stock_actual"]) for row in visible_rows)
     reserved_count = sum(1 for row in visible_rows if int(row["apartado_cantidad"]) > 0)
     fallback_count = sum(1 for row in visible_rows if bool(row.get("fallback_importacion")))
     conteo = contar_existencias(visible_rows)
+    total_stock = conteo.piezas  # sin conjuntos: ya están contados en sus piezas
     count_negative = conteo.negativos
     count_out = conteo.agotados
     count_low = conteo.bajos

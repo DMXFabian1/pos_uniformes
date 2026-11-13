@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
-from pos_uniformes.services.inventario_existencia_service import coincide_filtro_existencia
+from pos_uniformes.services.inventario_existencia_service import coincide_filtro_existencia, es_fila_virtual
 from pos_uniformes.ui.helpers.catalog_product_form_mode_helper import UNIFORM_CATEGORIES
 from pos_uniformes.ui.helpers.listing_visibility_helper import (
     matches_active_state,
@@ -70,7 +70,12 @@ def inventory_row_matches_visible_filters(
         and matches_selected_values(row["talla"], filters.size_filters)
         and matches_selected_values(row["color"], filters.color_filters)
         and matches_active_state(bool(row["variante_activa"]), filters.status_filter)
-        and _matches_inventory_stock_filter(int(row["stock_actual"]), filters.stock_filter, stock_minimo=row.get("stock_minimo"))
+        and _matches_inventory_stock_filter(
+            int(row["stock_actual"]),
+            filters.stock_filter,
+            stock_minimo=row.get("stock_minimo"),
+            virtual=es_fila_virtual(row),
+        )
         and _matches_inventory_qr_filter(bool(row["qr_exists"]), filters.qr_filter)
         and matches_origin_legacy(bool(row["origen_legacy"]), filters.origin_filter)
         and matches_fallback_duplicate(bool(row["fallback_importacion"]), filters.duplicate_filter)
@@ -91,8 +96,10 @@ def _matches_inventory_use_filter(category_name: str, use_filter: str) -> bool:
     )
 
 
-def _matches_inventory_stock_filter(stock_actual: int, stock_filter: str, *, stock_minimo: int | None = None) -> bool:
-    return coincide_filtro_existencia(stock_actual, stock_filter, stock_minimo=stock_minimo)
+def _matches_inventory_stock_filter(
+    stock_actual: int, stock_filter: str, *, stock_minimo: int | None = None, virtual: bool = False
+) -> bool:
+    return coincide_filtro_existencia(stock_actual, stock_filter, stock_minimo=stock_minimo, virtual=virtual)
 
 
 def _matches_inventory_conteo_filter(ultimo_conteo_at: object, conteo_filter: str) -> bool:

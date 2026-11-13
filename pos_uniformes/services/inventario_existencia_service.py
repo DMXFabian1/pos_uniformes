@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, Mapping
 
+from pos_uniformes.services.conjunto_service import TIPOS_CONJUNTO
+
 UMBRAL_BAJO = 3
 
 VIRTUAL = "virtual"
@@ -20,13 +22,35 @@ BAJO = "bajo"
 OK = "ok"
 
 
-def clasificar_existencia(stock: int, *, stock_minimo: int | None = None) -> str:
+def es_conjunto_o_virtual(*, tipo_pieza_nombre: object = None, stock_minimo: int | None = None) -> bool:
+    """Presentaciones cuyo stock no es mercancía propia sino armada de piezas.
+
+    Criterio (el mismo que ya usa el sistema):
+    - tipo de pieza en `conjunto_service.TIPOS_CONJUNTO` («Pants 3pz»,
+      «Chamarra»): su stock lo calcula `sincronizar_conjunto` a partir del
+      Pants 2pz / Playera / Pants Suelto, así que contarlo sería contar dos
+      veces (es la misma lista que `conteo_service._TIPOS_VIRTUALES`);
+    - o el marcador viejo `stock_minimo < 0` (la ficha ya lo llamaba «virtual»).
+    """
+    if stock_minimo is not None and stock_minimo < 0:
+        return True
+    return str(tipo_pieza_nombre or "").strip() in TIPOS_CONJUNTO
+
+
+def es_fila_virtual(fila: Mapping[str, object]) -> bool:
+    return es_conjunto_o_virtual(
+        tipo_pieza_nombre=fila.get("tipo_pieza_nombre"),
+        stock_minimo=_minimo(fila.get("stock_minimo")),
+    )
+
+
+def clasificar_existencia(stock: int, *, stock_minimo: int | None = None, virtual: bool = False) -> str:
     """virtual | negativo | agotado | bajo_minimo | bajo | ok, sobre el total.
 
     Un negativo (la venta del kiosko puede dejarlo) NO es «bajo»: es su
     propia clase, para que se vea y se corrija.
     """
-    if stock_minimo is not None and stock_minimo < 0:
+    if virtual or (stock_minimo is not None and stock_minimo < 0):
         return VIRTUAL
     if stock < 0:
         return NEGATIVO
@@ -56,18 +80,18 @@ _TONO = {
 }
 
 
-def texto_existencia(stock: int, *, stock_minimo: int | None = None) -> str:
-    """Texto de la columna «Stock»: «0 Agotado», «2 Bajo», «6 OK»…"""
-    clase = clasificar_existencia(stock, stock_minimo=stock_minimo)
+def texto_existencia(stock: int, *, stock_minimo: int | None = None, virtual: bool = False) -> str:
+    """Texto de la columna «Stock»: «0 Agotado», «2 Bajo», «6 OK», «3 Conjunto»…"""
+    clase = clasificar_existencia(stock, stock_minimo=stock_minimo, virtual=virtual)
     if clase == VIRTUAL:
-        return str(stock)
+        return f"{stock} Conjunto"
     if clase == NEGATIVO:
         return f"\u2212{abs(stock)} Negativo"
     return f"{stock} {_TEXTO[clase]}"
 
 
-def tono_existencia(stock: int, *, stock_minimo: int | None = None) -> str:
-    return _TONO[clasificar_existencia(stock, stock_minimo=stock_minimo)]
+def tono_existencia(stock: int, *, stock_minimo: int | None = None, virtual: bool = False) -> str:
+    return _TONO[clasificar_existencia(stock, stock_minimo=stock_minimo, virtual=virtual)]
 
 
 @dataclass(frozen=True)
@@ -75,30 +99,41 @@ class ConteoExistencias:
     negativos: int
     agotados: int
     bajos: int
+    piezas: int  # suma de existencias sin conjuntos/virtuales
 
 
 def contar_existencias(filas: Iterable[Mapping[str, object]]) -> ConteoExistencias:
-    """Cuenta para los chips. «Bajo» incluye «bajo mínimo»; un negativo no."""
-    negativos = agotados = bajos = 0
+    """Cuenta para los chips. «Bajo» incluye «bajo mínimo»; un negativo no.
+
+    Los conjuntos/virtuales no entran (ver `es_conjunto_o_virtual`).
+    """
+    negativos = agotados = bajos = piezas = 0
     for fila in filas:
-        clase = clasificar_existencia(
-            int(fila["stock_actual"]),
-            stock_minimo=_minimo(fila.get("stock_minimo")),
-        )
+        if es_fila_virtual(fila):
+            continue
+        stock = int(fila["stock_actual"])
+        piezas += stock
+        clase = clasificar_existencia(stock, stock_minimo=_minimo(fila.get("stock_minimo")))
         if clase == NEGATIVO:
             negativos += 1
         elif clase == AGOTADO:
             agotados += 1
         elif clase in (BAJO, BAJO_MINIMO):
             bajos += 1
-    return ConteoExistencias(negativos=negativos, agotados=agotados, bajos=bajos)
+    return ConteoExistencias(negativos=negativos, agotados=agotados, bajos=bajos, piezas=piezas)
 
 
-def coincide_filtro_existencia(stock: int, filtro: str, *, stock_minimo: int | None = None) -> bool:
-    """Filtro «Stock» de Inventario: negative | zero | low | available | below_min."""
+def coincide_filtro_existencia(
+    stock: int, filtro: str, *, stock_minimo: int | None = None, virtual: bool = False
+) -> bool:
+    """Filtro «Stock» de Inventario: negative | zero | low | available | below_min.
+
+    Un conjunto/virtual solo aparece sin filtro o en «Disponible» (como antes
+    con `stock_minimo < 0`).
+    """
     if not filtro:
         return True
-    clase = clasificar_existencia(stock, stock_minimo=stock_minimo)
+    clase = clasificar_existencia(stock, stock_minimo=stock_minimo, virtual=virtual)
     if clase == VIRTUAL:
         return filtro == "available"
     if filtro == "negative":
