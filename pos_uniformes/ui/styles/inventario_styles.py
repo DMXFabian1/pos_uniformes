@@ -163,10 +163,11 @@ QFrame#invTablaCard {{ background: {TARJETA}; border: 1px solid {TARJETA_BORDE};
 QTableWidget#invTabla {{
     background: {TARJETA}; alternate-background-color: {TARJETA}; border: none;
     gridline-color: transparent; font-size: 13px; color: {TEXTO};
-    selection-background-color: {VINO_SUAVE}; selection-color: {TEXTO};
+    selection-background-color: {VINO_SUAVE};
 }}
 QTableWidget#invTabla::item {{ border-bottom: 1px solid {LINEA}; padding: 0 8px; }}
-QTableWidget#invTabla::item:selected {{ background: {VINO_SUAVE}; color: {TEXTO}; }}
+/* Sin `color` al elegir: la letra (y el tono de «Hay») la pone DelegadoConTono. */
+QTableWidget#invTabla::item:selected {{ background: {VINO_SUAVE}; }}
 QTableWidget#invTabla QHeaderView::section {{
     background: {TARJETA}; color: {TENUE}; border: none; border-bottom: 1px solid {LINEA};
     padding: 8px 8px; font-size: 12px; font-weight: 700;

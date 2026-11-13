@@ -8,11 +8,11 @@ lleva toda su letra en gris. El SKU va en tono tenue: es dato, no enlace.
 from __future__ import annotations
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QColor, QFont
-from PyQt6.QtWidgets import QTableWidget, QTableWidgetItem
+from PyQt6.QtGui import QBrush, QColor, QFont, QPalette
+from PyQt6.QtWidgets import QStyledItemDelegate, QTableWidget, QTableWidgetItem
 
 from pos_uniformes.ui.helpers.inventory_table_row_helper import COLUMNA_SKU, COLUMNA_STOCK
-from pos_uniformes.ui.styles.inventario_styles import COLOR_CIFRA, COLOR_FILA_APAGADA, TENUE
+from pos_uniformes.ui.styles.inventario_styles import COLOR_CIFRA, COLOR_FILA_APAGADA, TENUE, TEXTO
 
 #: Alto de cada fila: cómodo para tocar sin perder filas a 768 px.
 ALTO_FILA = 36
@@ -58,3 +58,15 @@ def _pintar_cifra(item: QTableWidgetItem, tono: str, *, apagada: bool) -> None:
     color = COLOR_FILA_APAGADA if apagada else COLOR_CIFRA.get(tono or "")
     if color:
         item.setForeground(QColor(color))
+
+
+class DelegadoConTono(QStyledItemDelegate):
+    """Una fila elegida conserva el color de su letra: el −3 sigue rojo y el 1
+    ámbar sobre el vino suave (sin esto, la selección los pinta de negro)."""
+
+    def initStyleOption(self, option, index) -> None:  # noqa: N802 - API de Qt
+        super().initStyleOption(option, index)
+        color = index.data(Qt.ItemDataRole.ForegroundRole)
+        brocha = QBrush(color) if color is not None else QBrush(QColor(TEXTO))
+        for grupo in (QPalette.ColorGroup.Active, QPalette.ColorGroup.Inactive):
+            option.palette.setBrush(grupo, QPalette.ColorRole.HighlightedText, brocha)

@@ -24,7 +24,7 @@ from pos_uniformes.ui.helpers.inventario_pantalla import (
     InventarioPantalla,
     armar_menu_mas,
 )
-from pos_uniformes.ui.helpers.inventario_tabla_helper import ALTO_FILA
+from pos_uniformes.ui.helpers.inventario_tabla_helper import ALTO_FILA, DelegadoConTono
 from pos_uniformes.ui.helpers.inventory_help_texts import AYUDA_IMPRIMIR_ETIQUETA
 from pos_uniformes.ui.helpers.inventory_table_row_helper import INVENTORY_TABLE_HEADERS
 from pos_uniformes.ui.helpers.inventory_toggle_helper import etiqueta_boton_prenda, etiqueta_boton_talla
@@ -338,6 +338,7 @@ def _tabla(window: "MainWindow", pantalla: InventarioPantalla) -> QFrame:
     tabla.verticalHeader().setVisible(False)
     tabla.verticalHeader().setDefaultSectionSize(ALTO_FILA)
     tabla.setShowGrid(False)
+    tabla.setItemDelegate(DelegadoConTono(tabla))
     tabla.setAlternatingRowColors(False)
     tabla.setFrameShape(QFrame.Shape.NoFrame)
     tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)

@@ -358,6 +358,26 @@ class InventarioTanda3PantallaTests(unittest.TestCase):
         window.inventario_pantalla.tocar_encabezado(columna)
         self.assertEqual(self._visibles(window), [1, 2, 3, 4, 5, 6])
 
+    def test_fila_elegida_conserva_el_rojo_del_negativo(self) -> None:
+        window = self._ventana()
+        self._mostrar_a_1366(window)
+        tabla = window.inventory_table
+        columna = [tabla.horizontalHeaderItem(i).text() for i in range(tabla.columnCount())].index("Hay")
+        tabla.selectRow(0)  # la talla 4, con −2
+        tabla.selectionModel().select(
+            tabla.model().index(5, 0), QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows
+        )
+        QApplication.processEvents()
+        self.assertEqual(tabla.item(0, columna).text(), "−2")
+        imagen = tabla.viewport().grab(tabla.visualItemRect(tabla.item(0, columna))).toImage()
+        rojos = sum(
+            1
+            for x in range(imagen.width())
+            for y in range(imagen.height())
+            if (c := imagen.pixelColor(x, y)).red() > 140 and c.green() < 90 and c.blue() < 90
+        )
+        self.assertGreater(rojos, 5)
+
     def test_paginacion_discreta(self) -> None:
         window = self._ventana()
         self.assertEqual(window.inventario_pantalla.paginas.text(), "Mostrando 6 tallas")
