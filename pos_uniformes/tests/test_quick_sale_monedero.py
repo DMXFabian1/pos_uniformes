@@ -467,5 +467,26 @@ class ElMotorQueNoRespondeSeAvisaTests(unittest.TestCase):
         self.assertIn("avísale a Daniel", texto_si_el_motor_no_responde(truena))
 
 
+class MayoristaQueEligioMayoreoSinLineasTest(_Base):
+    """2026-11-12, Daniel, a «Mayorista que eligió mayoreo y ninguna prenda
+    calificó: ¿gana Monedero o no?»: «no». El ticket y el «Gana» dicen $0, la
+    venta se anota sin descuento_programa (no se cobró) y el abono del
+    servidor también da $0 (monedero_service, por la fotografía)."""
+
+    def test_ticket_y_gana_dicen_que_no_suma(self):
+        from pos_uniformes.services.beneficios_carrito import descuento_programa_a_guardar
+
+        w = self._widget()
+        w._cliente = _cliente(tasa=D("15"), descuento_disponible=D("15"))
+        w._usar_descuento_programa = True
+        self.assertEqual(w._cashback_estimado(D("450"), D("0")), D("0.00"))
+        self.assertEqual(w._datos_cliente_para_cola("venta", D("450"))["cashback_estimado"], "0.00")
+        w._pintar_cliente_bar()
+        self.assertIn("no suma Monedero", w._cliente_label.text())
+        self.assertNotIn("Gana", w._cliente_label.text())
+        # No se cobró descuento: la venta no lleva descuento_programa.
+        self.assertIsNone(descuento_programa_a_guardar(D("15"), SimpleNamespace(descuento_aplicado=False)))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -134,8 +134,12 @@ class LaBaseEsLaDelMotorTests(unittest.TestCase):
             rebajadas = [l for l in c.lineas if l.clasificacion_al_vender in ("oferta", "liquidacion")]
             with self.subTest(entrada=entrada):
                 if c.monedero is None:
-                    # Sin la parte del Monedero en la foto: la cuenta de antes.
-                    self.assertEqual(nueva, vieja)
+                    if {M.MAYOREO_SIN_MONEDERO, M.EMPLEADA_SIN_MONEDERO} & set(c.motivos_ticket):
+                        # 2026-11-12: bloqueado por lo que se eligió → base 0.
+                        self.assertEqual(nueva, D("0"))
+                    else:
+                        # Sin la parte del Monedero en la foto: la cuenta de antes.
+                        self.assertEqual(nueva, vieja)
                     continue
                 self.assertEqual(nueva, c.monedero.base)
                 if c.saldo_usado > 0 and rebajadas:
@@ -460,3 +464,116 @@ class TicketDelKioskoTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ═══ Mayorista que eligió mayoreo y ninguna prenda calificó (2026-11-12) ═══
+# Daniel, a «Mayorista que eligió mayoreo y ninguna prenda calificó: ¿gana
+# Monedero o no?»: «no». Antes el ticket decía «no suma Monedero» y el
+# servidor abonaba con la cuenta de antes ($67.50 en el ejemplo).
+
+MAYORISTA = ClienteCtx(9, "MAYORISTA", D("15"), D("15"))
+SIN_PROGRAMA = ClienteCtx(9, None, None, None)
+
+
+def _tres_pz() -> tuple[LineaEntrada, ...]:
+    """3 piezas de una promo 3pz a $150: el mayoreo no aplica a esas líneas."""
+    return (LineaEntrada(str(uuid.UUID(int=31)), "B3", 3, D("150"), "Deportivo", None, True),)
+
+
+class MayoristaSinLineasElegiblesTests(unittest.TestCase):
+    def test_el_motor_bloquea_el_monedero(self):
+        c = calcular(EntradaVenta(_tres_pz(), FECHA, cliente=MAYORISTA, modalidad_mayorista="descuento"))
+        self.assertEqual(c.total, D("450.00"))
+        self.assertFalse(c.descuento_aplicado)
+        self.assertIsNone(c.monedero)
+        self.assertIn(M.MAYOREO_SIN_LINEAS_ELEGIBLES, c.motivos_ticket)
+        self.assertIn(M.MAYOREO_SIN_MONEDERO, c.motivos_ticket)
+
+    def test_base_cero_y_no_cae_a_la_cuenta_de_antes(self):
+        e = EntradaVenta(_tres_pz(), FECHA, cliente=MAYORISTA, modalidad_mayorista="descuento")
+        fila = _fila(e, calcular(e))
+        self.assertEqual(mon.base_cashback_legada(fila), (D("450.00"), False))
+        self.assertEqual(mon.base_cashback_de_venta(fila), (D("0"), False))
+
+    def test_el_recalculo_del_servidor_lo_anota_igual(self):
+        e = EntradaVenta(_tres_pz(), FECHA, cliente=MAYORISTA, modalidad_mayorista="descuento")
+        fila = _fila(e, calcular(e))
+        servidor = calcular(replace(e, origen_calculo="servidor"))
+        self.assertIsNone(servidor.monedero)
+        self.assertIn(M.MAYOREO_SIN_MONEDERO, servidor.motivos_ticket)
+        fila.calculo["servidor"] = {"calculo": fotografia(e, servidor)["calculo"]}
+        fila.calculo["calculo"] = {"total": "1.00"}   # aunque la del kiosko no sirva
+        self.assertEqual(mon.base_cashback_de_venta(fila), (D("0"), False))
+
+    def test_foto_de_otra_venta_sigue_con_la_cuenta_de_antes(self):
+        e = EntradaVenta(_tres_pz(), FECHA, cliente=MAYORISTA, modalidad_mayorista="descuento")
+        fila = _fila(e, calcular(e))
+        fila.monto_total = D("999")
+        self.assertEqual(mon.base_cashback_de_venta(fila), mon.base_cashback_legada(fila))
+
+    def test_sin_programa_sin_conexion_sin_cambio(self):
+        """SIN_PROGRAMA no bloquea: el kiosko sin conexión puede no conocer el
+        programa del cliente; decide la tasa de la base (cuenta de antes)."""
+        e = EntradaVenta(_tres_pz(), FECHA, cliente=SIN_PROGRAMA, origen_calculo="kiosko_sin_conexion")
+        c = calcular(e)
+        self.assertIn(M.SIN_PROGRAMA, c.motivos_ticket)
+        fila = _fila(e, c)
+        self.assertEqual(mon.base_cashback_de_venta(fila), mon.base_cashback_legada(fila))
+        self.assertEqual(mon.base_cashback_de_venta(fila)[0], D("450.00"))
+
+    def test_mayorista_sin_conexion_con_mayoreo_si_gana(self):
+        """Sin conexión el motor no aplica el mayoreo y da Monedero (920177a9): sin cambio."""
+        e = EntradaVenta(_tres_pz(), FECHA, cliente=MAYORISTA, modalidad_mayorista="descuento",
+                         origen_calculo="kiosko_sin_conexion")
+        c = calcular(e)
+        self.assertNotIn(M.MAYOREO_SIN_MONEDERO, c.motivos_ticket)
+        self.assertEqual(mon.base_cashback_de_venta(_fila(e, c)), (D("450.00"), False))
+
+
+class MayoristaSinLineasAbonoRealTests(_Base):
+    def _venta_con_foto(self, entrada, *, descuento_programa=None):
+        c = calcular(entrada)
+        v = self._venta(str(c.total), monedero=str(c.saldo_usado))
+        v.pago_tarjeta = bool(entrada.pago_tarjeta)
+        v.detalle = _detalle(entrada)
+        v.calculo = fotografia(entrada, c)
+        v.descuento_programa = descuento_programa
+        self.s.flush()
+        return v
+
+    def test_eligio_mayoreo_y_nada_califico_no_abona(self):
+        self._tasa("15")
+        e = EntradaVenta(_tres_pz(), FECHA, cliente=MAYORISTA, modalidad_mayorista="descuento")
+        # descuento_programa_a_guardar da None: no se cobró descuento.
+        v = self._venta_con_foto(e, descuento_programa=None)
+        self.assertIsNone(mon.acreditar_cashback(self.s, libreta_venta=v, momento=T0))
+        self.assertFalse(mon.tiene_movimientos(self.s, v.id))
+
+    def test_el_bot_de_faltantes_no_lo_repone(self):
+        self._tasa("15")
+        e = EntradaVenta(_tres_pz(), FECHA, cliente=MAYORISTA, modalidad_mayorista="descuento")
+        v = self._venta_con_foto(e)
+        self.assertEqual(mon.acreditar_faltantes(self.s, momento=T0), 0)
+        self.assertFalse(mon.tiene_movimientos(self.s, v.id))
+
+    def test_el_mismo_mayorista_eligiendo_monedero_si_abona(self):
+        self._tasa("15")
+        e = EntradaVenta(_tres_pz(), FECHA, cliente=MAYORISTA, modalidad_mayorista="monedero")
+        v = self._venta_con_foto(e)
+        mov = mon.acreditar_cashback(self.s, libreta_venta=v, momento=T0)
+        self.assertEqual((mov.base_calculo, mov.monto), (D("450.00"), D("67.50")))
+
+    def test_mayoreo_que_si_califico_no_abona_como_hoy(self):
+        self._tasa("15")
+        e = EntradaVenta((_linea(1, "180", cantidad=2),), FECHA, cliente=MAYORISTA, modalidad_mayorista="descuento")
+        c = calcular(e)
+        self.assertTrue(c.descuento_aplicado)
+        v = self._venta_con_foto(e, descuento_programa=D("15"))
+        self.assertIsNone(mon.acreditar_cashback(self.s, libreta_venta=v, momento=T0))
+        self.assertEqual(mon.acreditar_faltantes(self.s, momento=T0), 0)
+
+    def test_sin_programa_sin_conexion_si_abona_con_la_tasa_de_la_base(self):
+        self._tasa("5")
+        e = EntradaVenta(_tres_pz(), FECHA, cliente=SIN_PROGRAMA, origen_calculo="kiosko_sin_conexion")
+        mov = mon.acreditar_cashback(self.s, libreta_venta=self._venta_con_foto(e), momento=T0)
+        self.assertEqual((mov.base_calculo, mov.monto), (D("450.00"), D("22.50")))

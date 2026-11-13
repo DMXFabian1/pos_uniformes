@@ -187,17 +187,18 @@ def _base_del_calculo(calc: dict, libreta_venta) -> tuple[Decimal, bool] | None:
 
     parte = calc.get("monedero")
     if not isinstance(parte, dict) or parte.get("base") in (None, ""):
+        if parte is None and _bloqueo_elegido(calc) and _describe_la_venta(calc, libreta_venta):
+            # 2026-11-12, Daniel, a «Mayorista que eligió mayoreo y ninguna
+            # prenda calificó: ¿gana Monedero o no?»: «no». El motor bloqueó
+            # el Monedero por lo que se eligió (mayoreo, o precio de
+            # empleada): base 0, no se cae a la cuenta de antes. Antes el
+            # ticket decía «no suma Monedero» y el servidor abonaba igual.
+            return _CERO, False
+        return None
+    if not _describe_la_venta(calc, libreta_venta):
         return None
     total, saldo = _d(calc.get("total")), _d(calc.get("saldo_usado"))
-    if total != _d(libreta_venta.monto_total) or saldo != _d(getattr(libreta_venta, "monto_monedero", None)):
-        return None
     pagado = importe_elegible(total, saldo)
-    con_tarjeta = any(
-        isinstance(p, dict) and p.get("medio") == "tarjeta" and _d(p.get("importe")) > 0
-        for p in calc.get("pagos") or ()
-    )
-    if pagado > 0 and con_tarjeta != bool(getattr(libreta_venta, "pago_tarjeta", False)):
-        return None
     base = max(_d(parte["base"]), _CERO)
     if base > pagado:
         # 2026-11-12: desde que la base del motor manda también sin saldo ya
@@ -211,7 +212,38 @@ def _base_del_calculo(calc: dict, libreta_venta) -> tuple[Decimal, bool] | None:
         # motor todavía no le quitaba la comisión a la base. Se le quita aquí,
         # una sola vez, con la misma cuenta del motor de hoy.
         base = base_monedero_con_comision(base, pagado, comision)
-    return base, comision > 0 and con_tarjeta
+    return base, comision > 0 and _con_tarjeta(calc)
+
+
+# Motivos con los que el motor le quita el Monedero a una venta por lo que se
+# ELIGIÓ en ella (2026-11-12): el Mayorista que pidió precio de mayoreo (C4,
+# aunque ninguna prenda calificara) y el precio de empleada (D1). Una venta
+# con fotografía válida y uno de estos motivos no gana Monedero.
+# No entran SIN_PROGRAMA (un kiosko sin conexión puede no conocer el programa
+# del cliente: lo decide la tasa de la base) ni CLIENTE_INACTIVO (lo decide el
+# estado del monedero en la base al abonar, no lo que vio el kiosko).
+def _bloqueo_elegido(calc: dict) -> bool:
+    from pos_uniformes.services.beneficios.motivos import EMPLEADA_SIN_MONEDERO, MAYOREO_SIN_MONEDERO
+
+    elegidos = {MAYOREO_SIN_MONEDERO, EMPLEADA_SIN_MONEDERO}
+    return any(m in elegidos for m in (calc.get("motivos_ticket") or ()))
+
+
+def _con_tarjeta(calc: dict) -> bool:
+    return any(
+        isinstance(p, dict) and p.get("medio") == "tarjeta" and _d(p.get("importe")) > 0
+        for p in calc.get("pagos") or ()
+    )
+
+
+def _describe_la_venta(calc: dict, libreta_venta) -> bool:
+    """Si el cálculo es de ESTA venta: mismo total, mismo saldo y mismo medio
+    de pago que lo que se guardó."""
+    total, saldo = _d(calc.get("total")), _d(calc.get("saldo_usado"))
+    if total != _d(libreta_venta.monto_total) or saldo != _d(getattr(libreta_venta, "monto_monedero", None)):
+        return False
+    pagado = importe_elegible(total, saldo)
+    return not (pagado > 0 and _con_tarjeta(calc) != bool(getattr(libreta_venta, "pago_tarjeta", False)))
 
 
 def base_cashback_de_venta(libreta_venta) -> tuple[Decimal, bool]:
@@ -238,7 +270,13 @@ def base_cashback_de_venta(libreta_venta) -> tuple[Decimal, bool]:
     motor los deja fuera de la base y la cuenta de antes los contaba.
     Daniel decidió: «los centavos no ganan». Por eso ya no hay max() contra
     la cuenta de antes: el ticket (que imprime la base del motor) y el abono
-    dicen lo mismo."""
+    dicen lo mismo.
+
+    Si la fotografía de esta venta dice que el motor bloqueó el Monedero por
+    lo que se eligió (MAYOREO_SIN_MONEDERO, EMPLEADA_SIN_MONEDERO), la base
+    es 0 (2026-11-12, Daniel: el Mayorista que eligió mayoreo y ninguna
+    prenda calificó «no» gana Monedero). Así tampoco lo repone
+    `acreditar_faltantes`."""
     del_motor = _base_de_la_fotografia(libreta_venta)
     if del_motor is not None:
         return del_motor
