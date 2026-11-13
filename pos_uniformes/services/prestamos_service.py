@@ -166,14 +166,12 @@ def por_cobrar(session: Session, employee_code: str, hasta=None) -> list[Prestam
 def total_por_cobrar(session: Session, employee_code: str, hasta=None) -> Decimal:
     """Cuánto se le descuenta en el siguiente pago.
 
-    Si la base todavía no tiene la tabla (un kiosko que abrió antes de que
-    corriera la migración), se devuelve cero: se le paga completo y el
-    préstamo sigue esperando. Pagar de más se corrige; no poder pagar, no."""
-    try:
-        prestamos = por_cobrar(session, employee_code, hasta)
-    except Exception:  # noqa: BLE001 — base sin la tabla todavía
-        session.rollback()
-        return Decimal("0.00")
+    Si la consulta falla, falla: antes devolvía cero «por si la base no tiene
+    la tabla todavía» (la tabla existe desde octubre), así que un error
+    pasajero pagaba el sueldo completo sin descontar préstamos ni compras a
+    cuenta, y su `rollback` soltaba el candado de la nómina (revisión de
+    deuda, 2026-11-12). Quien muestra el pago ya avisa «sin conexión»."""
+    prestamos = por_cobrar(session, employee_code, hasta)
     return sum((Decimal(str(p.monto)) for p in prestamos), Decimal("0.00"))
 
 

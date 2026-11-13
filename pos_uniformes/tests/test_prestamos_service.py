@@ -206,6 +206,23 @@ if __name__ == "__main__":
     unittest.main()
 
 
+class SiFallaLaConsultaNoSePagaCompleto(_Base):
+    """Revisión de deuda, 2026-11-12: si `por_cobrar` fallaba, se devolvía
+    cero y el sueldo salía completo sin descontar lo que debe."""
+
+    def test_el_error_sube_en_vez_de_cero(self):
+        from unittest.mock import patch
+
+        from sqlalchemy.exc import OperationalError
+
+        def falla(*a, **k):
+            raise OperationalError("SELECT", {}, Exception("se cayó la red"))
+
+        with patch.object(pr, "por_cobrar", falla):
+            with self.assertRaises(OperationalError):
+                pr.total_por_cobrar(self.s, "VEND-5")
+
+
 class CobroParcial(_Base):
     """Un préstamo más grande que el pago no se perdona: se parte y el resto
     sigue debiéndose (bug 2026-10-04)."""
