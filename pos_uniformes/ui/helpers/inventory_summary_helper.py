@@ -31,7 +31,6 @@ class InventorySummaryView:
     negative_counter: InventoryCounterState
     out_counter: InventoryCounterState
     low_counter: InventoryCounterState
-    qr_pending_counter: InventoryCounterState
     inactive_counter: InventoryCounterState
 
 
@@ -49,7 +48,6 @@ def build_inventory_summary_view(
     count_negative = conteo.negativos
     count_out = conteo.agotados
     count_low = conteo.bajos
-    count_missing_qr = sum(1 for row in visible_rows if not bool(row.get("qr_exists")))
     count_inactive = sum(1 for row in visible_rows if not bool(row.get("variante_activa")))
     return InventorySummaryView(
         results_summary=_with_notice(
@@ -68,10 +66,6 @@ def build_inventory_summary_view(
         low_counter=InventoryCounterState(
             text=f"Bajo stock: {count_low}",
             tone="warning" if count_low else "positive",
-        ),
-        qr_pending_counter=InventoryCounterState(
-            text=f"Sin QR: {count_missing_qr}",
-            tone="warning" if count_missing_qr else "positive",
         ),
         inactive_counter=InventoryCounterState(
             text=f"Inactivas: {count_inactive}",

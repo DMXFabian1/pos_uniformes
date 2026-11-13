@@ -22,7 +22,6 @@ class InventoryFilterHelperTests(unittest.TestCase):
             "color": "Azul",
             "variante_activa": True,
             "stock_actual": 5,
-            "qr_exists": True,
             "origen_legacy": False,
             "fallback_importacion": False,
             "ultimo_conteo_at": None,
@@ -44,7 +43,6 @@ class InventoryFilterHelperTests(unittest.TestCase):
                 color_filters=("Azul",),
                 status_filter="active",
                 stock_filter="available",
-                qr_filter="ready",
                 origin_filter="native",
                 duplicate_filter="fallback_exclude",
                 conteo_filter="",
@@ -56,7 +54,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
 
         self.assertTrue(matches)
 
-    def test_inventory_row_matches_visible_filters_rejects_missing_qr(self) -> None:
+    def test_fila_sin_dato_de_qr_pasa_porque_ya_no_hay_filtro_qr(self) -> None:
         row = {
             "categoria_nombre": "Uniforme",
             "marca_nombre": "Marca Norte",
@@ -67,7 +65,6 @@ class InventoryFilterHelperTests(unittest.TestCase):
             "color": "Azul",
             "variante_activa": True,
             "stock_actual": 5,
-            "qr_exists": False,
             "origen_legacy": False,
             "fallback_importacion": False,
             "ultimo_conteo_at": None,
@@ -89,7 +86,6 @@ class InventoryFilterHelperTests(unittest.TestCase):
                 color_filters=(),
                 status_filter="",
                 stock_filter="",
-                qr_filter="ready",
                 origin_filter="",
                 duplicate_filter="",
                 conteo_filter="",
@@ -99,7 +95,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
             search_matcher=lambda *_args: True,
         )
 
-        self.assertFalse(matches)
+        self.assertTrue(matches)
 
     def test_filter_visible_inventory_rows_keeps_only_matching_rows(self) -> None:
         rows = [
@@ -114,7 +110,6 @@ class InventoryFilterHelperTests(unittest.TestCase):
                 "color": "Azul",
                 "variante_activa": True,
                 "stock_actual": 5,
-                "qr_exists": True,
                 "origen_legacy": False,
                 "fallback_importacion": False,
                 "ultimo_conteo_at": None,
@@ -131,7 +126,6 @@ class InventoryFilterHelperTests(unittest.TestCase):
                 "color": "Blanco",
                 "variante_activa": False,
                 "stock_actual": 0,
-                "qr_exists": False,
                 "origen_legacy": True,
                 "fallback_importacion": True,
                 "ultimo_conteo_at": None,
@@ -153,7 +147,6 @@ class InventoryFilterHelperTests(unittest.TestCase):
                 color_filters=(),
                 status_filter="active",
                 stock_filter="available",
-                qr_filter="ready",
                 origin_filter="native",
                 duplicate_filter="fallback_exclude",
                 conteo_filter="",
@@ -176,7 +169,6 @@ class InventoryFilterHelperTests(unittest.TestCase):
             "color": "Azul",
             "variante_activa": True,
             "stock_actual": 5,
-            "qr_exists": True,
             "origen_legacy": False,
             "fallback_importacion": False,
             "ultimo_conteo_at": None,
@@ -199,7 +191,6 @@ class InventoryFilterHelperTests(unittest.TestCase):
                 color_filters=(),
                 status_filter="",
                 stock_filter="",
-                qr_filter="",
                 origin_filter="",
                 duplicate_filter="",
                 conteo_filter="",
@@ -223,7 +214,6 @@ class InventoryFilterHelperTests(unittest.TestCase):
             "color": "Azul",
             "variante_activa": True,
             "stock_actual": 5,
-            "qr_exists": True,
             "origen_legacy": False,
             "fallback_importacion": False,
             "ultimo_conteo_at": None,
@@ -251,7 +241,6 @@ class InventoryFilterHelperTests(unittest.TestCase):
                     color_filters=(),
                     status_filter="",
                     stock_filter="",
-                    qr_filter="",
                     origin_filter="",
                     duplicate_filter="",
                     conteo_filter="",
@@ -276,7 +265,6 @@ class InventoryFilterHelperTests(unittest.TestCase):
                     color_filters=(),
                     status_filter="",
                     stock_filter="",
-                    qr_filter="",
                     origin_filter="",
                     duplicate_filter="",
                     conteo_filter="",
@@ -301,7 +289,6 @@ class InventoryFilterHelperTests(unittest.TestCase):
                     color_filters=(),
                     status_filter="",
                     stock_filter="",
-                    qr_filter="",
                     origin_filter="",
                     duplicate_filter="",
                     conteo_filter="",

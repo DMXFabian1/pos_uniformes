@@ -41,7 +41,6 @@ class QuitarChipsInventarioTests(unittest.TestCase):
             inventory_use_filter_combo=_combo("school_only"),
             inventory_status_filter_combo=_combo("active"),
             inventory_stock_filter_combo=_combo("negative"),
-            inventory_qr_filter_combo=_combo("missing"),
             inventory_origin_filter_combo=_combo("legacy"),
             inventory_duplicate_filter_combo=_combo("fallback"),
             inventory_conteo_filter_combo=_combo("stale"),

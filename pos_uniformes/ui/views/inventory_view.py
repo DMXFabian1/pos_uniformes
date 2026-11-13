@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 from pos_uniformes.ui.helpers.flow_layout import FlowLayout
+from pos_uniformes.ui.helpers.inventory_table_row_helper import INVENTORY_TABLE_HEADERS
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
@@ -79,7 +80,6 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     for button in (
         window.toggle_product_button,
         window.toggle_variant_button,
-        window.inventory_generate_qr_button,
         window.inventory_print_label_button,
     ):
         button.setObjectName("inventorySecondaryButton")
@@ -164,14 +164,18 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     delete_variant_action.setToolTip("Eliminar permanentemente la presentacion seleccionada (SKU, talla, color)")
     delete_variant_action.triggered.connect(window._handle_delete_variant)
     more_menu.addSeparator()
-    qr_lote_action = more_menu.addAction("Generar QR de seleccion")
-    qr_lote_action.setToolTip("Generar codigos QR para las presentaciones seleccionadas en la tabla")
+    # QR: fuera de la vista (tanda 2). La etiqueta genera su QR sola al
+    # imprimir; esto queda solo para mantenimiento.
+    rarely_used_menu = more_menu.addMenu("Poco usado")
+    rarely_used_menu.setToolTipsVisible(True)
+    qr_lote_action = rarely_used_menu.addAction("Generar QR de la selección")
+    qr_lote_action.setToolTip("Guarda el QR de las tallas elegidas en la tabla (la etiqueta ya lo hace sola)")
     qr_lote_action.triggered.connect(window._handle_generate_all_qr)
-    qr_missing_action = more_menu.addAction("Generar QR faltantes")
-    qr_missing_action.setToolTip("Generar QR solo para presentaciones activas que aun no tienen archivo QR")
+    qr_missing_action = rarely_used_menu.addAction("Generar los QR que faltan")
+    qr_missing_action.setToolTip("Guarda el QR de las tallas activas que aún no lo tienen en esta computadora")
     qr_missing_action.triggered.connect(window._handle_generate_missing_qr)
-    qr_regen_action = more_menu.addAction("Regenerar todos los QR")
-    qr_regen_action.setToolTip("Recrear todos los QR de presentaciones activas (sobreescribe los existentes)")
+    qr_regen_action = rarely_used_menu.addAction("Regenerar todos los QR")
+    qr_regen_action.setToolTip("Vuelve a crear el QR de todas las tallas activas (reemplaza los guardados)")
     qr_regen_action.triggered.connect(window._handle_regenerate_all_qr)
     window.inventory_more_button.setMenu(more_menu)
 
@@ -212,13 +216,6 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_stock_hint_label.setWordWrap(True)
     window.inventory_meta_label.setWordWrap(True)
     window.inventory_last_movement_label.setWordWrap(True)
-    window.qr_preview_label.setMinimumSize(132, 132)
-    window.qr_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-    window.qr_preview_label.setObjectName("qrPreview")
-    window.qr_preview_info_label.setWordWrap(True)
-    window.qr_preview_info_label.setObjectName("inventoryQrCaption")
-    window.qr_status_label.setObjectName("inventoryQrStatus")
-    window.inventory_generate_qr_button.setText("Generar QR")
     window.inventory_print_label_button.setText("Imprimir etiqueta(s)")
     header_row = QHBoxLayout()
     header_row.setSpacing(8)
@@ -238,24 +235,17 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     side_layout.addWidget(window.inventory_meta_label)
     side_layout.addWidget(window.inventory_last_movement_label)
     side_layout.addLayout(state_row)
-    side_layout.addWidget(window.qr_preview_label, 0, Qt.AlignmentFlag.AlignHCenter)
-    side_layout.addWidget(window.inventory_generate_qr_button)
     side_layout.addWidget(window.inventory_print_label_button)
-    side_layout.addWidget(window.qr_preview_info_label)
-    side_layout.addWidget(window.qr_status_label)
-    window.inventory_generate_qr_button.clicked.connect(window._handle_generate_selected_qr)
     window.inventory_print_label_button.clicked.connect(window._handle_inventory_print_label)
     window.inventory_print_label_button.setToolTip(
         "Con una fila seleccionada abre la impresion individual. Con varias filas abre el lote experimental."
     )
     window.inventory_generate_all_qr_button.clicked.connect(window._handle_generate_all_qr)
-    window.inventory_variant_combo.currentIndexChanged.connect(window._refresh_selected_qr_preview)
+    window.inventory_variant_combo.currentIndexChanged.connect(window._refresh_inventory_selection_panel)
     side_box.setLayout(side_layout)
 
-    window.inventory_table.setColumnCount(11)
-    window.inventory_table.setHorizontalHeaderLabels(
-        ["SKU", "Producto", "Talla", "Color", "Stock", "Piso", "Almacén", "Apartado", "Estado", "QR", "Ult. conteo"]
-    )
+    window.inventory_table.setColumnCount(len(INVENTORY_TABLE_HEADERS))
+    window.inventory_table.setHorizontalHeaderLabels(list(INVENTORY_TABLE_HEADERS))
     window.inventory_table.setObjectName("dataTable")
     window.inventory_table.verticalHeader().setVisible(False)
     window.inventory_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -264,17 +254,11 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_table.setMinimumHeight(320)
     window.inventory_table.horizontalHeader().setStretchLastSection(True)
     inventory_header = window.inventory_table.horizontalHeader()
-    inventory_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)   # SKU
-    inventory_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)             # Producto
-    inventory_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)   # Talla
-    inventory_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)   # Color
-    inventory_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)   # Stock
-    inventory_header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)   # Piso
-    inventory_header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)   # Bodega
-    inventory_header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)   # Apartado
-    inventory_header.setSectionResizeMode(8, QHeaderView.ResizeMode.ResizeToContents)   # Estado
-    inventory_header.setSectionResizeMode(9, QHeaderView.ResizeMode.ResizeToContents)   # QR
-    inventory_header.setSectionResizeMode(10, QHeaderView.ResizeMode.ResizeToContents)  # Ult. conteo
+    for column_index, header in enumerate(INVENTORY_TABLE_HEADERS):
+        inventory_header.setSectionResizeMode(
+            column_index,
+            QHeaderView.ResizeMode.Stretch if header == "Producto" else QHeaderView.ResizeMode.ResizeToContents,
+        )
     inventory_header.setStretchLastSection(False)
     window.inventory_table.itemSelectionChanged.connect(window._handle_inventory_table_selection)
     window.inventory_table.currentCellChanged.connect(lambda *_: window._handle_inventory_table_selection())
@@ -310,7 +294,6 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_use_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_status_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_stock_filter_combo.setObjectName("inventoryFilterCombo")
-    window.inventory_qr_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_conteo_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_origin_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_duplicate_filter_combo.setObjectName("inventoryFilterCombo")
@@ -338,10 +321,6 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_conteo_filter_combo.addItem("Sin conteo", "never")
     window.inventory_conteo_filter_combo.addItem("Reciente (0-3d)", "recent")
     window.inventory_conteo_filter_combo.addItem("Vencido (8+d)", "stale")
-    window.inventory_qr_filter_combo.clear()
-    window.inventory_qr_filter_combo.addItem("QR: todos", "")
-    window.inventory_qr_filter_combo.addItem("Con QR", "ready")
-    window.inventory_qr_filter_combo.addItem("Sin QR", "missing")
     window.inventory_origin_filter_combo.clear()
     window.inventory_origin_filter_combo.addItem("Origen: todos", "")
     window.inventory_origin_filter_combo.addItem("Importados", "legacy")
@@ -371,9 +350,8 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     filters_row.addWidget(window.inventory_color_filter_combo, 1, 6)
     filters_row.addWidget(window.inventory_status_filter_combo, 2, 0)
     filters_row.addWidget(window.inventory_stock_filter_combo, 2, 1)
-    filters_row.addWidget(window.inventory_qr_filter_combo, 2, 2)
-    filters_row.addWidget(window.inventory_origin_filter_combo, 2, 3)
-    filters_row.addWidget(window.inventory_duplicate_filter_combo, 2, 4)
+    filters_row.addWidget(window.inventory_origin_filter_combo, 2, 2)
+    filters_row.addWidget(window.inventory_duplicate_filter_combo, 2, 3, 1, 2)
     filters_row.addWidget(window.inventory_precio_filter_combo, 2, 5)
     filters_row.addWidget(window.inventory_conteo_filter_combo, 2, 6)
     filters_row.setColumnStretch(0, 1)
@@ -397,7 +375,6 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
         window.inventory_negative_counter,
         window.inventory_out_counter,
         window.inventory_low_counter,
-        window.inventory_qr_pending_counter,
         window.inventory_inactive_counter,
     ):
         counter.setObjectName("inventoryCounterChip")
@@ -437,9 +414,6 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
         lambda _: window._handle_inventory_filters_changed_reset_page()
     )
     window.inventory_stock_filter_combo.currentIndexChanged.connect(
-        lambda _: window._handle_inventory_filters_changed_reset_page()
-    )
-    window.inventory_qr_filter_combo.currentIndexChanged.connect(
         lambda _: window._handle_inventory_filters_changed_reset_page()
     )
     window.inventory_origin_filter_combo.currentIndexChanged.connect(

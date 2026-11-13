@@ -15,7 +15,6 @@ class InventoryContextMenuAction:
 def build_inventory_context_menu_actions(
     *,
     is_admin: bool,
-    qr_exists: bool,
     variante_activa: bool,
 ) -> tuple[InventoryContextMenuAction, ...]:
     return (
@@ -33,11 +32,6 @@ def build_inventory_context_menu_actions(
             key="adjust",
             label="Corregir stock",
             enabled=is_admin,
-        ),
-        InventoryContextMenuAction(
-            key="qr",
-            label="Regenerar QR" if qr_exists else "Generar QR",
-            enabled=True,
         ),
         InventoryContextMenuAction(
             key="print",

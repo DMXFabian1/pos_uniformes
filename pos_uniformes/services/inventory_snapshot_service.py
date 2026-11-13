@@ -10,8 +10,6 @@ from pos_uniformes.services.search_filter_service import (
     attach_row_search_cache,
 )
 
-_inventory_qr_exists_cache: dict[str, bool] = {}
-
 from pos_uniformes.services.talla_orden_service import clave_talla
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 
@@ -46,7 +44,6 @@ def ordenar_filas_inventario(rows: list[dict[str, object]]) -> list[dict[str, ob
 
 
 def _build_inventory_snapshot_row(row: tuple[object, ...]) -> dict[str, object]:
-    qr_exists = _inventory_qr_exists(str(row[1]))
     return attach_row_search_cache(
         {
             "variante_id": row[0],
@@ -76,7 +73,6 @@ def _build_inventory_snapshot_row(row: tuple[object, ...]) -> dict[str, object]:
             # Tiene receta en conjunto_componente (Pants 3pz / Chamarra armados
             # de piezas): mismo criterio que conjunto_service.filtro_sin_conjuntos.
             "es_conjunto": bool(row[24]) if len(row) > 24 else False,
-            "qr_exists": qr_exists,
             "origen_etiqueta": "LEGACY" if row[10] else "NUEVO",
             "variante_estado": "ACTIVA" if row[19] else "INACTIVA",
             "fallback_text": "fallback" if bool(row[20]) else "",
@@ -84,25 +80,6 @@ def _build_inventory_snapshot_row(row: tuple[object, ...]) -> dict[str, object]:
         alias_map=INVENTORY_SEARCH_ALIAS_MAP,
         general_fields=INVENTORY_SEARCH_GENERAL_FIELDS,
     )
-
-
-def _inventory_qr_exists(sku: str) -> bool:
-    cached_value = _inventory_qr_exists_cache.get(sku)
-    if cached_value is not None:
-        return cached_value
-
-    from pos_uniformes.utils.qr_generator import QrGenerator
-
-    exists = (QrGenerator.output_dir() / f"{sku}.png").exists()
-    _inventory_qr_exists_cache[sku] = exists
-    return exists
-
-
-def invalidate_inventory_qr_exists_cache(*, sku: str | None = None) -> None:
-    if sku is None:
-        _inventory_qr_exists_cache.clear()
-        return
-    _inventory_qr_exists_cache.pop(sku, None)
 
 
 def _execute_inventory_snapshot_query(session) -> list[tuple[object, ...]]:

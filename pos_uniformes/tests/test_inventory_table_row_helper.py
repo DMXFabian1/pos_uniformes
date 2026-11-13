@@ -9,7 +9,7 @@ from pos_uniformes.ui.helpers.inventory_table_row_helper import (
 
 
 class InventoryTableRowHelperTests(unittest.TestCase):
-    def test_build_inventory_table_row_view_for_low_stock_pending_qr(self) -> None:
+    def test_build_inventory_table_row_view_for_low_stock_sin_columna_qr(self) -> None:
         view = build_inventory_table_row_view(
             {
                 "variante_id": 8,
@@ -20,7 +20,6 @@ class InventoryTableRowHelperTests(unittest.TestCase):
                 "stock_actual": 2,
                 "apartado_cantidad": 1,
                 "variante_activa": False,
-                "qr_exists": False,
                 "ultimo_conteo_at": None,
                 "stock_minimo": None,
             }
@@ -29,13 +28,13 @@ class InventoryTableRowHelperTests(unittest.TestCase):
         self.assertEqual(view.variant_id, 8)
         self.assertEqual(
             view.values,
-            ("SKU-008", "Pants Deportivo", "16", "Azul Marino", "2 Bajo", "", "", 1, "INACTIVA", "Pendiente", "Nunca"),
+            ("SKU-008", "Pants Deportivo", "16", "Azul Marino", "2 Bajo", "", "", 1, "INACTIVA", "Nunca"),
         )
         self.assertEqual(view.row_tone, "muted")
         self.assertEqual(view.stock_tone, "warning")
         self.assertEqual(view.committed_tone, "reserved")
         self.assertEqual(view.status_tone, "muted")
-        self.assertEqual(view.qr_tone, "warning")
+        self.assertFalse(hasattr(view, "qr_tone"))
 
     def test_build_inventory_table_row_views_for_multiple_rows(self) -> None:
         views = build_inventory_table_row_views(
@@ -49,7 +48,6 @@ class InventoryTableRowHelperTests(unittest.TestCase):
                     "stock_actual": 0,
                     "apartado_cantidad": 0,
                     "variante_activa": True,
-                    "qr_exists": True,
                     "ultimo_conteo_at": None,
                     "stock_minimo": None,
                 },
@@ -62,7 +60,6 @@ class InventoryTableRowHelperTests(unittest.TestCase):
                     "stock_actual": 6,
                     "apartado_cantidad": 0,
                     "variante_activa": True,
-                    "qr_exists": False,
                     "ultimo_conteo_at": None,
                     "stock_minimo": None,
                 },
@@ -91,7 +88,6 @@ class InventoryTableRowHelperTests(unittest.TestCase):
                 "stock_piso": 3,
                 "apartado_cantidad": 0,
                 "variante_activa": True,
-                "qr_exists": True,
                 "ultimo_conteo_at": None,
                 "stock_minimo": None,
             }
@@ -113,7 +109,6 @@ class InventoryTableRowHelperTests(unittest.TestCase):
                 "stock_actual": -2,
                 "apartado_cantidad": 0,
                 "variante_activa": True,
-                "qr_exists": True,
                 "ultimo_conteo_at": None,
                 "stock_minimo": None,
             }
@@ -126,8 +121,7 @@ class InventoryTableRowHelperTests(unittest.TestCase):
     def test_pants_3pz_con_receta_en_cero_y_con_existencia(self) -> None:
         base = {
             "variante_id": 5, "sku": "SKU-005", "producto_nombre_base": "Pants 3pz Gales",
-            "talla": "8", "color": "Azul", "apartado_cantidad": 0, "variante_activa": True,
-            "qr_exists": True, "ultimo_conteo_at": None, "stock_minimo": None,
+            "talla": "8", "color": "Azul", "apartado_cantidad": 0, "variante_activa": True, "ultimo_conteo_at": None, "stock_minimo": None,
             "tipo_pieza_nombre": "Pants 3pz", "es_conjunto": True,
         }
         cero = build_inventory_table_row_view({**base, "stock_actual": 0})

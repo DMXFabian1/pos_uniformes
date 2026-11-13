@@ -156,10 +156,7 @@ from pos_uniformes.services.inventory_label_service import (
 )
 from pos_uniformes.services.inventario_busqueda_service import combinar_hits_meili
 from pos_uniformes.services.inventory_overview_service import load_inventory_overview_snapshot
-from pos_uniformes.services.inventory_snapshot_service import (
-    invalidate_inventory_qr_exists_cache,
-    load_inventory_snapshot_rows,
-)
+from pos_uniformes.services.inventory_snapshot_service import load_inventory_snapshot_rows
 from pos_uniformes.services.presupuesto_service import PresupuestoService
 from pos_uniformes.services.quote_snapshot_service import (
     build_quote_history_input_rows,
@@ -360,14 +357,6 @@ from pos_uniformes.ui.helpers.inventory_overview_helper import (
     build_error_inventory_overview_view,
     build_inventory_overview_view,
 )
-from pos_uniformes.ui.helpers.inventory_qr_preview_helper import (
-    InventoryQrPreviewView,
-    build_available_inventory_qr_preview_view,
-    build_empty_inventory_qr_preview_view,
-    build_error_inventory_qr_preview_view,
-    build_pending_inventory_qr_preview_view,
-    build_inventory_qr_preview_selection,
-)
 from pos_uniformes.ui.helpers.inventory_selection_helper import (
     collect_inventory_row_variant_ids,
     collect_selected_inventory_variant_ids,
@@ -376,7 +365,12 @@ from pos_uniformes.ui.helpers.inventory_selection_helper import (
     normalize_inventory_variant_id,
 )
 from pos_uniformes.ui.helpers.inventory_summary_helper import INVENTORY_SEARCH_LIMIT, build_inventory_summary_view
-from pos_uniformes.ui.helpers.inventory_table_row_helper import build_inventory_table_row_views
+from pos_uniformes.ui.helpers.inventory_table_row_helper import (
+    COLUMNA_APARTADO as INVENTORY_COLUMNA_APARTADO,
+    COLUMNA_ESTADO as INVENTORY_COLUMNA_ESTADO,
+    COLUMNA_STOCK as INVENTORY_COLUMNA_STOCK,
+    build_inventory_table_row_views,
+)
 from pos_uniformes.ui.helpers.layaway_alerts_helper import build_layaway_alerts_view
 from pos_uniformes.ui.helpers.window_close_helper import build_main_window_close_decision
 from pos_uniformes.ui.helpers.quote_cart_view_helper import build_quote_cart_view
@@ -1380,13 +1374,9 @@ class MainWindow(QMainWindow):
         self.inventory_count_button = QPushButton("Conteo fisico")
         self.inventory_bulk_adjust_button = QPushButton("Ajuste masivo")
         self.inventory_bulk_price_button = QPushButton("Precio masivo")
-        self.inventory_generate_qr_button = QPushButton("Generar QR de presentacion")
         self.inventory_print_label_button = QPushButton("Imprimir etiqueta")
         self.inventory_generate_all_qr_button = QPushButton("Generar QR en lote")
         self.inventory_permission_label = QLabel()
-        self.qr_status_label = QLabel()
-        self.qr_preview_label = QLabel("Preview QR")
-        self.qr_preview_info_label = QLabel()
         self.inventory_overview_label = QLabel("Selecciona una presentacion")
         self.inventory_product_label = QLabel("Elige una fila para ver su ficha rápida.")
         self.inventory_status_badge = QLabel("Sin seleccion")
@@ -1410,7 +1400,6 @@ class MainWindow(QMainWindow):
         self.inventory_use_filter_combo = QComboBox()
         self.inventory_status_filter_combo = QComboBox()
         self.inventory_stock_filter_combo = QComboBox()
-        self.inventory_qr_filter_combo = QComboBox()
         self.inventory_conteo_filter_combo = QComboBox()
         self.inventory_origin_filter_combo = QComboBox()
         self.inventory_duplicate_filter_combo = QComboBox()
@@ -1422,7 +1411,6 @@ class MainWindow(QMainWindow):
         self.inventory_negative_counter = QLabel("En negativo: 0")
         self.inventory_out_counter = QLabel("Agotados: 0")
         self.inventory_low_counter = QLabel("Bajo stock: 0")
-        self.inventory_qr_pending_counter = QLabel("Sin QR: 0")
         self.inventory_inactive_counter = QLabel("Inactivas: 0")
         self.inventory_new_button = QToolButton()
         self.inventory_edit_button = QToolButton()
@@ -1796,7 +1784,6 @@ class MainWindow(QMainWindow):
             self.inventory_count_button: "Abre un conteo fisico para capturar existencias y aplicar diferencias en bloque.",
             self.inventory_bulk_adjust_button: "Aplica un lote de ajustes masivos con preview, validacion y auditoria por movimiento.",
             self.inventory_bulk_price_button: "Actualiza precios por lote con preview, aumentos, descuentos y auditoria de catalogo.",
-            self.inventory_generate_qr_button: "Genera el codigo QR de la presentacion seleccionada.",
             self.inventory_print_label_button: "Abre la impresion de etiquetas para la presentacion seleccionada. La logica completa se integrara en la siguiente fase.",
             self.inventory_generate_all_qr_button: "Genera codigos QR en lote para las presentaciones seleccionadas en Inventario.",
             self.inventory_new_button: "Crea catalogo base, productos o presentaciones nuevas desde un solo menu.",
@@ -5459,55 +5446,6 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, title, str(exc))
             return None
 
-    def _offer_generate_qr_for_variants(
-        self,
-        variant_ids: list[int],
-        *,
-        title: str,
-        summary_message: str,
-    ) -> None:
-        normalized_ids = [int(value) for value in variant_ids if value]
-        if not normalized_ids:
-            return
-        reply = QMessageBox.question(
-            self,
-            title,
-            (
-                f"{summary_message}\n\n"
-                "Los QR quedan pendientes por default para no frenar el alta.\n"
-                "Quieres generarlos ahora?"
-            ),
-        )
-        if reply != QMessageBox.StandardButton.Yes:
-            return
-
-        try:
-            with get_session() as session:
-                variantes = [
-                    variante
-                    for variant_id in normalized_ids
-                    if (variante := session.get(Variante, int(variant_id))) is not None
-                ]
-                if not variantes:
-                    raise ValueError("No se encontraron presentaciones activas para generar QR.")
-                paths = QrGenerator.generate_many(variantes)
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "QR fallido", str(exc))
-            return
-
-        self.refresh_all()
-        self._set_combo_value(self.inventory_variant_combo, normalized_ids[0])
-        self._refresh_selected_qr_preview()
-        generated_count = len(paths)
-        if generated_count == 1:
-            qr_message = f"Se genero 1 QR en:\n{paths[0]}"
-        else:
-            qr_message = (
-                f"Se generaron {generated_count} QR en:\n{QrGenerator.output_dir()}\n"
-                f"Primer archivo: {paths[0].name}"
-            )
-        QMessageBox.information(self, "QR generado", qr_message)
-
     def _handle_create_product(self) -> None:
         if self.current_role != RolUsuario.ADMIN:
             QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede crear productos.")
@@ -5649,27 +5587,7 @@ class MainWindow(QMainWindow):
                         if len(errors) > 4:
                             preview_errors += f"\n... y {len(errors) - 4} mas."
                         message += f"\n\nIncidencias:\n{preview_errors}"
-                    message += (
-                        "\n\nQR: pendiente. Puedes generarlo ahora o despues desde Inventario."
-                    )
-                    created_variant_ids: list[int] = []
-                    if created_skus:
-                        try:
-                            with get_session() as session:
-                                created_variant_ids = list(
-                                    session.scalars(
-                                        select(Variante.id)
-                                        .where(Variante.sku.in_(created_skus))
-                                        .order_by(Variante.sku)
-                                    ).all()
-                                )
-                        except Exception:
-                            created_variant_ids = []
-                    self._offer_generate_qr_for_variants(
-                        created_variant_ids,
-                        title="Presentaciones creadas",
-                        summary_message=message,
-                    )
+                    QMessageBox.information(self, "Tallas creadas", message)
                 return
 
         reply = QMessageBox.question(
@@ -5685,13 +5603,10 @@ class MainWindow(QMainWindow):
             if result is not None:
                 sku, variant_id = result
                 self.refresh_all()
-                self._offer_generate_qr_for_variants(
-                    [variant_id],
-                    title="Presentacion creada",
-                    summary_message=(
-                        f"Se agrego la primera presentacion del producto con SKU '{sku}'.\n\n"
-                        "QR: pendiente."
-                    ),
+                QMessageBox.information(
+                    self,
+                    "Talla creada",
+                    f"Se agregó la primera talla de la prenda con SKU '{sku}'.",
                 )
 
     def _handle_create_variant(self) -> None:
@@ -5706,11 +5621,7 @@ class MainWindow(QMainWindow):
         sku, variant_id = result
         self.refresh_all()
         self._set_combo_value(self.inventory_variant_combo, variant_id)
-        self._offer_generate_qr_for_variants(
-            [variant_id],
-            title="Presentacion creada",
-            summary_message=f"Presentacion '{sku.upper()}' creada correctamente.\n\nQR: pendiente.",
-        )
+        QMessageBox.information(self, "Talla creada", f"Talla '{sku.upper()}' creada correctamente.")
 
     def _handle_duplicate_variant(self) -> None:
         if self.current_role != RolUsuario.ADMIN:
@@ -5738,11 +5649,7 @@ class MainWindow(QMainWindow):
         sku, variant_id = result
         self.refresh_all()
         self._set_combo_value(self.inventory_variant_combo, variant_id)
-        self._offer_generate_qr_for_variants(
-            [variant_id],
-            title="Presentacion duplicada",
-            summary_message=f"Presentacion '{sku.upper()}' creada correctamente.\n\nQR: pendiente.",
-        )
+        QMessageBox.information(self, "Talla duplicada", f"Talla '{sku.upper()}' creada correctamente.")
 
     def _handle_catalog_selection(self) -> None:
         row = resolve_catalog_row(self.catalog_rows, self.catalog_table.currentRow())
@@ -6785,47 +6692,6 @@ class MainWindow(QMainWindow):
             f"Conteo {reference} aplicado correctamente. Filas ajustadas: {len(conteos)}.",
         )
 
-    def _handle_generate_selected_qr(self) -> None:
-        variante_id = self.inventory_variant_combo.currentData()
-        if not variante_id:
-            QMessageBox.warning(self, "Sin presentacion", "Selecciona una presentacion para generar su QR.")
-            return
-
-        preview_selection = None
-        try:
-            with self._busy_scope(
-                "Inventario: generando QR...",
-                status_label=self.qr_status_label,
-            ), get_session() as session:
-                variante = session.get(Variante, int(variante_id))
-                if variante is None:
-                    raise ValueError("Presentacion no encontrada.")
-                preview_selection = build_inventory_qr_preview_selection(variante)
-                path = QrGenerator.generate_for_variant(variante)
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "QR fallido", str(exc))
-            return
-
-        if preview_selection is None:
-            QMessageBox.critical(self, "QR fallido", "No fue posible preparar la vista previa del QR.")
-            return
-
-        self._apply_inventory_qr_preview_view(
-            build_available_inventory_qr_preview_view(
-                sku=preview_selection.sku,
-                product_name=preview_selection.product_name,
-                talla=preview_selection.talla,
-                color=preview_selection.color,
-                file_name=path.name,
-            ),
-            preview_path=path,
-        )
-        self._set_combo_value(self.inventory_variant_combo, variante_id)
-        invalidate_inventory_qr_exists_cache(sku=preview_selection.sku)
-        self._invalidate_listing_snapshot_caches(catalog=False, inventory=True)
-        self._handle_inventory_filters_changed()
-        QMessageBox.information(self, "QR generado", f"QR guardado en:\n{path}")
-
     def _handle_generate_all_qr(self) -> None:
         selected_variant_ids = self._selected_inventory_variant_ids()
         if not selected_variant_ids:
@@ -6837,10 +6703,7 @@ class MainWindow(QMainWindow):
             return
         progress_dialog: QProgressDialog | None = None
         try:
-            with self._busy_scope(
-                "Inventario: generando QR en lote...",
-                status_label=self.qr_status_label,
-            ), get_session() as session:
+            with self._busy_scope("Inventario: generando QR en lote..."), get_session() as session:
                 variantes = session.scalars(
                     select(Variante)
                     .where(
@@ -6866,7 +6729,6 @@ class MainWindow(QMainWindow):
                         return
                     progress_dialog.setLabelText(progress.message)
                     progress_dialog.setValue(progress.current - 1)
-                    self.qr_status_label.setText(progress.message)
                     QApplication.processEvents()
 
                 paths = generate_inventory_bulk_qr(
@@ -6880,7 +6742,6 @@ class MainWindow(QMainWindow):
         except InventoryBulkQrCancelled:
             if progress_dialog is not None:
                 progress_dialog.close()
-            self.qr_status_label.setText("Generacion de QR cancelada por el usuario.")
             QMessageBox.information(
                 self,
                 "Generacion cancelada",
@@ -6896,11 +6757,6 @@ class MainWindow(QMainWindow):
             progress_dialog.close()
 
         directory = QrGenerator.output_dir()
-        self.qr_status_label.setText(f"QRs generados en: {directory}")
-        invalidate_inventory_qr_exists_cache()
-        self._invalidate_listing_snapshot_caches(catalog=False, inventory=True)
-        self._handle_inventory_filters_changed()
-        self._refresh_selected_qr_preview()
         QMessageBox.information(
             self,
             "QRs generados",
@@ -6951,10 +6807,6 @@ class MainWindow(QMainWindow):
             progress.close()
             self._bulk_qr_worker = None
             self._bulk_qr_progress = None
-            invalidate_inventory_qr_exists_cache()
-            self._invalidate_listing_snapshot_caches(catalog=False, inventory=True)
-            self._handle_inventory_filters_changed()
-            self._refresh_selected_qr_preview()
             parts = [f"QR generados: {generated}"]
             if skipped:
                 parts.append(f"Ya existentes (omitidos): {skipped}")
@@ -7574,7 +7426,6 @@ class MainWindow(QMainWindow):
                 ("uso", self.inventory_use_filter_combo.currentData(), self.inventory_use_filter_combo.currentText()),
                 ("estado", self.inventory_status_filter_combo.currentData(), self.inventory_status_filter_combo.currentText()),
                 ("stock", self.inventory_stock_filter_combo.currentData(), self.inventory_stock_filter_combo.currentText()),
-                ("qr", self.inventory_qr_filter_combo.currentData(), self.inventory_qr_filter_combo.currentText()),
                 ("origen", self.inventory_origin_filter_combo.currentData(), self.inventory_origin_filter_combo.currentText()),
                 ("incidencias", self.inventory_duplicate_filter_combo.currentData(), self.inventory_duplicate_filter_combo.currentText()),
                 ("conteo", self.inventory_conteo_filter_combo.currentData(), self.inventory_conteo_filter_combo.currentText()),
@@ -7598,7 +7449,6 @@ class MainWindow(QMainWindow):
                 ("uso", self.inventory_use_filter_combo.currentData(), self.inventory_use_filter_combo.currentText()),
                 ("estado", self.inventory_status_filter_combo.currentData(), self.inventory_status_filter_combo.currentText()),
                 ("stock", self.inventory_stock_filter_combo.currentData(), self.inventory_stock_filter_combo.currentText()),
-                ("qr", self.inventory_qr_filter_combo.currentData(), self.inventory_qr_filter_combo.currentText()),
                 ("origen", self.inventory_origin_filter_combo.currentData(), self.inventory_origin_filter_combo.currentText()),
                 ("incidencias", self.inventory_duplicate_filter_combo.currentData(), self.inventory_duplicate_filter_combo.currentText()),
                 ("conteo", self.inventory_conteo_filter_combo.currentData(), self.inventory_conteo_filter_combo.currentText()),
@@ -7623,7 +7473,6 @@ class MainWindow(QMainWindow):
             "uso": self.inventory_use_filter_combo,
             "estado": self.inventory_status_filter_combo,
             "stock": self.inventory_stock_filter_combo,
-            "qr": self.inventory_qr_filter_combo,
             "origen": self.inventory_origin_filter_combo,
             "incidencias": self.inventory_duplicate_filter_combo,
             "conteo": self.inventory_conteo_filter_combo,
@@ -7768,7 +7617,7 @@ class MainWindow(QMainWindow):
         if current_inventory_variant_id is None:
             self.inventory_variant_combo.setCurrentIndex(-1)
         self._refresh_catalog_section_controls()
-        self._refresh_selected_qr_preview()
+        self._refresh_inventory_selection_panel()
 
     def _refresh_quotes(self, session) -> None:
         selected_quote_id = self._selected_quote_id()
@@ -7928,7 +7777,6 @@ class MainWindow(QMainWindow):
         color_filters = self.inventory_color_filter_combo.selected_values()
         status_filter = str(self.inventory_status_filter_combo.currentData() or "")
         stock_filter = str(self.inventory_stock_filter_combo.currentData() or "")
-        qr_filter = str(self.inventory_qr_filter_combo.currentData() or "")
         origin_filter = str(self.inventory_origin_filter_combo.currentData() or "")
         duplicate_filter = str(self.inventory_duplicate_filter_combo.currentData() or "")
         conteo_filter = str(self.inventory_conteo_filter_combo.currentData() or "")
@@ -7949,7 +7797,6 @@ class MainWindow(QMainWindow):
                 color_filters=tuple(color_filters),
                 status_filter=status_filter,
                 stock_filter=stock_filter,
-                qr_filter=qr_filter,
                 origin_filter=origin_filter,
                 duplicate_filter=duplicate_filter,
                 conteo_filter=conteo_filter,
@@ -7978,11 +7825,6 @@ class MainWindow(QMainWindow):
         )
         self._set_badge_state(self.inventory_out_counter, summary_view.out_counter.text, summary_view.out_counter.tone)
         self._set_badge_state(self.inventory_low_counter, summary_view.low_counter.text, summary_view.low_counter.tone)
-        self._set_badge_state(
-            self.inventory_qr_pending_counter,
-            summary_view.qr_pending_counter.text,
-            summary_view.qr_pending_counter.tone,
-        )
         self._set_badge_state(
             self.inventory_inactive_counter,
             summary_view.inactive_counter.text,
@@ -8029,18 +7871,15 @@ class MainWindow(QMainWindow):
                     if item is not None:
                         _set_table_row_tint(item, row_view.row_tone)
             self.inventory_table.item(row_index, 0).setData(Qt.ItemDataRole.UserRole, row_view.variant_id)
-            stock_item = self.inventory_table.item(row_index, 4)
-            committed_item = self.inventory_table.item(row_index, 7)
-            status_item = self.inventory_table.item(row_index, 8)
-            qr_item = self.inventory_table.item(row_index, 9)
+            stock_item = self.inventory_table.item(row_index, INVENTORY_COLUMNA_STOCK)
+            committed_item = self.inventory_table.item(row_index, INVENTORY_COLUMNA_APARTADO)
+            status_item = self.inventory_table.item(row_index, INVENTORY_COLUMNA_ESTADO)
             if stock_item is not None:
                 _set_table_badge_style(stock_item, row_view.stock_tone)
             if committed_item is not None and row_view.committed_tone is not None:
                 _set_table_badge_style(committed_item, row_view.committed_tone)
             if status_item is not None:
                 _set_table_badge_style(status_item, row_view.status_tone)
-            if qr_item is not None:
-                _set_table_badge_style(qr_item, row_view.qr_tone)
 
     def _schedule_inventory_filter_refresh(self) -> None:
         self.inventory_filter_debounce_timer.start()
@@ -8076,7 +7915,6 @@ class MainWindow(QMainWindow):
             self.inventory_use_filter_combo,
             self.inventory_status_filter_combo,
             self.inventory_stock_filter_combo,
-            self.inventory_qr_filter_combo,
             self.inventory_origin_filter_combo,
             self.inventory_duplicate_filter_combo,
             self.inventory_conteo_filter_combo,
@@ -8621,72 +8459,12 @@ class MainWindow(QMainWindow):
             f"Se exporto el historial filtrado actual en:\n{export_dir}",
         )
 
-    def _refresh_selected_qr_preview(self) -> None:
+    def _refresh_inventory_selection_panel(self) -> None:
+        """Ficha de la talla elegida (la vista previa del QR salió en la tanda 2)."""
         variante_id = self.inventory_variant_combo.currentData()
-        if not variante_id:
-            self._apply_inventory_qr_preview_view(build_empty_inventory_qr_preview_view())
-            self._refresh_inventory_overview()
-            return
-
-        preview_path: Path | None = None
-        preview_selection = None
-        try:
-            with get_session() as session:
-                variante = session.get(Variante, int(variante_id))
-                if variante is None:
-                    raise ValueError("Presentacion no encontrada.")
-                preview_selection = build_inventory_qr_preview_selection(variante)
-                path = QrGenerator.path_for_variant(variante)
-                if not path.exists():
-                    self._apply_inventory_qr_preview_view(
-                        build_pending_inventory_qr_preview_view(
-                            sku=preview_selection.sku,
-                            product_name=preview_selection.product_name,
-                            talla=preview_selection.talla,
-                            color=preview_selection.color,
-                        )
-                    )
-                    self._refresh_inventory_overview()
-                    self._sync_inventory_table_selection(variante_id)
-                    return
-                preview_path = path
-        except Exception:  # noqa: BLE001
-            self._apply_inventory_qr_preview_view(build_error_inventory_qr_preview_view())
-            self._refresh_inventory_overview()
-            return
-
-        if preview_selection is None:
-            self._apply_inventory_qr_preview_view(build_error_inventory_qr_preview_view())
-            self._refresh_inventory_overview()
-            return
-
-        self._apply_inventory_qr_preview_view(
-            build_available_inventory_qr_preview_view(
-                sku=preview_selection.sku,
-                product_name=preview_selection.product_name,
-                talla=preview_selection.talla,
-                color=preview_selection.color,
-                file_name=path.name,
-            ),
-            preview_path=preview_path,
-        )
         self._refresh_inventory_overview()
-        self._sync_inventory_table_selection(variante_id)
-
-    def _apply_inventory_qr_preview_view(
-        self,
-        view: InventoryQrPreviewView,
-        *,
-        preview_path: Path | None = None,
-    ) -> None:
-        self.inventory_generate_qr_button.setText(view.button_label)
-        self.qr_preview_info_label.setText(view.info_label)
-        self._set_badge_state(self.qr_status_label, view.status_text, view.status_tone)
-        if view.preview_available and preview_path is not None:
-            self._load_qr_preview(preview_path)
-            return
-        self.qr_preview_label.clear()
-        self.qr_preview_label.setText(view.placeholder_text)
+        if variante_id:
+            self._sync_inventory_table_selection(variante_id)
 
     def _print_image_path(
         self,
@@ -8959,19 +8737,6 @@ class MainWindow(QMainWindow):
             ),
         )
 
-    def _load_qr_preview(self, path: Path) -> None:
-        pixmap = QPixmap(str(path))
-        if pixmap.isNull():
-            self.qr_preview_label.clear()
-            self.qr_preview_label.setText("Sin preview")
-            return
-        scaled = pixmap.scaled(
-            self.qr_preview_label.size(),
-            Qt.AspectRatioMode.KeepAspectRatio,
-            Qt.TransformationMode.SmoothTransformation,
-        )
-        self.qr_preview_label.setPixmap(scaled)
-
     def _refresh_quote_cart_table(self) -> None:
         quote_cart_view = build_quote_cart_view(self.quote_cart)
         self.quote_cart_table.setRowCount(len(quote_cart_view.rows))
@@ -9026,7 +8791,7 @@ class MainWindow(QMainWindow):
             self.inventory_variant_combo.setCurrentIndex(-1)
         finally:
             self.inventory_variant_combo.blockSignals(False)
-        self._refresh_selected_qr_preview()
+        self._refresh_inventory_selection_panel()
 
     def _dialog_prefill_variant_id(self) -> int | None:
         """Variante a pre-seleccionar en dialogs de stock/compra: siempre desde inventory_table."""
@@ -9063,13 +8828,11 @@ class MainWindow(QMainWindow):
         if selected is None:
             return
 
-        qr_exists = (QrGenerator.output_dir() / f"{selected['sku']}.png").exists()
         action_key = prompt_inventory_context_action(
             self,
             global_pos=self.inventory_table.viewport().mapToGlobal(pos),
             action_specs=build_inventory_context_menu_actions(
                 is_admin=self.current_role == RolUsuario.ADMIN,
-                qr_exists=qr_exists,
                 variante_activa=bool(selected["variante_activo"]),
             ),
         )
@@ -9080,7 +8843,6 @@ class MainWindow(QMainWindow):
             "edit": self._handle_update_variant,
             "entry": self._handle_purchase,
             "adjust": self._handle_inventory_adjustment,
-            "qr": self._handle_generate_selected_qr,
             "print": self._handle_inventory_print_label,
             "toggle": self._handle_toggle_variant,
         }

@@ -16,6 +16,14 @@ from pos_uniformes.services.inventario_existencia_service import (
 )
 
 
+INVENTORY_TABLE_HEADERS = (
+    "SKU", "Producto", "Talla", "Color", "Stock", "Piso", "Almacén", "Apartado", "Estado", "Ult. conteo",
+)
+COLUMNA_STOCK = INVENTORY_TABLE_HEADERS.index("Stock")
+COLUMNA_APARTADO = INVENTORY_TABLE_HEADERS.index("Apartado")
+COLUMNA_ESTADO = INVENTORY_TABLE_HEADERS.index("Estado")
+
+
 @dataclass(frozen=True)
 class InventoryTableRowView:
     variant_id: int
@@ -24,7 +32,6 @@ class InventoryTableRowView:
     stock_tone: str
     committed_tone: str | None
     status_tone: str
-    qr_tone: str
 
 
 def build_inventory_table_row_views(visible_rows: list[dict[str, object]]) -> tuple[InventoryTableRowView, ...]:
@@ -48,8 +55,6 @@ def build_inventory_table_row_view(row: dict[str, object]) -> InventoryTableRowV
     )
     status_text = "ACTIVA" if row["variante_activa"] else "INACTIVA"
     status_tone = "positive" if row["variante_activa"] else "muted"
-    qr_text = "Listo" if row["qr_exists"] else "Pendiente"
-    qr_tone = "positive" if row["qr_exists"] else "warning"
     conteo_raw = row.get("ultimo_conteo_at")
     conteo_text = _format_ultimo_conteo(conteo_raw if isinstance(conteo_raw, datetime) else None)
     return InventoryTableRowView(
@@ -64,14 +69,12 @@ def build_inventory_table_row_view(row: dict[str, object]) -> InventoryTableRowV
             stock_bodega if stock_bodega > 0 else "",
             committed_value,
             status_text,
-            qr_text,
             conteo_text,
         ),
         row_tone=row_tone,
         stock_tone=stock_tone,
         committed_tone="reserved" if committed_value > 0 else None,
         status_tone=status_tone,
-        qr_tone=qr_tone,
     )
 
 

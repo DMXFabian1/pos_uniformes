@@ -29,7 +29,6 @@ class InventoryVisibleFilterState:
     color_filters: tuple[str, ...]
     status_filter: str
     stock_filter: str
-    qr_filter: str
     origin_filter: str
     duplicate_filter: str
     conteo_filter: str
@@ -76,7 +75,6 @@ def inventory_row_matches_visible_filters(
             stock_minimo=row.get("stock_minimo"),
             virtual=es_fila_virtual(row),
         )
-        and _matches_inventory_qr_filter(bool(row["qr_exists"]), filters.qr_filter)
         and matches_origin_legacy(bool(row["origen_legacy"]), filters.origin_filter)
         and matches_fallback_duplicate(bool(row["fallback_importacion"]), filters.duplicate_filter)
         and _matches_inventory_conteo_filter(row.get("ultimo_conteo_at"), filters.conteo_filter)
@@ -152,13 +150,3 @@ def _matches_inventory_precio_text_filter(precio_venta: object, precio_text_filt
     except (TypeError, ValueError):
         return True
     return abs(precio - target) < 0.005
-
-
-def _matches_inventory_qr_filter(qr_exists: bool, qr_filter: str) -> bool:
-    return (
-        not qr_filter
-        or (qr_filter == "ready" and qr_exists)
-        or (qr_filter == "missing" and not qr_exists)
-    )
-
-
