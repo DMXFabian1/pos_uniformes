@@ -1,5 +1,6 @@
-"""Corte de caja por periodo con reactivo (fondo). Distinto de caja_service.py
-(sesiones y movimientos de caja del POS principal).
+"""Corte de caja por periodo con reactivo (fondo). Distinto de la Caja
+antigua del POS principal (tablas sesion_caja / movimiento_caja), cuyo
+caja_service.py se retiró el 2026-11-12: esas tablas quedaron congeladas.
 
 Reglas (Daniel, 2026-09-08):
 - El cajón siempre tiene un fondo ("reactivo"). Efectivo esperado =

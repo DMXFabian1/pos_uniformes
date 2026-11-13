@@ -187,7 +187,6 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             "settings_employee_day_sales_dialog",
             "settings_employee_sale_detail_dialog",
             "settings_backup_dialog",
-            "settings_cash_history_dialog",
             "settings_business_dialog",
             "settings_marketing_dialog",
             "settings_whatsapp_dialog",

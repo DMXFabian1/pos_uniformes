@@ -29,7 +29,6 @@ from PyQt6.QtWidgets import (
 )
 
 from pos_uniformes.services.respaldo_estado_service import HORA_RESPALDO
-from pos_uniformes.ui.helpers.date_field_helper import configure_friendly_date_edit
 from pos_uniformes.ui.helpers.settings_clients_helper import CLIENTES_ADMIN_COLUMNAS
 from pos_uniformes.ui.styles import clientes_styles
 
@@ -1088,100 +1087,6 @@ def build_backup_settings_dialog(window: "MainWindow") -> QDialog:
     layout.addWidget(window.settings_backup_location_label)
     layout.addLayout(backup_actions)
     layout.addWidget(window.settings_backup_table)
-    footer = QHBoxLayout()
-    footer.addStretch()
-    close_btn = QPushButton("Cerrar")
-    close_btn.setObjectName("toolbarGhostButton")
-    close_btn.clicked.connect(dialog.reject)
-    footer.addWidget(close_btn)
-    layout.addLayout(footer)
-    return dialog
-
-
-def build_cash_history_settings_dialog(window: "MainWindow") -> QDialog:
-    dialog, layout = _create_settings_dialog(
-        window,
-        "Historial de cortes de caja",
-        "Consulta aperturas y cierres de caja, montos esperados, diferencias y responsables.",
-        width=1100,
-    )
-    window.settings_cash_history_status_label.setObjectName("analyticsLine")
-    actions = QHBoxLayout()
-    window.settings_cash_history_state_combo.clear()
-    window.settings_cash_history_state_combo.addItem("Todas", "todas")
-    window.settings_cash_history_state_combo.addItem("Abiertas", "abiertas")
-    window.settings_cash_history_state_combo.addItem("Cerradas", "cerradas")
-    configure_friendly_date_edit(window.settings_cash_history_from_input)
-    configure_friendly_date_edit(window.settings_cash_history_to_input)
-    window.settings_cash_history_refresh_button.setObjectName("toolbarPrimaryButton")
-    window.settings_cash_history_detail_button.setObjectName("toolbarSecondaryButton")
-    window.settings_cash_history_state_combo.currentIndexChanged.connect(window._refresh_settings_cash_history)
-    window.settings_cash_history_from_input.dateChanged.connect(window._refresh_settings_cash_history)
-    window.settings_cash_history_to_input.dateChanged.connect(window._refresh_settings_cash_history)
-    window.settings_cash_history_refresh_button.clicked.connect(window._refresh_settings_cash_history)
-    window.settings_cash_history_detail_button.clicked.connect(window._handle_view_cash_history_detail)
-    actions.addWidget(QLabel("Estado"))
-    actions.addWidget(window.settings_cash_history_state_combo)
-    actions.addWidget(QLabel("Desde"))
-    actions.addWidget(window.settings_cash_history_from_input)
-    actions.addWidget(QLabel("Hasta"))
-    actions.addWidget(window.settings_cash_history_to_input)
-    actions.addWidget(window.settings_cash_history_refresh_button)
-    actions.addWidget(window.settings_cash_history_detail_button)
-    actions.addStretch()
-
-    window.settings_cash_history_table.setColumnCount(10)
-    window.settings_cash_history_table.setHorizontalHeaderLabels(
-        [
-            "Id",
-            "Estado",
-            "Apertura",
-            "Abierta por",
-            "Reactivo inicial",
-            "Cierre",
-            "Cerrada por",
-            "Esperado",
-            "Contado",
-            "Diferencia",
-        ]
-    )
-    window.settings_cash_history_table.setObjectName("dataTable")
-    window.settings_cash_history_table.verticalHeader().setVisible(False)
-    window.settings_cash_history_table.setSelectionBehavior(
-        window.settings_cash_history_table.SelectionBehavior.SelectRows
-    )
-    window.settings_cash_history_table.setAlternatingRowColors(True)
-    window.settings_cash_history_table.setMinimumHeight(320)
-    window.settings_cash_history_table.horizontalHeader().setStretchLastSection(True)
-    window.settings_cash_history_table.itemDoubleClicked.connect(window._handle_view_cash_history_detail)
-    window.settings_cash_history_table.itemSelectionChanged.connect(window._refresh_permissions)
-    window.settings_cash_history_table.itemSelectionChanged.connect(window._refresh_selected_cash_history_movements)
-
-    movements_box = QGroupBox("Movimientos de la sesion seleccionada")
-    movements_box.setObjectName("infoCard")
-    movements_layout = QVBoxLayout()
-    window.settings_cash_history_movements_label.setObjectName("subtleLine")
-    window.settings_cash_history_table.setMinimumHeight(240)
-    window.settings_cash_history_movements_table.setColumnCount(5)
-    window.settings_cash_history_movements_table.setHorizontalHeaderLabels(
-        ["Fecha", "Tipo", "Monto", "Usuario", "Concepto"]
-    )
-    window.settings_cash_history_movements_table.setObjectName("dataTable")
-    window.settings_cash_history_movements_table.verticalHeader().setVisible(False)
-    window.settings_cash_history_movements_table.setSelectionBehavior(
-        window.settings_cash_history_movements_table.SelectionBehavior.SelectRows
-    )
-    window.settings_cash_history_movements_table.setAlternatingRowColors(True)
-    window.settings_cash_history_movements_table.setMinimumHeight(180)
-    window.settings_cash_history_movements_table.horizontalHeader().setStretchLastSection(True)
-    movements_layout.addWidget(window.settings_cash_history_movements_label)
-    movements_layout.addWidget(window.settings_cash_history_movements_table)
-    movements_box.setLayout(movements_layout)
-
-    layout.addWidget(window.settings_cash_history_status_label)
-    layout.addLayout(actions)
-    layout.addWidget(window.settings_cash_history_table)
-    layout.addWidget(movements_box)
     footer = QHBoxLayout()
     footer.addStretch()
     close_btn = QPushButton("Cerrar")

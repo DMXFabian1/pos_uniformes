@@ -172,9 +172,84 @@ class CajaFueraDelPosTests(unittest.TestCase):
             with self.assertRaises(ModuleNotFoundError, msg=modulo):
                 importlib.import_module(modulo)
 
-    def test_el_historial_de_cortes_de_configuracion_sigue(self) -> None:
-        """Solo lectura: muestra también los cortes hechos en el kiosko."""
-        self.assertTrue(hasattr(self.ventana, "settings_cash_history_button"))
+
+class HistorialCajaAntiguaRetiradoTests(unittest.TestCase):
+    """2026-11-12, Daniel: «Sí, retíralo».
+
+    Configuración tenía un «Historial de cortes» que leía las sesiones de la
+    Caja antigua (tabla sesion_caja). Desde que el POS ya no abre sesiones
+    esa tabla quedó congelada, así que el historial se retiró. Los datos y
+    las tablas siguen; los cortes reales se consultan en el kiosko (ver
+    KioskoConservaSuCorteTests).
+    """
+
+    def setUp(self) -> None:
+        self.ventana = MainWindow(user_id=1)
+
+    def tearDown(self) -> None:
+        _cerrar(self.ventana)
+
+    def test_configuracion_ya_no_tiene_historial_de_caja(self) -> None:
+        for atributo in (
+            "settings_cash_history_button",
+            "settings_cash_history_dialog",
+            "settings_cash_history_table",
+            "settings_cash_history_movements_table",
+            "settings_cash_history_state_combo",
+            "settings_cash_history_from_input",
+            "settings_cash_history_to_input",
+            "settings_cash_history_refresh_button",
+            "settings_cash_history_detail_button",
+            "settings_cash_history_rows",
+            "_open_cash_history_settings_dialog",
+            "_refresh_settings_cash_history",
+            "_refresh_selected_cash_history_movements",
+            "_selected_cash_history_id",
+            "_handle_view_cash_history_detail",
+            "_extract_opening_corrections",
+        ):
+            self.assertFalse(hasattr(self.ventana, atributo), atributo)
+
+    def test_no_queda_boton_historial_de_cortes_en_el_pos(self) -> None:
+        from PyQt6.QtWidgets import QAbstractButton
+
+        textos = {b.text() for b in self.ventana.findChildren(QAbstractButton)}
+        self.assertNotIn("Historial de cortes", textos)
+
+    def test_el_dialogo_de_configuracion_ya_no_existe(self) -> None:
+        from pos_uniformes.ui.dialogs import settings_dialogs
+
+        self.assertFalse(hasattr(settings_dialogs, "build_cash_history_settings_dialog"))
+
+    def test_los_modulos_que_solo_servian_al_historial_ya_no_estan(self) -> None:
+        import importlib
+
+        for modulo in (
+            "pos_uniformes.services.caja_service",
+            "pos_uniformes.services.cash_session_history_service",
+            "pos_uniformes.ui.helpers.settings_cash_history_helper",
+            "pos_uniformes.ui.helpers.settings_cash_history_detail_helper",
+            "pos_uniformes.ui.helpers.settings_cash_history_movements_helper",
+            "pos_uniformes.ui.helpers.settings_cash_history_summary_helper",
+        ):
+            with self.assertRaises(ModuleNotFoundError, msg=modulo):
+                importlib.import_module(modulo)
+
+    def test_la_exportacion_de_analitica_ya_no_lee_sesion_caja(self) -> None:
+        import inspect
+
+        fuente = inspect.getsource(MainWindow._handle_export_analytics)
+        self.assertNotIn("11_cortes_caja", fuente)
+        self.assertNotIn("SesionCaja", fuente)
+        # Las demás hojas conservan su nombre y número.
+        for hoja in ("00_resumen_general", "09_compras", "10_detalle_compras"):
+            self.assertIn(hoja, fuente)
+
+    def test_los_datos_de_la_caja_antigua_no_se_borran(self) -> None:
+        from pos_uniformes.database.models import MovimientoCaja, SesionCaja
+
+        self.assertEqual(SesionCaja.__tablename__, "sesion_caja")
+        self.assertEqual(MovimientoCaja.__tablename__, "movimiento_caja")
 
 
 class KioskoConservaSuCorteTests(unittest.TestCase):
@@ -182,7 +257,7 @@ class KioskoConservaSuCorteTests(unittest.TestCase):
 
     Aquí solo se revisa que el kiosko conserve sus puntos de entrada; la
     lógica del corte la ejercitan tests/test_corte_*.py,
-    test_caja_service.py, test_historial_cortes*.py y test_telegram_cortes.py.
+    test_historial_cortes*.py y test_telegram_cortes.py.
     """
 
     def test_el_kiosko_conserva_corte_retiro_e_historial(self) -> None:
@@ -196,15 +271,30 @@ class KioskoConservaSuCorteTests(unittest.TestCase):
             self.assertTrue(callable(getattr(QuoteSatelliteWindow, metodo, None)), metodo)
 
     def test_los_dialogos_y_servicios_del_corte_siguen(self) -> None:
-        from pos_uniformes.services.caja_service import CajaService
         from pos_uniformes.ui.dialogs import corte_caja_dialog
 
         for nombre in ("hacer_corte_caja", "apuntar_retiro", "editar_parametros_caja"):
             self.assertTrue(callable(getattr(corte_caja_dialog, nombre, None)), nombre)
-        for metodo in ("obtener_sesion_activa", "registrar_movimiento", "cerrar_sesion"):
-            self.assertTrue(callable(getattr(CajaService, metodo, None)), metodo)
+        # 2026-11-12: CajaService (Caja antigua del POS) se retiró; el corte
+        # del kiosko nunca dependió de él.
         import pos_uniformes.services.corte_caja_service  # noqa: F401
         import pos_uniformes.services.retiros_service  # noqa: F401
+
+    def test_el_historial_de_cortes_del_kiosko_sigue(self) -> None:
+        """El historial de cortes que importa vive en el kiosko (LibretaCorte)."""
+        from pathlib import Path
+
+        from pos_uniformes.services import historial_cortes_service
+        from pos_uniformes.ui.dialogs.historial_cortes_dialog import HistorialCortesDialog
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        self.assertTrue(callable(getattr(QuoteSatelliteWindow, "_abrir_historial_cortes", None)))
+        self.assertTrue(callable(HistorialCortesDialog))
+        for nombre in ("listar_cortes_mes", "totales_cortes", "periodo_del_corte", "borrar_corte"):
+            self.assertTrue(callable(getattr(historial_cortes_service, nombre, None)), nombre)
+        pruebas = sorted(p.name for p in Path(__file__).parent.glob("test_historial_cortes*.py"))
+        self.assertIn("test_historial_cortes.py", pruebas)
+        self.assertIn("test_historial_cortes_totales.py", pruebas)
 
 
 class CajaAntiguaRetiradaTests(unittest.TestCase):

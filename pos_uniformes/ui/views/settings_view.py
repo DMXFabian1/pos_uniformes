@@ -67,12 +67,6 @@ def build_settings_tab(window: "MainWindow") -> QWidget:
             window._open_backup_settings_dialog,
         ),
         (
-            window.settings_cash_history_button,
-            "Revisa aperturas, cierres, responsables y diferencias de caja.",
-            QStyle.StandardPixmap.SP_FileDialogContentsView,
-            window._open_cash_history_settings_dialog,
-        ),
-        (
             window.settings_business_button,
             "Configura datos del negocio, ticket e impresion.",
             QStyle.StandardPixmap.SP_FileDialogInfoView,

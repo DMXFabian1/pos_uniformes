@@ -37,7 +37,6 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QFrame,
     QFormLayout,
-    QGroupBox,
     QGridLayout,
     QHBoxLayout,
     QInputDialog,
@@ -58,7 +57,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 
 from pos_uniformes.database.connection import engine, get_session, test_connection
@@ -78,7 +77,6 @@ from pos_uniformes.database.models import (
     Producto,
     Proveedor,
     RolUsuario,
-    SesionCaja,
     TipoPieza,
     TipoPrenda,
     Usuario,
@@ -126,8 +124,6 @@ from pos_uniformes.services.employee_sales_history_service import (
 )
 from pos_uniformes.services.employee_ranking_service import build_ranking_period_dates
 from pos_uniformes.ui.helpers.settings_employee_ranking_helper import build_libreta_ranking_view
-from pos_uniformes.services.cash_session_history_service import build_cash_session_history_amounts
-from pos_uniformes.services.caja_service import CajaService
 from pos_uniformes.services.client_service import ClientService
 from pos_uniformes.services.employee_identity_service import EmployeeIdentityService
 from pos_uniformes.services import conjunto_service
@@ -244,7 +240,6 @@ from pos_uniformes.ui.login_dialog import LoginDialog
 from pos_uniformes.ui.dialogs.settings_dialogs import (
     build_backup_settings_dialog,
     build_business_settings_dialog,
-    build_cash_history_settings_dialog,
     build_clients_settings_dialog,
     build_employees_settings_dialog,
     build_marketing_settings_dialog,
@@ -441,18 +436,6 @@ from pos_uniformes.ui.helpers.settings_crm_selection_helper import (
     resolve_selected_settings_client_id,
     resolve_selected_settings_employee_id,
     resolve_selected_settings_supplier_id,
-)
-from pos_uniformes.ui.helpers.settings_cash_history_helper import (
-    build_settings_cash_history_rows,
-)
-from pos_uniformes.ui.helpers.settings_cash_history_detail_helper import (
-    build_settings_cash_history_detail_view,
-)
-from pos_uniformes.ui.helpers.settings_cash_history_movements_helper import (
-    build_settings_cash_history_movements_view,
-)
-from pos_uniformes.ui.helpers.settings_cash_history_summary_helper import (
-    build_settings_cash_history_status_label,
 )
 from pos_uniformes.ui.helpers.settings_clients_helper import (
     CLIENTES_ADMIN_COLUMNAS,
@@ -1488,7 +1471,6 @@ class MainWindow(QMainWindow):
         self.settings_marketing_button = QPushButton("Marketing y promociones")
         self.settings_whatsapp_button = QPushButton("WhatsApp y mensajes")
         self.settings_backup_button = QPushButton("Respaldo y restauracion")
-        self.settings_cash_history_button = QPushButton("Historial de cortes")
         self.settings_business_button = QPushButton("Negocio e impresion")
         self.settings_meilisearch_button = QPushButton("Meilisearch (búsqueda)")
         self.settings_monederos_button = QPushButton("Monederos de clientes")
@@ -1587,20 +1569,9 @@ class MainWindow(QMainWindow):
         self.settings_employee_ranking_dialog: QDialog | None = None
         self.settings_employees_dialog: QDialog | None = None
         self.settings_backup_dialog: QDialog | None = None
-        self.settings_cash_history_dialog: QDialog | None = None
         self.settings_business_dialog: QDialog | None = None
         self.settings_marketing_dialog: QDialog | None = None
         self.settings_whatsapp_dialog: QDialog | None = None
-        self.settings_cash_history_table = QTableWidget()
-        self.settings_cash_history_movements_table = QTableWidget()
-        self.settings_cash_history_status_label = QLabel("Sin cortes cargados.")
-        self.settings_cash_history_movements_label = QLabel("Selecciona un corte para ver sus movimientos.")
-        self.settings_cash_history_state_combo = QComboBox()
-        self.settings_cash_history_from_input = QDateEdit()
-        self.settings_cash_history_to_input = QDateEdit()
-        self.settings_cash_history_refresh_button = QPushButton("Refrescar")
-        self.settings_cash_history_detail_button = QPushButton("Ver detalle")
-        self.settings_cash_history_rows: dict[int, list[dict[str, object]]] = {}
         self.settings_business_name_input = QLineEdit()
         self.settings_business_logo_input = QLineEdit()
         self.settings_business_logo_pick_button = QPushButton("Seleccionar")
@@ -1859,8 +1830,6 @@ class MainWindow(QMainWindow):
             self.settings_users_button: "Abre la configuracion de usuarios y acceso.",
             self.settings_marketing_button: "Abre la configuracion de marketing, promociones y reglas de lealtad.",
             self.settings_backup_button: "Abre la configuracion de respaldo y restauracion.",
-            self.settings_cash_history_button: "Abre el historial de aperturas, cierres y diferencias de caja.",
-            self.settings_cash_history_detail_button: "Abre el detalle del corte seleccionado, incluyendo observaciones.",
             self.settings_business_button: "Abre la configuracion de negocio e impresion.",
             self.settings_marketing_save_button: "Guarda la regla de subida a Maximoda Leal.",
             self.settings_marketing_history_button: "Abre el historial de cambios en reglas y descuentos de marketing.",
@@ -2249,18 +2218,6 @@ class MainWindow(QMainWindow):
         self.settings_marketing_dialog.raise_()
         self.settings_marketing_dialog.activateWindow()
 
-    def _open_cash_history_settings_dialog(self) -> None:
-        if self.settings_cash_history_dialog is None:
-            self.settings_cash_history_dialog = build_cash_history_settings_dialog(self)
-            today = QDate.currentDate()
-            self.settings_cash_history_to_input.setDate(today)
-            self.settings_cash_history_from_input.setDate(today.addDays(-30))
-
-        self._refresh_settings_cash_history()
-        self.settings_cash_history_dialog.show()
-        self.settings_cash_history_dialog.raise_()
-        self.settings_cash_history_dialog.activateWindow()
-
     def _open_whatsapp_settings_dialog(self) -> None:
         if self.settings_whatsapp_dialog is None:
             self.settings_whatsapp_dialog = build_whatsapp_settings_dialog(self)
@@ -2293,347 +2250,6 @@ class MainWindow(QMainWindow):
         # retiraron las pestañas Caja y Apartados, 2026-11-12)
         if self.tabs is not None:
             self.tabs.setCurrentIndex(6)
-
-    def _refresh_settings_cash_history(self) -> None:
-        estado = self.settings_cash_history_state_combo.currentData() or "todas"
-        fecha_desde = self.settings_cash_history_from_input.date().toPyDate()
-        fecha_hasta = self.settings_cash_history_to_input.date().toPyDate()
-        try:
-            with get_session() as session:
-                cash_sessions = CajaService.listar_sesiones(
-                    session,
-                    str(estado),
-                    fecha_desde=fecha_desde,
-                    fecha_hasta=fecha_hasta,
-                )
-        except Exception as exc:
-            self.settings_cash_history_status_label.setText(f"No se pudo cargar el historial de caja: {exc}")
-            return
-
-        self.settings_cash_history_rows = {}
-        abiertas = 0
-        cerradas = 0
-        cash_session_snapshots: list[dict[str, object]] = []
-        for row_index, cash_session in enumerate(cash_sessions):
-            is_closed = cash_session.cerrada_at is not None
-            resumen = CajaService.resumir_sesion(session, cash_session)
-            history_amounts = build_cash_session_history_amounts(
-                cash_session,
-                summary=resumen,
-            )
-            if is_closed:
-                cerradas += 1
-            else:
-                abiertas += 1
-            opened_by = cash_session.abierta_por.nombre_completo if cash_session.abierta_por is not None else "-"
-            closed_by = cash_session.cerrada_por.nombre_completo if cash_session.cerrada_por is not None else "-"
-            self.settings_cash_history_rows[cash_session.id] = [
-                {
-                    "fecha": format_display_datetime(movement.created_at, empty="-"),
-                    "tipo": movement.tipo.value,
-                    "monto": Decimal(movement.monto).quantize(Decimal("0.01")),
-                    "usuario": movement.usuario.nombre_completo if movement.usuario is not None else "-",
-                    "concepto": movement.concepto or "",
-                }
-                for movement in cash_session.movimientos
-            ]
-            cash_session_snapshots.append(
-                {
-                    "session_id": cash_session.id,
-                    "is_closed": is_closed,
-                    "status_label": "Cerrada" if is_closed else "Abierta",
-                    "opened_at": format_display_datetime(cash_session.abierta_at),
-                    "opened_by": opened_by,
-                    "opening_amount": f"${Decimal(cash_session.monto_apertura or 0).quantize(Decimal('0.01'))}",
-                    "closed_at": format_display_datetime(cash_session.cerrada_at, empty="-"),
-                    "closed_by": closed_by,
-                    "expected_amount": (
-                        f"${history_amounts.expected_amount}"
-                        if history_amounts.expected_amount is not None
-                        else "-"
-                    ),
-                    "declared_amount": (
-                        f"${history_amounts.declared_amount}"
-                        if history_amounts.declared_amount is not None
-                        else "-"
-                    ),
-                    "difference_amount": (
-                        f"${history_amounts.difference_amount}"
-                        if history_amounts.difference_amount is not None
-                        else "-"
-                    ),
-                    "difference": str(history_amounts.difference_amount or Decimal("0.00")),
-                }
-            )
-        cash_history_rows = build_settings_cash_history_rows(cash_session_snapshots)
-        self.settings_cash_history_table.setRowCount(len(cash_history_rows))
-        for row_index, cash_history_row in enumerate(cash_history_rows):
-            for column_index, value in enumerate(cash_history_row.values):
-                item = _table_item(value)
-                if column_index == 0:
-                    item.setData(Qt.ItemDataRole.UserRole, cash_history_row.session_id)
-                if column_index == 1:
-                    _set_table_badge_style(item, cash_history_row.status_tone)
-                elif column_index == 9 and cash_history_row.difference_tone is not None:
-                    _set_table_badge_style(item, cash_history_row.difference_tone)
-                self.settings_cash_history_table.setItem(row_index, column_index, item)
-        self.settings_cash_history_table.resizeColumnsToContents()
-        self.settings_cash_history_status_label.setText(
-            build_settings_cash_history_status_label(
-                total_sessions=len(cash_sessions),
-                open_sessions=abiertas,
-                closed_sessions=cerradas,
-                date_from_iso=fecha_desde.isoformat(),
-                date_to_iso=fecha_hasta.isoformat(),
-            )
-        )
-        if cash_sessions:
-            self.settings_cash_history_table.setCurrentCell(0, 0)
-            self._refresh_selected_cash_history_movements()
-        else:
-            self._refresh_selected_cash_history_movements()
-
-    def _refresh_selected_cash_history_movements(self) -> None:
-        cash_session_id = self._selected_cash_history_id()
-        movements = self.settings_cash_history_rows.get(cash_session_id or -1, [])
-        movements_view = build_settings_cash_history_movements_view(
-            cash_session_id=cash_session_id,
-            movements=movements,
-        )
-        self.settings_cash_history_movements_table.setRowCount(len(movements_view.rows))
-        for row_index, movement_row in enumerate(movements_view.rows):
-            for column_index, value in enumerate(movement_row.values):
-                item = _table_item(value)
-                if column_index == 1:
-                    _set_table_badge_style(item, movement_row.type_tone)
-                self.settings_cash_history_movements_table.setItem(row_index, column_index, item)
-        self.settings_cash_history_movements_table.resizeColumnsToContents()
-        self.settings_cash_history_movements_label.setText(movements_view.status_label)
-
-    def _selected_cash_history_id(self) -> int | None:
-        row = self.settings_cash_history_table.currentRow()
-        if row < 0:
-            return None
-        item = self.settings_cash_history_table.item(row, 0)
-        if item is None:
-            return None
-        value = item.data(Qt.ItemDataRole.UserRole)
-        return int(value) if value is not None else None
-
-    @staticmethod
-    def _extract_opening_corrections(opening_note: str) -> list[str]:
-        if not opening_note:
-            return []
-        return [
-            token.strip()
-            for token in opening_note.split(" | ")
-            if token.strip().startswith("Correccion de apertura ")
-        ]
-
-    def _handle_view_cash_history_detail(self) -> None:
-        cash_session_id = self._selected_cash_history_id()
-        if cash_session_id is None:
-            QMessageBox.information(self, "Selecciona un corte", "Selecciona primero un corte de caja.")
-            return
-        try:
-            with get_session() as session:
-                cash_session = session.get(SesionCaja, cash_session_id)
-                if cash_session is None:
-                    raise ValueError("No se encontro la sesion de caja seleccionada.")
-                resumen = CajaService.resumir_sesion(session, cash_session)
-                history_amounts = build_cash_session_history_amounts(
-                    cash_session,
-                    summary=resumen,
-                )
-                opened_by = cash_session.abierta_por.nombre_completo if cash_session.abierta_por is not None else "-"
-                closed_by = cash_session.cerrada_por.nombre_completo if cash_session.cerrada_por is not None else "-"
-                movement_rows = []
-                for movement in cash_session.movimientos:
-                    movement_rows.append(
-                        {
-                            "fecha": format_display_datetime(movement.created_at, empty="-"),
-                            "tipo": movement.tipo.value,
-                            "monto": Decimal(movement.monto).quantize(Decimal("0.01")),
-                            "usuario": movement.usuario.nombre_completo if movement.usuario is not None else "-",
-                            "concepto": movement.concepto or "",
-                        }
-                    )
-                detail = {
-                    "id": cash_session.id,
-                    "status": "Cerrada" if cash_session.cerrada_at else "Abierta",
-                    "opened_at": format_display_datetime(cash_session.abierta_at, empty="-"),
-                    "opened_by": opened_by,
-                    "opening_amount": Decimal(cash_session.monto_apertura or 0).quantize(Decimal("0.01")),
-                    "opening_note": cash_session.observacion_apertura or "Sin observacion",
-                    "opening_corrections": self._extract_opening_corrections(cash_session.observacion_apertura or ""),
-                    "closed_at": format_display_datetime(cash_session.cerrada_at, empty="-"),
-                    "closed_by": closed_by,
-                    "expected_amount": history_amounts.expected_amount or Decimal("0.00"),
-                    "declared_amount": history_amounts.declared_amount or Decimal("0.00"),
-                    "difference": history_amounts.difference_amount or Decimal("0.00"),
-                    "closing_note": cash_session.observacion_cierre or "Sin observacion",
-                    "is_closed": cash_session.cerrada_at is not None,
-                    "cash_sales_count": resumen.ventas_efectivo_count,
-                    "cash_sales_total": resumen.efectivo_ventas,
-                    "cash_payments_count": resumen.abonos_efectivo_count,
-                    "cash_payments_total": resumen.efectivo_abonos,
-                    "reactivo_count": resumen.reactivo_count,
-                    "reactivo_total": resumen.reactivo_total,
-                    "ingresos_count": resumen.ingresos_count,
-                    "ingresos_total": resumen.ingresos_total,
-                    "retiros_count": resumen.retiros_count,
-                    "retiros_total": resumen.retiros_total,
-                    "discounts_total": resumen.total_descuentos,
-                    "rounding_total": resumen.total_ajuste_redondeo,
-                    "movements": movement_rows,
-                }
-        except Exception as exc:
-            QMessageBox.critical(self, "No se pudo abrir el detalle", str(exc))
-            return
-
-        dialog = QDialog(self)
-        detail_view = build_settings_cash_history_detail_view(
-            session_id=int(detail["id"]),
-            is_closed=bool(detail["is_closed"]),
-            opened_at=str(detail["opened_at"]),
-            opened_by=str(detail["opened_by"]),
-            opening_amount=detail["opening_amount"],
-            opening_note=str(detail["opening_note"]),
-            opening_corrections=list(detail["opening_corrections"]),
-            reactivo_count=int(detail["reactivo_count"]),
-            reactivo_total=detail["reactivo_total"],
-            ingresos_count=int(detail["ingresos_count"]),
-            ingresos_total=detail["ingresos_total"],
-            retiros_count=int(detail["retiros_count"]),
-            retiros_total=detail["retiros_total"],
-            cash_sales_count=int(detail["cash_sales_count"]),
-            cash_sales_total=detail["cash_sales_total"],
-            cash_payments_count=int(detail["cash_payments_count"]),
-            cash_payments_total=detail["cash_payments_total"],
-            discounts_total=detail["discounts_total"],
-            rounding_total=detail["rounding_total"],
-            movement_rows=list(detail["movements"]),
-            closed_at=str(detail["closed_at"]),
-            closed_by=str(detail["closed_by"]),
-            expected_amount=detail["expected_amount"],
-            declared_amount=detail["declared_amount"],
-            difference=detail["difference"],
-            closing_note=str(detail["closing_note"]),
-        )
-        dialog.setWindowTitle(detail_view.dialog_title)
-        dialog.setModal(True)
-        dialog.setMinimumWidth(560)
-
-        layout = QVBoxLayout()
-        layout.setSpacing(12)
-
-        status_row = QHBoxLayout()
-        title = QLabel(detail_view.title_label)
-        title.setObjectName("inventoryTitle")
-        status_badge = QLabel(detail_view.status_badge.text)
-        status_badge.setObjectName("inventoryStatusBadge")
-        self._set_badge_state(status_badge, detail_view.status_badge.text, detail_view.status_badge.tone)
-        status_row.addWidget(title)
-        status_row.addStretch()
-        status_row.addWidget(status_badge)
-
-        open_box = QGroupBox("Apertura")
-        open_box.setObjectName("infoCard")
-        open_form = QFormLayout()
-        for label, value in detail_view.opening_rows:
-            open_form.addRow(label, QLabel(value))
-        opening_note = QLabel(detail_view.opening_note)
-        opening_note.setWordWrap(True)
-        opening_note.setObjectName("subtleLine")
-        open_form.addRow("Observacion", opening_note)
-        open_box.setLayout(open_form)
-
-        layout.addLayout(status_row)
-        layout.addWidget(open_box)
-
-        if detail_view.opening_corrections:
-            corrections_box = QGroupBox("Correcciones de apertura")
-            corrections_box.setObjectName("infoCard")
-            corrections_layout = QVBoxLayout()
-            corrections_layout.setSpacing(8)
-            for correction in detail_view.opening_corrections:
-                correction_row = QFrame()
-                correction_row.setObjectName("infoCard")
-                correction_row_layout = QHBoxLayout()
-                correction_row_layout.setContentsMargins(10, 8, 10, 8)
-                correction_row_layout.setSpacing(8)
-                correction_badge = QLabel("CORRECCION")
-                correction_badge.setObjectName("inventoryStatusBadge")
-                self._set_badge_state(correction_badge, "CORRECCION", "warning")
-                correction_label = QLabel(correction)
-                correction_label.setWordWrap(True)
-                correction_label.setObjectName("analyticsLine")
-                correction_row_layout.addWidget(correction_badge, 0, Qt.AlignmentFlag.AlignTop)
-                correction_row_layout.addWidget(correction_label, 1)
-                correction_row.setLayout(correction_row_layout)
-                corrections_layout.addWidget(correction_row)
-            corrections_box.setLayout(corrections_layout)
-            layout.addWidget(corrections_box)
-
-        flow_box = QGroupBox("Movimiento de efectivo")
-        flow_box.setObjectName("infoCard")
-        flow_form = QFormLayout()
-        for label, value in detail_view.flow_rows:
-            flow_form.addRow(label, QLabel(value))
-        flow_box.setLayout(flow_form)
-        layout.addWidget(flow_box)
-
-        movements_box = QGroupBox("Movimientos manuales")
-        movements_box.setObjectName("infoCard")
-        movements_layout = QVBoxLayout()
-        movements_table = QTableWidget()
-        movements_table.setColumnCount(5)
-        movements_table.setHorizontalHeaderLabels(["Fecha", "Tipo", "Monto", "Usuario", "Concepto"])
-        movements_table.setObjectName("dataTable")
-        movements_table.verticalHeader().setVisible(False)
-        movements_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        movements_table.setAlternatingRowColors(True)
-        movements_table.setRowCount(len(detail_view.movement_rows))
-        for row_index, movement_row in enumerate(detail_view.movement_rows):
-            for column_index, value in enumerate(movement_row.values):
-                item = _table_item(value)
-                if column_index == 1:
-                    _set_table_badge_style(item, movement_row.type_tone)
-                movements_table.setItem(row_index, column_index, item)
-        movements_table.resizeColumnsToContents()
-        movements_table.setMinimumHeight(160)
-        movements_layout.addWidget(movements_table)
-        movements_box.setLayout(movements_layout)
-        layout.addWidget(movements_box)
-
-        if detail_view.closing_visible:
-            close_box = QGroupBox("Cierre")
-            close_box.setObjectName("infoCard")
-            close_form = QFormLayout()
-            for label, value in detail_view.closing_rows:
-                close_form.addRow(label, QLabel(value))
-            difference_label = QLabel(detail_view.difference_badge.text if detail_view.difference_badge is not None else "")
-            difference_label.setObjectName("inventoryStatusBadge")
-            if detail_view.difference_badge is not None:
-                self._set_badge_state(
-                    difference_label,
-                    detail_view.difference_badge.text,
-                    detail_view.difference_badge.tone,
-                )
-            close_form.addRow("Diferencia", difference_label)
-            closing_note = QLabel(detail_view.closing_note)
-            closing_note.setWordWrap(True)
-            closing_note.setObjectName("subtleLine")
-            close_form.addRow("Observacion", closing_note)
-            close_box.setLayout(close_form)
-            layout.addWidget(close_box)
-
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        buttons.rejected.connect(dialog.reject)
-        buttons.accepted.connect(dialog.accept)
-        layout.addWidget(buttons)
-        dialog.setLayout(layout)
-        dialog.exec()
 
     def _refresh_business_settings_form(self) -> None:
         try:
@@ -4589,7 +4205,6 @@ class MainWindow(QMainWindow):
             "settings_employee_day_sales_dialog",
             "settings_employee_sale_detail_dialog",
             "settings_backup_dialog",
-            "settings_cash_history_dialog",
             "settings_business_dialog",
             "settings_marketing_dialog",
             "settings_whatsapp_dialog",
@@ -7487,7 +7102,6 @@ class MainWindow(QMainWindow):
         self.settings_marketing_button.setEnabled(is_admin)
         self.settings_whatsapp_button.setEnabled(is_admin)
         self.settings_backup_button.setEnabled(is_admin)
-        self.settings_cash_history_button.setEnabled(is_admin)
         self.settings_business_button.setEnabled(is_admin)
         self.settings_meilisearch_button.setEnabled(is_admin)
         self.settings_monederos_button.setEnabled(is_admin)
@@ -7515,8 +7129,6 @@ class MainWindow(QMainWindow):
         self.settings_marketing_history_button.setEnabled(is_admin)
         self.settings_whatsapp_save_button.setEnabled(is_admin)
         self.settings_business_save_button.setEnabled(is_admin)
-        self.settings_cash_history_refresh_button.setEnabled(is_admin)
-        self.settings_cash_history_detail_button.setEnabled(is_admin and self._selected_cash_history_id() is not None)
 
         if self.dashboard_users_card is not None:
             self.dashboard_users_card.setVisible(is_admin)
@@ -8748,37 +8360,6 @@ class MainWindow(QMainWindow):
                                 "subtotal_linea": detalle.subtotal_linea,
                             }
                         )
-                cash_cut_rows = [
-                    {
-                        "sesion_id": sesion.id,
-                        "abierta_por": sesion.abierta_por.username if sesion.abierta_por is not None else None,
-                        "cerrada_por": sesion.cerrada_por.username if sesion.cerrada_por is not None else None,
-                        "monto_apertura": sesion.monto_apertura,
-                        "monto_esperado_cierre": sesion.monto_esperado_cierre,
-                        "monto_cierre_declarado": sesion.monto_cierre_declarado,
-                        "diferencia_cierre": sesion.diferencia_cierre,
-                        "observacion_apertura": sesion.observacion_apertura,
-                        "observacion_cierre": sesion.observacion_cierre,
-                        "abierta_at": sesion.abierta_at,
-                        "cerrada_at": sesion.cerrada_at,
-                        "estado": "ABIERTA" if sesion.cerrada_at is None else "CERRADA",
-                    }
-                    for sesion in session.scalars(
-                        select(SesionCaja)
-                        .where(
-                            or_(
-                                and_(SesionCaja.abierta_at >= period_start, SesionCaja.abierta_at < period_end),
-                                and_(
-                                    SesionCaja.cerrada_at.is_not(None),
-                                    SesionCaja.cerrada_at >= period_start,
-                                    SesionCaja.cerrada_at < period_end,
-                                ),
-                            )
-                        )
-                        .order_by(SesionCaja.abierta_at.asc())
-                    )
-                ]
-
                 layaway_rows = build_analytics_layaway_export_rows(
                     active_text=self.analytics_layaway_active_label.text(),
                     pending_balance_text=self.analytics_layaway_balance_label.text(),
@@ -8808,7 +8389,6 @@ class MainWindow(QMainWindow):
                     ("08_movimientos", movement_rows),
                     ("09_compras", purchase_rows),
                     ("10_detalle_compras", purchase_detail_rows),
-                    ("11_cortes_caja", cash_cut_rows),
                 ]
 
                 export_dir = self._analytics_export_dir() / datetime.now().strftime("%Y%m%d_%H%M%S")
