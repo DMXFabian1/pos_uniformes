@@ -3785,10 +3785,14 @@ class QuoteSatelliteWindow(QMainWindow):
         rows = list(getattr(self, "_libreta_rows_pintadas", []) or [])
         idx = tabla.currentRow()
         row = rows[idx] if hay and 0 <= idx < len(rows) else None
+        from pos_uniformes.ui.helpers.libreta_unir_helper import actualizar_boton, texto_detalle
+
         detalle = getattr(self, "libreta_mov_detalle", None)
         if detalle is not None:
-            detalle.setText(self._libreta_resumen_de(row) if row is not None else "")
-        from pos_uniformes.ui.helpers.libreta_unir_helper import actualizar_boton
+            texto = self._libreta_resumen_de(row) if row is not None else ""
+            # Unida con otra venta (2026-11-13): con cuál, en palabras.
+            unida = texto_detalle(row, getattr(self, "_libreta_rows_completas", None) or rows)
+            detalle.setText(f"{texto}\n{unida}" if unida else texto)
 
         actualizar_boton(
             getattr(self, "libreta_unir_button", None), row,

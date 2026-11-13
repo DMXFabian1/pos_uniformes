@@ -50,8 +50,11 @@ class PurosDeLaPantallaTests(_Qt):
         from pos_uniformes.services.libreta_unir_service import posiciones_en_grupo
 
         pos = posiciones_en_grupo(filas)
-        self.assertEqual(h.marcar_tipo("Venta — Fanny", filas[0], pos), "🔗 misma clienta 2/2 · Venta — Fanny")
+        self.assertEqual(pos, {1639: (1, 2), 1640: (2, 2)})
+        self.assertEqual(h.marcar_tipo("Venta — Fanny", filas[0], pos), "🔗 Venta — Fanny")
         self.assertEqual(h.marcar_tipo("Venta — Fanny", filas[2], pos), "Venta — Fanny")
+        self.assertEqual(h.texto_detalle(filas[0], filas), "🔗 Misma clienta que #1639: cuentan como 1 operación.")
+        self.assertEqual(h.texto_detalle(filas[2], filas), "")
 
     def test_el_boton_segun_la_fila(self) -> None:
         from PyQt6.QtWidgets import QPushButton
@@ -184,11 +187,13 @@ class VentanaTests(_Qt):
         win._pintar_libreta([_fila(1641, minutos=9), _fila(1640, minutos=7, grupo=1639), _fila(1639, grupo=1639)])
         tipos = [win.libreta_table.item(i, 2).text() for i in range(3)]
         self.assertFalse(tipos[0].startswith("🔗"))
-        self.assertTrue(tipos[1].startswith("🔗 misma clienta 2/2"))
-        self.assertTrue(tipos[2].startswith("🔗 misma clienta 1/2"))
+        self.assertTrue(tipos[1].startswith("🔗 Venta"))
+        self.assertTrue(tipos[2].startswith("🔗 Venta"))
+        self.assertIn("Misma clienta", win.libreta_table.item(1, 2).toolTip())
         win.libreta_table.selectRow(1)
         win._on_libreta_seleccion()
         self.assertEqual(win.libreta_unir_button.text(), h.TEXTO_SEPARAR)
+        self.assertIn("Misma clienta que #1639", win.libreta_mov_detalle.text())
         win.libreta_table.selectRow(0)
         win._on_libreta_seleccion()
         self.assertEqual(win.libreta_unir_button.text(), h.TEXTO_UNIR)

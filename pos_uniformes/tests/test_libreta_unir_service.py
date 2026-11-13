@@ -202,8 +202,6 @@ class TextosTests(unittest.TestCase):
         ]
         pos = lu.posiciones_en_grupo(filas)
         self.assertEqual(pos, {1: (1, 2), 2: (2, 2)})
-        self.assertEqual(lu.marca_de_grupo(filas[0], *pos[2]), "🔗 misma clienta 2/2")
-        self.assertEqual(lu.marca_de_grupo(filas[2]), "")
         self.assertTrue(lu.puede_ofrecerse(SimpleNamespace(id=9, tipo="venta", operacion_grupo_id=None)))
         self.assertFalse(lu.puede_ofrecerse(SimpleNamespace(id=9, tipo="apartado", operacion_grupo_id=None)))
 

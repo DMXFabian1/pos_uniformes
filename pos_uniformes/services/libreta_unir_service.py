@@ -254,16 +254,6 @@ def texto_confirmar_separar(venta_id: int) -> str:
     )
 
 
-def marca_de_grupo(row, posicion: int | None = None, total: int | None = None) -> str:
-    """La marca que lleva en MOVIMIENTOS una venta unida: «🔗 misma clienta»
-    (con «1/2» si se sabe su lugar en el grupo); "" si va sola."""
-    if getattr(row, "operacion_grupo_id", None) is None:
-        return ""
-    if posicion and total and total > 1:
-        return f"🔗 misma clienta {posicion}/{total}"
-    return "🔗 misma clienta"
-
-
 def posiciones_en_grupo(rows) -> dict[int, tuple[int, int]]:
     """{id: (lugar, de_cuántas)} de las filas unidas que se ven, en orden de
     hora (la primera es 1). Puro."""

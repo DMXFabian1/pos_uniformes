@@ -172,14 +172,27 @@ def al_tocar(ventana) -> None:
 # ─── La marca en la tabla ────────────────────────────────────────────────
 
 
-def marcar_tipo(texto_tipo: str, row, posiciones: dict) -> str:
-    """«🔗 misma clienta 1/2 · Venta — Fanny»: la marca va delante para que
-    las ventas unidas se lean juntas sin perder cada renglón."""
+def marcar_tipo(texto_tipo: str, row, posiciones: dict | None = None) -> str:
+    """«🔗 Venta — Fanny López»: el eslabón va delante (corto, para que el
+    nombre quepa) y las ventas unidas se leen juntas sin perder cada renglón.
+    «misma clienta» y con cuál se dice al pasar el mouse y en «Movimiento
+    elegido» (`texto_detalle`)."""
     if not lu.esta_unida(row):
         return texto_tipo
-    lugar = posiciones.get(getattr(row, "id", None))
-    marca = lu.marca_de_grupo(row, *(lugar or (None, None)))
-    return f"{marca} · {texto_tipo}"
+    return f"🔗 {texto_tipo}"
+
+
+def texto_detalle(row, rows) -> str:
+    """El renglón extra de «Movimiento elegido» para una venta unida:
+    «🔗 Misma clienta que #1639: cuentan como 1 operación.» ("" si va sola)."""
+    if row is None or not lu.esta_unida(row):
+        return ""
+    otras = sorted(
+        int(r.id) for r in rows or ()
+        if getattr(r, "operacion_grupo_id", None) == row.operacion_grupo_id and getattr(r, "id", None) != row.id
+    ) or [int(row.operacion_grupo_id)]
+    lista = " y ".join(f"#{i}" for i in otras)
+    return f"🔗 Misma clienta que {lista}: cuentan como 1 operación."
 
 
 def pintar_fila(tabla, fila: int, row) -> None:
@@ -190,6 +203,9 @@ def pintar_fila(tabla, fila: int, row) -> None:
     if item is None:
         return
     item.setForeground(QBrush(QColor(COLOR_MARCA)))
+    letra = item.font()
+    letra.setBold(True)
+    item.setFont(letra)
     quien = getattr(row, "operacion_unida_por", None)
     cuando = getattr(row, "operacion_unida_en", None)
     pie = ""
@@ -199,6 +215,7 @@ def pintar_fila(tabla, fila: int, row) -> None:
         )
         pie = f"\nUnida por {quien or '—'}" + (f" el {momento}" if momento else "") + "."
     item.setToolTip(
-        f"La misma clienta: cuenta como 1 operación junto con #{row.operacion_grupo_id}. "
-        "El dinero, las piezas y las comisiones de cada renglón no cambian." + pie
+        f"🔗 Misma clienta (operación #{row.operacion_grupo_id}): junto con las otras ventas "
+        "con 🔗 de ese número cuenta como 1 operación. El dinero, las piezas y las "
+        "comisiones de cada renglón no cambian." + pie
     )
