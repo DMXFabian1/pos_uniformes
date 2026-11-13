@@ -157,5 +157,33 @@ class FiltroExistenciaTests(unittest.TestCase):
         self.assertTrue(coincide_filtro_existencia(0, "zero", stock_minimo=-1))
 
 
+class CifraHayTests(unittest.TestCase):
+    """Tanda 3: «Hay» es solo el número; el tono va en su color."""
+
+    def test_cifra_sin_palabras(self) -> None:
+        from pos_uniformes.services.inventario_existencia_service import cifra_existencia
+
+        self.assertEqual(cifra_existencia(-2), "\u22122")
+        self.assertEqual(cifra_existencia(0), "0")
+        self.assertEqual(cifra_existencia(12), "12")
+
+    def test_tono_rojo_negativo_gris_cero_ambar_pocas(self) -> None:
+        from pos_uniformes.services.inventario_existencia_service import tono_cifra
+
+        self.assertEqual(tono_cifra(-1), "danger")
+        self.assertEqual(tono_cifra(0), "muted")
+        self.assertEqual(tono_cifra(2), "warning")
+        self.assertEqual(tono_cifra(5, stock_minimo=8), "warning")
+        self.assertEqual(tono_cifra(9), "")
+        self.assertEqual(tono_cifra(3, virtual=True), "")
+
+    def test_aviso_al_pasar_el_mouse(self) -> None:
+        from pos_uniformes.services.inventario_existencia_service import aviso_cifra
+
+        self.assertEqual(aviso_cifra(5, stock_minimo=8), "Quedan pocas: bajo su mínimo de 8")
+        self.assertEqual(aviso_cifra(0), "Se acabó")
+        self.assertIsNone(aviso_cifra(9))
+
+
 if __name__ == "__main__":
     unittest.main()

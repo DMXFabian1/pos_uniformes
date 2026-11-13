@@ -377,10 +377,7 @@ from pos_uniformes.ui.helpers.inventory_toggle_helper import (
     contar_tallas_de_prenda,
     preguntar as preguntar_desactivar,
 )
-from pos_uniformes.ui.helpers.inventory_table_row_helper import (
-    COLUMNA_STOCK as INVENTORY_COLUMNA_STOCK,
-    build_inventory_table_row_views,
-)
+from pos_uniformes.ui.helpers.inventory_table_row_helper import build_inventory_table_row_views
 from pos_uniformes.ui.helpers.layaway_alerts_helper import build_layaway_alerts_view
 from pos_uniformes.ui.helpers.window_close_helper import build_main_window_close_decision
 from pos_uniformes.ui.helpers.quote_cart_view_helper import build_quote_cart_view
@@ -483,6 +480,7 @@ from pos_uniformes.ui.helpers.inventory_label_windows_print_helper import print_
 from pos_uniformes.ui.views.analytics_view import build_analytics_tab
 from pos_uniformes.ui.views.dashboard_view import build_dashboard_tab
 from pos_uniformes.ui.views.history_view import build_history_tab
+from pos_uniformes.ui.helpers.inventario_tabla_helper import pintar_filas_inventario
 from pos_uniformes.ui.views.inventory_view import build_inventory_tab
 from pos_uniformes.ui.views.products_view import build_products_tab
 from pos_uniformes.ui.views.quotes_view import build_quotes_tab
@@ -7861,26 +7859,7 @@ class MainWindow(QMainWindow):
         self._refresh_inventory_overview()
 
     def _populate_inventory_table_rows(self, table_row_views) -> None:
-        for row_index, row_view in enumerate(table_row_views):
-            for column_index, value in enumerate(row_view.values):
-                self.inventory_table.setItem(row_index, column_index, _table_item(value))
-            if row_view.row_tone is not None or row_view.tooltip:
-                for column_index in range(len(row_view.values)):
-                    item = self.inventory_table.item(row_index, column_index)
-                    if item is None:
-                        continue
-                    if row_view.row_tone is not None:
-                        _set_table_row_tint(item, row_view.row_tone)
-                    if row_view.tooltip:
-                        item.setToolTip(row_view.tooltip)
-            for column_index, tooltip in row_view.cell_tooltips:
-                item = self.inventory_table.item(row_index, column_index)
-                if item is not None:
-                    item.setToolTip(tooltip)
-            self.inventory_table.item(row_index, 0).setData(Qt.ItemDataRole.UserRole, row_view.variant_id)
-            stock_item = self.inventory_table.item(row_index, INVENTORY_COLUMNA_STOCK)
-            if stock_item is not None:
-                _set_table_badge_style(stock_item, row_view.stock_tone, con_fondo=getattr(row_view, "stock_con_fondo", True))
+        pintar_filas_inventario(self.inventory_table, table_row_views)
 
     def _schedule_inventory_filter_refresh(self) -> None:
         self.inventory_filter_debounce_timer.start()

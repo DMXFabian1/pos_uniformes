@@ -97,6 +97,43 @@ def tono_existencia(stock: int, *, stock_minimo: int | None = None, virtual: boo
     return _TONO[clasificar_existencia(stock, stock_minimo=stock_minimo, virtual=virtual)]
 
 
+#: Tanda 3: la tabla ya no dice «OK» ni «Agotada»; el color va solo en el
+#: número. Rojo negativo, gris el cero, ámbar quedan pocas; lo demás sin tono.
+_TONO_CIFRA = {
+    NEGATIVO: "danger",
+    AGOTADO: "muted",
+    BAJO_MINIMO: "warning",
+    BAJO: "warning",
+    OK: "",
+    VIRTUAL: "",
+}
+
+_AVISO_CIFRA = {
+    NEGATIVO: "En negativo: se vendió sin haberse contado",
+    AGOTADO: "Se acabó",
+    BAJO: "Quedan pocas",
+    VIRTUAL: "Conjunto: su número sale de sus piezas",
+}
+
+
+def cifra_existencia(stock: int) -> str:
+    """El número de «Hay» sin palabras: «12», «0», «−2» (con signo menos tipográfico)."""
+    return f"\u2212{abs(stock)}" if stock < 0 else str(stock)
+
+
+def tono_cifra(stock: int, *, stock_minimo: int | None = None, virtual: bool = False) -> str:
+    """danger | muted | warning | "" (sin tono) para el número de «Hay»."""
+    return _TONO_CIFRA[clasificar_existencia(stock, stock_minimo=stock_minimo, virtual=virtual)]
+
+
+def aviso_cifra(stock: int, *, stock_minimo: int | None = None, virtual: bool = False) -> str | None:
+    """Lo que dice el número al pasar el mouse (antes iba escrito en la celda)."""
+    clase = clasificar_existencia(stock, stock_minimo=stock_minimo, virtual=virtual)
+    if clase == BAJO_MINIMO:
+        return f"Quedan pocas: bajo su mínimo de {stock_minimo}"
+    return _AVISO_CIFRA.get(clase)
+
+
 @dataclass(frozen=True)
 class ConteoExistencias:
     negativos: int
