@@ -121,7 +121,9 @@ COLORES_SUGERIDOS = (
 
 # Sinónimos conocidos (clave ya normalizada → forma oficial).
 # Tallas: «Uni» 66 y «NT» contra «Unitalla» 23; «Ch» 1 contra «CH» 256;
-# G, M, XL y XXL sueltas (1 cada una) contra GD, MD y EXG (perfil de la caja).
+# G, M y XL sueltas (1 cada una) contra GD, MD y EXG (perfil de la caja).
+# «XXL» NO va a EXG: es otra talla (más grande); queda como valor aparte hasta
+# que Daniel decida (si se escribe, pregunta como nueva).
 SINONIMOS_TALLA = {
     "uni": TALLA_UNITALLA,
     "nt": TALLA_UNITALLA,
@@ -139,7 +141,6 @@ SINONIMOS_TALLA = {
     "gd": "GD",
     "grande": "GD",
     "xl": "EXG",
-    "xxl": "EXG",
     "xg": "EXG",
     "exg": "EXG",
     "extra grande": "EXG",
@@ -171,6 +172,10 @@ SINONIMOS_POR_CAMPO = {
     CAMPO_ATRIBUTO: {"deportiva": "Deportivo", "basico": "Básico"},
     CAMPO_TIPO_PRENDA: {"basico": "Básico"},
 }
+
+# Tallas de letra del config.json del Gestor que NO son oficiales: no se
+# ofrecen en las listas del asistente (salvo que ya existan en la base).
+TALLAS_NO_OFICIALES = frozenset({"xs", "s", "l", "xxl", "xxxl", "xxxxl", "esp"})
 
 UMBRAL_PARECIDO = 0.78
 MAX_SUGERENCIAS = 3
@@ -245,11 +250,24 @@ def depurar_opciones(campo: str, *grupos: list[str]) -> list[str]:
     return [elegido[clave] for clave in orden]
 
 
+def tallas_para_ofrecer(valores: list[str]) -> list[str]:
+    """Quita de una lista de sugerencias (la del Gestor) las tallas de letra
+    que no son oficiales (XS, S, L, XXL, XXXL, ESP…). Las que ya existen en
+    la base se ofrecen aparte, así que no se pierden."""
+    return [v for v in valores if normalizar(v) not in TALLAS_NO_OFICIALES]
+
+
 # ── Revisión de un valor ───────────────────────────────────────────────────
 
 ESTADO_OK = "ok"
 ESTADO_PARECIDO = "parecido"
 ESTADO_NUEVO = "nuevo"
+
+# De dónde sale la propuesta: una forma oficial (sinónimo conocido), la misma
+# palabra con otra escritura (acentos/mayúsculas) o solo un parecido de letras.
+ORIGEN_FORMA_OFICIAL = "forma_oficial"
+ORIGEN_ESCRITURA = "escritura"
+ORIGEN_PARECIDO = "parecido"
 
 
 @dataclass(frozen=True)
@@ -266,16 +284,24 @@ class Revision:
     valor: str
     sugerencias: tuple[Parecido, ...] = field(default_factory=tuple)
     existe: bool = False
+    origen: str = ""
+    usos_escrito: int = 0
 
     @property
     def necesita_pregunta(self) -> bool:
         return self.estado != ESTADO_OK
 
     @property
+    def sugerencia_segura(self) -> bool:
+        """La propuesta es la misma cosa escrita de otra forma (sinónimo o
+        acentos), no solo letras parecidas: «Usar…» puede ir por defecto."""
+        return bool(self.sugerencias) and self.origen in (ORIGEN_FORMA_OFICIAL, ORIGEN_ESCRITURA)
+
+    @property
     def unidad(self) -> str:
         return "tallas" if self.campo in (CAMPO_TALLA, CAMPO_COLOR) else "prendas"
 
-    def texto_pregunta(self) -> str:
+    def texto_pregunta(self, puede_crear: bool = True) -> str:
         etiqueta = ETIQUETA_CAMPO.get(self.campo, self.campo)
         if self.campo == CAMPO_ESCUELA and not self.existe:
             if self.sugerencias:
@@ -283,6 +309,11 @@ class Revision:
                 return (
                     f"«{self.escrito}» no está en la lista de escuelas.\n"
                     f"¿Es la misma que «{primera.valor}» ({primera.usos} prendas)?"
+                )
+            if not puede_crear:
+                return (
+                    f"«{self.escrito}» no está en la lista de escuelas.\n"
+                    "Elige una de la lista o pide a un ADMIN que la dé de alta."
                 )
             return (
                 f"«{self.escrito}» no está en la lista de escuelas.\n"
@@ -293,22 +324,55 @@ class Revision:
             return f"«{self.escrito}» se parece a «{primera.valor}» ({primera.usos} {self.unidad})."
         return f"«{self.escrito}» no existe todavía como {etiqueta}."
 
+    def texto_motivo(self) -> str:
+        """Por qué se propone, cuando la propuesta es una forma oficial."""
+        if self.origen != ORIGEN_FORMA_OFICIAL or not self.sugerencias:
+            return ""
+        texto = f"Para lo nuevo se usa una sola forma: «{self.sugerencias[0].valor}»."
+        if self.existe and self.usos_escrito:
+            texto += f" «{self.escrito}» ya está en {self.usos_escrito} {self.unidad}; esas no cambian."
+        return texto
+
 
 def _mejor_de(grupo: list[str], usos: dict[str, int]) -> str:
     return sorted(grupo, key=lambda v: (not lleva_acento(v), -usos.get(v, 0), v))[0]
 
 
-def _similitud(a: str, b: str) -> float:
+def _solo_error_de_dedo(na: str, nb: str) -> bool:
+    """Mismas palabras, con letras cambiadas en alguna («Chamara»/«Chamarra»,
+    «Blnaco»/«Blanco»). Una palabra de más o de menos («Gris claro»/«Gris»,
+    «Verde Bandera»/«Verde») o un número distinto («Pants 3pz»/«Pants 2pz»,
+    «13-18»/«13-16») ya es otra cosa."""
+    pa, pb = na.split(), nb.split()
+    if len(pa) != len(pb):
+        return False
+    for wa, wb in zip(pa, pb):
+        if wa == wb:
+            continue
+        if any(c.isdigit() for c in wa + wb):
+            return False
+        if difflib.SequenceMatcher(None, wa, wb).ratio() < 0.7:
+            return False
+    return True
+
+
+def _similitud(a: str, b: str, campo: str = CAMPO_ESCUELA) -> float:
     na, nb = normalizar(a), normalizar(b)
     if not na or not nb:
         return 0.0
+    if campo == CAMPO_TALLA:
+        # Tallas: solo sinónimos. «2-4» no es «24» ni «13-18» es «13-16».
+        return 0.0
+    if campo != CAMPO_ESCUELA:
+        if not _solo_error_de_dedo(na, nb):
+            return 0.0
+        return difflib.SequenceMatcher(None, na, nb).ratio()
     ratio = difflib.SequenceMatcher(None, na, nb).ratio()
-    # «Ignacio Allende» dentro de «Ignacio Allende (Jaral)»: todas las
-    # palabras de uno están en el otro.
+    # Solo escuelas: «Ignacio Allende» dentro de «Ignacio Allende (Jaral)»
+    # (todas las palabras de uno están en el otro).
     pa, pb = set(na.split()), set(nb.split())
-    if pa and pb and (pa <= pb or pb <= pa) and min(len(pa), len(pb)) >= 1:
-        if min(len(na), len(nb)) >= 3:
-            ratio = max(ratio, 0.9)
+    if pa and pb and (pa <= pb or pb <= pa) and min(len(na), len(nb)) >= 3:
+        ratio = max(ratio, 0.9)
     return ratio
 
 
@@ -317,7 +381,7 @@ def _parecidos(campo: str, escrito: str, usos: dict[str, int]) -> tuple[Parecido
     for valor, n in usos.items():
         if valor == escrito:
             continue
-        score = _similitud(escrito, valor)
+        score = _similitud(escrito, valor, campo)
         if score >= UMBRAL_PARECIDO:
             puntuados.append((score, n, valor))
     puntuados.sort(key=lambda t: (-t[0], -t[1], t[2]))
@@ -349,12 +413,15 @@ def revisar_valor(campo: str, texto: object, usos: dict[str, int] | None = None)
             destino = oficial if (es_libre or oficial in existentes_oficial) else _mejor_de(existentes_oficial, usos)
             if destino == escrito:
                 return Revision(campo, escrito, ESTADO_OK, escrito, existe=existe)
-            if destino.casefold() == escrito.casefold():
-                # «ch» → «CH»: solo cambia la mayúscula, se corrige sin preguntar.
+            if normalizar(destino) == normalizar(escrito):
+                # «ch» → «CH», o «Básico» cuando en la base solo está «Basico»:
+                # es la misma palabra, se usa la que hay sin preguntar (el
+                # renombrado de lo viejo es de la tanda 5).
                 return Revision(campo, escrito, ESTADO_OK, destino, existe=existe)
             return Revision(
                 campo, escrito, ESTADO_PARECIDO, destino,
                 sugerencias=(Parecido(destino, usos.get(destino, 0)),), existe=existe,
+                origen=ORIGEN_FORMA_OFICIAL, usos_escrito=usos.get(escrito, 0),
             )
 
     grupo = por_clave.get(clave, [])
@@ -370,6 +437,7 @@ def revisar_valor(campo: str, texto: object, usos: dict[str, int] | None = None)
         return Revision(
             campo, escrito, ESTADO_PARECIDO, mejor,
             sugerencias=(Parecido(mejor, usos.get(mejor, 0)),), existe=existe,
+            origen=ORIGEN_ESCRITURA, usos_escrito=usos.get(escrito, 0),
         )
 
     if campo == CAMPO_TALLA and es_talla_oficial(escrito):
@@ -379,8 +447,11 @@ def revisar_valor(campo: str, texto: object, usos: dict[str, int] | None = None)
 
     parecidos = _parecidos(campo, escrito, usos)
     if parecidos:
-        return Revision(campo, escrito, ESTADO_PARECIDO, parecidos[0].valor, sugerencias=parecidos, existe=existe)
-    return Revision(campo, escrito, ESTADO_NUEVO, escrito, existe=existe)
+        return Revision(
+            campo, escrito, ESTADO_PARECIDO, parecidos[0].valor, sugerencias=parecidos, existe=existe,
+            origen=ORIGEN_PARECIDO, usos_escrito=usos.get(escrito, 0),
+        )
+    return Revision(campo, escrito, ESTADO_NUEVO, escrito, existe=existe, usos_escrito=usos.get(escrito, 0))
 
 
 # ── Base de datos ──────────────────────────────────────────────────────────

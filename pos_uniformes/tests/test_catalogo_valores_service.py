@@ -35,7 +35,7 @@ class NormalizarTests(unittest.TestCase):
     def test_formas_oficiales_de_talla(self) -> None:
         for escrito, oficial in [
             ("Uni", "Unitalla"), ("NT", "Unitalla"), ("Ch", "CH"), ("ch", "CH"),
-            ("M", "MD"), ("G", "GD"), ("XL", "EXG"), ("XXL", "EXG"), ("12", "12"), ("3-5", "3-5"),
+            ("M", "MD"), ("G", "GD"), ("XL", "EXG"), ("XXL", "XXL"), ("12", "12"), ("3-5", "3-5"),
         ]:
             self.assertEqual(cv.forma_oficial_talla(escrito), oficial, escrito)
 
@@ -92,10 +92,63 @@ class RevisarValorTests(unittest.TestCase):
         r = cv.revisar_valor(cv.CAMPO_TALLA, "46", self.TALLAS)
         self.assertEqual((r.estado, r.valor), (cv.ESTADO_OK, "46"))
 
-    def test_basico_sin_acento_propone_basico(self) -> None:
+    def test_basico_sin_acento_usa_basico_sin_preguntar(self) -> None:
+        # Es la misma palabra: se usa la acentuada sin preguntar.
         usos = {"Basico": 0, "Básico": 128, "Deportivo": 235}
         r = cv.revisar_valor(cv.CAMPO_TIPO_PRENDA, "Basico", usos)
-        self.assertEqual((r.estado, r.valor), (cv.ESTADO_PARECIDO, "Básico"))
+        self.assertEqual((r.estado, r.valor), (cv.ESTADO_OK, "Básico"))
+
+    def test_basico_de_la_lista_con_solo_basico_sin_acento_en_la_base(self) -> None:
+        # En la caja solo existe el atributo «Basico»: elegir «Básico» de la
+        # lista no pregunta «se parece a Basico»; usa la fila que hay.
+        r = cv.revisar_valor(cv.CAMPO_ATRIBUTO, "Básico", {"Basico": 3, "Deportivo": 101})
+        self.assertEqual((r.estado, r.valor), (cv.ESTADO_OK, "Basico"))
+        self.assertFalse(r.necesita_pregunta)
+
+    def test_no_une_valores_que_son_otra_cosa(self) -> None:
+        casos = [
+            (cv.CAMPO_COLOR, "Verde Bandera", {"Verde": 50}),
+            (cv.CAMPO_COLOR, "Gris claro", {"Gris": 80}),
+            (cv.CAMPO_COLOR, "Gris Oxford", {"Gris": 80}),
+            (cv.CAMPO_COLOR, "Azul cielo", {"Azul": 30}),
+            (cv.CAMPO_TIPO_PIEZA, "Pants 3pz", {"Pants 2pz": 60}),
+            (cv.CAMPO_TALLA, "2-4", {"24": 10}),
+            (cv.CAMPO_TALLA, "13-18", {"13-16": 10}),
+        ]
+        for campo, escrito, usos in casos:
+            with self.subTest(escrito=escrito):
+                r = cv.revisar_valor(campo, escrito, usos)
+                self.assertEqual(r.estado, cv.ESTADO_NUEVO)
+                self.assertEqual(r.sugerencias, ())
+
+    def test_xl_va_a_exg_pero_xxl_queda_aparte(self) -> None:
+        self.assertEqual(cv.revisar_valor(cv.CAMPO_TALLA, "XL", {"EXG": 40}).valor, "EXG")
+        r = cv.revisar_valor(cv.CAMPO_TALLA, "XXL", {"EXG": 40})
+        self.assertEqual((r.estado, r.valor), (cv.ESTADO_NUEVO, "XXL"))
+
+    def test_sugerencia_segura_solo_para_sinonimos_y_acentos(self) -> None:
+        self.assertTrue(cv.revisar_valor(cv.CAMPO_COLOR, "Blanca", self.COLORES).sugerencia_segura)
+        self.assertTrue(
+            cv.revisar_valor(cv.CAMPO_ATRIBUTO, "Deportiva", {"Deportivo": 101, "Deportiva": 75}).sugerencia_segura
+        )
+        errata = cv.revisar_valor(cv.CAMPO_TIPO_PIEZA, "Chamara", {"Chamarra": 68})
+        self.assertEqual(errata.estado, cv.ESTADO_PARECIDO)
+        self.assertFalse(errata.sugerencia_segura)
+
+    def test_el_motivo_explica_la_forma_unica(self) -> None:
+        r = cv.revisar_valor(cv.CAMPO_COLOR, "Blanca", self.COLORES)
+        self.assertEqual(
+            r.texto_motivo(),
+            "Para lo nuevo se usa una sola forma: «Blanco». «Blanca» ya está en 306 tallas; esas no cambian.",
+        )
+        self.assertEqual(cv.revisar_valor(cv.CAMPO_TIPO_PIEZA, "Chamara", {"Chamarra": 68}).texto_motivo(), "")
+
+    def test_tallas_para_ofrecer_quita_las_no_oficiales(self) -> None:
+        gestor = ["2", "28", "XS", "S", "M", "L", "XL", "XXL", "XXXL", "XXXXL", "CH", "Uni", "ESP", "NT", "3-5", "Dama"]
+        self.assertEqual(
+            cv.depurar_opciones(cv.CAMPO_TALLA, cv.tallas_para_ofrecer(gestor)),
+            ["2", "28", "MD", "EXG", "CH", "Unitalla", "3-5", "Dama"],
+        )
 
     def test_acentos_sobre_algo_que_no_existe_se_usa_el_existente(self) -> None:
         r = cv.revisar_valor(cv.CAMPO_TIPO_PIEZA, "sueter", {"Suéter": 86})
@@ -127,6 +180,13 @@ class RevisarValorTests(unittest.TestCase):
         self.assertEqual(r.estado, cv.ESTADO_PARECIDO)
         self.assertIn("Ignacio Allende (Jaral)", [s.valor for s in r.sugerencias])
         self.assertIn("¿Es la misma que", r.texto_pregunta())
+
+    def test_escuela_nueva_sin_permiso_no_pregunta_si_crear(self) -> None:
+        r = cv.revisar_valor(cv.CAMPO_ESCUELA, "Rancho Nuevo", {"Miguel Hidalgo": 12})
+        self.assertIn("¿Crear una escuela nueva", r.texto_pregunta())
+        texto = r.texto_pregunta(puede_crear=False)
+        self.assertNotIn("¿Crear", texto)
+        self.assertIn("pide a un ADMIN", texto)
 
     def test_escuela_sin_acento_usa_la_que_existe(self) -> None:
         r = cv.revisar_valor(cv.CAMPO_ESCUELA, "ignacio ramirez lopez", {"Ignacio Ramírez López": 4})

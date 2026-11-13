@@ -56,6 +56,7 @@ from pos_uniformes.services.catalogo_valores_service import (
     contar_usos,
     depurar_opciones,
     forma_oficial_talla,
+    tallas_para_ofrecer,
 )
 from pos_uniformes.ui.dialogs.quisiste_decir_dialog import (
     Campo,
@@ -1053,7 +1054,7 @@ def build_catalog_product_dialog(
         available_sizes = depurar_opciones(
             CAMPO_TALLA,
             suggested_sizes,
-            legacy_choices.get("TALLAS", []),
+            tallas_para_ofrecer(legacy_choices.get("TALLAS", [])),
             common_sizes,
             [default_variant_size],
         )

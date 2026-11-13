@@ -30,6 +30,7 @@ from pos_uniformes.services.catalogo_valores_service import (
     CAMPO_TALLA,
     contar_usos,
     depurar_opciones,
+    tallas_para_ofrecer,
 )
 from pos_uniformes.ui.dialogs.quisiste_decir_dialog import (
     Campo,
@@ -100,7 +101,12 @@ def build_catalog_variant_dialog(
     talla_combo = QComboBox()
     talla_combo.setEditable(True)
     talla_combo.addItems(
-        depurar_opciones(CAMPO_TALLA, legacy_choices.get("TALLAS", []), common_sizes, [default_variant_size])
+        depurar_opciones(
+            CAMPO_TALLA,
+            tallas_para_ofrecer(legacy_choices.get("TALLAS", [])),
+            common_sizes,
+            [default_variant_size],
+        )
     )
     if talla_combo.lineEdit() is not None:
         talla_combo.lineEdit().setPlaceholderText("Selecciona o escribe una talla")
