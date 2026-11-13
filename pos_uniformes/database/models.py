@@ -2491,6 +2491,18 @@ class LibretaVenta(Base):
     #: en las ventas de antes y en abonos/apartados sin motor.
     calculo: Mapped[dict | None] = mapped_column(JSON().with_variant(JSONB(), "postgresql"), nullable=True)
     version_reglas: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    #: Unir ventas en UNA operación (Daniel, 2026-11-13): la clienta compró,
+    #: se imprimió el ticket y luego se llevó otra cosa más. Las dos ventas
+    #: siguen valiendo (dinero, piezas, comisiones, existencia y Monedero no
+    #: cambian); solo cuentan como 1 operación. Todas las ventas del grupo
+    #: guardan aquí el id de la primera (la más vieja); NULL = sola.
+    #: Ver services/libreta_unir_service.py.
+    operacion_grupo_id: Mapped[int | None] = mapped_column(
+        ForeignKey("libreta_venta.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    #: Rastro de la unión: el gafete de quien la unió y cuándo.
+    operacion_unida_por: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    operacion_unida_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 _MONEDERO_TIPOS_CREDITO = "'cashback', 'devolucion_canje', 'ajuste_abono'"
