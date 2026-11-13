@@ -7625,6 +7625,8 @@ class MainWindow(QMainWindow):
             "qr": self.inventory_qr_filter_combo,
             "origen": self.inventory_origin_filter_combo,
             "incidencias": self.inventory_duplicate_filter_combo,
+            "conteo": self.inventory_conteo_filter_combo,
+            "precio": self.inventory_precio_filter_combo,
         }
         multi_filters = {
             "marca": self.inventory_brand_filter_combo,
@@ -7634,10 +7636,15 @@ class MainWindow(QMainWindow):
             "talla": self.inventory_size_filter_combo,
             "color": self.inventory_color_filter_combo,
         }
-        if token.key == "texto":
-            self.inventory_search_input.blockSignals(True)
-            self.inventory_search_input.clear()
-            self.inventory_search_input.blockSignals(False)
+        text_inputs = {
+            "texto": self.inventory_search_input,
+            "precio_exacto": self.inventory_precio_text_input,
+        }
+        text_input = text_inputs.get(token.key)
+        if text_input is not None:
+            text_input.blockSignals(True)
+            text_input.clear()
+            text_input.blockSignals(False)
             self._handle_inventory_filters_changed_reset_page()
             return
         combo = combo_filters.get(token.key)
