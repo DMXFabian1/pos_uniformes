@@ -299,7 +299,9 @@ def texto_inscribir_club(nombre: str, tasa: Decimal | None, *, desde_esta_compra
     comisión de tarjeta (regla B), ni el saldo que use del Monedero.
 
     2026-11-12 (Daniel, «solucionemos estos»): decía «de cada compra», que
-    prometía de más con tarjeta o con prendas rebajadas."""
+    prometía de más con tarjeta o con prendas rebajadas. Luego («sí, aplica
+    las tres») se acortó: la comisión de tarjeta confundía más de lo que
+    aclaraba en voz alta; esa regla vive en Reglas Claras."""
     pregunta = f"¿Inscribir a {nombre} a Maximoda Club?\n\n"
     if tasa is None or Decimal(str(tasa)) <= 0:
         return pregunta + "Queda como miembro desde hoy."
@@ -308,7 +310,7 @@ def texto_inscribir_club(nombre: str, tasa: Decimal | None, *, desde_esta_compra
     return (
         pregunta
         + f"Queda como miembro desde hoy y gana {pct} % de lo que pague en su Monedero, "
-        f"{cuando}. No suman Oferta, Liquidación ni la comisión de tarjeta."
+        f"{cuando}. No suman Oferta ni Liquidación."
     )
 
 

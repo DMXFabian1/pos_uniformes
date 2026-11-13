@@ -77,7 +77,8 @@ class TextoInscribirClubTests(unittest.TestCase):
         texto = ms.texto_inscribir_club("Ana", D("5.00"))
         self.assertTrue(texto.startswith("¿Inscribir a Ana a Maximoda Club?"))
         self.assertIn("gana 5 % de lo que pague en su Monedero, desde esta misma compra", texto)
-        self.assertIn("No suman Oferta, Liquidación ni la comisión de tarjeta", texto)
+        self.assertTrue(texto.endswith("No suman Oferta ni Liquidación."))
+        self.assertNotIn("comisión", texto)
         self.assertNotIn("de cada compra", texto)
 
     def test_tasa_con_decimales(self) -> None:
