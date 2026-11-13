@@ -338,19 +338,3 @@ def texto_confirmar_separar(venta_id: int) -> str:
         f"#{int(venta_id)} vuelve a contar como su propia operación. "
         "El dinero, las piezas y las comisiones no cambian."
     )
-
-
-def posiciones_en_grupo(rows) -> dict[int, tuple[int, int]]:
-    """{id: (lugar, de_cuántas)} de las filas unidas que se ven, en orden de
-    hora (la primera es 1). Puro."""
-    grupos: dict[int, list] = {}
-    for r in rows or ():
-        g = getattr(r, "operacion_grupo_id", None)
-        if g is not None and getattr(r, "id", None) is not None:
-            grupos.setdefault(int(g), []).append(r)
-    salida: dict[int, tuple[int, int]] = {}
-    for filas in grupos.values():
-        filas.sort(key=lambda r: (r.created_at, r.id))
-        for n, r in enumerate(filas, start=1):
-            salida[int(r.id)] = (n, len(filas))
-    return salida

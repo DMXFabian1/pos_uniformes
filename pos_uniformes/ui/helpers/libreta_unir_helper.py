@@ -21,6 +21,9 @@ logger = logging.getLogger(__name__)
 
 TEXTO_UNIR = "🔗 Unir con la anterior"
 TEXTO_SEPARAR = "✂ Separar de su operación"
+#: En la primera venta del día de esa empleada no hay con qué unir: el botón
+#: se apaga y dice cuál elegir (en el kiosko táctil no hay tooltip).
+TEXTO_ELIGE_SEGUNDA = "🔗 Elige la segunda venta de la clienta"
 AYUDA_UNIR = (
     "La misma clienta se llevó otra cosa después de imprimir el ticket: "
     "las dos ventas cuentan como 1 operación. El dinero, las piezas y las "
@@ -41,10 +44,12 @@ def crear_boton(ventana) -> QPushButton:
     return boton
 
 
-def actualizar_boton(boton: QPushButton | None, row, *, es_dueno: bool) -> None:
+def actualizar_boton(boton: QPushButton | None, row, *, es_dueno: bool, rows=None) -> None:
     """«Unir con la anterior» en una venta suelta; «Separar» en una unida;
     escondido en lo que no se une (abonos, apartados, cambios, compras de
-    empleada) y para quien no es el dueño."""
+    empleada) y para quien no es el dueño. Con `rows` (las filas ya cargadas)
+    se apaga en la primera venta del día de esa empleada, que no tiene otra
+    antes: «Elige la segunda venta de la clienta». Sin ir a la base."""
     if boton is None:
         return
     if row is None or not es_dueno:
@@ -63,7 +68,15 @@ def actualizar_boton(boton: QPushButton | None, row, *, es_dueno: bool) -> None:
     )
     boton.setVisible(se_une)
     # Sin id (aún en la cola sin red) se ve, pero apagado.
-    boton.setEnabled(lu.puede_ofrecerse(row))
+    ofrecer = lu.puede_ofrecerse(row)
+    if ofrecer and rows is not None and not lu.hay_anterior_en(rows, row):
+        boton.setText(TEXTO_ELIGE_SEGUNDA)
+        boton.setToolTip(
+            "Esta es la primera venta del día de esa empleada: no hay otra antes. "
+            "Elige la segunda venta de la clienta y únela con la anterior."
+        )
+        ofrecer = False
+    boton.setEnabled(ofrecer)
 
 
 def construir_confirmacion(parent, titulo: str, texto: str, detalle: str, accion: str) -> tuple[QMessageBox, object]:
@@ -141,11 +154,15 @@ def al_tocar(ventana) -> None:
                     ids = [r.id for r in juntas]
                     anterior_id = int(anterior.id)
                     detalle = "\n".join(f"#{r.id} · {resumen(r)}" for r in juntas)
+                    corte_en_medio = lu.corte_entre(session, juntas[0].created_at, juntas[-1].created_at)
             if anterior is None:
                 QMessageBox.information(
                     ventana, "Unir con la anterior",
                     f"{_quien(row)} no tiene otra venta antes de esta ese mismo día para unirla.",
                 )
+                return
+            if corte_en_medio:
+                QMessageBox.information(ventana, "Unir con la anterior", lu.TEXTO_CORTE_EN_MEDIO)
                 return
             texto = lu.texto_confirmar_union(ids, _quien(row))
             if not _confirmar(ventana, "Unir en una operación", texto, detalle, "Unir"):
@@ -172,27 +189,44 @@ def al_tocar(ventana) -> None:
 # ─── La marca en la tabla ────────────────────────────────────────────────
 
 
-def marcar_tipo(texto_tipo: str, row, posiciones: dict | None = None) -> str:
-    """«🔗 Venta — Fanny López»: el eslabón va delante (corto, para que el
-    nombre quepa) y las ventas unidas se leen juntas sin perder cada renglón.
-    «misma clienta» y con cuál se dice al pasar el mouse y en «Movimiento
-    elegido» (`texto_detalle`)."""
+def marcar_tipo(texto_tipo: str, row, horas: dict | None = None) -> str:
+    """«🔗 con 12:00 — Fanny López»: el eslabón y la hora de la otra venta del
+    grupo (la que el dueño ve en la columna Hora), para que se sepa con cuál
+    va cada una aunque haya dos grupos o queden separadas por otro renglón,
+    sin pasar el mouse (kiosko táctil). La hora toma el lugar de la palabra
+    «Venta» (solo las ventas se unen) para que el nombre siga cabiendo.
+    `horas` sale de `libreta_unir_service.horas_de_las_otras`."""
     if not lu.esta_unida(row):
         return texto_tipo
-    return f"🔗 {texto_tipo}"
+    otras = (horas or {}).get(getattr(row, "id", None)) or []
+    if not otras:
+        return f"🔗 {texto_tipo}"
+    con = f"con {_lista(otras)}"
+    if "Venta" in texto_tipo:
+        return f"🔗 {texto_tipo.replace('Venta', con, 1)}"
+    return f"🔗 {con} · {texto_tipo}"
+
+
+def _lista(cosas: list[str]) -> str:
+    return cosas[0] if len(cosas) == 1 else ", ".join(cosas[:-1]) + f" y {cosas[-1]}"
 
 
 def texto_detalle(row, rows) -> str:
     """El renglón extra de «Movimiento elegido» para una venta unida:
-    «🔗 Misma clienta que #1639: cuentan como 1 operación.» ("" si va sola)."""
+    «🔗 Misma clienta que la de 12:00 (#1639): cuentan como 1 operación.»
+    ("" si va sola). Por la hora, que es lo que se ve en la tabla."""
     if row is None or not lu.esta_unida(row):
         return ""
     otras = sorted(
-        int(r.id) for r in rows or ()
-        if getattr(r, "operacion_grupo_id", None) == row.operacion_grupo_id and getattr(r, "id", None) != row.id
-    ) or [int(row.operacion_grupo_id)]
-    lista = " y ".join(f"#{i}" for i in otras)
-    return f"🔗 Misma clienta que {lista}: cuentan como 1 operación."
+        (r for r in rows or ()
+         if getattr(r, "operacion_grupo_id", None) == row.operacion_grupo_id and getattr(r, "id", None) != row.id),
+        key=lambda r: (r.created_at, r.id),
+    )
+    if not otras:
+        return f"🔗 Misma clienta que #{int(row.operacion_grupo_id)}: cuentan como 1 operación."
+    lista = _lista([f"{lu.hora_local(r.created_at)} (#{r.id})" for r in otras])
+    articulo = "la de" if len(otras) == 1 else "las de"
+    return f"🔗 Misma clienta que {articulo} {lista}: cuentan como 1 operación."
 
 
 def pintar_fila(tabla, fila: int, row) -> None:

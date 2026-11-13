@@ -47,14 +47,49 @@ class _Qt(unittest.TestCase):
 class PurosDeLaPantallaTests(_Qt):
     def test_marca_en_la_tabla(self) -> None:
         filas = [_fila(1640, minutos=7, grupo=1639), _fila(1639, grupo=1639), _fila(1641, minutos=9)]
-        from pos_uniformes.services.libreta_unir_service import posiciones_en_grupo
+        from pos_uniformes.services.libreta_unir_service import horas_de_las_otras
 
-        pos = posiciones_en_grupo(filas)
-        self.assertEqual(pos, {1639: (1, 2), 1640: (2, 2)})
-        self.assertEqual(h.marcar_tipo("Venta — Fanny", filas[0], pos), "🔗 Venta — Fanny")
-        self.assertEqual(h.marcar_tipo("Venta — Fanny", filas[2], pos), "Venta — Fanny")
-        self.assertEqual(h.texto_detalle(filas[0], filas), "🔗 Misma clienta que #1639: cuentan como 1 operación.")
+        horas = horas_de_las_otras(filas)
+        self.assertEqual(horas, {1639: ["12:07"], 1640: ["12:00"]})
+        # Con cuál va cada una se lee en la celda, por la hora (sin tooltip).
+        self.assertEqual(h.marcar_tipo("Venta — Fanny", filas[0], horas), "🔗 con 12:00 — Fanny")
+        self.assertEqual(h.marcar_tipo("Venta — Fanny", filas[1], horas), "🔗 con 12:07 — Fanny")
+        self.assertEqual(h.marcar_tipo("Venta — Fanny", filas[2], horas), "Venta — Fanny")
+        self.assertEqual(
+            h.texto_detalle(filas[0], filas), "🔗 Misma clienta que la de 12:00 (#1639): cuentan como 1 operación."
+        )
         self.assertEqual(h.texto_detalle(filas[2], filas), "")
+
+    def test_dos_grupos_y_otra_empleada_en_medio_se_distinguen(self) -> None:
+        """Fanny: 12:00+12:07 y 15:00+15:05; Stayce vende entre las 12:00 y 12:07."""
+        from pos_uniformes.services.libreta_unir_service import horas_de_las_otras
+
+        filas = [
+            _fila(1, grupo=1), _fila(2, minutos=3, code="VEND-6"), _fila(3, minutos=7, grupo=1),
+            _fila(4, minutos=180, grupo=4), _fila(5, minutos=185, grupo=4), _fila(6, minutos=190, grupo=4),
+        ]
+        horas = horas_de_las_otras(filas)
+        marcas = {f.id: h.marcar_tipo("Venta — Fanny", f, horas) for f in filas}
+        self.assertEqual(marcas[1], "🔗 con 12:07 — Fanny")
+        self.assertEqual(marcas[2], "Venta — Fanny")
+        self.assertEqual(marcas[3], "🔗 con 12:00 — Fanny")
+        self.assertEqual(marcas[4], "🔗 con 15:05 y 15:10 — Fanny")
+        # Con tarjeta o candado la hora sigue delante.
+        self.assertEqual(h.marcar_tipo("🔒 Venta (tarjeta) — Fanny", filas[0], horas), "🔗 🔒 con 12:07 (tarjeta) — Fanny")
+        self.assertIn("las de 15:00 (#4) y 15:10 (#6)", h.texto_detalle(filas[4], filas))
+
+    def test_primera_venta_del_dia_no_ofrece_unir(self) -> None:
+        from PyQt6.QtWidgets import QPushButton
+
+        b = QPushButton()
+        primera, otra, segunda = _fila(1), _fila(2, minutos=1, code="VEND-6"), _fila(3, minutos=2)
+        rows = [segunda, otra, primera]
+        h.actualizar_boton(b, primera, es_dueno=True, rows=rows)
+        self.assertEqual((not b.isHidden(), b.text(), b.isEnabled()), (True, h.TEXTO_ELIGE_SEGUNDA, False))
+        h.actualizar_boton(b, segunda, es_dueno=True, rows=rows)
+        self.assertEqual((b.text(), b.isEnabled()), (h.TEXTO_UNIR, True))
+        h.actualizar_boton(b, otra, es_dueno=True, rows=rows)
+        self.assertEqual((b.text(), b.isEnabled()), (h.TEXTO_ELIGE_SEGUNDA, False))
 
     def test_el_boton_segun_la_fila(self) -> None:
         from PyQt6.QtWidgets import QPushButton
@@ -162,6 +197,19 @@ class AlTocarTests(_Qt):
         self._tocar(win, "Separar")
         self.assertEqual(self._grupos(), {1639: None, 1640: None})
 
+    def test_corte_en_medio_avisa_sin_preguntar_ni_unir(self) -> None:
+        from pos_uniformes.database.models import LibretaCorte
+
+        with Session(self.engine) as s:
+            momento = AHORA + timedelta(minutes=3)
+            s.add(LibretaCorte(fecha=momento.date(), monto_final=Decimal("0"), operaciones=1, piezas=1,
+                               creado_por="VEND-1", created_at=momento, hasta=momento))
+            s.commit()
+        textos = self._tocar(self._ventana(), "Unir")
+        self.assertEqual(textos, [h.lu.TEXTO_CORTE_EN_MEDIO])
+        self.assertEqual(self._grupos(), {1639: None, 1640: None})
+        self.assertEqual(self.refrescos, 0)
+
     def test_quien_no_es_el_dueno_no_hace_nada(self) -> None:
         self._tocar(self._ventana(dueno=False), "Unir")
         self.assertEqual(self._grupos(), {1639: None, 1640: None})
@@ -187,13 +235,13 @@ class VentanaTests(_Qt):
         win._pintar_libreta([_fila(1641, minutos=9), _fila(1640, minutos=7, grupo=1639), _fila(1639, grupo=1639)])
         tipos = [win.libreta_table.item(i, 2).text() for i in range(3)]
         self.assertFalse(tipos[0].startswith("🔗"))
-        self.assertTrue(tipos[1].startswith("🔗 Venta"))
-        self.assertTrue(tipos[2].startswith("🔗 Venta"))
+        self.assertTrue(tipos[1].startswith("🔗 con 12:00 — "))
+        self.assertTrue(tipos[2].startswith("🔗 con 12:07 — "))
         self.assertIn("Misma clienta", win.libreta_table.item(1, 2).toolTip())
         win.libreta_table.selectRow(1)
         win._on_libreta_seleccion()
         self.assertEqual(win.libreta_unir_button.text(), h.TEXTO_SEPARAR)
-        self.assertIn("Misma clienta que #1639", win.libreta_mov_detalle.text())
+        self.assertIn("Misma clienta que la de 12:00 (#1639)", win.libreta_mov_detalle.text())
         win.libreta_table.selectRow(0)
         win._on_libreta_seleccion()
         self.assertEqual(win.libreta_unir_button.text(), h.TEXTO_UNIR)

@@ -3797,6 +3797,7 @@ class QuoteSatelliteWindow(QMainWindow):
         actualizar_boton(
             getattr(self, "libreta_unir_button", None), row,
             es_dueno=bool(getattr(self, "_libreta_is_owner", False)),
+            rows=getattr(self, "_libreta_rows_completas", None),
         )
         boton = getattr(self, "libreta_privado_button", None)
         if boton is None:
@@ -4767,11 +4768,11 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_pag_next.setEnabled(self._libreta_pagina < total_paginas - 1)
 
         self.libreta_table.setRowCount(len(rows))
-        # Ventas unidas en una operación (2026-11-13): «🔗 misma clienta 1/2».
-        from pos_uniformes.services.libreta_unir_service import posiciones_en_grupo
+        # Ventas unidas en una operación (2026-11-13): «🔗 con 12:00 · …».
+        from pos_uniformes.services.libreta_unir_service import horas_de_las_otras
         from pos_uniformes.ui.helpers import libreta_unir_helper
 
-        posiciones_unidas = posiciones_en_grupo(self._libreta_rows_completas)
+        horas_unidas = horas_de_las_otras(self._libreta_rows_completas)
         for i, row in enumerate(rows):
             local_dt = (
                 row.created_at.astimezone()
@@ -4791,7 +4792,7 @@ class QuoteSatelliteWindow(QMainWindow):
             if self._libreta_is_owner:
                 nombre = _nombre_de(row.employee_name or row.employee_code)
                 tipo_txt = f"{tipo_txt} — {nombre}"
-            tipo_txt = libreta_unir_helper.marcar_tipo(tipo_txt, row, posiciones_unidas)
+            tipo_txt = libreta_unir_helper.marcar_tipo(tipo_txt, row, horas_unidas)
             if str(row.tipo) == "abono":
                 prendas_txt = f"Abono — {getattr(row, 'cliente', None) or 'cliente'}"
             else:
