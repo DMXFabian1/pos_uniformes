@@ -28,6 +28,7 @@ from datetime import datetime, timezone
 from typing import Iterable, Mapping, Sequence
 
 from pos_uniformes.services.inventario_ritmo_service import (
+    DIAS_PARA_ACABARSE,
     SE_ACABO_Y_SE_VENDE,
     SE_VA_A_ACABAR as ESTADO_SE_VA_A_ACABAR,
     estado_de_fila,
@@ -150,6 +151,8 @@ class ConteoTarjetas:
     pocas: int
     sin_contar: int
     acabarse: int = 0
+    #: De `acabarse`, las que ya se acabaron (0 o menos) y se siguen vendiendo.
+    acabadas_que_se_venden: int = 0
 
     def de(self, tarjeta: str) -> int:
         return {
@@ -164,17 +167,41 @@ class ConteoTarjetas:
 def contar_tarjetas(filas: Iterable[Mapping[str, object]], *, ahora: datetime) -> ConteoTarjetas:
     """El número grande de cada tarjeta: el mismo criterio que su filtro."""
     cuentas = dict.fromkeys(FILTROS, 0)
+    acabadas = 0
     for fila in filas:
         for tarjeta in FILTROS:
             if en_tarjeta(fila, tarjeta, ahora=ahora):
                 cuentas[tarjeta] += 1
+        if not es_fila_virtual(fila) and estado_de_fila(fila) == SE_ACABO_Y_SE_VENDE:
+            acabadas += 1
     return ConteoTarjetas(
         negativo=cuentas[EN_NEGATIVO],
         se_acabo=cuentas[SE_ACABO],
         pocas=cuentas[QUEDAN_POCAS],
         sin_contar=cuentas[SIN_CONTAR],
         acabarse=cuentas[SE_VA_A_ACABAR],
+        acabadas_que_se_venden=acabadas,
     )
+
+
+def textos_acabarse(van: int, acabadas: int) -> tuple[str, str]:
+    """Título y nota del bloque ámbar; separa las que se van a acabar de las que ya se acabaron.
+
+    `van` = las que aún tienen piezas y no llegan a `DIAS_PARA_ACABARSE` días;
+    `acabadas` = las que ya están en 0 (o menos) y se siguen vendiendo.
+    """
+    def tallas(n: int) -> str:
+        return "1 talla" if n == 1 else f"{n:,} tallas"
+
+    if van > 0:
+        titulo = f"⏳  {tallas(van)} {'se va' if van == 1 else 'se van'} a acabar"
+        if acabadas > 0:
+            ya = "ya se acabó y se vende" if acabadas == 1 else "ya se acabaron y se venden"
+            return titulo, f"No llegan a {DIAS_PARA_ACABARSE} días · y {acabadas:,} {ya}"
+        return titulo, f"Con lo que se vende, no llegan a {DIAS_PARA_ACABARSE} días"
+    if acabadas == 1:
+        return "⏳  1 talla se acabó y se vende", "Ya hay que pedirla"
+    return f"⏳  {tallas(acabadas)} se acabaron y se venden", "Ya hay que pedirlas"
 
 
 def filtrar_por_tarjeta(

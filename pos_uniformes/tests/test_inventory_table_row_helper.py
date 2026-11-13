@@ -172,5 +172,26 @@ class InventoryTableRowHelperTests(unittest.TestCase):
         self.assertIn("Conjunto", dict(dos.cell_tooltips)[4])
         self.assertEqual(dos.values[5], "—")  # se arma con piezas: no tiene lugar propio
 
+    def test_la_que_se_va_a_acabar_dice_para_cuanto_alcanza(self) -> None:
+        """Tanda 5: con el filtro «Se va a acabar», el 12 negro no decía por qué estaba ahí."""
+        from pos_uniformes.services.inventario_ritmo_service import LLAVE_VENDIDAS
+        from pos_uniformes.ui.helpers.inventory_table_row_helper import COLUMNA_STOCK
+
+        base = {
+            "variante_id": 4, "sku": "SKU-004", "producto_nombre_base": "Pants", "talla": "10", "color": "Azul",
+            "variante_activa": True, "ultimo_conteo_at": None, "stock_minimo": None,
+        }
+        va = build_inventory_table_row_view({**base, "stock_actual": 12, LLAVE_VENDIDAS: 30})
+        self.assertEqual(va.stock_tone, "warning")
+        self.assertIn("alcanza para 12 días", dict(va.cell_tooltips)[COLUMNA_STOCK])
+        acabada = build_inventory_table_row_view({**base, "stock_actual": 0, LLAVE_VENDIDAS: 6})
+        self.assertIn("ya no hay", dict(acabada.cell_tooltips)[COLUMNA_STOCK])
+        sobra = build_inventory_table_row_view({**base, "stock_actual": 40, LLAVE_VENDIDAS: 6})
+        self.assertEqual(sobra.stock_tone, "")
+        self.assertNotIn(COLUMNA_STOCK, dict(sobra.cell_tooltips))
+        sin_dato = build_inventory_table_row_view({**base, "stock_actual": 12})
+        self.assertEqual(sin_dato.stock_tone, "")
+
+
 if __name__ == "__main__":
     unittest.main()

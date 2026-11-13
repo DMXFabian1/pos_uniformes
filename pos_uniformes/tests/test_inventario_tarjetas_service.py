@@ -24,6 +24,7 @@ from pos_uniformes.services.inventario_tarjetas_service import (
     motivo_para_atender,
     para_atender,
     sin_contar_al_dia,
+    textos_acabarse,
 )
 
 AHORA = datetime(2026, 11, 13, 12, 0, tzinfo=timezone.utc)
@@ -144,7 +145,15 @@ class SeVaAAcabarTests(unittest.TestCase):
         visibles = [f["variante_id"] for f in filtrar_por_tarjeta(filas, SE_VA_A_ACABAR, ahora=AHORA)]
         self.assertEqual(visibles, [1, 3])
         self.assertEqual(contar_tarjetas(filas, ahora=AHORA).acabarse, 2)
+        self.assertEqual(contar_tarjetas(filas, ahora=AHORA).acabadas_que_se_venden, 1)
         self.assertEqual(contar_tarjetas(filas, ahora=AHORA).de(SE_VA_A_ACABAR), 2)
+
+    def test_textos_del_bloque_separan_las_que_ya_se_acabaron(self) -> None:
+        self.assertEqual(textos_acabarse(4, 0), ("⏳  4 tallas se van a acabar", "Con lo que se vende, no llegan a 14 días"))
+        self.assertEqual(textos_acabarse(4, 1), ("⏳  4 tallas se van a acabar", "No llegan a 14 días · y 1 ya se acabó y se vende"))
+        self.assertEqual(textos_acabarse(1, 3), ("⏳  1 talla se va a acabar", "No llegan a 14 días · y 3 ya se acabaron y se venden"))
+        self.assertEqual(textos_acabarse(0, 1), ("⏳  1 talla se acabó y se vende", "Ya hay que pedirla"))
+        self.assertEqual(textos_acabarse(0, 2), ("⏳  2 tallas se acabaron y se venden", "Ya hay que pedirlas"))
 
     def test_para_atender_sube_las_agotadas_que_se_venden_o_piden(self) -> None:
         filas = [

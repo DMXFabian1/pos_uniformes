@@ -114,7 +114,9 @@ class InventarioTanda5PantallaTests(unittest.TestCase):
         pantalla = window.inventario_pantalla
         ficha = pantalla.ficha
         self.assertFalse(ficha.acabarse.isHidden())
-        self.assertEqual(ficha.acabarse_titulo.text(), "⏳  2 tallas se van a acabar")
+        # La agotada que se vende se cuenta aparte: el título no promete «se va a acabar» de más.
+        self.assertEqual(ficha.acabarse_titulo.text(), "⏳  1 talla se va a acabar")
+        self.assertEqual(ficha.acabarse_nota.text(), "No llegan a 14 días · y 1 ya se acabó y se vende")
         self.assertTrue(pantalla.chip_acabarse.isHidden())
         ficha.acabarse_boton.click()
         self.assertEqual(pantalla.tarjeta, SE_VA_A_ACABAR)

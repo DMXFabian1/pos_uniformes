@@ -79,6 +79,7 @@ from pos_uniformes.services.inventario_tarjetas_service import (
     filtrar_por_tarjeta,
     motivo_para_atender,
     para_atender,
+    textos_acabarse,
     tono_para_atender,
 )
 from pos_uniformes.services.inventario_vista_service import (
@@ -1073,10 +1074,10 @@ class InventarioPantalla(QObject):
         prendido = self.tarjeta == SE_VA_A_ACABAR
         cuantas = self.conteo.acabarse
         ficha.acabarse.setVisible(cuantas > 0 or prendido)
-        if cuantas == 1:
-            ficha.acabarse_titulo.setText("⏳  1 talla se va a acabar")
-        else:
-            ficha.acabarse_titulo.setText(f"⏳  {cuantas:,} tallas se van a acabar")
+        acabadas = self.conteo.acabadas_que_se_venden
+        titulo, nota = textos_acabarse(cuantas - acabadas, acabadas)
+        ficha.acabarse_titulo.setText(titulo)
+        ficha.acabarse_nota.setText(nota)
         ficha.acabarse_boton.setText("Ver todas" if prendido else "Verlas")
         ficha.acabarse_boton.setToolTip(
             "Quitar este filtro" if prendido else "Ver en la lista solo las que se van a acabar"

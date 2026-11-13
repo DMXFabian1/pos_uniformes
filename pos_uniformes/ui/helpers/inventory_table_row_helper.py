@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from pos_uniformes.services.inventario_donde_service import texto_donde, texto_donde_completo
 from pos_uniformes.services.inventario_precio_service import aviso_precio, texto_precio
+from pos_uniformes.services.inventario_ritmo_service import SE_VA_A_ACABAR, estado_de_fila, ritmo_de_fila
 from pos_uniformes.services.inventario_existencia_service import (
     aviso_cifra,
     cifra_existencia,
@@ -57,6 +58,15 @@ def build_inventory_table_row_view(row: dict[str, object]) -> InventoryTableRowV
     activa = bool(row["variante_activa"])
     # Desactivada: toda la fila en gris (letra, sin fondo), también la cifra.
     stock_tone = tono_cifra(stock_total, stock_minimo=stock_minimo_int, virtual=virtual) if activa else "muted"
+    aviso_hay = aviso_cifra(stock_total, stock_minimo=stock_minimo_int, virtual=virtual) if activa else None
+    # Tanda 5: la que se va a acabar lleva su número en ámbar y dice para cuánto alcanza.
+    estado_venta = estado_de_fila(row) if activa else None
+    if estado_venta is not None:
+        ritmo = ritmo_de_fila(row)
+        if ritmo is not None:
+            aviso_hay = "\n".join(t for t in (aviso_hay, ritmo.texto()) if t)
+        if estado_venta == SE_VA_A_ACABAR and not stock_tone:
+            stock_tone = "warning"
     conteo_raw = row.get("ultimo_conteo_at")
     conteo_text = _format_ultimo_conteo(conteo_raw if isinstance(conteo_raw, datetime) else None)
     return InventoryTableRowView(
@@ -76,7 +86,7 @@ def build_inventory_table_row_view(row: dict[str, object]) -> InventoryTableRowV
         tooltip=None if activa else TEXTO_DESACTIVADA,
         stock_con_fondo=False,
         cell_tooltips=_cell_tooltips(
-            (COLUMNA_STOCK, aviso_cifra(stock_total, stock_minimo=stock_minimo_int, virtual=virtual) if activa else None),
+            (COLUMNA_STOCK, aviso_hay),
             (COLUMNA_DONDE, texto_donde_completo(stock_total, stock_bodega, stock_piso, conjunto=virtual)),
             (COLUMNA_PRECIO, aviso_precio(row)),
         ),
