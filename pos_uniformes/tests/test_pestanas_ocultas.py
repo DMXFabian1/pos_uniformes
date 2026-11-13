@@ -29,6 +29,18 @@ _ORDEN = [
 ]
 
 
+def _cerrar(ventana: MainWindow) -> None:
+    """2026-11-12: cada MainWindow que arma una prueba se cierra y se libera.
+
+    Ventanas sueltas acumuladas hacían tronar pytest (Segmentation fault en
+    BusyFeedbackScope → processEvents) al correr este archivo junto con otros.
+    """
+    ventana._force_close = True
+    ventana.close()
+    ventana.deleteLater()
+    QApplication.processEvents()
+
+
 def _tabs() -> QTabWidget:
     t = QTabWidget()
     for nombre in _ORDEN:
@@ -86,6 +98,7 @@ class CajaFueraDelPosTests(unittest.TestCase):
     eso hacía salir "Caja pendiente de corte" cada vez que abría el POS.
     """
 
+
     def test_la_caja_ya_no_vive_en_el_pos(self) -> None:
         from pos_uniformes.ui.main_window import caja_en_el_pos
 
@@ -95,6 +108,7 @@ class CajaFueraDelPosTests(unittest.TestCase):
         from pos_uniformes.ui.main_window import MainWindow
 
         ventana = MainWindow(user_id=1)
+        self.addCleanup(_cerrar, ventana)
         # Si el gate corriera, abriría un diálogo modal y colgaría la prueba.
         self.assertTrue(ventana.ensure_cash_session())
 
@@ -102,6 +116,7 @@ class CajaFueraDelPosTests(unittest.TestCase):
         from pos_uniformes.ui.main_window import MainWindow
 
         ventana = MainWindow(user_id=1)
+        self.addCleanup(_cerrar, ventana)
         ventana.cash_session_requires_cut = True
         self.assertTrue(
             ventana._ensure_cash_session_current_day_for_operation("registrar ventas")
@@ -111,6 +126,7 @@ class CajaFueraDelPosTests(unittest.TestCase):
         from pos_uniformes.ui.main_window import MainWindow
 
         ventana = MainWindow(user_id=1)
+        self.addCleanup(_cerrar, ventana)
         self.assertFalse(ventana.cash_session_label.isVisible())
         self.assertFalse(ventana.cash_cut_button.isVisible())
 
@@ -128,6 +144,9 @@ class CajaAntiguaRetiradaTests(unittest.TestCase):
         from pos_uniformes.ui.main_window import MainWindow
 
         self.ventana = MainWindow(user_id=1)
+
+    def tearDown(self) -> None:
+        _cerrar(self.ventana)
 
     def test_la_pestana_caja_no_se_construye(self) -> None:
         nombres = [
