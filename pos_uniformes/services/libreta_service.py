@@ -834,12 +834,49 @@ class OperacionConCambios(ValueError):
     """Un cambio, o una venta con cambios: no se borra (el texto se enseña)."""
 
 
+class OperacionACuenta(OperacionConCambios):
+    """Una venta que es una compra a cuenta viva: no se borra (el texto se
+    enseña igual que el de un cambio)."""
+
+
 def _no_si_hay_cambios(session, entry: LibretaVenta) -> None:
     from pos_uniformes.services.cambio_service import es_cambio_o_tiene_cambios
 
     motivo = es_cambio_o_tiene_cambios(session, entry)
     if motivo:
         raise OperacionConCambios(motivo)
+    _no_si_es_compra_a_cuenta(session, entry)
+
+
+def _no_si_es_compra_a_cuenta(session, entry: LibretaVenta) -> None:
+    """Una venta ligada a una compra a cuenta no rechazada no se borra
+    (revisión 2026-11-12).
+
+    El corte deja fuera la venta y el retiro de la compra JUNTOS mientras
+    están ligados (`prestamo_empleada.libreta_venta_id`). Si se borrara la
+    venta, la FK pone esa liga en NULL y el retiro volvería a contar solo:
+    un sobrante falso. Se rechaza primero la compra (su retiro se quita y
+    ella la paga en caja) y luego ya se puede borrar. No se rechaza aquí en
+    automático porque eso cambia lo que ella paga: lo decide Daniel."""
+    if getattr(entry, "id", None) is None:
+        return
+    from pos_uniformes.database.models import PrestamoEmpleada
+    from pos_uniformes.services import prestamos_service as pr
+
+    compra = session.scalars(
+        select(PrestamoEmpleada).where(
+            PrestamoEmpleada.libreta_venta_id == entry.id,
+            PrestamoEmpleada.tipo == pr.TIPO_COMPRA,
+            PrestamoEmpleada.estado != pr.RECHAZADO,
+        ).limit(1)
+    ).first()
+    if compra is not None:
+        nombre = compra.employee_name or compra.employee_code
+        if str(compra.estado) == pr.PEDIDO:
+            que_hacer = "Para borrarla, primero recházala desde Préstamos: así se quita su retiro del cajón."
+        else:
+            que_hacer = "Ya está autorizada y se descuenta de su pago: la venta no se puede borrar."
+        raise OperacionACuenta(f"Esta venta es una compra a cuenta de {nombre} (#{compra.id}). {que_hacer}")
 
 
 def _borrar_operacion(session, entry: LibretaVenta, operacion_id: int) -> bool:
