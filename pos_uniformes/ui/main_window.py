@@ -154,6 +154,7 @@ from pos_uniformes.services.inventory_label_service import (
     load_inventory_label_context,
     render_inventory_label,
 )
+from pos_uniformes.services.inventario_busqueda_service import combinar_hits_meili
 from pos_uniformes.services.inventory_overview_service import load_inventory_overview_snapshot
 from pos_uniformes.services.inventory_snapshot_service import (
     invalidate_inventory_qr_exists_cache,
@@ -7895,10 +7896,18 @@ class MainWindow(QMainWindow):
                     hits = meilisearch_service.search(search_text, limit=500)
                     if hits:
                         hit_skus = {str(h.get("sku", "")) for h in hits}
-                        inventory_snapshot_rows = [
-                            r for r in inventory_snapshot_rows
-                            if str(r.get("sku", "")) in hit_skus
-                        ]
+                        local_terms = compile_search_terms(search_text)
+                        inventory_snapshot_rows = combinar_hits_meili(
+                            inventory_snapshot_rows,
+                            hit_skus,
+                            lambda row: row_matches_search(
+                                row,
+                                search_text=search_text,
+                                search_terms=local_terms,
+                                alias_map=INVENTORY_SEARCH_ALIAS_MAP,
+                                general_fields=INVENTORY_SEARCH_GENERAL_FIELDS,
+                            ),
+                        )
                         used_meili = True
             except Exception:
                 pass
