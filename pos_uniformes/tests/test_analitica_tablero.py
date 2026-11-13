@@ -106,6 +106,38 @@ class CifrasTests(unittest.TestCase):
         dias = tb.cobrado_por_dia(rows, HOY - timedelta(days=3), HOY)
         self.assertEqual([d.cobrado for d in dias], [Decimal("0.00"), Decimal("300.00"), Decimal("0.00"), Decimal("100.00")])
 
+    def test_la_diferencia_de_un_cambio_es_cobrado_pero_no_venta(self) -> None:
+        """Revisión 2026-11-12 («arregla el cobrado de Analítica»): como el
+        Resumen, el corte y el bot, lo que el cliente paga de más en un cambio
+        de prenda es dinero cobrado. No es venta, ni operación, ni piezas."""
+        c = tb.cifras([_op("venta", "300", piezas=2), _op("cambio", "120", piezas=1)])
+        self.assertEqual(c.efectivo, Decimal("420.00"))
+        self.assertEqual(c.cobrado, Decimal("420.00"))
+        self.assertEqual((c.operaciones, c.ventas, c.piezas), (1, 1, 2))
+        self.assertEqual(c.ticket_promedio, Decimal("300.00"))
+
+    def test_el_dinero_sale_de_los_cobrables_y_los_conteos_de_todo(self) -> None:
+        """La compra a cuenta de una empleada (quitada de `cobrables` con
+        `sin_compras_a_cuenta`) no es dinero del cajón, pero la prenda sí se
+        vendió: sigue en operaciones, ventas y piezas (decisión 2026-11-12)."""
+        normal = _op("venta", "300", piezas=1)
+        a_cuenta = _op("venta", "500", piezas=2)
+        a_cuenta.descuento_empleada = True
+        c = tb.cifras([normal, a_cuenta], cobrables=[normal])
+        self.assertEqual(c.cobrado, Decimal("300.00"))
+        self.assertEqual((c.operaciones, c.ventas, c.piezas), (2, 2, 3))
+        self.assertGreaterEqual(c.operaciones, c.ventas)
+
+    def test_cobrado_por_dia_con_la_misma_regla(self) -> None:
+        ayer = HOY - timedelta(days=1)
+        normal, a_cuenta = _op("venta", "300", dia=ayer), _op("venta", "500", dia=ayer, piezas=2)
+        rows = [normal, a_cuenta, _op("cambio", "50", dia=ayer, piezas=1), _op("apartado", "900", dia=HOY),
+                _op("abono", "100", dia=HOY, piezas=0)]
+        cobrables = [r for r in rows if r is not a_cuenta]
+        dias = tb.cobrado_por_dia(rows, ayer, HOY, cobrables=cobrables, ajustes={HOY: Decimal("-40")})
+        self.assertEqual([d.cobrado for d in dias], [Decimal("350.00"), Decimal("60.00")])
+        self.assertEqual([d.piezas for d in dias], [3, 1])   # el cambio no suma piezas; la compra a cuenta sí
+
 
 class PorAcabarseTests(unittest.TestCase):
     def test_lo_que_no_alcanza_primero_lo_agotado(self) -> None:
@@ -172,6 +204,98 @@ class CargarTests(_ConBase):
         self.s.commit()
         self.assertEqual(tb.cargar(self.s, tb.HOY, HOY, hoy=HOY).ahora.cobrado, Decimal("800.00"))
         self.assertEqual(tb.cargar(self.s, tb.HOY, HOY, real=True, hoy=HOY).ahora.cobrado, Decimal("1000.00"))
+
+
+class CobradoComoElResumenTests(_ConBase):
+    """Revisión 2026-11-12 («arregla el cobrado de Analítica»): el cobrado de
+    Analítica sigue la regla del Resumen, el corte y el bot."""
+
+    def _anotar(self, dia, tipo="venta", monto="300", *, hora=12, piezas=1, **extra) -> LibretaVenta:
+        row = LibretaVenta(
+            employee_code="VEND-4", employee_name="Fanny Ortiz", tipo=tipo, piezas=piezas,
+            monto_total=Decimal(monto), monto_neto=Decimal(extra.pop("neto", monto)),
+            detalle=[{"sku": "SKU10", "nombre": "Pants 2pz CBTIS 148", "talla": "10", "precio": monto,
+                      "cantidad": piezas, "subtotal": monto}] if piezas else [],
+            created_at=datetime.combine(dia, time(hora, 0)).astimezone(), **extra,
+        )
+        self.s.add(row)
+        self.s.commit()
+        return row
+
+    def _a_cuenta(self, venta: LibretaVenta) -> None:
+        from pos_uniformes.database.models import PrestamoEmpleada
+        from pos_uniformes.services import prestamos_service as pr
+
+        self.s.add(PrestamoEmpleada(
+            employee_code="VEND-4", employee_name="Fanny Ortiz", monto=venta.monto_total, motivo="Compra a cuenta",
+            estado=pr.APROBADO, tipo=pr.TIPO_COMPRA, libreta_venta_id=venta.id,
+        ))
+        self.s.commit()
+
+    def _corte_del_dueno(self, dia, diferencia: str) -> None:
+        self.s.add(LibretaCorte(
+            fecha=dia, creado_por="VEND-1", monto_final=Decimal("10000") + Decimal(diferencia),
+            monto_esperado=Decimal("10000"), reactivo_inicial=Decimal("9000"), reactivo_final=Decimal("9000"),
+            desde=datetime.combine(dia, time(9)).astimezone(),
+            hasta=datetime.combine(dia, time(17)).astimezone(), periodo_label="hoy",
+        ))
+        self.s.commit()
+
+    def _un_dia_completo(self, dia) -> None:
+        self._anotar(dia, "venta", "300", hora=10)
+        self._anotar(dia, "venta", "200", hora=11, pago_tarjeta=True, neto="191")
+        self._anotar(dia, "apartado", "900", hora=12, piezas=3)
+        self._anotar(dia, "abono", "150", hora=13, piezas=0)
+        self._anotar(dia, "cambio", "120", hora=14, piezas=1)
+        self._anotar(dia, "venta", "400", hora=15, privado=True)
+        self._a_cuenta(self._anotar(dia, "venta", "500", hora=16, piezas=2, descuento_empleada=True))
+        self._corte_del_dueno(dia, "-70")
+
+    def test_hoy_es_igual_al_hoy_del_resumen(self) -> None:
+        from pos_uniformes.services import resumen_pos_service as rp
+
+        self._un_dia_completo(HOY)
+        t = tb.cargar(self.s, tb.HOY, HOY, hoy=HOY)
+        r = rp.cargar(self.s, HOY, incluir_privados=True)
+        # 300 + 150 + 120 + 400 − 70 de efectivo, + 191 de tarjeta; sin el
+        # apartado ni la compra a cuenta.
+        self.assertEqual(t.ahora.cobrado, Decimal("1091.00"))
+        self.assertEqual(t.ahora.cobrado, r.hoy.cobrado)
+        self.assertEqual((t.ahora.efectivo, t.ahora.tarjeta_neto), (Decimal("900.00"), Decimal("191.00")))
+        # Con lo real (Ctrl+Shift+R) no lleva el ajuste del dueño.
+        self.assertEqual(tb.cargar(self.s, tb.HOY, HOY, real=True, hoy=HOY).ahora.cobrado, Decimal("1161.00"))
+
+    def test_los_conteos_no_cambian_de_significado(self) -> None:
+        self._un_dia_completo(HOY)
+        c = tb.cargar(self.s, tb.HOY, HOY, hoy=HOY).ahora
+        # Ventas: 300, 200, 400 y la compra a cuenta (500); el apartado es
+        # operación; ni el abono ni el cambio. Piezas: 1+1+3+1+2.
+        self.assertEqual((c.operaciones, c.ventas, c.piezas), (5, 4, 8))
+        self.assertEqual(c.ticket_promedio, Decimal("350.00"))
+
+    def test_el_periodo_anterior_y_la_grafica_con_la_misma_regla(self) -> None:
+        ayer = HOY - timedelta(days=1)
+        self._un_dia_completo(HOY)
+        self._un_dia_completo(ayer)
+        self._un_dia_completo(HOY - timedelta(days=7))      # la semana pasada (sábado)
+        t = tb.cargar(self.s, tb.SEMANA, HOY, hoy=HOY)
+        por_dia = {d.dia: d.cobrado for d in t.dias}
+        self.assertEqual(por_dia[HOY], Decimal("1091.00"))
+        self.assertEqual(por_dia[ayer], Decimal("1091.00"))
+        self.assertEqual(sum(por_dia.values()), t.ahora.cobrado)
+        self.assertEqual(t.antes.cobrado, Decimal("1091.00"))
+        real = tb.cargar(self.s, tb.SEMANA, HOY, real=True, hoy=HOY)
+        self.assertEqual({d.dia: d.cobrado for d in real.dias}[HOY], Decimal("1161.00"))
+
+    def test_ajustes_por_dia_suman_el_ajuste_del_periodo(self) -> None:
+        from pos_uniformes.services.corte_caja_service import ajustes_en_rango
+
+        self._corte_del_dueno(HOY, "-70")
+        self._corte_del_dueno(HOY - timedelta(days=2), "25")
+        ini, fin = tb.limites(HOY - timedelta(days=6), HOY)
+        dias = tb.ajustes_por_dia(self.s, ini, fin)
+        self.assertEqual(dias, {HOY: Decimal("-70.00"), HOY - timedelta(days=2): Decimal("25.00")})
+        self.assertEqual(sum(dias.values()), ajustes_en_rango(self.s, ini, fin))
 
 
 class PestanaTests(_ConBase):

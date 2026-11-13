@@ -7,9 +7,21 @@ que de verdad se vende está en la Libreta del kiosko; de ahí sale todo esto.
 
 Reglas de la casa que se respetan:
 - **Solo dinero real**: «Cobrado» = efectivo + lo que LLEGA por la terminal
-  (tras el 4.5%), de ventas y abonos. El valor de los apartados no se suma.
+  (tras el 4.5%). Es la MISMA regla del Resumen (`resumen_pos_service`), del
+  corte y del bot (revisión, 2026-11-12: «arregla el cobrado de Analítica»):
+  se suma con `corte_caja_service.resumir_periodo` sobre TODAS las filas del
+  periodo, así que entra el dinero de ventas, abonos y la diferencia que el
+  cliente paga en un cambio de prenda; el valor de los apartados no se suma
+  (`resumir_periodo` lo separa). Las compras a cuenta de las empleadas
+  (`corte_caja_service.sin_compras_a_cuenta`) se quitan del dinero: no
+  entraron al cajón. Vale igual para el periodo, el de comparación y la
+  gráfica de cobrado por día.
 - **La cifra oficial por defecto**: el cobrado lleva los ajustes del dueño en
-  sus cortes (`ajustes_en_rango`); lo real solo con Ctrl+Shift+R.
+  sus cortes (`ajustes_en_rango`; por día, `ajustes_por_dia`); lo real solo
+  con Ctrl+Shift+R.
+- **Los conteos no cambian** (operaciones, ventas, piezas, ticket promedio):
+  un cambio de prenda no es venta ni operación y no suma piezas, y la compra
+  a cuenta de una empleada SÍ sigue contando ahí (ver `cifras`).
 """
 
 from __future__ import annotations
@@ -106,7 +118,7 @@ def limites(desde: date, hasta: date) -> tuple[datetime, datetime]:
 
 @dataclass(frozen=True)
 class Cifras:
-    cobrado: Decimal = Decimal("0.00")      # efectivo + lo que llega por terminal (ventas y abonos)
+    cobrado: Decimal = Decimal("0.00")      # efectivo + lo que llega por terminal (ventas, abonos y cambios)
     efectivo: Decimal = Decimal("0.00")
     tarjeta_neto: Decimal = Decimal("0.00")
     operaciones: int = 0                    # ventas + apartados (el abono no es operación, Daniel 2026-11-12)
@@ -121,16 +133,32 @@ class Cifras:
         return (self.importe_ventas / self.ventas).quantize(_CENT)
 
 
-def cifras(rows: list, *, ajuste: Decimal = Decimal("0.00")) -> Cifras:
+def cifras(rows: list, *, ajuste: Decimal = Decimal("0.00"), cobrables: list | None = None) -> Cifras:
     """Las cuatro cifras de un periodo, a partir de sus operaciones (puro).
 
-    `ajuste`: lo que el dueño cambió en sus cortes del periodo (cifra oficial);
-    se aplica al efectivo, que es donde lo aplica él."""
+    **Dinero** (cobrado, efectivo, tarjeta_neto): la regla del Resumen, del
+    corte y del bot (revisión, 2026-11-12). `resumir_periodo` sobre TODAS las
+    filas de `cobrables` (las del periodo tras `sin_compras_a_cuenta`; si no
+    se dan, `rows`), de cualquier tipo: entra la diferencia cobrada en un
+    cambio de prenda, y el apartado no es dinero. `ajuste`: lo que el dueño
+    cambió en sus cortes del periodo (cifra oficial); se aplica al efectivo,
+    que es donde lo aplica él. Así, el cobrado de «Hoy» aquí es el de «Hoy»
+    en el Resumen (`resumen_pos_service`, con privados).
+
+    **Conteos** (operaciones, ventas, piezas, importe y ticket promedio):
+    sobre `rows`, sin cambiar de significado. Un cambio de prenda no es venta
+    ni operación y no suma piezas. La compra a cuenta de una empleada SÍ sigue
+    contando aquí (decisión, 2026-11-12): es una compra de empleada con precio
+    especial, que ya contaba (ver el comentario de `operaciones`); la prenda
+    sí salió de la tienda y está en los cortes por escuela/prenda de la misma
+    pestaña y en el ritmo de «se va a acabar». Lo único que no pasó es que su
+    dinero entrara al cajón, y eso es lo único que se le quita. Como sale de
+    los conteos en bloque o no sale, «operaciones >= ventas» se mantiene."""
     from pos_uniformes.services.corte_caja_service import resumir_periodo
     from pos_uniformes.services.libreta_service import TIPOS_OPERACION
 
+    r = resumir_periodo(list(rows if cobrables is None else cobrables))
     rows = [x for x in rows if str(getattr(x, "tipo", "")) in ("venta", "apartado", "abono")]
-    r = resumir_periodo(rows)
     efectivo = (r.efectivo + Decimal(ajuste or 0)).quantize(_CENT)
     ventas = [x for x in rows if str(getattr(x, "tipo", "")) == "venta"]
     importe = sum((Decimal(str(x.monto_total or 0)) for x in ventas), Decimal("0.00"))
@@ -172,22 +200,68 @@ class Dia:
     piezas: int
 
 
-def cobrado_por_dia(rows: list, desde: date, hasta: date) -> list[Dia]:
-    """Un renglón por día del periodo, aunque no haya habido nada (puro)."""
+def _dia_local(momento) -> date:
+    return (momento.astimezone() if momento.tzinfo else momento).date()
+
+
+def cobrado_por_dia(rows: list, desde: date, hasta: date, *, cobrables: list | None = None,
+                    ajustes: dict[date, Decimal] | None = None) -> list[Dia]:
+    """Un renglón por día del periodo, aunque no haya habido nada (puro).
+
+    El cobrado de cada día sigue la regla de `cifras` (revisión, 2026-11-12):
+    el dinero de `cobrables` (sin compras a cuenta; si no se dan, `rows`), con
+    la diferencia de los cambios y sin apartados, más el ajuste del dueño de
+    ese día (`ajustes`, de `ajustes_por_dia`; vacío en modo real). Las
+    piezas, de `rows`."""
     from pos_uniformes.services.corte_caja_service import resumir_periodo
 
     por_dia: dict[date, list] = defaultdict(list)
     for x in rows:
-        momento = x.created_at.astimezone() if x.created_at.tzinfo else x.created_at
-        por_dia[momento.date()].append(x)
+        por_dia[_dia_local(x.created_at)].append(x)
+    dinero_por_dia: dict[date, list] = defaultdict(list)
+    for x in (rows if cobrables is None else cobrables):
+        dinero_por_dia[_dia_local(x.created_at)].append(x)
+    ajustes = ajustes or {}
     salida = []
     d = desde
     while d <= hasta:
-        r = resumir_periodo(por_dia.get(d, []))
+        r = resumir_periodo(dinero_por_dia.get(d, []))
         piezas = sum(int(x.piezas or 0) for x in por_dia.get(d, []) if str(x.tipo) in ("venta", "apartado"))
-        salida.append(Dia(d, (r.efectivo + r.tarjeta_neto).quantize(_CENT), piezas))
+        cobrado = r.efectivo + Decimal(ajustes.get(d) or 0) + r.tarjeta_neto
+        salida.append(Dia(d, cobrado.quantize(_CENT), piezas))
         d += timedelta(days=1)
     return salida
+
+
+def ajustes_por_dia(session, desde, hasta) -> dict[date, Decimal]:
+    """Los ajustes del dueño en sus cortes, por el día (local) en que cerró
+    cada corte. Mismas reglas que `corte_caja_service.ajustes_en_rango`: la
+    suma de los días es el ajuste del periodo. Una sola consulta."""
+    from sqlalchemy import select
+    from sqlalchemy.exc import ProgrammingError
+
+    from pos_uniformes.database.models import LibretaCorte
+    from pos_uniformes.services.corte_caja_service import DUENO_CODE
+
+    stmt = select(LibretaCorte.hasta, LibretaCorte.monto_final - LibretaCorte.monto_esperado).where(
+        LibretaCorte.creado_por == DUENO_CODE,
+        LibretaCorte.hasta.is_not(None),
+        LibretaCorte.monto_esperado > 0,
+    )
+    if desde is not None:
+        stmt = stmt.where(LibretaCorte.hasta >= desde)
+    if hasta is not None:
+        stmt = stmt.where(LibretaCorte.hasta <= hasta)
+    try:
+        filas = session.execute(stmt).all()
+    except ProgrammingError:
+        # Como ajustes_en_rango: solo una base sin las columnas vale cero.
+        session.rollback()
+        return {}
+    salida: dict[date, Decimal] = defaultdict(lambda: Decimal("0.00"))
+    for momento, dif in filas:
+        salida[_dia_local(momento)] += Decimal(str(dif or 0))
+    return {d: v.quantize(_CENT) for d, v in salida.items()}
 
 
 # ─── Se va a acabar ─────────────────────────────────────────────────────────
@@ -286,7 +360,7 @@ class Tablero:
 def cargar(session, clave: str, ancla: date, *, manual: tuple[date, date] | None = None,
            real: bool = False, hoy: date | None = None, ahora: datetime | None = None) -> Tablero:
     from pos_uniformes.services.analitica_libreta_service import filas_de_periodo
-    from pos_uniformes.services.corte_caja_service import ajustes_en_rango
+    from pos_uniformes.services.corte_caja_service import ajustes_en_rango, sin_compras_a_cuenta
     from pos_uniformes.services.libreta_service import listar_operaciones
 
     hoy = hoy or date.today()
@@ -311,6 +385,13 @@ def cargar(session, clave: str, ancla: date, *, manual: tuple[date, date] | None
     rows_antes = listar_operaciones(session, desde=a_ini, hasta=a_fin, employee_code=None)
     ajuste = Decimal("0.00") if real else ajustes_en_rango(session, ini, fin)
     ajuste_antes = Decimal("0.00") if real else ajustes_en_rango(session, a_ini, a_fin)
+    # El dinero, como el Resumen, el corte y el bot: sin las compras a cuenta
+    # de las empleadas, que no entraron al cajón (revisión, 2026-11-12). Los
+    # conteos siguen sobre todas las filas (ver `cifras`).
+    cobrables = sin_compras_a_cuenta(session, rows)
+    cobrables_antes = sin_compras_a_cuenta(session, rows_antes)
+    con_dias = (hasta - desde).days >= 1
+    ajustes_dia = {} if real or not con_dias else ajustes_por_dia(session, ini, fin)
     try:
         acabarse = tuple(cargar_por_acabarse(session, hoy=hoy))
     except Exception:  # noqa: BLE001 — sin esto, lo demás se ve igual
@@ -325,8 +406,9 @@ def cargar(session, clave: str, ancla: date, *, manual: tuple[date, date] | None
         afl = None
     return Tablero(
         clave=clave, desde=desde, hasta=hasta,
-        ahora=cifras(rows, ajuste=ajuste), antes=cifras(rows_antes, ajuste=ajuste_antes),
-        dias=tuple(cobrado_por_dia(rows, desde, hasta)) if (hasta - desde).days >= 1 else (),
+        ahora=cifras(rows, ajuste=ajuste, cobrables=cobrables),
+        antes=cifras(rows_antes, ajuste=ajuste_antes, cobrables=cobrables_antes),
+        dias=tuple(cobrado_por_dia(rows, desde, hasta, cobrables=cobrables, ajustes=ajustes_dia)) if con_dias else (),
         filas=tuple(filas_de_periodo(session, ini, fin)),
         acabarse=acabarse, afluencia=afl, real=real, ajuste=ajuste, a_medias=a_medias, hoy=hoy,
         hasta_la_hora=hasta_la_hora,
