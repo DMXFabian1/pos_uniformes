@@ -56,6 +56,7 @@ from pos_uniformes.services import conjunto_service, hermanos_service, uniforme_
 from pos_uniformes.services import precio_sugerido_service as precios
 from pos_uniformes.services.catalog_service import _MEILI_PENDIENTE, CatalogService
 from pos_uniformes.services.inventario_service import InventarioService
+from pos_uniformes.services.talla_orden_service import clave_talla
 
 ORIGEN_POS = "Alta desde POS"
 ORIGEN_CLAUDE = "Claude (skill alta-productos)"
@@ -96,6 +97,8 @@ class TallaPlan:
     #: Frena («Falta el precio.», «El precio no puede quedar en $0.»).
     error: str = ""
     sku: str = ""  # previsto (el real sale del ensayo)
+    #: «la tienen 3 de 14» (cuántas hermanas tienen esta talla).
+    texto_cobertura: str = ""
 
 
 @dataclass
@@ -114,6 +117,10 @@ class PlanPrenda:
     descripcion: str | None = None
     color: str = SIN_COLOR
     tallas: list[TallaPlan] = field(default_factory=list)
+    #: Tallas que tienen las hermanas pero no el modelo (o que se quitaron),
+    #: desmarcadas, con su precio sugerido y «la tienen 3 de 14». Se pasan a
+    #: `tallas` con `marcar_talla`.
+    tallas_posibles: list[TallaPlan] = field(default_factory=list)
     ligar: bool = True
     grupo: str | None = None
     orden: int | None = None
@@ -121,6 +128,10 @@ class PlanPrenda:
     modelo_id: int | None = None
     modelo_nombre: str | None = None
     modelo_texto: str = ""
+    #: Otros moldes para «Copiado de: ▾» (se elige con `modelo_id`).
+    alternativas: tuple[hermanos_service.Modelo, ...] = ()
+    #: Cuántos SKU reservan los planes anteriores del mismo lote.
+    saltar_skus: int = 0
     #: Valores nuevos que el usuario confirmó crear («Es otro, crearlo»).
     confirmados: tuple[str, ...] = ()
     #: Origen propio para la bitácora (gana sobre el de `aplicar`).
@@ -359,6 +370,14 @@ def _revisar_precios(plan: PlanPrenda, usos: _Usos) -> None:
     pieza_id = _id_de(usos.session, TipoPieza, plan.tipo_pieza)
     nivel_id = _id_de(usos.session, NivelEducativo, plan.nivel)
     conteos = usos.precios(pieza_id, nivel_id, plan.escuela_id)
+    for t in plan.tallas_posibles:  # desmarcadas: solo su precio y aviso
+        t.precio = precios.dinero(t.precio)
+        contador = conteos.get(t.talla)
+        t.moda = precios.moda(contador) if contador else None
+        t.prendas_con_moda = int(contador.get(t.moda, 0)) if contador and t.moda is not None else 0
+        t.origen_precio = precios.origen_de(t.precio, t.moda, t.precio_modelo, t.origen_precio)
+        t.sugerencia_5_9 = precios._sugerencia(t.precio, t.moda)
+        t.aviso, t.error, t.sku = "", "", ""
     for t in plan.tallas:
         t.precio = precios.dinero(t.precio)
         contador = conteos.get(t.talla)
@@ -464,10 +483,16 @@ def _conjuntos_de_la_escuela(session: Session, escuela_id: int) -> list[Producto
     )
 
 
-def completar(session: Session, plan: PlanPrenda, *, saltar_skus: int = 0, usos: _Usos | None = None) -> PlanPrenda:
+def completar(
+    session: Session, plan: PlanPrenda, *, saltar_skus: int | None = None, usos: _Usos | None = None
+) -> PlanPrenda:
     """Revisa el plan y le pone nombre, SKU previstos, uniforme, receta,
-    avisos y errores. No escribe nada. `saltar_skus`: cuántos SKU ya se
-    reservaron los planes anteriores del mismo lote."""
+    avisos y errores. No escribe nada; se puede volver a llamar después de
+    editar el plan. `saltar_skus`: cuántos SKU ya se reservaron los planes
+    anteriores del mismo lote (se guarda en el plan)."""
+    if saltar_skus is not None:
+        plan.saltar_skus = int(saltar_skus)
+    saltar_skus = plan.saltar_skus
     usos = usos or _Usos(session)
     plan.avisos, plan.errores = list(plan.avisos_fijos), list(plan.errores_fijos)
     _revisar_valores(plan, usos)
@@ -596,6 +621,46 @@ def planear(
     return completar(session, plan, saltar_skus=saltar_skus, usos=usos)
 
 
+def _talla_sugerida(s, m, hermanas, llegan: Mapping, costos: Mapping) -> TallaPlan:
+    cobertura = hermanas.cobertura(s.talla)
+    return TallaPlan(
+        talla=s.talla, precio=s.precio, origen_precio=s.origen,
+        llegan=int(llegan.get(s.talla, 0)), costo=costos.get(s.talla),
+        precio_modelo=(m.precios.get(s.talla) if m else None),
+        texto_cobertura=cobertura.texto if cobertura else "",
+    )
+
+
+def _ordenar(tallas: list[TallaPlan]) -> None:
+    tallas.sort(key=lambda t: clave_talla(t.talla))
+
+
+def marcar_talla(session: Session, plan: PlanPrenda, talla: str, *, usos: _Usos | None = None) -> PlanPrenda:
+    """Pasa una talla de `tallas_posibles` a `tallas` (la fila gris «EXG $305,
+    la tienen 1 de 4» que se marca) y vuelve a completar el plan."""
+    clave = valores.normalizar(valores.forma_oficial_talla(talla))
+    t = next((t for t in plan.tallas_posibles if valores.normalizar(t.talla) == clave), None)
+    if t is None:
+        raise ValueError(f"La talla «{talla}» no está entre las que se pueden agregar.")
+    plan.tallas_posibles.remove(t)
+    plan.tallas.append(t)
+    _ordenar(plan.tallas)
+    return completar(session, plan, usos=usos)
+
+
+def desmarcar_talla(session: Session, plan: PlanPrenda, talla: str, *, usos: _Usos | None = None) -> PlanPrenda:
+    """Lo contrario de `marcar_talla`: la talla queda gris, con su precio."""
+    clave = valores.normalizar(valores.forma_oficial_talla(talla))
+    t = next((t for t in plan.tallas if valores.normalizar(t.talla) == clave), None)
+    if t is None:
+        raise ValueError(f"La talla «{talla}» no está marcada.")
+    plan.tallas.remove(t)
+    t.llegan = 0
+    plan.tallas_posibles.append(t)
+    _ordenar(plan.tallas_posibles)
+    return completar(session, plan, usos=usos)
+
+
 def planear_desde_modelo(
     session: Session,
     escuela: str | int,
@@ -649,13 +714,20 @@ def planear_desde_modelo(
     fuera = {valores.normalizar(valores.forma_oficial_talla(t)) for t in quitar_tallas}
     lista = [t for t in lista if valores.normalizar(t) not in fuera]
 
+    marcadas = {valores.normalizar(t) for t in lista}
+    posibles = [t.talla for t in hermanas.tallas if valores.normalizar(t.talla) not in marcadas]
+    posibles += [t.talla for t in (m.tallas if m else ()) if valores.normalizar(t.talla) not in marcadas
+                 and t.talla not in posibles]
+    posibles.sort(key=clave_talla)
+
     pieza_id = _id_de(session, TipoPieza, hermanas.tipo_pieza or tipo_pieza)
     nivel_id = _id_de(session, NivelEducativo, nivel)
-    sugeridos = precios.sugerir(
-        session, pieza_id, nivel_id, lista,
+    todas = precios.sugerir(
+        session, pieza_id, nivel_id, lista + posibles,
         modelo=m.precios if m else None, a_mano=precios_a_mano, preferir=preferir,
         excluir_escuela_id=escuela_id,
     )
+    sugeridos, sugeridos_posibles = todas[: len(lista)], todas[len(lista):]
     llegan = {valores.forma_oficial_talla(k): int(v or 0) for k, v in (llegan or {}).items()}
     costos = {valores.forma_oficial_talla(k): precios.dinero(v) for k, v in (costos or {}).items()}
     color_final = valores.limpiar(color) or (m.color if m else SIN_COLOR)
@@ -678,12 +750,9 @@ def planear_desde_modelo(
         escudo=m.escudo if m else None,
         ubicacion=m.ubicacion if m else None,
         color=color_final,
-        tallas=[
-            TallaPlan(talla=s.talla, precio=s.precio, origen_precio=s.origen,
-                      llegan=llegan.get(s.talla, 0), costo=costos.get(s.talla),
-                      precio_modelo=(m.precios.get(s.talla) if m else None))
-            for s in sugeridos
-        ],
+        tallas=[_talla_sugerida(s, m, hermanas, llegan, costos) for s in sugeridos],
+        tallas_posibles=[_talla_sugerida(s, m, hermanas, {}, {}) for s in sugeridos_posibles],
+        alternativas=hermanas.alternativas,
         grupo=m.grupo_uniforme if m else None,
         modelo_id=m.producto_id if m else None,
         modelo_nombre=m.nombre if m else None,
@@ -961,6 +1030,8 @@ __all__ = [
     "aplicar",
     "cambiar_color_en_nombre",
     "completar",
+    "desmarcar_talla",
+    "marcar_talla",
     "ensayar",
     "origen_bitacora",
     "origen_copia_escuela",

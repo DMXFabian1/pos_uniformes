@@ -128,6 +128,34 @@ class PlanTests(_Base):
         alta.completar(self.s, plan)
         self.assertTrue(plan.avisos[0].startswith("No hay otra Mochila"))
 
+    def test_agregar_exg_que_tienen_algunas_hermanas(self) -> None:
+        plan = self.pants_suelto_jaral(color="Gris")
+        # La fila gris: EXG con su precio y cuántas hermanas la tienen.
+        self.assertEqual([t.talla for t in plan.tallas_posibles], ["EXG"])
+        exg = plan.tallas_posibles[0]
+        self.assertEqual((exg.precio, exg.origen_precio, exg.texto_cobertura), (D(305), "como las demás", "la tienen 1 de 4"))
+        self.assertEqual(exg.sku, "")
+        self.assertEqual(plan.tallas[0].texto_cobertura, "la tienen 4 de 4")
+        # «Copiado de: ▾»: el otro molde (el de Benito Juárez, con EXG).
+        self.assertEqual([m.escuela for m in plan.alternativas], ["Benito Juárez"])
+        n = self.ultimo_sku()
+        alta.marcar_talla(self.s, plan, "exg")
+        self.assertEqual([t.talla for t in plan.tallas][-2:], ["GD", "EXG"])
+        self.assertEqual(plan.tallas_posibles, [])
+        self.assertEqual(plan.skus_previstos, [f"SKU{i:06d}" for i in range(n + 1, n + 12)])
+        alta.desmarcar_talla(self.s, plan, "4")
+        self.assertEqual([t.talla for t in plan.tallas_posibles], ["4"])
+        self.assertEqual(plan.tallas_posibles[0].precio, D(245))
+        r = alta.aplicar(self.s, plan, self.admin, commit=True)
+        self.assertEqual(sorted(t.talla for t in r.productos[0].tallas),
+                         sorted([t for t in ESCALERAS["Pants Suelto"] if t != "4"] + ["EXG"]))
+        with self.assertRaises(ValueError):
+            alta.marcar_talla(self.s, plan, "XXG")
+
+    def test_las_tallas_quitadas_quedan_como_posibles(self) -> None:
+        plan = self.pants_suelto_jaral(quitar_tallas=["4"])
+        self.assertEqual([t.talla for t in plan.tallas_posibles], ["4", "EXG"])
+
     def test_precio_en_cero_frena(self) -> None:
         plan = self.pants_suelto_jaral(precios_a_mano={"4": 0})
         self.assertIn("Talla 4: el precio no puede quedar en $0.", plan.todos_los_errores)

@@ -115,6 +115,19 @@ class Modelo:
 
 
 @dataclass(frozen=True)
+class TallaEnHermanas:
+    """Una talla y cuántas de las hermanas la tienen («la tienen 3 de 14»)."""
+
+    talla: str
+    prendas: int
+    total: int
+
+    @property
+    def texto(self) -> str:
+        return f"la tienen {self.prendas} de {self.total}"
+
+
+@dataclass(frozen=True)
 class Hermanas:
     tipo_pieza: str
     nivel: str | None
@@ -124,6 +137,12 @@ class Hermanas:
     total: int = 0
     #: No había en el nivel pedido y se buscó en todos.
     relajado: bool = False
+    #: Todas las tallas que tienen las hermanas, en orden, con cuántas la tienen.
+    tallas: tuple[TallaEnHermanas, ...] = ()
+
+    def cobertura(self, talla: str) -> TallaEnHermanas | None:
+        clave = normalizar(forma_oficial_talla(talla))
+        return next((t for t in self.tallas if normalizar(t.talla) == clave), None)
 
     @property
     def texto(self) -> str:
@@ -384,12 +403,22 @@ def buscar_modelo(
             elegido = _modelo_de(mid, productos[mid], iguales, ligas)
     alternativas = tuple(m for m in moldes if elegido is None or m.producto_id != elegido.producto_id)
     return Hermanas(
+        tallas=_tallas_en_hermanas(productos),
         tipo_pieza=nombre_pieza,
         nivel=nombre_nivel,
         modelo=elegido,
         alternativas=alternativas[:MAX_ALTERNATIVAS],
         total=len(productos),
         relajado=relajado,
+    )
+
+
+def _tallas_en_hermanas(productos: dict[int, dict]) -> tuple[TallaEnHermanas, ...]:
+    """Puro: cada talla de las hermanas y en cuántas está."""
+    cuenta = Counter(t for p in productos.values() for t in p["precios"])
+    total = len(productos)
+    return tuple(
+        TallaEnHermanas(t, n, total) for t, n in sorted(cuenta.items(), key=lambda tn: clave_talla(tn[0]))
     )
 
 
