@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterable
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
 
@@ -40,20 +40,24 @@ def build_active_filter_tokens(
     search_text: str,
     multi_filters: Iterable[tuple[str, list[str]]],
     combo_filters: Iterable[tuple[str, object, str]],
+    titles: Mapping[str, str] | None = None,
 ) -> list[ActiveFilterToken]:
+    """Fichas de filtros activos. `titles` cambia el nombre que se ve de cada
+    llave (p. ej. «stock» → «Hay»); sin él, la llave con mayúscula."""
+    titles = titles or {}
     active_tokens: list[ActiveFilterToken] = []
     normalized_search = search_text.strip()
     if normalized_search:
         active_tokens.append(
             ActiveFilterToken(
                 key="texto",
-                display_text=f'Texto: "{normalized_search}"',
+                display_text=f'{titles.get("texto", "Texto")}: "{normalized_search}"',
                 value=normalized_search,
             )
         )
 
     for label, selected_labels in multi_filters:
-        title = label.capitalize()
+        title = titles.get(label, label.capitalize())
         for selected_label in selected_labels:
             cleaned = str(selected_label).strip()
             if cleaned:
@@ -71,7 +75,7 @@ def build_active_filter_tokens(
             active_tokens.append(
                 ActiveFilterToken(
                     key=label,
-                    display_text=f"{label.capitalize()}: {cleaned}",
+                    display_text=f"{titles.get(label, label.capitalize())}: {cleaned}",
                     value=cleaned,
                 )
             )
@@ -87,3 +91,14 @@ def build_active_filters_summary(active_filters: list[str]) -> str:
 
 def build_filters_label(active_filters: list[str]) -> str:
     return ", ".join(active_filters) if active_filters else "sin filtros"
+
+
+#: Nombres de las fichas de filtro en Inventario, en palabras de la tienda.
+TITULOS_FILTROS_INVENTARIO = {
+    "texto": "Busca",
+    "pieza": "Prenda",
+    "stock": "Hay",
+    "uso": "Ropa",
+    "conteo": "Contada",
+    "precio_exacto": "Precio exacto",
+}

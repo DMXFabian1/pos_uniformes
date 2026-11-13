@@ -75,3 +75,19 @@ class ActiveFilterServiceTests(unittest.TestCase):
                 ("uso", "Uso: Uniforme escolar", "Uniforme escolar"),
             ],
         )
+
+    def test_fichas_de_inventario_en_palabras_de_la_tienda(self) -> None:
+        from pos_uniformes.services.active_filter_service import TITULOS_FILTROS_INVENTARIO
+
+        tokens = build_active_filter_tokens(
+            search_text="pants",
+            multi_filters=(("pieza", ["Pants 2pz"]),),
+            combo_filters=(("stock", "negative", "En negativo"), ("estado", "inactive", "Desactivadas")),
+            titles=TITULOS_FILTROS_INVENTARIO,
+        )
+        self.assertEqual(
+            [t.display_text for t in tokens],
+            ['Busca: "pants"', "Prenda: Pants 2pz", "Hay: En negativo", "Estado: Desactivadas"],
+        )
+        # La llave no cambia: quitar la ficha sigue funcionando igual.
+        self.assertEqual([t.key for t in tokens], ["texto", "pieza", "stock", "estado"])
