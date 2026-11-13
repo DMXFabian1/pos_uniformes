@@ -31,6 +31,7 @@ from PyQt6.QtWidgets import (
 )
 
 from pos_uniformes.services.corte_caja_service import EstadoCaja, diferencia
+from pos_uniformes.services.libreta_service import texto_operaciones
 from pos_uniformes.services.nomina_service import OWNER_CODE
 from pos_uniformes.services.nombres_empleadas_service import mostrar as _nombre_de
 from pos_uniformes.services.nombres_empleadas_service import nombres_por_codigo
@@ -393,7 +394,10 @@ def contado_desde_venta(estado: EstadoCaja, venta: Decimal, otros_retiros: Decim
 
 
 def contar_tarjeta(rows: list) -> int:
-    """Cuántas operaciones (venta/abono) fueron con tarjeta = vouchers a cuadrar."""
+    """Cuántos cobros (venta/abono) fueron con tarjeta = vouchers a cuadrar.
+
+    Son cobros, no operaciones: un abono con tarjeta deja voucher aunque no
+    sea operación (Daniel, 2026-11-12), así que puede salir mayor."""
     return sum(1 for r in rows or [] if getattr(r, "pago_tarjeta", False) and str(getattr(r, "tipo", "")) in ("venta", "abono"))
 
 
@@ -427,7 +431,7 @@ def texto_estado_caja(estado: EstadoCaja) -> str:
     partes = [
         f"Periodo: {_periodo(estado)}",
         f"Fondo (reactivo) con que abrió: ${estado.reactivo:,.2f}",
-        f"VENTA EN EFECTIVO: ${r.efectivo:,.2f}   ({r.operaciones} operaciones)",
+        f"VENTA EN EFECTIVO: ${r.efectivo:,.2f}   ({texto_operaciones(r.operaciones, getattr(r, 'num_abonos', 0))})",
     ]
     if r.tarjeta:
         partes.append(f"Con tarjeta llega ${r.tarjeta_neto:,.2f} (cobrado ${r.tarjeta:,.2f}; no está en el cajón)")
@@ -447,7 +451,7 @@ def texto_estado_caja_sin_totales(estado: EstadoCaja) -> str:
     partes = [
         f"Periodo: {_periodo(estado)}",
         f"Fondo (reactivo) con que abrió: ${estado.reactivo:,.2f}",
-        f"VENTA EN EFECTIVO: ${r.efectivo:,.2f}   ({r.operaciones} operaciones)",
+        f"VENTA EN EFECTIVO: ${r.efectivo:,.2f}   ({texto_operaciones(r.operaciones, getattr(r, 'num_abonos', 0))})",
     ]
     if r.tarjeta:
         partes.append(f"Con tarjeta llega ${r.tarjeta_neto:,.2f} (cobrado ${r.tarjeta:,.2f}; no está en el cajón)")

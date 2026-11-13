@@ -58,6 +58,11 @@ class ResumenPeriodo:
     #: operación (2026-11-12). La compra de empleada con precio especial ya
     #: no suma a `operaciones`, pero sí es movimiento: su dinero entró.
     movimientos: int = 0
+    #: Cuántos abonos hubo (2026-11-12). No son operación (Daniel: «no
+    #: cuentan como operación»), pero su efectivo sí va en `efectivo`: los
+    #: textos del corte los nombran aparte para que «$X (N operaciones)» no
+    #: parezca que el dinero de los abonos salió de la nada.
+    num_abonos: int = 0
 
     @property
     def hubo_movimiento(self) -> bool:
@@ -106,7 +111,7 @@ def resumir_periodo(rows: list) -> ResumenPeriodo:
     quitadas por `sin_compras_a_cuenta`.)"""
     from pos_uniformes.services.libreta_service import cuenta_como_operacion, pagos_de
 
-    operaciones = piezas = movimientos = 0
+    operaciones = piezas = movimientos = num_abonos = 0
     ventas = abonos = apartados = tarjeta = efectivo = tarjeta_neto = monedero = Decimal("0.00")
     for row in rows:
         movimientos += 1
@@ -120,6 +125,7 @@ def resumir_periodo(rows: list) -> ResumenPeriodo:
             continue
         if tipo == "abono":
             abonos += monto
+            num_abonos += 1
         else:
             ventas += monto
         pagos = pagos_de(row)
@@ -139,6 +145,7 @@ def resumir_periodo(rows: list) -> ResumenPeriodo:
         tarjeta_neto=tarjeta_neto.quantize(_CENT),
         monedero=monedero.quantize(_CENT),
         movimientos=movimientos,
+        num_abonos=num_abonos,
     )
 
 

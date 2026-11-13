@@ -23,6 +23,7 @@ class ResultadoCorte:
 def texto_estado_actual(session, ahora: datetime | None = None) -> str:
     """Qué hay en caja ahora mismo (para /estado)."""
     from pos_uniformes.services.corte_caja_service import estado_caja, pagos_que_tocan_hoy
+    from pos_uniformes.services.libreta_service import texto_operaciones
 
     ahora = ahora or datetime.now().astimezone()
     e = estado_caja(session, ahora)
@@ -30,7 +31,7 @@ def texto_estado_actual(session, ahora: datetime | None = None) -> str:
     desde = f"desde {e.desde.astimezone():%d/%m %H:%M}" if e.desde else "sin corte previo"
     lineas = [
         f"💰 Caja ahora ({ahora:%d/%m %H:%M}, {desde})",
-        f"• Venta efectivo: ${e.resumen.efectivo:,.2f} ({e.resumen.operaciones} ops)",
+        f"• Venta efectivo: ${e.resumen.efectivo:,.2f} ({texto_operaciones(e.resumen.operaciones, getattr(e.resumen, 'num_abonos', 0), corto=True)})",
     ]
     if e.resumen.tarjeta:
         lineas.append(f"• Tarjeta: ${e.resumen.tarjeta:,.2f}")
@@ -85,6 +86,7 @@ def texto_propuesta_corte(session, ahora: datetime | None = None) -> str:
     """Lo que llega al celular a la hora del corte: qué hay y qué pasaría si
     lo haces. Nada se guarda ni se imprime hasta que Daniel conteste."""
     from pos_uniformes.services.corte_caja_service import estado_caja, pagos_que_tocan_hoy
+    from pos_uniformes.services.libreta_service import texto_operaciones
 
     ahora = ahora or datetime.now().astimezone()
     e = estado_caja(session, ahora)
@@ -92,7 +94,7 @@ def texto_propuesta_corte(session, ahora: datetime | None = None) -> str:
     de_la_venta = _de_la_venta(e, avisos)
     lineas = [
         f"🧾 ¿Hacemos el corte? ({ahora:%d/%m %H:%M})",
-        f"• Venta en efectivo: ${e.resumen.efectivo:,.2f} ({e.resumen.operaciones} ops)",
+        f"• Venta en efectivo: ${e.resumen.efectivo:,.2f} ({texto_operaciones(e.resumen.operaciones, getattr(e.resumen, 'num_abonos', 0), corto=True)})",
     ]
     if e.resumen.tarjeta:
         lineas.append(f"• Con tarjeta: ${e.resumen.tarjeta:,.2f} (no entra al cajón)")

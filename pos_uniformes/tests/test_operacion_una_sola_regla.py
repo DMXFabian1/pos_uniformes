@@ -173,6 +173,21 @@ class AgregadoresTests(unittest.TestCase):
         self.assertEqual(r.efectivo, Decimal("1600.00"))    # ventas + abonos en efectivo
 
 
+class TextosTests(unittest.TestCase):
+    def test_texto_operaciones(self) -> None:
+        self.assertEqual(ls.texto_operaciones(3), "3 operaciones")
+        self.assertEqual(ls.texto_operaciones(1), "1 operación")
+        self.assertEqual(ls.texto_operaciones(3, 2), "3 operaciones + 2 abonos")
+        self.assertEqual(ls.texto_operaciones(3, 0, corto=True), "3 ops")
+        self.assertEqual(ls.texto_operaciones(0, 1, corto=True), "0 ops + 1 abono")
+
+    def test_mensaje_de_la_empleada(self) -> None:
+        self.assertEqual(ls.mensaje_libreta_empleada(ls.totales_libreta([]), "hoy"),
+                         "Aún no tienes movimientos hoy. ¡Tú puedes! 💪")
+        t = ls.totales_libreta([_fila(1, "venta", 3, "900")])
+        self.assertEqual(ls.mensaje_libreta_empleada(t, "hoy"), "Llevas 3 pieza(s) y 3 comision(es) hoy. ¡Bien! ✨")
+
+
 class GafeteYSqlTests(unittest.TestCase):
     """La versión SQL (`predicado_operacion`) dice lo mismo que la de Python."""
 
@@ -345,6 +360,27 @@ class SoloAbonosTests(unittest.TestCase):
         hoy = rd.texto_hoy(d, ahora=datetime.combine(HOY, time(12, 0)))
         self.assertNotIn("ninguna venta", hoy.lower())
         self.assertIn("Entró: $300.00", hoy)
+
+    def test_textos_del_corte_nombran_los_abonos(self) -> None:
+        """Revisión 2026-11-12: «Venta efectivo: $300.00 (0 ops)» confundía;
+        el efectivo de los abonos se explica con «+ N abonos»."""
+        from pos_uniformes.services import corte_remoto_service as crs
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import texto_estado_caja
+
+        estado = cc.estado_caja(self.s, self.ahora)
+        self.assertEqual(estado.resumen.num_abonos, 1)
+        self.assertIn("VENTA EN EFECTIVO: $300.00   (0 operaciones + 1 abono)", texto_estado_caja(estado))
+        with patch("pos_uniformes.services.corte_caja_service.estado_caja", return_value=estado), patch(
+            "pos_uniformes.services.corte_caja_service.pagos_que_tocan_hoy", return_value=[]
+        ):
+            self.assertIn("Venta efectivo: $300.00 (0 ops + 1 abono)", crs.texto_estado_actual(self.s, self.ahora))
+            self.assertIn("Venta en efectivo: $300.00 (0 ops + 1 abono)", crs.texto_propuesta_corte(self.s, self.ahora))
+
+    def test_libreta_de_la_empleada_con_solo_abonos(self) -> None:
+        t = ls.totales_libreta([tabla()[3]])
+        self.assertEqual((t.operaciones, t.abonos), (0, 1))
+        self.assertEqual(ls.mensaje_libreta_empleada(t, "hoy"), "Llevas 1 abono(s) cobrado(s) hoy. ¡Tú puedes! 💪")
+        self.assertEqual(ls.texto_operaciones(t.operaciones, t.abonos), "0 operaciones + 1 abono")
 
     def test_gafete_no_cuenta_el_abono(self) -> None:
         self.assertTrue(gh.resumen_de_hoy(self.s, hoy=HOY).vacio)

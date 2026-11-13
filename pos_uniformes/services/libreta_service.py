@@ -222,6 +222,39 @@ class TotalesLibreta:
     #: Las filas con las que se calcula el DINERO (cajón, tarjeta, abonos):
     #: todas menos las compras a cuenta de las empleadas, que no entraron.
     filas_dinero: list
+    #: Cuántos abonos hubo (2026-11-12): no son operación, pero sí son
+    #: movimiento (ver `mensaje_libreta_empleada` y `texto_operaciones`).
+    abonos: int = 0
+
+
+def texto_operaciones(operaciones: int, abonos: int = 0, *, corto: bool = False) -> str:
+    """«3 operaciones», o «3 operaciones + 2 abonos» si hubo abonos.
+
+    Desde que un abono no es operación (Daniel, 2026-11-12: «no cuentan como
+    operación»), «Venta en efectivo: $300 (0 operaciones)» confundía: el
+    efectivo trae el de los abonos. Los abonos se nombran aparte.
+    `corto=True` dice «ops» (Telegram)."""
+    operaciones, abonos = int(operaciones or 0), int(abonos or 0)
+    if corto:
+        texto = f"{operaciones} ops"
+    else:
+        texto = f"{operaciones} operación" if operaciones == 1 else f"{operaciones} operaciones"
+    if abonos:
+        texto += f" + {abonos} abono" + ("" if abonos == 1 else "s")
+    return texto
+
+
+def mensaje_libreta_empleada(totales: "TotalesLibreta", periodo: str) -> str:
+    """El renglón de ánimo de la Libreta de la empleada en el kiosko.
+
+    Antes miraba solo las operaciones: con la regla del abono (2026-11-12),
+    la que solo cobró abonos leía «Aún no tienes movimientos», y sí los
+    tiene. Ahora el vacío es sin operaciones Y sin abonos."""
+    if totales.operaciones:
+        return f"Llevas {totales.piezas} pieza(s) y {totales.comisiones} comision(es) {periodo}. ¡Bien! ✨"
+    if totales.abonos:
+        return f"Llevas {totales.abonos} abono(s) cobrado(s) {periodo}. ¡Tú puedes! 💪"
+    return f"Aún no tienes movimientos {periodo}. ¡Tú puedes! 💪"
 
 
 def totales_libreta(filas: list, a_cuenta=None) -> TotalesLibreta:
@@ -240,6 +273,7 @@ def totales_libreta(filas: list, a_cuenta=None) -> TotalesLibreta:
         ventas=sum(1 for r in cuentan if str(getattr(r, "tipo", "venta") or "venta") == "venta"),
         apartados=sum(1 for r in cuentan if str(getattr(r, "tipo", "")) == "apartado"),
         filas_dinero=[r for r in filas if getattr(r, "id", None) not in a_cuenta] if a_cuenta else filas,
+        abonos=sum(1 for r in filas if str(getattr(r, "tipo", "")) == "abono"),
     )
 
 

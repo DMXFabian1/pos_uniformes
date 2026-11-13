@@ -4567,7 +4567,11 @@ class QuoteSatelliteWindow(QMainWindow):
         # Alineadas con las filas de la tabla MOVIMIENTOS (para poder borrar).
         self._libreta_rows_pintadas = list(rows)
 
-        from pos_uniformes.services.libreta_service import totales_libreta
+        from pos_uniformes.services.libreta_service import (
+            mensaje_libreta_empleada,
+            texto_operaciones,
+            totales_libreta,
+        )
 
         # Los totales salen de la regla única de la Libreta (2026-11-12): la
         # compra de una empleada con precio especial no es operación, piezas,
@@ -4646,8 +4650,10 @@ class QuoteSatelliteWindow(QMainWindow):
                     ),
                 ]
             )
+            # Los abonos se nombran aparte: no son operación (Daniel,
+            # 2026-11-12) y sin esto el filtro «Abonos» decía «0 operación(es)».
             self.libreta_resumen_label.setText(
-                f"{total_ops} operacion(es) {periodo}"
+                f"{texto_operaciones(total_ops, totales.abonos)} {periodo}"
             )
         else:
             # Saludo con el nombre real en cuanto lo conocemos por sus filas.
@@ -4664,14 +4670,8 @@ class QuoteSatelliteWindow(QMainWindow):
                     ("APARTADOS", str(apartados_count)),
                 ]
             )
-            if total_ops == 0:
-                mensaje = f"Aún no tienes movimientos {periodo}. ¡Tú puedes! 💪"
-            else:
-                mensaje = (
-                    f"Llevas {total_piezas} pieza(s) y "
-                    f"{total_comisiones} comision(es) {periodo}. ¡Bien! ✨"
-                )
-            self.libreta_resumen_label.setText(mensaje)
+            # La que solo cobró abonos sí tiene movimientos (2026-11-12).
+            self.libreta_resumen_label.setText(mensaje_libreta_empleada(totales, periodo))
 
         if self._libreta_is_owner:
             # En "Hoy" el desglose por día es una sola fila que repite las
