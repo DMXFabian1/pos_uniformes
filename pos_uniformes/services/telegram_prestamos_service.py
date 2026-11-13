@@ -248,23 +248,17 @@ def aviso_de_solicitud(prestamo, *, session: Session | None = None) -> str:
 
 
 def _lo_que_se_llevo(prestamo, session: Session | None) -> str:
-    """«Pantalón x1», de la venta que va con la compra. Vacío si no se halla."""
-    if session is None:
+    """«Pantalón x1», de la venta que va con la compra. Vacío si no se halla.
+
+    Por `libreta_venta_id` (2026-11-12), ya no por el folio del motivo."""
+    venta_id = getattr(prestamo, "libreta_venta_id", None)
+    if session is None or venta_id is None:
         return ""
     try:
-        import re
-
-        from sqlalchemy import select
-
         from pos_uniformes.database.models import LibretaVenta
         from pos_uniformes.services.libreta_service import describir_detalle
 
-        m = re.search(r"ticket\s+([0-9a-fA-F]{8})", str(prestamo.motivo or ""))
-        if not m:
-            return ""
-        venta = session.scalars(
-            select(LibretaVenta).where(LibretaVenta.operacion_uuid.like(f"{m.group(1).lower()}%")).limit(1)
-        ).first()
+        venta = session.get(LibretaVenta, int(venta_id))
         return describir_detalle(list(venta.detalle or [])) if venta is not None else ""
     except Exception:  # noqa: BLE001 — el aviso vale más que su adorno
         return ""

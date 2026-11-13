@@ -24,6 +24,9 @@ from sqlalchemy.orm import Session
 from pos_uniformes.database.models import PrestamoEmpleada
 
 PEDIDO, APROBADO, RECHAZADO, COBRADO = "pedido", "aprobado", "rechazado", "cobrado"
+#: `prestamo_empleada.tipo` (2026-11-12): la compra a cuenta se reconoce por
+#: columna, ya no por el texto de su motivo.
+TIPO_PRESTAMO, TIPO_COMPRA = "prestamo", "compra_cuenta"
 
 #: No se presta más de esta parte de lo que lleva ganado en el ciclo
 #: (Daniel, 2026-10-01). Así el préstamo siempre cabe en su siguiente pago.
@@ -112,7 +115,7 @@ def pedir(session: Session, *, employee_code: str, nombre: str, monto, motivo: s
 
     prestamo = PrestamoEmpleada(
         employee_code=str(employee_code), employee_name=str(nombre or ""),
-        monto=monto, motivo=motivo, estado=PEDIDO,
+        monto=monto, motivo=motivo, estado=PEDIDO, tipo=TIPO_PRESTAMO,
     )
     session.add(prestamo)
     session.flush()
@@ -202,6 +205,7 @@ def aprobar(session: Session, prestamo_id: int, *, quien: str) -> PrestamoEmplea
         motivo=f"Préstamo a {prestamo.employee_name or prestamo.employee_code}",
         creado_por=str(quien),
         revisar_repetido=False,
+        prestamo_id=prestamo.id,   # ligado por columna (2026-11-12)
     )
     session.flush()
     return prestamo
@@ -294,6 +298,12 @@ def marcar_cobrados(
             cobrado_at=_ahora(),
             created_at=p.created_at,
             cobrar_desde=p.cobrar_desde,
+            # La parte es de la misma deuda: mismo tipo, misma venta, y apunta
+            # a su original por columna (2026-11-12). El «(parte del #N)» del
+            # motivo se queda solo para leerlo.
+            tipo=p.tipo or TIPO_PRESTAMO,
+            libreta_venta_id=p.libreta_venta_id,
+            origen_id=p.id,
         ))
         p.monto = (monto - parte).quantize(_CENT)
         session.add(p)
@@ -314,9 +324,10 @@ def regresar_cobrados(session: Session, pago_id: int) -> Decimal:
     Lo inverso de `marcar_cobrados`: un préstamo saldado entero vuelve a
     «aprobado» (se le cobra en el siguiente pago); una PARTE cobrada se suma de
     regreso al préstamo del que salió, y si ese ya no estuviera pendiente, la
-    parte misma vuelve a ser deuda. Devuelve cuánto se regresó."""
-    import re
+    parte misma vuelve a ser deuda. Devuelve cuánto se regresó.
 
+    La parte encuentra su original por `origen_id` (2026-11-12), ya no por el
+    «(parte del #N)» del motivo."""
     total = Decimal("0.00")
     cobrados = session.scalars(
         select(PrestamoEmpleada).where(PrestamoEmpleada.pago_id == int(pago_id), PrestamoEmpleada.estado == COBRADO)
@@ -324,8 +335,7 @@ def regresar_cobrados(session: Session, pago_id: int) -> Decimal:
     for p in cobrados:
         monto = Decimal(str(p.monto))
         total += monto
-        m = re.search(r"parte del #(\d+)\)?$", p.motivo or "")
-        origen = session.get(PrestamoEmpleada, int(m.group(1))) if m else None
+        origen = session.get(PrestamoEmpleada, int(p.origen_id)) if p.origen_id is not None else None
         if origen is not None and origen.estado == APROBADO and origen.employee_code == p.employee_code:
             origen.monto = (Decimal(str(origen.monto)) + monto).quantize(_CENT)
             session.add(origen)

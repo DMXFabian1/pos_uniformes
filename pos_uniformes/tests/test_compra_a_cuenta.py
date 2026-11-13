@@ -228,7 +228,7 @@ class RegistrarTests(unittest.TestCase):
 
 class BotTests(unittest.TestCase):
     def _compra(self):
-        return SimpleNamespace(id=7, employee_code="VEND-3", employee_name="Cristal", monto=D("405.00"),
+        return SimpleNamespace(id=7, employee_code="VEND-3", employee_name="Cristal", monto=D("405.00"), tipo="compra_cuenta",
                                motivo="Compra a cuenta · pago del sáb 14 nov · ticket abcdef12")
 
     def test_el_aviso_dice_que_es_una_compra(self):

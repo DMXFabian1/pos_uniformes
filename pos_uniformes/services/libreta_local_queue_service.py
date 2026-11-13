@@ -276,14 +276,14 @@ def _cliente_id_de(session, entry: dict) -> int | None:
     return cliente.id if cliente is not None else None
 
 
-def _subir(session, entry: dict) -> None:
+def _subir(session, entry: dict):
     from pos_uniformes.services.libreta_service import registrar_operacion
 
     # El canje nunca viaja por la cola (requiere conexión). Si aparece uno,
     # algo está mal: que falle y avise en vez de subir dinero que no se cobró.
     if Decimal(str(entry.get("monto_monedero", "0") or "0")) > 0:
         raise ValueError("Venta con saldo de monedero en la cola offline: no se sube.")
-    registrar_operacion(
+    return registrar_operacion(
         session,
         employee_code=str(entry.get("employee_code", "")),
         employee_name=str(entry.get("employee_name", "")),
@@ -310,6 +310,14 @@ def _subir(session, entry: dict) -> None:
         # M2: la fotografía del motor; el servidor la recalcula al subir.
         calculo=entry.get("calculo") or None,
     )
+
+
+def registrar_entrada(session, entry: dict):
+    """Sube UNA entrada armada para la cola directo a la base, sin commit
+    (2026-11-12): la compra a cuenta la guarda junto con su préstamo y su
+    retiro (`compra_a_cuenta_service.registrar_venta_a_cuenta`). Es la misma
+    subida que hace el drenado; devuelve la LibretaVenta."""
+    return _subir(session, entry)
 
 
 def drenar_pendientes(session) -> int:

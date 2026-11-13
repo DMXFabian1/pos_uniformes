@@ -214,6 +214,10 @@ def sin_compras_a_cuenta(session, rows: list) -> list:
     (`retiros_service`). Si Daniel no la autoriza, vuelve a ser venta: ella
     la paga en caja y entonces sí la espera el corte.
 
+    Por `prestamo_empleada.libreta_venta_id` (2026-11-12), la misma liga con
+    la que `retiros_service` deja fuera el retiro: venta y retiro salen
+    juntos o no sale ninguno.
+
     Si la consulta falla, falla el corte: quitar el retiro sin quitar su venta
     daría un esperado falso."""
     from pos_uniformes.services.compra_a_cuenta_service import estados_en_libreta

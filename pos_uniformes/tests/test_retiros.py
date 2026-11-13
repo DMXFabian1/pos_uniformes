@@ -14,7 +14,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from pos_uniformes.database.models import CajaRetiro
+from pos_uniformes.database.models import CajaRetiro, PrestamoEmpleada
 from pos_uniformes.services.corte_caja_service import EstadoCaja, ResumenPeriodo
 from pos_uniformes.services.retiros_service import eliminar_retiro, registrar_retiro, retiros_del_periodo, total_retiros
 from pos_uniformes.ui.dialogs.corte_caja_dialog import texto_previa_corte_encargado, texto_ticket_corte, texto_ticket_corte_encargado
@@ -24,6 +24,9 @@ class RetirosServiceTests(unittest.TestCase):
     def setUp(self) -> None:
         engine = create_engine("sqlite://")
         CajaRetiro.__table__.create(engine)
+        # El corte deja fuera el retiro de una compra a cuenta por su
+        # `prestamo_id` (2026-11-12): la consulta también lee esa tabla.
+        PrestamoEmpleada.__table__.create(engine)
         self.session = sessionmaker(bind=engine)()
 
     def test_registrar_y_sumar(self) -> None:
