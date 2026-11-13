@@ -1300,7 +1300,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
     def test_refresh_inventory_limits_visible_rows_to_single_page(self) -> None:
         window = MainWindow(user_id=1)
-        filtered_rows = [{"variante_id": index, "sku": f"SKU-{index:03d}"} for index in range(60)]
+        filtered_rows = [{"variante_id": index, "sku": f"SKU-{index:03d}"} for index in range(2 * INVENTORY_PAGE_SIZE + 10)]
         table_row_view = SimpleNamespace(
             values=[
                 "SKU-000",
@@ -1340,9 +1340,9 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         ), patch.object(window, "_refresh_inventory_overview"):
             window._refresh_inventory_table()
 
-        self.assertEqual(len(window.inventory_filtered_rows), 60)
+        self.assertEqual(len(window.inventory_filtered_rows), 2 * INVENTORY_PAGE_SIZE + 10)
         self.assertEqual(len(window.inventory_rows), INVENTORY_PAGE_SIZE)
-        self.assertEqual(window.inventory_pagination_label.text(), "1-25 de 60 | p. 1/3")
+        self.assertEqual(window.inventory_pagination_label.text(), f"1-{INVENTORY_PAGE_SIZE} de {2 * INVENTORY_PAGE_SIZE + 10} | p. 1/3")
         self.assertFalse(window.inventory_previous_page_button.isEnabled())
         self.assertTrue(window.inventory_next_page_button.isEnabled())
 
@@ -1619,8 +1619,8 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
     def test_refresh_inventory_jumps_to_page_of_selected_variant(self) -> None:
         window = MainWindow(user_id=1)
-        filtered_rows = [{"variante_id": i, "sku": f"SKU-{i:03d}"} for i in range(30)]
-        variant_on_page1 = 27
+        filtered_rows = [{"variante_id": i, "sku": f"SKU-{i:03d}"} for i in range(INVENTORY_PAGE_SIZE + 5)]
+        variant_on_page1 = INVENTORY_PAGE_SIZE + 2  # en la 2.ª página
         window.inventory_variant_combo.addItem("SKU-027", variant_on_page1)
         window.inventory_variant_combo.setCurrentIndex(
             window.inventory_variant_combo.findData(variant_on_page1)
@@ -1661,7 +1661,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
     def test_refresh_inventory_stays_on_page_when_selected_variant_not_in_filtered_rows(self) -> None:
         window = MainWindow(user_id=1)
-        filtered_rows = [{"variante_id": i, "sku": f"SKU-{i:03d}"} for i in range(30)]
+        filtered_rows = [{"variante_id": i, "sku": f"SKU-{i:03d}"} for i in range(INVENTORY_PAGE_SIZE + 5)]
         window.inventory_variant_combo.addItem("SKU-999", 999)
         window.inventory_variant_combo.setCurrentIndex(
             window.inventory_variant_combo.findData(999)

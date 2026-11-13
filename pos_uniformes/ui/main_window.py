@@ -82,6 +82,7 @@ from pos_uniformes.database.models import (
     Variante,
 )
 from pos_uniformes.services.active_filter_service import (
+    TITULOS_FILTROS_INVENTARIO,
     build_active_filter_labels,
     build_active_filters_summary,
     build_active_filter_tokens,
@@ -522,7 +523,7 @@ PESTANAS_MUDADAS_AL_KIOSKO = ("Presupuestos", "Catálogo")
 
 LISTING_SEARCH_DEBOUNCE_MS = 300
 CATALOG_PAGE_SIZE = 25
-INVENTORY_PAGE_SIZE = 25
+INVENTORY_PAGE_SIZE = 100  # tanda 3: 100 filas por página (pintarlas tarda milisegundos)
 
 
 def _table_item(value: object) -> QTableWidgetItem:
@@ -1403,7 +1404,7 @@ class MainWindow(QMainWindow):
         self.inventory_brand_filter_combo = MultiSelectFilterButton("Marca: todas")
         self.inventory_school_filter_combo = MultiSelectFilterButton("Escuela: todas")
         self.inventory_type_filter_combo = MultiSelectFilterButton("Tipo: todos")
-        self.inventory_piece_filter_combo = MultiSelectFilterButton("Pieza: todas")
+        self.inventory_piece_filter_combo = MultiSelectFilterButton("Prenda: todas")
         self.inventory_size_filter_combo = MultiSelectFilterButton("Talla: todas", group_values_by_format=True)
         self.inventory_color_filter_combo = MultiSelectFilterButton("Color: todos")
         self.inventory_use_filter_combo = QComboBox()
@@ -1784,10 +1785,10 @@ class MainWindow(QMainWindow):
             self.toggle_variant_button: "Activa o desactiva solo esta talla (pregunta antes de desactivar).",
             self.delete_product_button: "Elimina el producto si no tiene stock ni historial operativo.",
             self.delete_variant_button: "Elimina la presentacion si no tiene stock ni historial operativo.",
-            self.inventory_new_button: "Dar de alta una prenda, una talla o un color.",
+            self.inventory_new_button: "Dar de alta una prenda nueva con su escuela, tipo y tallas.",
             self.inventory_edit_button: "Editar la prenda o la talla elegida, su foto o sus precios.",
             self.inventory_stock_button: "Registrar una entrada, contar o corregir cuántas hay.",
-            self.inventory_more_button: "Lo poco usado: eliminar y, en «Poco usado», los QR.",
+            self.inventory_more_button: "Todo lo demás: tallas, existencias, precios, etiquetas y lo poco usado.",
             self.quote_add_button: "Agrega el SKU capturado al presupuesto actual sin afectar inventario.",
             self.quote_create_client_button: "Crea un cliente rapido desde Presupuestos usando solo nombre y telefono.",
             self.quote_save_button: "Emite el presupuesto rapido actual con folio, cliente opcional y vigencia.",
@@ -7458,6 +7459,7 @@ class MainWindow(QMainWindow):
                 ("precio", self.inventory_precio_filter_combo.currentData(), self.inventory_precio_filter_combo.currentText()),
                 ("precio_exacto", self.inventory_precio_text_input.text().strip() or None, f"${self.inventory_precio_text_input.text().strip()}" if self.inventory_precio_text_input.text().strip() else ""),
             ),
+            titles=TITULOS_FILTROS_INVENTARIO,
         )
 
     def _build_inventory_active_filters_summary(self) -> str:
@@ -7808,6 +7810,8 @@ class MainWindow(QMainWindow):
                 general_fields=INVENTORY_SEARCH_GENERAL_FIELDS,
             ),
         )
+        # Tanda 3: la pestaña cuenta sus tarjetas, filtra por la tocada y ordena.
+        self.inventory_filtered_rows = self.inventario_pantalla.preparar_filas(self.inventory_filtered_rows)
 
         summary_view = build_inventory_summary_view(
             total_rows=len(inventory_snapshot_rows),
@@ -7857,6 +7861,7 @@ class MainWindow(QMainWindow):
         self.inventory_next_page_button.setEnabled(pagination_view.next_enabled)
         self._sync_inventory_table_selection(current_variant_id)
         self._refresh_inventory_overview()
+        self.inventario_pantalla.al_refrescar()
 
     def _populate_inventory_table_rows(self, table_row_views) -> None:
         pintar_filas_inventario(self.inventory_table, table_row_views)
@@ -8910,6 +8915,7 @@ class MainWindow(QMainWindow):
         self.catalog_selection_label.setText(overview_view.catalog_selection_label)
         self.toggle_product_button.setText(overview_view.toggle_product_label)
         self.toggle_variant_button.setText(overview_view.toggle_variant_label)
+        self.inventario_pantalla.al_cambiar_ficha(overview_view)
 
     def _inventory_table_variant_id_at_row(self, row_index: int) -> int | None:
         if row_index < 0:

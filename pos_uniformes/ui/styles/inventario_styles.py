@@ -135,6 +135,11 @@ QToolButton#invFiltro, QToolButton#invMasFiltros {{
 QToolButton#invFiltro::menu-indicator {{ subcontrol-position: right center; right: 6px; }}
 QToolButton#invFiltro {{ padding-right: 22px; }}
 QToolButton#invMasFiltros:checked {{ background: {VINO_SUAVE}; color: {VINO}; border-color: #e3c6d1; }}
+QWidget#invChips {{ background: transparent; }}
+QWidget#invRaiz QPushButton#chipButton {{
+    background: {VINO_SUAVE}; color: {VINO}; border: 1px solid #e3c6d1; border-radius: 12px;
+    padding: 4px 10px; font-size: 12px; font-weight: 700;
+}}
 QPushButton#invQuitar {{
     background: transparent; color: {VINO}; border: none; padding: 0 8px; min-height: 34px;
     font-size: 13px; font-weight: 700; text-decoration: underline;
@@ -167,7 +172,8 @@ QTableWidget#invTabla QTableCornerButton::section {{ background: {TARJETA}; bord
 QLabel#invPaginas {{ font-size: 12px; color: {TENUE}; }}
 QPushButton#invFlecha {{
     background: transparent; color: {VINO}; border: 1px solid {TARJETA_BORDE}; border-radius: 14px;
-    min-width: 28px; max-width: 28px; min-height: 28px; max-height: 28px; font-size: 12px; font-weight: 800;
+    min-width: 28px; max-width: 28px; min-height: 28px; max-height: 28px; padding: 0;
+    font-size: 12px; font-weight: 800;
 }}
 QPushButton#invFlecha:disabled {{ color: #cfc5ba; }}
 QPushButton#invSegmento {{
@@ -181,16 +187,17 @@ QPushButton#invSegmento:disabled {{ color: #b4aba0; }}
 
 /* ── Ficha derecha ── */
 QFrame#invFicha {{ background: {TARJETA}; border: 1px solid {TARJETA_BORDE}; border-radius: 20px; }}
+QStackedWidget#invFichaPaginas, QWidget#invFichaPagina {{ background: transparent; }}
 QLabel#invSeccion {{ font-size: 11px; font-weight: 800; color: {VINO}; letter-spacing: 1.5px; }}
 QLabel#invVacio {{
     background: #faf6f0; color: {TENUE}; border: 1.5px dashed #d8c6b0; border-radius: 14px;
     padding: 14px; font-size: 14px;
 }}
-QPushButton#invAtender {{
-    background: transparent; color: {TEXTO}; border: none; border-bottom: 1px solid {LINEA};
-    border-radius: 0; text-align: left; padding: 8px 4px; font-size: 13px;
-}}
-QPushButton#invAtender:hover {{ background: #faf6f0; color: {VINO}; }}
+QFrame#invAtender {{ background: transparent; border: none; border-bottom: 1px solid {LINEA}; border-radius: 0; }}
+QFrame#invAtender:hover {{ background: #faf6f0; }}
+QLabel#invAtenderTitulo {{ font-size: 13px; font-weight: 700; color: {TEXTO}; }}
+QLabel#invAtenderMotivo {{ font-size: 12px; color: {TENUE}; }}
+QLabel#invAtenderMotivo[tono="danger"] {{ color: #b3261e; font-weight: 700; }}
 QLabel#invNota {{ background: #faf6f0; color: {TENUE}; border-radius: 12px; padding: 10px 12px; font-size: 13px; }}
 QFrame#invFichaTotal {{
     background: qlineargradient(x1:0, y1:0, x2:1, y2:1, stop:0 {VINO_OSCURO}, stop:1 #84304c);
