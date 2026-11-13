@@ -156,6 +156,16 @@ class PlanTests(_Base):
         plan = self.pants_suelto_jaral(quitar_tallas=["4"])
         self.assertEqual([t.talla for t in plan.tallas_posibles], ["4", "EXG"])
 
+    def test_pants_2pz_de_secundaria_no_mezcla_escaleras(self) -> None:
+        self.caja.secundaria_con_dos_escaleras()
+        plan = alta.planear_desde_modelo(self.s, "Secundaria Nueva", "Pants 2pz", nivel="Secundaria")
+        self.assertEqual(plan.modelo_nombre.split(" Sec ")[1][0], "B")  # el juego más repetido
+        self.assertEqual({t.talla: t.precio for t in plan.tallas},
+                         {"10": D(595), "12": D(595), "14": D(605), "16": D(605),
+                          "CH": D(615), "MD": D(615), "GD": D(615), "EXG": D(615)})
+        self.assertTrue(any("dos escaleras" in a for a in plan.avisos), plan.avisos)
+        self.assertEqual(next(t for t in plan.tallas if t.talla == "10").origen_precio, "del modelo")
+
     def test_precio_en_cero_frena(self) -> None:
         plan = self.pants_suelto_jaral(precios_a_mano={"4": 0})
         self.assertIn("Talla 4: el precio no puede quedar en $0.", plan.todos_los_errores)

@@ -29,7 +29,7 @@ Además, sin bloquear nada:
 from __future__ import annotations
 
 from collections import Counter, defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from decimal import ROUND_CEILING, Decimal, InvalidOperation
 from typing import Iterable, Mapping
 
@@ -38,6 +38,7 @@ from sqlalchemy.orm import Session
 
 from pos_uniformes.database.models import Producto, Variante
 from pos_uniformes.services.catalogo_valores_service import forma_oficial_talla
+from pos_uniformes.services.talla_orden_service import clave_talla
 
 ORIGEN_COMO_LAS_DEMAS = "como las demás"
 ORIGEN_DEL_MODELO = "del modelo"
@@ -111,6 +112,9 @@ class PrecioSugerido:
     #: «¿$289?», solo si el precio no termina en 5 o 9 y no es el de las demás.
     sugerencia_5_9: Decimal | None = None
     aviso: str = ""
+    #: La base tiene dos escaleras para esta pieza y la moda talla por talla
+    #: las mezclaba: se tomó el precio del modelo para no mezclarlas.
+    escalera_del_modelo: bool = False
 
     @property
     def falta(self) -> bool:
@@ -202,7 +206,39 @@ def sugerir_desde(
                 aviso=aviso_precio(precio, la_moda),
             )
         )
+    if modelo and preferir == PREFERIR_BASE:
+        salida = _no_mezclar_escaleras(salida, modelo)
     return salida
+
+
+def escalera_baja(filas: Iterable[PrecioSugerido]) -> bool:
+    """Puro: True si, de la talla chica a la grande, algún precio baja."""
+    con_precio = sorted((f for f in filas if f.precio is not None), key=lambda f: clave_talla(f.talla))
+    return any(b.precio < a.precio for a, b in zip(con_precio, con_precio[1:]))
+
+
+def _no_mezclar_escaleras(salida: list[PrecioSugerido], modelo: Mapping[str, Decimal | None]) -> list[PrecioSugerido]:
+    """La moda talla por talla puede mezclar dos escaleras (Pants 2pz de
+    secundaria: 650 parejo o 595/605/615; `alta_datos.md` §6) y armar una que
+    no tiene ninguna escuela y que baja con la talla. En ese caso se toma la
+    escalera del modelo en las tallas donde la moda no coincide con él."""
+    distintas = [
+        f for f in salida
+        if f.origen == ORIGEN_COMO_LAS_DEMAS and modelo.get(f.talla) is not None and f.precio != modelo[f.talla]
+    ]
+    if not distintas or not escalera_baja(f for f in salida if f.origen != ORIGEN_A_MANO):
+        return salida
+    cambiar = {f.talla for f in distintas}
+    nueva = []
+    for f in salida:
+        if f.talla in cambiar:
+            precio = modelo[f.talla]
+            f = replace(
+                f, precio=precio, origen=ORIGEN_DEL_MODELO, escalera_del_modelo=True,
+                sugerencia_5_9=_sugerencia(precio, f.moda), aviso=aviso_precio(precio, f.moda),
+            )
+        nueva.append(f)
+    return nueva
 
 
 def _sugerencia(precio: Decimal | None, la_moda: Decimal | None) -> Decimal | None:

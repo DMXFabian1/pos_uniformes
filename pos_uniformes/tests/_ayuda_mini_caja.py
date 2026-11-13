@@ -161,3 +161,26 @@ class MiniCaja:
             self.s.add(ConjuntoComponente(conjunto_id=c.id, componente_id=self.productos[(escuela, pieza)].id,
                                           cantidad=cantidad, grupo=grupo))
         self.s.flush()
+
+    def secundaria_con_dos_escaleras(self) -> Escuela:
+        """Pants 2pz de secundaria con las dos escaleras reales (`alta_datos.md`
+        §6): 3 escuelas iguales a 595/605/615 y 4 a 650 parejo con tallas
+        sueltas distintas (ninguna con el mismo juego). Devuelve una escuela
+        de secundaria sin prendas para dar de alta."""
+        b = {"10": 595, "12": 595, "14": 605, "16": 605, "CH": 615, "MD": 615, "GD": 615, "EXG": 615}
+        a = {
+            "Sec A1": ("10", "12", "14", "16"),
+            "Sec A2": ("10", "12", "14", "16", "CH"),
+            "Sec A3": ("12", "14", "16"),
+            "Sec A4": ("10", "12"),
+        }
+        for nombre in ("Sec B1", "Sec B2", "Sec B3"):
+            self.escuelas[nombre] = self._escuela(nombre)
+            self.prod(nombre, "Pants 2pz", nivel="Secundaria", precios=b)
+        for nombre, tallas in a.items():
+            self.escuelas[nombre] = self._escuela(nombre)
+            self.prod(nombre, "Pants 2pz", nivel="Secundaria", precios={t: 650 for t in tallas})
+        nueva = self._escuela("Secundaria Nueva")
+        self.escuelas["Secundaria Nueva"] = nueva
+        self.s.commit()
+        return nueva

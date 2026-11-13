@@ -71,6 +71,25 @@ class SugerirTests(unittest.TestCase):
             [(f.precio, f.origen) for f in filas], [(D(295), "como las demás"), (D(305), "del modelo")]
         )
 
+    def test_no_mezcla_dos_escaleras(self) -> None:
+        """Pants 2pz de secundaria: 650 parejo o 595/605/615. Talla por talla
+        la moda daría 650 en las chicas y 615 en las grandes (baja)."""
+        conteos = {
+            "10": Counter({D(650): 3, D(595): 3}),
+            "12": Counter({D(650): 4, D(595): 3}),
+            "CH": Counter({D(615): 3, D(650): 1}),
+        }
+        modelo = {"10": 595, "12": 595, "CH": 615}
+        filas = ps.sugerir_desde(["10", "12", "CH"], conteos, modelo=modelo)
+        self.assertEqual([f.precio for f in filas], [D(595), D(595), D(615)])
+        self.assertEqual([f.origen for f in filas], ["del modelo", "del modelo", "como las demás"])
+        self.assertTrue(filas[0].escalera_del_modelo)
+        self.assertFalse(ps.escalera_baja(filas))
+        # Una escalera que no baja no se toca aunque difiera del modelo.
+        filas = ps.sugerir_desde(["10", "CH"], {"10": Counter({D(595): 3}), "CH": Counter({D(650): 3})},
+                                 modelo={"10": 595, "CH": 615})
+        self.assertEqual([(f.precio, f.origen) for f in filas], [(D(595), "como las demás"), (D(650), "como las demás")])
+
     def test_preferir_el_modelo_al_copiar_una_escuela(self) -> None:
         filas = ps.sugerir_desde(["4"], self.conteos, modelo={"4": 255}, preferir=ps.PREFERIR_MODELO)
         self.assertEqual((filas[0].precio, filas[0].origen), (D(255), "del modelo"))

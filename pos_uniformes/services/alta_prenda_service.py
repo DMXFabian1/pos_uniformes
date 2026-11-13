@@ -758,7 +758,11 @@ def planear_desde_modelo(
         modelo_nombre=m.nombre if m else None,
         modelo_texto=hermanas.texto,
         confirmados=tuple(confirmados),
-        avisos_fijos=[hermanas.texto] if m is None else [],
+        avisos_fijos=([hermanas.texto] if m is None else []) + (
+            [f"Esta pieza tiene dos escaleras de precio en {(nivel or 'la base').lower()}: "
+             "se tomó la del modelo para no mezclarlas."]
+            if any(s.escalera_del_modelo for s in sugeridos) else []
+        ),
         errores_fijos=errores_fijos,
     )
     return completar(session, plan, saltar_skus=saltar_skus, usos=usos)
