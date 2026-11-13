@@ -79,6 +79,13 @@ class CifrasPeriodoTests(unittest.TestCase):
         self.assertEqual(sin.cobrado, Decimal("100.00"))
         self.assertEqual(sin.ventas, 1)
 
+    def test_la_diferencia_de_un_cambio_es_dinero_cobrado(self) -> None:
+        # Revisión 2026-11-12: el corte y el bot suman lo que entra al cajón
+        # en un cambio de prenda; el Resumen lo dejaba fuera.
+        c = rp.cifras_periodo([_op(monto="300"), _op("cambio", "120", piezas=0)])
+        self.assertEqual(c.cobrado, Decimal("420.00"))
+        self.assertEqual(c.operaciones, 1)   # el cambio no es operación nueva
+
     def test_el_ajuste_del_dueno_corrige_el_cobrado(self) -> None:
         c = rp.cifras_periodo([_op(monto="1000")], ajuste=Decimal("-200"))
         self.assertEqual(c.cobrado, Decimal("800.00"))
@@ -123,6 +130,23 @@ class CargarTests(unittest.TestCase):
         r = rp.cargar(self.s, HOY)
         self.assertEqual(r.hoy.ventas, 1)
         self.assertEqual(r.hoy.cobrado, Decimal("300.00"))
+
+    def test_la_compra_a_cuenta_de_una_empleada_no_es_cobrado(self) -> None:
+        # Revisión 2026-11-12: ese dinero no entró al cajón; el corte y el
+        # bot la quitan con sin_compras_a_cuenta, y el Resumen también.
+        from pos_uniformes.database.models import PrestamoEmpleada
+        from pos_uniformes.services import prestamos_service as pr
+
+        self._anotar(HOY, "venta", "300")
+        a_cuenta = self._anotar(HOY, "venta", "500", descuento_empleada=True)
+        self.s.add(PrestamoEmpleada(
+            employee_code="VEND-4", employee_name="Fanny", monto=Decimal("500"), motivo="Compra a cuenta",
+            estado=pr.APROBADO, tipo=pr.TIPO_COMPRA, libreta_venta_id=a_cuenta.id,
+        ))
+        self.s.commit()
+        r = rp.cargar(self.s, HOY)
+        self.assertEqual(r.hoy.cobrado, Decimal("300.00"))
+        self.assertEqual(r.mes.cobrado, Decimal("300.00"))
 
     def test_sin_privadas_para_quien_no_es_dueno(self) -> None:
         self._anotar(HOY, "venta", "300")
