@@ -2,45 +2,28 @@
 
 from __future__ import annotations
 
-import unicodedata
-
 
 def build_catalog_product_display_name_preview(
     *,
     base_name: str,
     context_values: tuple[str, ...],
 ) -> str:
+    """El nombre tal como se va a guardar.
+
+    Usa la misma función que `CatalogService` (sin repetir la escuela y con
+    las siglas en mayúsculas). Antes la vista previa tenía su propia lógica
+    y le pegaba «| Tipo | Pieza» que el servicio ya no guarda desde la fase 1:
+    lo que se veía no era lo que se guardaba (tanda 1 del alta, 2026-11-13)."""
+    from pos_uniformes.services.catalog_service import CatalogService
+
     normalized_base_name = base_name.strip()
     if not normalized_base_name:
         return "Nombre final pendiente."
 
-    # context_values = (escuela, tipo_prenda, tipo_pieza)
+    # context_values = (escuela, tipo_prenda, tipo_pieza); tipo y pieza ya no
+    # forman parte del nombre.
     school = str(context_values[0] or "").strip() if len(context_values) > 0 else ""
-    remaining_values = context_values[1:] if len(context_values) > 1 else ()
-
-    # Integrate school into base name (matching what CatalogService does)
-    normalized_base = _normalize_lookup_text(normalized_base_name)
-    normalized_school = _normalize_lookup_text(school)
-    if school and normalized_school not in normalized_base:
-        full_base = f"{normalized_base_name} {school}"
-    else:
-        full_base = normalized_base_name
-
-    normalized_full = _normalize_lookup_text(full_base)
-    suffix_parts: list[str] = []
-    seen_suffixes: set[str] = set()
-    for value in remaining_values:
-        cleaned_value = str(value or "").strip()
-        normalized_value = _normalize_lookup_text(cleaned_value)
-        if not normalized_value or normalized_value in seen_suffixes:
-            continue
-        if normalized_value in normalized_full:
-            continue
-        seen_suffixes.add(normalized_value)
-        suffix_parts.append(cleaned_value)
-    if not suffix_parts:
-        return full_base
-    return f"{full_base} | {' | '.join(suffix_parts)}"
+    return CatalogService.armar_nombre(normalized_base_name, school or None) or "Nombre final pendiente."
 
 
 def build_catalog_variant_examples_preview(
@@ -111,8 +94,3 @@ def build_catalog_review_details_html(
         f"<div><b>Precio / stock:</b> {price_summary} / {stock_value}</div>"
         f"<div style='color:#7e3a22;'>{' | '.join(review_notes) if review_notes else 'Todo listo para guardar.'}</div>"
     )
-
-
-def _normalize_lookup_text(value: str) -> str:
-    decomposed = unicodedata.normalize("NFKD", value.strip().casefold())
-    return "".join(char for char in decomposed if not unicodedata.combining(char))

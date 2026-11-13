@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from decimal import Decimal
 
 logger = logging.getLogger(__name__)
@@ -83,19 +84,69 @@ class CatalogService:
     def _optional_name(value: object | None) -> str | None:
         return getattr(value, "nombre", None) if value is not None else None
 
+    @staticmethod
+    def nombre_sin_escuela(nombre: str, escuela_nombre: str | None) -> str:
+        """Quita del nombre la escuela, todas las veces que aparezca.
+
+        Compara sin mayúsculas, acentos ni signos, así que «Estv 154»,
+        «ESTV 154» e «Ignacio Ramirez Lopez» cuentan como la escuela
+        «ESTV 154» o «Ignacio Ramírez López». Arregla el hallazgo 1 de la
+        auditoría: editar volvía a pegar la escuela («Pants 3pz Deportivo
+        Estv 154 ESTV 154»)."""
+        from pos_uniformes.services.catalogo_valores_service import normalizar
+
+        palabras = [w for w in str(nombre or "").split() if normalizar(w)]
+        escuela = normalizar(escuela_nombre).split()
+        if not escuela:
+            return " ".join(palabras)
+        claves = [normalizar(w) for w in palabras]
+        n = len(escuela)
+        i = 0
+        while i <= len(claves) - n:
+            if claves[i : i + n] == escuela:
+                del palabras[i : i + n]
+                del claves[i : i + n]
+                continue
+            i += 1
+        return " ".join(palabras)
+
+    @classmethod
+    def armar_nombre(
+        cls,
+        base_name: str,
+        escuela_nombre: str | None = None,
+        *,
+        quitar: tuple[str, ...] | list[str] = (),
+    ) -> str:
+        """El nombre que se guarda: «<nombre sin escuela> <Escuela>».
+
+        Es la misma función que usa la vista previa del asistente, para que lo
+        que se ve sea lo que se guarda. `quitar` son otras escuelas que hay que
+        sacar del nombre (la anterior, si al editar se cambió de escuela)."""
+        escuela = " ".join(str(escuela_nombre or "").split())
+        name = str(base_name or "")
+        for otra in (escuela, *quitar):
+            if otra:
+                name = cls.nombre_sin_escuela(name, otra)
+        siglas = tuple(
+            w.strip("().,") for otra in (escuela, *quitar) for w in str(otra or "").split()
+            if len(w.strip("().,")) > 1 and w.strip("().,").isupper()
+        )
+        name = cls._title_case(name, siglas=siglas)
+        if escuela:
+            return f"{name} {escuela}".strip()
+        return name
+
     @classmethod
     def _build_nombre_base(
         cls,
         *,
         base_name: str,
         school: Escuela | None = None,
+        quitar: tuple[str, ...] | list[str] = (),
     ) -> str:
-        """Construye nombre_base incluyendo la escuela si aplica."""
-        name = cls._title_case(base_name)
-        school_name = cls._optional_name(school)
-        if school_name:
-            return f"{name} {school_name}"
-        return name
+        """Construye nombre_base con la escuela una sola vez al final."""
+        return cls.armar_nombre(base_name, cls._optional_name(school), quitar=quitar)
 
     @classmethod
     def _build_product_display_name(
@@ -105,6 +156,7 @@ class CatalogService:
         school: Escuela | None = None,
         garment_type: TipoPrenda | None = None,
         piece_type: TipoPieza | None = None,
+        quitar: tuple[str, ...] | list[str] = (),
     ) -> str:
         # Fase 1 del rediseño del catálogo (2026-09-20): el nombre ya NO carga
         # "| Tipo de prenda | Tipo de pieza". Eso vive en sus campos
@@ -114,18 +166,30 @@ class CatalogService:
         # las pantallas. `garment_type`/`piece_type` se aceptan por
         # compatibilidad; no cambian el nombre.
         del garment_type, piece_type
-        return cls._build_nombre_base(base_name=base_name, school=school)
+        return cls._build_nombre_base(base_name=base_name, school=school, quitar=quitar)
 
-    @staticmethod
-    def _title_case(text: str) -> str:
+    # Siglas de escuela que se quedan en mayúsculas aunque el nombre se haya
+    # tecleado todo en mayúsculas o todo en minúsculas («estv» → «ESTV»).
+    SIGLAS_CONOCIDAS = frozenset({"ESTV", "UVEG", "CONALEP", "CBTIS", "CBTA", "CECYTE", "CECYTEG", "SABES"})
+    _PIEZAS_RE = re.compile(r"^\d+pz$", re.IGNORECASE)
+
+    @classmethod
+    def _title_case(cls, text: str, siglas: tuple[str, ...] | list[str] = ()) -> str:
         _LOWERCASE = {"de", "del", "la", "las", "los", "el", "en", "y", "a", "con", "por", "para"}
+        conocidas = cls.SIGLAS_CONOCIDAS | {str(s).upper() for s in siglas if str(s).strip()}
         words = text.split()
         # «PLAYERA DEPORTIVA» tecleado con bloq mayús no son siglas: si TODO
         # viene en mayúsculas, se pasa a título como siempre.
         todo_mayusculas = text.isupper()
         result = []
         for i, w in enumerate(words):
-            if i > 0 and w.lower() in _LOWERCASE:
+            desnuda = w.strip("().,")
+            if len(desnuda) > 1 and desnuda.upper() in conocidas:
+                result.append(w.upper())
+            elif cls._PIEZAS_RE.match(w):
+                # «3PZ» o «3Pz» → «3pz», como en el resto del catálogo.
+                result.append(w.lower())
+            elif i > 0 and w.lower() in _LOWERCASE:
                 result.append(w.lower())
             elif any(ch.isdigit() for ch in w) or (len(w) > 1 and w.isupper() and not todo_mayusculas):
                 # Un código de proveedor («KY357H», «S01») o unas siglas
@@ -508,12 +572,15 @@ class CatalogService:
         raw_name = nombre.strip()
         if not raw_name:
             raise ValueError("El nombre del producto es obligatorio.")
-        nombre_base = cls._build_nombre_base(base_name=raw_name, school=escuela)
+        escuela_anterior = cls._optional_name(producto.escuela)
+        quitar = (escuela_anterior,) if escuela_anterior else ()
+        nombre_base = cls._build_nombre_base(base_name=raw_name, school=escuela, quitar=quitar)
         display_name = cls._build_product_display_name(
             base_name=raw_name,
             school=escuela,
             garment_type=tipo_prenda,
             piece_type=tipo_pieza,
+            quitar=quitar,
         )
 
         existente = session.scalar(

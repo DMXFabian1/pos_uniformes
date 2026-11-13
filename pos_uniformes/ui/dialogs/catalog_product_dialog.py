@@ -144,7 +144,10 @@ def build_catalog_product_dialog(
                     "categoria_id": producto.categoria_id,
                     "categoria_nombre": producto.categoria.nombre if producto.categoria else "",
                     "marca_id": producto.marca_id,
-                    "nombre_base": producto.nombre_base,
+                    # Sin la escuela: el servicio la pone una sola vez al guardar.
+                    "nombre_base": CatalogService.nombre_sin_escuela(
+                        producto.nombre_base, producto.escuela.nombre if producto.escuela else None
+                    ),
                     "descripcion": producto.descripcion or "",
                     "escuela": producto.escuela.nombre if producto.escuela else "",
                     "tipo_prenda": producto.tipo_prenda.nombre if producto.tipo_prenda else "",
