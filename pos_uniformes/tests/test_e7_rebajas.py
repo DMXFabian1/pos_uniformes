@@ -313,8 +313,11 @@ class KioskoTests(_Qt):
         self.assertTrue(abajo[2].startswith("├"))
         self.assertIn("Acumulado en esta compra:", abajo[3])
         self.assertIn("Saldo en monedero:", abajo[4])
-        self.assertTrue(abajo[5].startswith("├"))
-        self.assertIn("sin cambios ni devoluciones", "\n".join(abajo[6:]))
+        # La vigencia del Monedero cierra su sección (2026-11-12, «solucionemos estos»).
+        self.assertIn("Tu Monedero vence 12 meses", abajo[5])
+        self.assertIn("después de cada compra", abajo[6])
+        self.assertTrue(abajo[7].startswith("├"))
+        self.assertIn("sin cambios ni devoluciones", "\n".join(abajo[8:]))
         for linea in abajo:
             self.assertEqual(reb.largo_visible(linea), 38, linea)
 

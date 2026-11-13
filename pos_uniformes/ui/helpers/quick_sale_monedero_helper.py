@@ -43,11 +43,35 @@ _LARGO_NOMBRE = 25
 _RE_QR_CLIENTE = re.compile(r"CLI-[A-Z0-9]+")
 
 
-def lineas_ticket_monedero(info: dict, tk_row) -> list[str]:
+def lineas_vigencia_monedero() -> list[str]:
+    """«Tu Monedero vence 12 meses después de cada compra», partida y centrada
+    para que quepa en el recuadro del ticket (Daniel, 2026-11-12:
+    «solucionemos estos»). Una sola fuente para todos los tickets."""
+    import textwrap
+
+    from pos_uniformes.services.monedero_service import texto_vigencia_ticket
+    from pos_uniformes.ui.helpers.ticket_print_layout_helper import TICKET_CHAR_WIDTH, tk_center
+
+    ancho = TICKET_CHAR_WIDTH - 4
+    texto = texto_vigencia_ticket()
+    # Se parte donde se lee bien: «… vence 12 meses» / «después de cada compra».
+    inicio, sep, resto = texto.partition(" después ")
+    renglones = [inicio, f"después {resto}"] if sep else [texto]
+    if any(len(r) > ancho for r in renglones):
+        renglones = textwrap.wrap(texto, width=ancho)
+    return [tk_center(r) for r in renglones]
+
+
+def lineas_ticket_monedero(info: dict, tk_row, *, con_vigencia: bool = False) -> list[str]:
     """Renglones del monedero bajo el total del ticket.
 
     info: cliente, nivel, canje, por_cobrar, metodo, cashback, cashback_pendiente, saldo
-    y, si se pagó con tarjeta, tasa y base_tarjeta (regla B)."""
+    y, si se pagó con tarjeta, tasa y base_tarjeta (regla B).
+
+    con_vigencia=True agrega al final la leyenda de que el Monedero vence,
+    solo si el recuadro muestra Monedero (ganó, usó saldo o se sabe su saldo).
+    Quien arma el ticket decide: va en la copia del cliente y no en compra de
+    empleada (2026-11-12)."""
     lineas: list[str] = []
     # Quién es y en qué nivel va (Daniel, 2026-11-11). El nombre se corta para
     # que quepa en el renglón.
@@ -73,6 +97,8 @@ def lineas_ticket_monedero(info: dict, tk_row) -> list[str]:
             lineas.append(tk_row(f"  {tasa:f} % sobre:", f"${base:,.2f} (tarjeta)"))
     if info.get("saldo") is not None:
         lineas.append(tk_row("Saldo en monedero:", f"${Decimal(str(info['saldo'])):,.2f}"))
+    if con_vigencia and (canje > 0 or cashback > 0 or info.get("saldo") is not None):
+        lineas.extend(lineas_vigencia_monedero())
     return lineas
 
 

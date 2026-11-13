@@ -137,6 +137,16 @@ def vencimiento_de(acreditado: datetime) -> datetime:
     return sumar_meses(acreditado, MESES_VIGENCIA)
 
 
+def texto_vigencia_ticket(meses: int = MESES_VIGENCIA) -> str:
+    """La leyenda del ticket que le dice al cliente que su Monedero vence.
+
+    Daniel, 2026-11-12 («solucionemos estos»): la vigencia solo se veía en
+    pantalla. Sale de MESES_VIGENCIA, la misma que usa `vencimiento_de`, para
+    que el papel nunca diga otra cosa que la regla."""
+    unidad = "mes" if int(meses) == 1 else "meses"
+    return f"Tu Monedero vence {int(meses)} {unidad} después de cada compra"
+
+
 def importe_elegible(monto_total, monto_monedero=None) -> Decimal:
     """Lo que genera cashback: el total ya con descuentos y redondeo, menos lo
     pagado con el propio monedero. Nunca negativo."""

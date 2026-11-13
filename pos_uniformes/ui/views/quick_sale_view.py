@@ -3579,7 +3579,13 @@ class QuickSaleWidget(
         if ahorrado:
             secciones.append([tk_center(ahorrado)])
         if monedero:
-            renglones_monedero = lineas_ticket_monedero(monedero, tk_row)
+            # La leyenda de que el Monedero vence va en la copia del cliente,
+            # no en compra de empleada (Daniel, 2026-11-12: «solucionemos estos»).
+            renglones_monedero = lineas_ticket_monedero(
+                monedero,
+                tk_row,
+                con_vigencia=not store_copy and not getattr(self, "_discount_active", False),
+            )
             if renglones_monedero:
                 secciones.append(renglones_monedero)
         if not store_copy and hay_liquidacion(items):

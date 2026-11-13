@@ -393,6 +393,99 @@ class TicketSinCanjeTest(_Base):
         self.assertIsNone(w._monedero_para_ticket(D("450"), False))
 
 
+class TicketVigenciaMonederoTest(_Base):
+    """Daniel, 2026-11-12 («solucionemos estos»): el ticket dice que el
+    Monedero vence 12 meses después de cada compra."""
+
+    def _ticket(self, w, **kw):
+        with patch.object(w, "_load_business_info", return_value=("MAXIMODA", "", "")):
+            return w._build_venta_text(**kw)
+
+    def test_el_texto_sale_de_la_regla(self):
+        from pos_uniformes.services import monedero_service as mon
+
+        self.assertEqual(mon.MESES_VIGENCIA, 12)
+        self.assertEqual(mon.texto_vigencia_ticket(), "Tu Monedero vence 12 meses después de cada compra")
+        self.assertIn("6 meses", mon.texto_vigencia_ticket(6))
+
+    def test_cabe_en_el_ancho_del_ticket(self):
+        lineas = helper.lineas_vigencia_monedero()
+        self.assertEqual(len(lineas), 2)
+        for linea in lineas:
+            self.assertEqual(len(linea), 38)
+            linea.encode("cp850")   # la térmica imprime en CP850
+        self.assertIn("Tu Monedero vence 12 meses", lineas[0])
+        self.assertIn("después de cada compra", lineas[1])
+
+    def test_sale_con_monedero_del_cliente(self):
+        w = self._widget()
+        w._cliente = _cliente()
+        ticket = self._ticket(w, monedero=w._monedero_para_ticket(D("450"), False))
+        for linea in helper.lineas_vigencia_monedero():
+            self.assertIn(linea, ticket)
+        # Va dentro del recuadro del Monedero, después del saldo.
+        renglones = ticket.split("\n")
+        i_saldo = next(i for i, r in enumerate(renglones) if "Saldo en monedero:" in r)
+        self.assertEqual(renglones[i_saldo + 1], helper.lineas_vigencia_monedero()[0])
+
+    def test_sale_si_uso_saldo(self):
+        texto = "\n".join(helper.lineas_ticket_monedero(
+            {"canje": D("37"), "por_cobrar": D("413"), "metodo": "Efectivo"}, tk_row, con_vigencia=True,
+        ))
+        self.assertIn("Tu Monedero vence", texto)
+
+    def test_no_sale_sin_cliente(self):
+        w = self._widget()
+        w._cliente = None
+        ticket = self._ticket(w, monedero=w._monedero_para_ticket(D("450"), False))
+        self.assertNotIn("Monedero vence", ticket)
+
+    def test_no_sale_si_el_recuadro_no_muestra_monedero(self):
+        texto = "\n".join(helper.lineas_ticket_monedero({"cliente": "Ana"}, tk_row, con_vigencia=True))
+        self.assertNotIn("Monedero vence", texto)
+
+    def test_no_sale_en_compra_de_empleada(self):
+        w = self._widget()
+        w._cliente = _cliente()
+        w._discount_active = True
+        ticket = self._ticket(w, monedero=w._monedero_para_ticket(D("450"), False))
+        self.assertIn("Saldo en monedero:", ticket)
+        self.assertNotIn("Monedero vence", ticket)
+
+    def test_no_sale_en_la_copia_de_la_tienda(self):
+        w = self._widget()
+        w._cliente = _cliente()
+        ticket = self._ticket(w, store_copy=True, monedero=w._monedero_para_ticket(D("450"), False))
+        self.assertNotIn("Monedero vence", ticket)
+
+    def test_reimpresion_con_saldo_usado_la_lleva(self):
+        from datetime import datetime
+
+        w = self._widget()
+        with patch.object(w, "_load_business_info", return_value=("MAXIMODA", "", "")):
+            ticket = w.build_reprint_ticket(
+                tipo="venta",
+                detalle=[{"sku": "SKU1", "nombre": "Pants", "talla": "6", "precio": "450", "cantidad": 1}],
+                cliente=None, employee_name="Fanny", descuento_empleada=False,
+                created_at=datetime(2026, 11, 12, 10, 0), monto_total=D("450"), monto_monedero=D("37"),
+            )
+        self.assertIn("Pagado con monedero", ticket)
+        self.assertIn("Monedero vence", ticket)
+
+    def test_reimpresion_sin_monedero_no(self):
+        from datetime import datetime
+
+        w = self._widget()
+        with patch.object(w, "_load_business_info", return_value=("MAXIMODA", "", "")):
+            ticket = w.build_reprint_ticket(
+                tipo="venta",
+                detalle=[{"sku": "SKU1", "nombre": "Pants", "talla": "6", "precio": "450", "cantidad": 1}],
+                cliente=None, employee_name="Fanny", descuento_empleada=False,
+                created_at=datetime(2026, 11, 12, 10, 0), monto_total=D("450"),
+            )
+        self.assertNotIn("Monedero vence", ticket)
+
+
 class VentasIgualesSeguidasTest(_Base):
     """WALLET-003: dos ventas iguales seguidas son dos ventas."""
 
