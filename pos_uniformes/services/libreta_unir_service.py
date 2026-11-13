@@ -35,6 +35,7 @@ from datetime import date, datetime
 from sqlalchemy import select
 
 from pos_uniformes.database.models import LibretaVenta
+from pos_uniformes.services.libreta_service import esta_unida  # noqa: F401 — se usa desde la pantalla
 
 #: Solo las ventas se unen (ver el docstring del módulo).
 TIPOS_QUE_SE_UNEN = ("venta",)

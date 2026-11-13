@@ -61,4 +61,7 @@ def texto_movimiento(row, *, con_dia: bool = False) -> str:
     texto = f"{icono}  {dia}{hora} · {verbo} {piezas} pieza(s)"
     if comisiones:
         texto += f"  (+{comisiones} com.)"
+    if getattr(row, "operacion_grupo_id", None) is not None:
+        # Unida con otra venta (2026-11-13): la misma clienta, 1 operación.
+        texto += "  🔗 misma clienta"
     return texto + f"\n      {describir_detalle(list(row.detalle or []))}"

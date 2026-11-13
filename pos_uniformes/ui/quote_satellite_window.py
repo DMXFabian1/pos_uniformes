@@ -2107,12 +2107,18 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_privado_button.setAutoDefault(False)
         self.libreta_privado_button.setMinimumHeight(42)
         acciones_grid.addWidget(self.libreta_privado_button, 2, 0, 1, 2)
+        # Unir con la anterior (2026-11-13): la misma clienta se llevó otra
+        # cosa después del ticket; las dos ventas cuentan como 1 operación.
+        from pos_uniformes.ui.helpers import libreta_unir_helper
+
+        self.libreta_unir_button = libreta_unir_helper.crear_boton(self)
+        acciones_grid.addWidget(self.libreta_unir_button, 3, 0, 1, 2)
         # Borrar va aparte y en otro tono: es lo único que no tiene vuelta.
         self.libreta_delete_button.setText("🗑 Borrar este movimiento")
         self.libreta_delete_button.setObjectName("libretaAccionBorrar")
         self.libreta_delete_button.setAutoDefault(False)
         self.libreta_delete_button.setMinimumHeight(36)
-        acciones_grid.addWidget(self.libreta_delete_button, 3, 0, 1, 2)
+        acciones_grid.addWidget(self.libreta_delete_button, 4, 0, 1, 2)
         acciones_ly.addLayout(acciones_grid)
         self.libreta_acciones_bar.setVisible(False)
         # Sin nada elegido, la columna dice para qué sirve en vez de quedar vacía.
@@ -3782,6 +3788,12 @@ class QuoteSatelliteWindow(QMainWindow):
         detalle = getattr(self, "libreta_mov_detalle", None)
         if detalle is not None:
             detalle.setText(self._libreta_resumen_de(row) if row is not None else "")
+        from pos_uniformes.ui.helpers.libreta_unir_helper import actualizar_boton
+
+        actualizar_boton(
+            getattr(self, "libreta_unir_button", None), row,
+            es_dueno=bool(getattr(self, "_libreta_is_owner", False)),
+        )
         boton = getattr(self, "libreta_privado_button", None)
         if boton is None:
             return
@@ -4751,6 +4763,11 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_pag_next.setEnabled(self._libreta_pagina < total_paginas - 1)
 
         self.libreta_table.setRowCount(len(rows))
+        # Ventas unidas en una operación (2026-11-13): «🔗 misma clienta 1/2».
+        from pos_uniformes.services.libreta_unir_service import posiciones_en_grupo
+        from pos_uniformes.ui.helpers import libreta_unir_helper
+
+        posiciones_unidas = posiciones_en_grupo(self._libreta_rows_completas)
         for i, row in enumerate(rows):
             local_dt = (
                 row.created_at.astimezone()
@@ -4770,6 +4787,7 @@ class QuoteSatelliteWindow(QMainWindow):
             if self._libreta_is_owner:
                 nombre = _nombre_de(row.employee_name or row.employee_code)
                 tipo_txt = f"{tipo_txt} — {nombre}"
+            tipo_txt = libreta_unir_helper.marcar_tipo(tipo_txt, row, posiciones_unidas)
             if str(row.tipo) == "abono":
                 prendas_txt = f"Abono — {getattr(row, 'cliente', None) or 'cliente'}"
             else:
@@ -4787,6 +4805,7 @@ class QuoteSatelliteWindow(QMainWindow):
             )
             if a_cuenta:
                 self._pintar_fila_a_cuenta(i)
+            libreta_unir_helper.pintar_fila(self.libreta_table, i, row)
         self._ajustar_alto_tabla_libreta()
 
     #: La compra a cuenta de una empleada: azul y en cursiva, para que no se
