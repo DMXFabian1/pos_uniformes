@@ -17,26 +17,19 @@ FLOW_GROUPS: "OrderedDict[str, dict[str, object]]" = OrderedDict(
             "caja_cobro",
             {
                 "title": "Caja y Cobro",
+                # 2026-11-12: la Caja antigua (cobro, promo manual, cliente
+                # de la venta) se retiró del POS; quedan el PIN, el cliente
+                # escaneado de Presupuestos y la sesión/corte de caja.
                 "covers": (
-                    "venta con efectivo, transferencia y mixto",
-                    "promo manual",
+                    "validacion del PIN administrativo",
                     "cliente con y sin QR",
                     "apertura, movimiento y corte de caja",
                 ),
                 "tests": (
-                    "pos_uniformes.tests.test_sale_payment_collection_service",
-                    "pos_uniformes.tests.test_sale_payment_context_service",
                     "pos_uniformes.tests.test_sale_payment_validation_service",
-                    "pos_uniformes.tests.test_sale_payment_note_service",
                     "pos_uniformes.tests.test_sale_discount_context_service",
-                    "pos_uniformes.tests.test_manual_promo_flow_service",
-                    "pos_uniformes.tests.test_sale_client_discount_flow",
                     "pos_uniformes.tests.test_sale_client_sync_service",
-                    "pos_uniformes.tests.test_sale_client_selection_helper",
                     "pos_uniformes.tests.test_scanned_client_flow_service",
-                    "pos_uniformes.tests.test_sale_scanned_client_helper",
-                    "pos_uniformes.tests.test_sale_checkout_action_service",
-                    "pos_uniformes.tests.test_sale_checkout_service",
                     "pos_uniformes.tests.test_cash_session_action_service",
                     "pos_uniformes.tests.test_cash_session_feedback_helper",
                 ),

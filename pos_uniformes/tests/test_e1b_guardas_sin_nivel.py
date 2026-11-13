@@ -33,7 +33,6 @@ from pos_uniformes.database.models import (
 )
 from pos_uniformes.services.apartado_service import ApartadoItemInput, ApartadoService
 from pos_uniformes.services.layaway_pricing_service import resolve_layaway_client_discount_percent
-from pos_uniformes.services.sale_checkout_service import load_sale_client_checkout_snapshot
 from pos_uniformes.services.sale_discount_service import normalize_discount_value
 from pos_uniformes.services.sale_selected_client_service import (
     CLIENTE_LABEL,
@@ -112,18 +111,8 @@ class CajaAntiguaTests(unittest.TestCase):
         self.assertFalse(sync.locked)
         self.assertEqual(sync.discount_percent, Decimal("0.00"))
 
-    def test_contexto_de_descuento_de_la_caja(self) -> None:
-        from pos_uniformes.services import sale_discount_context_service as ctx_mod
-
-        fuente = open(ctx_mod.__file__, encoding="utf-8").read()
-        # El contexto de descuento de la Caja usa la misma función.
-        self.assertIn("resolve_sale_selected_client_sync_state", fuente)
-
-    def test_el_snapshot_de_cobro_ya_no_guarda_nivel(self) -> None:
-        c = _cliente(1, NivelLealtad.LEAL, "10.00")
-        snap = load_sale_client_checkout_snapshot(_Sesion([c]), selected_client_id=1)
-        self.assertIs(snap.client, c)
-        self.assertFalse(hasattr(snap, "previous_level"))
+    # 2026-11-12: se quitaron las pruebas del contexto de descuento y del
+    # snapshot de cobro de la Caja antigua: esos módulos se retiraron con ella.
 
 
 class ApartadosAntiguosTests(unittest.TestCase):
