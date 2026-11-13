@@ -329,11 +329,16 @@ def build_catalog_variant_dialog(
         if problema is not None:
             QMessageBox.warning(dialog, "Datos incompletos", problema)
             return
+        # Al agregar una talla a una prenda que ya existe (prefill), el color
+        # viene de sus hermanas («Blanca»): mientras no se cambie no se
+        # pregunta. La forma única es para altas nuevas, no para completar
+        # una prenda que ya tiene su color.
+        color_inicial = (initial or {}).get("color") or (prefill or {}).get("color") or ""
         resultado = confirmar_valores(
             dialog,
             [
                 Campo("talla", CAMPO_TALLA, talla_combo.currentText(), str((initial or {}).get("talla") or "")),
-                Campo("color", CAMPO_COLOR, color_combo.currentText(), str((initial or {}).get("color") or "")),
+                Campo("color", CAMPO_COLOR, color_combo.currentText(), str(color_inicial)),
             ],
             usos_de=usos_en_base,
             puede_crear_escuela=False,

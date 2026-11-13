@@ -354,11 +354,12 @@ class DialogoProductoTests(_ConBase):
 
 
 class DialogoTallaTests(_ConBase):
-    def _abrir(self, pasos, pregunta):
+    def _abrir(self, pasos, pregunta, prefill=None):
         self._con_dialogo("Presentacion", pasos)
         with patch.object(cvd, "load_legacy_config_choices", return_value={}):
             return cvd.build_catalog_variant_dialog(
                 self.ventana,
+                prefill=prefill,
                 include_stock=True,
                 default_product_id=self.producto_id,
                 common_sizes=list(cv.TALLAS_SUGERIDAS),
@@ -393,6 +394,26 @@ class DialogoTallaTests(_ConBase):
         self.assertEqual(payload["talla"], "Unitalla")
         self.assertEqual(payload["precio"], "245")
         self.assertEqual(payload["sku"], "")  # el servicio lo genera con el contador bloqueado
+
+
+    def test_talla_nueva_de_prenda_existente_no_pregunta_por_su_color(self) -> None:
+        pregunta = PreguntaFalsa()
+
+        def pasos(d):
+            combos = d.findChildren(QComboBox)
+            combos[1].setEditText("16")
+            ok = [b for b in d.findChildren(QPushButton) if b.text() in ("OK", "&OK", "Aceptar")][0]
+            ok.click()
+
+        payload = self._abrir(
+            pasos,
+            pregunta,
+            prefill={"producto_id": self.producto_id, "color": "Blanca", "precio_venta": "245",
+                     "costo_referencia": None},
+        )
+        self.assertEqual(pregunta.preguntas, [])
+        self.assertEqual(payload["color"], "Blanca")
+        self.assertEqual(payload["talla"], "16")
 
 
 class ResolverEnMainWindowTests(_ConBase):
