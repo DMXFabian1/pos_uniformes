@@ -82,6 +82,46 @@ class AvisoTests(_ConBot):
         m = self._proponer(cliente=otro)
         self.assertIn("Programa hoy: Maximoda Club", tm.aviso_de_propuesta(self.s, m))
 
+    def test_las_compras_salen_de_la_libreta(self) -> None:
+        """2026-11-12 (Daniel: «la caja antigua ya no es de utilidad, todo lo
+        demás corre en libreta y kioskos»): cuenta las ventas del cliente en
+        la Libreta; abonos, apartados y la compra de una empleada no; las
+        privadas sí (el aviso solo lo ve el dueño)."""
+        from decimal import Decimal
+
+        from pos_uniformes.database.models import LibretaVenta
+
+        ahora = datetime.now(timezone.utc)
+
+        def fila(tipo, monto, dias, **extra):
+            self.s.add(LibretaVenta(
+                employee_code=self.lupita.codigo, employee_name="Lupita", tipo=tipo, piezas=1,
+                monto_total=Decimal(monto), monto_neto=Decimal(monto), cliente_id=self.cliente.id,
+                created_at=ahora - timedelta(days=dias), **extra))
+
+        fila("venta", "500", 10)
+        fila("venta", "300", 3, privado=True, pago_tarjeta=True)
+        fila("abono", "200", 1)
+        fila("apartado", "900", 1)
+        fila("venta", "150", 0, descuento_empleada=True)
+        self.s.flush()
+        texto = tm.aviso_de_propuesta(self.s, self.m, ahora=ahora)
+        self.assertIn("· 2 compras por $800 (la última hace 3 días)", texto)
+        self.assertNotIn("Sin compras", texto)
+
+    def test_una_sola_compra_va_en_singular(self) -> None:
+        from decimal import Decimal
+
+        from pos_uniformes.database.models import LibretaVenta
+
+        ahora = datetime.now(timezone.utc)
+        self.s.add(LibretaVenta(
+            employee_code=self.lupita.codigo, employee_name="Lupita", tipo="venta", piezas=1,
+            monto_total=Decimal("1250"), monto_neto=Decimal("1250"), cliente_id=self.cliente.id,
+            created_at=ahora))
+        self.s.flush()
+        self.assertIn("· 1 compra por $1,250 (la última hoy)", tm.aviso_de_propuesta(self.s, self.m, ahora=ahora))
+
     def test_botones_de_una_propuesta(self) -> None:
         datos = _datos(tm.botones_de(self.m))
         self.assertEqual(datos, [f"mb:ok:{self.m.id}", f"mb:no:{self.m.id}", "mb:lista"])

@@ -71,12 +71,25 @@ def _hace(fecha: datetime | None, ahora: datetime) -> str:
 
 
 def _compras(session: Session, cliente_id: int) -> tuple[int, Decimal, datetime | None]:
-    """Solo lectura: ventas confirmadas de este cliente (número, total, última)."""
-    from pos_uniformes.database.models import EstadoVenta, Venta
+    """Solo lectura: lo que este cliente ha comprado, de la Libreta (número
+    de ventas, total y la última).
+
+    2026-11-12 (Daniel: «la caja antigua ya no es de utilidad, todo lo demás
+    corre en libreta y kioskos»): antes contaba en `Venta`, la tabla de la
+    Caja antigua que ya no crece, y a un cliente que compra seguido en el
+    kiosko le salía «Sin compras». Ahora cuenta en `LibretaVenta.cliente_id`:
+    solo ventas (ni abonos ni apartados, ni la compra de una empleada con
+    precio especial), incluidas las privadas (este aviso solo lo ve el
+    dueño). Una operación anulada se borra de la Libreta, así que no cuenta."""
+    from pos_uniformes.database.models import LibretaVenta
+    from pos_uniformes.services.libreta_service import predicado_operacion
 
     fila = session.execute(
-        select(func.count(Venta.id), func.coalesce(func.sum(Venta.total), 0), func.max(Venta.created_at))
-        .where(Venta.cliente_id == int(cliente_id), Venta.estado == EstadoVenta.CONFIRMADA)
+        select(
+            func.count(LibretaVenta.id),
+            func.coalesce(func.sum(LibretaVenta.monto_total), 0),
+            func.max(LibretaVenta.created_at),
+        ).where(LibretaVenta.cliente_id == int(cliente_id), predicado_operacion(("venta",)))
     ).one()
     return int(fila[0] or 0), Decimal(str(fila[1] or 0)), fila[2]
 
@@ -107,7 +120,8 @@ def _resumen_cliente(session: Session, membresia, ahora: datetime) -> list[str]:
     elif cuantas == 0:
         lineas.append("· Sin compras registradas a su nombre")
     else:
-        lineas.append(f"· {cuantas} compras por ${total:,.0f} (la última {_hace(ultima, ahora)})")
+        compras = "1 compra" if cuantas == 1 else f"{cuantas} compras"
+        lineas.append(f"· {compras} por ${total:,.0f} (la última {_hace(ultima, ahora)})")
     return lineas
 
 
