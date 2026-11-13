@@ -75,7 +75,9 @@ class CifrasTests(unittest.TestCase):
         self.assertEqual(c.efectivo, Decimal("450.00"))
         self.assertEqual(c.tarjeta_neto, Decimal("191.00"))
         self.assertEqual(c.cobrado, Decimal("641.00"))
-        self.assertEqual((c.operaciones, c.ventas, c.piezas), (4, 2, 4))
+        # El abono no es operación (Daniel, 2026-11-12: «no cuentan como
+        # operación»); su dinero sí está arriba, en efectivo y cobrado.
+        self.assertEqual((c.operaciones, c.ventas, c.piezas), (3, 2, 4))
         self.assertEqual(c.ticket_promedio, Decimal("250.00"))
 
     def test_el_ajuste_del_dueno_va_por_defecto(self) -> None:

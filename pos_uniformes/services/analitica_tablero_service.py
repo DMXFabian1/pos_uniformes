@@ -109,7 +109,7 @@ class Cifras:
     cobrado: Decimal = Decimal("0.00")      # efectivo + lo que llega por terminal (ventas y abonos)
     efectivo: Decimal = Decimal("0.00")
     tarjeta_neto: Decimal = Decimal("0.00")
-    operaciones: int = 0                    # ventas + apartados + abonos
+    operaciones: int = 0                    # ventas + apartados (el abono no es operación, Daniel 2026-11-12)
     ventas: int = 0                         # para el ticket promedio
     importe_ventas: Decimal = Decimal("0.00")
     piezas: int = 0
@@ -138,7 +138,10 @@ def cifras(rows: list, *, ajuste: Decimal = Decimal("0.00")) -> Cifras:
         cobrado=(efectivo + r.tarjeta_neto).quantize(_CENT),
         efectivo=efectivo,
         tarjeta_neto=r.tarjeta_neto,
-        operaciones=len(rows),
+        # La regla única de la Libreta (2026-11-12): un abono no es operación
+        # (Daniel: «no cuentan como operación»), ni la compra de una empleada
+        # con precio especial. Antes contaba todas las filas.
+        operaciones=r.operaciones,
         ventas=len(ventas),
         importe_ventas=importe.quantize(_CENT),
         piezas=piezas,
