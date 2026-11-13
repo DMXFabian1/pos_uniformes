@@ -839,7 +839,16 @@ class CatalogService:
         cls._validar_admin(usuario)
         valor_anterior = producto.activo
         producto.activo = activo
-        for variante in producto.variantes:
+        variantes = list(producto.variantes)
+        if activo:
+            # Reactivar la prenda ya no revive las tallas que se habían dado
+            # de baja una por una (hallazgo 14): solo las que se apagaron
+            # junto con la prenda. Si no hay rastro (bajas de antes de este
+            # cambio), se reactivan todas, como siempre.
+            apagadas_con_prenda = cls._variantes_apagadas_con_prenda(session, variantes)
+            if apagadas_con_prenda:
+                variantes = [v for v in variantes if v.activo or v.id in apagadas_con_prenda]
+        for variante in variantes:
             variante_anterior = variante.activo
             variante.activo = activo
             session.add(variante)
@@ -852,6 +861,7 @@ class CatalogService:
                 valores_anteriores={"activo": variante_anterior},
                 valores_nuevos={"activo": variante.activo},
                 accion_por_campo={"activo": TipoCambioCatalogo.ESTADO},
+                observacion=None if activo else cls.OBS_BAJA_CON_PRENDA,
             )
         session.add(producto)
         cls._registrar_cambios(
@@ -866,6 +876,31 @@ class CatalogService:
         )
         cls._notify_meili(session)
         return producto
+
+    OBS_BAJA_CON_PRENDA = "Desactivada junto con su prenda."
+
+    @classmethod
+    def _variantes_apagadas_con_prenda(cls, session: Session, variantes: list[Variante]) -> set[int]:
+        """Ids de las tallas inactivas cuyo último cambio de estado fue la baja
+        de su prenda (la bitácora lo dice en la observación)."""
+        from pos_uniformes.database.models import CambioCatalogo
+
+        inactivas = [v.id for v in variantes if not v.activo]
+        if not inactivas:
+            return set()
+        filas = session.execute(
+            select(CambioCatalogo.entidad_id, CambioCatalogo.observacion)
+            .where(
+                CambioCatalogo.entidad_tipo == TipoEntidadCatalogo.PRESENTACION,
+                CambioCatalogo.accion == TipoCambioCatalogo.ESTADO,
+                CambioCatalogo.entidad_id.in_(inactivas),
+            )
+            .order_by(CambioCatalogo.entidad_id, CambioCatalogo.created_at, CambioCatalogo.id)
+        ).all()
+        ultima: dict[int, str | None] = {}
+        for entidad_id, observacion in filas:
+            ultima[int(entidad_id)] = observacion
+        return {vid for vid, obs in ultima.items() if obs == cls.OBS_BAJA_CON_PRENDA}
 
     @classmethod
     def cambiar_estado_variante(
@@ -994,11 +1029,50 @@ class CatalogService:
             "Presentacion eliminada.",
         )
         session.delete(variante)
+        cls._notify_meili(session)
+
+    @classmethod
+    @staticmethod
+    def _validar_producto_eliminable(session: Session, producto: Producto) -> None:
+        """Una prenda que está en un uniforme o en una receta no se borra:
+        antes salía un error técnico de la base (hallazgo 15)."""
+        from pos_uniformes.database.models import ConjuntoComponente, Uniforme, UniformePieza
+
+        uniformes = session.execute(
+            select(Escuela.nombre, Uniforme.nombre)
+            .join(Uniforme, Uniforme.escuela_id == Escuela.id)
+            .join(UniformePieza, UniformePieza.uniforme_id == Uniforme.id)
+            .where(UniformePieza.producto_id == producto.id)
+        ).all()
+        if uniformes:
+            donde = ", ".join(sorted({f"{escuela} ({uniforme})" for escuela, uniforme in uniformes}))
+            raise ValueError(
+                f"Esta prenda está en el uniforme de {donde}. Quítala de ahí primero "
+                "(Más → Uniformes por escuela) o mejor desactívala."
+            )
+        recetas = session.scalars(
+            select(Producto.nombre)
+            .join(ConjuntoComponente, ConjuntoComponente.conjunto_id == Producto.id)
+            .where(ConjuntoComponente.componente_id == producto.id)
+        ).all()
+        if recetas:
+            raise ValueError(
+                f"Esta prenda es pieza de la receta de {', '.join(sorted(set(recetas)))}. "
+                "Quítala de la receta primero o mejor desactívala."
+            )
+        tiene_receta = session.scalar(
+            select(func.count(ConjuntoComponente.id)).where(ConjuntoComponente.conjunto_id == producto.id)
+        ) or 0
+        if tiene_receta:
+            raise ValueError(
+                "Esta prenda tiene receta (se arma de otras piezas). Borra su receta primero o mejor desactívala."
+            )
 
     @classmethod
     def eliminar_producto(cls, session: Session, usuario: Usuario, producto: Producto) -> None:
         cls._validar_admin(usuario)
         session.refresh(producto)
+        cls._validar_producto_eliminable(session, producto)
         variantes = list(producto.variantes)
         if not variantes:
             session.delete(producto)

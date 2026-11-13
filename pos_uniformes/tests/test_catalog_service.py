@@ -272,5 +272,56 @@ class BusquedaDespuesDelCommitTests(_ConBase):
         self.avisos.assert_called_once()
 
 
+class BorrarYReactivarTests(_ConBase):
+    def test_no_borra_una_prenda_que_esta_en_un_uniforme(self) -> None:
+        p = self._producto("Pants Suelto", self.allende)
+        uniforme = Uniforme(escuela_id=self.allende.id, nombre="Uniforme")
+        self.s.add(uniforme)
+        self.s.flush()
+        self.s.add(UniformePieza(uniforme_id=uniforme.id, producto_id=p.id, grupo="Deportivo"))
+        self.s.flush()
+        with self.assertRaisesRegex(ValueError, "uniforme de Ignacio Allende"):
+            C.eliminar_producto(self.s, self.admin, p)
+
+    def test_no_borra_una_pieza_de_receta(self) -> None:
+        pants2 = self._producto("Pants 2pz", self.allende)
+        pants3 = self._producto("Pants 3pz", self.allende)
+        self.s.add(ConjuntoComponente(conjunto_id=pants3.id, componente_id=pants2.id, cantidad=1))
+        self.s.flush()
+        with self.assertRaisesRegex(ValueError, "receta de Pants 3pz"):
+            C.eliminar_producto(self.s, self.admin, pants2)
+        with self.assertRaisesRegex(ValueError, "tiene receta"):
+            C.eliminar_producto(self.s, self.admin, pants3)
+
+    def test_borra_la_que_esta_suelta(self) -> None:
+        p = self._producto("Short", None)
+        self._talla(p, "4")
+        self.s.flush()
+        C.eliminar_producto(self.s, self.admin, p)
+        self.s.flush()
+        self.assertIsNone(self.s.get(Producto, p.id))
+
+    def test_reactivar_no_revive_las_tallas_dadas_de_baja_aparte(self) -> None:
+        p = self._producto("Chamarra", self.allende)
+        t4, t6, t8 = (self._talla(p, t) for t in ("4", "6", "8"))
+        C.cambiar_estado_variante(self.s, self.admin, t8, False)
+        self.s.flush()
+        C.cambiar_estado_producto(self.s, self.admin, p, False)
+        self.s.flush()
+        self.assertEqual([t.activo for t in (t4, t6, t8)], [False, False, False])
+        C.cambiar_estado_producto(self.s, self.admin, p, True)
+        self.s.flush()
+        self.assertEqual([t.activo for t in (t4, t6, t8)], [True, True, False])
+
+    def test_bajas_viejas_sin_rastro_se_reactivan_todas(self) -> None:
+        p = self._producto("Chamarra", self.allende)
+        t4, t6 = (self._talla(p, t) for t in ("4", "6"))
+        p.activo = False
+        t4.activo = t6.activo = False
+        self.s.flush()
+        C.cambiar_estado_producto(self.s, self.admin, p, True)
+        self.assertEqual([t4.activo, t6.activo], [True, True])
+
+
 if __name__ == "__main__":
     unittest.main()
