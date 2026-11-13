@@ -12,14 +12,37 @@ from pos_uniformes.services.search_filter_service import (
 
 _inventory_qr_exists_cache: dict[str, bool] = {}
 
+from pos_uniformes.ui.helpers.size_option_sort_helper import _size_sort_key
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 
 
 def load_inventory_snapshot_rows(session) -> list[dict[str, object]]:
-    return [
-        _build_inventory_snapshot_row(raw_row)
-        for raw_row in _execute_inventory_snapshot_query(session)
-    ]
+    return ordenar_filas_inventario(
+        [
+            _build_inventory_snapshot_row(raw_row)
+            for raw_row in _execute_inventory_snapshot_query(session)
+        ]
+    )
+
+
+def clave_orden_inventario(row: dict[str, object]) -> tuple[object, ...]:
+    """Agrupa por producto (y color) y ordena las tallas como talla, no como SKU.
+
+    Usa el mismo orden de tallas que los filtros y Bodega
+    (`size_option_sort_helper`): números y rangos ascendentes, luego
+    CH, CH-MD, MD, GD, GD-EXG, EXG, UNI/UNITALLA y al final lo raro.
+    """
+    return (
+        str(row.get("producto_nombre") or "").casefold(),
+        int(row.get("producto_id") or 0),
+        str(row.get("color") or "").casefold(),
+        _size_sort_key(str(row.get("talla") or "")),
+        str(row.get("sku") or ""),
+    )
+
+
+def ordenar_filas_inventario(rows: list[dict[str, object]]) -> list[dict[str, object]]:
+    return sorted(rows, key=clave_orden_inventario)
 
 
 def _build_inventory_snapshot_row(row: tuple[object, ...]) -> dict[str, object]:
@@ -49,6 +72,7 @@ def _build_inventory_snapshot_row(row: tuple[object, ...]) -> dict[str, object]:
             "fallback_importacion": bool(row[20]),
             "ultimo_conteo_at": row[21],
             "stock_minimo": int(row[22]) if row[22] is not None else None,
+            "producto_id": int(row[23]) if len(row) > 23 and row[23] is not None else None,
             "qr_exists": qr_exists,
             "origen_etiqueta": "LEGACY" if row[10] else "NUEVO",
             "variante_estado": "ACTIVA" if row[19] else "INACTIVA",
@@ -158,6 +182,7 @@ def _execute_inventory_snapshot_query(session) -> list[tuple[object, ...]]:
             func.coalesce(ImportacionCatalogoFila.producto_fallback, False),
             Variante.ultimo_conteo_at,
             Variante.stock_minimo,
+            Producto.id,
         )
         .join(Variante.producto)
         .join(Producto.categoria)

@@ -8,6 +8,7 @@ from unittest.mock import patch
 from pos_uniformes.services.inventory_snapshot_service import (
     invalidate_inventory_qr_exists_cache,
     load_inventory_snapshot_rows,
+    ordenar_filas_inventario,
 )
 from pos_uniformes.services.search_filter_service import (
     SEARCH_ALIAS_BLOBS_KEY,
@@ -121,6 +122,53 @@ class InventorySnapshotServiceTests(unittest.TestCase):
         self.assertTrue(second_rows[0]["qr_exists"])
         self.assertFalse(reloaded_rows[0]["qr_exists"])
         self.assertEqual(exists_mock.call_count, 2)
+
+
+class OrdenFilasInventarioTests(unittest.TestCase):
+    def _fila(self, sku: str, producto: str, talla: str, *, pid: int = 1, color: str = "Azul") -> dict[str, object]:
+        return {"sku": sku, "producto_nombre": producto, "producto_id": pid, "talla": talla, "color": color}
+
+    def test_tallas_en_orden_de_talla_no_de_sku(self) -> None:
+        filas = [
+            self._fila("SKU-1", "Pants Gales", "EXG"),
+            self._fila("SKU-2", "Pants Gales", "10"),
+            self._fila("SKU-3", "Pants Gales", "CH"),
+            self._fila("SKU-4", "Pants Gales", "2"),
+            self._fila("SKU-5", "Pants Gales", "GD"),
+            self._fila("SKU-6", "Pants Gales", "MD"),
+            self._fila("SKU-7", "Pants Gales", "16"),
+        ]
+        orden = [f["talla"] for f in ordenar_filas_inventario(filas)]
+        self.assertEqual(orden, ["2", "10", "16", "CH", "MD", "GD", "EXG"])
+
+    def test_agrupa_por_producto_y_uni_al_final(self) -> None:
+        filas = [
+            self._fila("SKU-9", "Suéter Morelos", "UNI", pid=2),
+            self._fila("SKU-1", "Calceta", "UNI", pid=3),
+            self._fila("SKU-8", "Suéter Morelos", "8", pid=2),
+            self._fila("SKU-7", "Calceta", "13-18", pid=3),
+            self._fila("SKU-6", "Calceta", "9-12", pid=3),
+        ]
+        orden = [(f["producto_nombre"], f["talla"]) for f in ordenar_filas_inventario(filas)]
+        self.assertEqual(
+            orden,
+            [
+                ("Calceta", "9-12"),
+                ("Calceta", "13-18"),
+                ("Calceta", "UNI"),
+                ("Suéter Morelos", "8"),
+                ("Suéter Morelos", "UNI"),
+            ],
+        )
+
+    def test_mismo_nombre_distinto_producto_no_se_mezcla(self) -> None:
+        filas = [
+            self._fila("A", "Playera", "8", pid=2),
+            self._fila("B", "Playera", "6", pid=1),
+            self._fila("C", "Playera", "10", pid=2),
+            self._fila("D", "Playera", "12", pid=1),
+        ]
+        self.assertEqual([f["sku"] for f in ordenar_filas_inventario(filas)], ["B", "D", "A", "C"])
 
 
 if __name__ == "__main__":
