@@ -1285,6 +1285,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             qr_tone="positive",
         )
         summary_view = SimpleNamespace(
+            negative_counter=SimpleNamespace(text="0", tone="positive"),
             out_counter=SimpleNamespace(text="0", tone="positive"),
             low_counter=SimpleNamespace(text="0", tone="positive"),
             qr_pending_counter=SimpleNamespace(text="0", tone="positive"),
@@ -1334,6 +1335,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             qr_tone="positive",
         )
         summary_view = SimpleNamespace(
+            negative_counter=SimpleNamespace(text="0", tone="positive"),
             out_counter=SimpleNamespace(text="0", tone="positive"),
             low_counter=SimpleNamespace(text="0", tone="positive"),
             qr_pending_counter=SimpleNamespace(text="0", tone="positive"),
@@ -1652,6 +1654,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             qr_tone="positive",
         )
         summary_view = SimpleNamespace(
+            negative_counter=SimpleNamespace(text="0", tone="positive"),
             out_counter=SimpleNamespace(text="0", tone="positive"),
             low_counter=SimpleNamespace(text="0", tone="positive"),
             qr_pending_counter=SimpleNamespace(text="0", tone="positive"),
@@ -1694,6 +1697,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             qr_tone="positive",
         )
         summary_view = SimpleNamespace(
+            negative_counter=SimpleNamespace(text="0", tone="positive"),
             out_counter=SimpleNamespace(text="0", tone="positive"),
             low_counter=SimpleNamespace(text="0", tone="positive"),
             qr_pending_counter=SimpleNamespace(text="0", tone="positive"),
