@@ -88,7 +88,6 @@ from pos_uniformes.services.active_filter_service import (
     build_active_filters_summary,
     build_active_filter_tokens,
 )
-from pos_uniformes.services.bootstrap_service import BootstrapService
 from pos_uniformes.services.analytics_snapshot_service import (
     build_analytics_sales_snapshot,
     load_confirmed_sales_for_analytics,
@@ -1371,7 +1370,6 @@ class MainWindow(QMainWindow):
         self.quote_search_input = QLineEdit()
         self.quote_state_combo = QComboBox()
 
-        self.seed_button = QPushButton("Cargar datos iniciales")
         self.logout_button = QPushButton("Cerrar sesion")
 
         self.inventory_variant_combo = QComboBox()
@@ -1613,7 +1611,6 @@ class MainWindow(QMainWindow):
         self.connection_button: QPushButton | None = None
         self.header_more_button: QToolButton | None = None
         self.connection_action: QAction | None = None
-        self.seed_action: QAction | None = None
         self.quick_backup_action: QAction | None = None
         self.api_server_action: QAction | None = None
         self._api_server_process: object | None = None
@@ -1699,8 +1696,6 @@ class MainWindow(QMainWindow):
         header_menu = QMenu(self)
         self.connection_action = header_menu.addAction("Verificar conexion")
         self.connection_action.triggered.connect(self._handle_test_connection)
-        self.seed_action = header_menu.addAction("Cargar datos iniciales")
-        self.seed_action.triggered.connect(self._handle_seed_data)
         self.quick_backup_action = header_menu.addAction("Respaldo rapido (.dump)")
         self.quick_backup_action.triggered.connect(self._handle_quick_backup)
         header_menu.addSeparator()
@@ -1819,7 +1814,6 @@ class MainWindow(QMainWindow):
             self.quote_whatsapp_button: "Abre WhatsApp con un mensaje prellenado para el cliente del presupuesto seleccionado.",
             self.quote_cancel_button: "Marca como cancelado el presupuesto seleccionado sin tocar inventario.",
             self.quote_refresh_button: "Vuelve a leer los presupuestos recientes con los filtros actuales.",
-            self.seed_button: "Carga datos demo para pruebas del sistema. Solo ADMIN.",
             self.history_filter_button: "Aplica los filtros del historial de movimientos.",
             self.history_today_button: "Filtra movimientos del dia actual.",
             self.history_clear_button: "Limpia las fechas y el resto de filtros del historial.",
@@ -5326,32 +5320,6 @@ class MainWindow(QMainWindow):
             return
         QMessageBox.information(self, "Conexion exitosa", "PostgreSQL respondio correctamente.")
 
-    def _handle_seed_data(self) -> None:
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede cargar datos demo.")
-            return
-
-        try:
-            with get_session() as session:
-                result = BootstrapService.seed_initial_data(session)
-                session.commit()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Error", str(exc))
-            return
-
-        self.refresh_all()
-        QMessageBox.information(
-            self,
-            "Datos iniciales",
-            (
-                "Datos base listos.\n"
-                f"Usuarios: {result['usuarios']}\n"
-                f"Proveedores: {result['proveedores']}\n"
-                f"Productos: {result['productos']}\n"
-                f"Presentaciones: {result['variantes']}"
-            ),
-        )
-
     def _handle_create_category(self) -> None:
         if self.current_role != RolUsuario.ADMIN:
             QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede crear categorias.")
@@ -7087,8 +7055,6 @@ class MainWindow(QMainWindow):
             self.header_more_button.setVisible(is_admin)
         if self.connection_action is not None:
             self.connection_action.setEnabled(is_admin)
-        if self.seed_action is not None:
-            self.seed_action.setEnabled(is_admin)
         self.inventory_adjust_button.setEnabled(is_admin)
         self.logout_button.setEnabled(True)
         self._apply_quote_action_state()
@@ -7143,7 +7109,7 @@ class MainWindow(QMainWindow):
 
         self.catalog_permission_label.setText(catalog_access_view.permission_label)
         self.purchase_permission_label.setText(
-            "" if is_admin else "Compras y carga de datos demo disponibles solo para ADMIN."
+            "" if is_admin else "Compras disponibles solo para ADMIN."
         )
         self.inventory_permission_label.setText(
             "" if is_admin else "Las altas, entradas, conteos, ajustes, cambios de precio y eliminacion estan restringidos a ADMIN."

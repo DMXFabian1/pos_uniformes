@@ -124,8 +124,6 @@
   - Apartados.
 - `services/backup_service.py`
   - Respaldos de DB y estado visible del ultimo respaldo automatico.
-- `services/bootstrap_service.py`
-  - Datos base/demo.
 - `services/customer_card_service.py`
   - Credenciales/QR de cliente.
 - Bloques mas recientes (lista no exhaustiva, ver `services/`):

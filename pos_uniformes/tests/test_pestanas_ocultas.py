@@ -554,5 +554,41 @@ class KioskoConservaSusApartadosTests(unittest.TestCase):
         self.assertTrue(callable(getattr(ApartadoService, "obtener_apartado", None)))
 
 
+class SinCargarDatosInicialesTests(unittest.TestCase):
+    """2026-11-12, Daniel: «la caja antigua ya no es de utilidad, todo lo
+    demás corre en libreta y kioskos» → «Pantallas con datos viejos».
+
+    «Cargar datos iniciales» del menú «Más» metía en la base real (el POS se
+    conecta solo a producción) un proveedor demo, marcas y productos de
+    prueba sin preguntar. Se retiró la acción, el botón y su handler, y
+    `bootstrap_service`, que solo usaba esto.
+    """
+
+    def setUp(self) -> None:
+        self.ventana = MainWindow(user_id=1)
+
+    def tearDown(self) -> None:
+        _cerrar(self.ventana)
+
+    def test_el_menu_mas_ya_no_carga_datos_iniciales(self) -> None:
+        from PyQt6.QtGui import QAction
+        from PyQt6.QtWidgets import QAbstractButton
+
+        acciones = {a.text() for a in self.ventana.findChildren(QAction)}
+        if self.ventana.header_more_button is not None and self.ventana.header_more_button.menu() is not None:
+            acciones |= {a.text() for a in self.ventana.header_more_button.menu().actions()}
+        self.assertNotIn("Cargar datos iniciales", acciones)
+        botones = {b.text() for b in self.ventana.findChildren(QAbstractButton)}
+        self.assertNotIn("Cargar datos iniciales", botones)
+        for atributo in ("seed_action", "seed_button", "_handle_seed_data"):
+            self.assertFalse(hasattr(self.ventana, atributo), atributo)
+
+    def test_bootstrap_service_ya_no_existe(self) -> None:
+        import importlib
+
+        with self.assertRaises(ModuleNotFoundError):
+            importlib.import_module("pos_uniformes.services.bootstrap_service")
+
+
 if __name__ == "__main__":
     unittest.main()
