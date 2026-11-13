@@ -24,12 +24,13 @@ from sqlalchemy import select
 from pos_uniformes.database.connection import get_session
 from pos_uniformes.database.models import Producto
 from pos_uniformes.services.catalog_service import CatalogService
+from pos_uniformes.services.catalogo_valores_service import CAMPO_COLOR, CAMPO_TALLA, depurar_opciones
 from pos_uniformes.ui.helpers.catalog_form_payload_helper import (
     build_catalog_batch_variant_dialog_payload,
     build_catalog_variant_dialog_payload,
     validate_catalog_variant_submission,
 )
-from pos_uniformes.utils.product_templates import load_legacy_config_choices, merge_choice_lists
+from pos_uniformes.utils.product_templates import load_legacy_config_choices
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
@@ -86,12 +87,16 @@ def build_catalog_variant_dialog(
     sku_input.setPlaceholderText("Se genera automaticamente si lo dejas vacio")
     talla_combo = QComboBox()
     talla_combo.setEditable(True)
-    talla_combo.addItems(merge_choice_lists(legacy_choices.get("TALLAS", []), common_sizes, [default_variant_size]))
+    talla_combo.addItems(
+        depurar_opciones(CAMPO_TALLA, legacy_choices.get("TALLAS", []), common_sizes, [default_variant_size])
+    )
     if talla_combo.lineEdit() is not None:
         talla_combo.lineEdit().setPlaceholderText("Selecciona o escribe una talla")
     color_combo = QComboBox()
     color_combo.setEditable(True)
-    color_combo.addItems(merge_choice_lists(legacy_choices.get("COLORES", []), common_colors, [default_variant_color]))
+    color_combo.addItems(
+        depurar_opciones(CAMPO_COLOR, legacy_choices.get("COLORES", []), common_colors, [default_variant_color])
+    )
     if color_combo.lineEdit() is not None:
         color_combo.lineEdit().setPlaceholderText("Selecciona o escribe un color")
     precio_input = QLineEdit()

@@ -126,6 +126,7 @@ from pos_uniformes.services import conjunto_service
 from pos_uniformes.services import exportacion_libreta_service
 from pos_uniformes.services import resumen_pos_service
 from pos_uniformes.services.catalog_service import CatalogService
+from pos_uniformes.services.catalogo_valores_service import COLORES_SUGERIDOS, TALLAS_SUGERIDAS
 from pos_uniformes.services.catalog_snapshot_service import load_catalog_snapshot_rows
 from pos_uniformes.services.catalog_mutation_service import (
     delete_catalog_product,
@@ -1007,60 +1008,11 @@ def _set_table_row_tint(item: QTableWidgetItem, tone: str) -> None:
     item.setBackground(QColor(background))
     item.setForeground(QColor(foreground))
 
-COMMON_COLORS = [
-    "Negro",
-    "Blanco",
-    "Gris",
-    "Azul",
-    "Marino",
-    "Celeste",
-    "Rojo",
-    "Verde",
-    "Olivo",
-    "Amarillo",
-    "Beige",
-    "Café",
-    "Camel",
-    "Khaki",
-    "Rosa",
-    "Morado",
-    "Naranja",
-    "Vino",
-    "Plateado",
-    "Dorado",
-    "Multicolor",
-]
-
-COMMON_SIZES = [
-    "XS",
-    "S",
-    "M",
-    "L",
-    "XL",
-    "XXL",
-    "22",
-    "24",
-    "25",
-    "26",
-    "27",
-    "28",
-    "29",
-    "30",
-    "31",
-    "32",
-    "33",
-    "34",
-    "35",
-    "36",
-    "37",
-    "38",
-    "39",
-    "40",
-    "41",
-    "42",
-    "43",
-    "44",
-]
+# Listas de los selectores de talla y color: las formas oficiales que decidió
+# Daniel el 2026-11-13 (viven en `catalogo_valores_service`). Antes traían
+# XS/S/M/L/XL/XXL y «Multicolor», que no se usan en la tienda.
+COMMON_COLORS = list(COLORES_SUGERIDOS)
+COMMON_SIZES = list(TALLAS_SUGERIDAS)
 
 DEFAULT_VARIANT_SIZE = "Unitalla"
 DEFAULT_VARIANT_COLOR = "Sin color"

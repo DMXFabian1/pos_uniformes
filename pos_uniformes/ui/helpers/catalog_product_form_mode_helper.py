@@ -82,7 +82,7 @@ REGULAR_PIECE_SUGGESTIONS = (
 )
 
 REGULAR_ATTRIBUTE_SUGGESTIONS = (
-    "Basico",
+    "Básico",
     "Liso",
     "Estampado",
     "Mezclilla",

@@ -44,6 +44,15 @@ from pos_uniformes.database.models import (
     Usuario,
 )
 from pos_uniformes.services.catalog_service import CatalogService
+from pos_uniformes.services.catalogo_valores_service import (
+    CAMPO_ATRIBUTO,
+    CAMPO_COLOR,
+    CAMPO_NIVEL,
+    CAMPO_TALLA,
+    CAMPO_TIPO_PIEZA,
+    CAMPO_TIPO_PRENDA,
+    depurar_opciones,
+)
 from pos_uniformes.ui.helpers.catalog_form_payload_helper import (
     build_catalog_product_dialog_payload,
     validate_catalog_product_presentations_step,
@@ -164,11 +173,15 @@ def build_catalog_product_dialog(
 
     legacy_choices = load_legacy_config_choices()
     escuelas = merge_choice_lists(escuelas)
-    tipos_uniforme = ["Deportivo", "Oficial", "Basico", "Escolta", "Accesorio"]
-    tipos_prenda = merge_choice_lists(tipos_prenda, legacy_choices.get("TIPOS_PRENDA", []), tipos_uniforme)
-    tipos_pieza = merge_choice_lists(tipos_pieza, legacy_choices.get("TIPOS_PIEZA", []))
-    atributos = merge_choice_lists(atributos, legacy_choices.get("ATRIBUTOS", []))
-    niveles = merge_choice_lists(niveles, legacy_choices.get("NIVELES_EDUCATIVOS", []))
+    tipos_uniforme = ["Deportivo", "Oficial", "Básico", "Escolta", "Accesorio"]
+    # Una sola forma de cada valor en las listas: «Basico» y «Básico» o
+    # «Deportiva» y «Deportivo» ya no salen juntos (tanda 1, 2026-11-13).
+    tipos_prenda = depurar_opciones(
+        CAMPO_TIPO_PRENDA, tipos_prenda, legacy_choices.get("TIPOS_PRENDA", []), tipos_uniforme
+    )
+    tipos_pieza = depurar_opciones(CAMPO_TIPO_PIEZA, tipos_pieza, legacy_choices.get("TIPOS_PIEZA", []))
+    atributos = depurar_opciones(CAMPO_ATRIBUTO, atributos, legacy_choices.get("ATRIBUTOS", []))
+    niveles = depurar_opciones(CAMPO_NIVEL, niveles, legacy_choices.get("NIVELES_EDUCATIVOS", []))
     generos_disponibles = merge_choice_lists(legacy_choices.get("GENEROS", []))
     escudos_disponibles = merge_choice_lists(legacy_choices.get("ESCUDOS", []))
     ubicaciones_disponibles = merge_choice_lists(legacy_choices.get("UBICACIONES", []))
@@ -1019,13 +1032,15 @@ def build_catalog_product_dialog(
     def sync_variant_options(template_entry: dict[str, object] | None, *, apply_defaults: bool) -> None:
         suggested_sizes = normalize_values(template_entry.get("tallas")) if template_entry else []
         suggested_colors = normalize_values(template_entry.get("colores")) if template_entry else []
-        available_sizes = merge_choice_lists(
+        available_sizes = depurar_opciones(
+            CAMPO_TALLA,
             suggested_sizes,
             legacy_choices.get("TALLAS", []),
             common_sizes,
             [default_variant_size],
         )
-        available_colors = merge_choice_lists(
+        available_colors = depurar_opciones(
+            CAMPO_COLOR,
             suggested_colors,
             legacy_choices.get("COLORES", []),
             common_colors,
