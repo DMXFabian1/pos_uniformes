@@ -69,7 +69,7 @@ def lineas_ticket_monedero(info: dict, tk_row, *, con_vigencia: bool = False) ->
     y, si se pagó con tarjeta, tasa y base_tarjeta (regla B).
 
     con_vigencia=True agrega al final la leyenda de que el Monedero vence,
-    solo si el recuadro muestra Monedero (ganó, usó saldo o se sabe su saldo).
+    solo si hay Monedero que vence (ganó, usó saldo o su saldo es mayor a $0).
     Quien arma el ticket decide: va en la copia del cliente y no en compra de
     empleada (2026-11-12)."""
     lineas: list[str] = []
@@ -97,7 +97,10 @@ def lineas_ticket_monedero(info: dict, tk_row, *, con_vigencia: bool = False) ->
             lineas.append(tk_row(f"  {tasa:f} % sobre:", f"${base:,.2f} (tarjeta)"))
     if info.get("saldo") is not None:
         lineas.append(tk_row("Saldo en monedero:", f"${Decimal(str(info['saldo'])):,.2f}"))
-    if con_vigencia and (canje > 0 or cashback > 0 or info.get("saldo") is not None):
+    saldo = Decimal(str(info["saldo"])) if info.get("saldo") is not None else _CERO
+    # Solo si hay Monedero que vence: con saldo $0 y sin ganar ni usar nada
+    # (p. ej. todo en Liquidación) no se avisa de un saldo que no existe.
+    if con_vigencia and (canje > 0 or cashback > 0 or saldo > 0):
         lineas.extend(lineas_vigencia_monedero())
     return lineas
 

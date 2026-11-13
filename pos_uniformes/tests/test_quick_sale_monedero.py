@@ -444,6 +444,44 @@ class TicketVigenciaMonederoTest(_Base):
         texto = "\n".join(helper.lineas_ticket_monedero({"cliente": "Ana"}, tk_row, con_vigencia=True))
         self.assertNotIn("Monedero vence", texto)
 
+    def test_no_sale_con_saldo_cero_sin_ganar_ni_usar(self):
+        # Todo en Liquidación: no gana, no usa y su saldo es $0 (2026-11-12).
+        texto = "\n".join(helper.lineas_ticket_monedero(
+            {"cliente": "Ana", "saldo": D("0")}, tk_row, con_vigencia=True,
+        ))
+        self.assertIn("Saldo en monedero:", texto)
+        self.assertNotIn("Monedero vence", texto)
+
+    def test_sale_con_saldo_aunque_hoy_no_gane(self):
+        texto = "\n".join(helper.lineas_ticket_monedero(
+            {"cliente": "Ana", "saldo": D("37.42")}, tk_row, con_vigencia=True,
+        ))
+        self.assertIn("Monedero vence", texto)
+
+    def _cambio(self, w, *, a_pagar="0", a_favor="0", saldo=None):
+        r = SimpleNamespace(
+            folio_venta="V-1", regresa=[{"sku": "S1", "nombre": "Pants", "talla": "6", "precio": "450", "cantidad": 1}],
+            lleva=[],
+            cambio=SimpleNamespace(cliente="Ana" if saldo is not None else None, pago_tarjeta=False),
+            cuenta=SimpleNamespace(valor_regresa=D("450"), valor_lleva=D("0"), cashback_quitado=D("0"),
+                                   a_pagar=D(a_pagar), a_favor=D(a_favor)),
+        )
+        with patch.object(w, "_load_business_info", return_value=("MAXIMODA", "", "")):
+            return w._build_cambio_text(r, saldo)
+
+    def test_cambio_con_saldo_a_favor_la_lleva(self):
+        w = self._widget()
+        ticket = self._cambio(w, a_favor="100", saldo=D("137.42"))
+        self.assertIn("A FAVOR EN MONEDERO", ticket)
+        renglones = ticket.split("\n")
+        i_saldo = next(i for i, r in enumerate(renglones) if "Saldo del Monedero:" in r)
+        self.assertEqual(renglones[i_saldo + 1:i_saldo + 3], helper.lineas_vigencia_monedero())
+
+    def test_cambio_parejo_o_que_paga_no(self):
+        w = self._widget()
+        self.assertNotIn("Monedero vence", self._cambio(w))
+        self.assertNotIn("Monedero vence", self._cambio(w, a_pagar="50"))
+
     def test_no_sale_en_compra_de_empleada(self):
         w = self._widget()
         w._cliente = _cliente()
