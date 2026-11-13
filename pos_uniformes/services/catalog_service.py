@@ -245,10 +245,19 @@ class CatalogService:
         return int(numeric)
 
     @classmethod
-    def _get_or_create_sku_sequence(cls, session: Session) -> SkuSequence:
-        sequence = session.scalar(
-            select(SkuSequence).where(SkuSequence.codigo == cls.SKU_SEQUENCE_CODE)
-        )
+    def _get_or_create_sku_sequence(cls, session: Session, *, bloquear: bool = False) -> SkuSequence:
+        """El contador de SKU. Con `bloquear`, toma la fila con FOR UPDATE.
+
+        Dos computadoras dando de alta a la vez leían el mismo
+        `ultimo_numero` y chocaban en el SKU (error técnico de llave
+        duplicada). Con el candado, la segunda espera a que la primera haga
+        commit y luego lee el número ya avanzado (`populate_existing` para
+        no quedarse con la copia vieja de la sesión). La vista previa de SKU
+        no bloquea."""
+        statement = select(SkuSequence).where(SkuSequence.codigo == cls.SKU_SEQUENCE_CODE)
+        if bloquear:
+            statement = statement.with_for_update().execution_options(populate_existing=True)
+        sequence = session.scalar(statement)
         if sequence is not None:
             return sequence
 
@@ -276,7 +285,7 @@ class CatalogService:
         parsed = cls._parse_legacy_sku_number(sku)
         if parsed is None:
             return
-        sequence = cls._get_or_create_sku_sequence(session)
+        sequence = cls._get_or_create_sku_sequence(session, bloquear=True)
         if parsed > int(sequence.ultimo_numero):
             sequence.ultimo_numero = parsed
             session.add(sequence)
@@ -289,10 +298,11 @@ class CatalogService:
         talla: str,
         color: str,
         excluding_variant_id: int | None = None,
+        bloquear: bool = False,
     ) -> str:
         del producto, talla, color
 
-        sequence = cls._get_or_create_sku_sequence(session)
+        sequence = cls._get_or_create_sku_sequence(session, bloquear=bloquear)
         next_number = int(sequence.ultimo_numero) + 1
         while True:
             candidate = f"{sequence.prefijo}{next_number:0{sequence.padding}d}"
@@ -324,6 +334,7 @@ class CatalogService:
             talla=talla,
             color=color,
             excluding_variant_id=excluding_variant_id,
+            bloquear=True,
         )
         cls._sync_sequence_with_manual_sku(session, generated)
         return generated

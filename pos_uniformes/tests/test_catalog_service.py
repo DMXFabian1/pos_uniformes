@@ -57,6 +57,61 @@ class _ConBase(unittest.TestCase):
         return C.crear_variante(self.s, self.admin, producto, None, talla, "Sin color", Decimal(precio))
 
 
+class SkuConCandadoTests(_ConBase):
+    def _sentencias_del_contador(self, accion) -> list:
+        vistas = []
+
+        def capturar(estado) -> None:
+            if estado.is_select and "sku_sequence" in str(estado.statement):
+                vistas.append(estado.statement)
+
+        event.listen(self.s, "do_orm_execute", capturar)
+        try:
+            accion()
+        finally:
+            event.remove(self.s, "do_orm_execute", capturar)
+        return vistas
+
+    def test_dar_de_alta_toma_el_contador_con_for_update(self) -> None:
+        p = self._producto("Bata", None)
+        self._talla(p, "4")  # crea el contador
+        vistas = self._sentencias_del_contador(lambda: self._talla(p, "6"))
+        self.assertTrue(vistas)
+        for sentencia in vistas:
+            self.assertIsNotNone(sentencia._for_update_arg)
+            self.assertIn("FOR UPDATE", str(sentencia.compile(dialect=postgresql.dialect())))
+            self.assertTrue(sentencia.get_execution_options().get("populate_existing"))
+
+    def test_la_vista_previa_no_bloquea(self) -> None:
+        p = self._producto("Bata", None)
+        self._talla(p, "4")
+        vistas = self._sentencias_del_contador(lambda: C.preview_next_skus(self.s, 3))
+        vistas += self._sentencias_del_contador(
+            lambda: C.generar_sku_sugerido(self.s, p, "6", "Sin color")
+        )
+        self.assertTrue(vistas)
+        self.assertTrue(all(s._for_update_arg is None for s in vistas))
+
+    def test_otra_computadora_avanza_el_contador_y_no_chocamos(self) -> None:
+        p = self._producto("Bata", None)
+        primera = self._talla(p, "4")
+        self.s.commit()
+        # La otra PC (otra sesión) da de alta y avanza el contador.
+        otra = Session(self.engine)
+        admin = otra.get(Usuario, self.admin.id)
+        prod = otra.get(Producto, p.id)
+        de_la_otra = C.crear_variante(otra, admin, prod, None, "6", "Sin color", Decimal("245"))
+        otra.commit()
+        # Nuestra sesión tenía en memoria el contador viejo (expire_on_commit=False).
+        segunda = self._talla(p, "8")
+        self.s.commit()
+        skus = {primera.sku, de_la_otra.sku, segunda.sku}
+        self.assertEqual(len(skus), 3)
+        contador = self.s.scalar(select(SkuSequence))
+        self.assertEqual(contador.ultimo_numero, 3)
+        otra.close()
+
+
 class BusquedaDespuesDelCommitTests(_ConBase):
     def test_avisa_una_vez_y_despues_del_commit(self) -> None:
         self.avisos.reset_mock()
