@@ -109,6 +109,17 @@ class AgregadoresTests(unittest.TestCase):
         fanny = next(e for e in r if e.employee_code == "VEND-4")
         self.assertEqual((fanny.operaciones, fanny.monto_total), (2, Decimal("2400.00")))
 
+    def test_el_cambio_de_talla_no_suma_importe_por_empleada(self) -> None:
+        """Revisión 2026-11-12: al separar el importe de la operación, una
+        fila tipo="cambio" (diferencia que paga el cliente) se coló al «$
+        vendidos» de la empleada. El importe suma solo venta, apartado y
+        abono, como antes de la regla del abono."""
+        filas = [_fila(1, "venta", 2, "500"), _fila(2, "cambio", 0, "150"), _fila(3, "abono", 0, "300")]
+        (ana,) = ls.resumir_por_empleada(filas)
+        self.assertEqual((ana.operaciones, ana.piezas), (1, 2))
+        self.assertEqual(ana.monto_total, Decimal("800.00"))   # 500 + 300; el cambio no
+        self.assertEqual(ls.TIPOS_CON_IMPORTE, ("venta", "apartado", "abono"))
+
     def test_resumir_por_dia(self) -> None:
         (dia,) = ls.resumir_por_dia(tabla())
         self.assertEqual((dia.operaciones, dia.piezas), (OPS, PIEZAS))

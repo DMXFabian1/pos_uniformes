@@ -171,6 +171,13 @@ TIPOS_OPERACION = ("venta", "apartado")
 #: desde 2026-11-08 («un abono no es una venta»); hoy es la misma regla.
 TIPOS_DE_VENTA = TIPOS_OPERACION
 
+#: Los tipos cuyo importe suma a lo que movió una empleada («$ vendidos» de
+#: la Libreta del dueño, «monto» del ranking en la API móvil): los de
+#: operación más el abono, cuyo dinero sí cobró aunque ya no sea operación
+#: (Daniel, 2026-11-12). Es la lista de antes de esa decisión, escrita aparte
+#: para que un «cambio» de talla (tipo="cambio") siga sin sumar importe.
+TIPOS_CON_IMPORTE = TIPOS_OPERACION + ("abono",)
+
 
 def es_compra_de_empleada(row) -> bool:
     """¿Es lo que compró una empleada con precio especial? Esa fila no es
@@ -663,9 +670,10 @@ def resumir_por_empleada(rows: list[LibretaVenta]) -> list[ResumenEmpleada]:
             # 2026-11-12: «no cuentan como operación»).
             bucket["operaciones"] += 1
             bucket["piezas"] += int(row.piezas or 0)
-        if not es_compra_de_empleada(row):
+        if cuenta_como_operacion(row, TIPOS_CON_IMPORTE):
             # El importe no cambia con la regla del abono: lo cobrado en un
-            # abono sigue sumando a lo que movió la empleada.
+            # abono sigue sumando a lo que movió la empleada. Solo los tipos
+            # de antes: un «cambio» de talla nunca sumó importe (2026-11-12).
             bucket["monto"] = (bucket["monto"] + Decimal(str(row.monto_total or 0))).quantize(
                 Decimal("0.01")
             )
