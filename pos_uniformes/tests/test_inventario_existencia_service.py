@@ -18,7 +18,7 @@ from pos_uniformes.services.inventario_existencia_service import (
 class ClasificarExistenciaTests(unittest.TestCase):
     def test_cero_es_agotado(self) -> None:
         self.assertEqual(clasificar_existencia(0), "agotado")
-        self.assertEqual(texto_existencia(0), "0 Agotado")
+        self.assertEqual(texto_existencia(0), "0 Agotada")
         self.assertEqual(tono_existencia(0), "danger")
 
     def test_uno_a_tres_es_bajo(self) -> None:
@@ -49,9 +49,9 @@ class ClasificarExistenciaTests(unittest.TestCase):
     def test_conjunto_en_cero_dice_agotado_en_rojo(self) -> None:
         # Pants 3pz talla 8 en 0 (se acabó la playera): no se puede vender.
         self.assertEqual(clasificar_existencia(0, virtual=True), "agotado")
-        self.assertEqual(texto_existencia(0, virtual=True), "0 Agotado")
+        self.assertEqual(texto_existencia(0, virtual=True), "0 Agotada")
         self.assertEqual(tono_existencia(0, virtual=True), "danger")
-        self.assertEqual(texto_existencia(0, stock_minimo=-1), "0 Agotado")
+        self.assertEqual(texto_existencia(0, stock_minimo=-1), "0 Agotada")
 
     def test_conjunto_en_negativo_dice_negativo_en_rojo(self) -> None:
         self.assertEqual(texto_existencia(-1, virtual=True), "\u22121 Negativo")

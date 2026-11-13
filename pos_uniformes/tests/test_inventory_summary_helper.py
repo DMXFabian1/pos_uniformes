@@ -25,7 +25,7 @@ class InventorySummaryHelperTests(unittest.TestCase):
         self.assertEqual(view.out_counter.text, "Agotadas: 0")
         self.assertEqual(view.out_counter.tone, "positive")
         self.assertEqual(view.low_counter.text, "Quedan pocas: 0")
-        self.assertEqual(view.inactive_counter.text, "Inactivas: 0")
+        self.assertEqual(view.inactive_counter.text, "Desactivadas: 0")
 
     def test_builds_summary_and_counters_for_visible_rows(self) -> None:
         visible_rows = [
@@ -63,7 +63,7 @@ class InventorySummaryHelperTests(unittest.TestCase):
         self.assertEqual(view.out_counter.tone, "danger")
         self.assertEqual(view.low_counter.text, "Quedan pocas: 1")
         self.assertEqual(view.low_counter.tone, "warning")
-        self.assertEqual(view.inactive_counter.text, "Inactivas: 1")
+        self.assertEqual(view.inactive_counter.text, "Desactivadas: 1")
         self.assertEqual(view.inactive_counter.tone, "muted")
 
     def test_negativos_tienen_su_chip_y_no_cuentan_como_bajo_ni_agotado(self) -> None:

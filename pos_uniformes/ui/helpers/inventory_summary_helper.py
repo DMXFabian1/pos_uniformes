@@ -65,7 +65,7 @@ def build_inventory_summary_view(
             tone="warning" if count_low else "positive",
         ),
         inactive_counter=InventoryCounterState(
-            text=f"Inactivas: {count_inactive}",
+            text=f"Desactivadas: {count_inactive}",
             tone="muted" if count_inactive else "positive",
         ),
     )

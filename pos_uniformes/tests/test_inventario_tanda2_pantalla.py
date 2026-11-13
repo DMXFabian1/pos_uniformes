@@ -333,6 +333,21 @@ class InventarioTanda2PantallaTests(unittest.TestCase):
             for jerga in ("presentacion", "presentación", "siguiente fase", "preview", "stock", "mas precision"):
                 self.assertNotIn(jerga, aviso.lower(), nombre)
 
+    def test_una_sola_palabra_para_agotada_y_desactivada(self) -> None:
+        window = self._ventana()
+        opciones_hay = [
+            window.inventory_stock_filter_combo.itemText(i) for i in range(window.inventory_stock_filter_combo.count())
+        ]
+        opciones_estado = [
+            window.inventory_status_filter_combo.itemText(i) for i in range(window.inventory_status_filter_combo.count())
+        ]
+        self.assertIn("Agotadas", opciones_hay)
+        self.assertNotIn("En cero", opciones_hay)
+        self.assertIn("Desactivadas", opciones_estado)
+        self.assertNotIn("Inactivas", opciones_estado)
+        self.assertTrue(window.inventory_out_counter.text().startswith("Agotadas"))
+        self.assertTrue(window.inventory_inactive_counter.text().startswith("Desactivadas"))
+
 
 if __name__ == "__main__":
     unittest.main()

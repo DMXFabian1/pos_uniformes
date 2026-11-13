@@ -88,7 +88,7 @@ class InventoryTableRowHelperTests(unittest.TestCase):
         )
 
         self.assertEqual(len(views), 2)
-        self.assertEqual(views[0].values[4], "0 Agotado")
+        self.assertEqual(views[0].values[4], "0 Agotada")
         self.assertEqual(views[0].row_tone, "danger")
         self.assertEqual(views[0].stock_tone, "danger")
         self.assertEqual(views[1].values[4], "6 OK")
@@ -162,7 +162,7 @@ class InventoryTableRowHelperTests(unittest.TestCase):
             "tipo_pieza_nombre": "Pants 3pz", "es_conjunto": True,
         }
         cero = build_inventory_table_row_view({**base, "stock_actual": 0})
-        self.assertEqual((cero.values[4], cero.stock_tone, cero.row_tone), ("0 Agotado", "danger", "danger"))
+        self.assertEqual((cero.values[4], cero.stock_tone, cero.row_tone), ("0 Agotada", "danger", "danger"))
         dos = build_inventory_table_row_view({**base, "stock_actual": 2})
         self.assertEqual((dos.values[4], dos.stock_tone), ("2 Conjunto", "neutral"))
         self.assertEqual(dos.values[5], "—")  # se arma con piezas: no tiene lugar propio

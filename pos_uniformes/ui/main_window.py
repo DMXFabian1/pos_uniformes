@@ -1420,7 +1420,7 @@ class MainWindow(QMainWindow):
         self.inventory_negative_counter = QLabel("En negativo: 0")
         self.inventory_out_counter = QLabel("Agotadas: 0")
         self.inventory_low_counter = QLabel("Quedan pocas: 0")
-        self.inventory_inactive_counter = QLabel("Inactivas: 0")
+        self.inventory_inactive_counter = QLabel("Desactivadas: 0")
         self.inventory_new_button = QToolButton()
         self.inventory_edit_button = QToolButton()
         self.inventory_stock_button = QToolButton()

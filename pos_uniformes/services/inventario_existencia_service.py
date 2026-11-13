@@ -67,7 +67,7 @@ def clasificar_existencia(stock: int, *, stock_minimo: int | None = None, virtua
 
 
 _TEXTO = {
-    AGOTADO: "Agotado",
+    AGOTADO: "Agotada",  # la talla: igual que el chip «Agotadas», el filtro y la ficha
     BAJO_MINIMO: "Bajo mín",
     BAJO: "Bajo",
     OK: "OK",
@@ -84,7 +84,7 @@ _TONO = {
 
 
 def texto_existencia(stock: int, *, stock_minimo: int | None = None, virtual: bool = False) -> str:
-    """Texto de la columna «Stock»: «0 Agotado», «2 Bajo», «6 OK», «3 Conjunto»…"""
+    """Texto de la columna «Stock»: «0 Agotada», «2 Bajo», «6 OK», «3 Conjunto»…"""
     clase = clasificar_existencia(stock, stock_minimo=stock_minimo, virtual=virtual)
     if clase == VIRTUAL:
         return f"{stock} Conjunto"
