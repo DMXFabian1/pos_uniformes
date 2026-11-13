@@ -10,17 +10,10 @@ from sqlalchemy.orm import Session
 from pos_uniformes.database.models import Cliente, RolUsuario, TipoCliente, Usuario
 from pos_uniformes.services.clientes import identidad_service
 from pos_uniformes.services.clientes.telefono import normalizar_telefono
-from pos_uniformes.services.loyalty_service import LoyaltyService
 
 
 class ClientService:
     """Reglas de negocio para administracion de clientes."""
-
-    DEFAULT_DISCOUNT_BY_TYPE = {
-        TipoCliente.GENERAL: Decimal("5.00"),
-        TipoCliente.PROFESOR: Decimal("15.00"),
-        TipoCliente.MAYORISTA: Decimal("20.00"),
-    }
 
     @staticmethod
     def _validar_admin(admin_user: Usuario) -> None:
@@ -42,7 +35,8 @@ class ClientService:
                     func.lower(func.coalesce(Cliente.telefono, "")).like(like_term),
                     func.lower(func.coalesce(Cliente.notas, "")).like(like_term),
                     func.lower(cast(Cliente.tipo_cliente, String)).like(like_term),
-                    func.lower(cast(Cliente.nivel_lealtad, String)).like(like_term),
+                    # 2026-11-12: ya no se busca por el nivel viejo
+                    # (`nivel_lealtad`), que se retiró.
                 )
             )
         return session.scalars(statement).all()
@@ -51,11 +45,6 @@ class ClientService:
     def _generate_client_code(session: Session) -> str:
         next_id = (session.scalar(select(func.coalesce(func.max(Cliente.id), 0))) or 0) + 1
         return f"CLI-{int(next_id):06d}"
-
-    @classmethod
-    def default_discount_for_type(cls, tipo_cliente: TipoCliente) -> Decimal:
-        default_level = LoyaltyService.default_level_for_client_type(tipo_cliente)
-        return LoyaltyService.discount_for_level(default_level)
 
     @classmethod
     def normalize_discount(cls, discount_value: Decimal | str | float | int) -> Decimal:
@@ -145,29 +134,16 @@ class ClientService:
         normalized_name = nombre.strip()
         if not normalized_name:
             raise ValueError("El nombre del cliente no puede estar vacio.")
-        if client.nivel_lealtad is None:
-            # E1-B (R1, R3): editar a un cliente SIN nivel nunca le asigna
-            # nivel ni toca su descuento ni los metadatos de asignación.
-            cls.normalize_discount(descuento_preferente)  # sigue validando el rango
-            client.nombre = normalized_name
-            client.tipo_cliente = tipo_cliente
-            client.telefono = telefono.strip() or None
-            client.telefono_normalizado = normalizar_telefono(client.telefono)
-            client.notas = notas.strip() or None
-            session.add(client)
-            return client
+        # 2026-11-12: «el nivel viejo retíralo» (Daniel). Editar a un cliente
+        # nunca toca su nivel viejo (`nivel_lealtad`), su `descuento_preferente`
+        # ni los metadatos de asignación, tenga o no nivel. Antes, a un cliente
+        # con nivel se le regresaba al nivel de su tipo.
+        cls.normalize_discount(descuento_preferente)  # sigue validando el rango
         client.nombre = normalized_name
         client.tipo_cliente = tipo_cliente
-        client.descuento_preferente = cls.normalize_discount(descuento_preferente)
         client.telefono = telefono.strip() or None
         client.telefono_normalizado = normalizar_telefono(client.telefono)
         client.notas = notas.strip() or None
-        LoyaltyService.assign_level(
-            client,
-            level=LoyaltyService.default_level_for_client_type(tipo_cliente),
-            actor_user=admin_user,
-            reason="actualizacion_cliente",
-        )
         session.add(client)
         return client
 

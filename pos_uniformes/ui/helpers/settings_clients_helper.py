@@ -24,36 +24,9 @@ class SettingsClientsView:
     rows: tuple[SettingsClientRowView, ...]
 
 
-def build_settings_clients_view(clients: list[dict[str, object]]) -> SettingsClientsView:
-    return SettingsClientsView(
-        status_label=f"Clientes registrados: {len(clients)}",
-        rows=tuple(
-            SettingsClientRowView(
-                client_id=int(client["id"]),
-                client_code=str(client["code"]),
-                values=(
-                    client["code"],
-                    client["name"],
-                    client["client_type"],
-                    client["loyalty_level"],
-                    client["discount_label"],
-                    client["phone"],
-                    client["notes"],
-                    client["qr_label"],
-                    client["card_label"],
-                    client["active_label"],
-                    client["updated_label"],
-                ),
-                client_type_tone=_client_type_tone(str(client["client_type"])),
-                loyalty_level_tone=_loyalty_level_tone(str(client["loyalty_level"])),
-                discount_tone="positive" if bool(client["has_discount"]) else None,
-                qr_tone="positive" if str(client["qr_label"]) == "Listo" else "warning",
-                card_tone="positive" if str(client["card_label"]) == "Lista" else "muted",
-                status_tone="positive" if bool(client["active"]) else "muted",
-            )
-            for client in clients
-        ),
-    )
+# 2026-11-12: se quitó `build_settings_clients_view`, la lista vieja con
+# columnas Nivel y Desc. (sin uso desde E1-C3). Mostraba el nivel viejo, que
+# se retiró («el nivel viejo retíralo», Daniel).
 
 
 def build_settings_clients_error_view(error_message: str) -> SettingsClientsView:
@@ -61,23 +34,6 @@ def build_settings_clients_error_view(error_message: str) -> SettingsClientsView
         status_label=f"No se pudieron cargar clientes: {error_message}",
         rows=(),
     )
-
-
-def _client_type_tone(client_type: str) -> str:
-    return {
-        "GENERAL": "muted",
-        "PROFESOR": "positive",
-        "MAYORISTA": "warning",
-    }.get(client_type, "muted")
-
-
-def _loyalty_level_tone(loyalty_level: str) -> str:
-    return {
-        "BASICO": "muted",
-        "LEAL": "warning",
-        "PROFESOR": "positive",
-        "MAYORISTA": "warning",
-    }.get(loyalty_level, "muted")
 
 
 # -- E1-C3: lista del ADMIN sobre el modelo nuevo -------------------------------

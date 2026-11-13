@@ -597,7 +597,6 @@ from pos_uniformes.ui.helpers.settings_clients_helper import (
     COLUMNA_QR,
     build_clientes_admin_view,
     build_settings_clients_error_view,
-    build_settings_clients_view,
 )
 from pos_uniformes.ui.helpers.settings_employees_helper import (
     build_settings_employees_error_view,

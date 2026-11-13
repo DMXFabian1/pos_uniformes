@@ -3,7 +3,6 @@ from __future__ import annotations
 from decimal import Decimal
 from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
 
 from pos_uniformes.database.models import NivelLealtad
 from pos_uniformes.services.sale_discount_service import normalize_discount_value
@@ -51,25 +50,22 @@ class SaleSelectedClientServiceTests(unittest.TestCase):
 
     def test_returns_resolved_benefit_for_selected_client(self) -> None:
         client = SimpleNamespace(
-            descuento_preferente=Decimal("0.00"),
+            descuento_preferente=Decimal("15.00"),
             nivel_lealtad=NivelLealtad.PROFESOR,
         )
         session = SimpleNamespace(get=lambda _model, _id: client)
 
-        with patch(
-            "pos_uniformes.services.sale_selected_client_service.LoyaltyService.discount_for_level",
-            return_value=Decimal("15.00"),
-        ):
-            result = load_sale_selected_client_benefit(
-                session,
-                selected_client_id=10,
-                normalize_discount_value=normalize_discount_value,
-            )
+        # 2026-11-12: ya no hay descuento por nivel viejo («el nivel viejo retíralo», Daniel).
+        result = load_sale_selected_client_benefit(
+            session,
+            selected_client_id=10,
+            normalize_discount_value=normalize_discount_value,
+        )
 
         self.assertIsNotNone(result)
         assert result is not None
-        self.assertEqual(result.discount_percent, Decimal("15.00"))
-        self.assertEqual(result.source_label, "Profesor")
+        self.assertEqual(result.discount_percent, Decimal("0.00"))
+        self.assertEqual(result.source_label, "Cliente")
 
     def test_load_sale_selected_client_discount_percent_returns_zero_when_missing(self) -> None:
         session = SimpleNamespace(get=lambda _model, _id: None)
@@ -84,22 +80,19 @@ class SaleSelectedClientServiceTests(unittest.TestCase):
 
     def test_load_sale_selected_client_discount_percent_returns_benefit_discount_when_client_exists(self) -> None:
         client = SimpleNamespace(
-            descuento_preferente=Decimal("0.00"),
+            descuento_preferente=Decimal("15.00"),
             nivel_lealtad=NivelLealtad.PROFESOR,
         )
         session = SimpleNamespace(get=lambda _model, _id: client)
 
-        with patch(
-            "pos_uniformes.services.sale_selected_client_service.LoyaltyService.discount_for_level",
-            return_value=Decimal("15.00"),
-        ):
-            result = load_sale_selected_client_discount_percent(
-                session,
-                selected_client_id=10,
-                normalize_discount_value=normalize_discount_value,
-            )
+        # 2026-11-12: ya no hay descuento por nivel viejo («el nivel viejo retíralo», Daniel).
+        result = load_sale_selected_client_discount_percent(
+            session,
+            selected_client_id=10,
+            normalize_discount_value=normalize_discount_value,
+        )
 
-        self.assertEqual(result, Decimal("15.00"))
+        self.assertEqual(result, Decimal("0.00"))
 
     def test_resolve_sale_selected_client_sync_state_returns_unlocked_state_when_missing(self) -> None:
         session = SimpleNamespace(get=lambda _model, _id: None)
@@ -116,24 +109,21 @@ class SaleSelectedClientServiceTests(unittest.TestCase):
 
     def test_resolve_sale_selected_client_sync_state_returns_locked_state_when_client_exists(self) -> None:
         client = SimpleNamespace(
-            descuento_preferente=Decimal("0.00"),
+            descuento_preferente=Decimal("15.00"),
             nivel_lealtad=NivelLealtad.PROFESOR,
         )
         session = SimpleNamespace(get=lambda _model, _id: client)
 
-        with patch(
-            "pos_uniformes.services.sale_selected_client_service.LoyaltyService.discount_for_level",
-            return_value=Decimal("15.00"),
-        ):
-            result = resolve_sale_selected_client_sync_state(
-                session,
-                selected_client_id=10,
-                normalize_discount_value=normalize_discount_value,
-            )
+        # 2026-11-12: ya no hay descuento por nivel viejo («el nivel viejo retíralo», Daniel).
+        result = resolve_sale_selected_client_sync_state(
+            session,
+            selected_client_id=10,
+            normalize_discount_value=normalize_discount_value,
+        )
 
         self.assertTrue(result.locked)
-        self.assertEqual(result.discount_percent, Decimal("15.00"))
-        self.assertEqual(result.source_label, "Profesor")
+        self.assertEqual(result.discount_percent, Decimal("0.00"))
+        self.assertEqual(result.source_label, "Cliente")
 
 
 if __name__ == "__main__":

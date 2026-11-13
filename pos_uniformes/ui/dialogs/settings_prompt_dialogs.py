@@ -2,13 +2,10 @@
 
 from __future__ import annotations
 
-from decimal import Decimal
-
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
-    QDoubleSpinBox,
     QFormLayout,
     QLabel,
     QLineEdit,
@@ -18,10 +15,6 @@ from PyQt6.QtWidgets import (
 )
 
 from pos_uniformes.database.models import RolUsuario, TipoCliente
-from pos_uniformes.services.client_service import ClientService
-
-
-DESCUENTO_BLOQUEADO_NOTA = "El nivel y el descuento se asignan despues, como accion del ADMIN."
 
 
 def _create_settings_prompt_dialog(
@@ -206,10 +199,12 @@ def prompt_client_data(
 ) -> dict[str, str] | None:
     """Captura los datos del cliente.
 
-    `descuento_bloqueado` (E1-B, R1): en el alta y al editar a un cliente sin
-    nivel, el descuento no se captura aquí. Sin el parámetro, el formulario se
-    comporta como siempre.
+    2026-11-12: «el nivel viejo retíralo» (Daniel). Ya no se captura el
+    descuento preferente; el diccionario devuelto siempre trae
+    `descuento_preferente = "0.00"` (el servicio lo ignora). `descuento_bloqueado`
+    se acepta por compatibilidad y ya no cambia nada.
     """
+    del descuento_bloqueado
     dialog, layout = _create_settings_prompt_dialog(parent, title, helper_text, width=560)
     form = QFormLayout()
     name_input = QLineEdit()
@@ -217,11 +212,6 @@ def prompt_client_data(
     client_type_combo.addItem("GENERAL", TipoCliente.GENERAL)
     client_type_combo.addItem("PROFESOR", TipoCliente.PROFESOR)
     client_type_combo.addItem("MAYORISTA", TipoCliente.MAYORISTA)
-    discount_spin = QDoubleSpinBox()
-    discount_spin.setRange(0.0, 100.0)
-    discount_spin.setDecimals(2)
-    discount_spin.setSuffix("%")
-    discount_spin.setSingleStep(5.0)
     phone_input = QLineEdit()
     notes_input = QTextEdit()
     notes_input.setMinimumHeight(90)
@@ -233,36 +223,11 @@ def prompt_client_data(
         initial_type = current_values.get("tipo_cliente", TipoCliente.GENERAL.value)
         type_index = client_type_combo.findData(TipoCliente(initial_type))
         client_type_combo.setCurrentIndex(type_index if type_index >= 0 else 0)
-        discount_spin.setValue(float(current_values.get("descuento_preferente", "0") or 0))
         phone_input.setText(current_values.get("telefono", ""))
         notes_input.setPlainText(current_values.get("notas", ""))
-    elif descuento_bloqueado:
-        discount_spin.setValue(0.0)
-    else:
-        discount_spin.setValue(float(ClientService.default_discount_for_type(TipoCliente.GENERAL)))
-    if descuento_bloqueado:
-        discount_spin.setEnabled(False)
-        discount_spin.setToolTip(DESCUENTO_BLOQUEADO_NOTA)
 
-    def _sync_discount_with_type() -> None:
-        if descuento_bloqueado:
-            return
-        client_type = client_type_combo.currentData()
-        if not isinstance(client_type, TipoCliente):
-            return
-        suggested = ClientService.default_discount_for_type(client_type)
-        if client_type != TipoCliente.GENERAL:
-            discount_spin.setValue(float(suggested))
-
-    client_type_combo.currentIndexChanged.connect(_sync_discount_with_type)
     form.addRow("Nombre", name_input)
     form.addRow("Tipo cliente", client_type_combo)
-    form.addRow("Desc. preferente", discount_spin)
-    if descuento_bloqueado:
-        nota_descuento = QLabel(DESCUENTO_BLOQUEADO_NOTA)
-        nota_descuento.setObjectName("subtleLine")
-        nota_descuento.setWordWrap(True)
-        form.addRow("", nota_descuento)
     form.addRow("Telefono", phone_input)
     form.addRow("Notas", notes_input)
     layout.addLayout(form)
@@ -272,7 +237,7 @@ def prompt_client_data(
     return {
         "nombre": name_input.text().strip(),
         "tipo_cliente": str((client_type_combo.currentData() or TipoCliente.GENERAL).value),
-        "descuento_preferente": str(Decimal(str(discount_spin.value())).quantize(Decimal("0.01"))),
+        "descuento_preferente": "0.00",
         "telefono": phone_input.text().strip(),
         "notas": notes_input.toPlainText().strip(),
     }

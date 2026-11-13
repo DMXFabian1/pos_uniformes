@@ -24,6 +24,10 @@ def resolve_layaway_client_discount_percent(
     *,
     selected_client_id: int | str | None,
 ) -> Decimal:
+    """% del cliente en los Apartados antiguos del POS.
+
+    2026-11-12: siempre 0; ya no hay descuento por nivel viejo («el nivel
+    viejo retíralo», Daniel)."""
     return normalize_discount_value(
         load_sale_selected_client_discount_percent(
             session,

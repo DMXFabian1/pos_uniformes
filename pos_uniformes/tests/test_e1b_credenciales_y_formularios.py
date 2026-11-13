@@ -57,54 +57,34 @@ class _Qt(unittest.TestCase):
 
 
 class FormularioClienteTests(_Qt):
-    """T-B11 y T-B13."""
+    """T-B11 y T-B13. 2026-11-12: «el nivel viejo retíralo» (Daniel). El
+    formulario ya no captura «Desc. preferente» y siempre devuelve 0.00."""
 
     def _abrir(self, **kw):
         capturado = {}
 
         def ejecutar(dialog):
-            spin = dialog.findChild(QDoubleSpinBox)
-            capturado["habilitado"] = spin.isEnabled()
-            capturado["valor"] = spin.value()
-            spin.setValue(33.0)  # aunque alguien lo forzara, el servicio lo ignora
+            capturado["spins"] = dialog.findChildren(QDoubleSpinBox)
             return int(QDialog.DialogCode.Accepted)
 
         with patch.object(prompts.QDialog, "exec", ejecutar):
             datos = prompts.prompt_client_data(QWidget(), title="t", helper_text="h", **kw)
         return capturado, datos
 
-    def test_tb11_alta_con_descuento_bloqueado_en_cero(self) -> None:
-        cap, _ = self._abrir(descuento_bloqueado=True)
-        self.assertFalse(cap["habilitado"])
-        self.assertEqual(cap["valor"], 0.0)
+    def test_alta_sin_campo_de_descuento(self) -> None:
+        for kw in ({}, {"descuento_bloqueado": True}):
+            with self.subTest(**kw):
+                cap, datos = self._abrir(**kw)
+                self.assertEqual(cap["spins"], [])
+                self.assertEqual(datos["descuento_preferente"], "0.00")
 
-    def test_tb13_edicion_sin_nivel_bloquea_y_muestra_el_valor_actual(self) -> None:
-        actuales = {"nombre": "Ana", "tipo_cliente": "GENERAL", "descuento_preferente": "0.00", "telefono": "", "notas": ""}
-        cap, _ = self._abrir(current_values=actuales, descuento_bloqueado=True)
-        self.assertFalse(cap["habilitado"])
-        self.assertEqual(cap["valor"], 0.0)
-
-    def test_tb13_sin_el_parametro_el_formulario_es_el_de_hoy(self) -> None:
-        cap, _ = self._abrir()
-        self.assertTrue(cap["habilitado"])
-        self.assertEqual(cap["valor"], 5.0)  # sugerencia de hoy para GENERAL
+    def test_edicion_no_devuelve_el_descuento_actual(self) -> None:
         actuales = {"nombre": "Ana", "tipo_cliente": "PROFESOR", "descuento_preferente": "15.00", "telefono": "", "notas": ""}
-        cap, _ = self._abrir(current_values=actuales)
-        self.assertTrue(cap["habilitado"])
-        self.assertEqual(cap["valor"], 15.0)
-
-    def test_tb11_main_window_pide_el_formulario_bloqueado_al_crear(self) -> None:
-        # E1-C1 (C10): Configuración ya no abre `prompt_client_data` sino la ficha
-        # nueva, que no tiene campo de descuento. Se conserva la intención: el alta
-        # del ADMIN no captura descuento.
-        falso = SimpleNamespace(current_role=RolUsuario.ADMIN)
-        with patch("pos_uniformes.ui.main_window.get_session", return_value=_ctx_vacio()), patch(
-            "pos_uniformes.ui.main_window.tipos_para_combo", return_value=[("GENERAL", "General")]
-        ), patch("pos_uniformes.ui.main_window.prompt_cliente_ficha", return_value=None) as prompt:
-            MainWindow._handle_create_client(falso)
-        prompt.assert_called_once()
-        self.assertNotIn("descuento_bloqueado", prompt.call_args.kwargs)
-        self.assertIsNone(prompt.call_args.kwargs.get("current_values"))
+        cap, datos = self._abrir(current_values=actuales)
+        self.assertEqual(cap["spins"], [])
+        self.assertEqual(datos["descuento_preferente"], "0.00")
+        self.assertEqual(datos["tipo_cliente"], "PROFESOR")
+        self.assertEqual(datos["nombre"], "Ana")
 
 
 class EdicionDesdeMainWindowTests(_Qt):
