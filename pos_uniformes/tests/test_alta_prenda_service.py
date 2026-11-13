@@ -174,6 +174,16 @@ class PlanTests(_Base):
         plan = alta.planear_desde_modelo(self.s, "Benito Juárez", "Pants 3pz", llegan={"4": 2})
         self.assertTrue(any("no tiene existencia propia" in e for e in plan.errores))
 
+    def test_escuela_con_varios_niveles_pide_el_nivel(self) -> None:
+        self.caja.prod("Técnica 18", "Playera")  # también tiene una de primaria
+        self.s.commit()
+        plan = alta.planear_desde_modelo(self.s, "Técnica 18", "Pants 2pz")
+        self.assertIn("La escuela tiene Primaria y Secundaria: di de qué nivel es la prenda.", plan.errores)
+        self.assertFalse(plan.puede_aplicar)
+        plan = alta.planear_desde_modelo(self.s, "Técnica 18", "Pants 2pz", nivel="Secundaria")
+        self.assertFalse(any("di de qué nivel" in e for e in plan.errores))
+        self.assertEqual(plan.nivel, "Secundaria")
+
     def test_ya_existe(self) -> None:
         plan = alta.planear_desde_modelo(self.s, "Miguel Hidalgo", "Pants Suelto")
         self.assertIn("Ya existe «Pants Suelto Miguel Hidalgo».", plan.errores)

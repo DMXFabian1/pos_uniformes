@@ -518,17 +518,18 @@ def completar(session: Session, plan: PlanPrenda, *, saltar_skus: int = 0, usos:
 
 # ── Armar planes ───────────────────────────────────────────────────────────
 
-def _nivel_de_la_escuela(session: Session, escuela_id: int | None) -> str | None:
+def _niveles_de_la_escuela(session: Session, escuela_id: int | None) -> list[str]:
+    """Los niveles de las prendas activas de la escuela, del que más tiene al que menos."""
     if escuela_id is None:
-        return None
+        return []
     filas = session.execute(
         select(NivelEducativo.nombre, func.count(Producto.id))
         .join(Producto, Producto.nivel_educativo_id == NivelEducativo.id)
         .where(Producto.escuela_id == int(escuela_id), Producto.activo.is_(True))
         .group_by(NivelEducativo.nombre)
-        .order_by(func.count(Producto.id).desc())
+        .order_by(func.count(Producto.id).desc(), NivelEducativo.nombre)
     ).all()
-    return str(filas[0][0]) if filas else None
+    return [str(n) for n, _c in filas]
 
 
 def _texto(valor: object) -> str | None:
@@ -628,7 +629,15 @@ def planear_desde_modelo(
     else:
         escuela_nombre = valores.limpiar(escuela)
         escuela_id = _id_de(session, Escuela, escuela_nombre)
-    nivel = nivel or _nivel_de_la_escuela(session, escuela_id)
+    errores_fijos: list[str] = []
+    if not nivel:
+        # Sin nivel se toma el de la escuela; si tiene varios no se adivina
+        # (copiaría el modelo y los precios de otro nivel sin avisar).
+        niveles = _niveles_de_la_escuela(session, escuela_id)
+        if len(niveles) == 1:
+            nivel = niveles[0]
+        elif len(niveles) > 1:
+            errores_fijos.append(f"La escuela tiene {' y '.join(sorted(niveles))}: di de qué nivel es la prenda.")
     hermanas = hermanos_service.buscar_modelo(
         session, tipo_pieza, nivel, escuela_id=escuela_id, modelo_id=modelo_id
     )
@@ -681,6 +690,7 @@ def planear_desde_modelo(
         modelo_texto=hermanas.texto,
         confirmados=tuple(confirmados),
         avisos_fijos=[hermanas.texto] if m is None else [],
+        errores_fijos=errores_fijos,
     )
     return completar(session, plan, saltar_skus=saltar_skus, usos=usos)
 
