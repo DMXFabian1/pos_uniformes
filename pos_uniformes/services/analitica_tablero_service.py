@@ -127,6 +127,7 @@ def cifras(rows: list, *, ajuste: Decimal = Decimal("0.00")) -> Cifras:
     `ajuste`: lo que el dueño cambió en sus cortes del periodo (cifra oficial);
     se aplica al efectivo, que es donde lo aplica él."""
     from pos_uniformes.services.corte_caja_service import resumir_periodo
+    from pos_uniformes.services.libreta_service import TIPOS_OPERACION
 
     rows = [x for x in rows if str(getattr(x, "tipo", "")) in ("venta", "apartado", "abono")]
     r = resumir_periodo(rows)
@@ -138,10 +139,13 @@ def cifras(rows: list, *, ajuste: Decimal = Decimal("0.00")) -> Cifras:
         cobrado=(efectivo + r.tarjeta_neto).quantize(_CENT),
         efectivo=efectivo,
         tarjeta_neto=r.tarjeta_neto,
-        # La regla única de la Libreta (2026-11-12): un abono no es operación
-        # (Daniel: «no cuentan como operación»), ni la compra de una empleada
-        # con precio especial. Antes contaba todas las filas.
-        operaciones=r.operaciones,
+        # Un abono no es operación (Daniel, 2026-11-12: «no cuentan como
+        # operación»). Solo se quitan los abonos: la compra de una empleada
+        # con precio especial sigue contando aquí, igual que en `ventas` y
+        # `piezas` de esta misma tarjeta, para que «N operaciones» nunca
+        # salga menor que «M ventas» (revisión 2026-11-12). Antes contaba
+        # todas las filas.
+        operaciones=sum(1 for x in rows if str(getattr(x, "tipo", "")) in TIPOS_OPERACION),
         ventas=len(ventas),
         importe_ventas=importe.quantize(_CENT),
         piezas=piezas,

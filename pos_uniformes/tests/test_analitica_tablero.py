@@ -80,6 +80,17 @@ class CifrasTests(unittest.TestCase):
         self.assertEqual((c.operaciones, c.ventas, c.piezas), (3, 2, 4))
         self.assertEqual(c.ticket_promedio, Decimal("250.00"))
 
+    def test_operaciones_nunca_menos_que_ventas(self) -> None:
+        """Revisión 2026-11-12: solo se quitan los abonos. La compra de una
+        empleada con precio especial sigue en operaciones, ventas y piezas
+        de la tarjeta, para que «1 operación · 2 ventas» no pase."""
+        empleada = _op("venta", "100", piezas=5)
+        empleada.descuento_empleada = True
+        c = tb.cifras([_op("venta", "100", piezas=2), empleada, _op("abono", "300", piezas=0)])
+        self.assertEqual((c.operaciones, c.ventas, c.piezas), (2, 2, 7))
+        self.assertGreaterEqual(c.operaciones, c.ventas)
+        self.assertEqual(c.efectivo, Decimal("500.00"))   # el dinero del abono sí
+
     def test_el_ajuste_del_dueno_va_por_defecto(self) -> None:
         c = tb.cifras([_op("venta", "1000")], ajuste=Decimal("-200"))
         self.assertEqual(c.cobrado, Decimal("800.00"))
