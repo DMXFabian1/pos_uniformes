@@ -92,6 +92,34 @@ class AgruparTests(unittest.TestCase):
         self.assertEqual(texto_rango_precio(None, None), "—")
         self.assertEqual(texto_rango_precio(Decimal("99.5"), Decimal("120")), "$99.50–$120")
 
+    def test_descuadre_de_una_talla_lleva_la_marca_como_en_por_talla(self) -> None:
+        # Talla 10: total −2 y 3 en Bodega (descuadre 3); talla 12: 4 en tienda.
+        grupo = agrupar_por_prenda([_fila("10", -2, stock_bodega=3), _fila("12", 4)])[0]
+        self.assertEqual(grupo.descuadre, 3)
+        self.assertEqual(grupo.tallas_descuadre, 1)
+        self.assertEqual(grupo.texto_donde, "Bodega 3 ⚠")
+        self.assertEqual(grupo.aviso_donde, "Tienda 4 · Bodega 3. Ojo: en 1 talla hay en cajas 3 de más contra su total")
+        cuadra = agrupar_por_prenda([_fila("4", 6, stock_bodega=4), _fila("8", 3, stock_piso=1)])[0]
+        self.assertEqual(cuadra.descuadre, 0)
+        self.assertEqual(cuadra.texto_donde, "Bodega 4 · Piso 1")
+        self.assertEqual(cuadra.aviso_donde, "Tienda 4 · Bodega 4 · Piso 1")
+
+    def test_oferta_y_liquidacion_mezcladas_no_se_disfrazan_de_una_sola(self) -> None:
+        grupo = agrupar_por_prenda([
+            _fila("4", 1, rebaja_tipo="oferta", rebaja_precio=Decimal(175)),
+            _fila("6", 1, rebaja_tipo="oferta", rebaja_precio=Decimal(180)),
+            _fila("8", 1, rebaja_tipo="liquidacion", rebaja_precio=Decimal(150)),
+        ])[0]
+        self.assertEqual(grupo.rebaja, "Rebaja")
+        self.assertEqual(grupo.texto_precio, "Rebaja $150–$180")
+        self.assertEqual(grupo.aviso_precio, "Oferta en 2 · Liquidación en 1 de 3 tallas")
+        sola = agrupar_por_prenda([
+            _fila("4", 1, rebaja_tipo="liquidacion", rebaja_precio=Decimal(150)),
+            _fila("6", 1, rebaja_tipo="liquidacion", rebaja_precio=Decimal(150)),
+        ])[0]
+        self.assertEqual(sola.rebaja, "Liquidación")
+        self.assertEqual(sola.aviso_precio, "Liquidación en todas sus tallas")
+
     def test_contada_dice_la_mas_vieja_o_nunca(self) -> None:
         grupo = agrupar_por_prenda([_fila("4", 1, dias=3), _fila("6", 1, dias=52), _fila("8", 1, dias=0)])[0]
         self.assertEqual(texto_contada_grupo(grupo, ahora=AHORA), "Hace 52d")

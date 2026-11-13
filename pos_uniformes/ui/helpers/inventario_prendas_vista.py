@@ -189,6 +189,8 @@ class ModeloPrendas(QAbstractItemModel):
                 if grupo.es_conjunto:
                     return "Conjunto: su número sale de sus piezas y no suma al total"
                 return "Piezas de todas sus tallas (un negativo no resta)"
+            if columna == COL_DONDE:
+                return grupo.aviso_donde
             if columna == COL_PRECIO:
                 return grupo.aviso_precio
             if columna == COL_CONTADA:

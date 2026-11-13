@@ -22,7 +22,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Iterable, Mapping, Sequence
 
-from pos_uniformes.services.inventario_donde_service import SEPARADOR, TIENDA, VACIO
+from pos_uniformes.services.inventario_donde_service import MARCA_DESCUADRE, SEPARADOR, TIENDA, VACIO, repartir
 from pos_uniformes.services.inventario_existencia_service import cifra_existencia, es_fila_virtual, tono_cifra
 from pos_uniformes.services.inventario_precio_service import LLAVE_PRECIO, LLAVE_TIPO, precio_efectivo
 from pos_uniformes.services.rebaja_service import ETIQUETAS as ETIQUETAS_REBAJA, fmt_corto
@@ -34,6 +34,9 @@ from pos_uniformes.services.talla_orden_service import clave_talla
 COLUMNAS_PRENDA = ("Prenda", "Tallas", "Hay", "Dónde", "Precio", "Contada")
 #: Columnas que ordenan al tocar el encabezado (la escalera no ordena).
 ORDEN_PRENDA = ("Prenda", "Hay", "Dónde", "Precio", "Contada")
+
+#: Etiqueta cuando las tallas de una prenda traen Oferta y Liquidación a la vez.
+REBAJA_MEZCLADA = "Rebaja"
 
 #: Separador entre fichas de la escalera en el texto plano (aviso y pruebas).
 SEPARADOR_ESCALERA = "  "
@@ -72,12 +75,20 @@ class GrupoPrenda:
     es_conjunto: bool
     precio_min: Decimal | None
     precio_max: Decimal | None
-    rebaja: str  # «Oferta» / «Liquidación» si alguna talla tiene rebaja vigente
+    rebaja: str  # «Oferta» / «Liquidación»; «Rebaja» si sus tallas traen las dos
     tallas_con_rebaja: int
     contada_mas_vieja: datetime | None
     nunca_contada: bool  # alguna talla nunca se contó
     bodega: int
     piso: int
+    #: Lo que está a la venta sin caja (suma de la «Tienda» de cada talla).
+    tienda: int = 0
+    #: Piezas que hay en cajas de más contra el total, sumadas talla por talla.
+    descuadre: int = 0
+    #: Tallas con descuadre (en cajas hay más de lo que dice su total).
+    tallas_descuadre: int = 0
+    #: Cuántas tallas trae cada tipo de rebaja, en orden: (("Oferta", 2), ("Liquidación", 1)).
+    rebajas: tuple = ()
 
     @property
     def variante_ids(self) -> tuple:
@@ -103,19 +114,39 @@ class GrupoPrenda:
     def aviso_precio(self) -> str | None:
         if not self.rebaja:
             return None
+        if len(self.rebajas) > 1:
+            # Tipos mezclados: cuántas de cada uno («Oferta en 2 · Liquidación en 1 de 3 tallas»).
+            cuentas = SEPARADOR.join(f"{tipo} en {n}" for tipo, n in self.rebajas)
+            return f"{cuentas} de {self.tallas} tallas"
         if self.tallas_con_rebaja >= self.tallas:
             return f"{self.rebaja} en todas sus tallas"
         return f"{self.rebaja} en {self.tallas_con_rebaja} de {self.tallas} tallas"
 
     @property
     def texto_donde(self) -> str:
-        """Lo que hay en cajas sumado: «Bodega 12 · Piso 2»; si nada, «Tienda» o «—»."""
+        """Lo que hay en cajas sumado: «Bodega 12 · Piso 2»; si nada, «Tienda» o «—».
+
+        Si alguna talla tiene descuadre (en cajas más de lo que dice su total)
+        lleva la misma marca «⚠» que en «Por talla»."""
         if self.es_conjunto:
             return VACIO
         partes = [f"{nombre} {n:,}" for nombre, n in (("Bodega", self.bodega), ("Piso", self.piso)) if n > 0]
         if partes:
-            return SEPARADOR.join(partes)
+            return SEPARADOR.join(partes) + (MARCA_DESCUADRE if self.descuadre else "")
         return TIENDA if self.piezas > 0 else VACIO
+
+    @property
+    def aviso_donde(self) -> str | None:
+        """Reparto completo para el aviso: «Tienda 4 · Bodega 6 · Piso 2» y, si
+        hay descuadre, en cuántas tallas."""
+        if self.es_conjunto:
+            return "Se arma con sus piezas: no se guarda aparte."
+        partes = [f"{nombre} {n:,}" for nombre, n in ((TIENDA, self.tienda), ("Bodega", self.bodega), ("Piso", self.piso)) if n > 0]
+        texto = SEPARADOR.join(partes) if partes else "No hay"
+        if self.descuadre:
+            tallas = "1 talla" if self.tallas_descuadre == 1 else f"{self.tallas_descuadre} tallas"
+            texto += f". Ojo: en {tallas} hay en cajas {self.descuadre:,} de más contra su total"
+        return texto
 
 
 def texto_escalera(escalera: Iterable[TallaEscalera]) -> str:
@@ -178,10 +209,10 @@ def _grupo(llave: tuple, filas: list[Mapping[str, object]]) -> GrupoPrenda:
         filas = sorted(filas, key=lambda f: (clave_talla(f.get("talla")), str(f.get("sku") or "")))
     primera = filas[0]
     escalera = []
-    piezas = piezas_conjunto = bodega = piso = 0
+    piezas = piezas_conjunto = bodega = piso = tienda = descuadre = tallas_descuadre = 0
     todas_virtuales = True
     precio_min = precio_max = None
-    rebaja = ""
+    tipos_rebaja: dict[str, int] = {}
     con_rebaja = 0
     mas_vieja: datetime | None = None
     nunca = False
@@ -206,8 +237,13 @@ def _grupo(llave: tuple, filas: list[Mapping[str, object]]) -> GrupoPrenda:
         else:
             todas_virtuales = False
             piezas += max(0, stock)
-            bodega += max(0, _entero(fila.get("stock_bodega")))
-            piso += max(0, _entero(fila.get("stock_piso")))
+            reparto = repartir(stock, _entero(fila.get("stock_bodega")), _entero(fila.get("stock_piso")))
+            bodega += reparto.bodega
+            piso += reparto.piso
+            tienda += reparto.tienda
+            if reparto.descuadre:
+                descuadre += reparto.descuadre
+                tallas_descuadre += 1
         precio = _decimal(precio_efectivo(fila))
         if precio is not None:
             precio_min = precio if precio_min is None or precio < precio_min else precio_min
@@ -215,13 +251,18 @@ def _grupo(llave: tuple, filas: list[Mapping[str, object]]) -> GrupoPrenda:
         tipo = fila.get(LLAVE_TIPO)
         if tipo and fila.get(LLAVE_PRECIO) is not None:
             con_rebaja += 1
-            rebaja = rebaja or ETIQUETAS_REBAJA.get(str(tipo), str(tipo))
+            etiqueta = ETIQUETAS_REBAJA.get(str(tipo), str(tipo))
+            tipos_rebaja[etiqueta] = tipos_rebaja.get(etiqueta, 0) + 1
         conteo = fila.get("ultimo_conteo_at")
         if isinstance(conteo, datetime):
             if mas_vieja is None or _utc(conteo) < _utc(mas_vieja):
                 mas_vieja = conteo
         else:
             nunca = True
+    if len(tipos_rebaja) > 1:
+        rebaja = REBAJA_MEZCLADA
+    else:
+        rebaja = next(iter(tipos_rebaja), "")
     return GrupoPrenda(
         llave=llave,
         producto_id=primera.get("producto_id"),
@@ -240,6 +281,10 @@ def _grupo(llave: tuple, filas: list[Mapping[str, object]]) -> GrupoPrenda:
         nunca_contada=nunca,
         bodega=bodega,
         piso=piso,
+        tienda=tienda,
+        descuadre=descuadre,
+        tallas_descuadre=tallas_descuadre,
+        rebajas=tuple(tipos_rebaja.items()),
     )
 
 
