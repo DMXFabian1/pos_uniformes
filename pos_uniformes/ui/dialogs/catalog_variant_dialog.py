@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QSpinBox,
     QCheckBox,
     QVBoxLayout,
@@ -24,7 +25,17 @@ from sqlalchemy import select
 from pos_uniformes.database.connection import get_session
 from pos_uniformes.database.models import Producto
 from pos_uniformes.services.catalog_service import CatalogService
-from pos_uniformes.services.catalogo_valores_service import CAMPO_COLOR, CAMPO_TALLA, depurar_opciones
+from pos_uniformes.services.catalogo_valores_service import (
+    CAMPO_COLOR,
+    CAMPO_TALLA,
+    contar_usos,
+    depurar_opciones,
+)
+from pos_uniformes.ui.dialogs.quisiste_decir_dialog import (
+    Campo,
+    confirmar_valores,
+    preguntar_quisiste_decir,
+)
 from pos_uniformes.ui.helpers.catalog_form_payload_helper import (
     build_catalog_batch_variant_dialog_payload,
     build_catalog_variant_dialog_payload,
@@ -47,6 +58,7 @@ def build_catalog_variant_dialog(
     common_colors: list[str],
     default_variant_size: str,
     default_variant_color: str,
+    preguntar_valor=preguntar_quisiste_decir,
 ) -> dict[str, object] | None:
     legacy_choices = load_legacy_config_choices()
     with get_session() as session:
@@ -294,8 +306,53 @@ def build_catalog_variant_dialog(
     if not initial:
         refresh_sku_suggestion()
 
+    def usos_en_base(campo: str) -> dict[str, int]:
+        try:
+            with get_session() as session:
+                return contar_usos(session, campo)
+        except Exception:  # noqa: BLE001 — sin base, al menos se revisan los sinónimos
+            return {}
+
+    def aceptar() -> None:
+        # Se valida aquí (y no después de cerrar) para que un error no tire
+        # lo capturado: el diálogo se queda abierto.
+        borrador = build_catalog_variant_dialog_payload(
+            product_id=producto_combo.currentData(),
+            sku=sku_input.text(),
+            size=talla_combo.currentText(),
+            color=color_combo.currentText(),
+            price=precio_input.text(),
+            cost=costo_input.text(),
+            initial_stock=stock_spin.value(),
+        )
+        problema = validate_catalog_variant_submission(borrador, require_stock=include_stock)
+        if problema is not None:
+            QMessageBox.warning(dialog, "Datos incompletos", problema)
+            return
+        resultado = confirmar_valores(
+            dialog,
+            [
+                Campo("talla", CAMPO_TALLA, talla_combo.currentText(), str((initial or {}).get("talla") or "")),
+                Campo("color", CAMPO_COLOR, color_combo.currentText(), str((initial or {}).get("color") or "")),
+            ],
+            usos_de=usos_en_base,
+            puede_crear_escuela=False,
+            preguntar=preguntar_valor,
+        )
+        if resultado is None:
+            return
+        for combo, clave in ((talla_combo, "talla"), (color_combo, "color")):
+            valor = resultado.valores.get(clave, "")
+            if valor and valor != combo.currentText().strip():
+                indice = combo.findText(valor)
+                if indice >= 0:
+                    combo.setCurrentIndex(indice)
+                else:
+                    combo.setEditText(valor)
+        dialog.accept()
+
     buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-    buttons.accepted.connect(dialog.accept)
+    buttons.accepted.connect(aceptar)
     buttons.rejected.connect(dialog.reject)
     layout.addWidget(product_box)
     layout.addWidget(id_box)
@@ -306,9 +363,14 @@ def build_catalog_variant_dialog(
     if dialog.exec() != int(QDialog.DialogCode.Accepted):
         return None
 
+    # Si el SKU es el sugerido, se manda vacío: el servicio lo genera con el
+    # contador bloqueado al guardar, así dos computadoras no toman el mismo.
+    sku_sugerido = not initial and (
+        sku_input.isReadOnly() or sku_input.text().strip().upper() == last_auto_sku["value"]
+    )
     payload = build_catalog_variant_dialog_payload(
         product_id=producto_combo.currentData(),
-        sku=sku_input.text(),
+        sku="" if sku_sugerido else sku_input.text(),
         size=talla_combo.currentText(),
         color=color_combo.currentText(),
         price=precio_input.text(),

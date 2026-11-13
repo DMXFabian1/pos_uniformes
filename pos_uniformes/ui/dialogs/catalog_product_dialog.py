@@ -46,15 +46,24 @@ from pos_uniformes.database.models import (
 from pos_uniformes.services.catalog_service import CatalogService
 from pos_uniformes.services.catalogo_valores_service import (
     CAMPO_ATRIBUTO,
+    CAMPO_CATEGORIA,
     CAMPO_COLOR,
+    CAMPO_ESCUELA,
     CAMPO_NIVEL,
     CAMPO_TALLA,
     CAMPO_TIPO_PIEZA,
     CAMPO_TIPO_PRENDA,
+    contar_usos,
     depurar_opciones,
+)
+from pos_uniformes.ui.dialogs.quisiste_decir_dialog import (
+    Campo,
+    confirmar_valores,
+    preguntar_quisiste_decir,
 )
 from pos_uniformes.ui.helpers.catalog_form_payload_helper import (
     build_catalog_product_dialog_payload,
+    invalid_catalog_prices,
     validate_catalog_product_presentations_step,
     validate_catalog_product_submission,
 )
@@ -101,6 +110,7 @@ def build_catalog_product_dialog(
     common_colors: list[str],
     default_variant_size: str,
     default_variant_color: str,
+    preguntar_valor=preguntar_quisiste_decir,
 ) -> dict[str, object] | None:
     with get_session() as session:
         categorias = [
@@ -1779,10 +1789,11 @@ def build_catalog_product_dialog(
                 return False
         if step_index == 2:
             has_variant_intent = bool(variant_sizes_button.selected_labels() or variant_colors_button.selected_labels())
-            _, missing_prices, _ = build_price_assignment()
+            price_map, missing_prices, _ = build_price_assignment()
             feedback = validate_catalog_product_presentations_step(
                 has_variant_intent=has_variant_intent,
                 missing_prices=missing_prices,
+                invalid_prices=invalid_catalog_prices(price_map),
             )
             if feedback is not None:
                 QMessageBox.warning(dialog, "Paso 3 incompleto", feedback)
@@ -1827,10 +1838,100 @@ def build_catalog_product_dialog(
     previous_button = QPushButton("Anterior")
     next_button = QPushButton("Siguiente")
     save_button = QPushButton("Guardar")
+    # Nombres para pruebas y capturas (no tienen estilo propio).
+    for widget, nombre in (
+        (save_button, "altaGuardar"),
+        (nombre_input, "altaNombre"),
+        (marca_combo, "altaMarca"),
+        (escuela_combo, "altaEscuela"),
+        (tipo_pieza_combo, "altaPieza"),
+        (variant_sizes_button, "altaTallas"),
+        (variant_colors_button, "altaColores"),
+        (variant_price_input, "altaPrecio"),
+    ):
+        if not widget.objectName():
+            widget.setObjectName(nombre)
+    # El precio único vive fuera del árbol del diálogo (se edita en su popup).
+    dialog.alta_precio = variant_price_input  # type: ignore[attr-defined]
+    dialog.alta_modo_precio = price_mode_combo  # type: ignore[attr-defined]
     cancel_button = QPushButton("Cancelar")
     previous_button.clicked.connect(lambda: go_to_step(current_step["index"] - 1))
     next_button.clicked.connect(lambda: go_to_step(current_step["index"] + 1))
-    save_button.clicked.connect(lambda: dialog.accept() if validate_step(0) and validate_step(2) else None)
+    decision_valores: dict[str, object] = {"tallas": {}, "colores": {}, "nuevos": {}}
+
+    def campos_a_confirmar() -> list[Campo]:
+        inicial = product_initial or {}
+        es_uniforme = current_product_mode["key"] == "uniform"
+        campos: list[Campo] = []
+        if es_uniforme:
+            campos.append(Campo("escuela", CAMPO_ESCUELA, escuela_combo.currentText(), str(inicial.get("escuela") or "")))
+        campos += [
+            Campo("tipo_prenda", CAMPO_TIPO_PRENDA, tipo_prenda_combo.currentText(), str(inicial.get("tipo_prenda") or "")),
+            Campo("tipo_pieza", CAMPO_TIPO_PIEZA, tipo_pieza_combo.currentText(), str(inicial.get("tipo_pieza") or "")),
+            Campo("atributo", CAMPO_ATRIBUTO, atributo_combo.currentText(), str(inicial.get("atributo") or "")),
+        ]
+        if es_uniforme:
+            campos.append(
+                Campo("nivel", CAMPO_NIVEL, nivel_combo.currentText(), str(inicial.get("nivel_educativo") or ""))
+            )
+        elif categoria_combo.currentData() is None and categoria_combo.currentText().strip():
+            campos.append(Campo("categoria", CAMPO_CATEGORIA, categoria_combo.currentText()))
+        campos += [
+            Campo(f"talla:{talla}", CAMPO_TALLA, talla) for talla in variant_sizes_button.selected_labels()
+        ]
+        campos += [
+            Campo(f"color:{color}", CAMPO_COLOR, color) for color in variant_colors_button.selected_labels()
+        ]
+        return campos
+
+    def usos_en_base(campo: str) -> dict[str, int]:
+        try:
+            with get_session() as session:
+                return contar_usos(session, campo)
+        except Exception:  # noqa: BLE001 — sin base, al menos se revisan los sinónimos
+            return {}
+
+    def poner_texto(combo: QComboBox, valor: str) -> None:
+        indice = combo.findText(valor)
+        if indice >= 0:
+            combo.setCurrentIndex(indice)
+        elif combo.isEditable():
+            combo.setEditText(valor)
+
+    def guardar() -> None:
+        if not (validate_step(0) and validate_step(2)):
+            return
+        # «¿Quisiste decir…?»: nada nuevo se crea sin que el usuario lo elija.
+        resultado = confirmar_valores(
+            dialog,
+            campos_a_confirmar(),
+            usos_de=usos_en_base,
+            puede_crear_escuela=window.current_role == RolUsuario.ADMIN,
+            preguntar=preguntar_valor,
+        )
+        if resultado is None:
+            return
+        combos = {
+            "escuela": escuela_combo,
+            "tipo_prenda": tipo_prenda_combo,
+            "tipo_pieza": tipo_pieza_combo,
+            "atributo": atributo_combo,
+            "nivel": nivel_combo,
+            "categoria": categoria_combo,
+        }
+        for clave, combo in combos.items():
+            if clave in resultado.valores and resultado.valores[clave] != combo.currentText().strip():
+                poner_texto(combo, resultado.valores[clave])
+        decision_valores["tallas"] = {
+            clave.split(":", 1)[1]: valor for clave, valor in resultado.valores.items() if clave.startswith("talla:")
+        }
+        decision_valores["colores"] = {
+            clave.split(":", 1)[1]: valor for clave, valor in resultado.valores.items() if clave.startswith("color:")
+        }
+        decision_valores["nuevos"] = resultado.nuevos
+        dialog.accept()
+
+    save_button.clicked.connect(guardar)
     def confirm_cancel() -> None:
         if nombre_input.text().strip() or variant_sizes_button.selected_labels():
             answer = QMessageBox.question(
@@ -1860,7 +1961,9 @@ def build_catalog_product_dialog(
         return None
 
     prices_by_size, _, price_summary = build_price_assignment()
-    return build_catalog_product_dialog_payload(
+    tallas_elegidas = dict(decision_valores["tallas"])  # type: ignore[arg-type]
+    colores_elegidos = dict(decision_valores["colores"])  # type: ignore[arg-type]
+    payload = build_catalog_product_dialog_payload(
         mode_key=current_product_mode["key"],
         category_id=categoria_combo.currentData(),
         category_name=categoria_combo.currentText(),
@@ -1875,12 +1978,27 @@ def build_catalog_product_dialog(
         shield=escudo_input.currentText(),
         location=ubicacion_input.currentText(),
         description=descripcion_input.toPlainText(),
-        sizes=variant_sizes_button.selected_labels(),
-        colors=variant_colors_button.selected_labels(),
+        sizes=reemplazar_valores(variant_sizes_button.selected_labels(), tallas_elegidas),
+        colors=reemplazar_valores(variant_colors_button.selected_labels(), colores_elegidos),
         variant_price=variant_price_input.text(),
         price_mode=str(price_mode_combo.currentData() or "single"),
-        prices_by_size=prices_by_size,
+        prices_by_size={tallas_elegidas.get(talla, talla): precio for talla, precio in prices_by_size.items()},
         price_summary=price_summary,
         variant_cost=variant_cost_input.text(),
         initial_stock=variant_stock_spin.value(),
     )
+    # Valores que el usuario eligió crear en «¿Quisiste decir…?»: solo esos
+    # se pueden crear al guardar (`catalogo_valores_service.resolver_o_crear`).
+    payload["valores_nuevos"] = dict(decision_valores["nuevos"])  # type: ignore[arg-type]
+    return payload
+
+
+def reemplazar_valores(valores: list[str], elegidos: dict[str, str]) -> list[str]:
+    """Cambia cada valor por el que se eligió en «¿Quisiste decir…?» y quita
+    los repetidos («Uni» y «Unitalla» quedan en una sola «Unitalla»)."""
+    vistos: list[str] = []
+    for valor in valores:
+        nuevo = elegidos.get(valor, valor)
+        if nuevo and nuevo not in vistos:
+            vistos.append(nuevo)
+    return vistos

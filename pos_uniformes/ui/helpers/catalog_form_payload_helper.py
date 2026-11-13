@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from decimal import Decimal, InvalidOperation
+
 from pos_uniformes.ui.helpers.catalog_product_form_mode_helper import (
     UNIFORM_CATEGORIES,
     UNIFORM_GARMENT_TYPES,
@@ -27,13 +29,38 @@ def validate_catalog_product_base_step(
     return None
 
 
+def invalid_catalog_prices(prices_by_size: dict[str, str]) -> list[str]:
+    """Tallas cuyo precio está en $0, es negativo o no es un número."""
+    invalid: list[str] = []
+    for size, raw_price in prices_by_size.items():
+        text = str(raw_price or "").strip()
+        if not text:
+            continue
+        try:
+            value = Decimal(text)
+        except InvalidOperation:
+            invalid.append(str(size))
+            continue
+        if value <= 0:
+            invalid.append(str(size))
+    return invalid
+
+
 def validate_catalog_product_presentations_step(
     *,
     has_variant_intent: bool,
     missing_prices: list[str],
+    invalid_prices: list[str] | None = None,
 ) -> str | None:
     if has_variant_intent and missing_prices:
         return "Todavia faltan precios para algunas tallas o bloques. Revisa ese paso antes de continuar."
+    if has_variant_intent and invalid_prices:
+        return (
+            "El precio no puede quedar en $0 ni ser negativo. Revisa: "
+            + ", ".join(invalid_prices[:8])
+            + ("…" if len(invalid_prices) > 8 else "")
+            + "."
+        )
     return None
 
 
@@ -135,6 +162,8 @@ def validate_catalog_variant_submission(
         return "Captura una talla."
     if not str(payload.get("precio") or "").strip():
         return "Captura el precio de venta."
+    if invalid_catalog_prices({"precio": str(payload.get("precio"))}):
+        return "El precio de venta no puede quedar en $0 ni ser negativo."
     if require_stock and int(payload.get("stock_inicial") or 0) < 0:
         return "El stock inicial no puede ser negativo."
     return None

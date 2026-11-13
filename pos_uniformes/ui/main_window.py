@@ -126,7 +126,12 @@ from pos_uniformes.services import conjunto_service
 from pos_uniformes.services import exportacion_libreta_service
 from pos_uniformes.services import resumen_pos_service
 from pos_uniformes.services.catalog_service import CatalogService
-from pos_uniformes.services.catalogo_valores_service import COLORES_SUGERIDOS, TALLAS_SUGERIDAS
+from pos_uniformes.services.catalogo_valores_service import (
+    CAMPO_POR_MODELO,
+    COLORES_SUGERIDOS,
+    TALLAS_SUGERIDAS,
+    resolver_o_crear,
+)
 from pos_uniformes.services.catalog_snapshot_service import load_catalog_snapshot_rows
 from pos_uniformes.services.catalog_mutation_service import (
     delete_catalog_product,
@@ -4217,18 +4222,17 @@ class MainWindow(QMainWindow):
             default_variant_color=DEFAULT_VARIANT_COLOR,
         )
 
-    @staticmethod
-    def _resolve_named_taxonomy(session, model, raw_name: str):
-        normalized = raw_name.strip()
-        if not normalized:
-            return None
-        existing = session.scalar(select(model).where(model.nombre == normalized))
-        if existing is not None:
-            return existing
-        created = model(nombre=normalized)
-        session.add(created)
-        session.flush()
-        return created
+    def _resolve_named_taxonomy(self, session, model, raw_name: str, data: dict | None = None):
+        # Ya no crea en silencio: solo lo que el usuario eligió crear en
+        # «¿Quisiste decir…?» (tanda 1 del alta, 2026-11-13).
+        campo = CAMPO_POR_MODELO.get(model, "")
+        return resolver_o_crear(
+            session,
+            model,
+            raw_name,
+            confirmados=((data or {}).get("valores_nuevos") or {}).get(campo, ()),
+            usuario=session.get(Usuario, self.user_id),
+        )
 
     def _prompt_purchase_data(self) -> dict[str, object] | None:
         with get_session() as session:
@@ -5357,19 +5361,19 @@ class MainWindow(QMainWindow):
                 categoria = (
                     session.get(Categoria, int(categoria_id))
                     if categoria_id is not None
-                    else self._resolve_named_taxonomy(session, Categoria, categoria_nombre)
+                    else self._resolve_named_taxonomy(session, Categoria, categoria_nombre, data)
                 )
                 marca = session.get(Marca, int(marca_id))
                 if user is None or categoria is None or marca is None:
                     raise ValueError("Usuario, categoria o marca no encontrada.")
-                escuela = None if is_regular_product_mode else self._resolve_named_taxonomy(session, Escuela, str(data["escuela"]))
-                tipo_prenda = self._resolve_named_taxonomy(session, TipoPrenda, str(data["tipo_prenda"]))
-                tipo_pieza = self._resolve_named_taxonomy(session, TipoPieza, str(data["tipo_pieza"]))
-                atributo = self._resolve_named_taxonomy(session, AtributoProducto, str(data["atributo"]))
+                escuela = None if is_regular_product_mode else self._resolve_named_taxonomy(session, Escuela, str(data["escuela"]), data)
+                tipo_prenda = self._resolve_named_taxonomy(session, TipoPrenda, str(data["tipo_prenda"]), data)
+                tipo_pieza = self._resolve_named_taxonomy(session, TipoPieza, str(data["tipo_pieza"]), data)
+                atributo = self._resolve_named_taxonomy(session, AtributoProducto, str(data["atributo"]), data)
                 nivel_educativo = (
                     None
                     if is_regular_product_mode
-                    else self._resolve_named_taxonomy(session, NivelEducativo, str(data["nivel_educativo"]))
+                    else self._resolve_named_taxonomy(session, NivelEducativo, str(data["nivel_educativo"]), data)
                 )
                 producto = CatalogService.crear_producto(
                     session,
@@ -5589,19 +5593,19 @@ class MainWindow(QMainWindow):
                 categoria = (
                     session.get(Categoria, int(categoria_id))
                     if categoria_id is not None
-                    else self._resolve_named_taxonomy(session, Categoria, categoria_nombre)
+                    else self._resolve_named_taxonomy(session, Categoria, categoria_nombre, data)
                 )
                 marca = session.get(Marca, int(marca_id))
                 if usuario is None or producto is None or categoria is None or marca is None:
                     raise ValueError("No se pudo cargar el producto, categoria o marca.")
-                escuela = None if is_regular_product_mode else self._resolve_named_taxonomy(session, Escuela, str(data["escuela"]))
-                tipo_prenda = self._resolve_named_taxonomy(session, TipoPrenda, str(data["tipo_prenda"]))
-                tipo_pieza = self._resolve_named_taxonomy(session, TipoPieza, str(data["tipo_pieza"]))
-                atributo = self._resolve_named_taxonomy(session, AtributoProducto, str(data["atributo"]))
+                escuela = None if is_regular_product_mode else self._resolve_named_taxonomy(session, Escuela, str(data["escuela"]), data)
+                tipo_prenda = self._resolve_named_taxonomy(session, TipoPrenda, str(data["tipo_prenda"]), data)
+                tipo_pieza = self._resolve_named_taxonomy(session, TipoPieza, str(data["tipo_pieza"]), data)
+                atributo = self._resolve_named_taxonomy(session, AtributoProducto, str(data["atributo"]), data)
                 nivel_educativo = (
                     None
                     if is_regular_product_mode
-                    else self._resolve_named_taxonomy(session, NivelEducativo, str(data["nivel_educativo"]))
+                    else self._resolve_named_taxonomy(session, NivelEducativo, str(data["nivel_educativo"]), data)
                 )
                 CatalogService.actualizar_producto(
                     session=session,
