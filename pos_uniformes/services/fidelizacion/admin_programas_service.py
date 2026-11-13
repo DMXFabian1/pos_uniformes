@@ -53,6 +53,17 @@ def texto_tasa(tasa) -> str:
 # -- pestaña Fidelización -----------------------------------------------------------
 
 
+#: Nota de las pantallas de programas (diálogo y panel del cliente).
+#: 2026-11-12 (Daniel, «solucionemos estos»): decían «Por ahora los programas
+#: son una etiqueta: no cambian precios ni descuentos», pero ya dan Monedero
+#: (programa.tasa_monedero) y Mayorista puede tomarlo como descuento. Sin
+#: números: el % de cada uno sale de la base, en la columna Monedero.
+NOTA_PROGRAMAS = (
+    "Cada programa da su % de Monedero en las compras. "
+    "Algunos (como Mayorista) dejan tomarlo como descuento en vez del Monedero."
+)
+
+
 @dataclass(frozen=True)
 class Pendiente:
     membresia_id: int

@@ -136,7 +136,7 @@ class ProgramasDialog(QDialog):
         textos.setSpacing(2)
         titulo = QLabel("Programas de fidelización")
         titulo.setObjectName("cliTitulo")
-        subtitulo = QLabel("Por ahora los programas son una etiqueta: no cambian precios ni descuentos.")
+        subtitulo = QLabel(aps.NOTA_PROGRAMAS)
         subtitulo.setObjectName("cliSubtitulo")
         textos.addWidget(titulo)
         textos.addWidget(subtitulo)

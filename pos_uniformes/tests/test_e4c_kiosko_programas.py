@@ -76,11 +76,38 @@ class TextoInscribirClubTests(unittest.TestCase):
     def test_con_tasa_dice_lo_que_gana(self) -> None:
         texto = ms.texto_inscribir_club("Ana", D("5.00"))
         self.assertTrue(texto.startswith("¿Inscribir a Ana a Maximoda Club?"))
-        self.assertIn("gana 5 % de cada compra en su Monedero, desde esta misma compra", texto)
-        self.assertIn("Oferta o Liquidación no suma", texto)
+        self.assertIn("gana 5 % de lo que pague en su Monedero, desde esta misma compra", texto)
+        self.assertIn("No suman Oferta, Liquidación ni la comisión de tarjeta", texto)
+        self.assertNotIn("de cada compra", texto)
 
     def test_tasa_con_decimales(self) -> None:
-        self.assertIn("gana 7.5 % de cada", ms.texto_inscribir_club("Ana", D("7.50")))
+        self.assertIn("gana 7.5 % de lo que pague", ms.texto_inscribir_club("Ana", D("7.50")))
+
+    def test_si_esta_compra_no_gana_no_lo_promete(self) -> None:
+        texto = ms.texto_inscribir_club("Ana", D("5"), desde_esta_compra=False)
+        self.assertNotIn("desde esta misma compra", texto)
+        self.assertIn("en sus próximas compras", texto)
+
+    def test_gana_desde_esta_compra(self) -> None:
+        g = ms.gana_desde_esta_compra
+        self.assertTrue(g(descuento_empleada=False, estado_monedero=None))  # aún sin monedero
+        self.assertTrue(g(descuento_empleada=False, estado_monedero="activo"))
+        self.assertFalse(g(descuento_empleada=True, estado_monedero="activo"))  # D1
+        self.assertFalse(g(descuento_empleada=False, estado_monedero="bloqueado"))
+        self.assertFalse(g(descuento_empleada=False, estado_monedero="cerrado"))
+
+    def test_pantallas_de_programas_ya_no_dicen_que_son_etiqueta(self) -> None:
+        import inspect
+
+        from pos_uniformes.services.fidelizacion import admin_programas_service as aps
+        from pos_uniformes.ui.dialogs import cliente_fidelizacion_panel, programas_dialog
+
+        for mod in (programas_dialog, cliente_fidelizacion_panel):
+            fuente = inspect.getsource(mod)
+            self.assertNotIn("no cambian precios ni descuentos", fuente)
+            self.assertIn("aps.NOTA_PROGRAMAS", fuente)
+        self.assertIn("Monedero", aps.NOTA_PROGRAMAS)
+        self.assertNotIn("etiqueta", aps.NOTA_PROGRAMAS)
 
     def test_sin_tasa_no_promete_ningun_porcentaje(self) -> None:
         for tasa in (None, D("0")):
@@ -184,9 +211,20 @@ class FranjaTests(_Kiosko):
         with patch.object(ph.QMessageBox, "question", return_value=QMessageBox.StandardButton.No) as pregunta:
             w._btn_inscribir_club.click()
         texto = pregunta.call_args.args[2]
-        self.assertIn("gana 7 % de cada compra en su Monedero", texto)
+        self.assertIn("gana 7 % de lo que pague en su Monedero", texto)
         self.assertIn("desde esta misma compra", texto)
         self.assertNotIn("no cambia", texto)
+
+    def test_con_precio_de_empleada_no_promete_esta_compra(self) -> None:
+        # D1: con descuento de empleada la Libreta no abona esta venta.
+        self._monedero_con_club_al("5")
+        w = self._widget()
+        w._discount_active = True
+        with patch.object(ph.QMessageBox, "question", return_value=QMessageBox.StandardButton.No) as pregunta:
+            w._btn_inscribir_club.click()
+        texto = pregunta.call_args.args[2]
+        self.assertNotIn("desde esta misma compra", texto)
+        self.assertIn("en sus próximas compras", texto)
 
     def test_ya_inscrito_la_pantalla_lee_su_tasa(self) -> None:
         self._monedero_con_club_al("5")

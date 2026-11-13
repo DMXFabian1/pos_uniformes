@@ -110,7 +110,7 @@ class FidelizacionPanel(QWidget):
         tarjetas.addWidget(self.propuesta_card, 1)
         caja.addWidget(fila_tarjetas)
 
-        nota = QLabel("Por ahora los programas son una etiqueta: no cambian precios ni descuentos.")
+        nota = QLabel(aps.NOTA_PROGRAMAS)
         nota.setObjectName("cliNota")
         nota.setWordWrap(True)
         caja.addWidget(nota)

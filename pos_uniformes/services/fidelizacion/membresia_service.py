@@ -274,21 +274,41 @@ def tasa_monedero_de_programa(session: Session, clave: str) -> Decimal | None:
     return tasa if tasa > 0 else None
 
 
-def texto_inscribir_club(nombre: str, tasa: Decimal | None) -> str:
+def gana_desde_esta_compra(*, descuento_empleada: bool, estado_monedero: str | None) -> bool:
+    """Si la compra que está en el kiosko ganaría Monedero al inscribir hoy.
+
+    2026-11-12 (Daniel, «solucionemos estos»): no se promete «desde esta
+    misma compra» cuando la Libreta no va a abonar: con descuento de empleada
+    (D1, el motor marca EMPLEADA_SIN_MONEDERO) o con el monedero bloqueado o
+    cerrado. Sin monedero todavía (estado None) sí gana: se crea activo."""
+    if descuento_empleada:
+        return False
+    from pos_uniformes.services.monedero_service import ACTIVO
+
+    return estado_monedero in (None, "", ACTIVO)
+
+
+def texto_inscribir_club(nombre: str, tasa: Decimal | None, *, desde_esta_compra: bool = True) -> str:
     """La pregunta antes de inscribir a Club en el kiosko. Sin tasa (no se
     pudo leer o el Monedero no da nada) no se menciona ningún %.
 
-    Desde esta misma compra es cierto: antes de cobrar el kiosko vuelve a leer
+    «Desde esta misma compra» es cierto solo si `desde_esta_compra`
+    (ver `gana_desde_esta_compra`): antes de cobrar el kiosko vuelve a leer
     al cliente (T3) y la Libreta abona con el programa que tenga al momento de
-    la venta. Lo de Oferta o Liquidación no suma (E7)."""
+    la venta. La base es lo que paga: no suman Oferta, Liquidación ni la
+    comisión de tarjeta (regla B), ni el saldo que use del Monedero.
+
+    2026-11-12 (Daniel, «solucionemos estos»): decía «de cada compra», que
+    prometía de más con tarjeta o con prendas rebajadas."""
     pregunta = f"¿Inscribir a {nombre} a Maximoda Club?\n\n"
     if tasa is None or Decimal(str(tasa)) <= 0:
         return pregunta + "Queda como miembro desde hoy."
     pct = format(Decimal(str(tasa)).normalize(), "f")
+    cuando = "desde esta misma compra" if desde_esta_compra else "en sus próximas compras"
     return (
         pregunta
-        + f"Queda como miembro desde hoy y gana {pct} % de cada compra en su Monedero, "
-        "desde esta misma compra. Lo de Oferta o Liquidación no suma."
+        + f"Queda como miembro desde hoy y gana {pct} % de lo que pague en su Monedero, "
+        f"{cuando}. No suman Oferta, Liquidación ni la comisión de tarjeta."
     )
 
 

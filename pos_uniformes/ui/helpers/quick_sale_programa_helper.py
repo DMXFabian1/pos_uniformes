@@ -223,12 +223,21 @@ class ProgramaClienteMixin:
         if not self._programa_puede_actuar():
             return
         c = self._cliente
-        from pos_uniformes.services.fidelizacion.membresia_service import texto_inscribir_club
+        from pos_uniformes.services.fidelizacion.membresia_service import (
+            gana_desde_esta_compra,
+            texto_inscribir_club,
+        )
 
+        # 2026-11-12 (Daniel, «solucionemos estos»): con precio de empleada o
+        # monedero bloqueado esta compra no abona; no se promete.
+        desde_ahora = gana_desde_esta_compra(
+            descuento_empleada=bool(getattr(self, "_discount_active", False)),
+            estado_monedero=c.get("estado"),
+        )
         respuesta = QMessageBox.question(
             self,
             "Maximoda Club",
-            texto_inscribir_club(str(c["nombre"]), self._tasa_de_club()),
+            texto_inscribir_club(str(c["nombre"]), self._tasa_de_club(), desde_esta_compra=desde_ahora),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
