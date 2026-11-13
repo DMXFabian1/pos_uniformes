@@ -216,6 +216,66 @@ class InventarioTanda2PantallaTests(unittest.TestCase):
         # Las insignias van en su propia fila: el título tiene todo el ancho.
         self.assertGreaterEqual(window.inventory_overview_label.width(), caja.width() - 60)
 
+    # ── Confirmar antes de desactivar ───────────────────────────────────
+
+    def _fila_elegida(self, *, talla_activa: bool = True, prenda_activa: bool = True) -> dict:
+        return {
+            "variante_id": 11, "producto_id": 3, "sku": "SKU-11", "producto_nombre": "Pants 2pz Colegio Muestra",
+            "talla": "10", "color": "Azul marino", "variante_activo": talla_activa, "producto_activo": prenda_activa,
+        }
+
+    def _preparar(self, fila: dict) -> MainWindow:
+        window = self._ventana()
+        window.current_role = RolUsuario.ADMIN
+        window._selected_catalog_row = Mock(return_value=fila)
+        window._load_inventory_snapshot_rows = Mock(return_value=[{"producto_id": 3}] * 8)
+        window.refresh_all = Mock()
+        window._restore_catalog_selection_after_mutation = Mock()
+        return window
+
+    def test_desactivar_talla_pregunta_y_cancelar_no_toca_nada(self) -> None:
+        window = self._preparar(self._fila_elegida())
+        with patch("pos_uniformes.ui.main_window.preguntar_desactivar", return_value=False) as pregunta, patch(
+            "pos_uniformes.ui.main_window.toggle_catalog_variant_state"
+        ) as cambiar:
+            window._handle_toggle_variant()
+        cambiar.assert_not_called()
+        confirmacion = pregunta.call_args.args[1]
+        self.assertIn("¿Desactivar la talla 10 de Pants 2pz Colegio Muestra (Azul marino)?", confirmacion.texto)
+        self.assertIn("No se borra, deja de venderse.", confirmacion.texto)
+
+    def test_desactivar_talla_si_confirma_si_desactiva(self) -> None:
+        window = self._preparar(self._fila_elegida())
+        with patch("pos_uniformes.ui.main_window.preguntar_desactivar", return_value=True), patch(
+            "pos_uniformes.ui.main_window.toggle_catalog_variant_state"
+        ) as cambiar, patch("pos_uniformes.ui.main_window.get_session"), patch.object(QMessageBox, "information"):
+            window._handle_toggle_variant()
+        cambiar.assert_called_once()
+        self.assertFalse(cambiar.call_args.kwargs["target_state"])
+
+    def test_desactivar_prenda_pregunta_con_sus_tallas(self) -> None:
+        window = self._preparar(self._fila_elegida())
+        with patch("pos_uniformes.ui.main_window.preguntar_desactivar", return_value=False) as pregunta, patch(
+            "pos_uniformes.ui.main_window.toggle_catalog_product_state"
+        ) as cambiar:
+            window._handle_toggle_product()
+        cambiar.assert_not_called()
+        self.assertIn("Sus 8 tallas dejan de venderse", pregunta.call_args.args[1].texto)
+
+    def test_activar_no_pregunta(self) -> None:
+        window = self._preparar(self._fila_elegida(talla_activa=False))
+        with patch("pos_uniformes.ui.main_window.preguntar_desactivar") as pregunta, patch(
+            "pos_uniformes.ui.main_window.toggle_catalog_variant_state"
+        ) as cambiar, patch("pos_uniformes.ui.main_window.get_session"), patch.object(QMessageBox, "information"):
+            window._handle_toggle_variant()
+        pregunta.assert_not_called()
+        self.assertTrue(cambiar.call_args.kwargs["target_state"])
+
+    def test_botones_con_nombre_entendible(self) -> None:
+        window = self._ventana()
+        self.assertEqual(window.toggle_variant_button.text(), "Desactivar esta talla")
+        self.assertEqual(window.toggle_product_button.text(), "Desactivar toda la prenda")
+
 
 if __name__ == "__main__":
     unittest.main()

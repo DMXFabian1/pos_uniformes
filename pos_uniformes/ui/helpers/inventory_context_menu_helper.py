@@ -20,7 +20,7 @@ def build_inventory_context_menu_actions(
     return (
         InventoryContextMenuAction(
             key="edit",
-            label="Editar presentacion",
+            label="Editar talla",
             enabled=is_admin,
         ),
         InventoryContextMenuAction(
@@ -30,7 +30,7 @@ def build_inventory_context_menu_actions(
         ),
         InventoryContextMenuAction(
             key="adjust",
-            label="Corregir stock",
+            label="Corregir existencia",
             enabled=is_admin,
         ),
         InventoryContextMenuAction(
@@ -40,7 +40,7 @@ def build_inventory_context_menu_actions(
         ),
         InventoryContextMenuAction(
             key="toggle",
-            label="Activar presentacion" if not variante_activa else "Desactivar presentacion",
+            label="Activar esta talla" if not variante_activa else "Desactivar esta talla…",
             enabled=is_admin,
         ),
     )

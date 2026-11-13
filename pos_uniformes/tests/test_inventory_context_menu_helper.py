@@ -18,11 +18,11 @@ class InventoryContextMenuHelperTests(unittest.TestCase):
         self.assertEqual(
             [(action.key, action.label, action.enabled) for action in actions],
             [
-                ("edit", "Editar presentacion", True),
+                ("edit", "Editar talla", True),
                 ("entry", "Registrar entrada", True),
-                ("adjust", "Corregir stock", True),
+                ("adjust", "Corregir existencia", True),
                 ("print", "Imprimir etiqueta", True),
-                ("toggle", "Desactivar presentacion", True),
+                ("toggle", "Desactivar esta talla…", True),
             ],
         )
 
@@ -35,11 +35,11 @@ class InventoryContextMenuHelperTests(unittest.TestCase):
         self.assertEqual(
             [(action.key, action.label, action.enabled) for action in actions],
             [
-                ("edit", "Editar presentacion", False),
+                ("edit", "Editar talla", False),
                 ("entry", "Registrar entrada", False),
-                ("adjust", "Corregir stock", False),
+                ("adjust", "Corregir existencia", False),
                 ("print", "Imprimir etiqueta", True),
-                ("toggle", "Activar presentacion", False),
+                ("toggle", "Activar esta talla", False),
             ],
         )
 

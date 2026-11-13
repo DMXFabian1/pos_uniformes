@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from pos_uniformes.services.rebaja_service import fmt_corto
+from pos_uniformes.ui.helpers.inventory_toggle_helper import etiqueta_boton_prenda, etiqueta_boton_talla
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 from pos_uniformes.services.inventario_existencia_service import (
     AGOTADO,
@@ -62,8 +63,8 @@ def build_empty_inventory_overview_view() -> InventoryOverviewView:
         meta_label="",
         last_movement_label="",
         catalog_selection_label=TEXTO_SELECCION_OCULTA,
-        toggle_product_label="Prod.",
-        toggle_variant_label="Pres.",
+        toggle_product_label=etiqueta_boton_prenda(True),
+        toggle_variant_label=etiqueta_boton_talla(True),
     )
 
 
@@ -77,8 +78,8 @@ def build_error_inventory_overview_view() -> InventoryOverviewView:
         meta_label="",
         last_movement_label="",
         catalog_selection_label=TEXTO_SELECCION_OCULTA,
-        toggle_product_label="Prod.",
-        toggle_variant_label="Pres.",
+        toggle_product_label=etiqueta_boton_prenda(True),
+        toggle_variant_label=etiqueta_boton_talla(True),
     )
 
 
@@ -126,8 +127,8 @@ def build_inventory_overview_view(
             f"{sku} | {clean_product_name} | {tipo_prenda_nombre} | {tipo_pieza_nombre} | "
             f"precio {precio_venta} | stock {stock_actual}"
         ),
-        toggle_product_label="Activar prod." if not product_active else "Desactivar prod.",
-        toggle_variant_label="Activar var." if not variant_active else "Desactivar var.",
+        toggle_product_label=etiqueta_boton_prenda(product_active),
+        toggle_variant_label=etiqueta_boton_talla(variant_active),
     )
 
 

@@ -365,6 +365,12 @@ from pos_uniformes.ui.helpers.inventory_selection_helper import (
     normalize_inventory_variant_id,
 )
 from pos_uniformes.ui.helpers.inventory_summary_helper import INVENTORY_SEARCH_LIMIT, build_inventory_summary_view
+from pos_uniformes.ui.helpers.inventory_toggle_helper import (
+    confirmacion_desactivar_prenda,
+    confirmacion_desactivar_talla,
+    contar_tallas_de_prenda,
+    preguntar as preguntar_desactivar,
+)
 from pos_uniformes.ui.helpers.inventory_table_row_helper import (
     COLUMNA_STOCK as INVENTORY_COLUMNA_STOCK,
     build_inventory_table_row_views,
@@ -1306,7 +1312,7 @@ class MainWindow(QMainWindow):
         self.edit_product_name_input = QLineEdit()
         self.edit_product_description_input = QTextEdit()
         self.update_product_button = QPushButton("Guardar producto")
-        self.toggle_product_button = QPushButton("Desactivar producto")
+        self.toggle_product_button = QPushButton("Desactivar toda la prenda")
         self.edit_variant_product_combo = QComboBox()
         self.edit_variant_sku_input = QLineEdit()
         self.edit_variant_size_input = QLineEdit()
@@ -1314,7 +1320,7 @@ class MainWindow(QMainWindow):
         self.edit_variant_price_input = QLineEdit()
         self.edit_variant_cost_input = QLineEdit()
         self.update_variant_button = QPushButton("Guardar presentacion")
-        self.toggle_variant_button = QPushButton("Desactivar presentacion")
+        self.toggle_variant_button = QPushButton("Desactivar esta talla")
         self.delete_product_button = QPushButton("Eliminar producto")
         self.delete_variant_button = QPushButton("Eliminar presentacion")
 
@@ -1771,8 +1777,8 @@ class MainWindow(QMainWindow):
             self.variant_button: "Abre una ventana para crear una presentacion nueva con talla, color, precio y SKU.",
             self.update_product_button: "Edita los datos generales del producto seleccionado.",
             self.update_variant_button: "Edita la presentacion seleccionada, incluyendo precio, SKU, talla y color.",
-            self.toggle_product_button: "Activa o desactiva el producto seleccionado y sus presentaciones.",
-            self.toggle_variant_button: "Activa o desactiva solo la presentacion seleccionada.",
+            self.toggle_product_button: "Activa o desactiva la prenda con todas sus tallas (pregunta antes de desactivar).",
+            self.toggle_variant_button: "Activa o desactiva solo esta talla (pregunta antes de desactivar).",
             self.delete_product_button: "Elimina el producto si no tiene stock ni historial operativo.",
             self.delete_variant_button: "Elimina la presentacion si no tiene stock ni historial operativo.",
             self.purchase_button: "Registra entrada de mercancia para la presentacion seleccionada.",
@@ -5818,6 +5824,14 @@ class MainWindow(QMainWindow):
 
         target_state = not bool(selected["producto_activo"])
         action = _catalog_toggle_feedback_action(target_state)
+        if not target_state and not preguntar_desactivar(
+            self,
+            confirmacion_desactivar_prenda(
+                selected.get("producto_nombre"),
+                contar_tallas_de_prenda(self._load_inventory_snapshot_rows(), selected.get("producto_id")),
+            ),
+        ):
+            return
 
         try:
             with get_session() as session:
@@ -5854,6 +5868,11 @@ class MainWindow(QMainWindow):
 
         target_state = not bool(selected["variante_activo"])
         action = _catalog_toggle_feedback_action(target_state)
+        if not target_state and not preguntar_desactivar(
+            self,
+            confirmacion_desactivar_talla(selected.get("producto_nombre"), selected.get("talla"), selected.get("color")),
+        ):
+            return
 
         try:
             with get_session() as session:
@@ -8932,8 +8951,9 @@ class MainWindow(QMainWindow):
     def _clear_catalog_editor(self) -> None:
         self.catalog_selection_label.setText(build_empty_inventory_overview_view().catalog_selection_label)
         self.products_selection_label.setText(build_empty_catalog_selection_view().selection_label)
-        self.toggle_product_button.setText("Prod.")
-        self.toggle_variant_button.setText("Pres.")
+        empty_overview = build_empty_inventory_overview_view()
+        self.toggle_product_button.setText(empty_overview.toggle_product_label)
+        self.toggle_variant_button.setText(empty_overview.toggle_variant_label)
 
     def _restore_catalog_selection_after_mutation(self, variant_id: int) -> None:
         restored = self._select_catalog_variant(variant_id)
