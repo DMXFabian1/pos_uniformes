@@ -77,6 +77,31 @@ class InventoryTableRowHelperTests(unittest.TestCase):
         self.assertIsNone(views[1].row_tone)
         self.assertEqual(views[1].stock_tone, "positive")
 
+    def test_stock_muestra_el_total_aunque_este_en_bodega_y_piso(self) -> None:
+        # 10 en total, 7 en bodega y 3 en piso: antes salía «0 Agotado».
+        view = build_inventory_table_row_view(
+            {
+                "variante_id": 3,
+                "sku": "SKU-003",
+                "producto_nombre_base": "Playera Deportiva",
+                "talla": "10",
+                "color": "Blanco",
+                "stock_actual": 10,
+                "stock_bodega": 7,
+                "stock_piso": 3,
+                "apartado_cantidad": 0,
+                "variante_activa": True,
+                "qr_exists": True,
+                "ultimo_conteo_at": None,
+                "stock_minimo": None,
+            }
+        )
+        self.assertEqual(view.values[4], "10 OK")
+        self.assertEqual(view.values[5], 3)
+        self.assertEqual(view.values[6], 7)
+        self.assertEqual(view.stock_tone, "positive")
+        self.assertIsNone(view.row_tone)
+
 
 if __name__ == "__main__":
     unittest.main()

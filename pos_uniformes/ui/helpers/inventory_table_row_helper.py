@@ -5,7 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
-from pos_uniformes.utils.stock_tone_helper import resolve_stock_tone
+from pos_uniformes.services.inventario_existencia_service import (
+    AGOTADO,
+    BAJO_MINIMO,
+    clasificar_existencia,
+    texto_existencia,
+    tono_existencia,
+)
 
 
 @dataclass(frozen=True)
@@ -24,21 +30,18 @@ def build_inventory_table_row_views(visible_rows: list[dict[str, object]]) -> tu
 
 
 def build_inventory_table_row_view(row: dict[str, object]) -> InventoryTableRowView:
+    # La cifra es el TOTAL (tienda + bodega + piso), igual que chips y filtros.
     stock_total = int(row["stock_actual"])
     stock_bodega = int(row.get("stock_bodega", 0))
     stock_piso = int(row.get("stock_piso", 0))
-    stock_tienda = stock_total - stock_bodega - stock_piso
     committed_value = int(row["apartado_cantidad"])
     stock_minimo = row.get("stock_minimo")
     stock_minimo_int = int(stock_minimo) if stock_minimo is not None else None
-    below_min = stock_minimo_int is not None and stock_tienda < stock_minimo_int
-    stock_tone = resolve_stock_tone(stock_tienda, stock_minimo=stock_minimo_int)
+    clase = clasificar_existencia(stock_total, stock_minimo=stock_minimo_int)
+    stock_tone = tono_existencia(stock_total, stock_minimo=stock_minimo_int)
     row_tone = _build_inventory_row_tone(
-        stock_value=stock_tienda,
-        committed_value=committed_value,
+        clase=clase,
         variant_active=bool(row["variante_activa"]),
-        qr_exists=bool(row["qr_exists"]),
-        below_min=below_min,
     )
     status_text = "ACTIVA" if row["variante_activa"] else "INACTIVA"
     status_tone = "positive" if row["variante_activa"] else "muted"
@@ -53,7 +56,7 @@ def build_inventory_table_row_view(row: dict[str, object]) -> InventoryTableRowV
             row["producto_nombre_base"],
             row["talla"],
             row["color"],
-            _build_stock_table_text(stock_tienda, stock_minimo=stock_minimo_int),
+            texto_existencia(stock_total, stock_minimo=stock_minimo_int),
             stock_piso if stock_piso > 0 else "",
             stock_bodega if stock_bodega > 0 else "",
             committed_value,
@@ -67,16 +70,6 @@ def build_inventory_table_row_view(row: dict[str, object]) -> InventoryTableRowV
         status_tone=status_tone,
         qr_tone=qr_tone,
     )
-
-
-def _build_stock_table_text(stock_value: int, *, stock_minimo: int | None = None) -> str:
-    if stock_value == 0:
-        return "0 Agotado"
-    if stock_minimo is not None and stock_value < stock_minimo:
-        return f"{stock_value} Bajo mín"
-    if stock_value <= 3:
-        return f"{stock_value} Bajo"
-    return f"{stock_value} OK"
 
 
 def _format_ultimo_conteo(ultimo_conteo_at: datetime | None) -> str:
@@ -96,18 +89,11 @@ def _format_ultimo_conteo(ultimo_conteo_at: datetime | None) -> str:
         return "-"
 
 
-def _build_inventory_row_tone(
-    *,
-    stock_value: int,
-    committed_value: int,
-    variant_active: bool,
-    qr_exists: bool,
-    below_min: bool = False,
-) -> str | None:
+def _build_inventory_row_tone(*, clase: str, variant_active: bool) -> str | None:
     if not variant_active:
         return "muted"
-    if stock_value == 0:
+    if clase == AGOTADO:
         return "danger"
-    if below_min:
+    if clase == BAJO_MINIMO:
         return "warning"
     return None
