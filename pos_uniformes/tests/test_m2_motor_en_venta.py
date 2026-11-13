@@ -187,7 +187,13 @@ class ServidorColaTests(_Db):
         foto = foto_de(items, en_linea=False, cliente={"id": None, "codigo": "CLI-000007", "estado": "activo"})
         v = self._subir(items, foto, "180.00", cliente_id=self.cliente.id)
         self.assertEqual(v.calculo["servidor"]["entrada"]["origen_calculo"], "kiosko_sin_conexion")
-        self.assertEqual(v.calculo["servidor"]["diferencias"], {})
+        # 2026-11-12: el Monedero también se compara y se anota (sin frenar el
+        # cobro). Sin conexión el kiosko no conocía el programa del cliente;
+        # el servidor sí, y abona.
+        self.assertEqual(
+            v.calculo["servidor"]["diferencias"],
+            {"monedero.base": ["0.00", "180.00"], "monedero.abono": ["0.00", "18.00"]},
+        )
 
     def test_si_el_recalculo_falla_la_venta_queda(self):
         items = [playera()]

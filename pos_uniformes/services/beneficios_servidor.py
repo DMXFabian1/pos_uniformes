@@ -36,8 +36,13 @@ from pos_uniformes.services.beneficios.motor import calcular
 
 #: Lo que, si cambia, cambia lo que paga el cliente.
 CAMPOS_DEL_COBRO = ("total", "saldo_usado", "por_cobrar")
-#: Lo que se compara y se anota.
-CAMPOS_COMPARADOS = (*CAMPOS_DEL_COBRO, "descuento_total", "neto_tienda", "consumo_tope_total")
+#: Lo que se compara y se anota. El Monedero (2026-11-12) se anota pero no
+#: frena el cobro: el abono sale de la base del motor y conviene ver cuándo
+#: el kiosko prometió otra cosa (otra tasa, otro programa).
+CAMPOS_DEL_MONEDERO = ("monedero.base", "monedero.abono")
+CAMPOS_COMPARADOS = (
+    *CAMPOS_DEL_COBRO, "descuento_total", "neto_tienda", "consumo_tope_total", *CAMPOS_DEL_MONEDERO,
+)
 
 
 class CalculoCambio(ValueError):
@@ -165,12 +170,21 @@ def refrescar(session, entrada: EntradaVenta, *, cliente_id: int | None = None) 
     return replace(entrada, **cambios)
 
 
+def _valor(plano: dict, campo: str) -> str:
+    """El valor de `campo` («monedero.abono» entra al dict anidado). Sin
+    Monedero (bloqueado o sin programa) cuenta como $0.00."""
+    valor = plano
+    for parte in campo.split("."):
+        valor = valor.get(parte) if isinstance(valor, dict) else None
+    return "0.00" if valor is None else str(valor)
+
+
 def diferencias(kiosko: dict, servidor) -> dict:
     """{campo: (kiosko, servidor)} de lo que no coincide."""
     plano = _plano(servidor)
     salida = {}
     for campo in CAMPOS_COMPARADOS:
-        antes, ahora = str(kiosko.get(campo)), str(plano.get(campo))
+        antes, ahora = _valor(kiosko, campo), _valor(plano, campo)
         if Decimal(antes) != Decimal(ahora):
             salida[campo] = (antes, ahora)
     return salida
