@@ -41,6 +41,13 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
 
+    def setUp(self) -> None:
+        # 2026-11-12: varias pruebas arman MainWindow sin cerrarla; las
+        # ventanas sueltas hacían tronar el archivo (Segmentation fault en
+        # BusyFeedbackScope → processEvents). Se cierran todas al terminar,
+        # después de las demás limpiezas de la prueba (addCleanup va al revés).
+        self.addCleanup(_cerrar_ventanas_abiertas)
+
     def test_catalog_snapshot_cache_reuses_rows_until_invalidated(self) -> None:
         window = MainWindow(user_id=1)
         sentinel_session = object()
@@ -1736,11 +1743,21 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 def _cerrar_ventana(window: MainWindow) -> None:
     """Cierra sin el diálogo de confirmación y la destruye de verdad, para no
     acumular ventanas (y sus timers) en el mismo proceso."""
+    from PyQt6 import sip
+
+    if sip.isdeleted(window):   # ya la cerró otra limpieza
+        return
     window._force_close = True
     window.close()
     window.deleteLater()
     QApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete.value)
     QApplication.processEvents()
+
+
+def _cerrar_ventanas_abiertas() -> None:
+    for widget in QApplication.topLevelWidgets():
+        if isinstance(widget, MainWindow):
+            _cerrar_ventana(widget)
 
 
 if __name__ == "__main__":
