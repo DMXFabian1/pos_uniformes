@@ -230,9 +230,12 @@ class CompradoraEmpleadaMixin:
             return None
         return respuesta.get("forma")
 
-    def _cargar_a_cuenta(self, opcion, total, folio) -> bool:
-        """Deja la compra a cuenta de su pago. Si no se puede, avisa que se
-        cobre al momento (la venta se anota igual, en efectivo)."""
+    def _revisar_a_cuenta(self, total) -> bool:
+        """Justo antes de imprimir (2026-11-12): ¿todavía le cabe a cuenta?
+
+        La copia de la empleada dice «A CUENTA DE TU PAGO» y sale de la
+        impresora ANTES de anotar nada. Si no cabe o no hay conexión, no se
+        imprime: se avisa y el carrito se queda para cobrarla al momento."""
         from pos_uniformes.services import compra_a_cuenta_service as cac
 
         c = self._compradora
@@ -240,21 +243,74 @@ class CompradoraEmpleadaMixin:
             from pos_uniformes.database.connection import get_session
 
             with get_session() as session:
-                compra = cac.registrar(
-                    session, employee_code=c.codigo, nombre=c.nombre, monto=total, opcion=opcion,
-                    quien=self._OWNER_CODE, folio=folio,
-                )
-                session.commit()
-                # Daniel la autoriza desde el aviso del bot (2026-11-12).
-                cac.avisar_a_daniel(session, compra)
+                razon = cac.puede_dejarse_a_cuenta(session, c.codigo, total)
+        except Exception:  # noqa: BLE001
+            _logger.warning("Compra a cuenta: sin conexión para revisarla", exc_info=True)
+            razon = "Sin conexión con la caja: no se puede dejar a cuenta. Cóbrale al momento."
+        if razon is None:
             return True
-        except Exception as exc:  # noqa: BLE001
-            _logger.warning("Compra a cuenta: no se pudo registrar", exc_info=True)
+        QMessageBox.warning(self, "A cuenta de su pago", f"{razon}\n\nNo se imprimió nada: elige efectivo o tarjeta.")
+        return False
+
+    def _anotar_a_cuenta(self, opcion) -> bool:
+        """Anota la venta, su compra a cuenta y el retiro del cajón en UNA
+        transacción (`compra_a_cuenta_service.registrar_venta_a_cuenta`,
+        2026-11-12). Antes eran dos: la compra y el retiro con commit, y la
+        venta después por la cola; si la venta no llegaba, el corte marcaba
+        un faltante falso.
+
+        Lo apunta el código real de quien está en el kiosko, con el permiso
+        propio de la compra a cuenta; ya no se pasa el código del dueño.
+
+        Si no se pudo (sin conexión o error) NO queda a cuenta: se avisa que
+        la copia que lo dice no vale y que se cobre al momento, y la venta se
+        anota como siempre (en efectivo, por la cola) con el mismo folio del
+        ticket. Devuelve False solo si ni siquiera se pudo armar la venta (y
+        entonces quien llama la anota por la vía normal)."""
+        from pos_uniformes.services import compra_a_cuenta_service as cac
+
+        c = self._compradora
+        try:
+            entradas = self._armar_anotacion(
+                "venta", cliente=None, pago_tarjeta=False, anticipo=None, anticipo_tarjeta=False,
+            )
+        except Exception:  # noqa: BLE001
+            _logger.exception("Compra a cuenta: no se pudo armar la venta")
             QMessageBox.warning(
                 self, "A cuenta de su pago",
-                f"No se pudo dejar a cuenta de su pago:\n{exc}\n\nCóbrale al momento: la venta quedó en efectivo.",
+                "No se pudo dejar a cuenta de su pago. La copia que dice «a cuenta» NO vale: "
+                "cóbrale al momento.",
             )
             return False
+        compra = None
+        try:
+            from pos_uniformes.database.connection import get_session
+
+            with get_session() as session:
+                compra = cac.registrar_venta_a_cuenta(
+                    session, entrada=entradas[0], employee_code=c.codigo, nombre=c.nombre, opcion=opcion,
+                    creado_por=str(getattr(self, "_employee_code", "") or c.codigo),
+                )
+                try:
+                    # Daniel la autoriza desde el aviso del bot (2026-11-12).
+                    cac.avisar_a_daniel(session, compra)
+                except Exception:  # noqa: BLE001 — la compra ya quedó guardada
+                    _logger.warning("Compra a cuenta: no se pudo avisar", exc_info=True)
+        except Exception as exc:  # noqa: BLE001
+            _logger.warning("Compra a cuenta: no se pudo registrar", exc_info=True)
+            if compra is None:
+                QMessageBox.warning(
+                    self, "A cuenta de su pago",
+                    f"No se pudo dejar a cuenta de su pago:\n{exc}\n\n"
+                    "La copia que dice «a cuenta» NO vale: cóbrale al momento. "
+                    "La venta quedó anotada en efectivo.",
+                )
+                retenidas_antes = len(self._anotaciones_pendientes)
+                if self._anotar(entradas) or len(self._anotaciones_pendientes) > retenidas_antes:
+                    self._vaciar_carrito()
+                return True
+        self._vaciar_carrito()
+        return True
 
     # ─── Elegir ─────────────────────────────────────────────────────────
 

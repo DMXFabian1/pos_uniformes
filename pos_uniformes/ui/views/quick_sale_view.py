@@ -2936,6 +2936,9 @@ class QuickSaleWidget(
         if a_cuenta is None and self._canje_actual(total_venta) > 0:
             self._cobrar_con_monedero(card, wants_copy)
             return
+        # 2026-11-12: la copia dice «a cuenta»; si ya no cabe, no se imprime.
+        if a_cuenta is not None and not self._revisar_a_cuenta(total_venta):
+            return
         # El folio (QR) se decide antes de imprimir y la Libreta guarda ese
         # mismo como identidad de la venta (2026-11-12).
         import uuid as _uuid
@@ -2949,10 +2952,10 @@ class QuickSaleWidget(
             tickets.append(self._build_venta_text(store_copy=True, terminal_commission=card, folio=folio))
 
         def _al_imprimir() -> None:
-            # A cuenta: primero el cargo a su pago (con el retiro del cajón);
-            # luego la venta se anota como siempre.
-            if a_cuenta is not None:
-                self._cargar_a_cuenta(a_cuenta, total_venta, folio)
+            # A cuenta: la venta, el cargo a su pago y el retiro del cajón en
+            # una sola transacción (2026-11-12, compra_a_cuenta_service).
+            if a_cuenta is not None and self._anotar_a_cuenta(a_cuenta):
+                return
             self._registrar_y_vaciar("venta", pago_tarjeta=card)
 
         # La Libreta registra HASTA que la impresión realmente arranca:

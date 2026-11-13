@@ -3187,12 +3187,15 @@ class QuoteSatelliteWindow(QMainWindow):
         try:
             from pos_uniformes.services import prestamos_service as pr
 
+            from pos_uniformes.services import compra_a_cuenta_service as cac
+
             with get_session() as session:
-                pendientes = [(float(p.monto), str(p.motivo)) for p in pr.pendientes_de(session, code)]
+                # La compra a cuenta se reconoce por columna (2026-11-12).
+                pendientes = [
+                    (float(p.monto), str(p.motivo), cac.es_compra(p)) for p in pr.pendientes_de(session, code)
+                ]
                 por_cobrar = pr.total_por_cobrar(session, code)
                 disponible = pr.disponible_para(session, code)
-                from pos_uniformes.services import compra_a_cuenta_service as cac
-
                 no_autorizadas = [float(p.monto) for p in cac.rechazadas_recientes(session, code)]
         except Exception:  # noqa: BLE001 — sin servidor, mejor no ofrecerlo
             logger.exception("Libreta: no se pudo leer el préstamo")
@@ -3203,8 +3206,8 @@ class QuoteSatelliteWindow(QMainWindow):
         # Puede tener varios (2026-10-26): se le dice en qué van y, si todavía
         # le cabe otro en el 70% de lo ganado, el botón se queda.
         partes = []
-        for monto_p, motivo_p in pendientes:
-            if motivo_p.startswith("Compra a cuenta"):
+        for monto_p, motivo_p, es_compra_p in pendientes:
+            if es_compra_p:
                 # Compras a cuenta de su pago (2026-11-12): las autoriza Daniel.
                 partes.append(f"🛍️ Tu compra a cuenta de ${monto_p:,.2f} espera que Daniel la autorice.")
             else:
