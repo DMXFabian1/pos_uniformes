@@ -2,9 +2,17 @@
 
 Un corte guardado (`libreta_corte`) trae su periodo (`desde`/`hasta`), así
 que las operaciones, los pagos y los retiros de ese periodo se vuelven a
-consultar y el ticket sale igual al original. Los cortes viejos (antes del
-corte por periodo, 2026-09-08) no tienen `desde`/`hasta`: se toma el corte
-anterior como inicio y `created_at` como fin.
+consultar y el dinero del ticket sale igual al original. Los cortes viejos
+(antes del corte por periodo, 2026-09-08) no tienen `desde`/`hasta`: se toma
+el corte anterior como inicio y `created_at` como fin.
+
+Lo que NO sale igual (2026-11-12): las «ops» por empleada se cuentan con la
+regla vigente. Un corte anterior a la decisión de Daniel de que el abono no
+es operación («no cuentan como operación») se reimprime sin contar sus
+abonos, aunque el papel original sí los contó. Se acepta así: Daniel dijo que
+no le hace falta recalcular los cortes viejos, y el dinero (efectivo,
+tarjeta, pagos y retiros) no cambia. El `operaciones` guardado en
+`libreta_corte` se queda con el número de su día.
 """
 
 from __future__ import annotations
