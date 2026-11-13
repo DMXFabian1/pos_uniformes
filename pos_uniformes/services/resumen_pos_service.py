@@ -54,7 +54,7 @@ class ResumenPos:
 def cifras_periodo(rows: list, *, ajuste: Decimal = Decimal("0.00"), incluir_privados: bool = True) -> CifrasPeriodo:
     """Las cifras de un periodo a partir de sus filas de la Libreta (puro)."""
     from pos_uniformes.services.corte_caja_service import resumir_periodo
-    from pos_uniformes.services.libreta_service import cuenta_como_operacion, sin_privados
+    from pos_uniformes.services.libreta_service import contar_operaciones, cuenta_como_operacion, sin_privados
 
     rows = list(rows or [])
     if not incluir_privados:
@@ -64,9 +64,10 @@ def cifras_periodo(rows: list, *, ajuste: Decimal = Decimal("0.00"), incluir_pri
     # mete dinero), el apartado no es dinero (resumir_periodo lo separa).
     r = resumir_periodo(rows)
     return CifrasPeriodo(
-        operaciones=len(operaciones),
-        ventas=sum(1 for r in operaciones if cuenta_como_operacion(r, ("venta",))),
-        apartados=sum(1 for r in operaciones if cuenta_como_operacion(r, ("apartado",))),
+        # Ventas unidas en una operación cuentan 1 (2026-11-13).
+        operaciones=contar_operaciones(operaciones),
+        ventas=contar_operaciones(operaciones, ("venta",)),
+        apartados=contar_operaciones(operaciones, ("apartado",)),
         piezas=sum(int(getattr(r, "piezas", 0) or 0) for r in operaciones),
         cobrado=(r.efectivo + Decimal(ajuste or 0) + r.tarjeta_neto).quantize(_CENT),
     )

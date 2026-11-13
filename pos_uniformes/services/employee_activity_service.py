@@ -100,9 +100,12 @@ def build_employee_activity_snapshot(
             amount=Decimal("0.00"),
         )
 
-    from pos_uniformes.services.libreta_service import cuenta_como_operacion
+    from pos_uniformes.services.libreta_service import clave_operacion, cuenta_como_operacion
 
     last_sale_at: datetime | None = None
+    #: Ventas unidas en una operación son 1 ticket (2026-11-13).
+    claves_periodo: set = set()
+    claves_dia: dict = {}
     for sale in operaciones:
         # El criterio del ranking: solo lo que cuenta como operación (venta y
         # apartado, sin su propia compra con precio especial).
@@ -118,18 +121,24 @@ def build_employee_activity_snapshot(
             if str(getattr(sale, "tipo", None) or "venta") == "venta"
             else Decimal("0.00")
         )
+        clave = clave_operacion(sale)
         if sale_day >= summary_start:
             period_pieces += pieces
-            period_tickets += 1
+            if clave not in claves_periodo:
+                claves_periodo.add(clave)
+                period_tickets += 1
             period_amount = (period_amount + amount).quantize(Decimal("0.01"))
         if sale_day not in day_rows:
             continue
         current = day_rows[sale_day]
+        del_dia = claves_dia.setdefault(sale_day, set())
+        ticket_nuevo = clave not in del_dia
+        del_dia.add(clave)
         day_rows[sale_day] = EmployeeActivityDayRow(
             day=current.day,
             day_label=current.day_label,
             pieces=current.pieces + pieces,
-            tickets=current.tickets + 1,
+            tickets=current.tickets + (1 if ticket_nuevo else 0),
             amount=(current.amount + amount).quantize(Decimal("0.01")),
         )
         if last_sale_at is None or sale_datetime > last_sale_at:

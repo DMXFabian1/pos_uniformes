@@ -60,7 +60,7 @@ def _entradas(session, desde: datetime, *, solo_empleada: str | None = None) -> 
     from sqlalchemy import case, func, literal_column, select
 
     from pos_uniformes.database import models as m
-    from pos_uniformes.services.libreta_service import TIPOS_OPERACION
+    from pos_uniformes.services.libreta_service import TIPOS_OPERACION, clave_operacion_sql
 
     lv = m.LibretaVenta
     # Un abono NO es operacion (Daniel, 2026-11-12: «no cuentan como
@@ -68,7 +68,9 @@ def _entradas(session, desde: datetime, *, solo_empleada: str | None = None) -> 
     # llaman «cobros» (ventas y abonos) y las «ops» de mes y empleada son
     # venta + apartado, como en el corte y la Libreta.
     es_operacion = lv.tipo.in_(TIPOS_OPERACION)
-    ops = func.coalesce(func.sum(case((es_operacion, 1), else_=0)), 0)
+    # Ventas unidas en una operacion cuentan 1 (2026-11-13): se cuenta la
+    # clave de la operacion (el grupo o la fila), distinta.
+    ops = func.count(func.distinct(case((es_operacion, clave_operacion_sql()), else_=None)))
     piezas_ops = func.coalesce(func.sum(case((es_operacion, lv.piezas), else_=0)), 0)
     cobrado, recibido = _dinero(lv)
     filtro = [lv.created_at >= desde]

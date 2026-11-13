@@ -110,14 +110,17 @@ def resumir_periodo(rows: list) -> ResumenPeriodo:
     a la terminal, y el corte lo espera; por eso `movimientos` cuenta toda
     fila y un periodo con solo abonos sigue siendo `hubo_movimiento`. (Las compras a cuenta ya vienen
     quitadas por `sin_compras_a_cuenta`.)"""
-    from pos_uniformes.services.libreta_service import cuenta_como_operacion, pagos_de
+    from pos_uniformes.services.libreta_service import clave_operacion, cuenta_como_operacion, pagos_de
 
-    operaciones = piezas = movimientos = num_abonos = 0
+    piezas = movimientos = num_abonos = 0
+    #: Ventas unidas en una operación cuentan 1 (2026-11-13); su dinero y
+    #: sus piezas, fila por fila como siempre.
+    claves: set = set()
     ventas = abonos = apartados = tarjeta = efectivo = tarjeta_neto = monedero = Decimal("0.00")
     for row in rows:
         movimientos += 1
         if cuenta_como_operacion(row):
-            operaciones += 1
+            claves.add(clave_operacion(row))
             piezas += int(row.piezas or 0)
         monto = _d(row.monto_total)
         tipo = str(row.tipo)
@@ -136,7 +139,7 @@ def resumir_periodo(rows: list) -> ResumenPeriodo:
             tarjeta += pagos.tarjeta
             tarjeta_neto += _d(getattr(row, "monto_neto", None) or pagos.tarjeta)
     return ResumenPeriodo(
-        operaciones=operaciones,
+        operaciones=len(claves),
         piezas=piezas,
         ventas=ventas.quantize(_CENT),
         abonos=abonos.quantize(_CENT),

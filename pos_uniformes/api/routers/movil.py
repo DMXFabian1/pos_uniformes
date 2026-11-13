@@ -158,6 +158,7 @@ def _payload_dueno(db: Session) -> dict:
         fecha_proximo_pago,
     )
     from pos_uniformes.services.libreta_service import (
+        clave_operacion,
         listar_operaciones,
         resumir_por_dia,
         resumir_por_empleada,
@@ -220,7 +221,8 @@ def _payload_dueno(db: Session) -> dict:
     tarjeta = sum((pagos_de(r).tarjeta for r in ventas_rows), Decimal("0.00"))
     efectivo = sum((pagos_de(r).efectivo for r in ventas_rows), Decimal("0.00"))
     comisiones = sum(int(getattr(r, "comisiones", 0) or 0) for r in rows)
-    ventas_count = sum(1 for r in rows if str(r.tipo) == "venta")
+    # Ventas unidas en una operación cuentan 1 (2026-11-13).
+    ventas_count = len({clave_operacion(r) for r in rows if str(r.tipo) == "venta"})
 
     return {
         "hoy": {

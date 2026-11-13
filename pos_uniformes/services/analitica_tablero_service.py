@@ -160,7 +160,7 @@ def cifras(rows: list, *, ajuste: Decimal = Decimal("0.00"), cobrables: list | N
     dinero entrara al cajón, y eso es lo único que se le quita. Como sale de
     los conteos en bloque o no sale, «operaciones >= ventas» se mantiene."""
     from pos_uniformes.services.corte_caja_service import resumir_periodo
-    from pos_uniformes.services.libreta_service import TIPOS_OPERACION
+    from pos_uniformes.services.libreta_service import TIPOS_OPERACION, clave_operacion
 
     r = resumir_periodo(list(rows if cobrables is None else cobrables))
     rows = [x for x in rows if str(getattr(x, "tipo", "")) in ("venta", "apartado", "abono")]
@@ -178,8 +178,10 @@ def cifras(rows: list, *, ajuste: Decimal = Decimal("0.00"), cobrables: list | N
         # `piezas` de esta misma tarjeta, para que «N operaciones» nunca
         # salga menor que «M ventas» (revisión 2026-11-12). Antes contaba
         # todas las filas.
-        operaciones=sum(1 for x in rows if str(getattr(x, "tipo", "")) in TIPOS_OPERACION),
-        ventas=len(ventas),
+        # Ventas unidas en una operación (2026-11-13) son 1 operación y 1
+        # venta: el ticket promedio es el de la clienta, no el de cada papel.
+        operaciones=len({clave_operacion(x) for x in rows if str(getattr(x, "tipo", "")) in TIPOS_OPERACION}),
+        ventas=len({clave_operacion(x) for x in ventas}),
         importe_ventas=importe.quantize(_CENT),
         piezas=piezas,
     )

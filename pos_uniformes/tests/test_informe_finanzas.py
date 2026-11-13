@@ -245,6 +245,25 @@ class MonederoYApartadosEnElInformeTests(unittest.TestCase):
         self.assertIn("(no es dinero)", self._renglon(texto, "apartado"))
         self.assertIn("2 com", self._renglon(texto, "Prueba informe"))   # la comisión sí cuenta
 
+    def test_dos_ventas_unidas_son_una_op_y_el_dinero_igual(self) -> None:
+        """Ventas unidas en una operación (2026-11-13): 1 op en el mes y en
+        «quien cobro»; el dinero, las piezas y las comisiones, igual."""
+        self._op("venta", "100.00", "100.00", piezas=1, comisiones=1)
+        self._op("venta", "50.00", "50.00", piezas=2, comisiones=2)
+        self.session.flush()
+        filas = self.session.query(LibretaVenta).filter(LibretaVenta.employee_code == self.codigo).all()
+        ancla = min(f.id for f in filas)
+        for f in filas:
+            f.operacion_grupo_id = ancla
+        texto = self._informe()
+        self.assertIn("Cobrado              : $150.00", texto)
+        mes = self._renglon(texto, f"{datetime.now(_TIENDA):%Y-%m}")
+        self.assertIn("    1 ops", mes)
+        self.assertIn("     3 pz", mes)
+        quien = self._renglon(texto, "Prueba informe")
+        self.assertIn("   1 ops", quien)
+        self.assertIn("   3 com", quien)
+
     def test_mes_cuenta_piezas_del_apartado_sin_sumar_dinero(self) -> None:
         """MEDIA-2: el apartado cuenta en ops y piezas del mes, no en dinero."""
         self._op("apartado", "1000.00", "1000.00", piezas=3, comisiones=2)

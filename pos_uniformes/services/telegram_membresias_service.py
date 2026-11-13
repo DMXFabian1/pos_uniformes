@@ -103,11 +103,12 @@ def _apartados(session: Session, cliente_id: int) -> tuple[int, Decimal, datetim
 
 def _sumar(session: Session, cliente_id: int, tipo: str) -> tuple[int, Decimal, datetime | None]:
     from pos_uniformes.database.models import LibretaVenta
-    from pos_uniformes.services.libreta_service import predicado_operacion
+    from pos_uniformes.services.libreta_service import contar_operaciones_sql, predicado_operacion
 
     fila = session.execute(
         select(
-            func.count(LibretaVenta.id),
+            # Ventas unidas en una operación son 1 compra (2026-11-13).
+            contar_operaciones_sql(),
             func.coalesce(func.sum(LibretaVenta.monto_total), 0),
             func.max(LibretaVenta.created_at),
         ).where(LibretaVenta.cliente_id == int(cliente_id), predicado_operacion((tipo,)))

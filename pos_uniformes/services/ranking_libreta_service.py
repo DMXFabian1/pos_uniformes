@@ -23,6 +23,7 @@ from decimal import Decimal
 
 from pos_uniformes.services.libreta_service import (
     TIPOS_OPERACION,
+    clave_operacion,
     cuenta_como_operacion,
     es_compra_de_empleada,
 )
@@ -62,6 +63,9 @@ def calcular(rows) -> list[FilaRanking]:
     luego piezas, luego código. Quien solo cobró abonos aparece con 0
     puntos (sale en la sección de abonos)."""
     filas: dict[str, FilaRanking] = {}
+    #: Ventas unidas en una operación (2026-11-13): 1 operación y 1 venta;
+    #: piezas, puntos e importe, fila por fila.
+    claves: dict[str, set] = {}
     for row in rows or []:
         code = str(getattr(row, "employee_code", "") or "").strip().upper()
         if not code:
@@ -79,11 +83,17 @@ def calcular(rows) -> list[FilaRanking]:
             # La regla única (libreta_service, 2026-11-12): su propia compra
             # con precio especial no le suma operación, piezas ni importe.
             continue
+        nueva = False
         if cuenta_como_operacion(row, TIPOS_OPERACION_RANKING):
-            fila.operaciones += 1
+            vistas = claves.setdefault(code, set())
+            clave = clave_operacion(row)
+            nueva = clave not in vistas
+            vistas.add(clave)
+            fila.operaciones = len(vistas)
             fila.piezas += int(getattr(row, "piezas", 0) or 0)
         if tipo == "venta":
-            fila.ventas += 1
+            if nueva:
+                fila.ventas += 1
             fila.importe_ventas += _monto(row)
         elif tipo == "apartado":
             fila.apartados += 1

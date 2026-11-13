@@ -11,7 +11,9 @@ Ahora salen de `libreta_venta`, con los mismos nombres de hoja:
 - **06_ventas**: una fila por operación de la Libreta del periodo (venta,
   apartado, abono…), con su tipo y si cuenta como operación
   (`libreta_service.cuenta_como_operacion`), para que quien lo abra pueda
-  separar el dinero real de los apartados. Las anuladas no salen: se borran
+  separar el dinero real de los apartados. Las ventas unidas en una
+  operación (2026-11-13) llevan en «unida_con» el número de la primera, y
+  «operacion» es la misma para todo el grupo. Las anuladas no salen: se borran
   de la Libreta.
 - **07_detalle_ventas**: una fila por línea de producto guardada en
   `detalle` (los abonos no traen prendas).
@@ -45,7 +47,7 @@ def filas_ventas(rows, a_cuenta: dict | None = None) -> list[dict[str, object]]:
 
     `a_cuenta`: {id de la venta: estado} de las compras a cuenta."""
     from pos_uniformes.services.employee_sales_history_service import folio_de_operacion
-    from pos_uniformes.services.libreta_service import cuenta_como_operacion
+    from pos_uniformes.services.libreta_service import clave_operacion, cuenta_como_operacion
 
     a_cuenta = a_cuenta or {}
     filas: list[dict[str, object]] = []
@@ -56,6 +58,11 @@ def filas_ventas(rows, a_cuenta: dict | None = None) -> list[dict[str, object]]:
                 "folio": folio_de_operacion(row),
                 "tipo": str(getattr(row, "tipo", None) or "venta"),
                 "cuenta_como_operacion": cuenta_como_operacion(row),
+                # Ventas unidas en una operación (2026-11-13): el número de la
+                # primera venta del grupo; vacío si va sola. Para contar
+                # operaciones, contar «operacion» distinta.
+                "unida_con": getattr(row, "operacion_grupo_id", None) or "",
+                "operacion": clave_operacion(row),
                 "fecha": getattr(row, "created_at", None),
                 "empleada_codigo": getattr(row, "employee_code", None),
                 "empleada": getattr(row, "employee_name", None),

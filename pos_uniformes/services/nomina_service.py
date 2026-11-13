@@ -481,6 +481,7 @@ def detalle_del_dia(session, employee_code: str, fecha: date, hoy: date | None =
     from sqlalchemy import func as sa_func
 
     from pos_uniformes.database.models import EmpleadaPago, LibretaVenta
+    from pos_uniformes.services.libreta_service import contar_operaciones_sql
 
     hoy = hoy or date.today()
     code = str(employee_code).strip().upper()
@@ -494,7 +495,9 @@ def detalle_del_dia(session, employee_code: str, fecha: date, hoy: date | None =
     if fecha <= hoy:
         inicio = datetime.combine(fecha, time.min).astimezone()
         comisiones, ventas = session.query(
-            sa_func.coalesce(sa_func.sum(LibretaVenta.comisiones), 0), sa_func.count(LibretaVenta.id)
+            # Ventas unidas en una operación cuentan 1 (2026-11-13); las
+            # comisiones, todas.
+            sa_func.coalesce(sa_func.sum(LibretaVenta.comisiones), 0), contar_operaciones_sql()
         ).filter(
             LibretaVenta.employee_code == code,
             LibretaVenta.created_at >= inicio,

@@ -15,7 +15,7 @@ from datetime import date, datetime, time
 from sqlalchemy import select
 
 from pos_uniformes.database.models import LibretaVenta
-from pos_uniformes.services.libreta_service import TIPOS_OPERACION, predicado_operacion
+from pos_uniformes.services.libreta_service import TIPOS_OPERACION, clave_operacion, predicado_operacion
 
 #: Lo que cuenta como «operación» para la empleada: venta y apartado.
 #: Retiros, entradas y pagos no son operaciones suyas, y desde 2026-11-12 el
@@ -74,8 +74,12 @@ def resumen_de_hoy(session, *, hoy: date | None = None) -> ResumenHoy:
     ).all()
     cuenta: dict[str, int] = {}
     nombres: dict[str, str] = {}
+    claves: dict[str, set] = {}
     for f in filas:
-        cuenta[f.employee_code] = cuenta.get(f.employee_code, 0) + 1
+        # Ventas unidas en una operación cuentan 1 (2026-11-13).
+        vistas = claves.setdefault(f.employee_code, set())
+        vistas.add(clave_operacion(f))
+        cuenta[f.employee_code] = len(vistas)
         nombres[f.employee_code] = _corto(f.employee_name, f.employee_code)
     orden = sorted(cuenta.items(), key=lambda kv: (-kv[1], nombres[kv[0]].lower()))
     ultima = None
