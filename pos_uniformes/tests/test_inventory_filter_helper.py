@@ -93,6 +93,50 @@ class InventoryFilterHelperTests(unittest.TestCase):
 
         self.assertTrue(matches)
 
+    def test_filtros_de_precio_usan_el_precio_rebajado_que_dice_la_columna(self) -> None:
+        row = {
+            "categoria_nombre": "Uniforme",
+            "marca_nombre": "Marca Norte",
+            "escuela_nombre": "General",
+            "tipo_prenda_nombre": "Deportivo",
+            "tipo_pieza_nombre": "Pants",
+            "talla": "16",
+            "color": "Azul",
+            "variante_activa": True,
+            "stock_actual": 5,
+            "precio_venta": "250.00",
+            "rebaja_tipo": "oferta",
+            "rebaja_precio": "175.00",
+        }
+
+        def filtros(precio_filter: str = "", precio_text_filter: str = "") -> InventoryVisibleFilterState:
+            return InventoryVisibleFilterState(
+                search_text="",
+                use_filter="",
+                category_filters=(),
+                brand_filters=(),
+                school_filters=(),
+                type_filters=(),
+                piece_filters=(),
+                size_filters=(),
+                color_filters=(),
+                status_filter="",
+                stock_filter="",
+                conteo_filter="",
+                precio_filter=precio_filter,
+                precio_text_filter=precio_text_filter,
+            )
+
+        def pasa(**kwargs: str) -> bool:
+            return inventory_row_matches_visible_filters(
+                row, filters=filtros(**kwargs), search_matcher=lambda *_args: True
+            )
+
+        self.assertTrue(pasa(precio_text_filter="175"))
+        self.assertFalse(pasa(precio_text_filter="250"))
+        self.assertTrue(pasa(precio_filter="100_199"))
+        self.assertFalse(pasa(precio_filter="200_499"))
+
     def test_filter_visible_inventory_rows_keeps_only_matching_rows(self) -> None:
         rows = [
             {

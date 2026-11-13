@@ -4,7 +4,12 @@ import unittest
 from datetime import date
 from decimal import Decimal
 
-from pos_uniformes.services.inventario_precio_service import adjuntar_rebajas, aviso_precio, texto_precio
+from pos_uniformes.services.inventario_precio_service import (
+    adjuntar_rebajas,
+    aviso_precio,
+    precio_efectivo,
+    texto_precio,
+)
 from pos_uniformes.services.rebaja_service import LIQUIDACION, OFERTA, RebajaVigente
 
 
@@ -62,3 +67,16 @@ class AdjuntarRebajasTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PrecioEfectivoTests(unittest.TestCase):
+    def test_sin_rebaja_es_el_normal(self) -> None:
+        self.assertEqual(precio_efectivo({"precio_venta": Decimal("250")}), Decimal("250"))
+
+    def test_con_rebaja_es_el_rebajado(self) -> None:
+        fila = {"precio_venta": Decimal("250"), "rebaja_tipo": OFERTA, "rebaja_precio": Decimal("175")}
+        self.assertEqual(precio_efectivo(fila), Decimal("175"))
+
+    def test_tipo_sin_precio_no_cuenta(self) -> None:
+        fila = {"precio_venta": Decimal("250"), "rebaja_tipo": OFERTA, "rebaja_precio": None}
+        self.assertEqual(precio_efectivo(fila), Decimal("250"))

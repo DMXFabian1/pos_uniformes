@@ -33,6 +33,17 @@ def adjuntar_rebajas(
         fila[LLAVE_HASTA] = rebaja.hasta if rebaja else None
 
 
+def precio_efectivo(fila: Mapping[str, object]) -> object:
+    """El precio al que se vende hoy: el rebajado si hay rebaja vigente, si no el normal.
+
+    Es el que muestra la columna «Precio», y el que usan los filtros de precio
+    para que filtro y columna digan lo mismo.
+    """
+    if fila.get(LLAVE_TIPO) and fila.get(LLAVE_PRECIO) is not None:
+        return fila.get(LLAVE_PRECIO)
+    return fila.get("precio_venta")
+
+
 def texto_precio(fila: Mapping[str, object]) -> str:
     """«$320» o, con rebaja vigente, «Oferta $175» / «Liquidación $150»."""
     precio = fila.get("precio_venta")

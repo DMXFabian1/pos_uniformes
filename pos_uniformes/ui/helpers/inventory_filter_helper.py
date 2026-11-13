@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from typing import Callable
 
 from pos_uniformes.services.inventario_existencia_service import coincide_filtro_existencia, es_fila_virtual
+from pos_uniformes.services.inventario_precio_service import precio_efectivo
 from pos_uniformes.ui.helpers.catalog_product_form_mode_helper import UNIFORM_CATEGORIES
 from pos_uniformes.ui.helpers.listing_visibility_helper import (
     matches_active_state,
@@ -72,8 +73,8 @@ def inventory_row_matches_visible_filters(
             virtual=es_fila_virtual(row),
         )
         and _matches_inventory_conteo_filter(row.get("ultimo_conteo_at"), filters.conteo_filter)
-        and _matches_inventory_precio_filter(row.get("precio_venta"), filters.precio_filter)
-        and _matches_inventory_precio_text_filter(row.get("precio_venta"), filters.precio_text_filter)
+        and _matches_inventory_precio_filter(precio_efectivo(row), filters.precio_filter)
+        and _matches_inventory_precio_text_filter(precio_efectivo(row), filters.precio_text_filter)
         and search_matcher(row, filters.search_text)
     )
 
