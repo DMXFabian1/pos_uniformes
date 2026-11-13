@@ -176,6 +176,22 @@ QTableWidget#invTabla QHeaderView::section {{
 QTableWidget#invTabla QHeaderView::section:hover {{ color: {VINO}; }}
 QTableWidget#invTabla QTableCornerButton::section {{ background: {TARJETA}; border: none; }}
 QLabel#invPaginas {{ font-size: 12px; color: {TENUE}; }}
+
+/* ── «Por prenda» (tanda 4): mismo aspecto que la tabla; la escalera la pinta su delegado ── */
+QStackedWidget#invPilaLista {{ background: {TARJETA}; border: none; }}
+QTreeView#invPrendas {{
+    background: {TARJETA}; alternate-background-color: {TARJETA}; border: none;
+    font-size: 13px; color: {TEXTO}; selection-background-color: {VINO_SUAVE}; outline: 0;
+}}
+QTreeView#invPrendas::item {{ border-bottom: 1px solid {LINEA}; padding: 0 8px; }}
+QTreeView#invPrendas::item:hover {{ background: #faf6f0; }}
+QTreeView#invPrendas::item:selected {{ background: {VINO_SUAVE}; }}
+QTreeView#invPrendas QHeaderView::section {{
+    background: {TARJETA}; color: {TENUE}; border: none; border-bottom: 1px solid {LINEA};
+    padding: 8px 8px; font-size: 12px; font-weight: 700;
+}}
+QTreeView#invPrendas QHeaderView::section:hover {{ color: {VINO}; }}
+
 QPushButton#invFlecha {{
     background: transparent; color: {VINO}; border: 1px solid {TARJETA_BORDE}; border-radius: 14px;
     min-width: 28px; max-width: 28px; min-height: 28px; max-height: 28px; padding: 0;

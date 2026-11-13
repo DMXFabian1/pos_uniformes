@@ -7265,6 +7265,11 @@ class MainWindow(QMainWindow):
             current_page_index=self.inventory_page_index,
             page_size=INVENTORY_PAGE_SIZE,
         )
+        if self.inventario_pantalla.por_prenda():
+            # Tanda 4: en «Por prenda» la página cuenta prendas (con todas sus tallas).
+            pagination_view = self.inventario_pantalla.paginar(
+                self.inventory_page_index, INVENTORY_PAGE_SIZE, current_variant_id
+            )
         self.inventory_page_index = pagination_view.current_page_index
         self.inventory_rows = pagination_view.page_rows
         table_row_views = build_inventory_table_row_views(self.inventory_rows)

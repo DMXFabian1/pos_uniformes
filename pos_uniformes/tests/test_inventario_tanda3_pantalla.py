@@ -342,12 +342,13 @@ class InventarioTanda3PantallaTests(unittest.TestCase):
         alturas = {w.height() for w in (combo, window.inventory_use_filter_combo, window.inventory_brand_filter_combo)}
         self.assertEqual(len(alturas), 1, alturas)  # misma altura los dos tipos de control
 
-    def test_segmento_por_prenda_apagado_con_su_aviso(self) -> None:
+    def test_segmento_empieza_en_por_talla_y_por_prenda_ya_se_puede_usar(self) -> None:
+        # Tanda 4: «Por prenda» dejó de estar apagada (sus pruebas, en test_inventario_tanda4_pantalla).
         window = self._ventana()
         por_talla, por_prenda = window.inventario_pantalla.segmento
         self.assertTrue(por_talla.isChecked())
-        self.assertFalse(por_prenda.isEnabled())
-        self.assertIn("Próximamente", por_prenda.toolTip())
+        self.assertTrue(por_prenda.isEnabled())
+        self.assertIn("escalera de tallas", por_prenda.toolTip())
         # Tocar «Por talla» otra vez no la apaga: siempre queda una vista marcada.
         por_talla.click()
         self.assertTrue(por_talla.isChecked())

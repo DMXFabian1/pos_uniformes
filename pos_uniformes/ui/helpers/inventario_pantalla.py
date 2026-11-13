@@ -16,7 +16,8 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Callable, Mapping
 
-from PyQt6.QtCore import QEvent, QObject, Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, QItemSelection, QItemSelectionModel, QModelIndex, QObject, Qt, pyqtSignal
+from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -39,6 +40,19 @@ from pos_uniformes.services.inventario_donde_service import texto_donde_completo
 from pos_uniformes.ui.helpers.history_filter_state_helper import build_history_clear_filter_state
 from pos_uniformes.services.inventario_existencia_service import es_fila_virtual
 from pos_uniformes.services.inventario_precio_service import LLAVE_PRECIO, LLAVE_TIPO, precio_efectivo
+from pos_uniformes.services.inventario_prenda_service import (
+    COLUMNAS_PRENDA,
+    GrupoPrenda,
+    PaginaPrendas,
+    agrupar_por_prenda,
+    filas_en_orden,
+    indice_de_variante,
+    ordenar_grupos,
+    paginar_prendas,
+    resumen_prendas,
+    siguiente_orden_prenda,
+    texto_paginacion_prendas,
+)
 from pos_uniformes.services.rebaja_service import ETIQUETAS as ETIQUETAS_REBAJA, fmt_corto
 from pos_uniformes.services.inventario_tarjetas_service import (
     AVISO_TARJETAS,
@@ -70,7 +84,9 @@ from pos_uniformes.services.inventario_vista_service import (
     texto_paginacion,
     texto_talla_color,
 )
+from pos_uniformes.ui.helpers.catalog_pagination_helper import CatalogPaginationView
 from pos_uniformes.ui.helpers.inventario_combo_rotulo import RotuloCombos
+from pos_uniformes.ui.helpers.inventario_prendas_vista import VistaPrendas
 from pos_uniformes.ui.helpers.inventory_table_row_helper import INVENTORY_TABLE_HEADERS
 from pos_uniformes.ui.styles.inventario_styles import sombra
 
@@ -80,7 +96,11 @@ if TYPE_CHECKING:
 #: El aviso de la búsqueda cortada viene pegado al resumen (`_with_notice`).
 _SEPARADOR_AVISO = " · ⚠ "
 
-TEXTO_PROXIMAMENTE = "Próximamente: cada prenda en una fila con su escalera de tallas."
+#: Las dos vistas de la lista (segmento [Por talla | Por prenda]).
+POR_TALLA = "talla"
+POR_PRENDA = "prenda"
+AVISO_POR_TALLA = "Una fila por cada talla"
+AVISO_POR_PRENDA = "Cada prenda y color en una fila con su escalera de tallas (talla·hay). Toca ▸ para ver sus tallas."
 
 
 def _repulir(widget: QWidget) -> None:
@@ -456,6 +476,23 @@ class InventarioPantalla(QObject):
         self._sku_escaneado = ""
         self._seleccionando = False
         self.tarjetas: dict[str, TarjetaFiltro] = {}
+        # Tanda 4: vista «Por prenda». La vista elegida se recuerda mientras
+        # la ventana esté abierta (la sesión); no se guarda en disco.
+        self.vista = POR_TALLA
+        self.orden_prenda: tuple[str | None, bool] = (None, False)
+        self.grupos: list[GrupoPrenda] = []
+        self.pagina_prendas: PaginaPrendas | None = None
+        #: Lo último elegido en el árbol (prendas por llave y tallas sueltas),
+        #: para volver a marcarlo tras un refresco.
+        self._eleccion_arbol: tuple[set, list] = (set(), [])
+        self._espejando = False
+        self.prendas = VistaPrendas()
+        self.prendas.selectionModel().selectionChanged.connect(lambda *_: self._al_elegir_en_arbol())
+        self.prendas.header().sectionClicked.connect(self.tocar_encabezado_prenda)
+        self.prendas.talla_doble_clic.connect(lambda _: self._llamar("_handle_inventory_table_double_click"))
+        soltar = QShortcut(QKeySequence(Qt.Key.Key_Escape), self.prendas)
+        soltar.setContext(Qt.ShortcutContext.WidgetShortcut)
+        soltar.activated.connect(self.quitar_seleccion)
         self.ficha = FichaInventario()
         self.subtitulo = _etiqueta("", "invSub")
         self.aviso_busqueda = _etiqueta("", "invSub")
@@ -487,26 +524,64 @@ class InventarioPantalla(QObject):
         self.filas_base = filas
         self.conteo = contar_tarjetas(filas, ahora=ahora)
         visibles = filtrar_por_tarjeta(filas, self.tarjeta, ahora=ahora)
+        if self.por_prenda():
+            # Se agrupa lo que pasó filtros y tarjeta; las filas quedan prenda tras prenda.
+            columna, descendente = self.orden_prenda
+            self.grupos = ordenar_grupos(agrupar_por_prenda(visibles), columna, descendente=descendente)
+            return filas_en_orden(self.grupos)
+        self.grupos = []
         columna, descendente = self.orden
         return ordenar_por_columna(visibles, columna, descendente=descendente)
+
+    def por_prenda(self) -> bool:
+        return self.vista == POR_PRENDA
+
+    def paginar(self, pagina: int, tamano: int, variante_id: object = None) -> CatalogPaginationView:
+        """«Por prenda»: la página cuenta prendas y lleva todas sus tallas.
+
+        Devuelve lo mismo que `build_catalog_pagination_view` para que la
+        ventana llene la tabla (escondida) con las tallas de la página: la
+        tabla sigue siendo de donde leen la selección todos los manejadores.
+        """
+        resultado = paginar_prendas(self.grupos, pagina, tamano, variante_id=variante_id)
+        self.pagina_prendas = resultado
+        filas = filas_en_orden(resultado.grupos)
+        return CatalogPaginationView(
+            page_rows=filas,
+            current_page_index=resultado.pagina,
+            total_pages=resultado.paginas,
+            total_rows=resultado.total,
+            start_row_number=resultado.inicio,
+            end_row_number=resultado.fin,
+            page_label=texto_paginacion_prendas(resultado),
+            previous_enabled=resultado.pagina > 0,
+            next_enabled=resultado.pagina < resultado.paginas - 1,
+        )
 
     def al_refrescar(self) -> None:
         """Fin de `_refresh_inventory_table`: encabezado, tarjetas, filtros, páginas y ficha."""
         w = self.window
         resumen = w.inventory_results_label.text()
         principal, _, aviso = resumen.partition(_SEPARADOR_AVISO)
-        self.subtitulo.setText(principal)
+        self.subtitulo.setText(resumen_prendas(self.grupos) if self.por_prenda() else principal)
         self.aviso_busqueda.setText(f"⚠ {aviso}" if aviso else "")
         self.aviso_busqueda.setVisible(bool(aviso))
         for llave, tarjeta in self.tarjetas.items():
             tarjeta.mostrar(self.conteo.de(llave), prendida=self.tarjeta == llave)
         self._refrescar_filtros()
-        self.paginas.setText(texto_paginacion(len(w.inventory_filtered_rows), w.inventory_page_index, _tamano_pagina()))
+        if self.por_prenda():
+            pagina = self.pagina_prendas or paginar_prendas(self.grupos, 0, _tamano_pagina())
+            self.paginas.setText(texto_paginacion_prendas(pagina))
+            varias = len(self.grupos) > _tamano_pagina()
+        else:
+            self.paginas.setText(texto_paginacion(len(w.inventory_filtered_rows), w.inventory_page_index, _tamano_pagina()))
+            varias = len(w.inventory_filtered_rows) > _tamano_pagina()
         # Con una sola página las flechas no sirven: no se enseñan.
-        varias = len(w.inventory_filtered_rows) > _tamano_pagina()
         w.inventory_previous_page_button.setVisible(varias)
         w.inventory_next_page_button.setVisible(varias)
         self._marcar_orden()
+        if self.por_prenda():
+            self._llenar_arbol()
         if not self._seleccionando:
             self._seleccionar_si_es_codigo()
         self.actualizar_ficha()
@@ -594,6 +669,10 @@ class InventarioPantalla(QObject):
                 indice = _indice(w.inventory_filtered_rows, variante_id)
             if indice is None:
                 return
+            if self.por_prenda():
+                # La talla se ve desplegada dentro de su prenda, en la página de esa prenda.
+                self._eleccion_arbol = (set(), [variante_id])
+                indice = indice_de_variante(self.grupos, variante_id) or 0
             w.inventory_page_index = indice // _tamano_pagina()
             w._set_combo_value(w.inventory_variant_combo, variante_id)
             w._handle_inventory_filters_changed()
@@ -604,6 +683,9 @@ class InventarioPantalla(QObject):
                     w.inventory_table.model().index(fila_tabla, 0),
                     w.inventory_table.ScrollHint.PositionAtCenter,
                 )
+            if self.por_prenda():
+                self._eleccion_arbol = (set(), [variante_id])
+                self._marcar_en_arbol()
         finally:
             self._seleccionando = False
         self.actualizar_ficha()
@@ -623,6 +705,170 @@ class InventarioPantalla(QObject):
             if fila.get("variante_id") == variante_id:
                 return fila
         return None
+
+    # ── Vista «Por prenda» (tanda 4) ─────────────────────────────────────
+
+    def cambiar_vista(self, vista: str) -> None:
+        """[Por talla | Por prenda]: cambia la lista y refresca desde la primera página.
+
+        La talla elegida se conserva: en «Por prenda» se ve desplegada dentro
+        de su prenda.
+        """
+        if vista not in (POR_TALLA, POR_PRENDA) or vista == self.vista:
+            self._marcar_segmento()
+            return
+        w = self.window
+        self.vista = vista
+        actual = w.inventory_variant_combo.currentData()
+        self._eleccion_arbol = (set(), [actual] if actual else [])
+        self._marcar_segmento()
+        w.inventory_page_index = 0
+        w._handle_inventory_filters_changed()
+
+    def _marcar_segmento(self) -> None:
+        segmento = getattr(self, "segmento", None)
+        if segmento:
+            segmento[0].setChecked(not self.por_prenda())
+            segmento[1].setChecked(self.por_prenda())
+        pila = getattr(self, "pila_lista", None)
+        if pila is not None:
+            pila.setCurrentWidget(self.prendas if self.por_prenda() else self.window.inventory_table)
+
+    def tocar_encabezado_prenda(self, columna: int) -> None:
+        if not 0 <= columna < len(COLUMNAS_PRENDA):
+            return
+        self.orden_prenda = siguiente_orden_prenda(self.orden_prenda, COLUMNAS_PRENDA[columna])
+        self.window._handle_inventory_filters_changed_reset_page()
+
+    def _llenar_arbol(self) -> None:
+        """Pone en el árbol las prendas de la página y vuelve a marcar lo elegido."""
+        arbol = self.prendas
+        desplegadas = arbol.llaves_desplegadas()
+        pagina = self.pagina_prendas.grupos if self.pagina_prendas else ()
+        self._espejando = True
+        try:
+            arbol.modelo.poner(pagina, ahora=self.ahora())
+            arbol.desplegar(desplegadas)
+        finally:
+            self._espejando = False
+        encabezado = arbol.header()
+        columna, descendente = self.orden_prenda
+        encabezado.setSortIndicatorShown(columna is not None)
+        if columna is not None:
+            encabezado.setSortIndicator(
+                COLUMNAS_PRENDA.index(columna),
+                Qt.SortOrder.DescendingOrder if descendente else Qt.SortOrder.AscendingOrder,
+            )
+        self._marcar_en_arbol()
+
+    def _marcar_en_arbol(self) -> None:
+        """Marca en el árbol lo último elegido ahí; si ya no está, lo que tenga la tabla.
+
+        Una talla suelta se ve desplegada dentro de su prenda. Si lo marcado no
+        coincide con la tabla (p. ej. una prenda entera tras un refresco), se
+        copia a la tabla para que los manejadores vean lo mismo.
+        """
+        arbol = self.prendas
+        llaves, ids = self._eleccion_arbol
+        indices = [arbol.indice_de_prenda(llave) for llave in llaves]
+        indices += [arbol.indice_de_talla(vid) for vid in ids]
+        indices = [i for i in indices if i.isValid()]
+        if not indices:
+            indices = [arbol.indice_de_talla(vid) for vid in self.window._selected_inventory_variant_ids()]
+            indices = [i for i in indices if i.isValid()]
+        seleccion = QItemSelection()
+        ultima = arbol.modelo.columnCount() - 1
+        for indice in indices:
+            padre = indice.parent()
+            if padre.isValid():
+                arbol.setExpanded(padre, True)
+            seleccion.select(indice, indice.sibling(indice.row(), ultima))
+        self._espejando = True
+        try:
+            modelo_sel = arbol.selectionModel()
+            modelo_sel.select(seleccion, QItemSelectionModel.SelectionFlag.ClearAndSelect)
+            modelo_sel.setCurrentIndex(indices[0] if indices else QModelIndex(), QItemSelectionModel.SelectionFlag.NoUpdate)
+        finally:
+            self._espejando = False
+        if indices:
+            arbol.scrollTo(indices[0], arbol.ScrollHint.EnsureVisible)
+            elegidas = arbol.variantes_elegidas()
+            if set(elegidas) != set(self.window._selected_inventory_variant_ids()):
+                self._espejar_a_tabla(elegidas, self._actual_del_arbol())
+
+    def _actual_del_arbol(self) -> object | None:
+        arbol = self.prendas
+        actual = arbol.currentIndex()
+        if actual.isValid():
+            if arbol.modelo.es_prenda(actual):
+                grupo = arbol.modelo.grupo_de(actual)
+                return grupo.variante_ids[0] if grupo and grupo.variante_ids else None
+            return arbol.modelo.data(actual.sibling(actual.row(), 0), Qt.ItemDataRole.UserRole)
+        elegidas = arbol.variantes_elegidas()
+        return elegidas[0] if elegidas else None
+
+    def _al_elegir_en_arbol(self) -> None:
+        if self._espejando:
+            return
+        arbol = self.prendas
+        tallas_sueltas = [
+            arbol.modelo.data(i, Qt.ItemDataRole.UserRole)
+            for i in arbol.selectionModel().selectedRows(0)
+            if not arbol.modelo.es_prenda(i)
+        ]
+        self._eleccion_arbol = (arbol.llaves_elegidas(), tallas_sueltas)
+        self._espejar_a_tabla(arbol.variantes_elegidas(), self._actual_del_arbol())
+
+    def _espejar_a_tabla(self, ids: list, actual: object | None) -> None:
+        """Copia lo elegido en el árbol a la tabla escondida (con las tallas de la
+        página): de ahí leen la ficha, la impresión y los ajustes de siempre."""
+        w = self.window
+        tabla = w.inventory_table
+        modelo = tabla.model()
+        renglones = {w._inventory_table_variant_id_at_row(r): r for r in range(tabla.rowCount())}
+        seleccion = QItemSelection()
+        ultima = max(0, tabla.columnCount() - 1)
+        for variante in ids:
+            renglon = renglones.get(variante)
+            if renglon is not None:
+                seleccion.select(modelo.index(renglon, 0), modelo.index(renglon, ultima))
+        if actual not in renglones:
+            actual = ids[0] if ids else None
+        tabla.blockSignals(True)
+        try:
+            tabla.selectionModel().select(seleccion, QItemSelectionModel.SelectionFlag.ClearAndSelect)
+            renglon = renglones.get(actual)
+            tabla.selectionModel().setCurrentIndex(
+                modelo.index(renglon, 0) if renglon is not None else QModelIndex(),
+                QItemSelectionModel.SelectionFlag.NoUpdate,
+            )
+        finally:
+            tabla.blockSignals(False)
+        combo = w.inventory_variant_combo
+        if len(ids) == 1:
+            # Una talla: la ficha de siempre (último movimiento incluido).
+            w._set_combo_value(combo, ids[0])
+        else:
+            combo.blockSignals(True)
+            try:
+                if actual is None:
+                    combo.setCurrentIndex(-1)
+                else:
+                    w._set_combo_value(combo, actual)
+            finally:
+                combo.blockSignals(False)
+        self.actualizar_ficha()
+
+    def quitar_seleccion(self) -> None:
+        """«Quitar selección» (ficha o Esc) en cualquiera de las dos vistas."""
+        self._eleccion_arbol = (set(), [])
+        self._espejando = True
+        try:
+            self.prendas.selectionModel().clearSelection()
+        finally:
+            self._espejando = False
+        self._llamar("_clear_inventory_table_selection")
+        self.actualizar_ficha()
 
     # ── Ficha ────────────────────────────────────────────────────────────
 
@@ -714,7 +960,12 @@ class InventarioPantalla(QObject):
     def _habilitar_acciones(self) -> None:
         w = self.window
         admin = w.inventory_more_button.isEnabled()
-        for boton in (self.boton_corregir, self.boton_editar, self.boton_lote_existencias, self.boton_lote_precio):
+        for boton in (
+            self.boton_corregir,
+            self.boton_editar,
+            self.boton_lote_existencias,
+            self.boton_lote_precio,
+        ):
             boton.setEnabled(admin)
         self.boton_lote_etiquetas.setEnabled(w.inventory_print_label_button.isEnabled())
         self.boton_movimientos.setEnabled(admin and _indice_pestana(w, "Historial inventarios") is not None)
@@ -758,7 +1009,7 @@ class InventarioPantalla(QObject):
         self.boton_lote_precio = boton_accion("💲  Cambiar precio", "Cambiar el precio de las tallas elegidas")
         self.boton_lote_precio.clicked.connect(lambda: self._llamar("_handle_inventory_bulk_price_update"))
         self.boton_lote_quitar = boton_accion("✕  Quitar la selección")
-        self.boton_lote_quitar.clicked.connect(lambda: self._llamar("_clear_inventory_table_selection"))
+        self.boton_lote_quitar.clicked.connect(self.quitar_seleccion)
         for boton in (
             self.boton_lote_etiquetas,
             self.boton_lote_existencias,

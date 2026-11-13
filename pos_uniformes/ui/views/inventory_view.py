@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QPushButton,
     QScrollArea,
+    QStackedWidget,
     QTableWidget,
     QToolButton,
     QVBoxLayout,
@@ -21,7 +22,10 @@ from PyQt6.QtWidgets import (
 )
 from pos_uniformes.ui.helpers.flow_layout import FlowLayout
 from pos_uniformes.ui.helpers.inventario_pantalla import (
-    TEXTO_PROXIMAMENTE,
+    AVISO_POR_PRENDA,
+    AVISO_POR_TALLA,
+    POR_PRENDA,
+    POR_TALLA,
     InventarioPantalla,
     MarcaFoco,
     armar_menu_mas,
@@ -379,23 +383,26 @@ def _tabla(window: "MainWindow", pantalla: InventarioPantalla) -> QFrame:
     caja = QVBoxLayout(tarjeta)
     caja.setContentsMargins(10, 8, 10, 8)
     caja.setSpacing(6)
-    caja.addWidget(tabla, 1)
+    # Las dos listas en una pila: «Por talla» (la tabla) y «Por prenda» (el árbol).
+    # La tabla sigue llena aunque se vea el árbol: de ella leen la selección los manejadores.
+    pila = QStackedWidget()
+    pila.setObjectName("invPilaLista")
+    pila.addWidget(tabla)
+    pila.addWidget(pantalla.prendas)
+    pantalla.pila_lista = pila
+    caja.addWidget(pila, 1)
 
     pie = QHBoxLayout()
     pie.setSpacing(6)
-    # Segmento de vistas: «Por prenda» llega en la tanda 4. Se apaga, no se
-    # esconde (norma del POS), y dice por qué al pasar el mouse.
+    # Segmento de vistas (tanda 4): la elegida se recuerda mientras la ventana esté abierta.
     por_talla = QPushButton("Por talla")
     por_talla.setObjectName("invSegmento")
     por_talla.setProperty("lado", "izq")
-    por_talla.setCheckable(True)
-    por_talla.setChecked(True)
-    por_talla.setToolTip("Una fila por cada talla")
+    por_talla.setToolTip(AVISO_POR_TALLA)
     por_prenda = QPushButton("Por prenda")
     por_prenda.setObjectName("invSegmento")
     por_prenda.setProperty("lado", "der")
-    por_prenda.setEnabled(False)
-    por_prenda.setToolTip(TEXTO_PROXIMAMENTE)
+    por_prenda.setToolTip(AVISO_POR_PRENDA)
     pantalla.segmento = (por_talla, por_prenda)
     # Una sola pieza: pegados (sin espacio) y exclusivos, así «Por talla» no se apaga.
     grupo = QButtonGroup(tarjeta)
@@ -404,9 +411,12 @@ def _tabla(window: "MainWindow", pantalla: InventarioPantalla) -> QFrame:
     segmento.setSpacing(0)
     for boton in (por_talla, por_prenda):
         boton.setCheckable(True)
+        boton.setCursor(Qt.CursorShape.PointingHandCursor)
         grupo.addButton(boton)
         segmento.addWidget(boton)
     por_talla.setChecked(True)
+    por_talla.clicked.connect(lambda: pantalla.cambiar_vista(POR_TALLA))
+    por_prenda.clicked.connect(lambda: pantalla.cambiar_vista(POR_PRENDA))
     pantalla.segmento_grupo = grupo
     pie.addLayout(segmento)
     pie.addStretch(1)
