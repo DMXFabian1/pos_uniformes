@@ -63,13 +63,26 @@ def combinar(afluencia: list, ventas_por_hora: dict[datetime, int]) -> list[Fila
 
 
 def ventas_por_hora(session, *, desde: datetime, hasta: datetime) -> dict[datetime, int]:
-    stmt = select(LibretaVenta.created_at).where(
+    from pos_uniformes.services.libreta_service import clave_operacion_sql
+
+    stmt = select(LibretaVenta.created_at, clave_operacion_sql()).where(
         LibretaVenta.created_at >= desde,
         LibretaVenta.created_at <= hasta,
         LibretaVenta.tipo.in_(TIPOS_QUE_CUENTAN_COMO_VENTA),
-    )
+    ).order_by(LibretaVenta.created_at, LibretaVenta.id)
+    return contar_por_hora(session.execute(stmt).all())
+
+
+def contar_por_hora(filas) -> dict[datetime, int]:
+    """(created_at, clave de operación) → compras por hora (puro). Ventas
+    unidas en una operación (2026-11-13) son UNA clienta que compró: cuentan
+    1, en la hora de la primera."""
     conteo: dict[datetime, int] = {}
-    for (created_at,) in session.execute(stmt):
+    vistas: set = set()
+    for created_at, clave in sorted(filas, key=lambda f: f[0]):
+        if clave in vistas:
+            continue
+        vistas.add(clave)
         hora = _hora_local(created_at)
         conteo[hora] = conteo.get(hora, 0) + 1
     return conteo

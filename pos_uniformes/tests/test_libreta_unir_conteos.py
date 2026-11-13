@@ -173,6 +173,21 @@ class PurosTests(unittest.TestCase):
         self.assertEqual([f["unida_con"] for f in filas[:3]], [1639, 1639, ""])
         self.assertEqual(len({f["operacion"] for f in filas if f["cuenta_como_operacion"]}), 4)
 
+    def test_afluencia_conversion_por_hora(self) -> None:
+        """«De cada 100 que entran, cuántos compran»: la clienta de dos
+        ventas unidas compró una vez (en la hora de la primera)."""
+        from pos_uniformes.services.afluencia_service import contar_por_hora
+
+        def por_hora(unidas):
+            return contar_por_hora([
+                (r.created_at, ls.clave_operacion(r)) for r in tabla(unidas) if r.tipo in ("venta", "apartado")
+            ])
+
+        h10 = datetime.combine(HOY, time(10))
+        self.assertEqual(por_hora(False)[h10], 2)
+        self.assertEqual(por_hora(True)[h10], 1)
+        self.assertEqual(sum(por_hora(True).values()), 4)
+
     def test_una_fila_sin_id_cuenta_sola(self) -> None:
         """Lo de la cola sin red no trae id: cada una es su propia operación."""
         filas = [SimpleNamespace(tipo="venta"), SimpleNamespace(tipo="venta")]
@@ -212,6 +227,14 @@ class SqlTests(unittest.TestCase):
         self.assertEqual(cuenta(), 4)
         filas = list(self.s.scalars(select(LibretaVenta)))
         self.assertEqual(ls.contar_operaciones(filas), 4)
+
+    def test_afluencia(self) -> None:
+        from pos_uniformes.services.afluencia_service import ventas_por_hora
+
+        desde, hasta = datetime.combine(HOY, time.min), datetime.combine(HOY, time.max)
+        self.assertEqual(sum(ventas_por_hora(self.s, desde=desde, hasta=hasta).values()), 5)
+        self.unir()
+        self.assertEqual(sum(ventas_por_hora(self.s, desde=desde, hasta=hasta).values()), 4)
 
     def test_gafete(self) -> None:
         with patch("pos_uniformes.services.horario_tienda_service.hora_apertura", return_value=time(9, 0)):
