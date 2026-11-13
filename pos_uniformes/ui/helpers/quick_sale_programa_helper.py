@@ -14,8 +14,11 @@ Mientras haya una propuesta esperando, la franja la vuelve a leer cada
 sola y se le avisa a la empleada (2026-11-10: «ya aprobé y no hubo cambios
 inmediatos»).
 
-Es solo una etiqueta: no cambia precios, ni la venta, ni el Monedero, ni la
-cola sin conexión. Sin conexión no se inscribe ni se propone (D3). Cambiar de
+La franja no cambia precios, ni la venta, ni la cola sin conexión. Inscribir
+a Club sí cambia lo que gana el Monedero (Club 5 % en la caja): la pregunta lo
+dice con la tasa leída de la base y, ya inscrito, se vuelve a leer al cliente
+para que la pantalla muestre su abono desde esta compra (2026-11-12, Daniel:
+«solucionemos estos»). Sin conexión no se inscribe ni se propone (D3). Cambiar de
 programa o sacar a alguien es solo en el POS con ADMIN (P-E4-7).
 """
 
@@ -220,11 +223,12 @@ class ProgramaClienteMixin:
         if not self._programa_puede_actuar():
             return
         c = self._cliente
+        from pos_uniformes.services.fidelizacion.membresia_service import texto_inscribir_club
+
         respuesta = QMessageBox.question(
             self,
             "Maximoda Club",
-            f"¿Inscribir a {c['nombre']} a Maximoda Club?\n\n"
-            "Queda como miembro desde hoy. Por ahora no cambia ningún precio.",
+            texto_inscribir_club(str(c["nombre"]), self._tasa_de_club()),
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             QMessageBox.StandardButton.No,
         )
@@ -237,7 +241,24 @@ class ProgramaClienteMixin:
             session.commit()
 
         if self._programa_ejecutar(hacer):
+            # Ya es Club: se vuelve a leer al cliente para que el abono de esta
+            # compra se vea en pantalla (antes de cobrar se lee otra vez, T3).
+            if self._refrescar_contexto_motor():
+                self._refresh_totals()
             self._flash_scan_hint(f"{c['nombre']} ya es miembro de Maximoda Club")
+
+    def _tasa_de_club(self):
+        """El % de Monedero de Club según la base, o None si no se pudo leer:
+        entonces la pregunta no menciona ningún %."""
+        try:
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.services.fidelizacion import membresia_service as ms
+
+            with get_session() as session:
+                return ms.tasa_monedero_de_programa(session, ms.CLUB)
+        except Exception:  # noqa: BLE001 — sin la tasa se pregunta sin número
+            _logger.warning("Programa: no se pudo leer la tasa de Club", exc_info=True)
+            return None
 
     def _on_proponer_programa(self) -> bool:
         """True si la propuesta quedó guardada."""

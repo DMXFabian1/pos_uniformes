@@ -1,7 +1,9 @@
 """Membresías a programas (E4-A). Las reglas viven aquí, no en las pantallas.
 
-Una membresía es una etiqueta: no da descuento ni cambia precios (eso es E5).
-Nunca toca ventas, Libreta, Monedero, promo 3pz ni el 5 % de empleada.
+Aquí solo se lleva la membresía: nunca toca ventas, Libreta, Monedero, promo
+3pz ni el 5 % de empleada. Lo que gana cada programa (el % de Monedero de
+`programa.tasa_monedero`, el descuento de Mayorista) lo aplica E5 en
+`monedero_service` (2026-11-12, «solucionemos estos»: Club ya gana Monedero).
 
 Reglas (D1 ajustada, P7, P-E4-1..7):
 
@@ -27,6 +29,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 
 import logging
 
@@ -251,6 +254,42 @@ def inscribir_por_empleada(session: Session, *, cliente_id: int, programa_clave:
 
 
 CLUB = "CLUB"
+
+
+def tasa_monedero_de_programa(session: Session, clave: str) -> Decimal | None:
+    """El % de Monedero que gana quien entra hoy al programa `clave` (Club 5
+    en la caja), leído de la base. None si el Monedero está apagado, si el
+    programa no existe o si da 0 %: entonces no se promete nada.
+
+    2026-11-12 (Daniel, «solucionemos estos»): el aviso de inscribir a Club
+    decía «por ahora no cambia ningún precio», pero Club ya gana Monedero."""
+    from pos_uniformes.services import monedero_service as mon
+
+    if mon.tasa_vigente(session) is None:
+        return None
+    programa = programa_por_clave(session, clave)
+    if programa is None or programa.estado != PROGRAMA_ACTIVO:
+        return None
+    tasa = Decimal(str(programa.tasa_monedero or 0))
+    return tasa if tasa > 0 else None
+
+
+def texto_inscribir_club(nombre: str, tasa: Decimal | None) -> str:
+    """La pregunta antes de inscribir a Club en el kiosko. Sin tasa (no se
+    pudo leer o el Monedero no da nada) no se menciona ningún %.
+
+    Desde esta misma compra es cierto: antes de cobrar el kiosko vuelve a leer
+    al cliente (T3) y la Libreta abona con el programa que tenga al momento de
+    la venta. Lo de Oferta o Liquidación no suma (E7)."""
+    pregunta = f"¿Inscribir a {nombre} a Maximoda Club?\n\n"
+    if tasa is None or Decimal(str(tasa)) <= 0:
+        return pregunta + "Queda como miembro desde hoy."
+    pct = format(Decimal(str(tasa)).normalize(), "f")
+    return (
+        pregunta
+        + f"Queda como miembro desde hoy y gana {pct} % de cada compra en su Monedero, "
+        "desde esta misma compra. Lo de Oferta o Liquidación no suma."
+    )
 
 
 def inscribir_al_club_al_registrar(session: Session, *, cliente_id: int, employee_code: str | None) -> Membresia | None:

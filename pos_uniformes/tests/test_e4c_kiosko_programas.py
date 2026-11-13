@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import os
 import unittest
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -17,7 +18,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtWidgets import QApplication, QDialog, QLabel, QMessageBox, QPushButton
 from sqlalchemy import func, select
 
-from pos_uniformes.database.models import Membresia, Venta
+from pos_uniformes.database.models import Membresia, MonederoConfig, Venta
 from pos_uniformes.services.fidelizacion import membresia_service as ms
 from pos_uniformes.tests.test_e4a_membresias import _Base
 from pos_uniformes.tests.test_e4b_telegram_membresias import _Fabrica
@@ -66,6 +67,33 @@ class EstadoBarraTests(unittest.TestCase):
         for kw in ({"activa": "Maximoda Club", "activa_clave": "CLUB", "pendiente": None},
                    {"activa": None, "activa_clave": None, "pendiente": "Maximoda Mayorista"}):
             self.assertNotIn("%", estado_para_barra(en_linea=True, **kw).texto)
+
+
+class TextoInscribirClubTests(unittest.TestCase):
+    """2026-11-12 (Daniel, «solucionemos estos»): decía «Por ahora no cambia
+    ningún precio», pero Club ya gana Monedero."""
+
+    def test_con_tasa_dice_lo_que_gana(self) -> None:
+        texto = ms.texto_inscribir_club("Ana", D("5.00"))
+        self.assertTrue(texto.startswith("¿Inscribir a Ana a Maximoda Club?"))
+        self.assertIn("gana 5 % de cada compra en su Monedero, desde esta misma compra", texto)
+        self.assertIn("Oferta o Liquidación no suma", texto)
+
+    def test_tasa_con_decimales(self) -> None:
+        self.assertIn("gana 7.5 % de cada", ms.texto_inscribir_club("Ana", D("7.50")))
+
+    def test_sin_tasa_no_promete_ningun_porcentaje(self) -> None:
+        for tasa in (None, D("0")):
+            texto = ms.texto_inscribir_club("Ana", tasa)
+            self.assertNotIn("%", texto)
+            self.assertIn("Queda como miembro desde hoy.", texto)
+
+    def test_el_texto_viejo_ya_no_aparece(self) -> None:
+        for tasa in (None, D("5")):
+            self.assertNotIn("no cambia ningún precio", ms.texto_inscribir_club("Ana", tasa))
+        import inspect
+
+        self.assertNotIn("no cambia ningún precio", inspect.getsource(ph))
 
 
 class DialogoTests(unittest.TestCase):
@@ -134,13 +162,53 @@ class FranjaTests(_Kiosko):
         ventas = self.s.scalar(select(func.count(Venta.id)).where(Venta.cliente_id == self.cliente.id))
         with patch.object(ph.QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes) as pregunta:
             w._btn_inscribir_club.click()
-        self.assertIn("no cambia ningún precio", pregunta.call_args.args[2])
+        # 2026-11-12 («solucionemos estos»): Club ya gana Monedero; el texto
+        # viejo mentía.
+        self.assertNotIn("no cambia ningún precio", pregunta.call_args.args[2])
         self.assertEqual([(m.estado, m.programa.clave) for m in self._membresias()], [(ms.ACTIVA, "CLUB")])
         self.assertEqual(w._programa_label.text(), "★ Miembro Maximoda Club")
         self.assertFalse(w._btn_inscribir_club.isEnabled())
         self.assertTrue(w._btn_proponer_programa.isEnabled())
         self.assertEqual(w._compute_totals(), antes, "el total no cambia")
         self.assertEqual(self.s.scalar(select(func.count(Venta.id)).where(Venta.cliente_id == self.cliente.id)), ventas)
+
+    def _monedero_con_club_al(self, tasa) -> None:
+        self.s.add(MonederoConfig(tasa_cashback=D("1"), habilitado=True, usuario_id=self.admin.id,
+                                  vigente_desde=datetime.now(timezone.utc) - timedelta(seconds=1)))
+        ms.programa_por_clave(self.s, ms.CLUB).tasa_monedero = D(str(tasa))
+        self.s.flush()
+
+    def test_la_pregunta_dice_lo_que_gana_con_la_tasa_de_la_base(self) -> None:
+        self._monedero_con_club_al("7")  # no la de la caja: se lee, no se adivina
+        w = self._widget()
+        with patch.object(ph.QMessageBox, "question", return_value=QMessageBox.StandardButton.No) as pregunta:
+            w._btn_inscribir_club.click()
+        texto = pregunta.call_args.args[2]
+        self.assertIn("gana 7 % de cada compra en su Monedero", texto)
+        self.assertIn("desde esta misma compra", texto)
+        self.assertNotIn("no cambia", texto)
+
+    def test_ya_inscrito_la_pantalla_lee_su_tasa(self) -> None:
+        self._monedero_con_club_al("5")
+        w = self._widget()
+        with patch.object(ph.QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes):
+            w._btn_inscribir_club.click()
+        self.assertEqual(D(str(w._cliente.get("tasa"))), D("5"), "el abono de esta compra ya se ve")
+
+    def test_si_no_se_lee_la_tasa_pregunta_sin_numero(self) -> None:
+        w = self._widget()
+        with patch.object(w, "_tasa_de_club", return_value=None), \
+                patch.object(ph.QMessageBox, "question", return_value=QMessageBox.StandardButton.No) as pregunta:
+            w._btn_inscribir_club.click()
+        texto = pregunta.call_args.args[2]
+        self.assertNotIn("%", texto)
+        self.assertNotIn("no cambia", texto)
+        self.assertIn("Queda como miembro desde hoy.", texto)
+
+    def test_si_falla_la_consulta_de_la_tasa_no_truena(self) -> None:
+        w = self._widget()
+        with patch("pos_uniformes.database.connection.get_session", side_effect=OSError("sin red")):
+            self.assertIsNone(w._tasa_de_club())
 
     def test_si_dice_que_no_no_inscribe(self) -> None:
         w = self._widget()
