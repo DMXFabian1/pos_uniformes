@@ -1,5 +1,7 @@
 """Las pestañas cuyo trabajo se mudó al kiosko ya no se muestran.
 
+2026-11-12: Caja y Apartados ya no solo se ocultan, se retiraron del POS.
+
 Se ocultan, no se borran: el código y los datos siguen ahí. Lo que estas
 pruebas cuidan es que ocultarlas no deje al POS parado en una pestaña
 invisible.
@@ -22,9 +24,9 @@ from pos_uniformes.ui.main_window import (  # noqa: E402
 
 _APP = QApplication.instance() or QApplication([])
 
-# 2026-11-12: "Caja" ya no está: la Caja antigua se retiró del POS.
+# 2026-11-12: "Caja" y "Apartados" ya no están: se retiraron del POS.
 _ORDEN = [
-    "Resumen", "Presupuestos", "Apartados", "Catálogo", "Inventario",
+    "Resumen", "Presupuestos", "Catálogo", "Inventario",
     "Bodega", "Historial inventarios", "Panel Uniformes", "Analítica", "Configuración",
 ]
 
@@ -49,11 +51,11 @@ def _tabs() -> QTabWidget:
 
 
 class PestanasOcultasTests(unittest.TestCase):
-    def test_son_las_tres_que_se_mudaron(self) -> None:
-        """La Caja ya no se oculta: se retiró (2026-11-12)."""
+    def test_son_las_dos_que_se_mudaron(self) -> None:
+        """La Caja y Apartados ya no se ocultan: se retiraron (2026-11-12)."""
         self.assertEqual(
             set(PESTANAS_MUDADAS_AL_KIOSKO),
-            {"Presupuestos", "Apartados", "Catálogo"},
+            {"Presupuestos", "Catálogo"},
         )
 
     def test_todas_existen_todavia_en_el_orden_real(self) -> None:
@@ -282,6 +284,172 @@ class CajaAntiguaRetiradaTests(unittest.TestCase):
 
     def test_cobrar_presupuesto_ya_no_existe(self) -> None:
         self.assertFalse(hasattr(self.ventana, "quote_convert_button"))
+
+
+class ApartadosRetiradosDelPosTests(unittest.TestCase):
+    """2026-11-12, Daniel: «retira también apartados».
+
+    La pestaña Apartados del POS principal ya estaba oculta y con sus botones
+    apagados; ahora ya no se construye. Los apartados se hacen en Venta Rápida
+    del kiosko y quedan en la Libreta (ver KioskoConservaSusApartadosTests).
+    """
+
+    def setUp(self) -> None:
+        self.ventana = MainWindow(user_id=1)
+
+    def tearDown(self) -> None:
+        _cerrar(self.ventana)
+
+    def _nombres(self) -> list[str]:
+        return [
+            self.ventana.tabs.tabText(i).strip() for i in range(self.ventana.tabs.count())
+        ]
+
+    def test_la_pestana_apartados_no_se_construye(self) -> None:
+        self.assertNotIn("Apartados", self._nombres())
+
+    def test_el_orden_real_de_pestanas_es_el_esperado(self) -> None:
+        self.assertEqual(
+            self._nombres(),
+            [
+                "Resumen", "Presupuestos", "Catálogo", "Inventario", "Bodega",
+                "Historial inventarios", "Panel Uniformes", "Analítica", "Configuración",
+            ],
+        )
+
+    def test_las_mudadas_siguen_existiendo_y_ocultas(self) -> None:
+        from pos_uniformes.database.models import RolUsuario
+
+        self.ventana.current_role = RolUsuario.ADMIN
+        self.ventana._apply_role_navigation()
+        nombres = self._nombres()
+        for nombre in PESTANAS_MUDADAS_AL_KIOSKO:
+            self.assertIn(nombre, nombres)
+            self.assertFalse(self.ventana.tabs.isTabVisible(nombres.index(nombre)), nombre)
+        for nombre in ("Resumen", "Inventario", "Panel Uniformes", "Configuración"):
+            self.assertTrue(self.ventana.tabs.isTabVisible(nombres.index(nombre)), nombre)
+
+    def test_el_boton_panel_uniformes_cae_en_su_pestana(self) -> None:
+        self.ventana._handle_open_uniforms_panel()
+        self.assertEqual(
+            self.ventana.tabs.tabText(self.ventana.tabs.currentIndex()), "Panel Uniformes"
+        )
+
+    def test_no_quedan_widgets_ni_metodos_de_la_pestana(self) -> None:
+        for atributo in (
+            "layaway_rows",
+            "layaway_table",
+            "layaway_detail_table",
+            "layaway_payments_table",
+            "layaway_search_input",
+            "layaway_state_combo",
+            "layaway_due_combo",
+            "layaway_create_button",
+            "layaway_payment_button",
+            "layaway_void_payment_button",
+            "layaway_edit_button",
+            "layaway_deliver_button",
+            "layaway_cancel_button",
+            "layaway_receipt_button",
+            "layaway_sale_ticket_button",
+            "layaway_whatsapp_button",
+            "layaway_status_label",
+            "layaway_quick_alerts_label",
+            "_build_layaway_tab",
+            "_refresh_layaways",
+            "_refresh_layaway_detail",
+            "_selected_layaway_id",
+            "_select_layaway",
+            "_handle_create_layaway",
+            "_handle_register_layaway_payment",
+            "_handle_void_layaway_payment",
+            "_handle_edit_layaway",
+            "_handle_deliver_layaway",
+            "_handle_cancel_layaway",
+            "_handle_view_layaway_receipt",
+            "_handle_view_layaway_sale_ticket",
+            "_handle_open_layaway_whatsapp",
+            "_handle_layaway_filters_changed",
+            "_registrar_abono_en_libreta",
+        ):
+            self.assertFalse(hasattr(self.ventana, atributo), atributo)
+
+    def test_no_hay_botones_de_apartado(self) -> None:
+        from PyQt6.QtWidgets import QAbstractButton
+
+        textos = {b.text() for b in self.ventana.findChildren(QAbstractButton)}
+        for texto in ("Nuevo apartado", "Registrar abono", "Editar apartado", "Anular abono"):
+            self.assertNotIn(texto, textos, texto)
+
+    def test_lo_que_no_era_de_la_pestana_se_queda(self) -> None:
+        """Alertas del Resumen, Analítica, filtro del Catálogo y plantillas
+        de WhatsApp leen apartados, pero no eran parte de la pestaña."""
+        for atributo in (
+            "layaway_alerts_label",
+            "analytics_layaway_active_label",
+            "catalog_layaway_filter_combo",
+            "settings_whatsapp_layaway_reminder_input",
+            "settings_whatsapp_layaway_liquidated_input",
+        ):
+            self.assertTrue(hasattr(self.ventana, atributo), atributo)
+
+    def test_los_modulos_que_solo_servian_a_la_pestana_ya_no_estan(self) -> None:
+        import importlib
+
+        for modulo in (
+            "pos_uniformes.ui.views.layaway_view",
+            "pos_uniformes.ui.dialogs.create_layaway_dialog",
+            "pos_uniformes.ui.dialogs.layaway_payment_dialog",
+            "pos_uniformes.ui.helpers.layaway_action_helper",
+            "pos_uniformes.ui.helpers.layaway_delivery_feedback_helper",
+            "pos_uniformes.ui.helpers.layaway_detail_helper",
+            "pos_uniformes.ui.helpers.layaway_history_helper",
+            "pos_uniformes.ui.helpers.layaway_summary_helper",
+            "pos_uniformes.ui.helpers.layaway_table_row_helper",
+        ):
+            with self.assertRaises(ModuleNotFoundError, msg=modulo):
+                importlib.import_module(modulo)
+
+
+class KioskoConservaSusApartadosTests(unittest.TestCase):
+    """Los apartados viven en Venta Rápida del kiosko y deben seguir igual.
+
+    Aquí solo se revisan los puntos de entrada; el flujo real lo ejercitan
+    test_quick_sale_print_tickets.py (ticket de apartado, anticipo y abono),
+    test_libreta*.py y test_api_movil.py.
+    """
+
+    def test_el_kiosko_monta_venta_rapida(self) -> None:
+        import inspect
+
+        import pos_uniformes.ui.quote_satellite_window as satelite
+        from pos_uniformes.ui.views.quick_sale_view import QuickSaleWidget
+
+        self.assertIs(satelite.QuickSaleWidget, QuickSaleWidget)
+        self.assertIn("QuickSaleWidget(self)", inspect.getsource(satelite.QuoteSatelliteWindow))
+
+    def test_venta_rapida_conserva_apartado_y_abono(self) -> None:
+        from pos_uniformes.ui.views.quick_sale_view import QuickSaleWidget
+
+        for metodo in (
+            "_on_ticket_apartado",
+            "_on_abono",
+            "_registrar_en_libreta",
+            "_build_apartado_text",
+        ):
+            self.assertTrue(callable(getattr(QuickSaleWidget, metodo, None)), metodo)
+
+    def test_los_servicios_de_dominio_de_apartados_siguen(self) -> None:
+        from pos_uniformes.database.models import Apartado
+        from pos_uniformes.services.apartado_service import ApartadoService
+        import pos_uniformes.services.layaway_alerts_service  # noqa: F401
+        import pos_uniformes.services.layaway_closure_service  # noqa: F401
+        import pos_uniformes.services.layaway_creation_service  # noqa: F401
+        import pos_uniformes.services.layaway_payment_service  # noqa: F401
+        import pos_uniformes.services.layaway_pricing_service  # noqa: F401
+
+        self.assertEqual(Apartado.__tablename__, "apartado")
+        self.assertTrue(callable(getattr(ApartadoService, "obtener_apartado", None)))
 
 
 if __name__ == "__main__":

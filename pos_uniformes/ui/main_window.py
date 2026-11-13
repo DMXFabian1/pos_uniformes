@@ -3,7 +3,7 @@
 import csv
 import json
 from collections.abc import Callable
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal, InvalidOperation
 import os
 from pathlib import Path
@@ -64,13 +64,11 @@ from sqlalchemy.exc import SQLAlchemyError
 from pos_uniformes.database.connection import engine, get_session, test_connection
 from pos_uniformes.database.models import (
     AtributoProducto,
-    Apartado,
     Categoria,
     Cliente,
     Compra,
     Empleada,
     Escuela,
-    EstadoApartado,
     EstadoPresupuesto,
     EstadoCompra,
     EstadoVenta,
@@ -87,7 +85,6 @@ from pos_uniformes.database.models import (
     Variante,
     Venta,
 )
-from pos_uniformes.services.apartado_service import ApartadoService
 from pos_uniformes.services.active_filter_service import (
     build_active_filter_labels,
     build_active_filters_summary,
@@ -158,10 +155,6 @@ from pos_uniformes.services.inventario_service import (
     AjusteMasivoFilaInput,
     InventarioService,
 )
-from pos_uniformes.services.layaway_snapshot_service import (
-    build_layaway_history_input_rows,
-    load_layaway_snapshot_rows,
-)
 from pos_uniformes.services.inventory_label_service import (
     load_inventory_label_context,
     render_inventory_label,
@@ -181,23 +174,6 @@ from pos_uniformes.services.quote_detail_service import load_quote_detail_snapsh
 from pos_uniformes.services.quote_action_service import cancel_quote
 from pos_uniformes.services.quote_whatsapp_service import build_quote_whatsapp_view
 from pos_uniformes.services.layaway_alerts_service import load_layaway_alerts_snapshot
-from pos_uniformes.services.layaway_closure_service import (
-    add_layaway_item,
-    cancel_layaway,
-    deliver_layaway,
-    load_layaway_delivery_confirmation,
-    remove_layaway_item,
-    settle_and_deliver_layaway,
-    update_layaway_item_quantity,
-    void_last_payment,
-)
-from pos_uniformes.services.layaway_creation_service import create_layaway_from_payload
-from pos_uniformes.services.layaway_detail_service import load_layaway_detail_snapshot
-from pos_uniformes.services.layaway_payment_action_service import register_layaway_payment
-from pos_uniformes.services.sale_document_view_service import (
-    build_layaway_receipt_document_view,
-    build_layaway_sale_ticket_document_view,
-)
 from pos_uniformes.services.sale_cart_update_service import update_sale_cart_item_quantity
 from pos_uniformes.services.sale_discount_service import format_discount_label
 from pos_uniformes.services.search_filter_service import (
@@ -291,14 +267,11 @@ from pos_uniformes.ui.dialogs.catalog_variant_dialog import (
     build_catalog_batch_variant_dialog,
     build_catalog_variant_dialog,
 )
-from pos_uniformes.ui.dialogs.layaway_payment_dialog import build_layaway_payment_dialog
-from pos_uniformes.ui.dialogs.create_layaway_dialog import build_create_layaway_dialog
 from pos_uniformes.ui.dialogs.inventory_context_menu_dialog import prompt_inventory_context_action
 from pos_uniformes.ui.dialogs.inventory_count_dialog import prompt_inventory_count_data
 from pos_uniformes.ui.dialogs.inventory_label_batch_dialog import build_inventory_label_batch_dialog
 from pos_uniformes.ui.dialogs.inventory_label_dialog import build_inventory_label_dialog
 from pos_uniformes.ui.dialogs.marketing_history_dialog import build_marketing_history_dialog
-from pos_uniformes.ui.dialogs.printable_text_dialog import open_printable_text_dialog
 from pos_uniformes.ui.helpers.busy_feedback_helper import BusyFeedbackController
 from pos_uniformes.ui.helpers.inventory_bulk_qr_helper import (
     InventoryBulkQrCancelled,
@@ -410,20 +383,7 @@ from pos_uniformes.ui.helpers.inventory_selection_helper import (
 )
 from pos_uniformes.ui.helpers.inventory_summary_helper import build_inventory_summary_view
 from pos_uniformes.ui.helpers.inventory_table_row_helper import build_inventory_table_row_views
-from pos_uniformes.ui.helpers.layaway_action_helper import build_layaway_action_state
 from pos_uniformes.ui.helpers.layaway_alerts_helper import build_layaway_alerts_view
-from pos_uniformes.ui.helpers.layaway_detail_helper import (
-    build_empty_layaway_detail_view,
-    build_error_layaway_detail_view,
-    build_layaway_detail_view,
-)
-from pos_uniformes.ui.helpers.layaway_delivery_feedback_helper import (
-    build_layaway_delivery_confirmation_view,
-    build_layaway_delivery_result_view,
-)
-from pos_uniformes.ui.helpers.layaway_history_helper import build_layaway_history_rows
-from pos_uniformes.ui.helpers.layaway_summary_helper import build_layaway_summary_view
-from pos_uniformes.ui.helpers.layaway_table_row_helper import build_layaway_table_row_views
 from pos_uniformes.ui.helpers.window_close_helper import build_main_window_close_decision
 from pos_uniformes.ui.helpers.quote_cart_view_helper import build_quote_cart_view
 from pos_uniformes.ui.helpers.quote_history_helper import build_quote_history_rows
@@ -446,7 +406,6 @@ from pos_uniformes.ui.helpers.quote_selection_helper import (
 )
 from pos_uniformes.ui.helpers.quote_summary_helper import build_quote_summary_view
 from pos_uniformes.ui.helpers.quote_table_row_helper import build_quote_table_row_views
-from pos_uniformes.ui.helpers.printable_document_flow_helper import open_printable_document_flow
 from pos_uniformes.ui.helpers.sale_sports_uniform_helper import (
     restore_sports_uniform_playera_price_if_needed,
 )
@@ -539,7 +498,6 @@ from pos_uniformes.ui.views.analytics_view import build_analytics_tab
 from pos_uniformes.ui.views.dashboard_view import build_dashboard_tab
 from pos_uniformes.ui.views.history_view import build_history_tab
 from pos_uniformes.ui.views.inventory_view import build_inventory_tab
-from pos_uniformes.ui.views.layaway_view import build_layaway_tab
 from pos_uniformes.ui.views.products_view import build_products_tab
 from pos_uniformes.ui.views.quotes_view import build_quotes_tab
 from pos_uniformes.ui.views.bodega_view import build_bodega_tab
@@ -554,8 +512,8 @@ from pos_uniformes.services.nombres_empleadas_service import mostrar as _nombre_
 from pos_uniformes.services.nombres_empleadas_service import nombres_por_codigo
 
 # Pestañas que dejaron de tener sentido aquí porque su trabajo se mudó al
-# kiosko: los presupuestos se hacen en Presupuesto guiado, los apartados en
-# Venta Rápida y el catálogo se lleva desde Panel Uniformes e Inventario.
+# kiosko: los presupuestos se hacen en Presupuesto guiado y el catálogo se
+# lleva desde Panel Uniformes e Inventario.
 #
 # Se ocultan, NO se borran: fueron la base del sistema, sus datos siguen
 # intactos y el código completo sigue en el repositorio. Para volver a ver
@@ -568,8 +526,15 @@ from pos_uniformes.services.nombres_empleadas_service import nombres_por_codigo
 # Después: «no lo necesito, retira también movimientos y el corte». Se fueron
 # el botón Movimientos y la sesión/corte de caja de esta ventana; el corte
 # vive en el kiosko.
+#
+# 2026-11-12: la pestaña Apartados tampoco se oculta ya: se retiró (vista,
+# botones crear/abonar/editar/entregar/cancelar, comprobantes, WhatsApp y su
+# refresco). Daniel: «retira también apartados». Los apartados se hacen en
+# Venta Rápida del kiosko y quedan en la Libreta; la tabla `apartado`, sus
+# datos y los servicios de dominio (services/apartado_service.py y
+# services/layaway_*) siguen intactos.
 
-PESTANAS_MUDADAS_AL_KIOSKO = ("Presupuestos", "Apartados", "Catálogo")
+PESTANAS_MUDADAS_AL_KIOSKO = ("Presupuestos", "Catálogo")
 
 LISTING_SEARCH_DEBOUNCE_MS = 300
 CATALOG_PAGE_SIZE = 25
@@ -1255,7 +1220,6 @@ class MainWindow(QMainWindow):
         self.settings_employees_debounce_timer = self._make_search_debounce_timer(
             lambda: self._refresh_settings_employees()
         )
-        self.layaway_rows: list[dict[str, object]] = []
         self.history_rows: list[dict[str, object]] = []
         self.quote_cart: list[dict[str, object]] = []
         self.quote_rows: list[dict[str, object]] = []
@@ -1486,30 +1450,6 @@ class MainWindow(QMainWindow):
         self.inventory_more_button = QToolButton()
         self.inventory_table = QTableWidget()
 
-        self.layaway_search_input = QLineEdit()
-        self.layaway_state_combo = QComboBox()
-        self.layaway_due_combo = QComboBox()
-        self.layaway_create_button = QPushButton("Nuevo apartado")
-        self.layaway_payment_button = QPushButton("Registrar abono")
-        self.layaway_void_payment_button = QPushButton("Anular abono")
-        self.layaway_edit_button = QPushButton("Editar apartado")
-        self.layaway_deliver_button = QPushButton("Entregar")
-        self.layaway_cancel_button = QPushButton("Cancelar")
-        self.layaway_receipt_button = QPushButton("Comprobante")
-        self.layaway_sale_ticket_button = QPushButton("Ticket venta")
-        self.layaway_whatsapp_button = QPushButton("WhatsApp")
-        self.layaway_status_label = QLabel("Sin apartados cargados.")
-        self.layaway_quick_alerts_label = QLabel("")
-        self.layaway_table = QTableWidget()
-        self.layaway_detail_table = QTableWidget()
-        self.layaway_payments_table = QTableWidget()
-        self.layaway_summary_label = QLabel("Selecciona un apartado")
-        self.layaway_customer_label = QLabel("Sin detalle.")
-        self.layaway_balance_label = QLabel("")
-        self.layaway_breakdown_label = QLabel("")
-        self.layaway_commitment_label = QLabel("")
-        self.layaway_due_status_label = QLabel("")
-        self.layaway_notes_label = QLabel("")
 
         self.history_sku_input = QLineEdit()
         self.history_source_combo = QComboBox()
@@ -1838,7 +1778,6 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         self.tabs.addTab(self._wrap_tab_scroll(self._build_dashboard_tab()), "Resumen")
         self.tabs.addTab(self._wrap_tab_scroll(self._build_quotes_tab()), "Presupuestos")
-        self.tabs.addTab(self._wrap_tab_scroll(self._build_layaway_tab()), "Apartados")
         self.tabs.addTab(self._wrap_tab_scroll(self._build_catalog_tab()), "Catálogo")
         self.tabs.addTab(self._wrap_tab_scroll(self._build_inventory_tab()), "Inventario")
         self.tabs.addTab(self._build_bodega_tab(), "Bodega")
@@ -1899,15 +1838,6 @@ class MainWindow(QMainWindow):
             self.inventory_edit_button: "Edita el producto o la presentacion seleccionada.",
             self.inventory_stock_button: "Abre acciones de stock como entrada, conteo fisico y correccion.",
             self.inventory_more_button: "Abre acciones poco frecuentes como eliminar y generar QRs masivos.",
-            self.layaway_create_button: "Crea un apartado nuevo y reserva stock disponible.",
-            self.layaway_payment_button: "Registra un abono sobre el apartado seleccionado.",
-            self.layaway_void_payment_button: "Anula el último abono registrado en el apartado.",
-            self.layaway_edit_button: "Agrega, quita o cambia cantidad de productos en el apartado.",
-            self.layaway_deliver_button: "Marca como entregado un apartado ya liquidado.",
-            self.layaway_cancel_button: "Cancela el apartado seleccionado y libera el stock reservado.",
-            self.layaway_receipt_button: "Abre un comprobante del apartado seleccionado para revisar o imprimir.",
-            self.layaway_sale_ticket_button: "Abre el ticket de la venta generada al entregar el apartado.",
-            self.layaway_whatsapp_button: "Abre WhatsApp con un recordatorio prellenado para el cliente del apartado.",
             self.quote_add_button: "Agrega el SKU capturado al presupuesto actual sin afectar inventario.",
             self.quote_create_client_button: "Crea un cliente rapido desde Presupuestos usando solo nombre y telefono.",
             self.quote_save_button: "Emite el presupuesto rapido actual con folio, cliente opcional y vigencia.",
@@ -1963,8 +1893,6 @@ class MainWindow(QMainWindow):
         )
         self.inventory_clear_filters_button.setToolTip("Limpia todos los filtros del inventario y muestra nuevamente todas las presentaciones.")
         self.inventory_table.setToolTip("Selecciona una presentacion para gestionar inventario, precio, QR o estado.")
-        self.layaway_table.setToolTip("Consulta apartados, saldo pendiente y fechas de vencimiento.")
-        self.layaway_due_combo.setToolTip("Filtra apartados por vencimiento.")
         self.movements_table.setToolTip("Historial de movimientos de inventario con filtros por fecha, SKU y tipo.")
 
     def _create_page_help_button(self, page_key: str) -> QPushButton:
@@ -1980,7 +1908,6 @@ class MainWindow(QMainWindow):
         current_label = self.tabs.tabText(self.tabs.currentIndex()).strip().lower()
         page_key = {
             "resumen": "dashboard",
-            "apartados": "layaway",
             "catalogo": "products",
             "inventario": "inventory",
             "historial inventarios": "history",
@@ -2013,14 +1940,6 @@ class MainWindow(QMainWindow):
                     "Selecciona una presentacion en la tabla para ver su ficha y sus acciones.",
                     "Usa los menus Nuevo, Editar, Stock y Mas para administrar catalogo, existencias y QR.",
                     "El panel lateral muestra estado, stock, ultimo movimiento y vista previa del QR.",
-                ],
-            ),
-            "layaway": (
-                "Ayuda de apartados",
-                [
-                    "Crea apartados, registra abonos, entrega apartados liquidados o cancela apartados activos.",
-                    "El stock se reserva al crear el apartado y se libera si lo cancelas.",
-                    "Usa los filtros para localizar apartados por cliente, estado o vencimiento.",
                 ],
             ),
             "analytics": (
@@ -2122,25 +2041,24 @@ class MainWindow(QMainWindow):
             return
 
         is_admin = self.current_role == RolUsuario.ADMIN
-        can_manage_layaways = self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
         visible_by_index = {
-            # 2026-11-12: la pestaña Caja (antes índice 1) ya no se construye.
+            # 2026-11-12: las pestañas Caja (antes índice 1) y Apartados
+            # (antes índice 2) ya no se construyen.
             0: is_admin,  # Resumen
             1: True,      # Presupuestos
-            2: can_manage_layaways,  # Apartados
-            3: True,      # Catalogo
-            4: is_admin,  # Inventario
-            5: is_admin,  # Bodega
-            6: is_admin,  # Historial inventarios
-            7: is_admin,  # Panel Uniformes
-            8: is_admin,  # Analitica
-            9: is_admin,  # Configuracion
+            2: True,      # Catalogo
+            3: is_admin,  # Inventario
+            4: is_admin,  # Bodega
+            5: is_admin,  # Historial inventarios
+            6: is_admin,  # Panel Uniformes
+            7: is_admin,  # Analitica
+            8: is_admin,  # Configuracion
         }
         # Estas ya no viven aquí: los presupuestos se hacen en Presupuesto
-        # guiado, los apartados en Venta Rápida y el catálogo en Panel
-        # Uniformes e Inventario. Se ocultan, no se borran — sus datos siguen
-        # intactos. Para volver a verlas, vaciar PESTANAS_MUDADAS_AL_KIOSKO.
-        # (La Caja antigua ya no se oculta: se retiró, 2026-11-12.)
+        # guiado y el catálogo en Panel Uniformes e Inventario. Se ocultan,
+        # no se borran — sus datos siguen intactos. Para volver a verlas,
+        # vaciar PESTANAS_MUDADAS_AL_KIOSKO.
+        # (La Caja antigua y Apartados ya no se ocultan: se retiraron, 2026-11-12.)
         for index in range(self.tabs.count()):
             if self.tabs.tabText(index).strip() in PESTANAS_MUDADAS_AL_KIOSKO:
                 visible_by_index[index] = False
@@ -2200,9 +2118,6 @@ class MainWindow(QMainWindow):
 
     def _build_analytics_tab(self) -> QWidget:
         return build_analytics_tab(self)
-
-    def _build_layaway_tab(self) -> QWidget:
-        return build_layaway_tab(self)
 
     def _build_history_tab(self) -> QWidget:
         return build_history_tab(self)
@@ -2374,10 +2289,10 @@ class MainWindow(QMainWindow):
         open_meilisearch_settings_dialog(self)
 
     def _handle_open_uniforms_panel(self) -> None:
-        # Navegar a la pestaña Panel Uniformes (índice 7 desde que se retiró
-        # la pestaña Caja, 2026-11-12)
+        # Navegar a la pestaña Panel Uniformes (índice 6 desde que se
+        # retiraron las pestañas Caja y Apartados, 2026-11-12)
         if self.tabs is not None:
-            self.tabs.setCurrentIndex(7)
+            self.tabs.setCurrentIndex(6)
 
     def _refresh_settings_cash_history(self) -> None:
         estado = self.settings_cash_history_state_combo.currentData() or "todas"
@@ -6609,40 +6524,6 @@ class MainWindow(QMainWindow):
         self.refresh_all()
         QMessageBox.information(self, "Compra registrada", f"Compra {document} confirmada correctamente.")
 
-    def _handle_view_layaway_receipt(self) -> None:
-        apartado_id = self._selected_layaway_id()
-        if apartado_id is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona un apartado para ver su comprobante.")
-            return
-
-        try:
-            open_printable_document_flow(
-                parent=self,
-                session_factory=get_session,
-                build_document_view=lambda session: build_layaway_receipt_document_view(session, layaway_id=apartado_id),
-                open_dialog=open_printable_text_dialog,
-            )
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Comprobante no disponible", str(exc))
-            return
-
-    def _handle_view_layaway_sale_ticket(self) -> None:
-        apartado_id = self._selected_layaway_id()
-        if apartado_id is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona un apartado para ver su ticket de venta.")
-            return
-
-        try:
-            open_printable_document_flow(
-                parent=self,
-                session_factory=get_session,
-                build_document_view=lambda session: build_layaway_sale_ticket_document_view(session, layaway_id=apartado_id),
-                open_dialog=open_printable_text_dialog,
-            )
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Ticket no disponible", str(exc))
-            return
-
     @staticmethod
     def _generate_quote_folio() -> str:
         return f"PRE-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid4().hex[:4].upper()}"
@@ -7528,7 +7409,6 @@ class MainWindow(QMainWindow):
                 self._refresh_catalog(session)
                 self._refresh_inventory_table(session)
                 self._refresh_quotes(session)
-                self._refresh_layaways(session)
                 self._refresh_analytics(session)
                 self._refresh_history(session)
         except Exception as exc:  # noqa: BLE001
@@ -7556,7 +7436,6 @@ class MainWindow(QMainWindow):
     def _refresh_permissions(self) -> None:
         is_admin = self.current_role == RolUsuario.ADMIN
         can_sell = self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
-        can_manage_layaways = self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
         catalog_access_view = build_catalog_access_view(is_admin=is_admin)
         self._apply_role_navigation()
         self.category_button.setEnabled(is_admin)
@@ -7596,23 +7475,6 @@ class MainWindow(QMainWindow):
         if self.seed_action is not None:
             self.seed_action.setEnabled(is_admin)
         self.inventory_adjust_button.setEnabled(is_admin)
-        layaway_action_state = build_layaway_action_state(
-            can_manage_layaways=can_manage_layaways,
-            # 2026-11-12: sin sesión de caja en el POS (el corte vive en el
-            # kiosko) esto ya era siempre False; se deja igual.
-            can_operate_open_cash=False,
-            is_admin=is_admin,
-            has_selected_layaway=self._selected_layaway_id() is not None,
-        )
-        self.layaway_create_button.setEnabled(layaway_action_state.create_enabled)
-        self.layaway_payment_button.setEnabled(layaway_action_state.payment_enabled)
-        self.layaway_void_payment_button.setEnabled(layaway_action_state.void_payment_enabled)
-        self.layaway_edit_button.setEnabled(layaway_action_state.edit_enabled)
-        self.layaway_deliver_button.setEnabled(layaway_action_state.deliver_enabled)
-        self.layaway_cancel_button.setEnabled(layaway_action_state.cancel_enabled)
-        self.layaway_receipt_button.setEnabled(layaway_action_state.receipt_enabled)
-        self.layaway_sale_ticket_button.setEnabled(layaway_action_state.sale_ticket_enabled)
-        self.layaway_whatsapp_button.setEnabled(layaway_action_state.whatsapp_enabled)
         self.logout_button.setEnabled(True)
         self._apply_quote_action_state()
         self.settings_create_backup_button.setEnabled(is_admin)
@@ -7674,8 +7536,6 @@ class MainWindow(QMainWindow):
         self.inventory_permission_label.setText(
             "" if is_admin else "Las altas, entradas, conteos, ajustes, cambios de precio y eliminacion estan restringidos a ADMIN."
         )
-        self.layaway_status_label.setText(self.layaway_status_label.text())
-        self.layaway_quick_alerts_label.setText(self.layaway_quick_alerts_label.text())
 
     def _refresh_summary(self, session) -> None:
         # Un solo round-trip: antes eran 11 queries escalares secuenciales,
@@ -9052,39 +8912,6 @@ class MainWindow(QMainWindow):
         self.history_detail_notes_label.setText(detail_view.notes_label)
 
     @staticmethod
-    def _generate_layaway_folio() -> str:
-        return f"APT-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid4().hex[:4].upper()}"
-
-    @staticmethod
-    def _classify_layaway_due(
-        commitment: datetime | None,
-        estado: EstadoApartado,
-    ) -> tuple[str, str]:
-        if commitment is None:
-            return ("Sin fecha", "muted")
-        if estado in {EstadoApartado.ENTREGADO, EstadoApartado.CANCELADO}:
-            return (format_display_date(commitment), "muted")
-        today = date.today()
-        due_date = (commitment.astimezone() if commitment.tzinfo else commitment).date()
-        if due_date < today:
-            return (f"Vencido desde {format_display_date(due_date)}", "danger")
-        if due_date == today:
-            return ("Vence hoy", "warning")
-        if due_date <= today + timedelta(days=7):
-            return (f"Vence {format_display_date(due_date)}", "warning")
-        return (f"Vence {format_display_date(due_date)}", "positive")
-
-    def _selected_layaway_id(self) -> int | None:
-        selected_row = self.layaway_table.currentRow()
-        if selected_row < 0:
-            return None
-        item = self.layaway_table.item(selected_row, 0)
-        if item is None:
-            return None
-        apartado_id = item.data(Qt.ItemDataRole.UserRole)
-        return int(apartado_id) if apartado_id is not None else None
-
-    @staticmethod
     def _normalize_whatsapp_phone(phone: str) -> str:
         digits = "".join(character for character in phone if character.isdigit())
         if digits.startswith("521") and len(digits) == 13:
@@ -9131,45 +8958,6 @@ class MainWindow(QMainWindow):
         self.settings_whatsapp_client_greeting_input.setPlainText(defaults["client_greeting"])
         self._refresh_whatsapp_preview()
         self.settings_whatsapp_status_label.setText("Se cargaron plantillas sugeridas. Guarda para aplicarlas.")
-
-    def _build_layaway_whatsapp_message(self, apartado: Apartado) -> str:
-        due_text, _ = self._classify_layaway_due(apartado.fecha_compromiso, apartado.estado)
-        due_date_text = (
-            format_display_date(apartado.fecha_compromiso)
-            if apartado.fecha_compromiso
-            else "sin fecha definida"
-        )
-        templates = self._get_whatsapp_templates()
-        values = {
-            "cliente": apartado.cliente_nombre,
-            "folio": apartado.folio,
-            "saldo": apartado.saldo_pendiente,
-            "vencimiento": due_text,
-            "fecha_compromiso": due_date_text,
-        }
-        if apartado.estado == EstadoApartado.ENTREGADO:
-            return (
-                f"Hola {apartado.cliente_nombre}, tu apartado {apartado.folio} ya fue entregado. "
-                "Gracias por tu compra."
-            )
-        if apartado.estado == EstadoApartado.CANCELADO:
-            return (
-                f"Hola {apartado.cliente_nombre}, tu apartado {apartado.folio} fue cancelado. "
-                "Si necesitas apoyo, escribenos."
-            )
-        if Decimal(apartado.saldo_pendiente) <= Decimal("0.00"):
-            return render_settings_whatsapp_template(templates["layaway_liquidated"], values)
-        return render_settings_whatsapp_template(templates["layaway_reminder"], values)
-
-    def _handle_layaway_selection(self) -> None:
-        self._refresh_layaway_detail(self._selected_layaway_id())
-
-    def _handle_layaway_filters_changed(self) -> None:
-        try:
-            with get_session() as session:
-                self._refresh_layaways(session)
-        except SQLAlchemyError:
-            self.status_label.setText("Estado: no se pudieron aplicar los filtros de apartados.")
 
     def _handle_catalog_filters_changed(self) -> None:
         self._refresh_catalog_uniform_macro_buttons()
@@ -9334,601 +9122,6 @@ class MainWindow(QMainWindow):
             "Historial exportado",
             f"Se exporto el historial filtrado actual en:\n{export_dir}",
         )
-
-    def _refresh_layaways(self, session) -> None:
-        search_text = self.layaway_search_input.text().strip().lower()
-        state_filter = str(self.layaway_state_combo.currentData() or "")
-        due_filter = str(self.layaway_due_combo.currentData() or "")
-        selected_id = self._selected_layaway_id()
-        layaway_snapshots = build_layaway_history_input_rows(
-            load_layaway_snapshot_rows(
-                session,
-                today=date.today(),
-                classify_due=self._classify_layaway_due,
-            )
-        )
-        rows = build_layaway_history_rows(
-            layaway_snapshots=layaway_snapshots,
-            search_text=search_text,
-            state_filter=state_filter,
-            due_filter=due_filter,
-        )
-        layaway_summary_view = build_layaway_summary_view(
-            visible_rows=rows,
-            search_text=self.layaway_search_input.text(),
-            state_filter_value=self.layaway_state_combo.currentData(),
-            state_filter_text=self.layaway_state_combo.currentText(),
-            due_filter_value=self.layaway_due_combo.currentData(),
-            due_filter_text=self.layaway_due_combo.currentText(),
-        )
-
-        self.layaway_rows = rows
-        row_views = build_layaway_table_row_views(rows)
-        self.layaway_table.setRowCount(len(row_views))
-        for row_index, row_view in enumerate(row_views):
-            for column_index, value in enumerate(row_view.values):
-                self.layaway_table.setItem(row_index, column_index, _table_item(value))
-            self.layaway_table.item(row_index, 0).setData(Qt.ItemDataRole.UserRole, row_view.layaway_id)
-            status_item = self.layaway_table.item(row_index, 2)
-            balance_item = self.layaway_table.item(row_index, 5)
-            due_item = self.layaway_table.item(row_index, 6)
-            if status_item is not None:
-                _set_table_badge_style(status_item, row_view.status_tone)
-            if balance_item is not None:
-                _set_table_badge_style(balance_item, row_view.balance_tone)
-            if due_item is not None:
-                _set_table_badge_style(due_item, row_view.due_tone)
-        self.layaway_table.resizeColumnsToContents()
-        self.layaway_status_label.setText(layaway_summary_view.status_label)
-
-        if selected_id is not None:
-            self.layaway_table.blockSignals(True)
-            for row_index in range(self.layaway_table.rowCount()):
-                item = self.layaway_table.item(row_index, 0)
-                if item is not None and item.data(Qt.ItemDataRole.UserRole) == selected_id:
-                    self.layaway_table.setCurrentCell(row_index, 0)
-                    self.layaway_table.selectRow(row_index)
-                    break
-            self.layaway_table.blockSignals(False)
-
-        self._refresh_layaway_detail(self._selected_layaway_id())
-
-    def _refresh_layaway_detail(self, apartado_id: int | None) -> None:
-        if not apartado_id:
-            detail_view = build_empty_layaway_detail_view()
-            self._apply_layaway_detail_view(detail_view)
-            return
-
-        try:
-            with get_session() as session:
-                detail_snapshot = load_layaway_detail_snapshot(
-                    session,
-                    layaway_id=apartado_id,
-                    current_role=self.current_role,
-                    classify_due=self._classify_layaway_due,
-                )
-                detail_view = build_layaway_detail_view(
-                    folio=detail_snapshot.folio,
-                    estado=detail_snapshot.estado,
-                    customer_code=detail_snapshot.customer_code,
-                    customer_name=detail_snapshot.customer_name,
-                    customer_phone=detail_snapshot.customer_phone,
-                    subtotal=detail_snapshot.subtotal,
-                    rounding_adjustment=detail_snapshot.rounding_adjustment,
-                    total=detail_snapshot.total,
-                    total_paid=detail_snapshot.total_paid,
-                    balance_due=detail_snapshot.balance_due,
-                    commitment_label=detail_snapshot.commitment_label,
-                    due_text=detail_snapshot.due_text,
-                    due_tone=detail_snapshot.due_tone,
-                    notes_text=detail_snapshot.notes_text,
-                    detail_rows=[
-                        {
-                            "sku": row.sku,
-                            "product_name": row.product_name,
-                            "quantity": row.quantity,
-                            "unit_price": row.unit_price,
-                            "subtotal": row.subtotal,
-                        }
-                        for row in detail_snapshot.detail_rows
-                    ],
-                    payment_rows=[
-                        {
-                            "created_at": row.created_at_label,
-                            "amount": row.amount,
-                            "reference": row.reference,
-                            "username": row.username,
-                        }
-                        for row in detail_snapshot.payment_rows
-                    ],
-                    sale_ticket_enabled=detail_snapshot.sale_ticket_enabled,
-                    whatsapp_enabled=detail_snapshot.whatsapp_enabled,
-                )
-                self._apply_layaway_detail_view(detail_view)
-        except Exception as exc:  # noqa: BLE001
-            detail_view = build_error_layaway_detail_view(str(exc))
-            self._apply_layaway_detail_view(detail_view)
-
-    def _apply_layaway_detail_view(self, detail_view) -> None:
-        self.layaway_summary_label.setText(detail_view.summary_label)
-        self.layaway_customer_label.setText(detail_view.customer_label)
-        self.layaway_balance_label.setText(detail_view.balance_label)
-        self.layaway_breakdown_label.setText(detail_view.breakdown_label)
-        self.layaway_commitment_label.setText(detail_view.commitment_label)
-        self._set_badge_state(
-            self.layaway_due_status_label,
-            detail_view.due_badge.text,
-            detail_view.due_badge.tone,
-        )
-        self.layaway_notes_label.setText(detail_view.notes_label)
-        self.layaway_sale_ticket_button.setEnabled(detail_view.sale_ticket_enabled)
-        self.layaway_whatsapp_button.setEnabled(detail_view.whatsapp_enabled)
-
-        self.layaway_detail_table.setRowCount(len(detail_view.detail_rows))
-        for row_index, detail_row in enumerate(detail_view.detail_rows):
-            for column_index, value in enumerate(detail_row.values):
-                item = _table_item(value)
-                if column_index == 0:
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                elif column_index in {2, 3}:
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                self.layaway_detail_table.setItem(row_index, column_index, item)
-            if detail_row.tone:
-                for column_index in (1, 3):
-                    item = self.layaway_detail_table.item(row_index, column_index)
-                    if item is not None:
-                        _set_table_badge_style(item, detail_row.tone)
-        self.layaway_detail_table.resizeColumnsToContents()
-
-        self.layaway_payments_table.setRowCount(len(detail_view.payment_rows))
-        for row_index, payment_row in enumerate(detail_view.payment_rows):
-            for column_index, value in enumerate(payment_row.values):
-                self.layaway_payments_table.setItem(row_index, column_index, _table_item(value))
-        self.layaway_payments_table.resizeColumnsToContents()
-
-    def _handle_open_layaway_whatsapp(self) -> None:
-        apartado_id = self._selected_layaway_id()
-        if apartado_id is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona un apartado para abrir WhatsApp.")
-            return
-
-        try:
-            with get_session() as session:
-                apartado = ApartadoService.obtener_apartado(session, apartado_id)
-                if apartado is None:
-                    raise ValueError("No se encontro el apartado seleccionado.")
-                if not (apartado.cliente_telefono or "").strip():
-                    raise ValueError("El apartado seleccionado no tiene telefono registrado.")
-                normalized_phone = self._normalize_whatsapp_phone(apartado.cliente_telefono or "")
-                if len(normalized_phone) < 10:
-                    raise ValueError("El telefono del cliente no parece valido para WhatsApp.")
-                message = self._build_layaway_whatsapp_message(apartado)
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "WhatsApp no disponible", str(exc))
-            return
-
-        whatsapp_url = f"https://wa.me/{normalized_phone}?text={quote(message)}"
-        if not webbrowser.open(whatsapp_url):
-            QMessageBox.warning(
-                self,
-                "No se pudo abrir WhatsApp",
-                "No se pudo abrir WhatsApp automaticamente. Verifica que tengas navegador disponible.",
-            )
-
-    def _handle_create_layaway(self) -> None:
-        if self.current_role not in {RolUsuario.ADMIN, RolUsuario.CAJERO}:
-            QMessageBox.warning(self, "Sin permisos", "No tienes permisos para crear apartados.")
-            return
-        payload = build_create_layaway_dialog(
-            self,
-            initial_items=None,
-            selected_catalog_row=self._selected_catalog_row(),
-        )
-        if payload is None:
-            return
-
-        try:
-            with get_session() as session:
-                result = create_layaway_from_payload(
-                    session=session,
-                    user_id=self.user_id,
-                    folio=self._generate_layaway_folio(),
-                    payload=payload,
-                )
-                session.commit()
-                apartado_id = result.layaway_id
-                apartado_folio = result.layaway_folio
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Apartado no creado", str(exc))
-            return
-
-        self.refresh_all()
-        self._select_layaway(apartado_id)
-        QMessageBox.information(self, "Apartado creado", f"Apartado {apartado_folio} registrado correctamente.")
-
-    def _registrar_abono_en_libreta(self, session, payload, apartado_id: int) -> None:
-        """Todo abono queda en la Libreta (registrado, pero sin comisión).
-
-        Un fallo aquí no debe tumbar el abono real: se loguea y sigue."""
-        import logging
-
-        from pos_uniformes.services.libreta_service import (
-            aplicar_comision_terminal,
-            registrar_operacion,
-        )
-
-        try:
-            monto = Decimal(str(payload.amount))
-            pago_tarjeta = "tarjeta" in str(getattr(payload, "payment_method", "")).lower()
-            registrar_operacion(
-                session,
-                employee_code=str(payload.seller_employee_code or "SIN-QR"),
-                employee_name=str(payload.seller_employee_display_name or ""),
-                tipo="abono",
-                items=[],
-                monto_total=monto,
-                cliente=f"Apartado #{apartado_id}",
-                origen="principal",
-                pago_tarjeta=pago_tarjeta,
-                monto_neto=aplicar_comision_terminal(monto) if pago_tarjeta else None,
-                comisiones=0,
-            )
-        except Exception:  # noqa: BLE001
-            logging.getLogger(__name__).exception("Abono sin registrar en la Libreta")
-
-    def _handle_register_layaway_payment(self) -> None:
-        apartado_id = self._selected_layaway_id()
-        if apartado_id is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona un apartado para registrar abono.")
-            return
-        payload = build_layaway_payment_dialog(self)
-        if payload is None:
-            return
-        try:
-            with get_session() as session:
-                register_layaway_payment(
-                    session,
-                    layaway_id=apartado_id,
-                    user_id=self.user_id,
-                    payment_input=payload,
-                    seller_employee_code=payload.seller_employee_code,
-                    seller_employee_display_name=payload.seller_employee_display_name,
-                )
-                self._registrar_abono_en_libreta(session, payload, apartado_id)
-                session.commit()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Abono no registrado", str(exc))
-            return
-
-        self.refresh_all()
-        self._select_layaway(apartado_id)
-        QMessageBox.information(
-            self,
-            "Abono registrado",
-            f"Se registro un abono por ${payload.amount}. Efectivo en caja: ${payload.cash_amount}.",
-        )
-
-    def _handle_deliver_layaway(self) -> None:
-        apartado_id = self._selected_layaway_id()
-        if apartado_id is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona un apartado para entregarlo.")
-            return
-        try:
-            with get_session() as session:
-                confirmation_snapshot = load_layaway_delivery_confirmation(session, layaway_id=apartado_id)
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "No se pudo preparar la entrega", str(exc))
-            return
-
-        confirmation_view = build_layaway_delivery_confirmation_view(confirmation_snapshot)
-        confirmation_box = QMessageBox(self)
-        confirmation_box.setIcon(QMessageBox.Icon.Question)
-        confirmation_box.setWindowTitle(confirmation_view.title)
-        confirmation_box.setText(confirmation_view.message)
-        deliver_button = confirmation_box.addButton("Entregar", QMessageBox.ButtonRole.AcceptRole)
-        confirmation_box.addButton(QMessageBox.StandardButton.Cancel)
-        confirmation_box.exec()
-        if confirmation_box.clickedButton() is not deliver_button:
-            return
-        payment_payload = None
-        if confirmation_snapshot.balance_due > Decimal("0.00"):
-            payment_payload = build_layaway_payment_dialog(
-                self,
-                title="Liquidar y entregar apartado",
-                helper_text=(
-                    f"Saldo pendiente actual: ${confirmation_snapshot.balance_due}. "
-                    "Registra el abono final para completar la entrega."
-                ),
-                initial_amount=confirmation_snapshot.balance_due,
-                fixed_amount=True,
-                default_notes=f"Liquidacion final previa a la entrega del apartado {confirmation_snapshot.layaway_folio}.",
-                accept_button_label="Liquidar y entregar",
-            )
-            if payment_payload is None:
-                return
-        try:
-            with get_session() as session:
-                if payment_payload is None:
-                    result = deliver_layaway(
-                        session,
-                        layaway_id=apartado_id,
-                        user_id=self.user_id,
-                    )
-                else:
-                    result = settle_and_deliver_layaway(
-                        session,
-                        layaway_id=apartado_id,
-                        user_id=self.user_id,
-                        payment_input=payment_payload,
-                        final_abono_employee_code=payment_payload.seller_employee_code,
-                        final_abono_employee_display_name=payment_payload.seller_employee_display_name,
-                        delivery_employee_code=payment_payload.seller_employee_code,
-                        delivery_employee_display_name=payment_payload.seller_employee_display_name,
-                    )
-                    self._registrar_abono_en_libreta(session, payment_payload, apartado_id)
-                session.commit()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "No se pudo entregar", str(exc))
-            return
-
-        self.refresh_all()
-        self._select_layaway(apartado_id)
-        result_view = build_layaway_delivery_result_view(result)
-        result_box = QMessageBox(self)
-        result_box.setIcon(QMessageBox.Icon.Information)
-        result_box.setWindowTitle(result_view.title)
-        result_box.setText(result_view.message)
-        open_ticket_button = result_box.addButton("Ver ticket", QMessageBox.ButtonRole.ActionRole)
-        result_box.addButton(QMessageBox.StandardButton.Close)
-        result_box.exec()
-        if result_box.clickedButton() is open_ticket_button:
-            self._handle_view_layaway_sale_ticket()
-
-    def _handle_cancel_layaway(self) -> None:
-        apartado_id = self._selected_layaway_id()
-        if apartado_id is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona un apartado para cancelarlo.")
-            return
-        dialog, layout = self._create_modal_dialog("Cancelar apartado", width=420)
-        note_input = QTextEdit()
-        note_input.setPlaceholderText("Motivo de cancelacion")
-        note_input.setMaximumHeight(100)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addWidget(note_input)
-        layout.addWidget(buttons)
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return
-
-        try:
-            with get_session() as session:
-                cancel_layaway(
-                    session,
-                    layaway_id=apartado_id,
-                    user_id=self.user_id,
-                    note=note_input.toPlainText().strip() or None,
-                )
-                session.commit()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "No se pudo cancelar", str(exc))
-            return
-
-        self.refresh_all()
-        self._select_layaway(apartado_id)
-        QMessageBox.information(self, "Apartado cancelado", "El stock reservado se libero correctamente.")
-
-    def _handle_void_layaway_payment(self) -> None:
-        apartado_id = self._selected_layaway_id()
-        if apartado_id is None:
-            QMessageBox.warning(self, "Sin selección", "Selecciona un apartado para anular abono.")
-            return
-        confirm = QMessageBox.question(
-            self,
-            "Anular último abono",
-            "¿Seguro que deseas anular el último abono registrado?\nEsta acción no se puede deshacer.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if confirm != QMessageBox.StandardButton.Yes:
-            return
-        try:
-            with get_session() as session:
-                result = void_last_payment(
-                    session,
-                    layaway_id=apartado_id,
-                    user_id=self.user_id,
-                )
-                session.commit()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "No se pudo anular", str(exc))
-            return
-        self.refresh_all()
-        self._select_layaway(apartado_id)
-        QMessageBox.information(
-            self,
-            "Abono anulado",
-            f"Se anuló el abono por ${result['monto']} del apartado {result['folio']}.",
-        )
-
-    def _handle_edit_layaway(self) -> None:
-        apartado_id = self._selected_layaway_id()
-        if apartado_id is None:
-            QMessageBox.warning(self, "Sin selección", "Selecciona un apartado para editarlo.")
-            return
-        try:
-            with get_session() as session:
-                from pos_uniformes.services.apartado_service import ApartadoService
-                apartado = ApartadoService.obtener_apartado(session, apartado_id)
-                if apartado is None:
-                    QMessageBox.warning(self, "Error", "No se encontró el apartado.")
-                    return
-                if apartado.estado != EstadoApartado.ACTIVO:
-                    QMessageBox.warning(self, "No editable", "Sólo puedes editar apartados activos.")
-                    return
-                detalles_info = []
-                for d in apartado.detalles:
-                    detalles_info.append({
-                        "id": d.id,
-                        "sku": d.variante.sku,
-                        "descripcion": str(d.variante.producto.nombre_base if d.variante.producto else d.variante.sku),
-                        "talla": d.variante.talla,
-                        "color": d.variante.color,
-                        "cantidad": d.cantidad,
-                        "precio": d.precio_unitario,
-                        "subtotal": d.subtotal_linea,
-                    })
-                total_abonado = apartado.total_abonado
-                folio = apartado.folio
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Error", str(exc))
-            return
-
-        dialog, layout = self._create_modal_dialog(f"Editar apartado {folio}", width=700)
-        info_label = QLabel(f"Total abonado: ${total_abonado} — El nuevo total no puede ser menor a este monto.")
-        info_label.setStyleSheet("color: #87492c; font-weight: bold; padding: 4px;")
-        layout.addWidget(info_label)
-
-        table = QTableWidget()
-        table.setColumnCount(7)
-        table.setHorizontalHeaderLabels(["SKU", "Producto", "Talla", "Color", "Cantidad", "Precio", "Subtotal"])
-        table.verticalHeader().setVisible(False)
-        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-
-        def refresh_table():
-            table.setRowCount(len(detalles_info))
-            for i, d in enumerate(detalles_info):
-                table.setItem(i, 0, QTableWidgetItem(str(d["sku"])))
-                table.setItem(i, 1, QTableWidgetItem(str(d["descripcion"])))
-                table.setItem(i, 2, QTableWidgetItem(str(d["talla"])))
-                table.setItem(i, 3, QTableWidgetItem(str(d["color"])))
-                table.setItem(i, 4, QTableWidgetItem(str(d["cantidad"])))
-                table.setItem(i, 5, QTableWidgetItem(f"${d['precio']}"))
-                table.setItem(i, 6, QTableWidgetItem(f"${d['subtotal']}"))
-            table.resizeColumnsToContents()
-
-        refresh_table()
-        layout.addWidget(table)
-
-        btn_row = QHBoxLayout()
-        add_btn = QPushButton("Agregar producto")
-        remove_btn = QPushButton("Quitar seleccionado")
-        qty_btn = QPushButton("Cambiar cantidad")
-        btn_row.addWidget(add_btn)
-        btn_row.addWidget(remove_btn)
-        btn_row.addWidget(qty_btn)
-        btn_row.addStretch()
-        layout.addLayout(btn_row)
-
-        changes: list[tuple] = []  # ("add"|"remove"|"qty", data)
-
-        def on_add():
-            from PyQt6.QtWidgets import QInputDialog
-            sku, ok = QInputDialog.getText(dialog, "Agregar producto", "Escanea o escribe el SKU:")
-            if not ok or not sku.strip():
-                return
-            qty, ok2 = QInputDialog.getInt(dialog, "Cantidad", "Cantidad:", 1, 1, 100)
-            if not ok2:
-                return
-            changes.append(("add", {"sku": sku.strip().upper(), "cantidad": qty}))
-            detalles_info.append({
-                "id": None, "sku": sku.strip().upper(), "descripcion": "(nuevo)",
-                "talla": "-", "color": "-", "cantidad": qty, "precio": "-", "subtotal": "-",
-            })
-            refresh_table()
-
-        def on_remove():
-            row = table.currentRow()
-            if row < 0:
-                QMessageBox.warning(dialog, "Sin selección", "Selecciona un producto para quitar.")
-                return
-            d = detalles_info[row]
-            if d["id"] is not None:
-                changes.append(("remove", {"detalle_id": d["id"]}))
-            else:
-                changes.append(("cancel_add", {"sku": d["sku"]}))
-            detalles_info.pop(row)
-            refresh_table()
-
-        def on_qty():
-            row = table.currentRow()
-            if row < 0:
-                QMessageBox.warning(dialog, "Sin selección", "Selecciona un producto.")
-                return
-            d = detalles_info[row]
-            if d["id"] is None:
-                QMessageBox.warning(dialog, "No disponible", "Primero guarda para cambiar cantidad.")
-                return
-            from PyQt6.QtWidgets import QInputDialog
-            qty, ok = QInputDialog.getInt(dialog, "Nueva cantidad", "Cantidad:", d["cantidad"], 1, 100)
-            if not ok or qty == d["cantidad"]:
-                return
-            changes.append(("qty", {"detalle_id": d["id"], "nueva_cantidad": qty}))
-            d["cantidad"] = qty
-            refresh_table()
-
-        add_btn.clicked.connect(on_add)
-        remove_btn.clicked.connect(on_remove)
-        qty_btn.clicked.connect(on_qty)
-
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addWidget(buttons)
-
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return
-        if not changes:
-            return
-
-        errors = []
-        try:
-            with get_session() as session:
-                for change_type, data in changes:
-                    if change_type == "add":
-                        add_layaway_item(
-                            session,
-                            layaway_id=apartado_id,
-                            user_id=self.user_id,
-                            sku=data["sku"],
-                            cantidad=data["cantidad"],
-                        )
-                    elif change_type == "remove":
-                        remove_layaway_item(
-                            session,
-                            layaway_id=apartado_id,
-                            user_id=self.user_id,
-                            detalle_id=data["detalle_id"],
-                        )
-                    elif change_type == "qty":
-                        update_layaway_item_quantity(
-                            session,
-                            layaway_id=apartado_id,
-                            user_id=self.user_id,
-                            detalle_id=data["detalle_id"],
-                            nueva_cantidad=data["nueva_cantidad"],
-                        )
-                session.commit()
-        except Exception as exc:  # noqa: BLE001
-            errors.append(str(exc))
-
-        self.refresh_all()
-        self._select_layaway(apartado_id)
-        if errors:
-            QMessageBox.warning(self, "Edición parcial", "\n".join(errors))
-        else:
-            QMessageBox.information(self, "Apartado editado", "Los cambios se aplicaron correctamente.")
-
-    def _select_layaway(self, apartado_id: int) -> None:
-        self.layaway_table.blockSignals(True)
-        for row_index in range(self.layaway_table.rowCount()):
-            item = self.layaway_table.item(row_index, 0)
-            if item is not None and item.data(Qt.ItemDataRole.UserRole) == apartado_id:
-                self.layaway_table.setCurrentCell(row_index, 0)
-                self.layaway_table.selectRow(row_index)
-                break
-        self.layaway_table.blockSignals(False)
-        self._refresh_layaway_detail(apartado_id)
 
     def _refresh_selected_qr_preview(self) -> None:
         variante_id = self.inventory_variant_combo.currentData()

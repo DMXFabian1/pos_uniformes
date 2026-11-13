@@ -798,8 +798,9 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertFalse(window.tabs.isTabVisible(0))
 
     def test_las_pestanas_mudadas_al_kiosko_ya_no_se_ven(self) -> None:
-        """Caja, Presupuestos, Apartados y Catalogo se ocultaron: su trabajo
-        vive en el kiosko. Ni el dueño las ve."""
+        """Presupuestos y Catalogo se ocultaron: su trabajo vive en el kiosko.
+        Ni el dueño las ve. (Caja y Apartados ya no se ocultan: se
+        retiraron, 2026-11-12.)"""
         window = MainWindow(user_id=1)
         window.current_role = RolUsuario.ADMIN
 
