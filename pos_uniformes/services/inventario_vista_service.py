@@ -136,6 +136,16 @@ def texto_contada_corto(fila: Mapping[str, object], *, ahora: datetime) -> str:
     return f"Hace {dias} días"
 
 
+def texto_combo_con_rotulo(primera_opcion: str, actual: str, indice: int) -> str:
+    """El combo cerrado no pierde su rótulo: con «Hay: todas» como primera
+    opción y «En negativo» elegida, se lee «Hay: En negativo»."""
+    rotulo, dos_puntos, _ = primera_opcion.partition(":")
+    rotulo = rotulo.strip()
+    if indice <= 0 or not dos_puntos or not rotulo or actual.startswith(f"{rotulo}:"):
+        return actual
+    return f"{rotulo}: {actual}"
+
+
 def texto_talla_color(fila: Mapping[str, object]) -> str:
     partes = []
     talla = str(fila.get("talla") or "").strip()

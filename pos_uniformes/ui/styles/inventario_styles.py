@@ -147,12 +147,16 @@ QPushButton#invQuitar {{
 QFrame#invMasFiltrosPanel {{ background: {TARJETA}; border: 1px solid {TARJETA_BORDE}; border-radius: 14px; }}
 QComboBox#invCombo, QLineEdit#invPrecioExacto {{
     background: #faf6f0; color: {CAFE}; border: 1px solid {TARJETA_BORDE}; border-radius: 10px;
-    padding: 0 10px; min-height: 32px; font-size: 13px;
+    padding: 0 10px; min-height: 32px; max-height: 32px; font-size: 13px;
 }}
+/* La flecha del combo la pinta `inventario_combo_rotulo` (el tema la quita). */
+QComboBox#invCombo {{ padding-right: 24px; }}
+QComboBox#invCombo::drop-down {{ border: none; width: 22px; }}
 QToolButton#invFiltroMas {{
     background: #faf6f0; color: {CAFE}; border: 1px solid {TARJETA_BORDE}; border-radius: 10px;
-    padding: 0 22px 0 10px; min-height: 32px; font-size: 13px;
+    padding: 0 22px 0 10px; min-height: 32px; max-height: 32px; font-size: 13px;
 }}
+QToolButton#invFiltroMas::menu-indicator {{ subcontrol-position: right center; right: 6px; }}
 
 /* ── Tabla ── */
 QFrame#invTablaCard {{ background: {TARJETA}; border: 1px solid {TARJETA_BORDE}; border-radius: 20px; }}

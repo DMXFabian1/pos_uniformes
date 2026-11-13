@@ -70,6 +70,7 @@ from pos_uniformes.services.inventario_vista_service import (
     texto_paginacion,
     texto_talla_color,
 )
+from pos_uniformes.ui.helpers.inventario_combo_rotulo import RotuloCombos
 from pos_uniformes.ui.helpers.inventory_table_row_helper import INVENTORY_TABLE_HEADERS
 from pos_uniformes.ui.styles.inventario_styles import sombra
 
@@ -445,6 +446,7 @@ class InventarioPantalla(QObject):
         self.mas_filtros.setObjectName("invMasFiltros")
         self.mas_filtros.setCheckable(True)
         self.mas_filtros.setText("Más filtros")
+        self.rotulos = RotuloCombos(self)
         self.mas_filtros_panel = QFrame()
         self.mas_filtros_panel.setObjectName("invMasFiltrosPanel")
         self.mas_filtros_panel.setVisible(False)

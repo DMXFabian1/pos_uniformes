@@ -238,6 +238,7 @@ def _filtros(window: "MainWindow", pantalla: InventarioPantalla, layout: QVBoxLa
         window.inventory_conteo_filter_combo,
     ):
         combo.setObjectName("invCombo")
+        pantalla.rotulos.vigilar(combo)  # «Hay: En negativo» y su flecha, como la fila principal
         panel_layout.addWidget(combo)
     window.inventory_precio_text_input.setObjectName("invPrecioExacto")
     window.inventory_precio_text_input.setPlaceholderText("Precio exacto $")

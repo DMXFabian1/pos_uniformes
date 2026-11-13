@@ -19,6 +19,7 @@ from pos_uniformes.services.inventario_vista_service import (
     ordenar_por_columna,
     resumir_lote,
     siguiente_orden,
+    texto_combo_con_rotulo,
     texto_contada_corto,
     texto_paginacion,
     texto_talla_color,
@@ -100,6 +101,12 @@ class TextosTests(unittest.TestCase):
         self.assertEqual(
             texto_contada_corto({"ultimo_conteo_at": AHORA - timedelta(days=52)}, ahora=AHORA), "Hace 52 días"
         )
+
+    def test_combo_no_pierde_su_rotulo(self) -> None:
+        self.assertEqual(texto_combo_con_rotulo("Hay: todas", "En negativo", 1), "Hay: En negativo")
+        self.assertEqual(texto_combo_con_rotulo("Hay: todas", "Hay: todas", 0), "Hay: todas")
+        self.assertEqual(texto_combo_con_rotulo("Contada: todas", "Contada: ya", 2), "Contada: ya")
+        self.assertEqual(texto_combo_con_rotulo("Todas", "Activas", 1), "Activas")
 
     def test_talla_y_color(self) -> None:
         self.assertEqual(texto_talla_color({"talla": "8", "color": "Azul marino"}), "Talla 8 · Azul marino")

@@ -317,6 +317,28 @@ class InventarioTanda3PantallaTests(unittest.TestCase):
         fichas = [b.text() for b in window.inventory_active_filters_wrap.findChildren(type(window.inventory_clear_filters_button))]
         self.assertIn("Hay: Agotadas  ×", fichas)
 
+    def test_combos_de_mas_filtros_no_pierden_su_rotulo(self) -> None:
+        from pos_uniformes.ui.helpers.inventario_combo_rotulo import texto_visible
+
+        window = self._ventana()
+        self._mostrar_a_1366(window)
+        pantalla = window.inventario_pantalla
+        pantalla.mas_filtros.setChecked(True)
+        combo = window.inventory_stock_filter_combo
+        self.assertEqual(texto_visible(combo), "Hay: todas")
+        combo.setCurrentIndex(combo.findData("negative"))
+        QApplication.processEvents()
+        self.assertEqual(texto_visible(combo), "Hay: En negativo")
+        # Cabe la opción más larga ya con su rótulo, y se pinta sin errores.
+        largo = combo.fontMetrics().horizontalAdvance("Hay: Bajo el mínimo")
+        self.assertGreater(combo.width(), largo)
+        self.assertFalse(combo.grab().isNull())
+        # La ficha de abajo no repite el rótulo.
+        fichas = [b.text() for b in window.inventory_active_filters_wrap.findChildren(type(window.inventory_clear_filters_button))]
+        self.assertIn("Hay: En negativo  ×", fichas)
+        alturas = {w.height() for w in (combo, window.inventory_use_filter_combo, window.inventory_brand_filter_combo)}
+        self.assertEqual(len(alturas), 1, alturas)  # misma altura los dos tipos de control
+
     def test_segmento_por_prenda_apagado_con_su_aviso(self) -> None:
         window = self._ventana()
         por_talla, por_prenda = window.inventario_pantalla.segmento
