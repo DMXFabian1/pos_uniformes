@@ -38,6 +38,11 @@ class InventoryTableRowView:
     tooltip: str | None = None
     #: (columna, texto) que gana sobre `tooltip` en esa celda.
     cell_tooltips: tuple[tuple[int, str], ...] = ()
+    #: Si la cifra «Hay» lleva fondo de pastilla. La talla desactivada no: solo
+    #: la letra en gris, como pide la norma (el tono va en el color del texto).
+    #: Pendiente tanda 3: quitar también los demás fondos (cifra y filas en
+    #: negativo o agotadas) y dejar el tono solo en el número.
+    stock_con_fondo: bool = True
 
 
 def build_inventory_table_row_views(visible_rows: list[dict[str, object]]) -> tuple[InventoryTableRowView, ...]:
@@ -77,6 +82,7 @@ def build_inventory_table_row_view(row: dict[str, object]) -> InventoryTableRowV
         row_tone=row_tone,
         stock_tone=stock_tone,
         tooltip=None if activa else TEXTO_DESACTIVADA,
+        stock_con_fondo=activa,
         cell_tooltips=_cell_tooltips(
             (COLUMNA_DONDE, texto_donde_completo(stock_total, stock_bodega, stock_piso, conjunto=virtual)),
             (COLUMNA_PRECIO, aviso_precio(row)),

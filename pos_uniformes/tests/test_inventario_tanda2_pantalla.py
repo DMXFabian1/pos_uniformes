@@ -118,6 +118,11 @@ class InventarioTanda2PantallaTests(unittest.TestCase):
         celda = window.inventory_table.item(0, 1)
         self.assertIn("Desactivada", celda.toolTip())
         self.assertEqual(celda.foreground().color().name(), "#7a6d60")
+        # La cifra «Hay» va en gris pero sin pastilla de fondo propia: solo el tinte de la fila.
+        hay = window.inventory_table.item(0, self._encabezados(window).index("Hay"))
+        self.assertEqual(hay.foreground().color().name(), "#6e675f")
+        self.assertNotEqual(hay.background().color().name(), "#ece8e1")
+        self.assertEqual(hay.background().color().name(), celda.background().color().name())
 
     # ── «Dónde» junta Piso y Almacén ────────────────────────────────────
 

@@ -34,6 +34,7 @@ class InventoryTableRowHelperTests(unittest.TestCase):
         self.assertEqual(view.row_tone, "muted")
         self.assertEqual(view.stock_tone, "muted")
         self.assertIn("Desactivada", view.tooltip)
+        self.assertFalse(view.stock_con_fondo)
         self.assertFalse(hasattr(view, "qr_tone"))
 
     def test_sin_columnas_apartado_ni_estado(self) -> None:

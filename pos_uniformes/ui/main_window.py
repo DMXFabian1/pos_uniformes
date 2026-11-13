@@ -1014,7 +1014,7 @@ class MultiSelectPickerButton(QPushButton):
         self.selectionChanged.emit()
 
 
-def _set_table_badge_style(item: QTableWidgetItem, tone: str) -> None:
+def _set_table_badge_style(item: QTableWidgetItem, tone: str, *, con_fondo: bool = True) -> None:
     palette = {
         "positive": ("#e5f2eb", "#245241"),
         "warning": ("#fbf0cf", "#8a5a00"),
@@ -1023,7 +1023,8 @@ def _set_table_badge_style(item: QTableWidgetItem, tone: str) -> None:
         "muted": ("#ece8e1", "#6e675f"),
     }
     background, foreground = palette.get(tone, palette["muted"])
-    item.setBackground(QColor(background))
+    if con_fondo:
+        item.setBackground(QColor(background))
     item.setForeground(QColor(foreground))
     item.setTextAlignment(int(Qt.AlignmentFlag.AlignCenter))
 
@@ -7879,7 +7880,7 @@ class MainWindow(QMainWindow):
             self.inventory_table.item(row_index, 0).setData(Qt.ItemDataRole.UserRole, row_view.variant_id)
             stock_item = self.inventory_table.item(row_index, INVENTORY_COLUMNA_STOCK)
             if stock_item is not None:
-                _set_table_badge_style(stock_item, row_view.stock_tone)
+                _set_table_badge_style(stock_item, row_view.stock_tone, con_fondo=row_view.stock_con_fondo)
 
     def _schedule_inventory_filter_refresh(self) -> None:
         self.inventory_filter_debounce_timer.start()
