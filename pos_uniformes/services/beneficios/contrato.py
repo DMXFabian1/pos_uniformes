@@ -76,6 +76,9 @@ class LineaEntrada:
     promo_3pz: bool = False
     nombre: str = ""
     talla: str = ""
+    # La playera a $100 de la promo 3pz (Daniel, 2026-11-13: «Solo la
+    # playera»): no genera Monedero. El pants base (también promo_3pz) sí.
+    playera_3pz: bool = False
 
 
 @dataclass(frozen=True)

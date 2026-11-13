@@ -82,6 +82,10 @@ def linea_desde_item(item: Mapping) -> LineaEntrada:
         if precio > 0:
             rebaja = Rebaja(tipo=tipo, precio=precio)
     sku = str(item.get("sku") or "").strip() or None
+    from pos_uniformes.services.sports_uniform_pricing_service import es_playera_promo_3pz
+
+    # 2026-11-13 («Solo la playera»): la playera a $100 no genera Monedero.
+    playera = es_playera_promo_3pz(item)
     return LineaEntrada(
         linea_uid=str(item[LLAVE_UID]),
         sku=sku,
@@ -89,9 +93,10 @@ def linea_desde_item(item: Mapping) -> LineaEntrada:
         precio_lista=precio_lista,
         categoria=str(item.get("categoria") or ""),
         rebaja=rebaja,
-        promo_3pz=es_promo_3pz(item),
+        promo_3pz=es_promo_3pz(item) or playera,
         nombre=str(item.get("nombre") or ""),
         talla=str(item.get("talla") or ""),
+        playera_3pz=playera,
     )
 
 

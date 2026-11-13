@@ -153,7 +153,8 @@ class KioskoTests(_Qt):
         self.assertEqual(w._btn_descuento_programa.text(), "🏷 Descuento 15 %")
         self.assertFalse(w._btn_descuento_programa.isChecked())
         self.assertEqual(w._compute_totals()[2], D("500"))
-        self.assertEqual(w._cashback_estimado(D("500"), D("0")), D("75.00"))
+        # 2026-11-13 («Solo la playera»): la playera a $100 del 3pz no suma Monedero.
+        self.assertEqual(w._cashback_estimado(D("500"), D("0")), D("60.00"))
 
     def test_al_elegir_descuento_baja_el_precio_y_no_suma_monedero(self) -> None:
         w = self._kiosko()

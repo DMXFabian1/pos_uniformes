@@ -82,6 +82,8 @@ def entrada_desde_plano(d: dict) -> EntradaVenta:
             promo_3pz=bool(l.get("promo_3pz")),
             nombre=str(l.get("nombre") or ""),
             talla=str(l.get("talla") or ""),
+            # 2026-11-13: fotografías de antes no lo traen (la playera ganaba).
+            playera_3pz=bool(l.get("playera_3pz")),
         )
         for l in d["lineas"]
     )

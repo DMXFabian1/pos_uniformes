@@ -262,10 +262,12 @@ class KioskoMayoristaTests(_Kiosko):
         self.assertEqual(w._cashback_estimado(D("360"), D("0")), D("54.00"))
 
     def test_e06_mayorista_monedero_acumula_sobre_la_3pz(self) -> None:
-        """Decisión aprobada (2026-11-11): con Monedero la 3pz SÍ acumula 15 %."""
+        """Decisión aprobada (2026-11-11): con Monedero la 3pz SÍ acumula 15 %.
+        CAMBIADA el 2026-11-13 (Daniel: «Solo la playera»): el pants base sí
+        acumula; la playera de la promo no. Base 180 + 300 = 480."""
         w = self._kiosko([playera(), promo_base(), promo_playera()], tasa="15", descuento="15")
         self.assertEqual(w._compute_totals()[2], D("630"))
-        self.assertEqual(w._cashback_estimado(D("630"), D("0")), D("94.50"))
+        self.assertEqual(w._cashback_estimado(D("630"), D("0")), D("72.00"))
 
     def test_e07_mayorista_descuento_con_3pz(self) -> None:
         w = self._con_mayoreo(self._kiosko([playera(), promo_base(), promo_playera()], tasa="15", descuento="15"))

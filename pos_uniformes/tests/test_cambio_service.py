@@ -310,6 +310,13 @@ class Promo3pzTests(_Base):
         self.assertEqual([r.rol_3pz for r in renglones], ["", "playera"])
         self.assertEqual(cs.cargo_promo_3pz(renglones, {0: 1}, [self._pants()]), D("0.00"))
 
+    def test_la_playera_3pz_no_genero_monedero(self):
+        """2026-11-13 («Solo la playera»): al regresarla no se le quita Monedero."""
+        renglones = cs.renglones_vendidos(self.s, self._venta_3pz())
+        self.assertEqual([r.sin_monedero for r in renglones], [False, True])
+        self.assertEqual(cs.cashback_proporcional(D("12.50"), D("0"), renglones, {1: 1}), D("0.00"))
+        self.assertEqual(cs.cashback_proporcional(D("12.50"), D("0"), renglones, {0: 1}), D("12.50"))
+
     def test_la_cuenta_suma_el_cargo(self):
         c = cs.cuenta(D("250"), D("0"), D("175"), D("80"))
         self.assertEqual((c.a_pagar, c.a_favor, c.cargo_promo_3pz), (D("5.00"), D("0.00"), D("80.00")))

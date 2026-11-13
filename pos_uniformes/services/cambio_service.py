@@ -96,10 +96,16 @@ class RenglonVendido:
     liquidacion: bool = False   # vendida en Liquidación: sin cambio (salvo el dueño)
     rol_3pz: str = ""           # "base" | "playera" de la promo 3pz, o vacío
     precio_normal: Decimal | None = None   # de la playera en promo: su precio de hoy
+    playera_sin_monedero: bool = False     # playera 3pz que no generó Monedero (2026-11-13)
 
     @property
     def disponibles(self) -> int:
         return max(self.vendidas - self.ya_cambiadas, 0)
+
+    @property
+    def sin_monedero(self) -> bool:
+        """No generó Monedero en esa venta: rebajada o la playera a $100 del 3pz."""
+        return self.rebajada or self.playera_sin_monedero
 
 
 def vendida_en_liquidacion(linea: dict) -> bool:
@@ -180,6 +186,49 @@ def roles_promo_3pz(detalle: list[dict], calculo: dict | None) -> list[str]:
     return roles
 
 
+def playeras_sin_monedero(detalle: list[dict], calculo: dict | None, roles: list[str],
+                          vendida_en: datetime | None = None) -> list[bool]:
+    """Qué playeras de la promo 3pz NO generaron Monedero en esa venta (pura).
+
+    Daniel (2026-11-13): «Solo la playera». Para no quitarle de más ni de
+    menos al regresar algo, se sigue lo que de verdad pasó en la venta:
+    - Con fotografía del motor, lo dice el motivo `3PZ_PLAYERA_SIN_MONEDERO`
+      de su línea (las fotografías de antes no lo traen: esa playera ganó).
+    - Sin fotografía, la cuenta de antes (`base_cashback_legada`): desde el
+      13/11/2026 la playera no gana; una venta de antes sí ganó."""
+    from pos_uniformes.services.beneficios.motivos import TRES_PZ_PLAYERA_SIN_MONEDERO
+    from pos_uniformes.services.sports_uniform_pricing_service import playera_3pz_sin_monedero_en
+
+    motivos_por_uid: dict[str, set] = {}
+    hay_foto = False
+    calculo = calculo if isinstance(calculo, dict) else {}
+    servidor = calculo.get("servidor")
+    for calc in (servidor.get("calculo") if isinstance(servidor, dict) else None, calculo.get("calculo")):
+        lineas = calc.get("lineas") if isinstance(calc, dict) else None
+        if not isinstance(lineas, list) or not lineas:
+            continue
+        hay_foto = True
+        for linea in lineas:
+            if not isinstance(linea, dict):
+                continue
+            for origen in linea.get("lineas_origen") or ():
+                if isinstance(origen, (list, tuple)) and origen:
+                    motivos_por_uid.setdefault(str(origen[0]), set(linea.get("motivos") or ()))
+        break
+    regla_nueva = playera_3pz_sin_monedero_en(vendida_en)
+    salida = []
+    for l, rol in zip(detalle, roles):
+        if rol != PLAYERA_3PZ or l.get("rebaja"):
+            salida.append(False)
+            continue
+        uid = str(l.get("linea_uid") or "")
+        if hay_foto and uid in motivos_por_uid:
+            salida.append(TRES_PZ_PLAYERA_SIN_MONEDERO in motivos_por_uid[uid])
+        else:
+            salida.append(regla_nueva)
+    return salida
+
+
 def _pants_rebajados_que_lleva(lleva: list[dict]) -> int:
     from pos_uniformes.services.rebaja_service import es_rebajado
 
@@ -236,7 +285,9 @@ def renglones_vendidos(session, venta) -> list[RenglonVendido]:
                 ya[r] = ya.get(r, 0) + int(l.get("cantidad", 0) or 0)
     valores = valores_por_pieza(venta)
     detalle = list(venta.detalle or [])
-    roles = roles_promo_3pz(detalle, venta.calculo if isinstance(venta.calculo, dict) else None)
+    calculo = venta.calculo if isinstance(venta.calculo, dict) else None
+    roles = roles_promo_3pz(detalle, calculo)
+    sin_monedero = playeras_sin_monedero(detalle, calculo, roles, getattr(venta, "created_at", None))
     normales = _precios_normales(
         session, {str(l.get("sku", "")) for l, rol in zip(detalle, roles) if rol == PLAYERA_3PZ}
     )
@@ -246,6 +297,7 @@ def renglones_vendidos(session, venta) -> list[RenglonVendido]:
             vendidas=int(l.get("cantidad", 0) or 0), ya_cambiadas=ya.get(i, 0), valor_pieza=valores[i],
             rebajada=bool(l.get("rebaja")), liquidacion=vendida_en_liquidacion(l),
             rol_3pz=roles[i], precio_normal=normales.get(str(l.get("sku", ""))) if roles[i] == PLAYERA_3PZ else None,
+            playera_sin_monedero=sin_monedero[i],
         )
         for i, l in enumerate(detalle)
     ]
@@ -284,14 +336,16 @@ def cuenta(valor_regresa: Decimal, cashback_quitado: Decimal, valor_lleva: Decim
 def cashback_proporcional(abono: Decimal, ya_quitado: Decimal, renglones: list[RenglonVendido],
                           regresa: dict[int, int]) -> Decimal:
     """La parte del Monedero que ganó la venta por lo que regresa: el abono
-    repartido entre lo que sí lo generó (sin Oferta/Liquidación), truncado
-    al centavo. Nunca más de lo que queda sin quitar en cambios anteriores."""
+    repartido entre lo que sí lo generó (sin Oferta/Liquidación ni la playera
+    a $100 del 3pz que no ganó, 2026-11-13), truncado al centavo. Nunca más
+    de lo que queda sin quitar en cambios anteriores."""
     if abono <= 0:
         return _CERO
-    elegible_total = sum((r.valor_pieza * r.vendidas for r in renglones if not r.rebajada), Decimal(0))
+    elegible_total = sum((r.valor_pieza * r.vendidas for r in renglones if not r.sin_monedero), Decimal(0))
     if elegible_total <= 0:
         return _CERO
-    elegible = sum((renglones[i].valor_pieza * q for i, q in regresa.items() if not renglones[i].rebajada), Decimal(0))
+    elegible = sum((renglones[i].valor_pieza * q for i, q in regresa.items() if not renglones[i].sin_monedero),
+                   Decimal(0))
     quitar = (abono * elegible / elegible_total).quantize(_CENT, rounding=ROUND_DOWN)
     return max(min(quitar, abono - ya_quitado), _CERO)
 

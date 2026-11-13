@@ -18,7 +18,7 @@ Orden de las reglas (§2.4 del diseño):
 4. Gana el mayor; un descuento de $0 respeta la modalidad (C4).
 5. Redondeo R1 del ticket, repartido entre las líneas (I8, D2).
 6. Saldo (C2), repartido en proporción (Q2).
-7. Base y abono de Monedero (C2, C4, T9, D1 del código).
+7. Base y abono de Monedero (C2, C4, T9, D1 del código; la playera 3pz no gana).
 8. Base de Leal (C1, C2).
 9. Comisión de tarjeta, una sola vez (T4).
 
@@ -59,7 +59,7 @@ from pos_uniformes.services.beneficios.reparto import (
     repartir_redondeo,
 )
 
-VERSION_MOTOR = "M1a-2026-11-11"
+VERSION_MOTOR = "M1a-2026-11-13"  # 2026-11-13: la playera 3pz no genera Monedero
 
 FUENTE_MAYOREO = "mayoreo"
 FUENTE_EMPLEADA = "empleada"
@@ -95,6 +95,11 @@ class _Grupo:
         return bool(self.base.promo_3pz)
 
     @property
+    def es_playera_3pz(self) -> bool:
+        """La playera a $100 de la promo (no el pants base): sin Monedero."""
+        return bool(self.base.promo_3pz and self.base.playera_3pz)
+
+    @property
     def precio_unitario(self) -> Decimal:
         return self.base.rebaja.precio if self.base.rebaja is not None else self.base.precio_lista
 
@@ -110,7 +115,7 @@ class _Grupo:
 def _llave_q6(linea: LineaEntrada):
     """Condiciones económicas y de beneficios que deben ser idénticas para agrupar."""
     rebaja = None if linea.rebaja is None else (linea.rebaja.tipo, linea.rebaja.precio)
-    return (linea.sku, linea.precio_lista, rebaja, bool(linea.promo_3pz), linea.categoria)
+    return (linea.sku, linea.precio_lista, rebaja, bool(linea.promo_3pz), bool(linea.playera_3pz), linea.categoria)
 
 
 def _agrupar(lineas: tuple[LineaEntrada, ...]) -> list[_Grupo]:
@@ -480,7 +485,14 @@ def calcular(entrada: EntradaVenta) -> Calculo:
         motivos_ticket.append(bloqueo)
     bases_mon = []
     for g, cobrado, parte in zip(grupos, cobrados, partes_saldo):
-        bases_mon.append(CERO if (bloqueo or g.rebajada) else (cobrado - parte).quantize(CENT))
+        # Daniel (2026-11-13): «Solo la playera». La playera a $100 de la
+        # promo 3pz es la parte con descuento (como una Oferta): no genera
+        # Monedero. El pants base sí, a su precio.
+        playera_sin_monedero = g.es_playera_3pz and not g.rebajada
+        if playera_sin_monedero and not bloqueo:
+            g.motivos.append(M.TRES_PZ_PLAYERA_SIN_MONEDERO)
+        sin_monedero = bloqueo or g.rebajada or playera_sin_monedero
+        bases_mon.append(CERO if sin_monedero else (cobrado - parte).quantize(CENT))
     monedero = None
     abonos = [CERO] * len(grupos)
     if not bloqueo:

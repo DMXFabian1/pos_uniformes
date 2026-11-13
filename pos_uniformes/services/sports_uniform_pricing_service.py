@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import date, datetime
 from decimal import Decimal
 from typing import Mapping
 
@@ -103,3 +104,50 @@ def quitar_promo_3pz_de_pants_rebajados(items: list[dict]) -> tuple[list[str], l
         if suyas and aviso not in avisos:
             avisos.append(aviso)
     return avisos, regresadas
+
+
+# ─── La playera de la promo no genera Monedero (2026-11-13) ─────────────
+#
+# Daniel (2026-11-13): «Solo la playera». La playera a $100 del conjunto 3pz
+# es la parte con descuento (como una Oferta): no genera Monedero. El pants
+# base sí, a su precio. Club/Leal no cambia. Una playera suelta (sin promo)
+# o la que regresó a su precio normal porque el pants está rebajado
+# (`regresar_playera_a_precio_normal` le quita el rol y el sufijo) sí da
+# Monedero como cualquier prenda.
+
+
+#: Desde cuándo rige. Las ventas de antes (sin fotografía del motor) se
+#: quedan con la cuenta con la que ganaron: no se recalculan.
+DESDE_PLAYERA_3PZ_SIN_MONEDERO = date(2026, 11, 13)
+
+
+def playera_3pz_sin_monedero_en(momento: datetime | None) -> bool:
+    """¿La regla aplica a una venta hecha en `momento`? Sin fecha, sí."""
+    if not isinstance(momento, datetime):
+        return True
+    dia = (momento.astimezone() if momento.tzinfo else momento).date()
+    return dia >= DESDE_PLAYERA_3PZ_SIN_MONEDERO
+
+
+def es_playera_promo_3pz(item: Mapping) -> bool:
+    """¿Este renglón es la playera a $100 de la promo 3pz?
+
+    En el carrito del kiosko lleva `sports_uniform_role="playera"`; en el
+    detalle de la Libreta solo queda su nombre («… (promo 3pz)»)."""
+    if str(item.get("sports_uniform_role") or "") == "playera":
+        return True
+    return str(item.get("nombre") or "").endswith(PROMO_NAME_SUFFIX)
+
+
+def importe_playeras_promo_3pz(lineas) -> Decimal:
+    """Lo cobrado en playeras de la promo 3pz (no genera Monedero).
+
+    Una playera que además viniera rebajada ya la cuenta `importe_rebajado`:
+    aquí no se cuenta dos veces."""
+    from pos_uniformes.services.rebaja_service import es_rebajado
+
+    total = Decimal("0")
+    for line in lineas:
+        if es_playera_promo_3pz(line) and not es_rebajado(line):
+            total += Decimal(str(line.get("precio", 0) or 0)) * int(line.get("cantidad", 0) or 0)
+    return total.quantize(Decimal("0.01"))

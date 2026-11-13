@@ -334,14 +334,17 @@ class MonederoVentaMixin:
         return self._base_cashback_legada(total, canje, tarjeta)
 
     def _base_cashback_legada(self, total: Decimal, canje: Decimal, tarjeta: bool = False) -> Decimal:
-        """La cuenta de antes del motor (cobrado − saldo − rebajado)."""
+        """La cuenta de antes del motor (cobrado − saldo − rebajado − playeras 3pz)."""
         from pos_uniformes.services.beneficios.motor import base_monedero_con_comision, neto_con_comision
         from pos_uniformes.services.libreta_service import TERMINAL_COMMISSION_PERCENT
         from pos_uniformes.services.monedero_service import importe_elegible
+        from pos_uniformes.services.sports_uniform_pricing_service import importe_playeras_promo_3pz
 
         pagado = importe_elegible(total, canje)
-        # E7: lo que va en Oferta o Liquidación no suma Monedero.
-        base = max(pagado - self._importe_rebajado_carrito(), _CERO)
+        # E7: lo que va en Oferta o Liquidación no suma Monedero; la playera
+        # a $100 del 3pz tampoco (2026-11-13, «Solo la playera»).
+        sin_monedero = self._importe_rebajado_carrito() + importe_playeras_promo_3pz(getattr(self, "_items", []) or [])
+        base = max(pagado - sin_monedero, _CERO)
         if tarjeta and pagado > 0:
             # Regla B (Daniel, 2026-11-12): con tarjeta, sobre lo que deja la terminal.
             comision = max(pagado - neto_con_comision(pagado, TERMINAL_COMMISSION_PERCENT), _CERO)

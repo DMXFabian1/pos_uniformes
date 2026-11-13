@@ -43,6 +43,9 @@ SALDO_REPARTIDO = "SALDO_REPARTIDO"
 SIN_PROGRAMA = "SIN_PROGRAMA"
 CLIENTE_INACTIVO = "CLIENTE_INACTIVO"
 REBAJA_SIN_LEAL = "REBAJA_SIN_LEAL"
+# La playera a $100 de la promo 3pz no genera Monedero (Daniel, 2026-11-13:
+# «Solo la playera»). El pants base sí; Club/Leal no cambia.
+TRES_PZ_PLAYERA_SIN_MONEDERO = "3PZ_PLAYERA_SIN_MONEDERO"
 
 # ─── Tarjeta (T4) ───
 COMISION_UNICA = "T4_COMISION_UNICA"

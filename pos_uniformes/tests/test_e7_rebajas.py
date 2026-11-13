@@ -747,7 +747,9 @@ class Promo3pzMotorTests(unittest.TestCase):
         self.assertIn(motivo, c.motivos_ticket)
         self.assertTrue(all(motivo in l.motivos for l in c.lineas))
         # Los importes, como antes: el kiosko es quien regresa la playera.
-        self.assertEqual((c.total, c.monedero.base, c.monedero.abono), (D("275.00"), D("100.00"), D("5.00")))
+        # 2026-11-13 («Solo la playera»): si aun así llega a $100 con la
+        # promo, no suma Monedero (y el pants en Oferta tampoco).
+        self.assertEqual((c.total, c.monedero.base, c.monedero.abono), (D("275.00"), D("0.00"), D("0.00")))
 
     def test_sin_rebaja_no_hay_motivo(self) -> None:
         c, motivo = self._calculo(_pants_3pz(sports_uniform_role="base"))

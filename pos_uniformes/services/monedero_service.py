@@ -185,14 +185,22 @@ def base_sin_comision_tarjeta(libreta_venta, base) -> tuple[Decimal, bool]:
 
 
 def base_cashback_legada(libreta_venta) -> tuple[Decimal, bool]:
-    """La cuenta de antes del motor: (lo cobrado − el saldo − lo rebajado),
-    luego sin la comisión de la terminal. Solo para ventas SIN fotografía
-    (ventas viejas o cobradas con el cálculo de respaldo)."""
+    """La cuenta de antes del motor: (lo cobrado − el saldo − lo rebajado −
+    las playeras de la promo 3pz), luego sin la comisión de la terminal. Solo
+    para ventas SIN fotografía (ventas viejas o cobradas con el cálculo de
+    respaldo)."""
     base = importe_elegible(libreta_venta.monto_total, getattr(libreta_venta, "monto_monedero", None))
     # E7: lo cobrado en Oferta o Liquidación no genera Monedero.
     from pos_uniformes.services.rebaja_service import importe_rebajado
+    from pos_uniformes.services import sports_uniform_pricing_service as spp
 
-    base = max(base - importe_rebajado(getattr(libreta_venta, "detalle", None) or []), _CERO)
+    detalle = getattr(libreta_venta, "detalle", None) or []
+    sin_monedero = importe_rebajado(detalle)
+    if spp.playera_3pz_sin_monedero_en(getattr(libreta_venta, "created_at", None)):
+        # 2026-11-13 (Daniel: «Solo la playera»): la playera a $100 del 3pz
+        # tampoco. Una venta de antes se queda con la cuenta de entonces.
+        sin_monedero += spp.importe_playeras_promo_3pz(detalle)
+    base = max(base - sin_monedero, _CERO)
     return base_sin_comision_tarjeta(libreta_venta, base)
 
 
