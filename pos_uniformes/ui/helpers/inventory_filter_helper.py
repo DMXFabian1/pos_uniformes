@@ -9,8 +9,6 @@ from pos_uniformes.services.inventario_existencia_service import coincide_filtro
 from pos_uniformes.ui.helpers.catalog_product_form_mode_helper import UNIFORM_CATEGORIES
 from pos_uniformes.ui.helpers.listing_visibility_helper import (
     matches_active_state,
-    matches_fallback_duplicate,
-    matches_origin_legacy,
     matches_selected_values,
 )
 from pos_uniformes.utils.text_normalization import normalize_text as _normalize_text
@@ -29,8 +27,6 @@ class InventoryVisibleFilterState:
     color_filters: tuple[str, ...]
     status_filter: str
     stock_filter: str
-    origin_filter: str
-    duplicate_filter: str
     conteo_filter: str
     precio_filter: str
     precio_text_filter: str
@@ -75,8 +71,6 @@ def inventory_row_matches_visible_filters(
             stock_minimo=row.get("stock_minimo"),
             virtual=es_fila_virtual(row),
         )
-        and matches_origin_legacy(bool(row["origen_legacy"]), filters.origin_filter)
-        and matches_fallback_duplicate(bool(row["fallback_importacion"]), filters.duplicate_filter)
         and _matches_inventory_conteo_filter(row.get("ultimo_conteo_at"), filters.conteo_filter)
         and _matches_inventory_precio_filter(row.get("precio_venta"), filters.precio_filter)
         and _matches_inventory_precio_text_filter(row.get("precio_venta"), filters.precio_text_filter)

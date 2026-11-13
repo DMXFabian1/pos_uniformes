@@ -18,7 +18,7 @@ class InventorySummaryHelperTests(unittest.TestCase):
 
         self.assertEqual(
             view.results_summary,
-            "0/0 resultados | stock 0 | ap. 0 | fallbacks 0",
+            "0 tallas · 0 piezas",
         )
         self.assertEqual(view.negative_counter.text, "En negativo: 0")
         self.assertEqual(view.negative_counter.tone, "positive")
@@ -57,7 +57,7 @@ class InventorySummaryHelperTests(unittest.TestCase):
 
         self.assertEqual(
             view.results_summary,
-            "3/5 resultados | stock 10 | ap. 1 | fallbacks 1",
+            "3 de 5 tallas · 10 piezas",
         )
         self.assertEqual(view.out_counter.text, "Agotados: 1")
         self.assertEqual(view.out_counter.tone, "danger")
@@ -83,7 +83,7 @@ class InventorySummaryHelperTests(unittest.TestCase):
             total_rows=500, visible_rows=[], active_filter_labels=[], search_hits_count=500
         )
         self.assertTrue(
-            view.results_summary.endswith("| ⚠ Mostrando los primeros 500; afina la búsqueda")
+            view.results_summary.endswith(" · ⚠ Mostrando los primeros 500; afina la búsqueda")
         )
 
     def test_no_avisa_debajo_del_tope_ni_sin_busqueda(self) -> None:
@@ -94,6 +94,22 @@ class InventorySummaryHelperTests(unittest.TestCase):
             total_rows=10, visible_rows=[], active_filter_labels=[], search_hits_count=12
         )
         self.assertNotIn("⚠", view.results_summary)
+
+
+class PieEnPalabrasDeLaTiendaTests(unittest.TestCase):
+    def test_sin_jerga(self) -> None:
+        from pos_uniformes.ui.helpers.inventory_summary_helper import build_results_summary
+
+        texto = build_results_summary(214, 5153, 18420)
+        self.assertEqual(texto, "214 de 5,153 tallas · 18,420 piezas")
+        for jerga in ("resultados", "stock", "ap.", "fallbacks", "|"):
+            self.assertNotIn(jerga, texto)
+
+    def test_todo_visible_y_singular(self) -> None:
+        from pos_uniformes.ui.helpers.inventory_summary_helper import build_results_summary
+
+        self.assertEqual(build_results_summary(5153, 5153, 1), "5,153 tallas · 1 pieza")
+        self.assertEqual(build_results_summary(1, 1, 0), "1 talla · 0 piezas")
 
 
 if __name__ == "__main__":

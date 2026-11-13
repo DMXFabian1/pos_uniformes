@@ -41,8 +41,6 @@ def build_inventory_summary_view(
     active_filter_labels: list[str],
     search_hits_count: int | None = None,
 ) -> InventorySummaryView:
-    reserved_count = sum(1 for row in visible_rows if int(row["apartado_cantidad"]) > 0)
-    fallback_count = sum(1 for row in visible_rows if bool(row.get("fallback_importacion")))
     conteo = contar_existencias(visible_rows)
     total_stock = conteo.piezas  # sin conjuntos: ya están contados en sus piezas
     count_negative = conteo.negativos
@@ -51,8 +49,7 @@ def build_inventory_summary_view(
     count_inactive = sum(1 for row in visible_rows if not bool(row.get("variante_activa")))
     return InventorySummaryView(
         results_summary=_with_notice(
-            f"{len(visible_rows)}/{total_rows} resultados | stock {total_stock} | "
-            f"ap. {reserved_count} | fallbacks {fallback_count}",
+            build_results_summary(len(visible_rows), total_rows, total_stock),
             build_search_cut_notice(search_hits_count),
         ),
         negative_counter=InventoryCounterState(
@@ -74,5 +71,17 @@ def build_inventory_summary_view(
     )
 
 
+def build_results_summary(visibles: int, total: int, piezas: int) -> str:
+    """El pie en palabras de la tienda: «214 de 5,153 tallas · 18,420 piezas».
+
+    Las piezas no cuentan los conjuntos (ya están contados en sus piezas)."""
+    tallas = f"{visibles:,} de {total:,} tallas" if visibles != total else f"{total:,} {_plural(total, 'talla', 'tallas')}"
+    return f"{tallas} · {piezas:,} {_plural(piezas, 'pieza', 'piezas')}"
+
+
+def _plural(n: int, uno: str, varios: str) -> str:
+    return uno if n == 1 else varios
+
+
 def _with_notice(summary: str, notice: str) -> str:
-    return f"{summary} | ⚠ {notice}" if notice else summary
+    return f"{summary} · ⚠ {notice}" if notice else summary

@@ -12,7 +12,6 @@ from PyQt6.QtWidgets import (
     QGroupBox,
     QHeaderView,
     QHBoxLayout,
-    QLabel,
     QMenu,
     QScrollArea,
     QStyle,
@@ -295,8 +294,6 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_status_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_stock_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_conteo_filter_combo.setObjectName("inventoryFilterCombo")
-    window.inventory_origin_filter_combo.setObjectName("inventoryFilterCombo")
-    window.inventory_duplicate_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_precio_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_precio_text_input.setObjectName("inventoryFilterCombo")
     window.inventory_precio_text_input.setPlaceholderText("$ exacto")
@@ -321,14 +318,6 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_conteo_filter_combo.addItem("Sin conteo", "never")
     window.inventory_conteo_filter_combo.addItem("Reciente (0-3d)", "recent")
     window.inventory_conteo_filter_combo.addItem("Vencido (8+d)", "stale")
-    window.inventory_origin_filter_combo.clear()
-    window.inventory_origin_filter_combo.addItem("Origen: todos", "")
-    window.inventory_origin_filter_combo.addItem("Importados", "legacy")
-    window.inventory_origin_filter_combo.addItem("Nuevos", "native")
-    window.inventory_duplicate_filter_combo.clear()
-    window.inventory_duplicate_filter_combo.addItem("Incidencias: todas", "")
-    window.inventory_duplicate_filter_combo.addItem("Solo fallbacks importados", "fallback_only")
-    window.inventory_duplicate_filter_combo.addItem("Ocultar fallbacks", "fallback_exclude")
     window.inventory_precio_filter_combo.clear()
     window.inventory_precio_filter_combo.addItem("Precio: todos", "")
     window.inventory_precio_filter_combo.addItem("Hasta $99", "under_100")
@@ -350,10 +339,8 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     filters_row.addWidget(window.inventory_color_filter_combo, 1, 6)
     filters_row.addWidget(window.inventory_status_filter_combo, 2, 0)
     filters_row.addWidget(window.inventory_stock_filter_combo, 2, 1)
-    filters_row.addWidget(window.inventory_origin_filter_combo, 2, 2)
-    filters_row.addWidget(window.inventory_duplicate_filter_combo, 2, 3, 1, 2)
-    filters_row.addWidget(window.inventory_precio_filter_combo, 2, 5)
-    filters_row.addWidget(window.inventory_conteo_filter_combo, 2, 6)
+    filters_row.addWidget(window.inventory_precio_filter_combo, 2, 2)
+    filters_row.addWidget(window.inventory_conteo_filter_combo, 2, 3)
     filters_row.setColumnStretch(0, 1)
     filters_row.setColumnStretch(1, 1)
     filters_row.setColumnStretch(2, 1)
@@ -390,11 +377,6 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     table_layout.addWidget(window.inventory_active_filters_wrap)
     table_layout.addLayout(summary_row)
     table_layout.addLayout(counters_row)
-    inventory_hint_label = QLabel(
-        "Ctrl/Cmd + clic para seleccion salteada, Shift para rango, Esc para limpiar y doble clic para editar."
-    )
-    inventory_hint_label.setObjectName("subtleLine")
-    table_layout.addWidget(inventory_hint_label)
     table_layout.addWidget(window.inventory_table)
     table_layout.addWidget(window.inventory_results_label)
     table_box.setLayout(table_layout)
@@ -414,12 +396,6 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
         lambda _: window._handle_inventory_filters_changed_reset_page()
     )
     window.inventory_stock_filter_combo.currentIndexChanged.connect(
-        lambda _: window._handle_inventory_filters_changed_reset_page()
-    )
-    window.inventory_origin_filter_combo.currentIndexChanged.connect(
-        lambda _: window._handle_inventory_filters_changed_reset_page()
-    )
-    window.inventory_duplicate_filter_combo.currentIndexChanged.connect(
         lambda _: window._handle_inventory_filters_changed_reset_page()
     )
     window.inventory_conteo_filter_combo.currentIndexChanged.connect(

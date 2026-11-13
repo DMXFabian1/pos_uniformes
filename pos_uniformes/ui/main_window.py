@@ -1399,8 +1399,6 @@ class MainWindow(QMainWindow):
         self.inventory_status_filter_combo = QComboBox()
         self.inventory_stock_filter_combo = QComboBox()
         self.inventory_conteo_filter_combo = QComboBox()
-        self.inventory_origin_filter_combo = QComboBox()
-        self.inventory_duplicate_filter_combo = QComboBox()
         self.inventory_precio_filter_combo = QComboBox()
         self.inventory_precio_text_input = QLineEdit()
         self.inventory_clear_filters_button = QPushButton("Limpiar filtros")
@@ -1839,7 +1837,10 @@ class MainWindow(QMainWindow):
             "Busca por producto, color, talla, marca, escuela o SKU. Si quieres mas precision, tambien acepta prefijos como sku:, producto: o color:."
         )
         self.inventory_clear_filters_button.setToolTip("Limpia todos los filtros del inventario y muestra nuevamente todas las presentaciones.")
-        self.inventory_table.setToolTip("Selecciona una presentacion para gestionar inventario, precio, QR o estado.")
+        self.inventory_table.setToolTip(
+            "Elige una talla para ver su ficha. Ctrl/Cmd + clic elige varias, Shift un rango, "
+            "Esc limpia y doble clic edita."
+        )
         self.movements_table.setToolTip("Historial de movimientos de inventario con filtros por fecha, SKU y tipo.")
 
     def _create_page_help_button(self, page_key: str) -> QPushButton:
@@ -7427,8 +7428,6 @@ class MainWindow(QMainWindow):
                 ("uso", self.inventory_use_filter_combo.currentData(), self.inventory_use_filter_combo.currentText()),
                 ("estado", self.inventory_status_filter_combo.currentData(), self.inventory_status_filter_combo.currentText()),
                 ("stock", self.inventory_stock_filter_combo.currentData(), self.inventory_stock_filter_combo.currentText()),
-                ("origen", self.inventory_origin_filter_combo.currentData(), self.inventory_origin_filter_combo.currentText()),
-                ("incidencias", self.inventory_duplicate_filter_combo.currentData(), self.inventory_duplicate_filter_combo.currentText()),
                 ("conteo", self.inventory_conteo_filter_combo.currentData(), self.inventory_conteo_filter_combo.currentText()),
                 ("precio", self.inventory_precio_filter_combo.currentData(), self.inventory_precio_filter_combo.currentText()),
                 ("precio_exacto", self.inventory_precio_text_input.text().strip() or None, f"${self.inventory_precio_text_input.text().strip()}" if self.inventory_precio_text_input.text().strip() else ""),
@@ -7450,8 +7449,6 @@ class MainWindow(QMainWindow):
                 ("uso", self.inventory_use_filter_combo.currentData(), self.inventory_use_filter_combo.currentText()),
                 ("estado", self.inventory_status_filter_combo.currentData(), self.inventory_status_filter_combo.currentText()),
                 ("stock", self.inventory_stock_filter_combo.currentData(), self.inventory_stock_filter_combo.currentText()),
-                ("origen", self.inventory_origin_filter_combo.currentData(), self.inventory_origin_filter_combo.currentText()),
-                ("incidencias", self.inventory_duplicate_filter_combo.currentData(), self.inventory_duplicate_filter_combo.currentText()),
                 ("conteo", self.inventory_conteo_filter_combo.currentData(), self.inventory_conteo_filter_combo.currentText()),
                 ("precio", self.inventory_precio_filter_combo.currentData(), self.inventory_precio_filter_combo.currentText()),
                 ("precio_exacto", self.inventory_precio_text_input.text().strip() or None, f"${self.inventory_precio_text_input.text().strip()}" if self.inventory_precio_text_input.text().strip() else ""),
@@ -7474,8 +7471,6 @@ class MainWindow(QMainWindow):
             "uso": self.inventory_use_filter_combo,
             "estado": self.inventory_status_filter_combo,
             "stock": self.inventory_stock_filter_combo,
-            "origen": self.inventory_origin_filter_combo,
-            "incidencias": self.inventory_duplicate_filter_combo,
             "conteo": self.inventory_conteo_filter_combo,
             "precio": self.inventory_precio_filter_combo,
         }
@@ -7778,8 +7773,6 @@ class MainWindow(QMainWindow):
         color_filters = self.inventory_color_filter_combo.selected_values()
         status_filter = str(self.inventory_status_filter_combo.currentData() or "")
         stock_filter = str(self.inventory_stock_filter_combo.currentData() or "")
-        origin_filter = str(self.inventory_origin_filter_combo.currentData() or "")
-        duplicate_filter = str(self.inventory_duplicate_filter_combo.currentData() or "")
         conteo_filter = str(self.inventory_conteo_filter_combo.currentData() or "")
         precio_filter = str(self.inventory_precio_filter_combo.currentData() or "")
         precio_text_filter = self.inventory_precio_text_input.text().strip()
@@ -7798,8 +7791,6 @@ class MainWindow(QMainWindow):
                 color_filters=tuple(color_filters),
                 status_filter=status_filter,
                 stock_filter=stock_filter,
-                origin_filter=origin_filter,
-                duplicate_filter=duplicate_filter,
                 conteo_filter=conteo_filter,
                 precio_filter=precio_filter,
                 precio_text_filter=precio_text_filter,
@@ -7918,8 +7909,6 @@ class MainWindow(QMainWindow):
             self.inventory_use_filter_combo,
             self.inventory_status_filter_combo,
             self.inventory_stock_filter_combo,
-            self.inventory_origin_filter_combo,
-            self.inventory_duplicate_filter_combo,
             self.inventory_conteo_filter_combo,
             self.inventory_precio_filter_combo,
         ):

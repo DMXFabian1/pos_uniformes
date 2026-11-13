@@ -41,8 +41,6 @@ class QuitarChipsInventarioTests(unittest.TestCase):
             inventory_use_filter_combo=_combo("school_only"),
             inventory_status_filter_combo=_combo("active"),
             inventory_stock_filter_combo=_combo("negative"),
-            inventory_origin_filter_combo=_combo("legacy"),
-            inventory_duplicate_filter_combo=_combo("fallback"),
             inventory_conteo_filter_combo=_combo("stale"),
             inventory_precio_filter_combo=_combo("under_100"),
             inventory_search_input=QLineEdit("pants"),

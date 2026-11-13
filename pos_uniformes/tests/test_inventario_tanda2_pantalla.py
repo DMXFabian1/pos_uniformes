@@ -160,6 +160,19 @@ class InventarioTanda2PantallaTests(unittest.TestCase):
         window._invalidate_listing_snapshot_caches.assert_called_once_with(catalog=False, inventory=True)
         window._handle_inventory_filters_changed.assert_called_once_with()
 
+    # ── Sin ayuda fija, sin filtros de la importación vieja ─────────────
+
+    def test_sin_linea_de_ayuda_ni_filtros_viejos(self) -> None:
+        from PyQt6.QtWidgets import QLabel
+
+        window = self._ventana()
+        self.assertFalse(hasattr(window, "inventory_origin_filter_combo"))
+        self.assertFalse(hasattr(window, "inventory_duplicate_filter_combo"))
+        pestana = window.inventory_table.window()
+        textos = [lbl.text() for lbl in pestana.findChildren(QLabel)]
+        self.assertFalse(any(t.startswith("Ctrl/Cmd + clic") for t in textos))
+        self.assertIn("Ctrl/Cmd + clic", window.inventory_table.toolTip())
+
 
 if __name__ == "__main__":
     unittest.main()
