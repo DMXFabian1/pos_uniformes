@@ -395,6 +395,74 @@ class EvaluateAutoLevelTests(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
+# refresh_client_level_from_sales: nunca baja de LEAL (2026-11-12)
+# ---------------------------------------------------------------------------
+
+class RefreshNoBajaDeLealTests(unittest.TestCase):
+    """2026-11-12: una sola regla para Leal. El gasto solo sirve para subir;
+    bajar a un cliente lo decide Daniel a mano («creo que es la misma»,
+    Daniel). Antes, un LEAL con poco gasto en la ventana bajaba a BASICO con
+    su siguiente venta en la Caja antigua, o al cancelarle una."""
+
+    def _refrescar(self, client, *, count: int, total: str, reason: str = "venta_confirmada"):
+        session = MagicMock()
+        session.execute.return_value.one.return_value = (count, Decimal(total))
+        with patch.object(LoyaltyService, "_load_program_rules", return_value=_make_rules()), patch.object(
+            LoyaltyService, "discount_for_level",
+            side_effect=lambda level, session=None: {NivelLealtad.BASICO: Decimal("5.00"),
+                                                     NivelLealtad.LEAL: Decimal("10.00")}.get(level, Decimal("0.00")),
+        ):
+            return LoyaltyService.refresh_client_level_from_sales(
+                session, client, actor_user=_make_actor(), reason=reason,
+            )
+
+    def test_leal_con_poco_gasto_no_baja(self) -> None:
+        client = _make_client(nivel_lealtad=NivelLealtad.LEAL, descuento_preferente="10.00")
+        client.nivel_asignado_por_user_id = 7
+        client.nivel_asignacion_motivo = "original"
+
+        self._refrescar(client, count=1, total="200.00")
+
+        self.assertEqual(client.nivel_lealtad, NivelLealtad.LEAL)
+        self.assertEqual(client.descuento_preferente, Decimal("10.00"))  # su descuento de Caja sigue
+        self.assertEqual(client.nivel_asignado_por_user_id, 7)
+        self.assertEqual(client.nivel_asignacion_motivo, "original")
+
+    def test_leal_no_baja_al_cancelar_una_venta(self) -> None:
+        client = _make_client(nivel_lealtad=NivelLealtad.LEAL, descuento_preferente="10.00")
+
+        self._refrescar(client, count=0, total="0.00", reason="venta_cancelada")
+
+        self.assertEqual(client.nivel_lealtad, NivelLealtad.LEAL)
+        self.assertEqual(client.descuento_preferente, Decimal("10.00"))
+
+    def test_basico_que_cruza_el_umbral_sube_como_siempre(self) -> None:
+        client = _make_client(nivel_lealtad=NivelLealtad.BASICO, descuento_preferente="5.00")
+
+        self._refrescar(client, count=1, total="3000.00")
+
+        self.assertEqual(client.nivel_lealtad, NivelLealtad.LEAL)
+        self.assertEqual(client.descuento_preferente, Decimal("10.00"))
+        self.assertEqual(client.nivel_asignacion_motivo, "venta_confirmada")
+
+    def test_basico_con_poco_gasto_sigue_basico(self) -> None:
+        client = _make_client(nivel_lealtad=NivelLealtad.BASICO, descuento_preferente="5.00")
+
+        self._refrescar(client, count=1, total="200.00")
+
+        self.assertEqual(client.nivel_lealtad, NivelLealtad.BASICO)
+        self.assertEqual(client.descuento_preferente, Decimal("5.00"))
+
+    def test_evaluate_auto_level_sigue_diciendo_lo_que_alcanza(self) -> None:
+        # La evaluación no cambia: solo quien escribe el nivel deja de bajar.
+        client = _make_client(nivel_lealtad=NivelLealtad.LEAL)
+        session = MagicMock()
+        session.execute.return_value.one.return_value = (1, Decimal("200.00"))
+        with patch.object(LoyaltyService, "_load_program_rules", return_value=_make_rules()):
+            self.assertEqual(LoyaltyService.evaluate_auto_level(session, client), NivelLealtad.BASICO)
+
+
+# ---------------------------------------------------------------------------
 # recalculate_all_clients
 # ---------------------------------------------------------------------------
 

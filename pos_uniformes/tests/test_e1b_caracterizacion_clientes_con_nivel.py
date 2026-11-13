@@ -624,6 +624,23 @@ ESPERADO = {'BASICO/GENERAL/0.00': {'apartado_pct': '5.00',
 # Todo lo demás (caja, apartados, edición vieja, recálculo) debe seguir igual.
 CREDENCIAL_E1C2 = ["", "", "#1F3A44", "#E3EAEC"]
 
+# 2026-11-12 (una sola regla para Leal): la revisión automática por ventas ya
+# no baja a nadie de LEAL a BASICO, igual que la subida a Maximoda Leal
+# («creo que es la misma», Daniel). Un cliente LEAL sin el gasto del año se
+# queda como estaba: nivel, descuento y quién lo asignó. `ESPERADO` se
+# conserva tal como se generó sobre E1-A; estos casos se comparan contra esto.
+def _leal_sin_tocar(preferente: str) -> dict:
+    return {"asignado_por": 99, "descuento": preferente, "motivo": "original", "nivel": "LEAL", "rol": "ADMIN"}
+
+
+LEAL_NO_BAJA_2026_11_12 = {
+    f"LEAL/GENERAL/{pref}": {
+        "recalculo_0_0.00": _leal_sin_tocar(pref),
+        "recalculo_2_2500.00": _leal_sin_tocar(pref),
+    }
+    for pref in ("0.00", "7.50")
+}
+
 
 class CaracterizacionClientesConNivelTests(unittest.TestCase):
     def test_los_clientes_con_nivel_se_comportan_igual_que_en_e1a(self) -> None:
@@ -634,6 +651,7 @@ class CaracterizacionClientesConNivelTests(unittest.TestCase):
             with self.subTest(caso=clave):
                 if isinstance(ESPERADO[clave], dict) and "credencial" in ESPERADO[clave]:
                     esperado = {k: v for k, v in ESPERADO[clave].items() if k != "credencial"}
+                    esperado.update(LEAL_NO_BAJA_2026_11_12.get(clave, {}))
                     actual = {k: v for k, v in obtenido[clave].items() if k != "credencial"}
                     self.assertEqual(actual, esperado)
                     self.assertEqual(obtenido[clave]["credencial"], CREDENCIAL_E1C2)

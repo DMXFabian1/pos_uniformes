@@ -174,6 +174,16 @@ class LoyaltyService:
         reason: str,
         reference_time: datetime | None = None,
     ) -> Cliente | None:
+        """Revisa el nivel VIEJO (`Cliente.nivel_lealtad`) con las ventas de la
+        Caja antigua (tabla `venta`).
+
+        2026-11-12: no es el mismo campo que Maximoda Leal. El programa del
+        cliente (Club, Leal, Profesional, Mayorista) vive en `membresia`, lo
+        sube `subida_leal_service` con la Libreta y es el que leen el kiosko,
+        el ticket y el Monedero (`monedero_service.tasa_para_cliente`). Este
+        nivel viejo solo da el descuento de la Caja y los Apartados antiguos
+        del POS (`sale_selected_client_service`, `layaway_pricing_service`).
+        Comparte con Leal el umbral y la ventana, y como Leal, nunca baja."""
         if client is None:
             return None
         # E1-B (R4, opción A): un cliente SIN nivel se omite a propósito. No se
@@ -190,6 +200,25 @@ class LoyaltyService:
             )
             return client
         normalized_level = cls.evaluate_auto_level(session, client, reference_time=reference_time)
+        # 2026-11-12: esta revisión automática ya no baja a nadie de LEAL a
+        # BASICO. Es la misma regla que la subida a Maximoda Leal
+        # (`services/fidelizacion/subida_leal_service.py`): el gasto solo
+        # sirve para SUBIR, y bajar a un cliente lo decide Daniel a mano
+        # («creo que es la misma», Daniel, 2026-11-12). Antes, un cliente
+        # LEAL de antes de E1 que en los últimos 365 días no juntaba $3,000
+        # en la Caja antigua bajaba a BASICO con su siguiente venta, o al
+        # cancelarle una, y su descuento de Caja pasaba de 10 % a 5 %.
+        # Se deja todo como estaba (nivel, descuento y quién lo asignó).
+        if (
+            cls.coerce_level(client.nivel_lealtad) == NivelLealtad.LEAL
+            and normalized_level == NivelLealtad.BASICO
+        ):
+            _logger.info(
+                "Cliente %s sigue en LEAL: la revisión automática no baja de nivel (motivo=%s).",
+                getattr(client, "codigo_cliente", None) or getattr(client, "id", None),
+                reason,
+            )
+            return client
         cls.assign_level(
             client,
             level=normalized_level,
