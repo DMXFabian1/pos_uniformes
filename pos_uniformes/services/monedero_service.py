@@ -180,7 +180,8 @@ def base_cashback_legada(libreta_venta) -> tuple[Decimal, bool]:
 def _base_del_calculo(calc: dict, libreta_venta) -> tuple[Decimal, bool] | None:
     """(base, con comisión de tarjeta) de UN cálculo plano del motor, o None
     si no sirve para esta venta (no trae la parte del Monedero, o no
-    describe lo que se guardó: otro total, otro saldo, otro medio de pago)."""
+    describe lo que se guardó: otro total, otro saldo, otro medio de pago,
+    o una base mayor que lo que se pagó sin saldo)."""
     from pos_uniformes.services.beneficios.motivos import MONEDERO_SIN_COMISION
     from pos_uniformes.services.beneficios.motor import base_monedero_con_comision
 
@@ -198,6 +199,12 @@ def _base_del_calculo(calc: dict, libreta_venta) -> tuple[Decimal, bool] | None:
     if pagado > 0 and con_tarjeta != bool(getattr(libreta_venta, "pago_tarjeta", False)):
         return None
     base = max(_d(parte["base"]), _CERO)
+    if base > pagado:
+        # 2026-11-12: desde que la base del motor manda también sin saldo ya
+        # no hay max()/min() contra la cuenta de antes que la acote. Una
+        # fotografía que dice ganar sobre más de lo que entró (kiosko con
+        # error, cola alterada) no describe esta venta: cuenta de antes.
+        return None
     comision = _d(calc.get("comision_tarjeta"))
     if comision > 0 and base > 0 and MONEDERO_SIN_COMISION not in (calc.get("motivos_ticket") or ()):
         # Fotografía de un kiosko de antes de la regla B (2026-11-12): su

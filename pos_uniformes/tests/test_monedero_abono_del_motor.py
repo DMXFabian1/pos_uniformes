@@ -215,6 +215,26 @@ class SinFotografiaTests(unittest.TestCase):
         fila.calculo["calculo"]["monedero"] = {"base": "250.00"}
         self.assertEqual(mon.base_cashback_de_venta(fila), (D("250.00"), False))
 
+    def test_base_mayor_que_lo_pagado_no_se_usa(self):
+        """2026-11-12: sin el max() contra la cuenta de antes, nada acotaba la
+        base de la fotografía. Una base mayor que lo cobrado (kiosko con
+        error, cola alterada) no describe la venta: cuenta de antes."""
+        e = EntradaVenta((_linea(1, "300"),), FECHA, cliente=CLUB)
+        fila = _fila(e, calcular(e))
+        fila.calculo["calculo"]["monedero"] = {"base": "999.00"}
+        self.assertEqual(mon.base_cashback_de_venta(fila), (D("300.00"), False))
+        fila.calculo["calculo"]["monedero"] = {"base": "300.00"}   # igual a lo pagado sí sirve
+        self.assertEqual(mon.base_cashback_de_venta(fila), (D("300.00"), False))
+
+    def test_con_saldo_la_base_tampoco_pasa_de_lo_pagado(self):
+        e = _ejemplo()
+        c = calcular(e)
+        self.assertGreater(c.saldo_usado, 0)
+        fila = _fila(e, c)
+        pagado = c.total - c.saldo_usado
+        fila.calculo["calculo"]["monedero"] = {"base": str(pagado + D("0.01"))}
+        self.assertEqual(mon.base_cashback_de_venta(fila), mon.base_cashback_legada(fila))
+
     def test_sin_saldo_y_sin_fotografia_cuenta_de_antes(self):
         e = EntradaVenta((_linea(1, "300"), _linea(2, "60", oferta="38.70")), FECHA, cliente=CLUB)
         fila = _fila(e, calcular(e), con_foto=False)
