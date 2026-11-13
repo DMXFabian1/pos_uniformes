@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import unittest
 
-from pos_uniformes.ui.helpers.inventory_summary_helper import build_inventory_summary_view
+from pos_uniformes.ui.helpers.inventory_summary_helper import (
+    build_inventory_summary_view,
+    build_search_cut_notice,
+)
 
 
 class InventorySummaryHelperTests(unittest.TestCase):
@@ -80,6 +83,23 @@ class InventorySummaryHelperTests(unittest.TestCase):
         self.assertEqual(view.negative_counter.tone, "danger")
         self.assertEqual(view.out_counter.text, "Agotados: 1")
         self.assertEqual(view.low_counter.text, "Bajo stock: 1")
+
+    def test_avisa_cuando_la_busqueda_llega_al_tope(self) -> None:
+        view = build_inventory_summary_view(
+            total_rows=500, visible_rows=[], active_filter_labels=[], search_hits_count=500
+        )
+        self.assertTrue(
+            view.results_summary.endswith("| ⚠ Mostrando los primeros 500; afina la búsqueda")
+        )
+
+    def test_no_avisa_debajo_del_tope_ni_sin_busqueda(self) -> None:
+        self.assertEqual(build_search_cut_notice(499), "")
+        self.assertEqual(build_search_cut_notice(None), "")
+        self.assertEqual(build_search_cut_notice(500), "Mostrando los primeros 500; afina la búsqueda")
+        view = build_inventory_summary_view(
+            total_rows=10, visible_rows=[], active_filter_labels=[], search_hits_count=12
+        )
+        self.assertNotIn("⚠", view.results_summary)
 
 
 if __name__ == "__main__":

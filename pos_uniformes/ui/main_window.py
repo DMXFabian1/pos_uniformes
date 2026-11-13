@@ -375,7 +375,7 @@ from pos_uniformes.ui.helpers.inventory_selection_helper import (
     find_inventory_row_index_by_variant_id,
     normalize_inventory_variant_id,
 )
-from pos_uniformes.ui.helpers.inventory_summary_helper import build_inventory_summary_view
+from pos_uniformes.ui.helpers.inventory_summary_helper import INVENTORY_SEARCH_LIMIT, build_inventory_summary_view
 from pos_uniformes.ui.helpers.inventory_table_row_helper import build_inventory_table_row_views
 from pos_uniformes.ui.helpers.layaway_alerts_helper import build_layaway_alerts_view
 from pos_uniformes.ui.helpers.window_close_helper import build_main_window_close_decision
@@ -7886,6 +7886,7 @@ class MainWindow(QMainWindow):
 
         search_text = self.inventory_search_input.text().strip()
         used_meili = False
+        search_hits_count = None
 
         # Meilisearch resuelve el texto (matchingStrategy=all); el filtro local
         # de texto solo corre como fallback para no matar los typos/sinónimos.
@@ -7893,8 +7894,9 @@ class MainWindow(QMainWindow):
             try:
                 from pos_uniformes.services import meilisearch_service
                 if meilisearch_service.is_available():
-                    hits = meilisearch_service.search(search_text, limit=500)
+                    hits = meilisearch_service.search(search_text, limit=INVENTORY_SEARCH_LIMIT)
                     if hits:
+                        search_hits_count = len(hits)
                         hit_skus = {str(h.get("sku", "")) for h in hits}
                         local_terms = compile_search_terms(search_text)
                         inventory_snapshot_rows = combinar_hits_meili(
@@ -7967,6 +7969,7 @@ class MainWindow(QMainWindow):
             total_rows=len(inventory_snapshot_rows),
             visible_rows=self.inventory_filtered_rows,
             active_filter_labels=self._inventory_active_filter_labels(),
+            search_hits_count=search_hits_count,
         )
         self._set_badge_state(
             self.inventory_negative_counter,

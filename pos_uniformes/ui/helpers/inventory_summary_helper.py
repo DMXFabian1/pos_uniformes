@@ -6,6 +6,19 @@ from dataclasses import dataclass
 
 from pos_uniformes.services.inventario_existencia_service import contar_existencias
 
+# Meilisearch devuelve como máximo esto en la pestaña Inventario. No se sube:
+# cada hit trae ~25 campos y una búsqueda amplia (p. ej. «pants») con 5000
+# hits pesaría varios MB por tecla; mejor avisar y que se afine la búsqueda.
+INVENTORY_SEARCH_LIMIT = 500
+
+
+def build_search_cut_notice(hits_count: int | None, *, limit: int = INVENTORY_SEARCH_LIMIT) -> str:
+    """Aviso cuando la búsqueda llegó al tope y pudo quedarse corta."""
+    if hits_count is None or hits_count < limit:
+        return ""
+    return f"Mostrando los primeros {limit}; afina la búsqueda"
+
+
 @dataclass(frozen=True)
 class InventoryCounterState:
     text: str
@@ -27,6 +40,7 @@ def build_inventory_summary_view(
     total_rows: int,
     visible_rows: list[dict[str, object]],
     active_filter_labels: list[str],
+    search_hits_count: int | None = None,
 ) -> InventorySummaryView:
     reserved_count = sum(1 for row in visible_rows if int(row["apartado_cantidad"]) > 0)
     fallback_count = sum(1 for row in visible_rows if bool(row.get("fallback_importacion")))
@@ -38,9 +52,10 @@ def build_inventory_summary_view(
     count_missing_qr = sum(1 for row in visible_rows if not bool(row.get("qr_exists")))
     count_inactive = sum(1 for row in visible_rows if not bool(row.get("variante_activa")))
     return InventorySummaryView(
-        results_summary=(
+        results_summary=_with_notice(
             f"{len(visible_rows)}/{total_rows} resultados | stock {total_stock} | "
-            f"ap. {reserved_count} | fallbacks {fallback_count}"
+            f"ap. {reserved_count} | fallbacks {fallback_count}",
+            build_search_cut_notice(search_hits_count),
         ),
         negative_counter=InventoryCounterState(
             text=f"En negativo: {count_negative}",
@@ -63,3 +78,7 @@ def build_inventory_summary_view(
             tone="muted" if count_inactive else "positive",
         ),
     )
+
+
+def _with_notice(summary: str, notice: str) -> str:
+    return f"{summary} | ⚠ {notice}" if notice else summary
