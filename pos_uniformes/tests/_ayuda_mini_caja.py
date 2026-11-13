@@ -27,6 +27,7 @@ from pos_uniformes.database.models import (
     NivelEducativo,
     Producto,
     RolUsuario,
+    SkuSequence,
     TipoPieza,
     TipoPrenda,
     Uniforme,
@@ -118,6 +119,7 @@ class MiniCaja:
             self.receta(nombre, "Pants 3pz", [("Pants 2pz", 1), ("Playera", 1)])
             self.receta(nombre, "Chamarra", [("Pants 2pz", 1), ("Pants Suelto", -1)])
         self.receta("Ignacio Allende (Jaral)", "Pants 3pz", [("Pants 2pz", 1), ("Playera", 1)])
+        s.add(SkuSequence(codigo="VARIANTE", prefijo="SKU", padding=6, ultimo_numero=self._sku))
         s.commit()
 
     # ── piezas ────────────────────────────────────────────────────────────
