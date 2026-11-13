@@ -406,6 +406,8 @@ class ApartadosRetiradosDelPosTests(unittest.TestCase):
             "pos_uniformes.ui.helpers.layaway_history_helper",
             "pos_uniformes.ui.helpers.layaway_summary_helper",
             "pos_uniformes.ui.helpers.layaway_table_row_helper",
+            "pos_uniformes.ui.helpers.printable_document_flow_helper",
+            "pos_uniformes.services.layaway_snapshot_service",
         ):
             with self.assertRaises(ModuleNotFoundError, msg=modulo):
                 importlib.import_module(modulo)

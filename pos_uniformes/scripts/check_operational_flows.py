@@ -48,7 +48,6 @@ FLOW_GROUPS: "OrderedDict[str, dict[str, object]]" = OrderedDict(
                     "pos_uniformes.tests.test_layaway_detail_service",
                     "pos_uniformes.tests.test_sale_document_service",
                     "pos_uniformes.tests.test_sale_document_view_service",
-                    "pos_uniformes.tests.test_printable_document_flow_helper",
                     "pos_uniformes.tests.test_sale_ticket_text_service",
                 ),
             },
