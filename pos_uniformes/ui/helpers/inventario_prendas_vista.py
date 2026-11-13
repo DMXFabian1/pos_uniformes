@@ -17,8 +17,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from PyQt6.QtCore import QAbstractItemModel, QEvent, QModelIndex, QRect, QSize, Qt, pyqtSignal
-from PyQt6.QtGui import QBrush, QColor, QFont, QFontMetrics, QPainter, QPalette
+from PyQt6.QtCore import QAbstractItemModel, QEvent, QModelIndex, QPointF, QRect, QSize, Qt, pyqtSignal
+from PyQt6.QtGui import QBrush, QColor, QFont, QFontMetrics, QPainter, QPainterPath, QPalette, QPen
 from PyQt6.QtWidgets import QAbstractItemView, QFrame, QHeaderView, QStyle, QStyledItemDelegate, QStyleOptionViewItem, QTreeView
 
 from pos_uniformes.services.inventario_prenda_service import (
@@ -37,7 +37,7 @@ from pos_uniformes.ui.helpers.inventory_table_row_helper import (
     InventoryTableRowView,
     build_inventory_table_row_view,
 )
-from pos_uniformes.ui.styles.inventario_styles import COLOR_CIFRA, COLOR_FILA_APAGADA, TENUE, TEXTO, VINO
+from pos_uniformes.ui.styles.inventario_styles import COLOR_CIFRA, COLOR_FILA_APAGADA, HOVER, LINEA, TENUE, TEXTO, TONOS, VINO
 
 COL_PRENDA, COL_TALLAS, COL_HAY, COL_DONDE, COL_PRECIO, COL_CONTADA = range(len(COLUMNAS_PRENDA))
 
@@ -51,9 +51,19 @@ ANCHO_FLECHA = 26
 #: La fila de prenda lleva dos renglones: el nombre y, debajo, el color.
 ALTO_PRENDA = 46
 #: Anchos fijos de las columnas cortas; Prenda y Tallas se reparten el resto.
-ANCHOS_FIJOS = {2: 46, 3: 108, 4: 108, 5: 86}
-#: Parte del resto que se lleva «Prenda» (la escalera, lo demás).
-PARTE_PRENDA = 0.46
+ANCHOS_FIJOS = {2: 46, 3: 100, 4: 100, 5: 86}
+#: «Prenda» se lleva lo que pide el nombre más largo de la página, entre estas
+#: partes del resto; la escalera, lo demás (y ella sí sabe recortarse con «…»).
+PARTE_PRENDA_MIN = 0.34
+PARTE_PRENDA_MAX = 0.60
+#: La escalera nunca baja de esto (caben 4–5 fichas) aunque el nombre no quepa.
+ESCALERA_MIN = 220
+#: Lo que la celda se come alrededor del texto (relleno 0 8px y márgenes del estilo).
+MARGEN_CELDA = 24
+#: Sangría propia de las tallas desplegadas (además del ancho del ▸).
+SANGRIA_TALLA = 12
+#: Color de la etiqueta «Oferta» / «Liquidación» sobre el rango (ámbar de la paleta).
+COLOR_REBAJA = TONOS["warning"][1]
 _COLUMNA_TALLA = INVENTORY_TABLE_HEADERS.index("Talla")
 _COLUMNA_CONTADA = INVENTORY_TABLE_HEADERS.index("Contada")
 #: Fondo neutro de cada ficha de la escalera (el color va solo en el número).
@@ -175,8 +185,8 @@ class ModeloPrendas(QAbstractItemModel):
             if columna == COL_DONDE:
                 return grupo.texto_donde.replace(" · ", "\n")
             if columna == COL_PRECIO:
-                rango = texto_rango_precio(grupo.precio_min, grupo.precio_max)
-                return f"{rango}\n{grupo.rebaja}" if grupo.rebaja else rango
+                # «Oferta $175–$289», como en «Por talla»; el delegado pinta «Oferta» arriba en chico.
+                return grupo.texto_precio
             if columna == COL_CONTADA:
                 return texto_contada_grupo(grupo, ahora=self.ahora)
         elif role == Qt.ItemDataRole.ToolTipRole:
@@ -249,11 +259,39 @@ class ModeloPrendas(QAbstractItemModel):
                 return int(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             return None
         if role == Qt.ItemDataRole.FontRole:
-            if columna in (COL_HAY, COL_TALLAS):
+            # Solo «Hay» en negritas: la talla pesa menos que el nombre de la prenda.
+            if columna == COL_HAY:
                 fuente = QFont()
                 fuente.setBold(True)
                 return fuente
         return None
+
+
+def ancho_nombre_prenda(grupo: GrupoPrenda, fuente: QFont) -> int:
+    """Lo que pide la celda «Prenda» para que el nombre no se recorte."""
+    negrita = QFont(fuente)
+    negrita.setBold(True)
+    return ANCHO_FLECHA + QFontMetrics(negrita).horizontalAdvance(grupo.prenda) + MARGEN_CELDA
+
+
+def chevron(painter: QPainter, centro: QPointF, *, abierta: bool, color: QColor) -> None:
+    """▸ / ▾ dibujado (8×8 px, trazo de 1.8 px): igual en Mac y Windows, sin depender de la fuente."""
+    camino = QPainterPath()
+    x, y = centro.x(), centro.y()
+    if abierta:
+        camino.moveTo(x - 4, y - 2)
+        camino.lineTo(x, y + 2)
+        camino.lineTo(x + 4, y - 2)
+    else:
+        camino.moveTo(x - 2, y - 4)
+        camino.lineTo(x + 2, y)
+        camino.lineTo(x - 2, y + 4)
+    pluma = QPen(color, 1.8)
+    pluma.setCapStyle(Qt.PenCapStyle.RoundCap)
+    pluma.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
+    painter.setPen(pluma)
+    painter.setBrush(Qt.BrushStyle.NoBrush)
+    painter.drawPath(camino)
 
 
 # ── Pintar ───────────────────────────────────────────────────────────────
@@ -289,7 +327,9 @@ class DelegadoPrendas(QStyledItemDelegate):
             and seleccion.isRowSelected(index.parent().row(), QModelIndex())
         ):
             painter.fillRect(opcion.rect, FONDO_TALLA_DE_PRENDA_ELEGIDA)
-        dibujo_propio = columna == COL_PRENDA or (es_prenda and columna == COL_TALLAS)
+        grupo = modelo.grupo_de(index)
+        precio_con_rebaja = es_prenda and columna == COL_PRECIO and grupo is not None and bool(grupo.rebaja)
+        dibujo_propio = columna in (COL_PRENDA, COL_TALLAS) or precio_con_rebaja
         if not dibujo_propio:
             estilo = opcion.widget.style() if opcion.widget else None
             if estilo is not None:
@@ -304,21 +344,71 @@ class DelegadoPrendas(QStyledItemDelegate):
         try:
             if columna == COL_PRENDA:
                 self._pintar_primera(painter, opcion, rect, index, texto, es_prenda)
+            elif columna == COL_TALLAS and es_prenda:
+                self._pintar_escalera(painter, opcion, rect, grupo)
+            elif columna == COL_TALLAS:
+                self._pintar_talla(painter, opcion, rect, index)
             else:
-                self._pintar_escalera(painter, opcion, rect, modelo.grupo_de(index))
+                self._pintar_precio(painter, opcion, rect, grupo)
         finally:
             painter.restore()
+
+    def _pintar_talla(self, painter: QPainter, opcion, rect: QRect, index: QModelIndex) -> None:
+        """«Talla 10» de una fila hija: «Talla» en tenue y el número en peso 600."""
+        fila = index.model().fila_de(index)
+        talla = str((fila or {}).get("talla") or "").strip()
+        color = index.data(Qt.ItemDataRole.ForegroundRole)
+        apagada = isinstance(color, QColor)
+        area = rect.adjusted(SANGRIA_TALLA, 0, 0, 0)
+        tenue = QFont(opcion.font)
+        tenue.setBold(False)
+        cifra = QFont(opcion.font)
+        cifra.setWeight(QFont.Weight.DemiBold)
+        alinear = int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+        painter.setFont(tenue)
+        painter.setPen(color if apagada else QColor(TENUE))
+        if not talla:
+            painter.drawText(area, alinear, "Sin talla")
+            return
+        prefijo = "Talla "
+        painter.drawText(area, alinear, prefijo)
+        ancho = QFontMetrics(tenue).horizontalAdvance(prefijo)
+        painter.setFont(cifra)
+        painter.setPen(color if apagada else QColor(TEXTO))
+        painter.drawText(area.adjusted(ancho, 0, 0, 0), alinear,
+                         QFontMetrics(cifra).elidedText(talla, Qt.TextElideMode.ElideRight, max(0, area.width() - ancho)))
+
+    def _pintar_precio(self, painter: QPainter, opcion, rect: QRect, grupo: GrupoPrenda) -> None:
+        """«Oferta» chico en ámbar arriba y el rango debajo (mismo orden que «Por talla»)."""
+        etiqueta = QFont(opcion.font)
+        etiqueta.setPixelSize(11)
+        etiqueta.setWeight(QFont.Weight.Bold)
+        normal = QFont(opcion.font)
+        m_etiqueta, m_normal = QFontMetrics(etiqueta), QFontMetrics(normal)
+        alto = m_etiqueta.height() + m_normal.height()
+        arriba = rect.top() + (rect.height() - alto) // 2
+        alinear = int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft)
+        painter.setFont(etiqueta)
+        painter.setPen(QColor(COLOR_REBAJA))
+        painter.drawText(QRect(rect.left(), arriba, rect.width(), m_etiqueta.height()), alinear,
+                         m_etiqueta.elidedText(grupo.rebaja, Qt.TextElideMode.ElideRight, rect.width()))
+        rango = texto_rango_precio(grupo.precio_min, grupo.precio_max)
+        painter.setFont(normal)
+        painter.setPen(QColor(TEXTO))
+        painter.drawText(QRect(rect.left(), arriba + m_etiqueta.height(), rect.width(), m_normal.height()), alinear,
+                         m_normal.elidedText(rango, Qt.TextElideMode.ElideRight, rect.width()))
 
     def _pintar_primera(self, painter: QPainter, opcion, rect: QRect, index: QModelIndex, texto: str, es_prenda: bool) -> None:
         fuente = QFont(opcion.font)
         if es_prenda:
             abierta = self.vista.isExpanded(index)
-            flecha = QRect(rect.left(), rect.top(), ANCHO_FLECHA - 6, rect.height())
-            painter.setPen(QColor(VINO))
-            fuente_flecha = QFont(fuente)
-            fuente_flecha.setPixelSize(16)
-            painter.setFont(fuente_flecha)
-            painter.drawText(flecha, int(Qt.AlignmentFlag.AlignCenter), "▾" if abierta else "▸")
+            centro = QPointF(rect.left() + (ANCHO_FLECHA - 6) / 2, rect.center().y() + 0.5)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+            if self.vista.fila_flecha_encima == index.row():
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(QColor(HOVER))
+                painter.drawEllipse(centro, 10, 10)
+            chevron(painter, centro, abierta=abierta, color=QColor(VINO))
             grupo = index.model().grupo_de(index)
             area = rect.adjusted(ANCHO_FLECHA, 0, 0, 0)
             # Dos renglones: el nombre en negritas y, debajo, el color en tenue.
@@ -343,8 +433,11 @@ class DelegadoPrendas(QStyledItemDelegate):
                              int(Qt.AlignmentFlag.AlignVCenter | Qt.AlignmentFlag.AlignLeft),
                              m_color.elidedText(color, Qt.TextElideMode.ElideRight, area.width()))
             return
-        # Talla: sangría bajo la flecha y el código en tenue.
-        area = rect.adjusted(ANCHO_FLECHA, 0, 0, 0)
+        # Talla: una línea tenue bajo el ▸ amarra las tallas a su prenda, y el
+        # código va con sangría propia y en tenue.
+        guia = int(rect.left() + (ANCHO_FLECHA - 6) / 2)
+        painter.fillRect(QRect(guia - 1, opcion.rect.top(), 2, opcion.rect.height()), QColor(LINEA).darker(112))
+        area = rect.adjusted(ANCHO_FLECHA + SANGRIA_TALLA, 0, 0, 0)
         color = index.data(Qt.ItemDataRole.ForegroundRole)
         painter.setFont(fuente)
         painter.setPen(color if isinstance(color, QColor) else QColor(TENUE))
@@ -401,8 +494,12 @@ class VistaPrendas(QTreeView):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setObjectName("invPrendas")
+        #: Fila de prenda con el mouse sobre su ▸ (para pintarle el círculo); -1 si ninguna.
+        self.fila_flecha_encima = -1
         self.modelo = ModeloPrendas(self)
         self.setModel(self.modelo)
+        # Cada página nueva puede traer nombres más largos: se vuelven a repartir las columnas.
+        self.modelo.modelReset.connect(self._acomodar_columnas)
         self.setItemDelegate(DelegadoPrendas(self))
         self.setRootIsDecorated(False)
         self.setIndentation(0)
@@ -427,13 +524,16 @@ class VistaPrendas(QTreeView):
         self.doubleClicked.connect(self._doble_clic)
 
     def _acomodar_columnas(self) -> None:
-        """Las columnas cortas tienen ancho fijo; Prenda y la escalera se
-        reparten lo que queda (sin barra horizontal a 1366 px)."""
+        """Las columnas cortas tienen ancho fijo; Prenda se lleva lo que pide el
+        nombre más largo de la página (entre 34 % y 60 % del resto, sin dejar
+        la escalera bajo 220 px) y la escalera lo demás. Sin barra horizontal."""
         encabezado = self.header()
         for columna, ancho in ANCHOS_FIJOS.items():
             encabezado.resizeSection(columna, ancho)
         resto = max(240, self.viewport().width() - sum(ANCHOS_FIJOS.values()))
-        prenda = int(resto * PARTE_PRENDA)
+        pide = max((ancho_nombre_prenda(grupo, self.font()) for grupo in self.modelo.grupos), default=0)
+        tope = min(int(resto * PARTE_PRENDA_MAX), resto - ESCALERA_MIN)
+        prenda = max(int(resto * PARTE_PRENDA_MIN), min(pide, tope))
         encabezado.resizeSection(COL_PRENDA, prenda)
         encabezado.resizeSection(COL_TALLAS, resto - prenda)
 
@@ -450,14 +550,39 @@ class VistaPrendas(QTreeView):
         if indice.isValid():
             self.setExpanded(indice, not self.isExpanded(indice))
 
-    def mousePressEvent(self, event) -> None:  # noqa: N802 - API de Qt
-        index = self.indexAt(event.position().toPoint())
+    def _sobre_flecha(self, punto) -> QModelIndex:
+        """La prenda cuyo ▸ está bajo el punto (los primeros ANCHO_FLECHA px de la celda)."""
+        index = self.indexAt(punto)
         if (
-            event.button() == Qt.MouseButton.LeftButton
-            and self.modelo.es_prenda(index)
+            self.modelo.es_prenda(index)
             and index.column() == COL_PRENDA
-            and event.position().toPoint().x() - self.visualRect(index).left() < ANCHO_FLECHA
+            and punto.x() - self.visualRect(index).left() < ANCHO_FLECHA
         ):
+            return index
+        return QModelIndex()
+
+    def mouseMoveEvent(self, event) -> None:  # noqa: N802 - API de Qt
+        encima = self._sobre_flecha(event.position().toPoint())
+        fila = encima.row() if encima.isValid() else -1
+        if fila != self.fila_flecha_encima:
+            self.fila_flecha_encima = fila
+            if fila >= 0:
+                self.viewport().setCursor(Qt.CursorShape.PointingHandCursor)
+            else:
+                self.viewport().unsetCursor()
+            self.viewport().update()
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event) -> None:  # noqa: N802 - API de Qt
+        if self.fila_flecha_encima >= 0:
+            self.fila_flecha_encima = -1
+            self.viewport().unsetCursor()
+            self.viewport().update()
+        super().leaveEvent(event)
+
+    def mousePressEvent(self, event) -> None:  # noqa: N802 - API de Qt
+        index = self._sobre_flecha(event.position().toPoint())
+        if event.button() == Qt.MouseButton.LeftButton and index.isValid():
             self.alternar(index)
             event.accept()
             return

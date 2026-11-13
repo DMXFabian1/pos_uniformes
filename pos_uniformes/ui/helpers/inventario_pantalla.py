@@ -441,7 +441,7 @@ class FichaInventario(QFrame):
         caja.addWidget(self.lote_nota)
         layout.addWidget(total)
         # Las acciones de lote viven SOLO en la barra de arriba de la lista (sin repetirlas aquí).
-        self.lote_donde = _etiqueta(AVISO_ACCIONES_EN_BARRA, "invFichaSub", envolver=True)
+        self.lote_donde = _etiqueta(AVISO_ACCIONES_EN_BARRA, "invSub", envolver=True)
         layout.addWidget(self.lote_donde)
         layout.addStretch(1)
         return pagina
@@ -455,7 +455,7 @@ TEXTO_LOTE_ETIQUETAS = "🏷  Imprimir etiquetas"
 TEXTO_LOTE_EXISTENCIAS = "🧮  Corregir existencias"
 TEXTO_LOTE_PRECIO = "💲  Cambiar precio"
 TEXTO_LOTE_QUITAR = "✕  Quitar selección"
-AVISO_ACCIONES_EN_BARRA = "Imprimir, corregir existencias o cambiar el precio de estas tallas: en la barra de arriba de la lista."
+AVISO_ACCIONES_EN_BARRA = "Imprimir, corregir existencias o cambiar precio: en la barra de arriba de la lista."
 
 
 def texto_imprimir_etiquetas(cantidad: int) -> str:

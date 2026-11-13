@@ -19,7 +19,7 @@ from PyQt6.QtWidgets import QApplication, QMessageBox
 
 from pos_uniformes.services.inventario_prenda_service import agrupar_por_prenda, paginar_prendas
 from pos_uniformes.ui.helpers.inventario_pantalla import LOTE, POR_PRENDA, POR_TALLA, TALLA, VACIA
-from pos_uniformes.ui.helpers.inventario_prendas_vista import COL_TALLAS, VistaPrendas
+from pos_uniformes.ui.helpers.inventario_prendas_vista import COL_PRECIO, COL_TALLAS, VistaPrendas, ancho_nombre_prenda
 from pos_uniformes.ui.main_window import MainWindow
 
 AHORA = datetime.now(tz=timezone.utc)
@@ -363,6 +363,44 @@ class InventarioTanda4PantallaTests(unittest.TestCase):
         for widget in cortables:
             self.assertGreaterEqual(widget.width(), widget.fontMetrics().horizontalAdvance(widget.text()), widget.text())
         self.assertGreaterEqual(arbol.viewport().height(), 4 * 46)
+
+    def test_a_1366_el_nombre_de_la_prenda_no_se_recorta_si_hay_lugar(self) -> None:
+        filas = [_fila(i, 3, talla=t, producto_id=6, producto="Falda tableada Colegio Muestra", color="Cuadros")
+                 for i, t in enumerate(("6", "8", "10"), start=1)]
+        filas += [_fila(10 + i, 4, talla=t, producto_id=4, producto="Bata infantil Jardín Arcoíris", color="Azul cielo")
+                  for i, t in enumerate(("4", "6", "8", "10", "12", "14"))]
+        window = self._ventana(filas, mostrar=True)
+        arbol = window.inventario_pantalla.prendas
+        falda = next(g for g in arbol.modelo.grupos if g.prenda.startswith("Falda"))
+        self.assertGreaterEqual(arbol.columnWidth(0), ancho_nombre_prenda(falda, arbol.font()))
+        self.assertGreaterEqual(arbol.columnWidth(COL_TALLAS), 220)
+        self.assertLessEqual(arbol.header().length(), arbol.viewport().width())
+
+    def test_oferta_va_antes_del_precio_como_en_por_talla(self) -> None:
+        filas = [dict(f) for f in FILAS]
+        filas[1].update(rebaja_tipo="oferta", rebaja_precio=Decimal(175))
+        window = self._ventana(filas)
+        modelo = window.inventario_pantalla.prendas.modelo
+        self.assertEqual(modelo.index(0, COL_PRECIO).data(), "Oferta $175–$289")
+        self.assertEqual(modelo.index(0, COL_PRECIO).data(Qt.ItemDataRole.ToolTipRole), "Oferta en 1 de 4 tallas")
+
+    def test_la_flecha_se_marca_al_pasar_el_mouse(self) -> None:
+        window = self._ventana(mostrar=True)
+        arbol = window.inventario_pantalla.prendas
+        rect = arbol.visualRect(arbol.modelo.index(0, 0))
+        QTest.mouseMove(arbol.viewport(), QPoint(rect.left() + 10, rect.center().y()))
+        self.assertEqual(arbol.fila_flecha_encima, 0)
+        self.assertEqual(arbol.viewport().cursor().shape(), Qt.CursorShape.PointingHandCursor)
+        QTest.mouseMove(arbol.viewport(), QPoint(rect.left() + 150, rect.center().y()))
+        self.assertEqual(arbol.fila_flecha_encima, -1)
+
+    def test_la_talla_desplegada_pesa_menos_que_su_prenda(self) -> None:
+        window = self._ventana()
+        modelo = window.inventario_pantalla.prendas.modelo
+        prenda = modelo.index(0, 0)
+        self.assertTrue(modelo.index(0, 0).data(Qt.ItemDataRole.FontRole).bold())
+        self.assertIsNone(modelo.index(0, COL_TALLAS, prenda).data(Qt.ItemDataRole.FontRole))
+        self.assertTrue(modelo.index(0, 2, prenda).data(Qt.ItemDataRole.FontRole).bold())  # «Hay»
 
     def test_agrupar_y_pintar_5200_tallas_tarda_menos_de_100_ms(self) -> None:
         tallas = ("4", "6", "8", "10", "12", "14", "16", "CH", "MD", "GD", "EXG", "UNI")
