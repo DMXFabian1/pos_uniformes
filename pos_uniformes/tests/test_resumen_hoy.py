@@ -53,7 +53,11 @@ class LoQueEntroTest(unittest.TestCase):
         self.assertIn("10 operaciones · 17 piezas", texto_hoy(_datos(), ahora=_AHORA))
 
     def test_sin_ventas_lo_dice_sin_inventar_ceros(self):
-        r = texto_hoy(_datos(operaciones=0, piezas=0), ahora=_AHORA)
+        # Sin operaciones Y sin dinero: la compra de una empleada sola no es
+        # operación pero sí trae dinero, y ahí sí se muestra (2026-11-12).
+        sin_nada = dict(operaciones=0, piezas=0, ventas=Decimal("0"),
+                        efectivo=Decimal("0"), tarjeta=Decimal("0"))
+        r = texto_hoy(_datos(**sin_nada), ahora=_AHORA)
         self.assertIn("Todavía no se registra ninguna venta", r)
         self.assertNotIn("Entró", r)
 
