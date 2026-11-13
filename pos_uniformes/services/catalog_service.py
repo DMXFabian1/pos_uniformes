@@ -133,9 +133,18 @@ class CatalogService:
         sacar del nombre (la anterior, si al editar se cambió de escuela)."""
         escuela = " ".join(str(escuela_nombre or "").split())
         name = str(base_name or "")
-        for otra in (escuela, *quitar):
-            if otra:
-                name = cls.nombre_sin_escuela(name, otra)
+        # De la más larga a la más corta: si la nueva («Miguel Hidalgo») está
+        # dentro de la anterior («Miguel Hidalgo (Rancho Nuevo)»), quitar
+        # primero la corta dejaría un pedazo de la larga en el nombre.
+        from pos_uniformes.services.catalogo_valores_service import normalizar
+
+        por_quitar = sorted(
+            (otra for otra in (escuela, *quitar) if otra),
+            key=lambda otra: len(normalizar(otra).split()),
+            reverse=True,
+        )
+        for otra in por_quitar:
+            name = cls.nombre_sin_escuela(name, otra)
         siglas = tuple(
             w.strip("().,") for otra in (escuela, *quitar) for w in str(otra or "").split()
             if len(w.strip("().,")) > 1 and w.strip("().,").isupper()
@@ -1039,7 +1048,6 @@ class CatalogService:
         session.delete(variante)
         cls._notify_meili(session)
 
-    @classmethod
     @staticmethod
     def _validar_producto_eliminable(session: Session, producto: Producto) -> None:
         """Una prenda que está en un uniforme o en una receta no se borra:

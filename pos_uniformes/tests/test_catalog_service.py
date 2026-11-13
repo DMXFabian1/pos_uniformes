@@ -66,6 +66,25 @@ class ArmarNombreTests(unittest.TestCase):
         )
 
 
+    def test_escuela_nueva_contenida_en_la_anterior(self) -> None:
+        # De «Miguel Hidalgo (Rancho Nuevo)» a «Miguel Hidalgo», con el
+        # nombre completo (como lo mandan scripts, Por nombrar o la API).
+        self.assertEqual(
+            C.armar_nombre(
+                "Pants 2pz Miguel Hidalgo (Rancho Nuevo)",
+                "Miguel Hidalgo",
+                quitar=("Miguel Hidalgo (Rancho Nuevo)",),
+            ),
+            "Pants 2pz Miguel Hidalgo",
+        )
+        self.assertEqual(
+            C.armar_nombre(
+                "Pants 2pz Miguel Hidalgo", "Miguel Hidalgo (Rancho Nuevo)", quitar=("Miguel Hidalgo",)
+            ),
+            "Pants 2pz Miguel Hidalgo (Rancho Nuevo)",
+        )
+
+
 class TitleCaseSiglasTests(unittest.TestCase):
     def test_siglas_conocidas_no_se_bajan_aunque_todo_venga_en_mayusculas(self) -> None:
         self.assertEqual(C._title_case("PANTS 3PZ DEPORTIVO ESTV 154"), "Pants 3pz Deportivo ESTV 154")
@@ -322,6 +341,10 @@ class BorrarYReactivarTests(_ConBase):
             C.eliminar_producto(self.s, self.admin, pants2)
         with self.assertRaisesRegex(ValueError, "tiene receta"):
             C.eliminar_producto(self.s, self.admin, pants3)
+
+    def test_validar_eliminable_es_staticmethod_simple(self) -> None:
+        # @classmethod encima de @staticmethod deja de funcionar en Python 3.13.
+        self.assertIsInstance(C.__dict__["_validar_producto_eliminable"], staticmethod)
 
     def test_borra_la_que_esta_suelta(self) -> None:
         p = self._producto("Short", None)
