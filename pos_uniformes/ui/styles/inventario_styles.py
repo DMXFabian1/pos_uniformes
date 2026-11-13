@@ -192,6 +192,15 @@ QTreeView#invPrendas QHeaderView::section {{
 }}
 QTreeView#invPrendas QHeaderView::section:hover {{ color: {VINO}; }}
 
+/* ── Barra de lote: discreta, vino suave, arriba de la lista ── */
+QFrame#invLote {{ background: {VINO_SUAVE}; border: 1px solid #e3c6d1; border-radius: 12px; }}
+QLabel#invLoteTexto {{ font-size: 13px; font-weight: 800; color: {VINO}; }}
+QPushButton#invLoteAccion {{
+    background: transparent; color: {VINO}; border: none; border-radius: 9px;
+    padding: 0 9px; min-height: 30px; font-size: 13px; font-weight: 700;
+}}
+QPushButton#invLoteAccion:hover {{ background: #ecd5de; }}
+QPushButton#invLoteAccion:disabled {{ color: #c4a9b4; }}
 QPushButton#invFlecha {{
     background: transparent; color: {VINO}; border: 1px solid {TARJETA_BORDE}; border-radius: 14px;
     min-width: 28px; max-width: 28px; min-height: 28px; max-height: 28px; padding: 0;

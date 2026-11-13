@@ -1,5 +1,5 @@
 """Pestaña Inventario, tanda 4 «Por prenda» (2026-11-13): cambiar de vista,
-escalera, desplegar, elegir prenda o talla, ficha, escaneo,
+escalera, desplegar, elegir prenda o talla, ficha, barra de lote, escaneo,
 tarjetas, páginas por prenda, 1366 px y rendimiento con ~5,200 tallas."""
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtCore import QEvent, QItemSelectionModel, QPoint, Qt
 from PyQt6.QtTest import QTest
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QMessageBox
 
 from pos_uniformes.services.inventario_prenda_service import agrupar_por_prenda, paginar_prendas
 from pos_uniformes.ui.helpers.inventario_pantalla import LOTE, POR_PRENDA, POR_TALLA, TALLA, VACIA
@@ -168,12 +168,13 @@ class InventarioTanda4PantallaTests(unittest.TestCase):
         self.assertEqual(window.inventory_variant_combo.currentData(), 1)
         self.assertEqual(pantalla.ficha.estado(), TALLA)
         self.assertEqual(pantalla.ficha.hay.text(), "5")
+        self.assertFalse(pantalla.barra_lote.isVisibleTo(pantalla.barra_lote.parentWidget() or pantalla.barra_lote))
         # Doble clic en la talla: lo de siempre (editar).
         window._handle_inventory_table_double_click = Mock()
         arbol.doubleClicked.emit(arbol.modelo.index(3, 0, prenda))
         window._handle_inventory_table_double_click.assert_called_once_with()
 
-    def test_elegir_la_prenda_elige_todas_sus_tallas(self) -> None:
+    def test_elegir_la_prenda_elige_todas_sus_tallas_y_sale_la_barra_de_lote(self) -> None:
         window = self._ventana()
         pantalla = window.inventario_pantalla
         arbol = pantalla.prendas
@@ -181,12 +182,61 @@ class InventarioTanda4PantallaTests(unittest.TestCase):
         self.assertEqual(sorted(window._selected_inventory_variant_ids()), [1, 2, 3, 4])
         self.assertEqual(pantalla.ficha.estado(), LOTE)
         self.assertEqual(pantalla.ficha.lote_total.text(), "4 tallas · 7 piezas")
+        barra = pantalla.barra_lote
+        self.assertFalse(barra.isHidden())
+        self.assertEqual(barra.texto.text(), "4 tallas · 7 piezas")
+        self.assertEqual(barra.etiquetas.text(), "🏷  Imprimir 4 etiquetas")
         # Prenda + una talla de otra prenda: se suman sin repetir.
         otra = arbol.modelo.index(1, 0)
         arbol.setExpanded(otra, True)
         self._elegir(arbol, arbol.modelo.index(0, 0), arbol.modelo.index(0, 0, otra))
         self.assertEqual(sorted(window._selected_inventory_variant_ids()), [1, 2, 3, 4, 5])
-        self.assertEqual(pantalla.ficha.lote_total.text(), "5 tallas · 13 piezas")
+        self.assertEqual(barra.texto.text(), "5 tallas · 13 piezas")
+
+    def test_la_barra_de_lote_usa_los_manejadores_de_siempre(self) -> None:
+        window = self._ventana()
+        pantalla = window.inventario_pantalla
+        arbol = pantalla.prendas
+        for nombre in ("_handle_inventory_bulk_adjustment", "_handle_inventory_bulk_price_update", "_handle_inventory_print_label"):
+            setattr(window, nombre, Mock())
+        self._elegir(arbol, arbol.modelo.index(0, 0))
+        barra = pantalla.barra_lote
+        barra.existencias.click()
+        barra.precio.click()
+        barra.etiquetas.click()
+        window._handle_inventory_bulk_adjustment.assert_called_once_with()
+        window._handle_inventory_bulk_price_update.assert_called_once_with()
+        window._handle_inventory_print_label.assert_called_once_with()
+        barra.quitar.click()
+        self.assertEqual(window._selected_inventory_variant_ids(), [])
+        self.assertEqual(arbol.selectionModel().selectedRows(), [])
+        self.assertTrue(barra.isHidden())
+        self.assertEqual(pantalla.ficha.estado(), VACIA)
+
+    def test_etiquetas_de_mas_de_200_tallas_piden_confirmar_desde_la_barra(self) -> None:
+        filas = [_fila(i, 1, talla=str(i)) for i in range(1, 206)]
+        window = self._ventana(filas)
+        pantalla = window.inventario_pantalla
+        window._handle_inventory_print_label = Mock()
+        self._elegir(pantalla.prendas, pantalla.prendas.modelo.index(0, 0))
+        with patch("pos_uniformes.ui.helpers.inventario_pantalla.QMessageBox.question",
+                   return_value=QMessageBox.StandardButton.No) as pregunta:
+            pantalla.barra_lote.etiquetas.click()
+        pregunta.assert_called_once()
+        window._handle_inventory_print_label.assert_not_called()
+
+    def test_la_barra_de_lote_tambien_sale_en_por_talla(self) -> None:
+        window = self._ventana(por_prenda=False)
+        pantalla = window.inventario_pantalla
+        tabla = window.inventory_table
+        modelo = tabla.selectionModel()
+        for fila in (0, 1, 2):
+            modelo.select(tabla.model().index(fila, 0),
+                          QItemSelectionModel.SelectionFlag.Select | QItemSelectionModel.SelectionFlag.Rows)
+        self.assertFalse(pantalla.barra_lote.isHidden())
+        self.assertTrue(pantalla.barra_lote.texto.text().startswith("3 tallas"))
+        pantalla.barra_lote.quitar.click()
+        self.assertTrue(pantalla.barra_lote.isHidden())
 
     # ── Escaneo, tarjetas y páginas ─────────────────────────────────────
 
@@ -269,7 +319,8 @@ class InventarioTanda4PantallaTests(unittest.TestCase):
         self.assertLessEqual(arbol.header().length(), arbol.viewport().width())
         self.assertGreaterEqual(arbol.columnWidth(0), 180)
         self.assertGreaterEqual(arbol.columnWidth(COL_TALLAS), 220)
-        cortables = [*pantalla.segmento]
+        barra = pantalla.barra_lote
+        cortables = [barra.texto, barra.etiquetas, barra.existencias, barra.precio, barra.quitar, *pantalla.segmento]
         for widget in cortables:
             self.assertGreaterEqual(widget.width(), widget.fontMetrics().horizontalAdvance(widget.text()), widget.text())
         self.assertGreaterEqual(arbol.viewport().height(), 4 * 46)

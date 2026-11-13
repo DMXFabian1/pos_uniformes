@@ -383,6 +383,8 @@ def _tabla(window: "MainWindow", pantalla: InventarioPantalla) -> QFrame:
     caja = QVBoxLayout(tarjeta)
     caja.setContentsMargins(10, 8, 10, 8)
     caja.setSpacing(6)
+    # Barra de lote (2+ tallas elegidas) arriba de la lista, en las dos vistas.
+    caja.addWidget(pantalla.barra_lote)
     # Las dos listas en una pila: «Por talla» (la tabla) y «Por prenda» (el árbol).
     # La tabla sigue llena aunque se vea el árbol: de ella leen la selección los manejadores.
     pila = QStackedWidget()
