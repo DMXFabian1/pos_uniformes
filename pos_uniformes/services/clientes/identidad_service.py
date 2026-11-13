@@ -56,6 +56,64 @@ def tipos_activos(session: Session) -> list[ClienteTipo]:
         session.scalars(select(ClienteTipo).where(ClienteTipo.activo.is_(True)).order_by(ClienteTipo.orden, ClienteTipo.id))
     )
 
+
+def clave_desde_enum(tipo_cliente: TipoCliente | None) -> str:
+    """La clave del catálogo que corresponde al enum viejo (PROFESOR = DOCENTE)."""
+    return _CLAVE_DESDE_ENUM.get(tipo_cliente, TIPO_GENERAL)
+
+
+def enum_desde_clave(clave: str | None) -> TipoCliente:
+    """El enum viejo más cercano a una clave del catálogo, solo para dejar
+    `Cliente.tipo_cliente` coherente (2026-11-12: nadie vivo lo lee ya).
+    DOCENTE → PROFESOR; MAYORISTA e INSTITUCION → MAYORISTA; lo demás GENERAL."""
+    clave = (clave or "").strip().upper()
+    if clave == "DOCENTE":
+        return TipoCliente.PROFESOR
+    if clave in {"MAYORISTA", "INSTITUCION"}:
+        return TipoCliente.MAYORISTA
+    return TipoCliente.GENERAL
+
+
+EVENTO_CAMBIO_TIPO = "cambio_tipo"
+
+
+def aplicar_tipo(
+    session: Session,
+    cliente: Cliente,
+    clave: str,
+    *,
+    usuario_id: int | None = None,
+    respetar_institucion: bool = False,
+    origen: str | None = None,
+) -> bool:
+    """Pone a `cliente` el tipo del catálogo `clave` (`tipo_cliente_id`, el
+    que manda) y deja el evento `cambio_tipo`, como `admin_service.cambiar_tipo`.
+
+    El tipo no da nivel, descuento ni programa: no toca nada de eso (los
+    beneficios vienen de las membresías). Con `respetar_institucion`, pedir
+    MAYORISTA a una Institución la deja Institución (la misma regla que al
+    aprobar Maximoda Mayorista). Devuelve si cambió. 2026-11-12."""
+    clave = (clave or "").strip().upper()
+    tipo = tipo_por_clave(session, clave)
+    if tipo is None or not tipo.activo:
+        raise ValueError(f"El tipo de cliente {clave} no existe o no está activo.")
+    if cliente.tipo_cliente_id == tipo.id:
+        return False
+    anterior = session.get(ClienteTipo, cliente.tipo_cliente_id) if cliente.tipo_cliente_id is not None else None
+    if respetar_institucion and clave == "MAYORISTA" and anterior is not None and anterior.clave == "INSTITUCION":
+        return False
+    cliente.tipo_cliente_id = int(tipo.id)
+    session.add(cliente)
+    registrar_evento(
+        session,
+        cliente,
+        EVENTO_CAMBIO_TIPO,
+        detalle={"antes": anterior.clave if anterior is not None else None, "despues": str(tipo.clave)},
+        usuario_id=usuario_id,
+        origen=origen,
+    )
+    return True
+
 ORIGEN_VENTA_RAPIDA = "venta_rapida"
 ORIGEN_PRESUPUESTO_KIOSKO = "presupuesto_kiosko"
 ORIGEN_POS_ADMIN = "pos_admin"

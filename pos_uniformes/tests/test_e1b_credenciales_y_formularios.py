@@ -221,6 +221,22 @@ class AccionesDeConfiguracionTests(_Qt):
         self.assertEqual(Decimal(cliente.descuento_preferente), Decimal("0.00"))
         self.assertEqual(cliente.origen_alta, ids.ORIGEN_POS_ADMIN)
 
+    def test_tipo_clave_del_formulario_llega_a_tipo_cliente_id(self) -> None:
+        """2026-11-12: el `tipo_clave` del combo nuevo se guarda en el tipo que manda."""
+        from pos_uniformes.database.models import ClienteTipo
+        from pos_uniformes.services.settings_client_action_service import load_settings_client_prompt_snapshot
+
+        payload = {"nombre": "Cliente tipo", "tipo_cliente": "PROFESOR", "tipo_clave": "DOCENTE",
+                   "descuento_preferente": "0.00", "telefono": "9988776644", "notas": ""}
+        creado = create_settings_client(self.s, admin_user_id=self.admin_id, payload=payload)
+        cliente = self.s.query(Cliente).filter_by(codigo_cliente=creado.client_code).one()
+        self.assertEqual(load_settings_client_prompt_snapshot(self.s, client_id=cliente.id).tipo_clave, "DOCENTE")
+        update_settings_client(self.s, admin_user_id=self.admin_id, client_id=cliente.id,
+                               payload={**payload, "tipo_cliente": "MAYORISTA", "tipo_clave": "INSTITUCION"})
+        self.s.flush()
+        self.s.refresh(cliente)
+        self.assertEqual(self.s.get(ClienteTipo, cliente.tipo_cliente_id).clave, "INSTITUCION")
+
 
 if __name__ == "__main__":
     unittest.main()

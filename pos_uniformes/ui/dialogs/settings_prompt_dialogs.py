@@ -196,6 +196,7 @@ def prompt_client_data(
     helper_text: str,
     current_values: dict[str, str] | None = None,
     descuento_bloqueado: bool = False,
+    tipos: list[tuple[str, str]] | None = None,
 ) -> dict[str, str] | None:
     """Captura los datos del cliente.
 
@@ -203,15 +204,26 @@ def prompt_client_data(
     descuento preferente; el diccionario devuelto siempre trae
     `descuento_preferente = "0.00"` (el servicio lo ignora). `descuento_bloqueado`
     se acepta por compatibilidad y ya no cambia nada.
+
+    2026-11-12 (Daniel: «la caja antigua ya no es de utilidad»): con `tipos`
+    (pares clave, nombre de `tipos_para_combo`, el catálogo `ClienteTipo`)
+    el combo ofrece los tipos que mandan (Docente, Institución…) y el
+    resultado trae `tipo_clave`, que el servicio guarda en `tipo_cliente_id`;
+    `tipo_cliente` sigue llegando, con el enum viejo más cercano. Sin
+    `tipos`, el combo de siempre (enum viejo) para quien aún no los pasa.
     """
     del descuento_bloqueado
     dialog, layout = _create_settings_prompt_dialog(parent, title, helper_text, width=560)
     form = QFormLayout()
     name_input = QLineEdit()
     client_type_combo = QComboBox()
-    client_type_combo.addItem("GENERAL", TipoCliente.GENERAL)
-    client_type_combo.addItem("PROFESOR", TipoCliente.PROFESOR)
-    client_type_combo.addItem("MAYORISTA", TipoCliente.MAYORISTA)
+    if tipos:
+        for clave, nombre in tipos:
+            client_type_combo.addItem(str(nombre), str(clave))
+    else:
+        client_type_combo.addItem("GENERAL", TipoCliente.GENERAL)
+        client_type_combo.addItem("PROFESOR", TipoCliente.PROFESOR)
+        client_type_combo.addItem("MAYORISTA", TipoCliente.MAYORISTA)
     phone_input = QLineEdit()
     notes_input = QTextEdit()
     notes_input.setMinimumHeight(90)
@@ -220,8 +232,11 @@ def prompt_client_data(
     notes_input.setPlaceholderText("Notas internas o referencias")
     if current_values:
         name_input.setText(current_values.get("nombre", ""))
-        initial_type = current_values.get("tipo_cliente", TipoCliente.GENERAL.value)
-        type_index = client_type_combo.findData(TipoCliente(initial_type))
+        if tipos:
+            type_index = client_type_combo.findData(str(current_values.get("tipo_clave", "") or "").upper())
+        else:
+            initial_type = current_values.get("tipo_cliente", TipoCliente.GENERAL.value)
+            type_index = client_type_combo.findData(TipoCliente(initial_type))
         client_type_combo.setCurrentIndex(type_index if type_index >= 0 else 0)
         phone_input.setText(current_values.get("telefono", ""))
         notes_input.setPlainText(current_values.get("notas", ""))
@@ -234,13 +249,21 @@ def prompt_client_data(
     layout.addWidget(_build_prompt_buttons(dialog))
     if dialog.exec() != int(QDialog.DialogCode.Accepted):
         return None
-    return {
+    datos = {
         "nombre": name_input.text().strip(),
-        "tipo_cliente": str((client_type_combo.currentData() or TipoCliente.GENERAL).value),
         "descuento_preferente": "0.00",
         "telefono": phone_input.text().strip(),
         "notas": notes_input.toPlainText().strip(),
     }
+    if tipos:
+        from pos_uniformes.services.clientes.identidad_service import enum_desde_clave
+
+        clave = str(client_type_combo.currentData() or "GENERAL")
+        datos["tipo_clave"] = clave
+        datos["tipo_cliente"] = enum_desde_clave(clave).value
+    else:
+        datos["tipo_cliente"] = str((client_type_combo.currentData() or TipoCliente.GENERAL).value)
+    return datos
 
 
 def prompt_employee_data(

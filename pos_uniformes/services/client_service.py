@@ -4,10 +4,10 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from sqlalchemy import String, cast, func, or_, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
-from pos_uniformes.database.models import Cliente, RolUsuario, TipoCliente, Usuario
+from pos_uniformes.database.models import Cliente, ClienteTipo, RolUsuario, TipoCliente, Usuario
 from pos_uniformes.services.clientes import identidad_service
 from pos_uniformes.services.clientes.telefono import normalizar_telefono
 
@@ -28,13 +28,23 @@ class ClientService:
         normalized_search = search_text.strip().lower()
         if normalized_search:
             like_term = f"%{normalized_search}%"
+            # 2026-11-12 (Daniel: «la caja antigua ya no es de utilidad»): el
+            # tipo se busca en el catálogo (`ClienteTipo` por
+            # `tipo_cliente_id`, el que manda), no en el enum viejo, que no
+            # tiene «docente» ni «institución».
+            tipo_coincide = select(ClienteTipo.id).where(
+                or_(
+                    func.lower(ClienteTipo.nombre).like(like_term),
+                    func.lower(ClienteTipo.clave).like(like_term),
+                )
+            )
             statement = statement.where(
                 or_(
                     func.lower(Cliente.codigo_cliente).like(like_term),
                     func.lower(Cliente.nombre).like(like_term),
                     func.lower(func.coalesce(Cliente.telefono, "")).like(like_term),
                     func.lower(func.coalesce(Cliente.notas, "")).like(like_term),
-                    func.lower(cast(Cliente.tipo_cliente, String)).like(like_term),
+                    Cliente.tipo_cliente_id.in_(tipo_coincide),
                     # 2026-11-12: ya no se busca por el nivel viejo
                     # (`nivel_lealtad`), que se retiró.
                 )
@@ -63,6 +73,7 @@ class ClientService:
         descuento_preferente: Decimal = Decimal("0.00"),
         telefono: str = "",
         notas: str = "",
+        tipo_clave: str | None = None,
     ) -> Cliente:
         cls._validar_admin(admin_user)
         # E1-B (R1, K1): el alta del ADMIN nace sin nivel y con descuento 0.
@@ -76,7 +87,8 @@ class ClientService:
                 nombre=nombre,
                 telefono=telefono,
                 origen=identidad_service.ORIGEN_POS_ADMIN,
-                tipo_cliente=tipo_cliente,
+                tipo_cliente=identidad_service.enum_desde_clave(tipo_clave) if tipo_clave else tipo_cliente,
+                tipo_clave=tipo_clave or None,
                 notas=notas,
                 usuario_id=getattr(admin_user, "id", None),
                 exigir_telefono_valido=True,
@@ -129,6 +141,7 @@ class ClientService:
         descuento_preferente: Decimal = Decimal("0.00"),
         telefono: str = "",
         notas: str = "",
+        tipo_clave: str | None = None,
     ) -> Cliente:
         cls._validar_admin(admin_user)
         normalized_name = nombre.strip()
@@ -140,7 +153,24 @@ class ClientService:
         # con nivel se le regresaba al nivel de su tipo.
         cls.normalize_discount(descuento_preferente)  # sigue validando el rango
         client.nombre = normalized_name
-        client.tipo_cliente = tipo_cliente
+        # 2026-11-12 (Daniel: «la caja antigua ya no es de utilidad, todo lo
+        # demás corre en libreta y kioskos»): el tipo que manda es
+        # `tipo_cliente_id` (catálogo `ClienteTipo`). Antes aquí solo se
+        # escribía el enum viejo y el tipo real no cambiaba. Se aplica con la
+        # misma regla que el alta y la aprobación de programas: no da nivel,
+        # descuento ni programa, deja su evento, y si el tipo llega del enum
+        # viejo (que no tiene Institución), MAYORISTA respeta a Institución.
+        clave = (tipo_clave or "").strip().upper() or identidad_service.clave_desde_enum(tipo_cliente)
+        identidad_service.aplicar_tipo(
+            session,
+            client,
+            clave,
+            usuario_id=getattr(admin_user, "id", None),
+            respetar_institucion=not tipo_clave,
+            origen=identidad_service.ORIGEN_POS_ADMIN,
+        )
+        # El enum viejo queda coherente (nadie vivo lo lee; se retira en la etapa R).
+        client.tipo_cliente = identidad_service.enum_desde_clave(clave) if tipo_clave else tipo_cliente
         client.telefono = telefono.strip() or None
         client.telefono_normalizado = normalizar_telefono(client.telefono)
         client.notas = notas.strip() or None

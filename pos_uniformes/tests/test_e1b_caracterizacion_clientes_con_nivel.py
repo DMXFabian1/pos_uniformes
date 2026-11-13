@@ -60,6 +60,10 @@ class _SesionFalsa:
     def add(self, _obj):
         pass
 
+    def scalar(self, _stmt):
+        # 2026-11-12: editar aplica el tipo del catálogo (`tipo_cliente_id`).
+        return SimpleNamespace(id=7, clave="GENERAL", activo=True)
+
 
 def _cliente(i, nivel, tipo, preferente):
     return Cliente(

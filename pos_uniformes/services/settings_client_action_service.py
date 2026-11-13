@@ -15,6 +15,9 @@ class SettingsClientPromptSnapshot:
     discount_label: str
     phone: str
     notes: str
+    #: 2026-11-12: la clave del tipo que manda (`ClienteTipo` por
+    #: `tipo_cliente_id`); vacía en una ficha vieja sin tipo.
+    tipo_clave: str = ""
 
 
 @dataclass(frozen=True)
@@ -37,7 +40,18 @@ def load_settings_client_prompt_snapshot(session, *, client_id: int) -> Settings
         discount_label=str(Decimal(client.descuento_preferente).quantize(Decimal("0.01"))),
         phone=str(client.telefono or ""),
         notes=str(client.notas or ""),
+        tipo_clave=_clave_de_tipo(session, client),
     )
+
+
+def _clave_de_tipo(session, client) -> str:
+    tipo_id = getattr(client, "tipo_cliente_id", None)
+    if tipo_id is None:
+        return ""
+    from pos_uniformes.database.models import ClienteTipo
+
+    tipo = session.get(ClienteTipo, tipo_id)
+    return str(tipo.clave) if tipo is not None else ""
 
 
 def create_settings_client(
@@ -59,6 +73,7 @@ def create_settings_client(
         descuento_preferente=Decimal(str(payload["descuento_preferente"])),
         telefono=str(payload["telefono"]),
         notas=str(payload["notas"]),
+        tipo_clave=str(payload.get("tipo_clave") or "") or None,
     )
     session.flush()
     card_path, card_error = render_card(client) if render_card is not None else (None, None)
@@ -92,6 +107,7 @@ def update_settings_client(
         descuento_preferente=Decimal(str(payload["descuento_preferente"])),
         telefono=str(payload["telefono"]),
         notas=str(payload["notas"]),
+        tipo_clave=str(payload.get("tipo_clave") or "") or None,
     )
     session.flush()
     card_path, card_error = render_card(updated_client) if render_card is not None else (None, None)
