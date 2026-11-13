@@ -4508,6 +4508,9 @@ class QuoteSatelliteWindow(QMainWindow):
                     monto_total=monto,
                     monto_neto=_Dec(str(entry.get("monto_neto") or monto)),
                     pago_tarjeta=bool(entry.get("pago_tarjeta", False)),
+                    # Para que la regla única de «operación» la reconozca
+                    # también sin red (2026-11-12).
+                    descuento_empleada=bool(entry.get("descuento_empleada", False)),
                     detalle=items,
                 )
             )
@@ -4561,20 +4564,19 @@ class QuoteSatelliteWindow(QMainWindow):
         # Alineadas con las filas de la tabla MOVIMIENTOS (para poder borrar).
         self._libreta_rows_pintadas = list(rows)
 
-        from pos_uniformes.services.libreta_service import cuenta_como_operacion
+        from pos_uniformes.services.libreta_service import totales_libreta
 
-        # La compra de una empleada con precio especial no cuenta como
-        # operación ni como piezas.
-        total_ops = sum(1 for r in rows if cuenta_como_operacion(r))
-        total_piezas = sum(int(r.piezas or 0) for r in rows if cuenta_como_operacion(r))
-        total_comisiones = sum(int(getattr(r, "comisiones", 0) or 0) for r in rows)
-        ventas_count = sum(1 for r in rows if str(r.tipo) == "venta" and cuenta_como_operacion(r))
-        apartados_count = sum(1 for r in rows if str(r.tipo) == "apartado")
+        # Los totales salen de la regla única de la Libreta (2026-11-12): la
+        # compra de una empleada con precio especial no es operación, piezas,
+        # venta ni apartado; el dinero no cuenta las compras a cuenta.
+        totales = totales_libreta(rows, getattr(self, "_libreta_a_cuenta", {}) or {})
+        total_ops = totales.operaciones
+        total_piezas = totales.piezas
+        total_comisiones = totales.comisiones
+        ventas_count = totales.ventas
+        apartados_count = totales.apartados
         periodo = self._libreta_periodo_texto()
-        # El dinero (cajón, tarjeta) no cuenta las compras a cuenta de las
-        # empleadas: no entró nada, igual que en el corte (2026-11-12).
-        a_cuenta = getattr(self, "_libreta_a_cuenta", {}) or {}
-        filas_dinero = [r for r in rows if getattr(r, "id", None) not in a_cuenta]
+        filas_dinero = totales.filas_dinero
         cortes = resumir_por_dia(filas_dinero) if self._libreta_is_owner else []
         self._libreta_last_cortes = cortes
 
