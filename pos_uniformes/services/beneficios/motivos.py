@@ -9,6 +9,9 @@ from __future__ import annotations
 
 # ─── Rebajas (E7, C7, C13) ───
 REBAJA_SIN_OTRO_BENEFICIO = "REBAJA_SIN_OTRO_BENEFICIO"
+# Llegó una promo 3pz con el pants base rebajado (Daniel, 2026-11-12: «Sí,
+# que no aplique»). El kiosko ya no la arma; si llega, queda registrada.
+TRES_PZ_CON_PANTS_REBAJADO = "3PZ_CON_PANTS_REBAJADO"
 
 # ─── Mayorista (C4, T9) ───
 MAYOREO = "MAYOREO"

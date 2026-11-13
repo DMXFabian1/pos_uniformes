@@ -368,6 +368,24 @@ def base_monedero_con_comision(base: Decimal, pagado: Decimal, comision: Decimal
 # ─── Cálculo ─────────────────────────────────────────────────────────────
 
 
+def _marcar_3pz_con_pants_rebajado(grupos: list[_Grupo], motivos_ticket: list[str]) -> None:
+    """E7 y la promo 3pz (Daniel, 2026-11-12: «Sí, que no aplique»).
+
+    Si el pants base de la promo está en Oferta o Liquidación, la promo no
+    aplica y la playera va a su precio normal: eso lo arregla el kiosko
+    (`sports_uniform_pricing_service`). El motor no conoce el precio normal
+    de la playera ni qué playera va con qué pants, así que aquí solo queda la
+    huella: una línea que llega rebajada y marcada como promo 3pz es un pants
+    base rebajado. Cada línea 3pz de esa venta y el ticket llevan el motivo
+    `3PZ_CON_PANTS_REBAJADO` en la fotografía. Los importes no cambian."""
+    if not any(g.rebajada and g.es_3pz for g in grupos):
+        return
+    for g in grupos:
+        if g.es_3pz:
+            g.motivos.append(M.TRES_PZ_CON_PANTS_REBAJADO)
+    motivos_ticket.append(M.TRES_PZ_CON_PANTS_REBAJADO)
+
+
 def calcular(entrada: EntradaVenta) -> Calculo:
     validar(entrada)
     r = entrada.reglas
@@ -375,6 +393,7 @@ def calcular(entrada: EntradaVenta) -> Calculo:
     motivos_ticket: list[str] = []
 
     grupos = _agrupar(entrada.lineas)
+    _marcar_3pz_con_pants_rebajado(grupos, motivos_ticket)
     descuentos = _descuentos(grupos, entrada, motivos_ticket)
 
     # C4: la modalidad elegida se respeta aunque el descuento salga en $0.
