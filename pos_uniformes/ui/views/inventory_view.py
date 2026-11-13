@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
 )
 from pos_uniformes.ui.helpers.flow_layout import FlowLayout
 from pos_uniformes.ui.helpers.inventory_table_row_helper import INVENTORY_TABLE_HEADERS
+from pos_uniformes.ui.helpers.inventory_toggle_helper import etiqueta_boton_prenda, etiqueta_boton_talla
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
@@ -50,8 +51,8 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_stock_button.setText("Existencias")
     window.inventory_labels_button.setText("Etiquetas")
     window.inventory_more_button.setText("Más")
-    window.toggle_product_button.setText("Desactivar toda la prenda")
-    window.toggle_variant_button.setText("Desactivar esta talla")
+    window.toggle_product_button.setText(etiqueta_boton_prenda(True))
+    window.toggle_variant_button.setText(etiqueta_boton_talla(True))
     window.delete_product_button.setText("Eliminar prenda")
     window.delete_variant_button.setText("Eliminar talla")
     window.purchase_button.setText("Registrar entrada")

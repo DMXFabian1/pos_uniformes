@@ -273,8 +273,8 @@ class InventarioTanda2PantallaTests(unittest.TestCase):
 
     def test_botones_con_nombre_entendible(self) -> None:
         window = self._ventana()
-        self.assertEqual(window.toggle_variant_button.text(), "Desactivar esta talla")
-        self.assertEqual(window.toggle_product_button.text(), "Desactivar toda la prenda")
+        self.assertEqual(window.toggle_variant_button.text(), "Desactivar esta talla…")
+        self.assertEqual(window.toggle_product_button.text(), "Desactivar toda la prenda…")
 
 
 if __name__ == "__main__":

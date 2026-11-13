@@ -13,8 +13,8 @@ from typing import Iterable, Mapping
 
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 
-BOTON_TALLA = {True: "Desactivar esta talla", False: "Activar esta talla"}
-BOTON_PRENDA = {True: "Desactivar toda la prenda", False: "Activar toda la prenda"}
+BOTON_TALLA = {True: "Desactivar esta talla…", False: "Activar esta talla"}
+BOTON_PRENDA = {True: "Desactivar toda la prenda…", False: "Activar toda la prenda"}
 
 
 @dataclass(frozen=True)
@@ -64,13 +64,18 @@ def confirmacion_desactivar_prenda(producto: object, tallas: int | None = None) 
 
 
 def contar_tallas_de_prenda(filas: Iterable[Mapping[str, object]], producto_id: object) -> int | None:
+    """Cuántas tallas de la prenda se venden hoy (las ya desactivadas no cuentan)."""
     if producto_id in (None, ""):
         return None
     try:
         pid = int(producto_id)  # type: ignore[arg-type]
     except (TypeError, ValueError):
         return None
-    total = sum(1 for fila in filas if _entero(fila.get("producto_id")) == pid)
+    total = sum(
+        1
+        for fila in filas
+        if _entero(fila.get("producto_id")) == pid and fila.get("variante_activa", True) is not False
+    )
     return total or None
 
 

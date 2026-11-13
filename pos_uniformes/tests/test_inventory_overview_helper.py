@@ -19,8 +19,8 @@ class InventoryOverviewHelperTests(unittest.TestCase):
         self.assertEqual(view.status_badge.tone, "neutral")
         self.assertEqual(view.catalog_selection_label, "Elige una talla en Inventario para hacer cambios.")
         self.assertEqual(view.stock_badge.text, "—")  # «Sin stock» se leía como «agotado»
-        self.assertEqual(view.toggle_product_label, "Desactivar toda la prenda")
-        self.assertEqual(view.toggle_variant_label, "Desactivar esta talla")
+        self.assertEqual(view.toggle_product_label, "Desactivar toda la prenda…")
+        self.assertEqual(view.toggle_variant_label, "Desactivar esta talla…")
 
     def test_builds_error_view(self) -> None:
         view = build_error_inventory_overview_view()
@@ -71,7 +71,7 @@ class InventoryOverviewHelperTests(unittest.TestCase):
             view.catalog_selection_label,
             "SKU-001 | Playera deportiva | Deportivo | Playera | precio 199.00 | stock 2",
         )
-        self.assertEqual(view.toggle_product_label, "Desactivar toda la prenda")
+        self.assertEqual(view.toggle_product_label, "Desactivar toda la prenda…")
         self.assertEqual(view.toggle_variant_label, "Activar esta talla")
 
     def test_sanitizes_legacy_hash_in_product_name(self) -> None:

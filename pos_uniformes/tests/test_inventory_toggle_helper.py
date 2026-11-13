@@ -18,9 +18,9 @@ from pos_uniformes.ui.helpers.inventory_toggle_helper import (
 
 class BotonesTests(unittest.TestCase):
     def test_dicen_lo_que_hacen(self) -> None:
-        self.assertEqual(etiqueta_boton_talla(True), "Desactivar esta talla")
+        self.assertEqual(etiqueta_boton_talla(True), "Desactivar esta talla…")
         self.assertEqual(etiqueta_boton_talla(False), "Activar esta talla")
-        self.assertEqual(etiqueta_boton_prenda(True), "Desactivar toda la prenda")
+        self.assertEqual(etiqueta_boton_prenda(True), "Desactivar toda la prenda…")
         self.assertEqual(etiqueta_boton_prenda(False), "Activar toda la prenda")
 
 
@@ -51,6 +51,12 @@ class ConfirmacionTests(unittest.TestCase):
         self.assertEqual(contar_tallas_de_prenda(filas, 1), 2)
         self.assertIsNone(contar_tallas_de_prenda(filas, 9))
         self.assertIsNone(contar_tallas_de_prenda(filas, None))
+
+    def test_contar_tallas_no_cuenta_las_ya_desactivadas(self) -> None:
+        filas = [{"producto_id": 1, "variante_activa": True}] * 8 + [{"producto_id": 1, "variante_activa": False}] * 4
+        self.assertEqual(contar_tallas_de_prenda(filas, 1), 8)
+        todas_apagadas = [{"producto_id": 3, "variante_activa": False}] * 2
+        self.assertIsNone(contar_tallas_de_prenda(todas_apagadas, 3))
 
 
 class PreguntarTests(unittest.TestCase):

@@ -1312,7 +1312,7 @@ class MainWindow(QMainWindow):
         self.edit_product_name_input = QLineEdit()
         self.edit_product_description_input = QTextEdit()
         self.update_product_button = QPushButton("Guardar producto")
-        self.toggle_product_button = QPushButton("Desactivar toda la prenda")
+        self.toggle_product_button = QPushButton("Desactivar toda la prenda…")
         self.edit_variant_product_combo = QComboBox()
         self.edit_variant_sku_input = QLineEdit()
         self.edit_variant_size_input = QLineEdit()
@@ -1320,7 +1320,7 @@ class MainWindow(QMainWindow):
         self.edit_variant_price_input = QLineEdit()
         self.edit_variant_cost_input = QLineEdit()
         self.update_variant_button = QPushButton("Guardar presentacion")
-        self.toggle_variant_button = QPushButton("Desactivar esta talla")
+        self.toggle_variant_button = QPushButton("Desactivar esta talla…")
         self.delete_product_button = QPushButton("Eliminar producto")
         self.delete_variant_button = QPushButton("Eliminar presentacion")
 
