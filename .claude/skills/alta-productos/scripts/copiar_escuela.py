@@ -22,6 +22,9 @@ Uso (desde la raíz del repo):
 
 Los productos se emparejan por tipo de pieza + nombre sin escuela y sin color.
 No crea la escuela destino: si no existe, se da de alta en el POS primero.
+Las altas del plan las crea `aplicar_alta.py` con el motor del alta del POS
+(`services/alta_prenda_service.py`): mismos precios que el origen, existencia
+0, receta propuesta y bitácora «Copia de escuela: ORIGEN → DESTINO».
 """
 from __future__ import annotations
 
@@ -182,10 +185,15 @@ def main() -> int:
             },
             "color": color,
             "variantes": [
-                {"talla": v["talla"], "precio": float(v["precio_venta"]),
+                {"talla": v["talla"], "precio": float(v["precio_venta"]), "origen_precio": "del modelo",
                  **({"costo": float(v["costo_referencia"])} if v["costo_referencia"] is not None else {})}
                 for v in p["variantes"]
             ],
+            # Para la bitácora del motor del alta («Copia de escuela: A → B · modelo: …»).
+            "modelo": p["nombre"],
+            "origen": f"Copia de escuela: {args.origen} → {args.destino}",
+            # Sin pieza en el uniforme del origen, tampoco se liga en el destino.
+            "uniforme": False,
         }
         if p["id"] in pieza_origen:
             u = pieza_origen[p["id"]]

@@ -58,6 +58,8 @@ def motor(args, *, solo_lectura: bool = False):
     connect_args = {"connect_timeout": 5}
     if solo_lectura:
         connect_args["options"] = "-c default_transaction_read_only=on"
+    if str(url).startswith("sqlite"):
+        connect_args = {}  # base de ensayo en un archivo (pruebas de la skill)
     engine = create_engine(url, connect_args=connect_args)
     host = engine.url.host
     aviso = "" if host in LOCALES else "  ⚠ PRODUCCIÓN / RED"

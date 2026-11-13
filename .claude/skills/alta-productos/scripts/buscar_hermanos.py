@@ -18,6 +18,9 @@ Imprime:
      con su patrón (nombre sin escuela, marca, categoría, género, escudo,
      atributo, tallas, colores, precio por talla).
   3. Lo que ya existe para esa escuela (para no duplicar) y su uniforme.
+  4. Lo que elige el motor del alta del POS (el mismo de la pantalla
+     «Nueva prenda»): el modelo con «igual en N escuelas», el precio por
+     talla con de dónde sale, y «Ya tiene / Le falta» de la escuela.
 """
 from __future__ import annotations
 
@@ -225,6 +228,51 @@ def seccion_escuela(conn, productos: dict[int, dict], escuela: str) -> None:
         print(f"  Uniforme: no disponible en esta DB ({type(exc).__name__})")
 
 
+def seccion_motor(engine, args) -> None:
+    """Lo mismo que verá la pantalla «Nueva prenda»: el modelo que elige el
+    motor del alta (hermanos_service) con el precio por talla y de dónde sale
+    (precio_sugerido_service), y «Ya tiene / Le falta» de la escuela."""
+    from sqlalchemy import select
+    from sqlalchemy.orm import Session
+
+    from pos_uniformes.database.models import Escuela
+    from pos_uniformes.services import hermanos_service, precio_sugerido_service
+
+    print("\n## 4. Motor del alta del POS")
+    with Session(engine) as session:
+        escuela_id = None
+        if args.escuela:
+            escuela_id = session.scalar(select(Escuela.id).where(Escuela.nombre == args.escuela))
+        if args.pieza:
+            h = hermanos_service.buscar_modelo(session, args.pieza, args.nivel, escuela_id=escuela_id)
+            print(f"  {h.texto}")
+            if h.modelo:
+                from pos_uniformes.database.models import NivelEducativo, TipoPieza
+
+                pieza_id = session.scalar(select(TipoPieza.id).where(TipoPieza.nombre == h.tipo_pieza))
+                nivel_id = session.scalar(select(NivelEducativo.id).where(NivelEducativo.nombre == h.nivel)) \
+                    if h.nivel else None
+                filas = precio_sugerido_service.sugerir(
+                    session, pieza_id, nivel_id, [t.talla for t in h.modelo.tallas],
+                    modelo=h.modelo.precios, excluir_escuela_id=escuela_id,
+                )
+                print("  precio por talla: " + " ".join(
+                    f"{f.talla}:{f.precio:.0f}{'' if f.origen == 'como las demás' else '(' + f.origen + ')'}"
+                    for f in filas if f.precio is not None
+                ))
+                for alt in h.alternativas:
+                    print(f"  otro molde: {alt.nombre} ({alt.texto_iguales}) · {alt.texto_rango}")
+        if escuela_id is not None:
+            try:
+                c = hermanos_service.comparar_escuela(session, escuela_id, args.nivel)
+            except ValueError as exc:
+                print(f"  Ya tiene / Le falta: {exc}")
+                return
+            print(f"  {c.escuela} ({c.nivel}, contra {c.escuelas_del_nivel} escuelas):")
+            print("    ya tiene: " + ", ".join(f"{p.tipo_pieza} ({p.texto})" for p in c.ya_tiene))
+            print("    le falta: " + ", ".join(f"{p.tipo_pieza} ({p.texto})" for p in c.le_falta))
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--pieza")
@@ -246,6 +294,7 @@ def main() -> int:
         seccion_hermanos(productos, args, args.limite)
         if args.escuela:
             seccion_escuela(conn, productos, args.escuela)
+    seccion_motor(engine, args)
     return 0
 
 
