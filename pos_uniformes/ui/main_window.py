@@ -7880,7 +7880,7 @@ class MainWindow(QMainWindow):
             self.inventory_table.item(row_index, 0).setData(Qt.ItemDataRole.UserRole, row_view.variant_id)
             stock_item = self.inventory_table.item(row_index, INVENTORY_COLUMNA_STOCK)
             if stock_item is not None:
-                _set_table_badge_style(stock_item, row_view.stock_tone, con_fondo=row_view.stock_con_fondo)
+                _set_table_badge_style(stock_item, row_view.stock_tone, con_fondo=getattr(row_view, "stock_con_fondo", True))
 
     def _schedule_inventory_filter_refresh(self) -> None:
         self.inventory_filter_debounce_timer.start()
