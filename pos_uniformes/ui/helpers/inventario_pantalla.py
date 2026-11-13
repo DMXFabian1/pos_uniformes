@@ -36,6 +36,7 @@ from PyQt6.QtWidgets import (
 )
 
 from pos_uniformes.services.inventario_donde_service import texto_donde_completo
+from pos_uniformes.ui.helpers.history_filter_state_helper import build_history_clear_filter_state
 from pos_uniformes.services.inventario_existencia_service import es_fila_virtual
 from pos_uniformes.services.inventario_precio_service import LLAVE_PRECIO, LLAVE_TIPO, precio_efectivo
 from pos_uniformes.services.rebaja_service import ETIQUETAS as ETIQUETAS_REBAJA, fmt_corto
@@ -502,7 +503,9 @@ class InventarioPantalla(QObject):
             if not texto:
                 self._sku_escaneado = ""
             return
-        variante_id = buscar_sku_exacto(self.window.inventory_filtered_rows, texto)
+        # Se busca antes de la tarjeta: si el código no cae en la tarjeta prendida,
+        # `seleccionar` la apaga y elige la talla de todos modos.
+        variante_id = buscar_sku_exacto(self.filas_base, texto)
         if variante_id is None:
             return
         self._sku_escaneado = texto
@@ -712,7 +715,23 @@ class InventarioPantalla(QObject):
         indice = _indice_pestana(w, "Historial inventarios")
         if fila is None or indice is None:
             return
-        w.history_sku_input.setText(str(fila.get("sku", "")))
+        # Filtros de Historial limpios (como su «Quitar filtros»), con solo el código:
+        # un rango «Hoy» o un tipo «Ajuste» olvidados no deben esconder la historia.
+        limpio = build_history_clear_filter_state(w.history_from_input.minimumDate().toPyDate())
+        widgets = (w.history_source_combo, w.history_entity_combo, w.history_type_combo,
+                   w.history_from_input, w.history_to_input, w.history_sku_input)
+        for widget in widgets:
+            widget.blockSignals(True)
+        try:
+            w.history_source_combo.setCurrentIndex(limpio.source_index)
+            w.history_entity_combo.setCurrentIndex(limpio.entity_index)
+            w.history_type_combo.setCurrentIndex(limpio.type_index)
+            w.history_from_input.setDate(limpio.from_date)
+            w.history_to_input.setDate(limpio.to_date)
+            w.history_sku_input.setText(str(fila.get("sku", "")))
+        finally:
+            for widget in widgets:
+                widget.blockSignals(False)
         w._handle_history_filter()
         w.tabs.setCurrentIndex(indice)
 

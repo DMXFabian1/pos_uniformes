@@ -388,6 +388,37 @@ class InventarioTanda3PantallaTests(unittest.TestCase):
         window._handle_history_filter.assert_called_once_with()
         self.assertEqual(window.tabs.tabText(window.tabs.currentIndex()), "Historial inventarios")
 
+    def test_ver_movimientos_limpia_los_otros_filtros_del_historial(self) -> None:
+        from datetime import date
+
+        window = self._ventana()
+        window._handle_history_filter = Mock()
+        hoy = date.today()
+        window.history_from_input.blockSignals(True)
+        window.history_from_input.setDate(hoy)
+        window.history_from_input.blockSignals(False)
+        window.history_type_combo.blockSignals(True)
+        window.history_type_combo.setCurrentIndex(window.history_type_combo.count() - 1)
+        window.history_type_combo.blockSignals(False)
+        window.inventory_variant_combo.setCurrentIndex(window.inventory_variant_combo.findData(3))
+        window.inventario_pantalla.boton_movimientos.click()
+        self.assertEqual(window.history_sku_input.text(), "SKU000003")
+        self.assertEqual(window.history_type_combo.currentIndex(), 0)
+        self.assertEqual(window.history_from_input.date(), window.history_from_input.minimumDate())
+        window._handle_history_filter.assert_called_once_with()
+
+    def test_escanear_con_tarjeta_prendida_apaga_la_tarjeta_y_elige_la_talla(self) -> None:
+        window = self._ventana()
+        pantalla = window.inventario_pantalla
+        pantalla.tocar_tarjeta("negativo")
+        self.assertEqual(self._visibles(window), [1, 6])
+        with patch("pos_uniformes.services.meilisearch_service.is_available", return_value=False):
+            window.inventory_search_input.setText("SKU000004")
+            window._handle_inventory_filters_changed()
+        self.assertIsNone(pantalla.tarjeta)
+        self.assertEqual(window.inventory_variant_combo.currentData(), 4)
+        self.assertEqual(pantalla.ficha.estado(), TALLA)
+
     def test_ficha_de_varias_tallas(self) -> None:
         window = self._ventana()
         tabla = window.inventory_table
