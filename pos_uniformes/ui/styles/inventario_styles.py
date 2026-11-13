@@ -197,6 +197,7 @@ QLabel#invVacio {{
 QFrame#invAtender {{ background: transparent; border: none; border-bottom: 1px solid {LINEA}; border-radius: 0; }}
 QFrame#invAtender:hover {{ background: #faf6f0; }}
 QLabel#invAtenderTitulo {{ font-size: 13px; font-weight: 700; color: {TEXTO}; }}
+QLabel#invAtenderTalla {{ font-size: 12px; color: {TEXTO}; }}
 QLabel#invAtenderMotivo {{ font-size: 12px; color: {TENUE}; }}
 QLabel#invAtenderMotivo[tono="danger"] {{ color: #b3261e; font-weight: 700; }}
 QLabel#invNota {{ background: #faf6f0; color: {TENUE}; border-radius: 12px; padding: 10px 12px; font-size: 13px; }}

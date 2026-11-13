@@ -354,6 +354,21 @@ class InventarioTanda3PantallaTests(unittest.TestCase):
         self.assertEqual(window.inventory_variant_combo.currentData(), 6)
         self.assertEqual(ficha.estado(), TALLA)
 
+    def test_para_atender_con_nombre_largo_no_pierde_talla_ni_color(self) -> None:
+        largo = "Pants deportivo 2 piezas Instituto Bilingüe Las Américas Secundaria"
+        window = self._ventana([_fila(1, -2, talla="10", producto=largo), _fila(2, 0, talla="CH", producto=largo)])
+        self._mostrar_a_1366(window)
+        filas = window.inventario_pantalla.ficha.atender_botones
+        self.assertEqual(len(filas), 2)
+        for fila, talla in zip(filas, ("Talla 10", "Talla CH")):
+            self.assertEqual(fila.titulo.completo(), largo)
+            self.assertIn(largo, fila.titulo.toolTip())
+            self.assertTrue(fila.titulo.text().endswith("…"), fila.titulo.text())
+            self.assertLessEqual(fila.titulo.fontMetrics().horizontalAdvance(fila.titulo.text()), fila.titulo.width())
+            self.assertTrue(fila.talla.text().startswith(f"{talla} · Azul marino"))
+            self.assertGreaterEqual(fila.talla.width(), fila.talla.fontMetrics().horizontalAdvance(fila.talla.text()))
+        self.assertEqual(filas[0].motivo.text(), "En negativo (−2)")
+
     def test_ficha_de_una_talla(self) -> None:
         window = self._ventana()
         pantalla = window.inventario_pantalla

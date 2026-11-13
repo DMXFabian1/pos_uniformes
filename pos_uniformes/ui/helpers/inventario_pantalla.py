@@ -16,7 +16,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import TYPE_CHECKING, Callable, Mapping
 
-from PyQt6.QtCore import QObject, Qt, pyqtSignal
+from PyQt6.QtCore import QEvent, QObject, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -144,26 +144,70 @@ class TarjetaFiltro(QFrame):
 # ── Ficha derecha ────────────────────────────────────────────────────────
 
 
+class EtiquetaRecortada(QLabel):
+    """Un renglón que, si no cabe, termina en «…» y enseña el texto completo
+    al pasar el mouse (en vez de cortarse en seco)."""
+
+    def __init__(self, texto: str, nombre: str) -> None:
+        super().__init__()
+        self.setObjectName(nombre)
+        self.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
+        self.setMinimumWidth(1)
+        self._completo = ""
+        self.poner(texto)
+
+    def poner(self, texto: str) -> None:
+        self._completo = texto
+        self.setToolTip(texto)
+        self._recortar()
+
+    def completo(self) -> str:
+        return self._completo
+
+    def _recortar(self) -> None:
+        ancho = max(1, self.contentsRect().width())
+        self.setText(self.fontMetrics().elidedText(self._completo, Qt.TextElideMode.ElideRight, ancho))
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 - API de Qt
+        super().resizeEvent(event)
+        self._recortar()
+
+    def changeEvent(self, event) -> None:  # noqa: N802 - API de Qt
+        super().changeEvent(event)
+        if event.type() in (QEvent.Type.FontChange, QEvent.Type.StyleChange):
+            self._recortar()
+
+
 class FilaAtender(QFrame):
-    """Un renglón tocable de «Para atender»: la talla y por qué urge."""
+    """Un renglón tocable de «Para atender». Arriba la prenda (con «…» si es
+    larga); abajo la talla, el color y por qué urge, que nunca se pierden."""
 
     tocada = pyqtSignal(object)
 
-    def __init__(self, variante_id: object, titulo: str, motivo: str, tono: str, aviso: str = "") -> None:
+    def __init__(
+        self, variante_id: object, prenda: str, talla_color: str, motivo: str, tono: str, aviso: str = ""
+    ) -> None:
         super().__init__()
         self.variante_id = variante_id
         self.setObjectName("invAtender")
         self.setCursor(Qt.CursorShape.PointingHandCursor)
-        if aviso:
-            self.setToolTip(aviso)
         layout = QVBoxLayout(self)
         layout.setContentsMargins(6, 6, 6, 6)
-        layout.setSpacing(0)
-        self.titulo = _etiqueta(titulo, "invAtenderTitulo")
+        layout.setSpacing(1)
+        self.titulo = EtiquetaRecortada(prenda, "invAtenderTitulo")
+        if aviso:
+            self.titulo.setToolTip(f"{prenda}\n{aviso}")
+            self.setToolTip(aviso)
+        layout.addWidget(self.titulo)
+        abajo = QHBoxLayout()
+        abajo.setSpacing(0)
+        self.talla = _etiqueta(f"{talla_color} · " if talla_color else "", "invAtenderTalla")
         self.motivo = _etiqueta(motivo, "invAtenderMotivo")
         self.motivo.setProperty("tono", tono)
-        layout.addWidget(self.titulo)
-        layout.addWidget(self.motivo)
+        abajo.addWidget(self.talla)
+        abajo.addWidget(self.motivo)
+        abajo.addStretch(1)
+        layout.addLayout(abajo)
 
     def mousePressEvent(self, event) -> None:  # noqa: N802 - API de Qt
         if event.button() == Qt.MouseButton.LeftButton:
@@ -585,7 +629,8 @@ class InventarioPantalla(QObject):
             for fila in urgentes:
                 nueva = FilaAtender(
                     fila.get("variante_id"),
-                    f"{fila.get('producto_nombre_base', '')} · {texto_talla_color(fila)}",
+                    str(fila.get("producto_nombre_base") or fila.get("producto_nombre") or ""),
+                    texto_talla_color(fila),
                     motivo_para_atender(fila),
                     "danger" if int(fila.get("stock_actual") or 0) < 0 else "muted",
                     f"Código {fila.get('sku', '')}",
