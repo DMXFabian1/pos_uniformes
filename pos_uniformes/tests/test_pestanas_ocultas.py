@@ -176,7 +176,12 @@ class CajaFueraDelPosTests(unittest.TestCase):
 
 
 class KioskoConservaSuCorteTests(unittest.TestCase):
-    """El corte se hace en el kiosko y debe seguir igual."""
+    """El corte se hace en el kiosko y debe seguir igual.
+
+    Aquí solo se revisa que el kiosko conserve sus puntos de entrada; la
+    lógica del corte la ejercitan tests/test_corte_*.py,
+    test_caja_service.py, test_historial_cortes*.py y test_telegram_cortes.py.
+    """
 
     def test_el_kiosko_conserva_corte_retiro_e_historial(self) -> None:
         from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow

@@ -18,12 +18,11 @@ FLOW_GROUPS: "OrderedDict[str, dict[str, object]]" = OrderedDict(
             {
                 "title": "Caja y Cobro",
                 # 2026-11-12: la Caja antigua (cobro, promo manual, cliente
-                # de la venta) se retiró del POS; quedan el PIN, el cliente
-                # escaneado de Presupuestos y la sesión/corte de caja.
-                # 2026-11-12: también se retiraron del POS Movimientos y la
-                # sesión/corte de caja (Daniel: «no lo necesito, retira
-                # también movimientos y el corte»); el corte vive en el
-                # kiosko y lo cubren sus propias pruebas (test_corte_*).
+                # de la venta, PIN, Movimientos y sesión/corte de caja) se
+                # retiró del POS (Daniel: «no lo necesito, retira también
+                # movimientos y el corte»); de caja_cobro solo queda
+                # «cliente con y sin QR». El corte vive en el kiosko y lo
+                # cubren sus propias pruebas (test_corte_*).
                 "covers": (
                     "cliente con y sin QR",
                 ),
