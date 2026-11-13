@@ -209,7 +209,6 @@ from pos_uniformes.services.layaway_closure_service import (
 from pos_uniformes.services.layaway_creation_service import create_layaway_from_payload
 from pos_uniformes.services.layaway_detail_service import load_layaway_detail_snapshot
 from pos_uniformes.services.layaway_payment_action_service import register_layaway_payment
-from pos_uniformes.services.sale_loyalty_notice_service import build_sale_loyalty_transition_notice
 from pos_uniformes.services.sale_payment_context_service import build_sale_payment_note_context
 from pos_uniformes.services.sale_checkout_action_service import complete_sale_checkout
 from pos_uniformes.services.sale_discount_context_service import (
@@ -7627,21 +7626,6 @@ class MainWindow(QMainWindow):
         self.sale_sku_input.setFocus()
         return True
 
-    @staticmethod
-    def _build_sale_loyalty_transition_notice(
-        client_name: str,
-        previous_label: str,
-        new_label: str,
-        new_discount: Decimal | str | int | float,
-    ) -> str:
-        return build_sale_loyalty_transition_notice(
-            client_name=client_name,
-            previous_label=previous_label,
-            new_label=new_label,
-            new_discount=new_discount,
-            format_discount_label=MainWindow._format_discount_label,
-        )
-
     def _sale_discount_presets(self) -> list[Decimal]:
         try:
             with get_session() as session:
@@ -8763,7 +8747,6 @@ class MainWindow(QMainWindow):
                 credit_mode=self.sale_credit_mode,
                 seller_employee_code=self.sale_seller_employee_code or None,
                 seller_employee_display_name=self.sale_seller_employee_display_name or None,
-                build_notice=self._build_sale_loyalty_transition_notice,
             )
                 session.commit()
         except Exception as exc:  # noqa: BLE001
@@ -8781,7 +8764,6 @@ class MainWindow(QMainWindow):
             folio=result.folio,
             total=result.total,
             payment_method=result.payment_method,
-            loyalty_transition_notice=result.loyalty_transition_notice,
         )
         self._apply_sale_post_action_view(post_action_view)
 

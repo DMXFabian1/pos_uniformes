@@ -26,7 +26,6 @@ class SaleCheckoutActionServiceTests(unittest.TestCase):
         client_snapshot = SimpleNamespace(client=cliente)
         fake_checkout = SimpleNamespace(
             load_sale_client_checkout_snapshot=lambda session, selected_client_id: client_snapshot,
-            resolve_sale_loyalty_transition_notice=lambda snapshot, build_notice: "Cambio de nivel",
         )
         manual_calls: list[dict[str, object]] = []
         fake_manual = SimpleNamespace(log_authorized_promo=lambda session, **kwargs: manual_calls.append(kwargs))
@@ -75,7 +74,6 @@ class SaleCheckoutActionServiceTests(unittest.TestCase):
                 credit_mode=ModoOrigenVenta.OPERATOR_DIRECT,
                 seller_employee_code=None,
                 seller_employee_display_name=None,
-                build_notice=lambda *args: "Cambio de nivel",
             )
 
         self.assertEqual(
@@ -84,7 +82,6 @@ class SaleCheckoutActionServiceTests(unittest.TestCase):
                 folio="V-001",
                 total=Decimal("180.00"),
                 payment_method="Efectivo",
-                loyalty_transition_notice="Cambio de nivel",
             ),
         )
         self.assertEqual(venta.total, Decimal("180.00"))
@@ -132,7 +129,6 @@ class SaleCheckoutActionServiceTests(unittest.TestCase):
         )
         fake_checkout = SimpleNamespace(
             load_sale_client_checkout_snapshot=lambda session, selected_client_id: SimpleNamespace(client=None),
-            resolve_sale_loyalty_transition_notice=lambda snapshot, build_notice: "",
         )
         fake_manual = SimpleNamespace(log_authorized_promo=lambda session, **kwargs: None)
         fake_venta_service = SimpleNamespace(
@@ -178,7 +174,6 @@ class SaleCheckoutActionServiceTests(unittest.TestCase):
                 credit_mode=ModoOrigenVenta.UNASSIGNED,
                 seller_employee_code=None,
                 seller_employee_display_name=None,
-                build_notice=lambda *args: "",
             )
 
         self.assertEqual(

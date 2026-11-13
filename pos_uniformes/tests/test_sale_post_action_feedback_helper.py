@@ -10,12 +10,11 @@ from pos_uniformes.ui.helpers.sale_post_action_feedback_helper import (
 
 
 class SalePostActionFeedbackHelperTests(unittest.TestCase):
-    def test_build_sale_checkout_post_action_view_includes_feedback_and_notice(self) -> None:
+    def test_build_sale_checkout_post_action_view_includes_feedback(self) -> None:
         view = build_sale_checkout_post_action_view(
             folio="VTA-001",
             total=Decimal("169.00"),
             payment_method="Efectivo",
-            loyalty_transition_notice="Cliente sube a nivel Plata.",
         )
 
         self.assertEqual(
@@ -29,17 +28,8 @@ class SalePostActionFeedbackHelperTests(unittest.TestCase):
         self.assertTrue(view.reset_sale_form)
         self.assertTrue(view.focus_sale_input)
         self.assertTrue(view.play_feedback_sound)
-        self.assertEqual(view.notice_title, "Nivel actualizado para siguiente compra")
-        self.assertEqual(view.notice_message, "Cliente sube a nivel Plata.")
-
-    def test_build_sale_checkout_post_action_view_omits_empty_notice(self) -> None:
-        view = build_sale_checkout_post_action_view(
-            folio="VTA-002",
-            total=Decimal("250.00"),
-            payment_method="Transferencia",
-            loyalty_transition_notice="   ",
-        )
-
+        # 2026-11-12: ya no hay aviso de cambio de nivel («el nivel viejo
+        # retíralo», Daniel).
         self.assertIsNone(view.notice_title)
         self.assertIsNone(view.notice_message)
 

@@ -66,9 +66,6 @@ class VentaServiceLayawayTests(unittest.TestCase):
 
         with patch("pos_uniformes.services.venta_service.Venta", _FakeVenta), patch(
             "pos_uniformes.services.venta_service.VentaDetalle", _FakeVentaDetalle
-        ), patch(
-            "pos_uniformes.services.venta_service.LoyaltyService.refresh_client_level_from_sales",
-            return_value=None,
         ):
             venta = VentaService.crear_confirmada_desde_apartado(
                 session=session,
@@ -102,9 +99,6 @@ class VentaServiceLayawayTests(unittest.TestCase):
 
         with patch("pos_uniformes.services.venta_service.Venta", _FakeVenta), patch(
             "pos_uniformes.services.venta_service.VentaDetalle", _FakeVentaDetalle
-        ), patch(
-            "pos_uniformes.services.venta_service.LoyaltyService.refresh_client_level_from_sales",
-            return_value=None,
         ):
             venta = VentaService.crear_confirmada_desde_apartado(
                 session=session,
@@ -179,6 +173,97 @@ class VentaServiceLayawayTests(unittest.TestCase):
         self.assertEqual(venta.credit_mode, ModoOrigenVenta.OPERATOR_DIRECT)
         self.assertIsNone(venta.seller_employee_code)
         self.assertIsNone(venta.seller_employee_display_name)
+
+
+class VentaServiceNivelViejoRetiradoTests(unittest.TestCase):
+    """2026-11-12: «el nivel viejo retíralo» (Daniel). Cobrar, entregar un
+    apartado o cancelar una venta ya no revisa `nivel_lealtad` ni toca
+    `descuento_preferente` ni los metadatos de asignación."""
+
+    @staticmethod
+    def _cliente() -> SimpleNamespace:
+        return SimpleNamespace(
+            id=9,
+            codigo_cliente="CLI-000009",
+            nivel_lealtad="BASICO",
+            descuento_preferente=Decimal("5.00"),
+            nivel_asignado_por_user_id=None,
+            nivel_asignado_por_rol=None,
+            nivel_asignacion_motivo=None,
+        )
+
+    def _assert_cliente_intacto(self, cliente: SimpleNamespace) -> None:
+        self.assertEqual(cliente.nivel_lealtad, "BASICO")
+        self.assertEqual(cliente.descuento_preferente, Decimal("5.00"))
+        self.assertIsNone(cliente.nivel_asignado_por_user_id)
+        self.assertIsNone(cliente.nivel_asignacion_motivo)
+
+    def test_venta_service_ya_no_importa_loyalty_service(self) -> None:
+        from pos_uniformes.services import venta_service
+
+        self.assertFalse(hasattr(venta_service, "LoyaltyService"))
+
+    def test_confirmar_venta_no_cambia_nivel(self) -> None:
+        from pos_uniformes.database.models import EstadoVenta, RolUsuario
+
+        cliente = self._cliente()
+        venta = SimpleNamespace(
+            usuario=SimpleNamespace(activo=True, rol=RolUsuario.CAJERO, username="caja"),
+            estado=EstadoVenta.BORRADOR,
+            detalles=[SimpleNamespace(variante=None, cantidad=1)],
+            cliente=cliente,
+            folio="V-NIV-001",
+        )
+        session = _SessionStub()
+
+        VentaService.confirmar_venta(session, venta)
+
+        self.assertEqual(venta.estado, EstadoVenta.CONFIRMADA)
+        self._assert_cliente_intacto(cliente)
+
+    def test_crear_confirmada_desde_apartado_no_cambia_nivel(self) -> None:
+        cliente = self._cliente()
+        variante = SimpleNamespace(sku="PLY-001", producto=SimpleNamespace(nombre="Playera"))
+        apartado = SimpleNamespace(
+            detalles=[
+                SimpleNamespace(
+                    variante=variante,
+                    cantidad=1,
+                    precio_unitario=Decimal("100.00"),
+                    subtotal_linea=Decimal("100.00"),
+                )
+            ],
+            cliente=cliente,
+            total=Decimal("100.00"),
+        )
+        usuario = SimpleNamespace(activo=True, rol="CAJERO", username="caja")
+
+        with patch("pos_uniformes.services.venta_service.Venta", _FakeVenta), patch(
+            "pos_uniformes.services.venta_service.VentaDetalle", _FakeVentaDetalle
+        ):
+            VentaService.crear_confirmada_desde_apartado(
+                session=_SessionStub(), usuario=usuario, apartado=apartado, folio="ENT-NIV-001"
+            )
+
+        self._assert_cliente_intacto(cliente)
+
+    def test_cancelar_venta_no_cambia_nivel(self) -> None:
+        from pos_uniformes.database.models import EstadoVenta, RolUsuario
+
+        cliente = self._cliente()
+        venta = SimpleNamespace(
+            estado=EstadoVenta.CONFIRMADA,
+            detalles=[SimpleNamespace(variante=None, cantidad=1)],
+            cliente=cliente,
+            folio="V-NIV-002",
+            observacion=None,
+        )
+        admin = SimpleNamespace(activo=True, rol=RolUsuario.ADMIN, username="admin")
+
+        VentaService.cancelar_venta(_SessionStub(), venta, admin)
+
+        self.assertEqual(venta.estado, EstadoVenta.CANCELADA)
+        self._assert_cliente_intacto(cliente)
 
 
 if __name__ == "__main__":

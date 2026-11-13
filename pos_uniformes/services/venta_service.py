@@ -21,7 +21,6 @@ from pos_uniformes.database.models import (
     VentaDetalle,
 )
 from pos_uniformes.services.inventario_service import InventarioService
-from pos_uniformes.services.loyalty_service import LoyaltyService
 from pos_uniformes.services.sale_stock_policy import sale_stock_guard_enabled
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 
@@ -173,13 +172,9 @@ class VentaService:
         venta.confirmada_at = datetime.now(timezone.utc)
         session.add(venta)
         session.flush()
-        LoyaltyService.refresh_client_level_from_sales(
-            session,
-            venta.cliente,
-            actor_user=venta.usuario,
-            reason="venta_confirmada",
-            reference_time=venta.confirmada_at,
-        )
+        # 2026-11-12: ya no se revisa el nivel viejo del cliente al cobrar ni al
+        # cancelar («el nivel viejo retíralo», Daniel). El programa vigente vive
+        # en `membresia` y lo sube `subida_leal_service`.
         return venta
 
     @staticmethod
@@ -229,13 +224,9 @@ class VentaService:
                 venta.observacion = adjustment_note
         session.add(venta)
         session.flush()
-        LoyaltyService.refresh_client_level_from_sales(
-            session,
-            venta.cliente,
-            actor_user=usuario,
-            reason="venta_confirmada_apartado",
-            reference_time=venta.confirmada_at,
-        )
+        # 2026-11-12: ya no se revisa el nivel viejo del cliente al cobrar ni al
+        # cancelar («el nivel viejo retíralo», Daniel). El programa vigente vive
+        # en `membresia` y lo sube `subida_leal_service`.
         return venta
 
     @staticmethod
@@ -273,11 +264,7 @@ class VentaService:
 
         session.add(venta)
         session.flush()
-        LoyaltyService.refresh_client_level_from_sales(
-            session,
-            venta.cliente,
-            actor_user=admin_usuario,
-            reason="venta_cancelada",
-            reference_time=datetime.now(timezone.utc),
-        )
+        # 2026-11-12: ya no se revisa el nivel viejo del cliente al cobrar ni al
+        # cancelar («el nivel viejo retíralo», Daniel). El programa vigente vive
+        # en `membresia` y lo sube `subida_leal_service`.
         return venta

@@ -28,14 +28,14 @@ def build_sale_checkout_post_action_view(
     folio: str,
     total: Decimal,
     payment_method: str,
-    loyalty_transition_notice: str,
 ) -> SalePostActionView:
+    # 2026-11-12: sin aviso de cambio de nivel («el nivel viejo retíralo»,
+    # Daniel). `notice_title` y `notice_message` quedan en None.
     feedback = build_sale_checkout_success_feedback(
         folio=folio,
         total=total,
         payment_method=payment_method,
     )
-    notice_message = loyalty_transition_notice.strip()
     return SalePostActionView(
         feedback_message=feedback.message,
         feedback_tone=feedback.tone,
@@ -45,8 +45,6 @@ def build_sale_checkout_post_action_view(
         reset_sale_form=True,
         focus_sale_input=True,
         play_feedback_sound=True,
-        notice_title="Nivel actualizado para siguiente compra" if notice_message else None,
-        notice_message=notice_message or None,
     )
 
 

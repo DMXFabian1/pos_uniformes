@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-from typing import Callable
 
 from pos_uniformes.database.models import ModoOrigenVenta
 
@@ -14,7 +13,6 @@ class SaleCheckoutResult:
     folio: str
     total: Decimal
     payment_method: str
-    loyalty_transition_notice: str
 
 
 def complete_sale_checkout(
@@ -35,7 +33,6 @@ def complete_sale_checkout(
     credit_mode: ModoOrigenVenta,
     seller_employee_code: str | None,
     seller_employee_display_name: str | None,
-    build_notice: Callable[[str, str, str, Decimal], str],
 ) -> SaleCheckoutResult:
     (
         usuario_model,
@@ -101,15 +98,12 @@ def complete_sale_checkout(
             note="Promocion manual autorizada con codigo en caja.",
         )
 
-    loyalty_transition_notice = sale_checkout_service.resolve_sale_loyalty_transition_notice(
-        client_snapshot,
-        build_notice=build_notice,
-    )
+    # 2026-11-12: ya no hay aviso de cambio de nivel después de cobrar
+    # («el nivel viejo retíralo», Daniel).
     return SaleCheckoutResult(
         folio=folio,
         total=total,
         payment_method=payment_method,
-        loyalty_transition_notice=loyalty_transition_notice,
     )
 
 
