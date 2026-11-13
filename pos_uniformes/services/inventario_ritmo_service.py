@@ -10,7 +10,16 @@ MISMA regla, talla por talla, para la lista de Inventario:
   `DIAS_PARA_ACABARSE` días (14 = las `SEMANAS_DE_ALERTA` de Analítica).
 - «Se acabó y se vende»: hay 0 o menos y sí se vendió en esos días.
 
-Lo puro (`Ritmo`, `ritmo_de_fila`, `poner_datos_de_venta`) no sabe de base.
+Conjuntos (Pants 3pz, chamarra armada): la Libreta anota la venta con el
+SKU del conjunto, pero las existencias que bajan son las de sus piezas
+(`conjunto_service.descomponer`). `repartir_conjuntos` le pasa a cada pieza
+lo vendido como conjunto (cantidad × piezas de la receta, en la misma talla)
+para que su ritmo sea el real. De un grupo de alternativas cuenta la que más
+hay en esa talla, la misma que mueve la venta. La pieza que «queda» (cantidad
+negativa, el pants suelto de la chamarra) no se cuenta: entra, no sale.
+
+Lo puro (`Ritmo`, `ritmo_de_fila`, `poner_datos_de_venta`,
+`repartir_conjuntos`) no sabe de base.
 `CacheVentas` guarda lo leído unos minutos: la pestaña se refresca seguido y
 la Libreta se lee **una vez cada `MINUTOS_CACHE` minutos como máximo**. Si
 leerla falla, la pantalla sigue sin ese dato: nunca truena.
@@ -201,10 +210,86 @@ class CacheVentas:
         self._momento = None
 
 
+def repartir_conjuntos(
+    vendidas: Mapping[str, int], recetas: Mapping[str, Iterable[tuple[str, int]]]
+) -> dict[str, int]:
+    """A cada pieza, además de lo suyo, lo vendido como conjunto (cantidad × piezas).
+
+    `recetas` = {sku del conjunto (una talla): [(sku de la pieza, piezas que lleva)]}.
+    El SKU del conjunto se queda con lo suyo (su fila es virtual y no se mide).
+    """
+    salida = {str(sku): _entero(n) for sku, n in vendidas.items()}
+    for sku_conjunto, piezas in recetas.items():
+        vendidas_conjunto = _entero(vendidas.get(sku_conjunto))
+        if vendidas_conjunto <= 0:
+            continue
+        for sku_pieza, cantidad in piezas:
+            if _entero(cantidad) <= 0 or not sku_pieza:
+                continue
+            salida[sku_pieza] = salida.get(sku_pieza, 0) + vendidas_conjunto * _entero(cantidad)
+    return salida
+
+
+def cargar_recetas_por_sku(session) -> dict[str, list[tuple[str, int]]]:
+    """{SKU de cada talla de conjunto: [(SKU de la pieza en esa talla, cantidad)]} en dos consultas."""
+    from sqlalchemy import select
+
+    from pos_uniformes.database.models import ConjuntoComponente, Variante
+    from pos_uniformes.services.conjunto_service import _norm_talla, por_grupos
+
+    componentes = list(session.scalars(select(ConjuntoComponente)).all())
+    if not componentes:
+        return {}
+    productos = {int(c.conjunto_id) for c in componentes} | {int(c.componente_id) for c in componentes}
+    # Por producto y talla, la primera variante activa (como `_variantes_por_talla`).
+    por_talla: dict[int, dict[str, tuple[str, int]]] = {}
+    filas = session.execute(
+        select(Variante.producto_id, Variante.talla, Variante.sku, Variante.stock_actual)
+        .where(Variante.producto_id.in_(sorted(productos)), Variante.activo == True)  # noqa: E712
+        .order_by(Variante.id)
+    ).all()
+    for producto_id, talla, sku, stock in filas:
+        por_talla.setdefault(int(producto_id), {}).setdefault(_norm_talla(talla), (str(sku), _entero(stock)))
+    recetas: dict[int, list] = {}
+    for c in componentes:
+        recetas.setdefault(int(c.conjunto_id), []).append(c)
+    salida: dict[str, list[tuple[str, int]]] = {}
+    for conjunto_id, receta in recetas.items():
+        for talla, (sku_conjunto, _stock) in por_talla.get(conjunto_id, {}).items():
+            piezas: list[tuple[str, int]] = []
+            for grupo in por_grupos(receta):
+                if grupo[0].cantidad <= 0:
+                    continue
+                candidatas = [
+                    (por_talla[int(c.componente_id)][talla], int(c.cantidad))
+                    for c in grupo
+                    if talla in por_talla.get(int(c.componente_id), {})
+                ]
+                if candidatas:
+                    (sku_pieza, _), cantidad = max(candidatas, key=lambda par: par[0][1])
+                    piezas.append((sku_pieza, cantidad))
+            if piezas:
+                salida[sku_conjunto] = piezas
+    return salida
+
+
 def cargar_vendidas() -> dict[str, int]:
-    """Lo vendido por SKU en la Libreta en los últimos `DIAS_DE_RITMO` días (una consulta)."""
+    """Lo vendido por SKU en la Libreta en los últimos `DIAS_DE_RITMO` días, con los conjuntos repartidos.
+
+    Una consulta a la Libreta y dos a las recetas, cada `MINUTOS_CACHE` minutos
+    como máximo (la llama `CacheVentas`). Si las recetas fallan, se usa lo
+    vendido tal cual.
+    """
     from pos_uniformes.database.connection import get_session
     from pos_uniformes.services.analitica_tablero_service import vendidas_por_sku
 
     with get_session() as session:
-        return vendidas_por_sku(session)
+        vendidas = vendidas_por_sku(session)
+        if not vendidas:
+            return vendidas
+        try:
+            recetas = cargar_recetas_por_sku(session)
+        except Exception:  # noqa: BLE001 — sin recetas, el ritmo sale sin conjuntos
+            logger.warning("Inventario: no se pudieron leer las recetas de conjuntos.", exc_info=True)
+            return vendidas
+        return repartir_conjuntos(vendidas, recetas)

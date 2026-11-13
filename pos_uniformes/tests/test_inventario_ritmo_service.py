@@ -13,10 +13,13 @@ from pos_uniformes.services.inventario_ritmo_service import (
     SE_VA_A_ACABAR,
     CacheVentas,
     Ritmo,
+    cargar_recetas_por_sku,
     estado_de_fila,
     poner_datos_de_venta,
+    repartir_conjuntos,
     ritmo_de_fila,
 )
+from tests.test_conjunto_service import _Base as _BaseConjuntos
 
 
 class RitmoTests(unittest.TestCase):
@@ -132,6 +135,41 @@ class CacheTests(unittest.TestCase):
         cache.invalidar()
         cache.obtener()
         self.assertEqual(len(lecturas), 2)
+
+
+class RepartirConjuntosTests(unittest.TestCase):
+    def test_las_piezas_reciben_lo_vendido_como_conjunto(self) -> None:
+        """12 Pants 3pz talla 10 en 30 días = 12 pants 2pz y 12 playeras talla 10 que salieron."""
+        vendidas = {"P3-10": 12, "P2-10": 1, "OTRA": 4}
+        recetas = {"P3-10": [("P2-10", 1), ("PLAY-10", 1)], "P3-12": [("P2-12", 1)]}
+        self.assertEqual(repartir_conjuntos(vendidas, recetas), {
+            "P3-10": 12, "P2-10": 13, "PLAY-10": 12, "OTRA": 4,
+        })
+        # Con eso, 3 piezas alcanzan para unos 7 días: se va a acabar.
+        self.assertEqual(Ritmo(13, 3).estado, SE_VA_A_ACABAR)
+
+    def test_la_pieza_que_queda_y_la_cantidad_cuentan(self) -> None:
+        recetas = {"CHAM-10": [("P2-10", 1), ("SUELTO-10", -1)], "DOBLE-8": [("CALC-8", 2)]}
+        self.assertEqual(repartir_conjuntos({"CHAM-10": 3, "DOBLE-8": 2}, recetas), {
+            "CHAM-10": 3, "P2-10": 3, "DOBLE-8": 2, "CALC-8": 4,
+        })
+
+    def test_sin_recetas_queda_igual(self) -> None:
+        self.assertEqual(repartir_conjuntos({"A": 2}, {}), {"A": 2})
+
+
+class RecetasPorSkuTests(_BaseConjuntos):
+    def test_cada_talla_del_conjunto_apunta_a_sus_piezas_de_esa_talla(self) -> None:
+        self._armar()
+        recetas = cargar_recetas_por_sku(self.s)
+        p2, play, suelto = (self._var(p, "10").sku for p in (self.p2, self.play, self.suelto))
+        self.assertEqual(sorted(recetas[self._var(self.p3, "10").sku]), sorted([(p2, 1), (play, 1)]))
+        # La chamarra mueve el pants 2pz; el pants suelto que «queda» no cuenta como venta.
+        self.assertEqual(recetas[self._var(self.cham, "10").sku], [(p2, 1)])
+        self.assertNotIn(suelto, [sku for piezas in recetas.values() for sku, _ in piezas])
+
+    def test_sin_recetas_nada(self) -> None:
+        self.assertEqual(cargar_recetas_por_sku(self.s), {})
 
 
 if __name__ == "__main__":
