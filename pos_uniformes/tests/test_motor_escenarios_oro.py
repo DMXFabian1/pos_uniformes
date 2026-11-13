@@ -524,26 +524,28 @@ class BaseOroTests(_Monedero):
 
     # ─── Leal (D4 y C1–C3) ───
 
-    def test_leal_cuenta_lo_pagado_con_saldo(self) -> None:
-        """HOY (D4): el umbral suma `monto_total`, incluido lo que se pagó con Monedero."""
+    def test_leal_no_cuenta_lo_pagado_con_saldo(self) -> None:
+        """CAMBIA (2026-11-12): el umbral suma la base Leal; lo pagado con Monedero no cuenta."""
         self._club()
         venta = self._venta("3000", acreditar=False)
         venta.monto_monedero = D("200")
         self.s.flush()
         gasto = leal.gasto_del_periodo(self.s, self.cliente.id, hasta=datetime.now(timezone.utc), dias=365)
-        self.assertEqual(gasto, D("3000.00"))
+        self.assertEqual(gasto, D("2800.00"))
 
-    def test_leal_cuenta_las_ofertas(self) -> None:
-        """HOY: lo rebajado suma para Leal (la propuesta 1 dice que no)."""
+    def test_leal_no_cuenta_las_ofertas(self) -> None:
+        """CAMBIA (2026-11-12, propuesta 1): lo rebajado no suma para Leal."""
         self._club()
         self._venta("3000", items=[pants_oferta()])
-        self.assertEqual(self._clave(), "LEAL")
+        gasto = leal.gasto_del_periodo(self.s, self.cliente.id, hasta=datetime.now(timezone.utc), dias=365)
+        self.assertEqual(gasto, D("2825.00"))     # 3,000 − 175 de la oferta
+        self.assertEqual(self._clave(), "CLUB")
 
-    def test_leal_cuenta_compras_de_empleada_con_cliente(self) -> None:
-        """HOY: una compra con descuento de empleada y cliente identificado suma para Leal."""
+    def test_leal_no_cuenta_compras_de_empleada_con_cliente(self) -> None:
+        """CAMBIA (2026-11-12): una compra con descuento de empleada no suma para Leal."""
         self._club()
         self._venta("3000", descuento_empleada=True)
-        self.assertEqual(self._clave(), "LEAL")
+        self.assertEqual(self._clave(), "CLUB")
 
     def test_leal_la_venta_anulada_deja_de_contar_y_no_baja(self) -> None:
         """HOY: la anulación borra la venta (deja de sumar), pero quien ya subió se queda en Leal."""

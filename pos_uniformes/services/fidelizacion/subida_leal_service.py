@@ -10,6 +10,13 @@ su Club queda `reemplazada` y Leal activa, con su evento cada una.
   la de Leal (el Monedero mira el programa vigente cuando se hizo la venta).
 - Nunca tumba la venta: `subir_sin_bloquear` corre en su punto de guardado.
 - Si Leal está pausado o cerrado, nadie sube.
+
+Qué cuenta para subir (Daniel, 2026-11-12): no todo el `monto_total`. Cuenta
+la «base Leal» de cada venta: lo pagado con dinero en prendas a precio normal.
+No cuentan lo rebajado (Oferta/Liquidación), lo pagado con saldo del Monedero
+ni las compras con descuento de empleada. Antes $3,000 en Liquidación, o
+pagados con saldo, subían a Leal. Esto solo cambia cuánto cuenta para SUBIR:
+no baja a nadie que ya esté en Leal.
 """
 
 from __future__ import annotations
@@ -18,10 +25,11 @@ import logging
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from pos_uniformes.database.models import ConfiguracionNegocio, LibretaVenta, Membresia
+from pos_uniformes.services import rebaja_service
 from pos_uniformes.services.fidelizacion import membresia_service as ms
 
 _logger = logging.getLogger(__name__)
@@ -42,18 +50,58 @@ def reglas(session: Session) -> tuple[Decimal, int]:
     return Decimal(str(umbral)), int(dias)
 
 
+_CERO = Decimal("0.00")
+_CENT = Decimal("0.01")
+
+
+def _base_de_fotografia(calculo) -> Decimal | None:
+    """`base_leal_total` que calculó el motor al cobrar (lo que vio el cliente
+    en su ticket), o None si la venta no trae fotografía del motor."""
+    if not isinstance(calculo, dict):
+        return None
+    motor = calculo.get("calculo")
+    if not isinstance(motor, dict) or motor.get("base_leal_total") in (None, ""):
+        return None
+    try:
+        return Decimal(str(motor["base_leal_total"]))
+    except (ArithmeticError, ValueError):
+        return None
+
+
+def base_leal_de_venta(venta) -> Decimal:
+    """Lo que una venta de la Libreta cuenta para subir a Leal (2026-11-12).
+
+    - Compra con descuento de empleada: 0 (el motor tampoco le da base Leal).
+    - Con fotografía del motor (`calculo`): su `base_leal_total`.
+    - Ventas de antes, sin fotografía: la regla equivalente aproximada,
+      monto_total − lo pagado con saldo − lo cobrado en prendas rebajadas.
+    Nunca negativa, en centavos."""
+    if bool(getattr(venta, "descuento_empleada", False)):
+        return _CERO
+    base = _base_de_fotografia(getattr(venta, "calculo", None))
+    if base is None:
+        total = Decimal(str(getattr(venta, "monto_total", 0) or 0))
+        monedero = Decimal(str(getattr(venta, "monto_monedero", 0) or 0))
+        rebajado = rebaja_service.importe_rebajado(getattr(venta, "detalle", None) or [])
+        base = total - monedero - rebajado
+    return max(base, _CERO).quantize(_CENT)
+
+
 def gasto_del_periodo(session: Session, cliente_id: int, *, hasta: datetime, dias: int) -> Decimal:
-    """Lo que el cliente compró en la Libreta (ventas, sin apartados ni
-    abonos) en los `dias` días que terminan en `hasta`."""
-    total = session.scalar(
-        select(func.coalesce(func.sum(LibretaVenta.monto_total), 0)).where(
+    """Lo que cuenta para Leal de las ventas del cliente en la Libreta (sin
+    apartados, abonos ni cambios) en los `dias` días que terminan en `hasta`.
+
+    Suma `base_leal_de_venta` de cada una; se suma en Python porque son pocas
+    filas por cliente y la base viene dentro del JSON de la fotografía."""
+    ventas = session.scalars(
+        select(LibretaVenta).where(
             LibretaVenta.cliente_id == int(cliente_id),
             LibretaVenta.tipo == "venta",
             LibretaVenta.created_at > hasta - timedelta(days=dias),
             LibretaVenta.created_at <= hasta,
         )
     )
-    return Decimal(str(total or 0)).quantize(Decimal("0.01"))
+    return sum((base_leal_de_venta(v) for v in ventas), _CERO).quantize(_CENT)
 
 
 def subir_si_alcanza(session: Session, cliente_id: int, *, momento: datetime | None = None,
