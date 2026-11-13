@@ -141,10 +141,85 @@ def comisiones_de_items(items: list[dict]) -> int:
     )
 
 
-def cuenta_como_operacion(row) -> bool:
-    """¿Es una operación de la empleada? Su propia compra con precio especial
-    no (Daniel, 2026-11-12: «tampoco quiero que le cuente como operación»)."""
-    return not bool(getattr(row, "descuento_empleada", False))
+# ─── ¿Cuenta como operación? (una sola regla, 2026-11-12) ────────────────
+#
+# Antes cada pantalla (ranking, gafete, corte, Libreta del kiosko) decidía
+# por su cuenta qué era una «operación», y la compra de la empleada con
+# precio especial se colaba en unas sí y en otras no. La regla vive aquí:
+#
+# 1. Lo que compra una empleada con precio especial (`descuento_empleada`)
+#    NO es operación de nadie: ni operación, ni piezas, ni importe, ni
+#    comisión (Daniel, 2026-11-12: «tampoco quiero que le cuente como
+#    operación»). Su DINERO sí entró al cajón: eso lo siguen sumando el
+#    corte y el desglose por día.
+# 2. El tipo: por defecto cuentan los tres tipos de la Libreta. Una pantalla
+#    puede pedir menos, con su razón escrita; hoy el ranking usa
+#    `TIPOS_DE_VENTA` porque «un abono no es una venta».
+
+#: Todos los tipos de la Libreta son operación del mostrador (lo que se
+#: atiende): venta, apartado y abono. Es lo que cuentan el gafete, el corte
+#: y la Libreta del kiosko.
+TIPOS_OPERACION = ("venta", "apartado", "abono")
+
+#: Solo lo que se vende (piezas que salen o se apartan). El ranking cuenta
+#: operaciones y piezas así: un abono no es una venta (2026-11-08).
+TIPOS_DE_VENTA = ("venta", "apartado")
+
+
+def cuenta_como_operacion(row, tipos: tuple[str, ...] = TIPOS_OPERACION) -> bool:
+    """¿Esta fila de la Libreta cuenta como operación (y sus piezas)?
+
+    No, si es la compra de una empleada con precio especial. Tampoco si su
+    tipo no está en `tipos`. Una fila sin `tipo` (filas armadas a mano) se
+    toma como venta, el valor por defecto de la tabla."""
+    if bool(getattr(row, "descuento_empleada", False)):
+        return False
+    tipo = str(getattr(row, "tipo", None) or "venta")
+    return tipo in tipos
+
+
+def predicado_operacion(tipos: tuple[str, ...] = TIPOS_OPERACION):
+    """La misma regla de `cuenta_como_operacion`, para un `.where()` de
+    SQLAlchemy sobre `LibretaVenta`."""
+    from sqlalchemy import and_
+
+    return and_(LibretaVenta.tipo.in_(tuple(tipos)), LibretaVenta.descuento_empleada.is_(False))
+
+
+@dataclass(frozen=True)
+class TotalesLibreta:
+    """Las cifras de arriba de la Libreta del kiosko (vista de la empleada y
+    del dueño). Operaciones, piezas, ventas y apartados siguen la regla de
+    `cuenta_como_operacion`; las comisiones se suman tal cual están
+    guardadas (la compra con precio especial ya se guarda con 0)."""
+
+    operaciones: int
+    piezas: int
+    comisiones: int
+    ventas: int
+    apartados: int
+    #: Las filas con las que se calcula el DINERO (cajón, tarjeta, abonos):
+    #: todas menos las compras a cuenta de las empleadas, que no entraron.
+    filas_dinero: list
+
+
+def totales_libreta(filas: list, a_cuenta=None) -> TotalesLibreta:
+    """Totales de la Libreta del kiosko (puro; antes vivía en la ventana).
+
+    `a_cuenta` son los ids de las compras a cuenta (lo que da
+    `compra_a_cuenta_service.estados_en_libreta`): se quitan del dinero,
+    igual que `corte_caja_service.sin_compras_a_cuenta` en el corte."""
+    filas = list(filas or [])
+    cuentan = [r for r in filas if cuenta_como_operacion(r)]
+    a_cuenta = a_cuenta or {}
+    return TotalesLibreta(
+        operaciones=len(cuentan),
+        piezas=sum(int(getattr(r, "piezas", 0) or 0) for r in cuentan),
+        comisiones=sum(int(getattr(r, "comisiones", 0) or 0) for r in filas),
+        ventas=sum(1 for r in cuentan if str(getattr(r, "tipo", "venta") or "venta") == "venta"),
+        apartados=sum(1 for r in cuentan if str(getattr(r, "tipo", "")) == "apartado"),
+        filas_dinero=[r for r in filas if getattr(r, "id", None) not in a_cuenta] if a_cuenta else filas,
+    )
 
 
 def comisiones_de_operacion(items: list[dict], comisiones=None, descuento_empleada: bool = False) -> int:
@@ -640,8 +715,11 @@ def resumir_por_dia(rows: list[LibretaVenta]) -> list[CorteDia]:
                 "en_caja": Decimal("0.00"),
             },
         )
-        bucket["operaciones"] += 1
-        bucket["piezas"] += int(row.piezas or 0)
+        if cuenta_como_operacion(row):
+            # La compra de la empleada con precio especial no es operación
+            # ni piezas; su dinero sí entró (2026-11-12, regla única).
+            bucket["operaciones"] += 1
+            bucket["piezas"] += int(row.piezas or 0)
         monto = Decimal(str(row.monto_total or 0))
         neto = Decimal(str(getattr(row, "monto_neto", None) or monto))
         tipo = str(row.tipo)

@@ -21,8 +21,15 @@ from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 
+from pos_uniformes.services.libreta_service import TIPOS_DE_VENTA, cuenta_como_operacion
+
 _CENT = Decimal("0.01")
-TIPOS_DE_VENTA = ("venta", "apartado")
+
+
+#: Para el ranking, operaciones y piezas son solo ventas y apartados (ver
+#: arriba: un abono no es una venta). Es la razón escrita de que aquí se
+#: pida menos que `TIPOS_OPERACION`.
+TIPOS_OPERACION_RANKING = TIPOS_DE_VENTA
 
 
 @dataclass
@@ -63,11 +70,11 @@ def calcular(rows) -> list[FilaRanking]:
         tipo = str(getattr(row, "tipo", "") or "")
         # Los puntos se suman tal cual están guardados (los abonos valen 0).
         fila.puntos += int(getattr(row, "comisiones", 0) or 0)
-        if getattr(row, "descuento_empleada", False):
-            # Su propia compra con precio especial no le suma operación,
-            # piezas ni importe (Daniel, 2026-11-12).
+        if not cuenta_como_operacion(row):
+            # La regla única (libreta_service, 2026-11-12): su propia compra
+            # con precio especial no le suma operación, piezas ni importe.
             continue
-        if tipo in TIPOS_DE_VENTA:
+        if cuenta_como_operacion(row, TIPOS_OPERACION_RANKING):
             fila.operaciones += 1
             fila.piezas += int(getattr(row, "piezas", 0) or 0)
         if tipo == "venta":

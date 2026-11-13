@@ -15,10 +15,13 @@ from datetime import date, datetime, time
 from sqlalchemy import select
 
 from pos_uniformes.database.models import LibretaVenta
+from pos_uniformes.services.libreta_service import TIPOS_OPERACION, predicado_operacion
 
 #: Lo que cuenta como «operación» para la empleada: lo que se atiende en el
-#: mostrador. Retiros, entradas y pagos no son operaciones suyas.
-TIPOS_QUE_CUENTAN = ("venta", "apartado", "abono")
+#: mostrador (venta, apartado y abono). Retiros, entradas y pagos no son
+#: operaciones suyas. Desde 2026-11-12 es la regla única de la Libreta
+#: (`libreta_service.TIPOS_OPERACION`); este nombre se queda por compatibilidad.
+TIPOS_QUE_CUENTAN = TIPOS_OPERACION
 
 
 @dataclass(frozen=True)
@@ -60,11 +63,11 @@ def resumen_de_hoy(session, *, hoy: date | None = None) -> ResumenHoy:
         .where(
             LibretaVenta.created_at >= desde,
             LibretaVenta.created_at < datetime.combine(desde.date(), time.max),
-            LibretaVenta.tipo.in_(TIPOS_QUE_CUENTAN),
+            # La regla única de «operación» (libreta_service, 2026-11-12):
+            # venta, apartado y abono; lo que compra una empleada con precio
+            # especial no es operación de nadie.
+            predicado_operacion(TIPOS_QUE_CUENTAN),
             LibretaVenta.privado.is_(False),
-            # Lo que compra una empleada con precio especial no es operación
-            # de nadie (Daniel, 2026-11-12).
-            LibretaVenta.descuento_empleada.is_(False),
         )
         .order_by(LibretaVenta.created_at)
     ).all()
