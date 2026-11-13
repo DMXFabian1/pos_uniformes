@@ -262,6 +262,36 @@ class BusquedaDespuesDelCommitTests(_ConBase):
         self.s.commit()
         self.avisos.assert_not_called()
 
+    def test_lote_con_savepoints_avisa_hasta_el_commit_aunque_falle_la_ultima(self) -> None:
+        # Como «Presentaciones por lote»: cada talla en su begin_nested; la
+        # última choca. Ni liberar un savepoint ni deshacerlo cuenta como el
+        # commit o el rollback de afuera.
+        p = self._producto("Bata", None)
+        self.s.commit()
+        self.avisos.reset_mock()
+        for talla, sku in (("6", "SKUL6"), ("8", "SKUL8"), ("10", "SKUL8")):
+            try:
+                with self.s.begin_nested():
+                    C.crear_variante(self.s, self.admin, p, sku, talla, "Sin color", Decimal("10"))
+                    self.s.flush()
+            except ValueError:
+                pass
+        self.avisos.assert_not_called()
+        self.s.commit()
+        self.avisos.assert_called_once()
+        self.assertEqual(sorted(v.talla for v in p.variantes), ["6", "8"])
+
+    def test_savepoint_fallido_despues_de_crear_no_borra_el_aviso(self) -> None:
+        self.avisos.reset_mock()
+        self._producto("Bata", None)
+        try:
+            with self.s.begin_nested():
+                raise ValueError("talla repetida")
+        except ValueError:
+            pass
+        self.s.commit()
+        self.avisos.assert_called_once()
+
     def test_borrar_tambien_avisa(self) -> None:
         p = self._producto("Bata", None)
         self._talla(p, "4")

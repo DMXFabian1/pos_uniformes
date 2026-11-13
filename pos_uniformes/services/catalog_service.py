@@ -64,12 +64,20 @@ class CatalogService:
 
     @staticmethod
     def _despues_del_commit(session: Session) -> None:
+        # `after_commit` también salta al liberar un savepoint
+        # (`begin_nested`, p. ej. «Presentaciones por lote»): ahí todavía no
+        # hay nada guardado, así que se espera al commit de afuera.
+        if session.get_nested_transaction() is not None:
+            return
         if session.info.pop(_MEILI_PENDIENTE, False):
             CatalogService._avisar_busqueda()
 
     @staticmethod
     def _despues_del_rollback(session: Session, previous_transaction) -> None:
-        del previous_transaction
+        # Deshacer un savepoint no deshace lo de afuera: la marca se queda
+        # (a lo más, se avisa de más). Solo el rollback de afuera la borra.
+        if getattr(previous_transaction, "nested", False):
+            return
         session.info.pop(_MEILI_PENDIENTE, None)
 
     @staticmethod
