@@ -803,6 +803,10 @@ class InventarioPantalla(QObject):
         """
         arbol = self.prendas
         llaves, ids = self._eleccion_arbol
+        if (llaves or ids) and not self._eleccion_sigue_viva(llaves, ids):
+            # La ventana ya soltó la selección (p. ej. al cambiar de página): no se revive.
+            self._eleccion_arbol = (set(), [])
+            llaves, ids = set(), []
         indices = [arbol.indice_de_prenda(llave) for llave in llaves]
         indices += [arbol.indice_de_talla(vid) for vid in ids]
         indices = [i for i in indices if i.isValid()]
@@ -828,6 +832,17 @@ class InventarioPantalla(QObject):
             elegidas = arbol.variantes_elegidas()
             if set(elegidas) != set(self.window._selected_inventory_variant_ids()):
                 self._espejar_a_tabla(elegidas, self._actual_del_arbol())
+
+    def _eleccion_sigue_viva(self, llaves: set, ids: list) -> bool:
+        """Lo recordado del árbol solo vale si la ventana lo sigue teniendo: la
+        talla «actual» (el combo) es de una de esas prendas o tallas. Al cambiar
+        de página la ventana vacía el combo y suelta la tabla."""
+        actual = self.window.inventory_variant_combo.currentData()
+        if actual is None:
+            return False
+        if actual in ids:
+            return True
+        return any(actual in grupo.variante_ids for grupo in self.grupos if grupo.llave in llaves)
 
     def _actual_del_arbol(self) -> object | None:
         arbol = self.prendas

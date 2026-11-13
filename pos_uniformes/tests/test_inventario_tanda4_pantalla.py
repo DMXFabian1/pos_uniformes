@@ -292,6 +292,30 @@ class InventarioTanda4PantallaTests(unittest.TestCase):
             pantalla.seleccionar(2)
             self.assertEqual(pantalla.paginas.text(), "Mostrando 1–2 de 3 prendas")
 
+    def test_cambiar_de_pagina_suelta_la_prenda_elegida_y_no_revive(self) -> None:
+        with patch("pos_uniformes.ui.main_window.INVENTORY_PAGE_SIZE", 2):
+            window = self._ventana()
+            pantalla = window.inventario_pantalla
+            arbol = pantalla.prendas
+            self._elegir(arbol, arbol.modelo.index(0, 0))
+            self.assertEqual(sorted(window._selected_inventory_variant_ids()), [1, 2, 3, 4])
+            window._handle_inventory_next_page()
+            window._handle_inventory_previous_page()
+            self.assertEqual(pantalla.paginas.text(), "Mostrando 1–2 de 3 prendas")
+            self.assertEqual(window._selected_inventory_variant_ids(), [])
+            self.assertEqual(arbol.selectionModel().selectedRows(), [])
+            self.assertTrue(pantalla.barra_lote.isHidden())
+            self.assertEqual(pantalla.ficha.estado(), VACIA)
+
+    def test_un_refresco_conserva_la_prenda_elegida(self) -> None:
+        window = self._ventana()
+        pantalla = window.inventario_pantalla
+        arbol = pantalla.prendas
+        self._elegir(arbol, arbol.modelo.index(0, 0))
+        window._handle_inventory_filters_changed()
+        self.assertEqual(sorted(window._selected_inventory_variant_ids()), [1, 2, 3, 4])
+        self.assertEqual(pantalla.ficha.estado(), LOTE)
+
     def test_tocar_el_encabezado_ordena_las_prendas(self) -> None:
         window = self._ventana()
         pantalla = window.inventario_pantalla
