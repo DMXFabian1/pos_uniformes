@@ -314,20 +314,27 @@ def por_acabarse(vendidas_por_sku: dict[str, int], existencias: dict[str, dict],
     return salida[:tope]
 
 
-def cargar_por_acabarse(session, *, hoy: date | None = None) -> list[PorAcabarse]:
-    from sqlalchemy import select
-
-    from pos_uniformes.database.models import Escuela, Producto, Variante
+def vendidas_por_sku(session, *, hoy: date | None = None, dias: int = DIAS_DE_RITMO) -> dict[str, int]:
+    """Piezas vendidas por SKU en la Libreta en los últimos `dias` días (una consulta)."""
     from pos_uniformes.services.libreta_service import listar_operaciones
     from pos_uniformes.services.analitica_libreta_service import desglosar
 
     hoy = hoy or date.today()
-    desde, hasta = limites(hoy - timedelta(days=DIAS_DE_RITMO - 1), hoy)
+    desde, hasta = limites(hoy - timedelta(days=dias - 1), hoy)
     filas = desglosar(listar_operaciones(session, desde=desde, hasta=hasta, employee_code=None))
     vendidas: dict[str, int] = defaultdict(int)
     for f in filas:
         if f.sku and f.sku != "SIN-CODIGO":
             vendidas[f.sku] += int(f.cantidad)
+    return dict(vendidas)
+
+
+def cargar_por_acabarse(session, *, hoy: date | None = None) -> list[PorAcabarse]:
+    from sqlalchemy import select
+
+    from pos_uniformes.database.models import Escuela, Producto, Variante
+
+    vendidas = vendidas_por_sku(session, hoy=hoy)
     if not vendidas:
         return []
     existencias = {}
