@@ -93,12 +93,25 @@ def cuantos(session: Session) -> int:
 def _por_nombre(session: Session, modelo, nombre: str):
     """La fila con ese nombre, sin importar mayúsculas ni acentos, o una nueva.
 
-    Prefiere la que lleva acento si hay dos («Basico»/«Básico»)."""
+    Prefiere la que lleva acento si hay dos («Basico»/«Básico»). Si lo escrito
+    es un sinónimo conocido y su forma oficial ya existe («Deportiva» →
+    «Deportivo»), usa la oficial, igual que el asistente de alta.
+
+    Pendiente (tanda 2 del alta): aquí todavía se crea una pieza o un detalle
+    nuevo sin preguntar «¿Quisiste decir…?»; hace falta que la bandeja y la
+    API móvil regresen la sugerencia en vez de crear."""
     import unicodedata
+
+    from pos_uniformes.services.catalogo_valores_service import CAMPO_POR_MODELO, forma_oficial
 
     nombre = " ".join((nombre or "").split())
     if not nombre:
         return None
+    oficial = forma_oficial(CAMPO_POR_MODELO.get(modelo, ""), nombre)
+    if oficial and oficial != nombre:
+        buscado_oficial = _sin_acentos(oficial)
+        if any(_sin_acentos(f.nombre) == buscado_oficial for f in session.scalars(select(modelo)).all()):
+            nombre = oficial
     buscado = _sin_acentos(nombre)
     parecidas = [f for f in session.scalars(select(modelo)).all() if _sin_acentos(f.nombre) == buscado]
     if parecidas:
@@ -165,6 +178,13 @@ def nombrar(
         raise NoSePuede(str(exc)) from exc
 
     color = " ".join((color or "").split())
+    activas = [v for v in producto.variantes if v.activo]
+    if color and not (activas and all((v.color or "") == color for v in activas)):
+        # Una sola forma para lo nuevo («Blanca» → «Blanco», «Multicolor» →
+        # «Surtido»); si ya todas traen ese color tal cual, no se toca.
+        from pos_uniformes.services.catalogo_valores_service import forma_oficial_color
+
+        color = forma_oficial_color(color)
     if color:
         for v in producto.variantes:
             if v.activo and (v.color or "") != color:

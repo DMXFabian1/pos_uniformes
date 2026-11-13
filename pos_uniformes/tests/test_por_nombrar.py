@@ -80,6 +80,25 @@ class NombrarTests(_Base):
         pn.nombrar(self.s, self.admin, p.id, nombre="Sudadera YT0572", pieza="sudadera")
         self.assertEqual(self.s.query(TipoPieza).count(), 1)
 
+    def test_color_y_detalle_van_en_su_forma_oficial(self) -> None:
+        from pos_uniformes.database.models import AtributoProducto
+
+        self.s.add(AtributoProducto(nombre="Deportivo"))
+        self.s.flush()
+        p = self._codigo()
+        pn.nombrar(self.s, self.admin, p.id, nombre="Sudadera YT0572", pieza="Sudadera",
+                   detalle="Deportiva", color="Blanca")
+        self.assertEqual(p.atributo.nombre, "Deportivo")
+        self.assertEqual({v.color for v in p.variantes}, {"Blanco"})
+        q = self._codigo("MO194")
+        pn.nombrar(self.s, self.admin, q.id, nombre="Sudadera MO194", pieza="Sudadera", color="Multicolor")
+        self.assertEqual({v.color for v in q.variantes}, {"Surtido"})
+
+    def test_el_color_que_ya_traen_todas_no_se_cambia(self) -> None:
+        p = self._codigo(color="Blanca")
+        pn.nombrar(self.s, self.admin, p.id, nombre="Sudadera YT0572", pieza="Sudadera", color="Blanca")
+        self.assertEqual({v.color for v in p.variantes}, {"Blanca"})
+
     def test_sin_pieza_no_se_da_por_nombrado(self) -> None:
         p = self._codigo()
         with self.assertRaises(pn.NoSePuede):
