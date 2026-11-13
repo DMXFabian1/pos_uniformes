@@ -20,9 +20,20 @@ Reglas (si una falla, no se une):
   cuenta), ni abonos, ni cambios, ni la compra de una empleada con precio
   especial (esa no es operación de nadie);
 - de la misma empleada y del mismo día (hora local);
+- sin un corte en medio: si entre las dos ya se hizo un corte, cada una
+  quedó en un periodo distinto y ningún corte bajaría (cada uno vería una
+  sola venta del grupo), así que no se unen («Entre estas dos ventas ya se
+  hizo un corte»);
 - una venta está en un solo grupo: si la anterior ya está unida, la nueva
   se suma a ese grupo (A+B, luego C → A+B+C, una sola operación); si la que
   se une ya está en otro grupo, se rechaza («ya está unida»: sepárala antes).
+
+Cortes ya guardados: si se unen dos ventas de un periodo que ya tiene su
+corte, el número guardado en `libreta_corte.operaciones` (el que enseña «Ver
+cortes» y Telegram) se queda como estaba: es la foto de ese momento. Lo que
+se vuelve a calcular (la reimpresión, el resumen del día, el ranking) ya
+cuenta la unión. Daniel une a mano y normalmente el mismo rato, antes del
+corte; no se reescriben cortes.
 
 Nada aquí hace commit: lo hace quien llama.
 """
@@ -32,9 +43,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
-from pos_uniformes.database.models import LibretaVenta
+from pos_uniformes.database.models import LibretaCorte, LibretaVenta
 from pos_uniformes.services.libreta_service import esta_unida  # noqa: F401 — se usa desde la pantalla
 
 #: Solo las ventas se unen (ver el docstring del módulo).
@@ -86,6 +97,77 @@ def puede_ofrecerse(row) -> bool:
     return motivo_para_no_unir(row) is None and getattr(row, "operacion_grupo_id", None) is None
 
 
+def corte_entre(session, desde: datetime, hasta: datetime) -> bool:
+    """¿Se hizo un corte entre esas dos horas? Una venta cae en el corte
+    cuyo `hasta` es igual o posterior a su hora (`corte_caja_service.
+    operaciones_del_periodo`), así que un corte en `k` separa a las de
+    `<= k` de las de `> k`: hay corte en medio si `desde <= k < hasta`."""
+    if desde is None or hasta is None or desde == hasta:
+        return False
+    lo, hi = (desde, hasta) if desde < hasta else (hasta, desde)
+    momento = func.coalesce(LibretaCorte.hasta, LibretaCorte.created_at)
+    return session.scalars(
+        select(LibretaCorte.id).where(momento >= lo, momento < hi).limit(1)
+    ).first() is not None
+
+
+TEXTO_CORTE_EN_MEDIO = (
+    "Entre estas dos ventas ya se hizo un corte: no se pueden unir. "
+    "Cada una ya cuenta en su propio corte."
+)
+
+
+def hay_anterior_en(rows, row) -> bool:
+    """Con las filas que ya están en pantalla (sin ir a la base): ¿esta
+    empleada tiene ese mismo día una venta antes de esta, que se pueda unir
+    y que no esté ya en su grupo? Para no ofrecer «Unir con la anterior» en
+    la primera venta del día. Puro."""
+    if row is None or getattr(row, "created_at", None) is None:
+        return False
+    code = str(getattr(row, "employee_code", "") or "").upper()
+    dia = _fecha_local(row.created_at)
+    llave = (row.created_at, getattr(row, "id", None) or 0)
+    grupo = getattr(row, "operacion_grupo_id", None)
+    for r in rows or ():
+        if r is row or getattr(r, "created_at", None) is None:
+            continue
+        if getattr(r, "id", None) is not None and r.id == getattr(row, "id", None):
+            continue
+        if str(getattr(r, "employee_code", "") or "").upper() != code:
+            continue
+        if motivo_para_no_unir(r) is not None or _fecha_local(r.created_at) != dia:
+            continue
+        if (r.created_at, r.id) >= llave:
+            continue
+        if grupo is not None and getattr(r, "operacion_grupo_id", None) == grupo:
+            continue
+        return True
+    return False
+
+
+def hora_local(momento: datetime | None) -> str:
+    if momento is None:
+        return ""
+    local = momento.astimezone() if momento.tzinfo is not None else momento
+    return local.strftime("%H:%M")
+
+
+def horas_de_las_otras(rows) -> dict[int, list[str]]:
+    """{id: [«12:00», …]}: de cada venta unida que se ve, la hora de las
+    otras de su grupo (las que el dueño ve en la columna Hora). Puro."""
+    grupos: dict[int, list] = {}
+    for r in rows or ():
+        g = getattr(r, "operacion_grupo_id", None)
+        if g is not None and getattr(r, "id", None) is not None:
+            grupos.setdefault(int(g), []).append(r)
+    salida: dict[int, list[str]] = {}
+    for filas in grupos.values():
+        filas.sort(key=lambda r: (r.created_at, r.id))
+        for r in filas:
+            salida[int(r.id)] = [hora_local(o.created_at) for o in filas if o is not r]
+    return salida
+
+
 def miembros(session, grupo_id: int) -> list[LibretaVenta]:
     return list(session.scalars(
         select(LibretaVenta)
@@ -98,7 +180,9 @@ def anterior_para_unir(session, venta_id: int) -> LibretaVenta | None:
     """La venta inmediata anterior de la misma empleada ese mismo día (la que
     «Unir con la anterior» uniría). Se saltan los abonos, apartados, cambios
     y compras de empleada: no se unen. Si la anterior ya es del mismo grupo,
-    no hay nada que unir (None)."""
+    no hay nada que unir (None). Si entre las dos hubo corte la devuelve
+    igual: quien llama pregunta `corte_entre` para decir por qué no se une
+    (y `unir` lo rechaza de todos modos)."""
     venta = session.get(LibretaVenta, int(venta_id))
     if venta is None or venta.created_at is None:
         return None
@@ -157,6 +241,8 @@ def unir(session, venta_a_id: int, venta_b_id: int, *, actor: str, ahora: dateti
     grupo_antes = a.operacion_grupo_id
     grupo = miembros(session, grupo_antes) if grupo_antes is not None else [a]
     todas = sorted({r.id: r for r in [*grupo, b]}.values(), key=lambda r: (r.created_at, r.id))
+    if corte_entre(session, todas[0].created_at, todas[-1].created_at):
+        raise NoSePuedeUnir(TEXTO_CORTE_EN_MEDIO)
     ancla = todas[0].id
     momento = ahora or datetime.now().astimezone()
     quien = str(actor).strip().upper()

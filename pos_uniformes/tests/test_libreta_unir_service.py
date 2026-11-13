@@ -175,6 +175,92 @@ class AnteriorTests(_Base):
         self.assertIsNone(lu.anterior_para_unir(self.s, b.id))
 
 
+class CorteEnMedioTests(_Base):
+    """Si entre las dos ventas ya se hizo un corte, cada una cuenta en su
+    corte y ninguno bajaría: no se unen (revisión 2026-11-13)."""
+
+    def corte(self, hora, minuto=0, *, con_hasta=True):
+        from pos_uniformes.database.models import LibretaCorte
+
+        momento = _en(hora, minuto)
+        c = LibretaCorte(fecha=HOY, monto_final=Decimal("0"), operaciones=10, piezas=0, creado_por=DUENO,
+                         created_at=momento + timedelta(seconds=30), hasta=momento if con_hasta else None)
+        self.s.add(c)
+        self.s.flush()
+        return c
+
+    def test_corte_entre_las_dos_rechaza(self) -> None:
+        a = self.venta(1639, 15, minuto=50)
+        self.corte(16)
+        b = self.venta(1640, 16, minuto=5)
+        antes = self.foto(1639, 1640)
+        with self.assertRaisesRegex(lu.NoSePuedeUnir, "ya se hizo un corte"):
+            lu.unir(self.s, a.id, b.id, actor=DUENO)
+        self.assertEqual((a.operacion_grupo_id, b.operacion_grupo_id), (None, None))
+        self.assertEqual(self.foto(1639, 1640), antes)
+        self.assertTrue(lu.corte_entre(self.s, a.created_at, b.created_at))
+
+    def test_corte_viejo_sin_hasta_usa_su_hora(self) -> None:
+        a = self.venta(1, 15, minuto=50)
+        self.corte(16, con_hasta=False)
+        b = self.venta(2, 16, minuto=5)
+        with self.assertRaises(lu.NoSePuedeUnir):
+            lu.unir(self.s, a.id, b.id, actor=DUENO)
+
+    def test_corte_antes_o_despues_de_las_dos_si_deja(self) -> None:
+        self.corte(9)
+        a, b = self.venta(1, 10), self.venta(2, 10, minuto=7)
+        self.corte(18)
+        self.assertEqual(lu.unir(self.s, a.id, b.id, actor=DUENO).ids, (1, 2))
+
+    def test_la_venta_justo_a_la_hora_del_corte_cae_en_ese_corte(self) -> None:
+        a = self.venta(1, 16)            # created_at == hasta: es del corte de las 16:00
+        self.corte(16)
+        b = self.venta(2, 16, minuto=1)
+        with self.assertRaises(lu.NoSePuedeUnir):
+            lu.unir(self.s, a.id, b.id, actor=DUENO)
+        self.assertFalse(lu.corte_entre(self.s, _en(15), _en(16)))   # las dos antes o en el corte
+
+    def test_agrandar_un_grupo_pasando_un_corte_tambien_se_rechaza(self) -> None:
+        a, b = self.venta(1, 10), self.venta(2, 10, minuto=5)
+        lu.unir(self.s, a.id, b.id, actor=DUENO)
+        self.corte(11)
+        c = self.venta(3, 11, minuto=30)
+        with self.assertRaises(lu.NoSePuedeUnir):
+            lu.unir(self.s, b.id, c.id, actor=DUENO)
+        self.assertIsNone(c.operacion_grupo_id)
+
+
+class HayAnteriorEnPantallaTests(unittest.TestCase):
+    """Para no ofrecer «Unir con la anterior» en la primera venta del día."""
+
+    @staticmethod
+    def fila(id_, hora, minuto=0, *, code="VEND-4", tipo="venta", grupo=None, empleada=False, dia=HOY):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(id=id_, tipo=tipo, employee_code=code, descuento_empleada=empleada,
+                               operacion_grupo_id=grupo, created_at=_en(hora, minuto, dia))
+
+    def test_primera_y_segunda(self) -> None:
+        f = self.fila
+        primera, otra_emp, segunda = f(1, 12), f(2, 12, 1, code="VEND-6"), f(3, 12, 2)
+        rows = [segunda, otra_emp, primera]
+        self.assertFalse(lu.hay_anterior_en(rows, primera))
+        self.assertFalse(lu.hay_anterior_en(rows, otra_emp))
+        self.assertTrue(lu.hay_anterior_en(rows, segunda))
+
+    def test_no_cuenta_otro_dia_ni_lo_que_no_se_une_ni_su_propio_grupo(self) -> None:
+        f = self.fila
+        ayer = f(1, 18, dia=HOY - timedelta(days=1))
+        abono, empleada = f(2, 9, tipo="abono"), f(3, 9, 30, empleada=True)
+        a, b = f(4, 10, grupo=4), f(5, 10, 5, grupo=4)
+        rows = [ayer, abono, empleada, a, b]
+        self.assertFalse(lu.hay_anterior_en(rows, a))
+        # b ya está con a: si estuviera suelta, a sí sería su anterior.
+        self.assertFalse(lu.hay_anterior_en(rows, b))
+        self.assertTrue(lu.hay_anterior_en(rows, f(5, 10, 5)))
+
+
 class BorrarYReasignarTests(_Base):
     def test_borrar_una_unida_deja_sola_a_la_otra(self) -> None:
         a, b = self.venta(1, 10), self.venta(2, 11)
@@ -200,8 +286,7 @@ class TextosTests(unittest.TestCase):
             SimpleNamespace(id=1, operacion_grupo_id=1, created_at=_en(10)),
             SimpleNamespace(id=3, operacion_grupo_id=None, created_at=_en(12)),
         ]
-        pos = lu.posiciones_en_grupo(filas)
-        self.assertEqual(pos, {1: (1, 2), 2: (2, 2)})
+        self.assertEqual(lu.horas_de_las_otras(filas), {1: ["11:00"], 2: ["10:00"]})
         self.assertTrue(lu.puede_ofrecerse(SimpleNamespace(id=9, tipo="venta", operacion_grupo_id=None)))
         self.assertFalse(lu.puede_ofrecerse(SimpleNamespace(id=9, tipo="apartado", operacion_grupo_id=None)))
 
