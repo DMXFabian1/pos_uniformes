@@ -142,6 +142,38 @@ class CanjeTest(_Base):
         self.assertEqual(w._items, [])
         self.assertIsNone(w._cliente)
 
+    def _cobrar_con_motor(self, calculo_y_entrada):
+        w = self._widget()
+        w._cliente = _cliente()
+        w._usar_saldo = True
+        session = MagicMock()
+        with patch.object(w, "_ask_venta_options", return_value=(False, False, False)), \
+             patch.object(w, "_calculo_y_entrada", calculo_y_entrada), \
+             patch("pos_uniformes.database.connection.get_session", self._session_ctx(session)), \
+             patch("pos_uniformes.services.libreta_service.registrar_venta_con_monedero") as reg, \
+             patch.object(helper.QMessageBox, "warning") as aviso, \
+             patch(f"{_MOD}.route_tickets") as route:
+            w._on_ticket_venta()
+        return w, reg, aviso, route
+
+    def test_si_el_motor_falla_no_se_cobra_con_saldo_sin_revisar(self):
+        """Revisión de deuda, 2026-11-12: sin el cálculo no hay fotografía, el
+        servidor no revisaba (T3) y el saldo se cobraba a ciegas."""
+        def falla(**kw):
+            raise RuntimeError("motor caído")
+
+        w, reg, aviso, route = self._cobrar_con_motor(falla)
+        reg.assert_not_called()
+        route.assert_not_called()
+        self.assertEqual(aviso.call_args.args[2], helper.MENSAJE_SALDO_SIN_REVISAR)
+        self.assertEqual(len(w._items), 1)
+
+    def test_si_el_motor_no_coincide_con_la_pantalla_tampoco(self):
+        otro = SimpleNamespace(total=D("1.00"), saldo_usado=D("0"))
+        w, reg, aviso, route = self._cobrar_con_motor(lambda **kw: (None, otro))
+        reg.assert_not_called()
+        self.assertEqual(aviso.call_args.args[2], helper.MENSAJE_SALDO_SIN_REVISAR)
+
     def test_si_se_cae_la_red_no_se_registra_y_el_carrito_queda(self):
         w = self._widget()
         w._cliente = _cliente()
@@ -382,6 +414,36 @@ class TicketTest(unittest.TestCase):
         texto = "\n".join(helper.lineas_ticket_monedero({"cashback": D("0"), "saldo": D("12")}, tk_row))
         self.assertNotIn("Acumulado", texto)
         self.assertIn(tk_row("Saldo en monedero:", "$12.00"), texto)
+
+
+
+class ElMotorQueNoRespondeSeAvisaTests(unittest.TestCase):
+    """Revisión de deuda, 2026-11-12: si el motor no podía calcular, se cobraba
+    con el cálculo de respaldo y solo quedaba en el log."""
+
+    def test_si_calcula_no_hay_aviso(self):
+        from pos_uniformes.ui.helpers.quick_sale_motor_helper import texto_si_el_motor_no_responde
+
+        self.assertIsNone(texto_si_el_motor_no_responde(lambda: object()))
+
+    def test_un_carrito_rechazado_dice_el_motivo(self):
+        from pos_uniformes.services.beneficios.contrato import EntradaInvalida
+        from pos_uniformes.ui.helpers.quick_sale_motor_helper import texto_si_el_motor_no_responde
+
+        def rechaza():
+            raise EntradaInvalida("SKU con categorías incompatibles")
+
+        texto = texto_si_el_motor_no_responde(rechaza)
+        self.assertIn("cálculo de antes", texto)
+        self.assertIn("Motivo: SKU con categorías incompatibles", texto)
+
+    def test_un_error_cualquiera_tambien_avisa(self):
+        from pos_uniformes.ui.helpers.quick_sale_motor_helper import texto_si_el_motor_no_responde
+
+        def truena():
+            raise RuntimeError("x")
+
+        self.assertIn("avísale a Daniel", texto_si_el_motor_no_responde(truena))
 
 
 if __name__ == "__main__":

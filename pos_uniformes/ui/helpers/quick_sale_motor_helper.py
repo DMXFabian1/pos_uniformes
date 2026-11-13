@@ -20,6 +20,26 @@ _logger = logging.getLogger(__name__)
 _CERO = Decimal("0.00")
 
 
+def texto_si_el_motor_no_responde(calcular) -> str | None:
+    """None si `calcular()` funciona; si no, qué decirle a la empleada."""
+    from pos_uniformes.services.beneficios.contrato import EntradaInvalida
+
+    try:
+        calcular()
+    except EntradaInvalida as exc:
+        _logger.warning("Motor de beneficios: carrito rechazado (%s); se cobra con el cálculo anterior", exc)
+        motivo = f"\n\nMotivo: {exc}"
+    except Exception:  # noqa: BLE001 — se avisa; el mostrador no se detiene
+        _logger.exception("Motor de beneficios: no se pudo calcular; se cobra con el cálculo anterior")
+        motivo = ""
+    else:
+        return None
+    return (
+        "Las reglas de descuento no pudieron calcular esta venta. Se cobra con el cálculo de antes: "
+        "revisa que el total sea correcto y avísale a Daniel." + motivo
+    )
+
+
 class MotorVentaMixin:
     """Se mezcla en QuickSaleWidget. Usa de él: _items, _cliente,
     _usar_descuento_programa, _descuento_programa_fijo, _discount_active,
@@ -67,6 +87,19 @@ class MotorVentaMixin:
 
         entrada = self._entrada_motor(pago_tarjeta=pago_tarjeta, fecha=fecha)
         return entrada, calcular(entrada)
+
+    def _avisar_si_el_motor_no_responde(self) -> None:
+        """Antes de cobrar: si el motor no puede calcular este carrito, la
+        empleada lo sabe. Antes se cobraba con el cálculo de respaldo (otro
+        tope de empleada, otro reparto) y solo quedaba en el log (revisión de
+        deuda, 2026-11-12). No detiene la venta: el mostrador no se para."""
+        if self._calculo_fijo is not None or self._reimpresion_legada:
+            return
+        texto = texto_si_el_motor_no_responde(self._calculo_motor)
+        if texto:
+            from PyQt6.QtWidgets import QMessageBox
+
+            QMessageBox.warning(self, "Cálculo de respaldo", texto)
 
     def _fotografia_motor(self, entrada, calculo) -> dict:
         from pos_uniformes.services.beneficios.fotografia import fotografia

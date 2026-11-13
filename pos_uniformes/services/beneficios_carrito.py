@@ -213,3 +213,19 @@ def detalle_por_renglon(items: Sequence[Mapping], calculo, *, pct_base=Decimal("
         if cantidad - nivel_aqui:
             salida.append({**base, "cantidad": cantidad - nivel_aqui, "desc_empleada_pct": pct_base})
     return salida
+
+
+def descuento_programa_a_guardar(pct, calculo) -> Decimal | None:
+    """El % del Mayorista que se anota en la venta, o None si no se cobró.
+
+    Con el motor manda lo que se COBRÓ: sin conexión el motor no aplica el
+    mayoreo (C4), pero la venta se anotaba con `descuento_programa` y el
+    servidor, al verlo, no abonaba Monedero. El cliente pagaba precio completo
+    y se quedaba sin ninguno de los dos (revisión de deuda, 2026-11-12).
+    Sin `calculo` (cálculo de respaldo) se queda el % de la pantalla."""
+    if not pct:
+        return None
+    if calculo is not None and not getattr(calculo, "descuento_aplicado", False):
+        return None
+    return Decimal(str(pct))
+

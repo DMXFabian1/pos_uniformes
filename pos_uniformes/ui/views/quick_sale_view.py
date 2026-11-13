@@ -1514,6 +1514,7 @@ class QuickSaleWidget(
         # M2: el motor decide UNA vez; de aquí salen el total, el neto (T4),
         # los renglones y la fotografía (T2).
         foto = None
+        calculo = None
         renglones = self._items
         try:
             entrada, calculo = self._calculo_y_entrada(pago_tarjeta=pago_tarjeta, fecha=creado)
@@ -1530,7 +1531,9 @@ class QuickSaleWidget(
             renglones = detalle_por_renglon(self._items, calculo)
             foto = self._fotografia_motor(entrada, calculo)
         origen = self._origen_satelite()
-        pct_programa = self._pct_descuento_programa()
+        from pos_uniformes.services.beneficios_carrito import descuento_programa_a_guardar
+
+        pct_programa = descuento_programa_a_guardar(self._pct_descuento_programa(), calculo)
         entradas = [
             {
                 "employee_code": str(self._employee_code or ""),
@@ -2895,6 +2898,7 @@ class QuickSaleWidget(
         if not self._items:
             QMessageBox.information(self, "Sin piezas", "Agrega piezas antes de generar ticket.")
             return
+        self._avisar_si_el_motor_no_responde()
         # Una sola pregunta al imprimir: ¿copia? ¿pago con tarjeta? Con eso
         # la copia interna sale con la comisión descontada automáticamente y
         # la Libreta registra el neto — ya no hay checkbox en el diálogo de

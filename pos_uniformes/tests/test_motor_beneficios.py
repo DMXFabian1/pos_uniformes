@@ -500,6 +500,21 @@ class OroSaldoYTarjetaTests(unittest.TestCase):
 
 
 class SinConexionC12Tests(unittest.TestCase):
+    def test_sin_conexion_la_venta_no_se_anota_con_descuento(self) -> None:
+        """Revisión de deuda, 2026-11-12: el Mayorista que eligió descuento y
+        compró sin conexión pagaba precio completo y, como la venta decía
+        «descuento_programa», el servidor tampoco le abonaba Monedero."""
+        from pos_uniformes.services.beneficios_carrito import descuento_programa_a_guardar
+
+        f = _Fabrica()
+        sin = calcular(venta([f.linea("PO1", "180")], cliente=MAYORISTA, modalidad_mayorista="descuento",
+                             origen_calculo="kiosko_sin_conexion"))
+        con = calcular(venta([f.linea("PO1", "180")], cliente=MAYORISTA, modalidad_mayorista="descuento"))
+        self.assertIsNone(descuento_programa_a_guardar(D("15"), sin))
+        self.assertEqual(descuento_programa_a_guardar(D("15"), con), D("15"))
+        self.assertEqual(descuento_programa_a_guardar(D("15"), None), D("15"))   # cálculo de respaldo
+        self.assertIsNone(descuento_programa_a_guardar(None, con))
+
     def test_sin_mayoreo_sin_saldo_y_empleada_al_base(self) -> None:
         f = _Fabrica()
         c = calcular(venta([f.linea("PO1", "180", 2)], cliente=MAYORISTA, modalidad_mayorista="descuento",

@@ -88,6 +88,12 @@ def _es_error_de_red(exc: BaseException) -> bool:
 
     return isinstance(exc, (sa_exc.OperationalError, sa_exc.InterfaceError, sa_exc.DisconnectionError))
 
+#: Cuando no se puede revisar el cobro con saldo (revisión de deuda, 2026-11-12).
+MENSAJE_SALDO_SIN_REVISAR = (
+    "No se pudo revisar el cobro con saldo del Monedero, así que no se usó.\n\n"
+    "Inténtalo otra vez. Si sigue, quita «Usar saldo» y cobra normal; el saldo se queda para otra compra."
+)
+
 
 class MonederoVentaMixin:
     """Se mezcla en QuickSaleWidget. Usa de él: _items, _compute_totals,
@@ -568,18 +574,27 @@ class MonederoVentaMixin:
         from datetime import datetime as _dt
         from datetime import timezone as _tz
 
-        foto = None
-        renglones = self._items
+        # Sin fotografía el servidor no revisa (T3) y el saldo se cobraría a
+        # ciegas: antes pasaba en silencio si el motor fallaba o no coincidía
+        # con la pantalla. Ahora no se cobra con saldo (revisión de deuda,
+        # 2026-11-12); la venta se puede cobrar sin usarlo.
         try:
             entrada, calculo = self._calculo_y_entrada(pago_tarjeta=bool(tarjeta), fecha=_dt.now(_tz.utc))
-        except Exception:  # noqa: BLE001 — sin motor, como antes
-            _logger.exception("Motor de beneficios: venta con saldo con el cálculo anterior")
-        else:
-            from pos_uniformes.services.beneficios_carrito import detalle_por_renglon
+        except Exception:  # noqa: BLE001 — se avisa abajo
+            _logger.exception("Motor de beneficios: no se cobra con saldo sin el cálculo")
+            calculo = None
+        if calculo is None or calculo.total != total or calculo.saldo_usado != canje:
+            if calculo is not None:
+                _logger.warning(
+                    "Monedero: el motor (%s, saldo %s) no coincide con la pantalla (%s, saldo %s)",
+                    calculo.total, calculo.saldo_usado, total, canje,
+                )
+            QMessageBox.warning(self, "Monedero", MENSAJE_SALDO_SIN_REVISAR)
+            return
+        from pos_uniformes.services.beneficios_carrito import detalle_por_renglon
 
-            if calculo.total == total and calculo.saldo_usado == canje:
-                renglones = detalle_por_renglon(self._items, calculo)
-                foto = self._fotografia_motor(entrada, calculo)
+        renglones = detalle_por_renglon(self._items, calculo)
+        foto = self._fotografia_motor(entrada, calculo)
         items = [
             {"sku": it["sku"], "nombre": it["nombre"], "talla": it["talla"],
              "cantidad": int(it["cantidad"]), "precio": str(it["precio"]),
