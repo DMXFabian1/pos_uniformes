@@ -120,7 +120,8 @@ class LibretaServiceTests(unittest.TestCase):
         self.assertEqual(len(cortes), 2)
         self.assertEqual(cortes[0].dia, martes.date())  # más reciente primero
         lunes_corte = cortes[1]
-        self.assertEqual(lunes_corte.operaciones, 4)
+        # El abono no es operación (Daniel, 2026-11-12); su dinero sí cuenta.
+        self.assertEqual(lunes_corte.operaciones, 3)
         self.assertEqual(lunes_corte.piezas, 6)
         # Ventas, neto (tras tarjeta), apartados y abonos, cada uno aparte
         self.assertEqual(lunes_corte.monto_ventas, Decimal("800.00"))

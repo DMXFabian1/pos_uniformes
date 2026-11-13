@@ -65,6 +65,8 @@ class ResumenPeriodo:
         si lo único del periodo fue la compra de una empleada con precio
         especial, hay 0 operaciones pero su efectivo está en el cajón, y el
         corte (automático, remoto, del encargado o del celular) debe salir.
+        Igual con un periodo de solo abonos: no son operación (Daniel,
+        2026-11-12) pero entró dinero y hay que cortarlo.
         Antes de esa regla, `operaciones > 0` decía lo mismo que esto."""
         return bool(self.movimientos or self.operaciones or self.ventas or self.abonos or self.apartados)
 
@@ -97,8 +99,10 @@ def resumir_periodo(rows: list) -> ResumenPeriodo:
 
     Operaciones y piezas siguen la regla única de la Libreta
     (`libreta_service.cuenta_como_operacion`, 2026-11-12): la compra de una
-    empleada con precio especial no cuenta. Su DINERO sí: entró al cajón o
-    a la terminal, y el corte lo espera. (Las compras a cuenta ya vienen
+    empleada con precio especial no cuenta, y un abono tampoco (Daniel,
+    2026-11-12: «no cuentan como operación»). Su DINERO sí: entró al cajón o
+    a la terminal, y el corte lo espera; por eso `movimientos` cuenta toda
+    fila y un periodo con solo abonos sigue siendo `hubo_movimiento`. (Las compras a cuenta ya vienen
     quitadas por `sin_compras_a_cuenta`.)"""
     from pos_uniformes.services.libreta_service import cuenta_como_operacion, pagos_de
 

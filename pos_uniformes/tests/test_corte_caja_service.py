@@ -25,8 +25,11 @@ class ResumirPeriodoTests(unittest.TestCase):
             _op("abono", "100", tarjeta=True),
             _op("apartado", "900", piezas=3),
         ])
-        self.assertEqual(r.operaciones, 5)
-        self.assertEqual(r.piezas, 7)
+        # Los abonos no son operación ni piezas (Daniel, 2026-11-12: «no
+        # cuentan como operación»), aunque la fila traiga piezas; el dinero
+        # de abajo no cambia.
+        self.assertEqual(r.operaciones, 3)
+        self.assertEqual(r.piezas, 5)
         self.assertEqual(r.ventas, Decimal("800.00"))
         self.assertEqual(r.abonos, Decimal("300.00"))
         self.assertEqual(r.apartados, Decimal("900.00"))

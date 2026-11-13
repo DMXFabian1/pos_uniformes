@@ -73,7 +73,9 @@ class DatosResumen:
         """¿Pasó algo en el periodo? No basta con `operaciones`: desde
         2026-11-12 la compra de una empleada con precio especial no cuenta
         como operación, pero su dinero sí entró. Un día con solo esa compra
-        no debe decir «ninguna venta» y esconder el efectivo."""
+        no debe decir «ninguna venta» y esconder el efectivo. Lo mismo un día
+        con solo abonos: no son operación (Daniel, 2026-11-12) pero entró
+        dinero, y `abonos` lo cuenta."""
         return bool(self.operaciones or self.ventas or self.abonos or self.apartados_n)
 
     @property

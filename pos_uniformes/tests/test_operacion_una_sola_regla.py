@@ -5,6 +5,10 @@ como operación, ni piezas, ni importe, ni comisión de nadie. Antes cada
 pantalla lo decidía por su cuenta y el corte sí la contaba. Esta prueba de
 tabla pasa la MISMA lista de filas por todos los agregadores y revisa que
 operaciones y piezas salgan coherentes con la regla de `libreta_service`.
+
+Ese mismo día Daniel decidió que un abono tampoco es operación («no cuentan
+como operación»): no suma operación ni piezas en ninguna pantalla, pero su
+DINERO sigue igual y un periodo con solo abonos sigue siendo movimiento.
 """
 
 from __future__ import annotations
@@ -64,9 +68,10 @@ def tabla():
 
 
 # Lo que dice la regla, a mano, para la tabla:
-#   cuentan como operación (TIPOS_OPERACION): 1, 3, 4  → 3 ops, 7 piezas
-#   en el ranking (TIPOS_DE_VENTA):           1, 3     → 2 ops, 7 piezas
-OPS, PIEZAS = 3, 7
+#   cuentan como operación (TIPOS_OPERACION): 1, 3  → 2 ops, 7 piezas
+#   (el abono, 4, ya no: Daniel, 2026-11-12, «no cuentan como operación»)
+#   en el ranking (TIPOS_DE_VENTA, hoy el mismo valor): 1, 3 → 2 ops, 7 piezas
+OPS, PIEZAS = 2, 7
 OPS_RANKING, PIEZAS_RANKING = 2, 7
 
 
@@ -76,10 +81,15 @@ class ReglaTests(unittest.TestCase):
         self.assertTrue(ls.cuenta_como_operacion(f[1]))
         self.assertFalse(ls.cuenta_como_operacion(f[2]))
         self.assertTrue(ls.cuenta_como_operacion(f[3]))
-        self.assertTrue(ls.cuenta_como_operacion(f[4]))
+        # El abono no es operación (Daniel, 2026-11-12).
+        self.assertFalse(ls.cuenta_como_operacion(f[4]))
         self.assertFalse(ls.cuenta_como_operacion(f[ID_A_CUENTA]))
-        # El ranking pide menos tipos: el abono no es venta.
         self.assertFalse(ls.cuenta_como_operacion(f[4], ls.TIPOS_DE_VENTA))
+        # Una sola definición: el alias del ranking es el mismo valor.
+        self.assertEqual(ls.TIPOS_OPERACION, ("venta", "apartado"))
+        self.assertEqual(ls.TIPOS_DE_VENTA, ls.TIPOS_OPERACION)
+        self.assertEqual(rk.TIPOS_OPERACION_RANKING, ls.TIPOS_OPERACION)
+        self.assertEqual(gh.TIPOS_QUE_CUENTAN, ls.TIPOS_OPERACION)
         # Un tipo que no es de la Libreta (p. ej. un retiro) no es operación.
         self.assertFalse(ls.cuenta_como_operacion(SimpleNamespace(tipo="retiro")))
 
@@ -95,12 +105,18 @@ class AgregadoresTests(unittest.TestCase):
         self.assertEqual(sum(e.piezas for e in r), PIEZAS)
         stayce = next(e for e in r if e.employee_code == "VEND-5")
         self.assertEqual((stayce.operaciones, stayce.piezas, stayce.monto_total, stayce.comisiones), (0, 0, Decimal("0"), 0))
+        # El importe no cambia con la regla del abono: 900 + 1200 + 300.
+        fanny = next(e for e in r if e.employee_code == "VEND-4")
+        self.assertEqual((fanny.operaciones, fanny.monto_total), (2, Decimal("2400.00")))
 
     def test_resumir_por_dia(self) -> None:
         (dia,) = ls.resumir_por_dia(tabla())
         self.assertEqual((dia.operaciones, dia.piezas), (OPS, PIEZAS))
-        # El dinero no cambia: las dos compras de empleada entraron como venta.
+        # El dinero no cambia: las dos compras de empleada entraron como venta,
+        # y el abono sigue en abonos y en el cajón.
         self.assertEqual(dia.monto_ventas, Decimal("1550.00"))
+        self.assertEqual(dia.monto_abonos, Decimal("300.00"))
+        self.assertEqual(dia.monto_en_caja, Decimal("1850.00"))
 
     def test_ranking(self) -> None:
         r = rk.calcular(tabla())
@@ -108,6 +124,7 @@ class AgregadoresTests(unittest.TestCase):
         self.assertEqual(sum(f.piezas for f in r), PIEZAS_RANKING)
         self.assertEqual(sum(f.ventas for f in r), 1)
         self.assertEqual(sum(f.abonos for f in r), 1)
+        self.assertEqual(sum(f.importe_abonos for f in r), Decimal("300.00"))
         stayce = next(f for f in r if f.employee_code == "VEND-5")
         self.assertEqual((stayce.operaciones, stayce.piezas, stayce.importe_ventas), (0, 0, Decimal("0")))
 
@@ -253,6 +270,94 @@ class CorteConSoloLaCompraDeEmpleadaTests(unittest.TestCase):
         self.assertTrue(estado.resumen.hubo_movimiento)
         decision = decidir_corte_automatico(momento_corte(HOY), None, estado.resumen.hubo_movimiento)
         self.assertTrue(decision.hacer, decision.motivo)
+
+    def test_corte_remoto_no_dice_sin_corte(self) -> None:
+        from pos_uniformes.services import corte_remoto_service as crs
+
+        estado = cc.estado_caja(self.s, self.ahora)
+
+        class _Paso(Exception):
+            pass
+
+        with patch("pos_uniformes.services.corte_caja_service.estado_caja", return_value=estado), patch(
+            "pos_uniformes.services.corte_caja_service.pagos_que_tocan_hoy", return_value=[]
+        ), patch(
+            "pos_uniformes.services.corte_caja_service.ultimo_corte", return_value=None
+        ), patch(
+            "pos_uniformes.services.corte_caja_service.cerrar_corte_automatico", side_effect=_Paso
+        ) as cerrar:
+            try:
+                r = crs.hacer_corte_y_avisar(self.s, creado_por="VEND-1", ahora=self.ahora, sin_tarjeta=False)
+            except _Paso:
+                r = None
+        self.assertIsNone(r, getattr(r, "mensaje", r))
+        cerrar.assert_called_once()
+
+
+class SoloAbonosTests(unittest.TestCase):
+    """Un periodo con solo abonos: 0 operaciones y 0 piezas (Daniel,
+    2026-11-12: «no cuentan como operación»), pero entró dinero. El resumen
+    no dice «ninguna venta» y las puertas del corte lo dejan pasar."""
+
+    def setUp(self) -> None:
+        engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+        Base.metadata.create_all(engine)
+        self.s = Session(engine)
+        self.addCleanup(self.s.close)
+        f = tabla()[3]   # abono de $300 en efectivo
+        self.s.add(LibretaVenta(
+            id=f.id, employee_code=f.employee_code, employee_name=f.employee_name, tipo="abono",
+            piezas=0, comisiones=0, monto_total=f.monto_total,
+            descuento_empleada=False, privado=False, created_at=f.created_at,
+        ))
+        self.s.commit()
+        self.ahora = datetime.combine(HOY, time(20, 0))
+
+    def test_resumir_periodo(self) -> None:
+        r = cc.resumir_periodo([tabla()[3]])
+        self.assertEqual((r.operaciones, r.piezas), (0, 0))
+        # El dinero, igual que antes de la regla.
+        self.assertEqual((r.abonos, r.efectivo, r.ventas), (Decimal("300.00"), Decimal("300.00"), Decimal("0.00")))
+        self.assertTrue(r.hubo_movimiento)
+
+    def test_resumen_de_telegram_no_dice_ninguna_venta(self) -> None:
+        from pos_uniformes.services import resumen_diario_service as rd
+
+        r = cc.resumir_periodo([tabla()[3]])
+        d = rd.DatosResumen(fecha=HOY, operaciones=r.operaciones, piezas=r.piezas, ventas=r.ventas,
+                            abonos=r.abonos, efectivo=r.efectivo)
+        self.assertTrue(d.hubo_movimiento)
+        texto = rd.formatear(d)
+        self.assertNotIn("Sin operaciones", texto)
+        self.assertIn("Abonos: $300.00", texto)
+        self.assertIn("0 operaciones · 0 piezas", texto)
+        hoy = rd.texto_hoy(d, ahora=datetime.combine(HOY, time(12, 0)))
+        self.assertNotIn("ninguna venta", hoy.lower())
+        self.assertIn("Entró: $300.00", hoy)
+
+    def test_gafete_no_cuenta_el_abono(self) -> None:
+        self.assertTrue(gh.resumen_de_hoy(self.s, hoy=HOY).vacio)
+
+    def test_estado_caja_y_corte_automatico(self) -> None:
+        from pos_uniformes.services.horario_tienda_service import decidir_corte_automatico, momento_corte
+
+        estado = cc.estado_caja(self.s, self.ahora)
+        self.assertEqual(estado.resumen.operaciones, 0)
+        self.assertEqual(estado.resumen.abonos, Decimal("300.00"))
+        self.assertEqual(estado.resumen.efectivo, Decimal("300.00"))
+        self.assertTrue(estado.resumen.hubo_movimiento)
+        decision = decidir_corte_automatico(momento_corte(HOY), None, estado.resumen.hubo_movimiento)
+        self.assertTrue(decision.hacer, decision.motivo)
+
+    def test_propuesta_de_corte_cierra_sola(self) -> None:
+        from pos_uniformes.services import corte_propuesta_service as cp
+
+        estado = cc.estado_caja(self.s, self.ahora)
+        p = cp.Propuesta(fecha=HOY, momento=datetime.combine(HOY, time(17, 30)), recordado=True)
+        self.assertTrue(cp.toca_cerrar_solo(
+            p, hoy=HOY, minutos_tras_cierre=60, hubo_corte_despues=False,
+            hubo_movimiento=estado.resumen.hubo_movimiento,
+        ))
 
     def test_corte_remoto_no_dice_sin_corte(self) -> None:
         from pos_uniformes.services import corte_remoto_service as crs

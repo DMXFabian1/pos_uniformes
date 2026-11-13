@@ -152,18 +152,32 @@ def comisiones_de_items(items: list[dict]) -> int:
 #    comisión (Daniel, 2026-11-12: «tampoco quiero que le cuente como
 #    operación»). Su DINERO sí entró al cajón: eso lo siguen sumando el
 #    corte y el desglose por día.
-# 2. El tipo: por defecto cuentan los tres tipos de la Libreta. Una pantalla
-#    puede pedir menos, con su razón escrita; hoy el ranking usa
-#    `TIPOS_DE_VENTA` porque «un abono no es una venta».
+# 2. El tipo: solo venta y apartado son operación. Un abono NO es operación
+#    (Daniel, 2026-11-12, a «¿el corte debe contar los abonos como
+#    operación? (el ranking no)»: «no cuentan como operación»). El abono es
+#    dinero de un apartado que ya se contó al apartar: no suma operación ni
+#    piezas en ninguna pantalla (corte, resumen, gafete, desglose por día,
+#    Libreta del kiosko y del dueño, ranking). Su DINERO sí sigue sumando
+#    igual que antes (abonos, efectivo, tarjeta, esperado del corte), y un
+#    periodo con solo abonos sigue siendo «hubo movimiento».
 
-#: Todos los tipos de la Libreta son operación del mostrador (lo que se
-#: atiende): venta, apartado y abono. Es lo que cuentan el gafete, el corte
-#: y la Libreta del kiosko.
-TIPOS_OPERACION = ("venta", "apartado", "abono")
+#: Lo que es operación del mostrador: venta y apartado. Antes (tanda 2,
+#: 2026-11-12) también el abono; desde la decisión de Daniel del mismo día
+#: («no cuentan como operación») ya no. Es lo que cuentan el gafete, el
+#: corte, el resumen, la Libreta del kiosko y el ranking.
+TIPOS_OPERACION = ("venta", "apartado")
 
-#: Solo lo que se vende (piezas que salen o se apartan). El ranking cuenta
-#: operaciones y piezas así: un abono no es una venta (2026-11-08).
-TIPOS_DE_VENTA = ("venta", "apartado")
+#: Alias de `TIPOS_OPERACION` (compatibilidad): el ranking ya contaba así
+#: desde 2026-11-08 («un abono no es una venta»); hoy es la misma regla.
+TIPOS_DE_VENTA = TIPOS_OPERACION
+
+
+def es_compra_de_empleada(row) -> bool:
+    """¿Es lo que compró una empleada con precio especial? Esa fila no es
+    operación, ni piezas, ni importe de nadie (Daniel, 2026-11-12). Se separa
+    de `cuenta_como_operacion` porque el importe de un abono sí se sigue
+    sumando aunque el abono ya no sea operación (2026-11-12)."""
+    return bool(getattr(row, "descuento_empleada", False))
 
 
 def cuenta_como_operacion(row, tipos: tuple[str, ...] = TIPOS_OPERACION) -> bool:
@@ -172,7 +186,7 @@ def cuenta_como_operacion(row, tipos: tuple[str, ...] = TIPOS_OPERACION) -> bool
     No, si es la compra de una empleada con precio especial. Tampoco si su
     tipo no está en `tipos`. Una fila sin `tipo` (filas armadas a mano) se
     toma como venta, el valor por defecto de la tabla."""
-    if bool(getattr(row, "descuento_empleada", False)):
+    if es_compra_de_empleada(row):
         return False
     tipo = str(getattr(row, "tipo", None) or "venta")
     return tipo in tipos
@@ -644,10 +658,14 @@ def resumir_por_empleada(rows: list[LibretaVenta]) -> list[ResumenEmpleada]:
         )
         bucket["comisiones"] += int(getattr(row, "comisiones", 0) or 0)
         if cuenta_como_operacion(row):
-            # Su propia compra con precio especial no le suma operación, piezas
-            # ni importe (Daniel, 2026-11-12).
+            # Su propia compra con precio especial no le suma operación ni
+            # piezas (Daniel, 2026-11-12); un abono tampoco (Daniel,
+            # 2026-11-12: «no cuentan como operación»).
             bucket["operaciones"] += 1
             bucket["piezas"] += int(row.piezas or 0)
+        if not es_compra_de_empleada(row):
+            # El importe no cambia con la regla del abono: lo cobrado en un
+            # abono sigue sumando a lo que movió la empleada.
             bucket["monto"] = (bucket["monto"] + Decimal(str(row.monto_total or 0))).quantize(
                 Decimal("0.01")
             )
@@ -717,7 +735,9 @@ def resumir_por_dia(rows: list[LibretaVenta]) -> list[CorteDia]:
         )
         if cuenta_como_operacion(row):
             # La compra de la empleada con precio especial no es operación
-            # ni piezas; su dinero sí entró (2026-11-12, regla única).
+            # ni piezas; su dinero sí entró (2026-11-12, regla única). El
+            # abono tampoco es operación (Daniel, 2026-11-12); su dinero va
+            # abajo, en abonos y en caja, igual que antes.
             bucket["operaciones"] += 1
             bucket["piezas"] += int(row.piezas or 0)
         monto = Decimal(str(row.monto_total or 0))

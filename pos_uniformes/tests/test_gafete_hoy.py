@@ -40,7 +40,9 @@ class ResumenDeHoyTests(unittest.TestCase):
         self._mov("VEND-5", "Stayce Chavarria", time(12, 30), tipo="abono")
         self._mov("VEND-4", "Fanny Ortiz", time(16, 42))
         r = gh.resumen_de_hoy(self.s, hoy=HOY)
-        self.assertEqual(r.por_empleada, (("Fanny", 3), ("Stayce", 1)))
+        # El abono de Stayce no es operación (Daniel, 2026-11-12: «no cuentan
+        # como operación»): con solo eso no sale en el gafete.
+        self.assertEqual(r.por_empleada, (("Fanny", 3),))
         self.assertEqual(r.ultima, ("Fanny", "16:42"))
         self.assertEqual(r.desde, datetime.combine(HOY, time(9, 0)))
 
