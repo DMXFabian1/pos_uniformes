@@ -287,6 +287,33 @@ class CobradoComoElResumenTests(_ConBase):
         real = tb.cargar(self.s, tb.SEMANA, HOY, real=True, hoy=HOY)
         self.assertEqual({d.dia: d.cobrado for d in real.dias}[HOY], Decimal("1161.00"))
 
+    def test_un_dia_puede_salir_negativo_y_la_suma_cuadra(self) -> None:
+        lunes = HOY - timedelta(days=HOY.weekday())
+        martes = lunes + timedelta(days=1)
+        self._anotar(martes, "venta", "300")
+        self._corte_del_dueno(martes, "-800")
+        t = tb.cargar(self.s, tb.SEMANA, martes, hoy=martes)
+        por_dia = {d.dia: d.cobrado for d in t.dias}
+        self.assertEqual(por_dia[martes], Decimal("-500.00"))
+        self.assertEqual(sum(por_dia.values()), t.ahora.cobrado)
+
+    def test_una_base_sin_la_liga_de_compras_a_cuenta_no_tumba_la_pestana(self) -> None:
+        # Base atrasada sin prestamo_empleada.libreta_venta_id: sin_compras_a_cuenta
+        # lanza ProgrammingError. Analítica sigue (ninguna venta puede estar
+        # ligada) en vez de quedarse en blanco; otro error sí sube.
+        from sqlalchemy.exc import OperationalError, ProgrammingError
+
+        from pos_uniformes.services import corte_caja_service as cc
+
+        self._anotar(HOY, "venta", "300")
+        falla = ProgrammingError("SELECT …", {}, Exception("column libreta_venta_id does not exist"))
+        with patch.object(cc, "sin_compras_a_cuenta", side_effect=falla):
+            t = tb.cargar(self.s, tb.HOY, HOY, real=True, hoy=HOY)
+        self.assertEqual((t.ahora.cobrado, t.ahora.ventas), (Decimal("300.00"), 1))
+        with patch.object(cc, "sin_compras_a_cuenta", side_effect=OperationalError("x", {}, Exception("caída"))):
+            with self.assertRaises(OperationalError):
+                tb.cargar(self.s, tb.HOY, HOY, real=True, hoy=HOY)
+
     def test_ajustes_por_dia_suman_el_ajuste_del_periodo(self) -> None:
         from pos_uniformes.services.corte_caja_service import ajustes_en_rango
 
@@ -296,6 +323,9 @@ class CobradoComoElResumenTests(_ConBase):
         dias = tb.ajustes_por_dia(self.s, ini, fin)
         self.assertEqual(dias, {HOY: Decimal("-70.00"), HOY - timedelta(days=2): Decimal("25.00")})
         self.assertEqual(sum(dias.values()), ajustes_en_rango(self.s, ini, fin))
+
+
+_CARGAR = tb.cargar
 
 
 class PestanaTests(_ConBase):
@@ -350,6 +380,33 @@ class PestanaTests(_ConBase):
         antes = ventana._ana_estado["ancla"]
         ui._mover(ventana, 1)
         self.assertEqual(ventana._ana_estado["ancla"], antes)
+
+    def test_un_dia_pasado_negativo_se_pinta_y_el_futuro_no(self) -> None:
+        # Revisión 2026-11-12: con el ajuste del dueño por día, un día pasado
+        # puede salir negativo. Antes −1 era la marca de «día futuro» y ese día
+        # se pintaba vacío; ahora el futuro va como None y el negativo es dato.
+        lunes = HOY - timedelta(days=HOY.weekday())
+        martes = lunes + timedelta(days=1)
+        self._vender(martes, "300")
+        self.s.add(LibretaCorte(fecha=martes, creado_por="VEND-1", monto_final=Decimal("9200"),
+                                monto_esperado=Decimal("10000"), reactivo_inicial=Decimal("9000"),
+                                reactivo_final=Decimal("9000"),
+                                desde=datetime.combine(martes, time(9)).astimezone(),
+                                hasta=datetime.combine(martes, time(21)).astimezone(), periodo_label="semana"))
+        self.s.commit()
+        ventana, ui = self._pestana()
+        ventana._ana_estado.update(clave=tb.SEMANA, ancla=martes)
+        with patch.object(tb, "cargar", side_effect=lambda *a, **kw: _CARGAR(*a, **{**kw, "hoy": martes})):
+            ui.refrescar(ventana, self.s)
+        datos = ventana.ana_barras.datos
+        self.assertEqual(len(datos), 7)
+        self.assertEqual(datos[1][1], -500.0)
+        self.assertEqual(datos[1][2], "−$500")
+        self.assertTrue(all(v is None for _e, v, _t in datos[2:]))     # miércoles en adelante
+        self.assertEqual(datos[0][1], 0.0)
+        # Pintar con negativos y días por venir no truena.
+        ventana.ana_barras.resize(500, 200)
+        ventana.ana_barras.grab()
 
     def test_la_combinacion_alterna_lo_real(self) -> None:
         from unittest.mock import patch

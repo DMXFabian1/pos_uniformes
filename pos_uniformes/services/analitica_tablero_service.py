@@ -15,7 +15,9 @@ Reglas de la casa que se respetan:
   (`resumir_periodo` lo separa). Las compras a cuenta de las empleadas
   (`corte_caja_service.sin_compras_a_cuenta`) se quitan del dinero: no
   entraron al cajón. Vale igual para el periodo, el de comparación y la
-  gráfica de cobrado por día.
+  gráfica de cobrado por día (un día puede salir negativo si el ajuste del
+  dueño pesó más que lo cobrado; la gráfica lo pinta como tal). Una base sin
+  la liga de las compras a cuenta no tumba la pestaña (`_sin_compras_a_cuenta`).
 - **La cifra oficial por defecto**: el cobrado lleva los ajustes del dueño en
   sus cortes (`ajustes_en_rango`; por día, `ajustes_por_dia`); lo real solo
   con Ctrl+Shift+R.
@@ -26,10 +28,13 @@ Reglas de la casa que se respetan:
 
 from __future__ import annotations
 
+import logging
 from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
+
+logger = logging.getLogger(__name__)
 
 _CENT = Decimal("0.01")
 
@@ -357,10 +362,35 @@ class Tablero:
     hoy: date | None = None
 
 
+def _sin_compras_a_cuenta(session, rows: list) -> list:
+    """`corte_caja_service.sin_compras_a_cuenta`, sin tumbar la pestaña.
+
+    El corte falla a propósito si no puede leer las compras a cuenta (quitar
+    el retiro sin su venta daría un esperado falso). Aquí no hay esperado, y
+    Analítica pinta mucho más que dinero (conteos, «se va a acabar», cortes
+    por escuela, demanda): una base atrasada sin
+    `prestamo_empleada.libreta_venta_id` no debe dejarla en blanco (revisión,
+    2026-11-12). Solo `ProgrammingError` (la columna o la tabla no existe):
+    en esa base ninguna venta puede estar ligada a una compra a cuenta, así
+    que las filas tal cual SON lo cobrable. Cualquier otro error sigue
+    subiendo, igual que en el corte."""
+    from sqlalchemy.exc import ProgrammingError
+
+    from pos_uniformes.services.corte_caja_service import sin_compras_a_cuenta
+
+    try:
+        return sin_compras_a_cuenta(session, rows)
+    except ProgrammingError:
+        session.rollback()
+        logger.warning("Analítica: sin prestamo_empleada.libreta_venta_id (¿migración pendiente?); "
+                       "no hay compras a cuenta que quitar")
+        return rows
+
+
 def cargar(session, clave: str, ancla: date, *, manual: tuple[date, date] | None = None,
            real: bool = False, hoy: date | None = None, ahora: datetime | None = None) -> Tablero:
     from pos_uniformes.services.analitica_libreta_service import filas_de_periodo
-    from pos_uniformes.services.corte_caja_service import ajustes_en_rango, sin_compras_a_cuenta
+    from pos_uniformes.services.corte_caja_service import ajustes_en_rango
     from pos_uniformes.services.libreta_service import listar_operaciones
 
     hoy = hoy or date.today()
@@ -388,8 +418,8 @@ def cargar(session, clave: str, ancla: date, *, manual: tuple[date, date] | None
     # El dinero, como el Resumen, el corte y el bot: sin las compras a cuenta
     # de las empleadas, que no entraron al cajón (revisión, 2026-11-12). Los
     # conteos siguen sobre todas las filas (ver `cifras`).
-    cobrables = sin_compras_a_cuenta(session, rows)
-    cobrables_antes = sin_compras_a_cuenta(session, rows_antes)
+    cobrables = _sin_compras_a_cuenta(session, rows)
+    cobrables_antes = _sin_compras_a_cuenta(session, rows_antes)
     con_dias = (hasta - desde).days >= 1
     ajustes_dia = {} if real or not con_dias else ajustes_por_dia(session, ini, fin)
     try:

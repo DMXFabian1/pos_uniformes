@@ -120,14 +120,19 @@ class _Tarjeta(QFrame):
 
 
 class Barras(QWidget):
-    """Barras verticales sencillas: una por día (u hora), con su etiqueta abajo."""
+    """Barras verticales sencillas: una por día (u hora), con su etiqueta abajo.
+
+    Cada dato es (etiqueta, valor, texto). `valor` None = un día que no ha
+    llegado: solo su etiqueta. Un valor negativo SÍ es un dato (un día en que
+    el ajuste del dueño en su corte pesó más que lo cobrado; revisión,
+    2026-11-12): se pinta como rayita roja con su monto, no como día futuro."""
 
     def __init__(self) -> None:
         super().__init__()
         self.setMinimumHeight(170)
-        self.datos: list[tuple[str, float, str]] = []   # (etiqueta, valor, texto del valor)
+        self.datos: list[tuple[str, float | None, str]] = []   # (etiqueta, valor, texto del valor)
 
-    def poner(self, datos: list[tuple[str, float, str]]) -> None:
+    def poner(self, datos: list[tuple[str, float | None, str]]) -> None:
         self.datos = list(datos)
         self.update()
 
@@ -138,23 +143,28 @@ class Barras(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         ancho, alto = self.width(), self.height()
         abajo, arriba = 22, 18
-        tope = max((v for _e2, v, _t in self.datos), default=0) or 1
+        tope = max((v for _e2, v, _t in self.datos if v is not None and v > 0), default=0) or 1
         n = len(self.datos)
         paso = ancho / n
         barra = max(4.0, min(42.0, paso * 0.62))
         f = QFont(self.font())
         f.setPointSize(8 if n > 16 else 9)
         p.setFont(f)
-        mas_alto = max(range(n), key=lambda i: self.datos[i][1])
+        mas_alto = max(range(n), key=lambda i: self.datos[i][1] if self.datos[i][1] is not None else float("-inf"))
         for i, (etiqueta, valor, texto) in enumerate(self.datos):
             x = i * paso + (paso - barra) / 2
-            h = (alto - abajo - arriba) * (valor / tope)
-            color = QColor(VINO if i == mas_alto and valor > 0 else TERRACOTA)
-            if valor < 0:
-                h = 0          # un día que no ha llegado: solo su etiqueta
+            h = 0.0
+            color = QColor(TERRACOTA)
+            if valor is None:
+                pass           # un día que no ha llegado: solo su etiqueta
+            elif valor < 0:
+                color, h = QColor(ROJO), 3
             elif valor == 0:
-                color = QColor("#e6dccb")
-                h = 2
+                color, h = QColor("#e6dccb"), 2
+            else:
+                h = (alto - abajo - arriba) * (valor / tope)
+                if i == mas_alto:
+                    color = QColor(VINO)
             p.setPen(Qt.PenStyle.NoPen)
             p.setBrush(color)
             if h > 0:
@@ -165,8 +175,8 @@ class Barras(QWidget):
             if i % cada == 0 or i == n - 1:
                 p.drawText(QRectF(i * paso, alto - abajo + 4, paso * cada, 16),
                            int(Qt.AlignmentFlag.AlignLeft), etiqueta)
-            if i == mas_alto and valor > 0:
-                p.setPen(QColor(VINO))
+            if valor is not None and (valor < 0 or (i == mas_alto and valor > 0)):
+                p.setPen(QColor(ROJO if valor < 0 else VINO))
                 p.drawText(QRectF(x - 40, alto - abajo - h - 16, barra + 80, 14),
                            int(Qt.AlignmentFlag.AlignHCenter), texto)
         p.end()
@@ -210,6 +220,8 @@ def _pesos(valor) -> str:
 
 def _pesos_cortos(valor) -> str:
     v = Decimal(valor)
+    if v < 0:
+        return "−" + _pesos_cortos(-v)
     return f"${v / 1000:,.1f}k" if v >= 10000 else f"${v:,.0f}"
 
 
@@ -444,9 +456,11 @@ def pintar(window, t: "tb.Tablero") -> None:
         dias = ("lun", "mar", "mié", "jue", "vie", "sáb", "dom")
         etiqueta = (lambda d: f"{dias[d.weekday()]} {d.day}") if len(t.dias) <= 7 else (lambda d: str(d.day))
         hoy = t.hoy or date.today()
-        # Los días que no han llegado van sin barra (valor −1), no en cero.
+        # Los días que no han llegado van sin barra (None), no en cero. Un día
+        # pasado puede salir negativo (el ajuste del dueño en su corte): eso
+        # sí es dato y se pinta (revisión, 2026-11-12).
         window.ana_barras.poner([
-            (etiqueta(d.dia), float(d.cobrado) if d.dia <= hoy else -1.0, _pesos_cortos(d.cobrado))
+            (etiqueta(d.dia), float(d.cobrado) if d.dia <= hoy else None, _pesos_cortos(d.cobrado))
             for d in t.dias
         ])
     else:
