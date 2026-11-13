@@ -14,20 +14,21 @@ class InventoryOverviewHelperTests(unittest.TestCase):
     def test_builds_empty_view(self) -> None:
         view = build_empty_inventory_overview_view()
 
-        self.assertEqual(view.overview_label, "Selecciona una presentacion")
-        self.assertEqual(view.status_badge.text, "Sin seleccion")
+        self.assertEqual(view.overview_label, "Elige una talla")
+        self.assertEqual(view.status_badge.text, "Sin selección")
         self.assertEqual(view.status_badge.tone, "neutral")
-        self.assertEqual(view.catalog_selection_label, "Selecciona una presentacion en inventario para gestionar cambios.")
+        self.assertEqual(view.catalog_selection_label, "Elige una talla en Inventario para hacer cambios.")
+        self.assertEqual(view.stock_badge.text, "—")  # «Sin stock» se leía como «agotado»
         self.assertEqual(view.toggle_product_label, "Prod.")
         self.assertEqual(view.toggle_variant_label, "Pres.")
 
     def test_builds_error_view(self) -> None:
         view = build_error_inventory_overview_view()
 
-        self.assertEqual(view.overview_label, "No se pudo cargar la presentacion seleccionada.")
+        self.assertEqual(view.overview_label, "No se pudo cargar la talla elegida.")
         self.assertEqual(view.status_badge.text, "Error")
         self.assertEqual(view.status_badge.tone, "danger")
-        self.assertEqual(view.stock_badge.text, "Sin stock")
+        self.assertEqual(view.stock_badge.text, "—")
 
     def test_builds_complete_view_for_selected_variant(self) -> None:
         view = build_inventory_overview_view(
@@ -52,19 +53,19 @@ class InventoryOverviewHelperTests(unittest.TestCase):
         self.assertEqual(view.product_label, "Playera deportiva")
         self.assertEqual(view.status_badge.text, "Desactivada")
         self.assertEqual(view.status_badge.tone, "muted")
-        self.assertEqual(view.stock_badge.text, "Bajo")
+        self.assertEqual(view.stock_badge.text, "Quedan pocas")
         self.assertEqual(view.stock_badge.tone, "warning")
         self.assertEqual(
             view.stock_hint_label,
-            "Talla CH | Color Azul | Precio 199.00 | LEGACY",
+            "Talla CH · Azul · $199",
         )
         self.assertEqual(
             view.meta_label,
-            "Stock actual 2 | Escuela General",
+            "Hay 2 · General",
         )
         self.assertEqual(
             view.last_movement_label,
-            "Ultimo movimiento: Ajuste Salida | -1 | 2026-03-18 10:40",
+            "Último movimiento: Ajuste Salida \u22121 · 2026-03-18 10:40",
         )
         self.assertEqual(
             view.catalog_selection_label,
@@ -113,7 +114,7 @@ class InventoryOverviewHelperTests(unittest.TestCase):
             movement_quantity=None,
             movement_date="",
         )
-        self.assertEqual(view.stock_badge.text, "Negativo")
+        self.assertEqual(view.stock_badge.text, "En negativo")
         self.assertEqual(view.stock_badge.tone, "danger")
 
 
@@ -141,8 +142,8 @@ class InventoryOverviewHelperTests(unittest.TestCase):
         self.assertEqual(self._ficha_3pz(2, es_conjunto=True).stock_badge.text, "Conjunto")
         self.assertEqual(self._ficha_3pz(2, es_conjunto=True).stock_badge.tone, "neutral")
         cero = self._ficha_3pz(0, es_conjunto=True)
-        self.assertEqual((cero.stock_badge.text, cero.stock_badge.tone), ("Agotado", "danger"))
-        self.assertEqual(self._ficha_3pz(2, es_conjunto=False).stock_badge.text, "Bajo")
+        self.assertEqual((cero.stock_badge.text, cero.stock_badge.tone), ("Agotada", "danger"))
+        self.assertEqual(self._ficha_3pz(2, es_conjunto=False).stock_badge.text, "Quedan pocas")
 
 class FichaDiceSiSeVendeTests(unittest.TestCase):
     """Tanda 2: sin columna «Estado», la ficha dice «Desactivada»."""

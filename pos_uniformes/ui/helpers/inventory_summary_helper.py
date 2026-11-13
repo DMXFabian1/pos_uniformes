@@ -57,11 +57,11 @@ def build_inventory_summary_view(
             tone="danger" if count_negative else "positive",
         ),
         out_counter=InventoryCounterState(
-            text=f"Agotados: {count_out}",
+            text=f"Agotadas: {count_out}",
             tone="danger" if count_out else "positive",
         ),
         low_counter=InventoryCounterState(
-            text=f"Bajo stock: {count_low}",
+            text=f"Quedan pocas: {count_low}",
             tone="warning" if count_low else "positive",
         ),
         inactive_counter=InventoryCounterState(

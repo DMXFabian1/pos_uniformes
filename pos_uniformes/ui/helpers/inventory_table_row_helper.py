@@ -19,9 +19,9 @@ from pos_uniformes.services.inventario_existencia_service import (
 
 
 INVENTORY_TABLE_HEADERS = (
-    "SKU", "Producto", "Talla", "Color", "Stock", "Dónde", "Precio", "Ult. conteo",
+    "SKU", "Prenda", "Talla", "Color", "Hay", "Dónde", "Precio", "Contada",
 )
-COLUMNA_STOCK = INVENTORY_TABLE_HEADERS.index("Stock")
+COLUMNA_STOCK = INVENTORY_TABLE_HEADERS.index("Hay")  # el total (tienda + bodega + piso)
 COLUMNA_DONDE = INVENTORY_TABLE_HEADERS.index("Dónde")
 COLUMNA_PRECIO = INVENTORY_TABLE_HEADERS.index("Precio")
 

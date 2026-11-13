@@ -1,10 +1,11 @@
-"""Helpers visibles para la ficha rapida de la seleccion actual en inventario."""
+"""Helpers visibles para la ficha rápida de la selección actual en Inventario."""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
 
+from pos_uniformes.services.rebaja_service import fmt_corto
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 from pos_uniformes.services.inventario_existencia_service import (
     AGOTADO,
@@ -18,12 +19,17 @@ from pos_uniformes.services.inventario_existencia_service import (
 )
 
 _ESTADO_FICHA = {
-    VIRTUAL: "conjunto",
-    NEGATIVO: "negativo",
-    AGOTADO: "agotado",
-    BAJO_MINIMO: "bajo",
-    BAJO: "bajo",
+    VIRTUAL: "Conjunto",
+    NEGATIVO: "En negativo",
+    AGOTADO: "Agotada",
+    BAJO_MINIMO: "Quedan pocas",
+    BAJO: "Quedan pocas",
 }
+_ESTADO_FICHA_CON_EXISTENCIA = "Sí hay"
+
+TEXTO_SIN_SELECCION = "Elige una talla"
+TEXTO_SIN_SELECCION_DETALLE = "Toca una fila de la tabla para ver su ficha."
+TEXTO_SELECCION_OCULTA = "Elige una talla en Inventario para hacer cambios."
 
 
 @dataclass(frozen=True)
@@ -48,14 +54,14 @@ class InventoryOverviewView:
 
 def build_empty_inventory_overview_view() -> InventoryOverviewView:
     return InventoryOverviewView(
-        overview_label="Selecciona una presentacion",
-        product_label="Elige una fila para ver su ficha rapida.",
-        status_badge=InventoryBadgeState(text="Sin seleccion", tone="neutral"),
-        stock_badge=InventoryBadgeState(text="Sin stock", tone="neutral"),
+        overview_label=TEXTO_SIN_SELECCION,
+        product_label=TEXTO_SIN_SELECCION_DETALLE,
+        status_badge=InventoryBadgeState(text="Sin selección", tone="neutral"),
+        stock_badge=InventoryBadgeState(text="—", tone="neutral"),
         stock_hint_label="",
         meta_label="",
         last_movement_label="",
-        catalog_selection_label="Selecciona una presentacion en inventario para gestionar cambios.",
+        catalog_selection_label=TEXTO_SELECCION_OCULTA,
         toggle_product_label="Prod.",
         toggle_variant_label="Pres.",
     )
@@ -63,14 +69,14 @@ def build_empty_inventory_overview_view() -> InventoryOverviewView:
 
 def build_error_inventory_overview_view() -> InventoryOverviewView:
     return InventoryOverviewView(
-        overview_label="No se pudo cargar la presentacion seleccionada.",
+        overview_label="No se pudo cargar la talla elegida.",
         product_label="",
         status_badge=InventoryBadgeState(text="Error", tone="danger"),
-        stock_badge=InventoryBadgeState(text="Sin stock", tone="neutral"),
+        stock_badge=InventoryBadgeState(text="—", tone="neutral"),
         stock_hint_label="",
         meta_label="",
         last_movement_label="",
-        catalog_selection_label="Selecciona una presentacion en inventario para gestionar cambios.",
+        catalog_selection_label=TEXTO_SELECCION_OCULTA,
         toggle_product_label="Prod.",
         toggle_variant_label="Pres.",
     )
@@ -99,22 +105,22 @@ def build_inventory_overview_view(
     clean_product_name = sanitize_product_display_name(product_name)
     virtual = es_conjunto_o_virtual(es_conjunto=es_conjunto, stock_minimo=stock_minimo)
     clase = clasificar_existencia(stock_actual, stock_minimo=stock_minimo, virtual=virtual)
-    stock_status = _ESTADO_FICHA.get(clase, "saludable")
+    stock_status = _ESTADO_FICHA.get(clase, _ESTADO_FICHA_CON_EXISTENCIA)
     stock_tone = tono_existencia(stock_actual, stock_minimo=stock_minimo, virtual=virtual)
     if movement_type is None or movement_quantity is None:
-        last_movement_label = "Sin movimientos registrados."
+        last_movement_label = "Sin movimientos todavía."
     else:
-        last_movement_label = f"Ultimo movimiento: {movement_type} | {movement_quantity:+} | {movement_date}"
+        last_movement_label = f"Último movimiento: {movement_type} {_con_signo(movement_quantity)} · {movement_date}"
     return InventoryOverviewView(
         overview_label=sku,
         product_label=clean_product_name,
         status_badge=_estado_badge(product_active=product_active, variant_active=variant_active),
         stock_badge=InventoryBadgeState(
-            text=stock_status.capitalize(),
+            text=stock_status,
             tone=stock_tone,
         ),
-        stock_hint_label=f"Talla {talla} | Color {color} | Precio {precio_venta} | {origen_etiqueta}",
-        meta_label=f"Stock actual {stock_actual} | Escuela {escuela_nombre}",
+        stock_hint_label=f"Talla {talla} · {color} · {_precio(precio_venta)}",
+        meta_label=f"Hay {stock_actual} · {escuela_nombre}",
         last_movement_label=last_movement_label,
         catalog_selection_label=(
             f"{sku} | {clean_product_name} | {tipo_prenda_nombre} | {tipo_pieza_nombre} | "
@@ -132,3 +138,15 @@ def _estado_badge(*, product_active: bool, variant_active: bool) -> InventoryBad
     if not variant_active:
         return InventoryBadgeState(text="Desactivada", tone="muted")
     return InventoryBadgeState(text="Activa", tone="positive")
+
+
+def _precio(precio_venta) -> str:
+    try:
+        return fmt_corto(precio_venta)
+    except Exception:  # noqa: BLE001
+        return str(precio_venta)
+
+
+def _con_signo(cantidad: int) -> str:
+    """«+3» / «−1» (con el signo menos de verdad, como la tabla)."""
+    return f"+{cantidad}" if cantidad > 0 else f"\u2212{abs(cantidad)}" if cantidad < 0 else "0"

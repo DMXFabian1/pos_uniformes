@@ -173,6 +173,49 @@ class InventarioTanda2PantallaTests(unittest.TestCase):
         self.assertFalse(any(t.startswith("Ctrl/Cmd + clic") for t in textos))
         self.assertIn("Ctrl/Cmd + clic", window.inventory_table.toolTip())
 
+    # ── Acentos y palabras de la tienda ─────────────────────────────────
+
+    def test_palabras_de_la_tienda(self) -> None:
+        from PyQt6.QtWidgets import QGroupBox
+
+        window = self._ventana()
+        titulos = {g.title() for g in window.findChildren(QGroupBox)}
+        self.assertTrue({"Acciones rápidas", "Selección actual", "Tallas"} <= titulos, titulos)
+        self.assertFalse({"Acciones rapidas", "Seleccion actual", "Presentaciones disponibles"} & titulos)
+        self.assertEqual(
+            self._encabezados(window), ["SKU", "Prenda", "Talla", "Color", "Hay", "Dónde", "Precio", "Contada"]
+        )
+        self.assertEqual(window.inventory_status_badge.text(), "Sin selección")
+        menus = [
+            window.inventory_new_button.menu(),
+            window.inventory_edit_button.menu(),
+            window.inventory_stock_button.menu(),
+            window.inventory_labels_button.menu(),
+            window.inventory_more_button.menu(),
+        ]
+        textos = " ".join(t for m in menus for t in self._textos_menu(m))
+        for jerga in ("presentacion", "Presentacion", "fisico", "Categoria", "seleccion", "masivo", "stock"):
+            self.assertNotIn(jerga, textos)
+
+    def test_ficha_no_se_corta_a_1366(self) -> None:
+        from PyQt6.QtWidgets import QTabWidget
+
+        window = self._ventana()
+        window.resize(1366, 768)
+        tabs = window.findChild(QTabWidget)
+        for i in range(tabs.count()):
+            if tabs.tabText(i).strip().lower().startswith("inventario"):
+                tabs.setCurrentIndex(i)
+        window.show()
+        QApplication.processEvents()
+        caja = window.inventory_overview_label.parentWidget()
+        self.assertGreaterEqual(caja.width(), 290)
+        # El título de la caja cabe completo en su ancho.
+        metrica = caja.fontMetrics()
+        self.assertLess(metrica.horizontalAdvance("Selección actual"), caja.width() - 40)
+        # Las insignias van en su propia fila: el título tiene todo el ancho.
+        self.assertGreaterEqual(window.inventory_overview_label.width(), caja.width() - 60)
+
 
 if __name__ == "__main__":
     unittest.main()

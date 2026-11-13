@@ -1375,9 +1375,9 @@ class MainWindow(QMainWindow):
         self.inventory_print_label_button = QPushButton("Imprimir etiqueta")
         self.inventory_generate_all_qr_button = QPushButton("Generar QR en lote")
         self.inventory_permission_label = QLabel()
-        self.inventory_overview_label = QLabel("Selecciona una presentacion")
-        self.inventory_product_label = QLabel("Elige una fila para ver su ficha rápida.")
-        self.inventory_status_badge = QLabel("Sin seleccion")
+        self.inventory_overview_label = QLabel("Elige una talla")
+        self.inventory_product_label = QLabel("Toca una fila de la tabla para ver su ficha.")
+        self.inventory_status_badge = QLabel("Sin selección")
         self.inventory_stock_badge = QLabel("Sin stock")
         self.inventory_stock_hint_label = QLabel("")
         self.inventory_meta_label = QLabel("")
@@ -1405,8 +1405,8 @@ class MainWindow(QMainWindow):
         self.inventory_previous_page_button = QPushButton("Anterior")
         self.inventory_next_page_button = QPushButton("Siguiente")
         self.inventory_negative_counter = QLabel("En negativo: 0")
-        self.inventory_out_counter = QLabel("Agotados: 0")
-        self.inventory_low_counter = QLabel("Bajo stock: 0")
+        self.inventory_out_counter = QLabel("Agotadas: 0")
+        self.inventory_low_counter = QLabel("Quedan pocas: 0")
         self.inventory_inactive_counter = QLabel("Inactivas: 0")
         self.inventory_new_button = QToolButton()
         self.inventory_edit_button = QToolButton()
@@ -1782,10 +1782,10 @@ class MainWindow(QMainWindow):
             self.inventory_bulk_price_button: "Actualiza precios por lote con preview, aumentos, descuentos y auditoria de catalogo.",
             self.inventory_print_label_button: "Abre la impresion de etiquetas para la presentacion seleccionada. La logica completa se integrara en la siguiente fase.",
             self.inventory_generate_all_qr_button: "Genera codigos QR en lote para las presentaciones seleccionadas en Inventario.",
-            self.inventory_new_button: "Crea catalogo base, productos o presentaciones nuevas desde un solo menu.",
-            self.inventory_edit_button: "Edita el producto o la presentacion seleccionada.",
-            self.inventory_stock_button: "Abre acciones de stock como entrada, conteo fisico y correccion.",
-            self.inventory_more_button: "Abre acciones poco frecuentes como eliminar y generar QRs masivos.",
+            self.inventory_new_button: "Dar de alta una prenda, una talla o un color.",
+            self.inventory_edit_button: "Editar la prenda o la talla elegida, su foto o sus precios.",
+            self.inventory_stock_button: "Registrar una entrada, contar o corregir cuántas hay.",
+            self.inventory_more_button: "Lo poco usado: eliminar y, en «Poco usado», los QR.",
             self.quote_add_button: "Agrega el SKU capturado al presupuesto actual sin afectar inventario.",
             self.quote_create_client_button: "Crea un cliente rapido desde Presupuestos usando solo nombre y telefono.",
             self.quote_save_button: "Emite el presupuesto rapido actual con folio, cliente opcional y vigencia.",
@@ -8930,7 +8930,7 @@ class MainWindow(QMainWindow):
         return normalize_inventory_variant_id(item.data(Qt.ItemDataRole.UserRole))
 
     def _clear_catalog_editor(self) -> None:
-        self.catalog_selection_label.setText("Selecciona una presentacion en inventario para gestionar cambios.")
+        self.catalog_selection_label.setText(build_empty_inventory_overview_view().catalog_selection_label)
         self.products_selection_label.setText(build_empty_catalog_selection_view().selection_label)
         self.toggle_product_button.setText("Prod.")
         self.toggle_variant_button.setText("Pres.")

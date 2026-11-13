@@ -847,7 +847,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertEqual(window.catalog_table.currentRow(), -1)
         self.assertEqual(window.inventory_table.currentRow(), -1)
-        self.assertIn("Selecciona una presentacion", window.catalog_selection_label.text())
+        self.assertIn("Elige una talla", window.catalog_selection_label.text())
 
     def test_selected_catalog_row_falls_back_to_snapshot_when_variant_is_hidden_in_catalog(self) -> None:
         window = MainWindow(user_id=1)
@@ -890,8 +890,8 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertEqual(window.inventory_table.currentRow(), -1)
         self.assertEqual(window.inventory_variant_combo.currentIndex(), -1)
-        self.assertEqual(window.inventory_overview_label.text(), "Selecciona una presentacion")
-        self.assertEqual(window.catalog_selection_label.text(), "Selecciona una presentacion en inventario para gestionar cambios.")
+        self.assertEqual(window.inventory_overview_label.text(), "Elige una talla")
+        self.assertEqual(window.catalog_selection_label.text(), "Elige una talla en Inventario para hacer cambios.")
 
     def test_clear_inventory_filters_also_clears_table_selection(self) -> None:
         window = MainWindow(user_id=1)
@@ -911,8 +911,8 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertEqual(window.inventory_table.currentRow(), -1)
         self.assertEqual(window.inventory_variant_combo.currentIndex(), -1)
-        self.assertEqual(window.inventory_overview_label.text(), "Selecciona una presentacion")
-        self.assertEqual(window.catalog_selection_label.text(), "Selecciona una presentacion en inventario para gestionar cambios.")
+        self.assertEqual(window.inventory_overview_label.text(), "Elige una talla")
+        self.assertEqual(window.catalog_selection_label.text(), "Elige una talla en Inventario para hacer cambios.")
         self.assertEqual(window.inventory_search_input.text(), "")
         refresh_filters.assert_called_once_with()
 
@@ -926,7 +926,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertEqual(window.inventory_variant_combo.currentIndex(), -1)
         self.assertEqual(window.inventory_table.currentRow(), -1)
-        self.assertEqual(window.inventory_overview_label.text(), "Selecciona una presentacion")
+        self.assertEqual(window.inventory_overview_label.text(), "Elige una talla")
 
     def test_inventory_print_label_uses_batch_dialog_for_multiple_selected_rows(self) -> None:
         window = MainWindow(user_id=1)

@@ -22,9 +22,9 @@ class InventorySummaryHelperTests(unittest.TestCase):
         )
         self.assertEqual(view.negative_counter.text, "En negativo: 0")
         self.assertEqual(view.negative_counter.tone, "positive")
-        self.assertEqual(view.out_counter.text, "Agotados: 0")
+        self.assertEqual(view.out_counter.text, "Agotadas: 0")
         self.assertEqual(view.out_counter.tone, "positive")
-        self.assertEqual(view.low_counter.text, "Bajo stock: 0")
+        self.assertEqual(view.low_counter.text, "Quedan pocas: 0")
         self.assertEqual(view.inactive_counter.text, "Inactivas: 0")
 
     def test_builds_summary_and_counters_for_visible_rows(self) -> None:
@@ -59,9 +59,9 @@ class InventorySummaryHelperTests(unittest.TestCase):
             view.results_summary,
             "3 de 5 tallas · 10 piezas",
         )
-        self.assertEqual(view.out_counter.text, "Agotados: 1")
+        self.assertEqual(view.out_counter.text, "Agotadas: 1")
         self.assertEqual(view.out_counter.tone, "danger")
-        self.assertEqual(view.low_counter.text, "Bajo stock: 1")
+        self.assertEqual(view.low_counter.text, "Quedan pocas: 1")
         self.assertEqual(view.low_counter.tone, "warning")
         self.assertEqual(view.inactive_counter.text, "Inactivas: 1")
         self.assertEqual(view.inactive_counter.tone, "muted")
@@ -75,8 +75,8 @@ class InventorySummaryHelperTests(unittest.TestCase):
         view = build_inventory_summary_view(total_rows=3, visible_rows=filas, active_filter_labels=[])
         self.assertEqual(view.negative_counter.text, "En negativo: 1")
         self.assertEqual(view.negative_counter.tone, "danger")
-        self.assertEqual(view.out_counter.text, "Agotados: 1")
-        self.assertEqual(view.low_counter.text, "Bajo stock: 1")
+        self.assertEqual(view.out_counter.text, "Agotadas: 1")
+        self.assertEqual(view.low_counter.text, "Quedan pocas: 1")
 
     def test_avisa_cuando_la_busqueda_llega_al_tope(self) -> None:
         view = build_inventory_summary_view(
