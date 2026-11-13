@@ -278,7 +278,6 @@ from pos_uniformes.services.clientes import admin_service
 from pos_uniformes.services.clientes.ficha_service import cargar_ficha as cargar_ficha_cliente
 from pos_uniformes.services.settings_marketing_action_service import (
     load_settings_marketing_history_rows,
-    recalculate_settings_loyalty_levels,
 )
 from pos_uniformes.services.settings_supplier_action_service import (
     create_settings_supplier,
@@ -569,7 +568,6 @@ from pos_uniformes.ui.helpers.settings_crm_feedback_helper import (
     build_settings_employee_guard_feedback,
     build_settings_employee_result_feedback,
     build_settings_marketing_guard_feedback,
-    build_settings_marketing_result_feedback,
     build_settings_supplier_guard_feedback,
     build_settings_supplier_result_feedback,
 )
@@ -1821,14 +1819,7 @@ class MainWindow(QMainWindow):
         self.dashboard_manual_promo_label = QLabel("Sin promociones manuales hoy.")
         self.settings_marketing_review_days_spin = QSpinBox()
         self.settings_marketing_leal_spend_spin = QDoubleSpinBox()
-        self.settings_marketing_leal_purchase_count_spin = QSpinBox()
-        self.settings_marketing_leal_purchase_sum_spin = QDoubleSpinBox()
-        self.settings_marketing_discount_basico_spin = QDoubleSpinBox()
-        self.settings_marketing_discount_leal_spin = QDoubleSpinBox()
-        self.settings_marketing_discount_profesor_spin = QDoubleSpinBox()
-        self.settings_marketing_discount_mayorista_spin = QDoubleSpinBox()
         self.settings_marketing_save_button = QPushButton("Guardar reglas")
-        self.settings_marketing_recalculate_button = QPushButton("Recalcular niveles")
         self.settings_marketing_history_button = QPushButton("Historial")
         self.settings_business_phone_input = QLineEdit()
         self.settings_business_address_input = QTextEdit()
@@ -2141,8 +2132,7 @@ class MainWindow(QMainWindow):
             self.settings_cash_history_button: "Abre el historial de aperturas, cierres y diferencias de caja.",
             self.settings_cash_history_detail_button: "Abre el detalle del corte seleccionado, incluyendo observaciones.",
             self.settings_business_button: "Abre la configuracion de negocio e impresion.",
-            self.settings_marketing_save_button: "Guarda reglas automaticas de lealtad y descuentos por nivel.",
-            self.settings_marketing_recalculate_button: "Recalcula los niveles de todos los clientes usando las reglas vigentes.",
+            self.settings_marketing_save_button: "Guarda la regla de subida a Maximoda Leal.",
             self.settings_marketing_history_button: "Abre el historial de cambios en reglas y descuentos de marketing.",
             self.cash_cut_button: "Abre el corte de caja actual o permite cerrar la caja abierta.",
             self.cash_movement_button: "Registra movimientos manuales de caja: Corregir apertura, Ajustar reactivo, Ingreso o Retiro.",
@@ -3047,12 +3037,6 @@ class MainWindow(QMainWindow):
                 self._refresh_business_logo_preview(snapshot.logo_path)
                 self.settings_marketing_review_days_spin.setValue(snapshot.loyalty_review_window_days)
                 self.settings_marketing_leal_spend_spin.setValue(snapshot.leal_spend_threshold)
-                self.settings_marketing_leal_purchase_count_spin.setValue(snapshot.leal_purchase_count_threshold)
-                self.settings_marketing_leal_purchase_sum_spin.setValue(snapshot.leal_purchase_sum_threshold)
-                self.settings_marketing_discount_basico_spin.setValue(snapshot.discount_basico)
-                self.settings_marketing_discount_leal_spin.setValue(snapshot.discount_leal)
-                self.settings_marketing_discount_profesor_spin.setValue(snapshot.discount_profesor)
-                self.settings_marketing_discount_mayorista_spin.setValue(snapshot.discount_mayorista)
                 self.settings_business_phone_input.setText(snapshot.phone)
                 self.settings_business_address_input.setPlainText(snapshot.address)
                 self.settings_business_footer_input.setPlainText(snapshot.footer)
@@ -3093,12 +3077,6 @@ class MainWindow(QMainWindow):
             logo_path=self.settings_business_logo_input.text(),
             loyalty_review_window_days=self.settings_marketing_review_days_spin.value(),
             leal_spend_threshold=Decimal(str(self.settings_marketing_leal_spend_spin.value())).quantize(Decimal("0.01")),
-            leal_purchase_count_threshold=self.settings_marketing_leal_purchase_count_spin.value(),
-            leal_purchase_sum_threshold=Decimal(str(self.settings_marketing_leal_purchase_sum_spin.value())).quantize(Decimal("0.01")),
-            discount_basico=Decimal(str(self.settings_marketing_discount_basico_spin.value())).quantize(Decimal("0.01")),
-            discount_leal=Decimal(str(self.settings_marketing_discount_leal_spin.value())).quantize(Decimal("0.01")),
-            discount_profesor=Decimal(str(self.settings_marketing_discount_profesor_spin.value())).quantize(Decimal("0.01")),
-            discount_mayorista=Decimal(str(self.settings_marketing_discount_mayorista_spin.value())).quantize(Decimal("0.01")),
             telefono=self.settings_business_phone_input.text(),
             direccion=self.settings_business_address_input.toPlainText(),
             pie_ticket=self.settings_business_footer_input.toPlainText(),
@@ -3118,9 +3096,9 @@ class MainWindow(QMainWindow):
         )
 
     def _refresh_marketing_summary(self, session) -> None:
-        loyalty_levels = session.scalars(select(Cliente.nivel_lealtad)).all()
+        clientes = session.scalars(select(Cliente.id)).all()
         self.settings_marketing_summary_label.setText(
-            build_settings_marketing_summary_label(list(loyalty_levels))
+            build_settings_marketing_summary_label(list(clientes))
         )
 
     def _save_business_settings(self, success_message: str) -> bool:
@@ -3238,41 +3216,6 @@ class MainWindow(QMainWindow):
 
     def _handle_save_whatsapp_settings(self) -> None:
         self._save_business_settings("Las plantillas de WhatsApp se actualizaron correctamente.")
-
-    def _handle_recalculate_loyalty_levels(self) -> None:
-        feedback = build_settings_marketing_guard_feedback(
-            "recalculate_levels",
-            is_admin=self.current_role == RolUsuario.ADMIN,
-        )
-        if feedback is not None:
-            QMessageBox.warning(self, feedback.title, feedback.message)
-            return
-        confirmation = QMessageBox.question(
-            self,
-            "Recalcular niveles",
-            "Se recalcularan los niveles y descuentos de todos los clientes segun las reglas vigentes. Continuar?",
-        )
-        if confirmation != QMessageBox.StandardButton.Yes:
-            return
-        try:
-            with get_session() as session:
-                result = recalculate_settings_loyalty_levels(
-                    session,
-                    admin_user_id=self.user_id,
-                )
-                session.commit()
-                self._refresh_marketing_summary(session)
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "No se pudo recalcular", str(exc))
-            return
-
-        self.refresh_all()
-        result_feedback = build_settings_marketing_result_feedback(
-            total=result.total,
-            changed=result.changed,
-        )
-        self.settings_marketing_status_label.setText(result_feedback.message)
-        QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
     def _handle_open_marketing_history(self) -> None:
         feedback = build_settings_marketing_guard_feedback(
@@ -9487,7 +9430,6 @@ class MainWindow(QMainWindow):
         self.settings_generate_employee_qr_button.setEnabled(is_admin)
         self.settings_generate_employee_card_button.setEnabled(is_admin)
         self.settings_marketing_save_button.setEnabled(is_admin)
-        self.settings_marketing_recalculate_button.setEnabled(is_admin)
         self.settings_marketing_history_button.setEnabled(is_admin)
         self.settings_whatsapp_save_button.setEnabled(is_admin)
         self.settings_business_save_button.setEnabled(is_admin)

@@ -8,7 +8,6 @@ from pos_uniformes.ui.helpers.settings_crm_feedback_helper import (
     build_settings_client_result_feedback,
     build_settings_employee_result_feedback,
     build_settings_marketing_guard_feedback,
-    build_settings_marketing_result_feedback,
     build_settings_supplier_guard_feedback,
     build_settings_supplier_result_feedback,
 )
@@ -85,13 +84,9 @@ class SettingsCrmFeedbackHelperTests(unittest.TestCase):
             build_settings_marketing_guard_feedback("open_history", is_admin=False),
             SettingsCrmFeedbackView("Sin permisos", "Solo ADMIN puede consultar este historial."),
         )
-        self.assertEqual(
-            build_settings_marketing_result_feedback(total=10, changed=4),
-            SettingsCrmFeedbackView(
-                "Recalculo completado",
-                "Niveles revisados: 10\nClientes con cambio aplicado: 4",
-            ),
-        )
+        # 2026-11-12: «Recalcular niveles» se retiró con el nivel viejo.
+        with self.assertRaises(ValueError):
+            build_settings_marketing_guard_feedback("recalculate_levels", is_admin=False)
 
 
 if __name__ == "__main__":

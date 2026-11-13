@@ -962,55 +962,31 @@ def build_marketing_settings_dialog(window: "MainWindow") -> QDialog:
     dialog, layout = _create_settings_dialog(
         window,
         "Marketing y promociones",
-        "Configura reglas automaticas de lealtad, descuentos por nivel y recalculo masivo de clientes.",
+        "Configura la regla de subida a Maximoda Leal.",
         width=720,
     )
     window.settings_marketing_status_label.setObjectName("analyticsLine")
-    rules_box = QGroupBox("Reglas de lealtad")
+    rules_box = QGroupBox("Subida a Leal")
     rules_box.setObjectName("infoCard")
     rules_form = QFormLayout()
-    for money_spin in (
-        window.settings_marketing_leal_spend_spin,
-        window.settings_marketing_leal_purchase_sum_spin,
-        window.settings_marketing_discount_basico_spin,
-        window.settings_marketing_discount_leal_spin,
-        window.settings_marketing_discount_profesor_spin,
-        window.settings_marketing_discount_mayorista_spin,
-    ):
-        money_spin.setRange(0.0, 999999.99)
-        money_spin.setDecimals(2)
-        money_spin.setSingleStep(5.0)
-    for percent_spin in (
-        window.settings_marketing_discount_basico_spin,
-        window.settings_marketing_discount_leal_spin,
-        window.settings_marketing_discount_profesor_spin,
-        window.settings_marketing_discount_mayorista_spin,
-    ):
-        percent_spin.setSuffix("%")
-        percent_spin.setRange(0.0, 100.0)
+    # 2026-11-12: «el nivel viejo retíralo» (Daniel). Se quitaron «Compras
+    # minimas para LEAL», «Monto acumulado por frecuencia», los «Descuentos
+    # por nivel» y «Recalcular niveles»: solo los usaba el nivel viejo
+    # (`cliente.nivel_lealtad`). Las columnas siguen en la base, sin uso. La
+    # ventana y el monto se quedan: los usa `subida_leal_service`.
+    window.settings_marketing_leal_spend_spin.setRange(0.0, 999999.99)
+    window.settings_marketing_leal_spend_spin.setDecimals(2)
+    window.settings_marketing_leal_spend_spin.setSingleStep(5.0)
     window.settings_marketing_leal_spend_spin.setPrefix("$")
-    window.settings_marketing_leal_purchase_sum_spin.setPrefix("$")
     window.settings_marketing_review_days_spin.setRange(30, 1095)
     window.settings_marketing_review_days_spin.setSingleStep(30)
-    window.settings_marketing_leal_purchase_count_spin.setRange(1, 50)
     rules_form.addRow("Ventana evaluacion (dias)", window.settings_marketing_review_days_spin)
     rules_form.addRow("Monto para subir a LEAL", window.settings_marketing_leal_spend_spin)
-    rules_form.addRow("Compras minimas para LEAL", window.settings_marketing_leal_purchase_count_spin)
-    rules_form.addRow("Monto acumulado por frecuencia", window.settings_marketing_leal_purchase_sum_spin)
     rules_box.setLayout(rules_form)
 
-    discounts_box = QGroupBox("Descuentos por nivel")
-    discounts_box.setObjectName("infoCard")
-    discounts_form = QFormLayout()
-    discounts_form.addRow("BASICO", window.settings_marketing_discount_basico_spin)
-    discounts_form.addRow("LEAL", window.settings_marketing_discount_leal_spin)
-    discounts_form.addRow("PROFESOR", window.settings_marketing_discount_profesor_spin)
-    discounts_form.addRow("MAYORISTA", window.settings_marketing_discount_mayorista_spin)
-    discounts_box.setLayout(discounts_form)
-
     note = QLabel(
-        "PROFESOR y MAYORISTA siguen siendo niveles asignados manualmente. "
-        "Las reglas automaticas solo aplican a la transicion BASICO <-> LEAL."
+        "Un cliente sube solo a Maximoda Leal al juntar este monto en la ventana. "
+        "Profesional y Mayorista se asignan en la ficha del cliente."
     )
     note.setWordWrap(True)
     note.setObjectName("subtleLine")
@@ -1023,23 +999,17 @@ def build_marketing_settings_dialog(window: "MainWindow") -> QDialog:
     summary_box.setLayout(summary_layout)
 
     window.settings_marketing_save_button.setObjectName("toolbarPrimaryButton")
-    window.settings_marketing_recalculate_button.setObjectName("toolbarSecondaryButton")
     window.settings_marketing_history_button.setObjectName("toolbarGhostButton")
     window.settings_marketing_save_button.clicked.connect(window._handle_save_marketing_settings)
-    window.settings_marketing_recalculate_button.clicked.connect(window._handle_recalculate_loyalty_levels)
     window.settings_marketing_history_button.clicked.connect(window._handle_open_marketing_history)
 
     actions = QHBoxLayout()
     actions.addWidget(window.settings_marketing_history_button)
-    # E1-A (D6): «Recalcular niveles» ya no se agrega al diálogo. El botón y
-    # su manejador siguen existiendo sin cambios; solo deja de ofrecerse.
-    window.settings_marketing_recalculate_button.setVisible(False)
     actions.addWidget(window.settings_marketing_save_button)
     actions.addStretch()
 
     layout.addWidget(window.settings_marketing_status_label)
     layout.addWidget(rules_box)
-    layout.addWidget(discounts_box)
     layout.addWidget(summary_box)
     layout.addWidget(note)
     layout.addLayout(actions)

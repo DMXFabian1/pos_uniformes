@@ -17,14 +17,13 @@ from pos_uniformes.services.marketing_audit_service import MarketingAuditField, 
 class BusinessSettingsInput:
     nombre_negocio: str
     logo_path: str | None
+    # 2026-11-12: «el nivel viejo retíralo» (Daniel). Ya no se capturan
+    # `leal_purchase_count_threshold`, `leal_purchase_sum_threshold` ni los
+    # `discount_*` por nivel: solo los usaba el nivel viejo. Las columnas se
+    # quedan en la base. La ventana y el monto siguen: los usa Maximoda Leal
+    # (`subida_leal_service`).
     loyalty_review_window_days: int
     leal_spend_threshold: Decimal
-    leal_purchase_count_threshold: int
-    leal_purchase_sum_threshold: Decimal
-    discount_basico: Decimal
-    discount_leal: Decimal
-    discount_profesor: Decimal
-    discount_mayorista: Decimal
     telefono: str | None
     direccion: str | None
     pie_ticket: str | None
@@ -49,12 +48,6 @@ class BusinessSettingsService:
     MARKETING_AUDIT_FIELDS = (
         ("REGLAS", "loyalty_review_window_days", "Ventana evaluacion (dias)"),
         ("REGLAS", "leal_spend_threshold", "Monto para subir a LEAL"),
-        ("REGLAS", "leal_purchase_count_threshold", "Compras minimas para LEAL"),
-        ("REGLAS", "leal_purchase_sum_threshold", "Monto acumulado por frecuencia"),
-        ("DESCUENTOS", "discount_basico", "Descuento BASICO"),
-        ("DESCUENTOS", "discount_leal", "Descuento LEAL"),
-        ("DESCUENTOS", "discount_profesor", "Descuento PROFESOR"),
-        ("DESCUENTOS", "discount_mayorista", "Descuento MAYORISTA"),
     )
 
     @staticmethod
@@ -118,24 +111,9 @@ class BusinessSettingsService:
             raise ValueError("Las copias de ticket deben estar entre 1 y 5.")
         if payload.loyalty_review_window_days < 30 or payload.loyalty_review_window_days > 1095:
             raise ValueError("La ventana de evaluacion debe estar entre 30 y 1095 dias.")
-        if payload.leal_purchase_count_threshold < 1:
-            raise ValueError("La cantidad minima de compras para LEAL debe ser al menos 1.")
-        for field_name, field_value in {
-            "Monto LEAL": payload.leal_spend_threshold,
-            "Monto acumulado por frecuencia": payload.leal_purchase_sum_threshold,
-        }.items():
-            normalized = Decimal(str(field_value)).quantize(Decimal("0.01"))
-            if normalized < Decimal("0.00") or normalized > Decimal("999999.99"):
-                raise ValueError(f"{field_name} fuera de rango.")
-        for field_name, field_value in {
-            "Descuento BASICO": payload.discount_basico,
-            "Descuento LEAL": payload.discount_leal,
-            "Descuento PROFESOR": payload.discount_profesor,
-            "Descuento MAYORISTA": payload.discount_mayorista,
-        }.items():
-            normalized = Decimal(str(field_value)).quantize(Decimal("0.01"))
-            if normalized < Decimal("0.00") or normalized > Decimal("100.00"):
-                raise ValueError(f"{field_name} debe estar entre 0 y 100.")
+        normalized_spend = Decimal(str(payload.leal_spend_threshold)).quantize(Decimal("0.01"))
+        if normalized_spend < Decimal("0.00") or normalized_spend > Decimal("999999.99"):
+            raise ValueError("Monto LEAL fuera de rango.")
 
         config = cls.get_or_create(session)
         audit_fields = [
@@ -152,12 +130,6 @@ class BusinessSettingsService:
         config.logo_path = payload.logo_path.strip() if payload.logo_path else None
         config.loyalty_review_window_days = int(payload.loyalty_review_window_days)
         config.leal_spend_threshold = Decimal(str(payload.leal_spend_threshold)).quantize(Decimal("0.01"))
-        config.leal_purchase_count_threshold = int(payload.leal_purchase_count_threshold)
-        config.leal_purchase_sum_threshold = Decimal(str(payload.leal_purchase_sum_threshold)).quantize(Decimal("0.01"))
-        config.discount_basico = Decimal(str(payload.discount_basico)).quantize(Decimal("0.01"))
-        config.discount_leal = Decimal(str(payload.discount_leal)).quantize(Decimal("0.01"))
-        config.discount_profesor = Decimal(str(payload.discount_profesor)).quantize(Decimal("0.01"))
-        config.discount_mayorista = Decimal(str(payload.discount_mayorista)).quantize(Decimal("0.01"))
         config.telefono = payload.telefono.strip() if payload.telefono else None
         config.direccion = payload.direccion.strip() if payload.direccion else None
         config.pie_ticket = payload.pie_ticket.strip() if payload.pie_ticket else None

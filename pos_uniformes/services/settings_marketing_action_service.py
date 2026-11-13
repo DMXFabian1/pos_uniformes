@@ -1,32 +1,12 @@
-"""Acciones operativas de marketing en Configuracion."""
+"""Acciones operativas de marketing en Configuracion.
+
+2026-11-12: se retiró «Recalcular niveles» («el nivel viejo retíralo»,
+Daniel). Ya no hay revisión del nivel viejo de los clientes.
+"""
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-
 from pos_uniformes.utils.date_format import format_display_datetime
-
-
-@dataclass(frozen=True)
-class SettingsMarketingRecalculationResult:
-    total: int
-    changed: int
-
-
-def recalculate_settings_loyalty_levels(session, *, admin_user_id: int) -> SettingsMarketingRecalculationResult:
-    loyalty_service, usuario_model = _resolve_settings_marketing_recalc_dependencies()
-    admin_user = session.get(usuario_model, admin_user_id)
-    if admin_user is None:
-        raise ValueError("Administrador no encontrado.")
-    summary = loyalty_service.recalculate_all_clients(
-        session,
-        actor_user=admin_user,
-        reason="recalculo_manual_marketing",
-    )
-    return SettingsMarketingRecalculationResult(
-        total=int(summary["total"]),
-        changed=int(summary["changed"]),
-    )
 
 
 def load_settings_marketing_history_rows(session, *, limit: int = 120) -> list[dict[str, str]]:
@@ -44,13 +24,6 @@ def load_settings_marketing_history_rows(session, *, limit: int = 120) -> list[d
         }
         for change in changes
     ]
-
-
-def _resolve_settings_marketing_recalc_dependencies():
-    from pos_uniformes.database.models import Usuario
-    from pos_uniformes.services.loyalty_service import LoyaltyService
-
-    return LoyaltyService, Usuario
 
 
 def _resolve_settings_marketing_history_dependencies():

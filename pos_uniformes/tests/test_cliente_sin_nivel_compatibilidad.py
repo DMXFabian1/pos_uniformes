@@ -50,25 +50,19 @@ def _cliente(codigo: str, nivel: NivelLealtad | None) -> Cliente:
 
 
 class ResumenMarketingTests(unittest.TestCase):
-    def test_cuenta_sin_nivel_aparte(self) -> None:
+    # 2026-11-12: «el nivel viejo retíralo» (Daniel). El resumen ya no reparte
+    # por nivel viejo: cuenta clientes con y sin nivel por igual.
+    def test_cuenta_todos_sin_repartir_por_nivel(self) -> None:
         texto = build_settings_marketing_summary_label([NivelLealtad.BASICO, None, NivelLealtad.LEAL, None])
-        self.assertIn("Clientes registrados: 4", texto)
-        self.assertIn("BASICO: 1", texto)
-        self.assertIn("Sin nivel: 2", texto)
+        self.assertEqual(texto, "Clientes registrados: 4")
         self.assertNotIn("None", texto)
-
-    def test_sin_clientes_sin_nivel_el_texto_no_cambia(self) -> None:
-        texto = build_settings_marketing_summary_label([NivelLealtad.BASICO])
-        self.assertEqual(
-            texto, "Clientes registrados: 1\nBASICO: 1 | LEAL: 0 | PROFESOR: 0 | MAYORISTA: 0"
-        )
 
     def test_refresh_de_main_window(self) -> None:
         app = QApplication.instance() or QApplication([])  # noqa: F841
         falso = SimpleNamespace(settings_marketing_summary_label=QLabel())
-        sesion = SimpleNamespace(scalars=lambda _q: SimpleNamespace(all=lambda: [None, NivelLealtad.PROFESOR]))
+        sesion = SimpleNamespace(scalars=lambda _q: SimpleNamespace(all=lambda: [1, 2]))
         MainWindow._refresh_marketing_summary(falso, sesion)
-        self.assertIn("Sin nivel: 1", falso.settings_marketing_summary_label.text())
+        self.assertEqual(falso.settings_marketing_summary_label.text(), "Clientes registrados: 2")
 
 
 class ListaYCredencialTests(unittest.TestCase):

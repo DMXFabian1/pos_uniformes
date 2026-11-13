@@ -19,7 +19,6 @@ import uuid
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import patch
 
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.engine import make_url
@@ -28,7 +27,6 @@ from sqlalchemy.orm import Session
 from pos_uniformes.database.models import Cliente, ClienteEvento, NivelLealtad, RolUsuario, TipoCliente
 from pos_uniformes.services.client_service import ClientService
 from pos_uniformes.services.clientes import identidad_service as ids
-from pos_uniformes.services.loyalty_service import LoyaltyService
 from pos_uniformes.utils.config import settings
 from tests.base_por_trabajador import es_base_de_prueba_local
 
@@ -42,15 +40,8 @@ def _url_local():
     return url
 
 
-def _sin_loyalty():
-    """Un doble que FALLA si cualquier alta llama a LoyaltyService."""
-    falla = AssertionError("El alta no debe llamar a LoyaltyService (K1)")
-    return (
-        patch.object(LoyaltyService, "assign_level", side_effect=falla),
-        patch.object(LoyaltyService, "discount_for_level", side_effect=falla),
-        patch.object(LoyaltyService, "resolve_initial_level", side_effect=falla),
-        patch.object(LoyaltyService, "default_level_for_client_type", side_effect=falla),
-    )
+# 2026-11-12: `LoyaltyService` se retiró con el nivel viejo («el nivel viejo
+# retíralo», Daniel); ya no hay nada que vigilar para que el alta no lo llame.
 
 
 class _EnTransaccion(unittest.TestCase):
@@ -67,9 +58,6 @@ class _EnTransaccion(unittest.TestCase):
         self.s = Session(bind=self.conn, join_transaction_mode="create_savepoint")
         self.addCleanup(self.s.close)
         self.marca = uuid.uuid4().hex[:6].upper()
-        for p in _sin_loyalty():
-            p.start()
-            self.addCleanup(p.stop)
 
     def _tel(self, sufijo: str) -> str:
         # Teléfonos de prueba que no existen en la base de prueba.

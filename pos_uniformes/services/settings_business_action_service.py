@@ -11,12 +11,6 @@ class SettingsBusinessFormSnapshot:
     logo_path: str
     loyalty_review_window_days: int
     leal_spend_threshold: float
-    leal_purchase_count_threshold: int
-    leal_purchase_sum_threshold: float
-    discount_basico: float
-    discount_leal: float
-    discount_profesor: float
-    discount_mayorista: float
     phone: str
     address: str
     footer: str
@@ -46,12 +40,9 @@ def load_settings_business_form_snapshot(session, *, default_templates: dict[str
         logo_path=str(config.logo_path or ""),
         loyalty_review_window_days=int(config.loyalty_review_window_days or 365),
         leal_spend_threshold=float(config.leal_spend_threshold or 3000),
-        leal_purchase_count_threshold=int(config.leal_purchase_count_threshold or 3),
-        leal_purchase_sum_threshold=float(config.leal_purchase_sum_threshold or 2000),
-        discount_basico=float(config.discount_basico or 5),
-        discount_leal=float(config.discount_leal or 10),
-        discount_profesor=float(config.discount_profesor or 15),
-        discount_mayorista=float(config.discount_mayorista or 20),
+        # 2026-11-12: sin los campos del nivel viejo («el nivel viejo
+        # retíralo», Daniel): compras mínimas, monto por frecuencia y
+        # descuentos por nivel.
         phone=str(config.telefono or ""),
         address=str(config.direccion or ""),
         footer=str(config.pie_ticket or ""),

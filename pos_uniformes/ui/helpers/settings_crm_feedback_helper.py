@@ -160,13 +160,7 @@ def build_settings_employee_result_feedback(
 def build_settings_marketing_guard_feedback(action_key: str, *, is_admin: bool) -> SettingsCrmFeedbackView | None:
     if is_admin:
         return None
-    if action_key == "recalculate_levels":
-        return SettingsCrmFeedbackView("Sin permisos", "Solo ADMIN puede recalcular niveles.")
     if action_key == "open_history":
         return SettingsCrmFeedbackView("Sin permisos", "Solo ADMIN puede consultar este historial.")
     raise ValueError(f"Accion no soportada: {action_key}")
 
-
-def build_settings_marketing_result_feedback(*, total: int, changed: int) -> SettingsCrmFeedbackView:
-    message = f"Niveles revisados: {total}\nClientes con cambio aplicado: {changed}"
-    return SettingsCrmFeedbackView("Recalculo completado", message)

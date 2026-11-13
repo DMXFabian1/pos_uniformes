@@ -2,33 +2,12 @@
 
 from __future__ import annotations
 
-SIN_NIVEL = "Sin nivel"
 
+def build_settings_marketing_summary_label(clientes: list[object]) -> str:
+    """Resumen del diálogo de Marketing.
 
-def _normalize_loyalty_level(loyalty_level: object) -> str:
-    if loyalty_level is None:
-        return SIN_NIVEL
-    if hasattr(loyalty_level, "value"):
-        return str(getattr(loyalty_level, "value"))
-    return str(loyalty_level)
-
-
-def build_settings_marketing_summary_label(loyalty_levels: list[object]) -> str:
-    counts = {
-        "BASICO": 0,
-        "LEAL": 0,
-        "PROFESOR": 0,
-        "MAYORISTA": 0,
-    }
-    for loyalty_level in loyalty_levels:
-        normalized_level = _normalize_loyalty_level(loyalty_level)
-        counts[normalized_level] = counts.get(normalized_level, 0) + 1
-
-    return (
-        f"Clientes registrados: {len(loyalty_levels)}\n"
-        f"BASICO: {counts['BASICO']} | "
-        f"LEAL: {counts['LEAL']} | "
-        f"PROFESOR: {counts['PROFESOR']} | "
-        f"MAYORISTA: {counts['MAYORISTA']}"
-        + (f" | {SIN_NIVEL}: {counts[SIN_NIVEL]}" if counts.get(SIN_NIVEL) else "")
-    )
+    2026-11-12: ya no reparte a los clientes por el nivel viejo (BASICO,
+    LEAL, PROFESOR, MAYORISTA), que se retiró («el nivel viejo retíralo»,
+    Daniel). Solo dice cuántos clientes hay.
+    """
+    return f"Clientes registrados: {len(clientes)}"
