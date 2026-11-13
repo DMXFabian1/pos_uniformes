@@ -177,10 +177,28 @@ class CajaAntiguaRetiradaTests(unittest.TestCase):
             sc.key().toString(QKeySequence.SequenceFormat.PortableText)
             for sc in self.ventana.findChildren(QShortcut)
         }
-        for tecla in ("F2", "F6", "F8", "Del", "Ctrl+S", "Meta+S"):
+        for tecla in ("F2", "F6", "F8", "Del"):
             self.assertNotIn(tecla, atajos, tecla)
+        # Ctrl+S / Cmd+S se quedan, pero solo para consultar (sin carrito).
+        self.assertIn("Ctrl+S", atajos)
+        self.assertIn("Meta+S", atajos)
         # Escape sigue: limpia Presupuestos y Catálogo.
         self.assertIn("Esc", atajos)
+
+    def test_ctrl_s_abre_la_busqueda_solo_para_consultar(self) -> None:
+        from unittest.mock import patch
+
+        from PyQt6.QtGui import QKeySequence
+
+        atajo = next(
+            sc for sc in self.ventana._atajos_busqueda
+            if sc.key().toString(QKeySequence.SequenceFormat.PortableText) == "Ctrl+S"
+        )
+        with patch(
+            "pos_uniformes.ui.dialogs.quick_product_search_dialog.QuickProductSearchDialog"
+        ) as dialogo:
+            atajo.activated.emit()
+        dialogo.assert_called_once_with(self.ventana, solo_consulta=True)
 
     def test_escape_ya_no_toca_la_caja(self) -> None:
         # Sin pestaña Caja, Escape en cualquier pestaña no debe tronar.

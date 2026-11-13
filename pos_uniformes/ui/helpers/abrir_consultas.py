@@ -133,6 +133,30 @@ def instalar_atajos(ventana: QWidget) -> list[QShortcut]:
     return atajos
 
 
+ATAJOS_BUSQUEDA_CONSULTA = ("Ctrl+S", "Meta+S")
+
+
+def abrir_busqueda_de_consulta(parent: QWidget | None = None) -> None:
+    """Buscar producto por texto y ver precio y existencia (2026-11-12).
+
+    Antes Ctrl+S agregaba al carrito de la Caja antigua; con ella retirada
+    (Daniel: «la caja antigua ya no es de utilidad, todo lo demás corre en
+    libreta y kioskos») la búsqueda se queda en el POS solo para consultar."""
+    from pos_uniformes.ui.dialogs.quick_product_search_dialog import QuickProductSearchDialog
+
+    QuickProductSearchDialog(parent, solo_consulta=True).exec()
+
+
+def instalar_busqueda_de_consulta(ventana: QWidget) -> list[QShortcut]:
+    """Ctrl+S / Cmd+S del POS principal. El kiosko tiene su propio Ctrl+S."""
+    atajos = []
+    for tecla in ATAJOS_BUSQUEDA_CONSULTA:
+        atajo = QShortcut(QKeySequence(tecla), ventana)
+        atajo.activated.connect(lambda: abrir_busqueda_de_consulta(ventana))
+        atajos.append(atajo)
+    return atajos
+
+
 def abrir_whatsapp_web(url: str, parent: QWidget | None = None) -> bool:
     """WhatsApp Web, nunca la app de escritorio (Daniel, 2026-11-10).
 

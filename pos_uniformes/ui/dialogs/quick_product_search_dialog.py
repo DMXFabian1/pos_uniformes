@@ -42,9 +42,22 @@ class QuickProductSearchDialog(QDialog):
     sku_selected = pyqtSignal(str, int)
     sku_to_kiosk = pyqtSignal(str, int)
 
-    def __init__(self, parent=None, catalog_rows: list[dict] | None = None, *, kiosk_mode: bool = False, **_kwargs):
+    def __init__(
+        self,
+        parent=None,
+        catalog_rows: list[dict] | None = None,
+        *,
+        kiosk_mode: bool = False,
+        solo_consulta: bool = False,
+        **_kwargs,
+    ):
         super().__init__(parent)
-        self.setWindowTitle("Buscar producto")
+        # 2026-11-12: con la Caja antigua retirada, el POS principal la abre
+        # solo para consultar precio y existencia (sin «Agregar a venta»).
+        # Daniel: «la caja antigua ya no es de utilidad, todo lo demás corre
+        # en libreta y kioskos».
+        self._solo_consulta = solo_consulta and not kiosk_mode
+        self.setWindowTitle("Consultar producto" if self._solo_consulta else "Buscar producto")
         self.setModal(True)
         self.setMinimumSize(780, 560)
         self.resize(850, 640)
@@ -149,6 +162,7 @@ class QuickProductSearchDialog(QDialog):
         actions_bar.addWidget(self._detail_label, 1)
 
         qty_label = QLabel("Cant:")
+        self._qty_label = qty_label
         qty_label.setStyleSheet("font-size: 13px; color: #6B4226;")
         self._qty_spin = QSpinBox()
         self._qty_spin.setRange(1, 100)
@@ -168,6 +182,9 @@ class QuickProductSearchDialog(QDialog):
         self._kiosk_btn.setMinimumHeight(40)
         self._kiosk_btn.setEnabled(False)
         self._kiosk_btn.setVisible(self._kiosk_mode)
+        if self._solo_consulta:
+            for widget in (qty_label, self._qty_spin, self._add_btn, self._kiosk_btn):
+                widget.setVisible(False)
 
         actions_bar.addWidget(qty_label)
         actions_bar.addWidget(self._qty_spin)
@@ -369,6 +386,9 @@ class QuickProductSearchDialog(QDialog):
         self._detail_label.setText("  ·  ".join(parts))
 
     def _handle_add(self) -> None:
+        if self._solo_consulta:
+            # Solo consulta: Enter o doble clic no agregan nada a ningún lado.
+            return
         row_idx = self._table.currentRow()
         if row_idx < 0 or row_idx >= len(self._result_rows):
             return

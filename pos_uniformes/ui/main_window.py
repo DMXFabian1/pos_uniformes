@@ -2157,10 +2157,11 @@ class MainWindow(QMainWindow):
 
     def _configure_shortcuts(self) -> None:
         # 2026-11-12: F2 (cobrar), F8 (captura de SKU), F6 (ventas recientes),
-        # Supr (quitar línea) y Ctrl+S / Cmd+S (búsqueda que agregaba al carrito)
-        # eran de la Caja antigua y se retiraron con ella. Daniel: «la caja
-        # antigua ya no es de utilidad, todo lo demás corre en libreta y kioskos».
-        # Escape se queda solo para limpiar Presupuestos y Catálogo.
+        # y Supr (quitar línea) eran de la Caja antigua y se retiraron con ella.
+        # Daniel: «la caja antigua ya no es de utilidad, todo lo demás corre en
+        # libreta y kioskos». Ctrl+S / Cmd+S se queda solo para consultar precio
+        # y existencia, sin agregar a ningún carrito. Escape se queda solo para
+        # limpiar Presupuestos y Catálogo.
         clear_capture_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
         clear_capture_shortcut.activated.connect(self._handle_escape)
         quick_backup_shortcut = QShortcut(QKeySequence("Ctrl+Shift+B"), self)
@@ -2171,6 +2172,9 @@ class MainWindow(QMainWindow):
         from pos_uniformes.ui.helpers.abrir_consultas import instalar_atajos
 
         self._atajos_consultas = instalar_atajos(self)
+        from pos_uniformes.ui.helpers.abrir_consultas import instalar_busqueda_de_consulta
+
+        self._atajos_busqueda = instalar_busqueda_de_consulta(self)
         # Ctrl+K global via event filter (funciona incluso en diálogos modales)
         from PyQt6.QtWidgets import QApplication
 
