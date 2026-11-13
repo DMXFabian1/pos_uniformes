@@ -123,15 +123,17 @@ def texto_paginacion(total: int, pagina: int, tamano: int) -> str:
 # ── Textos de la ficha ───────────────────────────────────────────────────
 
 
-def texto_contada(fila: Mapping[str, object], *, ahora: datetime) -> str:
+def texto_contada_corto(fila: Mapping[str, object], *, ahora: datetime) -> str:
+    """Lo que va junto a la etiqueta «CONTADA» de la ficha, sin repetir la
+    palabra: «Hace 56 días», «Hoy», «Ayer» o «Nunca»."""
     dias = dias_desde_conteo(fila, ahora=ahora)
     if dias is None:
-        return "Nunca contada"
+        return "Nunca"
     if dias == 0:
-        return "Contada hoy"
+        return "Hoy"
     if dias == 1:
-        return "Contada ayer"
-    return f"Contada hace {dias} días"
+        return "Ayer"
+    return f"Hace {dias} días"
 
 
 def texto_talla_color(fila: Mapping[str, object]) -> str:

@@ -26,6 +26,7 @@ from PyQt6.QtWidgets import (
     QMenu,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSizePolicy,
     QStackedWidget,
     QToolButton,
@@ -64,7 +65,7 @@ from pos_uniformes.services.inventario_vista_service import (
     ordenar_por_columna,
     resumir_lote,
     siguiente_orden,
-    texto_contada,
+    texto_contada_corto,
     texto_paginacion,
     texto_talla_color,
 )
@@ -202,9 +203,23 @@ class FichaInventario(QFrame):
         # (Con «Ignored» su mínimo no cuenta y la pestaña no se desplaza entera.)
         self.paginas.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Ignored)
         layout.addWidget(self.paginas)
-        self.paginas.addWidget(self._pagina_vacia())
-        self.paginas.addWidget(self._pagina_talla())
-        self.paginas.addWidget(self._pagina_lote())
+        # Cada cara va en su propio scroll sin marco: si un nombre de dos
+        # renglones no cabe a 768 px, se desplaza SOLO la ficha y nada se aplasta.
+        self.scrolls: list[QScrollArea] = []
+        for pagina in (self._pagina_vacia(), self._pagina_talla(), self._pagina_lote()):
+            self.paginas.addWidget(self._desplazable(pagina))
+
+    def _desplazable(self, pagina: QWidget) -> QScrollArea:
+        area = QScrollArea()
+        area.setObjectName("invFichaScroll")
+        area.setWidgetResizable(True)
+        area.setFrameShape(QFrame.Shape.NoFrame)
+        area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        area.viewport().setObjectName("invFichaVista")
+        area.viewport().setAutoFillBackground(False)
+        area.setWidget(pagina)
+        self.scrolls.append(area)
+        return area
 
     # Vacía: instrucción y «Para atender»
     def _pagina_vacia(self) -> QWidget:
@@ -238,8 +253,18 @@ class FichaInventario(QFrame):
         layout = QVBoxLayout(pagina)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(10)
+        # El estado («Se acabó», «Desactivada») sube al renglón del título:
+        # así no le quita alto a la tarjeta vino.
         encabezado = QHBoxLayout()
+        encabezado.setSpacing(6)
         encabezado.addWidget(_etiqueta("TALLA ELEGIDA", "invSeccion"))
+        encabezado.addSpacing(4)
+        self.chip_estado = _etiqueta("", "invChip")
+        self.chip_apagada = _etiqueta("Desactivada", "invChip")
+        self.chip_apagada.setToolTip("Desactivada: no se vende ni sale en el kiosko")
+        self.chip_apagada.setProperty("tono", "muted")
+        encabezado.addWidget(self.chip_estado, 0, Qt.AlignmentFlag.AlignVCenter)
+        encabezado.addWidget(self.chip_apagada, 0, Qt.AlignmentFlag.AlignVCenter)
         encabezado.addStretch(1)
         self.mas = QToolButton()
         self.mas.setObjectName("invFichaMas")
@@ -251,6 +276,8 @@ class FichaInventario(QFrame):
 
         total = QFrame()
         total.setObjectName("invFichaTotal")
+        # Nunca se encoge: si falta alto, se desplaza la ficha, no se cortan las cifras.
+        total.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Minimum)
         sombra(total, fuerte=True)
         caja = QVBoxLayout(total)
         caja.setContentsMargins(18, 14, 18, 14)
@@ -266,21 +293,19 @@ class FichaInventario(QFrame):
         self.precio, self.precio_nota = self._dato(datos, "PRECIO")
         datos.addStretch(1)
         caja.addLayout(datos)
+        self.total = total
         layout.addWidget(total)
 
-        chips = QHBoxLayout()
-        chips.setSpacing(6)
-        self.chip_estado = _etiqueta("", "invChip")
-        self.chip_apagada = _etiqueta("Desactivada: no se vende", "invChip")
-        self.chip_apagada.setProperty("tono", "muted")
-        chips.addWidget(self.chip_estado)
-        chips.addWidget(self.chip_apagada)
-        chips.addStretch(1)
-        layout.addLayout(chips)
-
-        self.donde = self._linea(layout, "DÓNDE")
-        self.contada = self._linea(layout, "CONTADA")
-        self.movimiento = self._linea(layout, "ÚLTIMO MOVIMIENTO")
+        # «Etiqueta: valor» en un renglón cada uno (antes eran dos por dato).
+        lineas = QGridLayout()
+        lineas.setHorizontalSpacing(12)
+        lineas.setVerticalSpacing(6)
+        lineas.setColumnStretch(1, 1)
+        self.donde = self._linea(lineas, 0, "DÓNDE")
+        self.contada = self._linea(lineas, 1, "CONTADA")
+        self.movimiento = self._linea(lineas, 2, "ÚLTIMO MOV.")
+        self.movimiento.setToolTip("Último movimiento de esta talla")
+        layout.addLayout(lineas)
 
         self.acciones = QGridLayout()
         self.acciones.setHorizontalSpacing(8)
@@ -295,16 +320,19 @@ class FichaInventario(QFrame):
         columna.setSpacing(0)
         columna.addWidget(_etiqueta(titulo, "invFichaDatoTitulo"))
         valor = _etiqueta("", "invFichaDatoValor")
+        # La cifra grande guarda su alto completo pase lo que pase.
+        valor.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         nota = _etiqueta("", "invFichaDatoNota")
         columna.addWidget(valor)
         columna.addWidget(nota)
         fila.addLayout(columna)
         return valor, nota
 
-    def _linea(self, layout: QVBoxLayout, titulo: str) -> QLabel:
-        layout.addWidget(_etiqueta(titulo, "invFichaEtiqueta"))
+    def _linea(self, rejilla: QGridLayout, renglon: int, titulo: str) -> QLabel:
+        etiqueta = _etiqueta(titulo, "invFichaEtiqueta")
+        rejilla.addWidget(etiqueta, renglon, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
         valor = _etiqueta("", "invFichaLinea", envolver=True)
-        layout.addWidget(valor)
+        rejilla.addWidget(valor, renglon, 1, Qt.AlignmentFlag.AlignTop)
         return valor
 
     # Varias tallas
@@ -590,7 +618,7 @@ class InventarioPantalla(QObject):
                 stock, int(fila.get("stock_bodega") or 0), int(fila.get("stock_piso") or 0), conjunto=virtual
             )
         )
-        ficha.contada.setText(texto_contada(fila, ahora=self.ahora()))
+        ficha.contada.setText(texto_contada_corto(fila, ahora=self.ahora()))
         sku, movimiento = self._ultimo_mov
         if sku == str(fila.get("sku", "")) and movimiento:
             ficha.movimiento.setText(movimiento.replace("Último movimiento: ", ""))

@@ -19,7 +19,7 @@ from pos_uniformes.services.inventario_vista_service import (
     ordenar_por_columna,
     resumir_lote,
     siguiente_orden,
-    texto_contada,
+    texto_contada_corto,
     texto_paginacion,
     texto_talla_color,
 )
@@ -92,12 +92,13 @@ class TextosTests(unittest.TestCase):
         self.assertEqual(texto_paginacion(1, 0, 100), "Mostrando 1 talla")
         self.assertEqual(texto_paginacion(0, 0, 100), "Sin tallas con estos filtros")
 
-    def test_contada(self) -> None:
-        self.assertEqual(texto_contada({"ultimo_conteo_at": None}, ahora=AHORA), "Nunca contada")
-        self.assertEqual(texto_contada({"ultimo_conteo_at": AHORA}, ahora=AHORA), "Contada hoy")
-        self.assertEqual(texto_contada({"ultimo_conteo_at": AHORA - timedelta(days=1)}, ahora=AHORA), "Contada ayer")
+    def test_contada_sin_repetir_la_palabra(self) -> None:
+        # Va junto a la etiqueta «CONTADA» de la ficha: no se repite «Contada».
+        self.assertEqual(texto_contada_corto({"ultimo_conteo_at": None}, ahora=AHORA), "Nunca")
+        self.assertEqual(texto_contada_corto({"ultimo_conteo_at": AHORA}, ahora=AHORA), "Hoy")
+        self.assertEqual(texto_contada_corto({"ultimo_conteo_at": AHORA - timedelta(days=1)}, ahora=AHORA), "Ayer")
         self.assertEqual(
-            texto_contada({"ultimo_conteo_at": AHORA - timedelta(days=52)}, ahora=AHORA), "Contada hace 52 días"
+            texto_contada_corto({"ultimo_conteo_at": AHORA - timedelta(days=52)}, ahora=AHORA), "Hace 52 días"
         )
 
     def test_talla_y_color(self) -> None:

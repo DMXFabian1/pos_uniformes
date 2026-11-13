@@ -322,7 +322,7 @@ class InventarioTanda3PantallaTests(unittest.TestCase):
         self.assertEqual(ficha.hay.text(), "−2")
         self.assertEqual(ficha.precio.text(), "$289")
         self.assertEqual(ficha.chip_estado.text(), "En negativo")
-        self.assertEqual(ficha.contada.text(), "Contada hace 10 días")
+        self.assertEqual(ficha.contada.text(), "Hace 10 días")
         self.assertEqual(ficha.movimiento.text(), "Venta −1 · 12/11/2026")
         textos = [pantalla.boton_corregir.text(), window.inventory_print_label_button.text(),
                   pantalla.boton_editar.text(), pantalla.boton_movimientos.text()]
@@ -387,6 +387,36 @@ class InventarioTanda3PantallaTests(unittest.TestCase):
             self.assertGreaterEqual(widget.width(), widget.fontMetrics().horizontalAdvance(widget.text()), widget.text())
         # La lista enseña varias filas sin desplazar la página.
         self.assertGreaterEqual(window.inventory_table.viewport().height(), 6 * 36)
+
+    def _mostrar_a_1366(self, window: MainWindow) -> None:
+        window.resize(1366, 768)
+        for i in range(window.tabs.count()):
+            if window.tabs.tabText(i).strip() == "Inventario":
+                window.tabs.setCurrentIndex(i)
+        window.show()
+        for _ in range(3):
+            QApplication.processEvents()
+
+    def test_a_1366_las_cifras_de_la_ficha_no_se_aplastan_con_chips_y_nombre_largo(self) -> None:
+        largo = "Pants deportivo 2 piezas Instituto Bilingüe Las Américas Secundaria"
+        filas = [_fila(1, 0, talla="CH", producto=largo), _fila(2, -3, talla="10", producto=largo), _fila(3, 5)]
+        filas[0]["variante_activa"] = False
+        window = self._ventana(filas)
+        self._mostrar_a_1366(window)
+        pantalla = window.inventario_pantalla
+        ficha = pantalla.ficha
+        for vid in (1, 2):
+            pantalla.seleccionar(vid)
+            for _ in range(3):
+                QApplication.processEvents()
+            self.assertEqual(ficha.estado(), TALLA)
+            self.assertFalse(ficha.chip_estado.isHidden())
+            for cifra in (ficha.hay, ficha.precio):
+                self.assertGreaterEqual(cifra.height(), cifra.sizeHint().height(), cifra.text())
+            self.assertGreaterEqual(ficha.total.height(), ficha.total.sizeHint().height())
+        self.assertTrue(ficha.chip_apagada.isHidden())
+        pantalla.seleccionar(1)
+        self.assertFalse(ficha.chip_apagada.isHidden())
 
 
 if __name__ == "__main__":

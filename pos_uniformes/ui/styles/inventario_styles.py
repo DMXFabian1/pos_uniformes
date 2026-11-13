@@ -188,6 +188,7 @@ QPushButton#invSegmento:disabled {{ color: #b4aba0; }}
 /* ── Ficha derecha ── */
 QFrame#invFicha {{ background: {TARJETA}; border: 1px solid {TARJETA_BORDE}; border-radius: 20px; }}
 QStackedWidget#invFichaPaginas, QWidget#invFichaPagina {{ background: transparent; }}
+QScrollArea#invFichaScroll, QWidget#invFichaVista {{ background: transparent; border: none; }}
 QLabel#invSeccion {{ font-size: 11px; font-weight: 800; color: {VINO}; letter-spacing: 1.5px; }}
 QLabel#invVacio {{
     background: #faf6f0; color: {TENUE}; border: 1.5px dashed #d8c6b0; border-radius: 14px;
