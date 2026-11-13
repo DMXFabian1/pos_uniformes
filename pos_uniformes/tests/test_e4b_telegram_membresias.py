@@ -122,6 +122,49 @@ class AvisoTests(_ConBot):
         self.s.flush()
         self.assertIn("· 1 compra por $1,250 (la última hoy)", tm.aviso_de_propuesta(self.s, self.m, ahora=ahora))
 
+    def test_quien_solo_aparta_no_sale_sin_compras(self) -> None:
+        """2026-11-12: el cliente que compra por apartado y liquida con
+        abonos sale con sus apartados en una línea aparte (los abonos no se
+        suman: sería el mismo dinero dos veces)."""
+        from decimal import Decimal
+
+        from pos_uniformes.database.models import LibretaVenta
+
+        ahora = datetime.now(timezone.utc)
+        for tipo, monto in (("apartado", "4800"), ("abono", "1600"), ("abono", "3200")):
+            self.s.add(LibretaVenta(
+                employee_code=self.lupita.codigo, employee_name="Lupita", tipo=tipo, piezas=1,
+                monto_total=Decimal(monto), monto_neto=Decimal(monto), cliente_id=self.cliente.id,
+                created_at=ahora - timedelta(days=5)))
+        self.s.flush()
+        texto = tm.aviso_de_propuesta(self.s, self.m, ahora=ahora)
+        self.assertIn("· 1 apartado por $4,800 (el último hace 5 días)", texto)
+        self.assertNotIn("Sin compras", texto)
+        self.assertNotIn("compra por", texto)
+
+    def test_hace_cuenta_dias_de_calendario_en_hora_local(self) -> None:
+        """2026-11-12: «hoy»/«ayer» por fecha local, no por bloques de 24 h."""
+        import os
+        import time
+
+        anterior = os.environ.get("TZ")
+        os.environ["TZ"] = "America/Mexico_City"
+        time.tzset()
+        try:
+            # 11/11 20:00 y 12/11 10:00 en la Ciudad de México (UTC-6).
+            ahora = datetime(2026, 11, 12, 16, 0, tzinfo=timezone.utc)
+            self.assertEqual(tm._hace(datetime(2026, 11, 12, 2, 0, tzinfo=timezone.utc), ahora), "ayer")
+            # 10/11 09:00 y 12/11 08:00: anteayer, no «ayer».
+            ahora = datetime(2026, 11, 12, 14, 0, tzinfo=timezone.utc)
+            self.assertEqual(tm._hace(datetime(2026, 11, 10, 15, 0, tzinfo=timezone.utc), ahora), "hace 2 días")
+            self.assertEqual(tm._hace(datetime(2026, 11, 12, 13, 0, tzinfo=timezone.utc), ahora), "hoy")
+        finally:
+            if anterior is None:
+                os.environ.pop("TZ", None)
+            else:
+                os.environ["TZ"] = anterior
+            time.tzset()
+
     def test_botones_de_una_propuesta(self) -> None:
         datos = _datos(tm.botones_de(self.m))
         self.assertEqual(datos, [f"mb:ok:{self.m.id}", f"mb:no:{self.m.id}", "mb:lista"])

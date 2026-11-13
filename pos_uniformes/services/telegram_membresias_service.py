@@ -58,11 +58,16 @@ def _cliente(session: Session, cliente_id: int):
 
 
 def _hace(fecha: datetime | None, ahora: datetime) -> str:
+    """«hoy», «ayer» o «hace N días» por día de calendario en hora local
+    (2026-11-12: antes eran bloques de 24 horas y una compra de anoche a
+    las 20:00 salía «hoy» en el aviso de la mañana siguiente)."""
     if fecha is None:
         return ""
     if fecha.tzinfo is None:
         fecha = fecha.replace(tzinfo=timezone.utc)
-    dias = (ahora - fecha).days
+    if ahora.tzinfo is None:
+        ahora = ahora.replace(tzinfo=timezone.utc)
+    dias = (ahora.astimezone().date() - fecha.astimezone().date()).days
     if dias <= 0:
         return "hoy"
     if dias == 1:
@@ -80,7 +85,23 @@ def _compras(session: Session, cliente_id: int) -> tuple[int, Decimal, datetime 
     kiosko le salía «Sin compras». Ahora cuenta en `LibretaVenta.cliente_id`:
     solo ventas (ni abonos ni apartados, ni la compra de una empleada con
     precio especial), incluidas las privadas (este aviso solo lo ve el
-    dueño). Una operación anulada se borra de la Libreta, así que no cuenta."""
+    dueño). Una operación anulada se borra de la Libreta, así que no cuenta.
+
+    El total es el importe de las ventas (`monto_total`: lo que el cliente
+    compró, incluido lo pagado con Monedero), no el dinero recibido del
+    corte (`monto_neto`), y no descuenta los cambios de talla posteriores:
+    es una referencia para decidir, no una cifra para cuadrar."""
+    return _sumar(session, cliente_id, "venta")
+
+
+def _apartados(session: Session, cliente_id: int) -> tuple[int, Decimal, datetime | None]:
+    """Solo lectura: los apartados del cliente en la Libreta (número e
+    importe apartado). Va en una línea aparte de las ventas y no se suma con
+    los abonos, que contarían el mismo dinero dos veces. 2026-11-12."""
+    return _sumar(session, cliente_id, "apartado")
+
+
+def _sumar(session: Session, cliente_id: int, tipo: str) -> tuple[int, Decimal, datetime | None]:
     from pos_uniformes.database.models import LibretaVenta
     from pos_uniformes.services.libreta_service import predicado_operacion
 
@@ -89,7 +110,7 @@ def _compras(session: Session, cliente_id: int) -> tuple[int, Decimal, datetime 
             func.count(LibretaVenta.id),
             func.coalesce(func.sum(LibretaVenta.monto_total), 0),
             func.max(LibretaVenta.created_at),
-        ).where(LibretaVenta.cliente_id == int(cliente_id), predicado_operacion(("venta",)))
+        ).where(LibretaVenta.cliente_id == int(cliente_id), predicado_operacion((tipo,)))
     ).one()
     return int(fila[0] or 0), Decimal(str(fila[1] or 0)), fila[2]
 
@@ -113,15 +134,22 @@ def _resumen_cliente(session: Session, membresia, ahora: datetime) -> list[str]:
     lineas.append(f"· Programa hoy: {activa.programa.nombre if activa is not None else 'ninguno'}")
     try:
         cuantas, total, ultima = _compras(session, int(cliente.id))
+        n_apartados, total_apartados, ultimo_apartado = _apartados(session, int(cliente.id))
     except Exception:  # noqa: BLE001 — sin el historial se contesta igual
         cuantas = None
     if cuantas is None:
         lineas.append("· (no se pudo leer su historial de compras)")
-    elif cuantas == 0:
-        lineas.append("· Sin compras registradas a su nombre")
-    else:
+        return lineas
+    if cuantas:
         compras = "1 compra" if cuantas == 1 else f"{cuantas} compras"
         lineas.append(f"· {compras} por ${total:,.0f} (la última {_hace(ultima, ahora)})")
+    if n_apartados:
+        # 2026-11-12: quien compra por apartado y liquida con abonos no
+        # sale «Sin compras»; va aparte para no sumar el dinero dos veces.
+        apartados = "1 apartado" if n_apartados == 1 else f"{n_apartados} apartados"
+        lineas.append(f"· {apartados} por ${total_apartados:,.0f} (el último {_hace(ultimo_apartado, ahora)})")
+    if not cuantas and not n_apartados:
+        lineas.append("· Sin compras registradas a su nombre")
     return lineas
 
 
