@@ -149,6 +149,31 @@ class InventarioTanda2PantallaTests(unittest.TestCase):
         self.assertEqual(celda.text(), "Oferta $175")
         self.assertEqual(celda.toolTip(), "Precio normal $250")
 
+    def test_ficha_toma_la_oferta_de_la_fila_sin_otra_consulta(self) -> None:
+        from decimal import Decimal
+
+        from pos_uniformes.services.inventory_overview_service import InventoryOverviewSnapshot
+
+        window = self._ventana()
+        window.inventory_filtered_rows = [
+            {"variante_id": 8, "rebaja_tipo": "oferta", "rebaja_precio": Decimal("175")},
+        ]
+        window.inventory_variant_combo.currentData = Mock(return_value=8)
+        snapshot = InventoryOverviewSnapshot(
+            sku="SKU000008", product_name="Pants", product_active=True, variant_active=True,
+            stock_actual=3, apartado_cantidad=0, talla="6", color="Azul marino",
+            precio_venta=Decimal("250"), origen_etiqueta="NUEVO", escuela_nombre="General",
+            tipo_prenda_nombre="Deportivo", tipo_pieza_nombre="Pants", stock_minimo=None,
+            movement_type=None, movement_quantity=None, movement_date="",
+        )
+        aplicada = Mock()
+        window._apply_inventory_overview_view = aplicada
+        with patch("pos_uniformes.ui.main_window.get_session"), patch(
+            "pos_uniformes.ui.main_window.load_inventory_overview_snapshot", return_value=snapshot
+        ):
+            window._refresh_inventory_overview()
+        self.assertEqual(aplicada.call_args.args[0].stock_hint_label, "Talla 6 · Azul marino · Oferta $175")
+
     def test_al_cerrar_ofertas_se_refresca_el_listado(self) -> None:
         window = self._ventana()
         window.current_role = RolUsuario.ADMIN

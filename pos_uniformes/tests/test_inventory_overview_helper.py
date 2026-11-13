@@ -74,6 +74,29 @@ class InventoryOverviewHelperTests(unittest.TestCase):
         self.assertEqual(view.toggle_product_label, "Desactivar toda la prenda…")
         self.assertEqual(view.toggle_variant_label, "Activar esta talla")
 
+    def test_ficha_dice_el_mismo_precio_rebajado_que_la_tabla(self) -> None:
+        comunes = dict(
+            sku="SKU000008",
+            product_name="Pants",
+            product_active=True,
+            variant_active=True,
+            stock_actual=5,
+            talla="6",
+            color="Azul marino",
+            precio_venta=Decimal("250.00"),
+            origen_etiqueta="NUEVO",
+            escuela_nombre="General",
+            tipo_prenda_nombre="Deportivo",
+            tipo_pieza_nombre="Pants",
+            movement_type=None,
+            movement_quantity=None,
+            movement_date="",
+        )
+        con_oferta = build_inventory_overview_view(**comunes, rebaja_tipo="oferta", rebaja_precio=Decimal("175"))
+        self.assertEqual(con_oferta.stock_hint_label, "Talla 6 · Azul marino · Oferta $175")
+        sin_oferta = build_inventory_overview_view(**comunes)
+        self.assertEqual(sin_oferta.stock_hint_label, "Talla 6 · Azul marino · $250")
+
     def test_sanitizes_legacy_hash_in_product_name(self) -> None:
         view = build_inventory_overview_view(
             sku="SKU-001",

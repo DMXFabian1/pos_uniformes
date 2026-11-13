@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from pos_uniformes.services.inventario_precio_service import LLAVE_PRECIO, LLAVE_TIPO, texto_precio
 from pos_uniformes.services.rebaja_service import fmt_corto
 from pos_uniformes.ui.helpers.inventory_toggle_helper import etiqueta_boton_prenda, etiqueta_boton_talla
 from pos_uniformes.utils.product_name import sanitize_product_display_name
@@ -102,6 +103,8 @@ def build_inventory_overview_view(
     movement_quantity: int | None,
     movement_date: str,
     es_conjunto: bool = False,
+    rebaja_tipo: str | None = None,
+    rebaja_precio: Decimal | str | int | float | None = None,
 ) -> InventoryOverviewView:
     clean_product_name = sanitize_product_display_name(product_name)
     virtual = es_conjunto_o_virtual(es_conjunto=es_conjunto, stock_minimo=stock_minimo)
@@ -120,7 +123,7 @@ def build_inventory_overview_view(
             text=stock_status,
             tone=stock_tone,
         ),
-        stock_hint_label=f"Talla {talla} · {color} · {_precio(precio_venta)}",
+        stock_hint_label=f"Talla {talla} · {color} · {_precio(precio_venta, rebaja_tipo, rebaja_precio)}",
         meta_label=f"Hay {stock_actual} · {escuela_nombre}",
         last_movement_label=last_movement_label,
         catalog_selection_label=(
@@ -141,8 +144,13 @@ def _estado_badge(*, product_active: bool, variant_active: bool) -> InventoryBad
     return InventoryBadgeState(text="Activa", tone="positive")
 
 
-def _precio(precio_venta) -> str:
+def _precio(precio_venta, rebaja_tipo=None, rebaja_precio=None) -> str:
+    """Mismo texto que la columna «Precio»: «$250» o «Oferta $175»."""
     try:
+        if rebaja_tipo and rebaja_precio is not None:
+            return texto_precio(
+                {"precio_venta": precio_venta, LLAVE_TIPO: rebaja_tipo, LLAVE_PRECIO: rebaja_precio}
+            )
         return fmt_corto(precio_venta)
     except Exception:  # noqa: BLE001
         return str(precio_venta)

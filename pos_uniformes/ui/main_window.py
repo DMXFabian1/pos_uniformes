@@ -8896,6 +8896,8 @@ class MainWindow(QMainWindow):
                     variant_id=int(variante_id),
                     catalog_rows=self.catalog_filtered_rows,
                 )
+                # La rebaja ya viene pegada a la fila de la tabla: sin otra consulta.
+                fila_tabla = find_catalog_row_by_variant_id(self.inventory_filtered_rows, variante_id) or {}
                 self._apply_inventory_overview_view(
                     build_inventory_overview_view(
                         sku=overview_snapshot.sku,
@@ -8915,6 +8917,8 @@ class MainWindow(QMainWindow):
                         movement_quantity=overview_snapshot.movement_quantity,
                         movement_date=overview_snapshot.movement_date,
                         es_conjunto=overview_snapshot.es_conjunto,
+                        rebaja_tipo=fila_tabla.get("rebaja_tipo"),
+                        rebaja_precio=fila_tabla.get("rebaja_precio"),
                     )
                 )
         except Exception:  # noqa: BLE001
