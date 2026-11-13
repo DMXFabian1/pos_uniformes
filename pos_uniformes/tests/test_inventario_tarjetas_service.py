@@ -5,8 +5,13 @@ from __future__ import annotations
 import unittest
 from datetime import datetime, timedelta, timezone
 
+from pos_uniformes.services.inventario_ritmo_service import LLAVE_PEDIDAS, LLAVE_VENDIDAS
 from pos_uniformes.services.inventario_tarjetas_service import (
+    AVISO_TARJETAS,
     DIAS_CONTEO_AL_DIA,
+    SE_VA_A_ACABAR,
+    TARJETAS,
+    tono_para_atender,
     EN_NEGATIVO,
     INFO_TARJETAS,
     QUEDAN_POCAS,
@@ -117,6 +122,54 @@ class ParaAtenderTests(unittest.TestCase):
         self.assertEqual(motivo_para_atender(fila(1, -2)), "En negativo (−2)")
         self.assertEqual(motivo_para_atender(fila(1, 0)), "Se acabó")
         self.assertEqual(motivo_para_atender(fila(1, 0, dias=None)), "Se acabó · nunca contada")
+
+
+class SeVaAAcabarTests(unittest.TestCase):
+    """Tanda 5: ritmo de venta de la Libreta y demanda no atendida."""
+
+    def test_filtro_sin_tarjeta_propia(self) -> None:
+        self.assertEqual(len(TARJETAS), 4)
+        self.assertNotIn(SE_VA_A_ACABAR, TARJETAS)
+        self.assertIn("2 semanas", AVISO_TARJETAS[SE_VA_A_ACABAR])
+
+    def test_se_va_a_acabar_y_se_acabo_y_se_vende_caen_en_el_filtro(self) -> None:
+        filas = [
+            fila(1, 2, **{LLAVE_VENDIDAS: 12}),   # alcanza 5 días
+            fila(2, 20, **{LLAVE_VENDIDAS: 12}),  # alcanza 50 días
+            fila(3, 0, **{LLAVE_VENDIDAS: 4}),    # se acabó y se vende
+            fila(4, 0, **{LLAVE_VENDIDAS: 1}),    # una venta no es ritmo
+            fila(5, 1),                           # sin dato de ventas
+            fila(6, 0, es_conjunto=True, **{LLAVE_VENDIDAS: 9}),
+        ]
+        visibles = [f["variante_id"] for f in filtrar_por_tarjeta(filas, SE_VA_A_ACABAR, ahora=AHORA)]
+        self.assertEqual(visibles, [1, 3])
+        self.assertEqual(contar_tarjetas(filas, ahora=AHORA).acabarse, 2)
+        self.assertEqual(contar_tarjetas(filas, ahora=AHORA).de(SE_VA_A_ACABAR), 2)
+
+    def test_para_atender_sube_las_agotadas_que_se_venden_o_piden(self) -> None:
+        filas = [
+            fila(1, 0, dias=1),                                  # cero contado, nadie la pide
+            fila(2, 3, **{LLAVE_VENDIDAS: 30}),                  # alcanza 3 días
+            fila(3, 0, **{LLAVE_PEDIDAS: 4}),                    # la pidieron 4 veces
+            fila(4, -1),                                         # negativo
+            fila(5, 0, **{LLAVE_VENDIDAS: 6}),                   # se acabó y se vende
+            fila(6, 1, **{LLAVE_VENDIDAS: 30}),                  # alcanza 1 día
+        ]
+        self.assertEqual([f["variante_id"] for f in para_atender(filas, limite=10)], [4, 5, 3, 6, 2, 1])
+
+    def test_motivos_y_tonos(self) -> None:
+        self.assertEqual(motivo_para_atender(fila(1, 0, **{LLAVE_PEDIDAS: 1})), "Se acabó · la pidieron 1 vez")
+        self.assertEqual(motivo_para_atender(fila(1, 0, **{LLAVE_PEDIDAS: 3})), "Se acabó · la pidieron 3 veces")
+        self.assertEqual(motivo_para_atender(fila(1, 0, **{LLAVE_VENDIDAS: 13})), "Se acabó y se vende (3/sem)")
+        self.assertEqual(motivo_para_atender(fila(1, 2, **{LLAVE_VENDIDAS: 12})), "Se va a acabar · alcanza para 5 días")
+        self.assertEqual(tono_para_atender(fila(1, -1)), "danger")
+        self.assertEqual(tono_para_atender(fila(1, 0, **{LLAVE_PEDIDAS: 2})), "danger")
+        self.assertEqual(tono_para_atender(fila(1, 2, **{LLAVE_VENDIDAS: 12})), "warning")
+        self.assertEqual(tono_para_atender(fila(1, 0)), "muted")
+
+    def test_sin_datos_de_venta_queda_como_antes(self) -> None:
+        filas = [fila(1, 0, dias=None), fila(2, -1), fila(3, 0, dias=3)]
+        self.assertEqual([f["variante_id"] for f in para_atender(filas)], [2, 3, 1])
 
 
 if __name__ == "__main__":
