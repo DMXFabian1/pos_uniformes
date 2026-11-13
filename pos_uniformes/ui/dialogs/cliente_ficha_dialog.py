@@ -31,6 +31,8 @@ ORIGEN_ETIQUETAS = {
     "pos_admin": "Configuracion",
     "": "Anterior",
 }
+#: 2026-11-12: rótulo de las ventas de la Caja antigua (solo si hay alguna).
+SECCION_POS_ANTERIOR = "POS anterior (hasta abril 2026)"
 PROGRAMAS_PENDIENTES = "Programas: E4. Esta ficha todavia no tiene programa de fidelizacion."
 EVENTO_ETIQUETAS = {
     "alta": "Alta",
@@ -247,8 +249,13 @@ def construir_ficha_dialog(
         privadas = QLabel(f"Ademas hay {ficha.libreta_privadas} registro(s) privado(s) que no se muestran.")
         privadas.setObjectName("cliNota")
         caja_compras.addWidget(privadas)
-    caja_compras.addWidget(_seccion("Ventas del POS"))
-    caja_compras.addWidget(_tabla(["Folio", "Estado", "Total"], ficha.ventas, "Sin ventas del POS."))
+    # 2026-11-12 (Daniel: «la caja antigua ya no es de utilidad, todo lo
+    # demás corre en libreta y kioskos»): las ventas de la Caja antigua ya no
+    # crecen. La sección solo aparece si el cliente tiene alguna, y rotulada
+    # como lo que es; si no, ni se pinta (antes salía siempre vacía).
+    if ficha.ventas:
+        caja_compras.addWidget(_seccion(SECCION_POS_ANTERIOR))
+        caja_compras.addWidget(_tabla(["Folio", "Estado", "Total"], ficha.ventas, ""))
     pestanas.addTab(compras, "Compras")
 
     pestanas.addTab(

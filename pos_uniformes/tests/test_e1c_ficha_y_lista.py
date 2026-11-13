@@ -23,7 +23,7 @@ from pos_uniformes.database.models import ClienteEvento, LibretaVenta, RolUsuari
 from pos_uniformes.services.clientes import admin_service as adm
 from pos_uniformes.services.clientes import ficha_service
 from pos_uniformes.services.clientes import identidad_service as ids
-from pos_uniformes.ui.dialogs.cliente_ficha_dialog import PROGRAMAS_PENDIENTES, construir_ficha_dialog
+from pos_uniformes.ui.dialogs.cliente_ficha_dialog import PROGRAMAS_PENDIENTES, SECCION_POS_ANTERIOR, construir_ficha_dialog
 from pos_uniformes.ui.helpers.settings_clients_helper import CLIENTES_ADMIN_COLUMNAS
 from pos_uniformes.ui.main_window import MainWindow
 from pos_uniformes.utils.config import settings
@@ -99,6 +99,27 @@ class FichaServiceTests(unittest.TestCase):
         self.assertIn(PROGRAMAS_PENDIENTES, textos)
         self.assertTrue(any("1 registro(s) privado(s)" in t for t in textos))
         self.assertEqual([b.text() for b in dialogo.findChildren(QPushButton)], ["Cerrar"])
+
+    def test_ventas_del_pos_anterior_solo_si_hay(self) -> None:
+        """2026-11-12 (Daniel: «la caja antigua ya no es de utilidad»): la
+        sección de la Caja antigua salía siempre vacía; ahora se oculta si
+        no hay ventas y, si hay, se rotula «POS anterior (hasta abril 2026)»."""
+        import dataclasses
+        from datetime import datetime
+
+        self.app = QApplication.instance() or QApplication([])
+        ficha = ficha_service.cargar_ficha(self.s, cliente_id=self.cliente.id, usuario_id=self.admin.id)
+
+        def secciones(f):
+            dialogo = construir_ficha_dialog(None, f)
+            return [l.text() for l in dialogo.findChildren(QLabel) if l.objectName() == "cliSeccion"]
+
+        self.assertEqual(secciones(ficha), ["LIBRETA"])
+        dialogo = construir_ficha_dialog(None, ficha)
+        textos = [l.text() for l in dialogo.findChildren(QLabel)]
+        self.assertFalse(any("ventas del POS" in t.lower() for t in textos))
+        vieja = ficha_service.FilaHistorial(fecha=datetime(2026, 4, 2), columnas=("F-1", "confirmada", "$100.00"))
+        self.assertEqual(secciones(dataclasses.replace(ficha, ventas=[vieja])), ["LIBRETA", SECCION_POS_ANTERIOR.upper()])
 
 
 class ListaAdminTests(unittest.TestCase):
