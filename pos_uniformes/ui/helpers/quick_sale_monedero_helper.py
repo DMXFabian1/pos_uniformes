@@ -264,9 +264,38 @@ class MonederoVentaMixin:
         )
         self._refresh_totals()
 
+    def _base_cashback_del_motor(self, total: Decimal, canje: Decimal, tarjeta: bool) -> Decimal | None:
+        """La base del Monedero que calculó el motor para este carrito, o None
+        si no la hay o no corresponde a este total y este saldo (2026-11-12:
+        el abono del servidor sale de esa misma base, así lo impreso
+        coincide con lo abonado)."""
+        if getattr(self, "_calculo_fijo", None) is not None or getattr(self, "_reimpresion_legada", False):
+            return None  # reimpresión: no se vuelve a decidir con las reglas de hoy
+        if not getattr(self, "_items", None) or not hasattr(self, "_calculo_motor"):
+            return None
+        try:
+            calculo = self._calculo_motor(pago_tarjeta=bool(tarjeta))
+        except Exception:  # noqa: BLE001 — se usa la cuenta de antes
+            return None
+        if calculo is None or calculo.monedero is None:
+            return None
+        if calculo.total != Decimal(str(total)) or calculo.saldo_usado != Decimal(str(canje)):
+            return None
+        return calculo.monedero.base
+
     def _base_cashback(self, total: Decimal, canje: Decimal, tarjeta: bool = False) -> Decimal:
-        """Sobre cuánto gana Monedero esta compra (la misma cuenta que el abono
-        del servidor)."""
+        """Sobre cuánto gana Monedero esta compra, con la misma regla que el
+        abono del servidor (`monedero_service.base_cashback_de_venta`): con
+        saldo, la del motor (sin el doble descuento de saldo + rebaja), nunca
+        menos que la cuenta de antes; sin saldo, la cuenta de antes."""
+        legada = self._base_cashback_legada(total, canje, tarjeta)
+        if Decimal(str(canje or 0)) <= 0:
+            return legada
+        del_motor = self._base_cashback_del_motor(total, canje, tarjeta)
+        return max(legada, del_motor) if del_motor is not None else legada
+
+    def _base_cashback_legada(self, total: Decimal, canje: Decimal, tarjeta: bool = False) -> Decimal:
+        """La cuenta de antes del motor (cobrado − saldo − rebajado)."""
         from pos_uniformes.services.beneficios.motor import base_monedero_con_comision, neto_con_comision
         from pos_uniformes.services.libreta_service import TERMINAL_COMMISSION_PERCENT
         from pos_uniformes.services.monedero_service import importe_elegible

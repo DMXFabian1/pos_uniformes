@@ -165,6 +165,98 @@ def base_sin_comision_tarjeta(libreta_venta, base) -> tuple[Decimal, bool]:
     return base_monedero_con_comision(base, pagado, comision), True
 
 
+def base_cashback_legada(libreta_venta) -> tuple[Decimal, bool]:
+    """La cuenta de antes del motor: (lo cobrado − el saldo − lo rebajado),
+    luego sin la comisión de la terminal. Solo para ventas SIN fotografía
+    (ventas viejas o cobradas con el cálculo de respaldo)."""
+    base = importe_elegible(libreta_venta.monto_total, getattr(libreta_venta, "monto_monedero", None))
+    # E7: lo cobrado en Oferta o Liquidación no genera Monedero.
+    from pos_uniformes.services.rebaja_service import importe_rebajado
+
+    base = max(base - importe_rebajado(getattr(libreta_venta, "detalle", None) or []), _CERO)
+    return base_sin_comision_tarjeta(libreta_venta, base)
+
+
+def _base_del_calculo(calc: dict, libreta_venta) -> tuple[Decimal, bool] | None:
+    """(base, con comisión de tarjeta) de UN cálculo plano del motor, o None
+    si no sirve para esta venta (no trae la parte del Monedero, o no
+    describe lo que se guardó: otro total, otro saldo, otro medio de pago)."""
+    from pos_uniformes.services.beneficios.motivos import MONEDERO_SIN_COMISION
+    from pos_uniformes.services.beneficios.motor import base_monedero_con_comision
+
+    parte = calc.get("monedero")
+    if not isinstance(parte, dict) or parte.get("base") in (None, ""):
+        return None
+    total, saldo = _d(calc.get("total")), _d(calc.get("saldo_usado"))
+    if total != _d(libreta_venta.monto_total) or saldo != _d(getattr(libreta_venta, "monto_monedero", None)):
+        return None
+    pagado = importe_elegible(total, saldo)
+    con_tarjeta = any(
+        isinstance(p, dict) and p.get("medio") == "tarjeta" and _d(p.get("importe")) > 0
+        for p in calc.get("pagos") or ()
+    )
+    if pagado > 0 and con_tarjeta != bool(getattr(libreta_venta, "pago_tarjeta", False)):
+        return None
+    base = max(_d(parte["base"]), _CERO)
+    comision = _d(calc.get("comision_tarjeta"))
+    if comision > 0 and base > 0 and MONEDERO_SIN_COMISION not in (calc.get("motivos_ticket") or ()):
+        # Fotografía de un kiosko de antes de la regla B (2026-11-12): su
+        # motor todavía no le quitaba la comisión a la base. Se le quita aquí,
+        # una sola vez, con la misma cuenta del motor de hoy.
+        base = base_monedero_con_comision(base, pagado, comision)
+    return base, comision > 0 and con_tarjeta
+
+
+def base_cashback_de_venta(libreta_venta) -> tuple[Decimal, bool]:
+    """Sobre cuánto gana Monedero una venta, y si se le quitó la comisión de
+    la tarjeta (2026-11-12).
+
+    Una sola cuenta: la del motor de beneficios. Si la venta trae su
+    fotografía (`libreta_venta.calculo`), la base es la del motor, que ya
+    excluye las prendas rebajadas, reparte el saldo usado entre renglones y
+    quita la comisión de la terminal (regla B). Antes el servidor hacía su
+    propia cuenta (cobrado − saldo − rebajado) y, cuando se pagaba con saldo
+    una compra con prendas rebajadas, restaba dos veces el saldo que caía en
+    esas prendas: prenda normal $100 + Liquidación $100 pagando $100 con
+    saldo daba base $0 en vez de $50, y el ticket decía otra cosa.
+
+    Primero el cálculo del servidor (con el cliente y el saldo de la base),
+    luego el del kiosko. Sin fotografía que sirva, la cuenta de antes.
+
+    Lo único que cambia es el doble descuento de saldo + rebaja. Por eso la
+    base del motor solo manda cuando se usó saldo, y nunca queda por debajo
+    de la cuenta de antes: sin saldo, las dos cuentas solo difieren en los
+    centavos del redondeo de la tienda (R1) que le tocan a una prenda
+    rebajada (el motor los deja fuera de la base; antes contaban). Eso es
+    decisión de Daniel; mientras tanto nadie gana ni un centavo distinto."""
+    legada = base_cashback_legada(libreta_venta)
+    if _d(getattr(libreta_venta, "monto_monedero", None)) <= 0:
+        return legada
+    del_motor = _base_de_la_fotografia(libreta_venta)
+    if del_motor is None or del_motor[0] <= legada[0]:
+        return legada
+    return del_motor
+
+
+def _base_de_la_fotografia(libreta_venta) -> tuple[Decimal, bool] | None:
+    foto = getattr(libreta_venta, "calculo", None)
+    if isinstance(foto, dict):
+        servidor = foto.get("servidor")
+        candidatos = [servidor.get("calculo") if isinstance(servidor, dict) else None, foto.get("calculo")]
+        for calc in candidatos:
+            if not isinstance(calc, dict):
+                continue
+            try:
+                resultado = _base_del_calculo(calc, libreta_venta)
+            except (ArithmeticError, TypeError, ValueError):
+                # Fotografía dañada: no tumba el abono, se usa la cuenta de antes.
+                logger.warning("Monedero: fotografía ilegible en la venta %s", getattr(libreta_venta, "id", None))
+                resultado = None
+            if resultado is not None:
+                return resultado
+    return None
+
+
 def calcular_cashback(importe, tasa) -> Decimal:
     """Cashback = importe × tasa %, truncado al centavo (nunca se da de más)."""
     if tasa is None:
@@ -546,12 +638,7 @@ def acreditar_cashback(
     tasa = tasa_para_cliente(session, libreta_venta.cliente_id, fecha_venta)
     if tasa is None:
         return None
-    base = importe_elegible(libreta_venta.monto_total, getattr(libreta_venta, "monto_monedero", None))
-    # E7: lo cobrado en Oferta o Liquidación no genera Monedero.
-    from pos_uniformes.services.rebaja_service import importe_rebajado
-
-    base = max(base - importe_rebajado(getattr(libreta_venta, "detalle", None) or []), _CERO)
-    base, con_tarjeta = base_sin_comision_tarjeta(libreta_venta, base)
+    base, con_tarjeta = base_cashback_de_venta(libreta_venta)
     monto = calcular_cashback(base, tasa)
     if monto <= 0:
         return None
