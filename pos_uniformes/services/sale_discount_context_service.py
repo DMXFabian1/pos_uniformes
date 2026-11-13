@@ -35,29 +35,27 @@ class SaleDiscountContext:
     breakdown: dict[str, object]
 
 
+# Opciones fijas de la promoción manual de la Caja antigua (2026-11-12).
+# Daniel: «el nivel viejo retíralo». Antes salían de las columnas
+# configuracion_negocio.discount_basico/leal/profesor/mayorista, que ya no se
+# pueden editar en Configuración; ahora la lista es fija y no lee esas columnas
+# (siguen en la base, sin uso).
+SALE_DISCOUNT_PRESETS: tuple[Decimal, ...] = (
+    Decimal("5.00"),
+    Decimal("10.00"),
+    Decimal("15.00"),
+    Decimal("20.00"),
+)
+
+
 def load_sale_discount_presets(
     session,
     *,
     normalize_discount_value: Callable[[object | None], Decimal],
 ) -> list[Decimal]:
-    default_values = [
-        Decimal("5.00"),
-        Decimal("10.00"),
-        Decimal("15.00"),
-        Decimal("20.00"),
-    ]
-    business_settings_service = _resolve_sale_discount_preset_dependencies()
-    try:
-        config = business_settings_service.get_or_create(session)
-        values = [
-            normalize_discount_value(config.discount_basico),
-            normalize_discount_value(config.discount_leal),
-            normalize_discount_value(config.discount_profesor),
-            normalize_discount_value(config.discount_mayorista),
-        ]
-    except Exception:
-        logger.warning("No se pudo leer configuración de descuentos; usando presets por defecto", exc_info=True)
-        values = default_values
+    """Lista fija de % para la promo manual; `session` se conserva por compatibilidad."""
+    del session
+    values = [normalize_discount_value(value) for value in SALE_DISCOUNT_PRESETS]
     return sorted({value for value in values if value > Decimal("0.00")})
 
 
@@ -213,12 +211,6 @@ def calculate_sale_discount_pricing(
         loyalty_discount=context.loyalty_discount,
         promo_discount=context.promo_discount,
     )
-
-
-def _resolve_sale_discount_preset_dependencies():
-    from pos_uniformes.services.business_settings_service import BusinessSettingsService
-
-    return BusinessSettingsService
 
 
 def _resolve_sale_client_discount_ui_dependencies():

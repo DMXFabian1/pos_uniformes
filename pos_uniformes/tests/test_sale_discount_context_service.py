@@ -21,24 +21,26 @@ from pos_uniformes.services.sale_discount_service import format_discount_label, 
 
 
 class SaleDiscountContextServiceTests(unittest.TestCase):
-    def test_load_sale_discount_presets_uses_config_and_fallbacks(self) -> None:
-        config = SimpleNamespace(
-            discount_basico="5",
-            discount_leal="10",
-            discount_profesor="15",
-            discount_mayorista="20",
-        )
-        fake_service = SimpleNamespace(get_or_create=lambda session: config)
-        with patch(
-            "pos_uniformes.services.sale_discount_context_service._resolve_sale_discount_preset_dependencies",
-            return_value=fake_service,
-        ):
-            presets = load_sale_discount_presets(object(), normalize_discount_value=normalize_discount_value)
-
+    def test_load_sale_discount_presets_es_lista_fija_sin_leer_configuracion(self) -> None:
+        # 2026-11-12, Daniel: «el nivel viejo retíralo». Las opciones de la
+        # promo manual ya no salen de discount_basico/leal/profesor/mayorista.
+        presets = load_sale_discount_presets(object(), normalize_discount_value=normalize_discount_value)
         self.assertEqual(
             presets,
             [Decimal("5.00"), Decimal("10.00"), Decimal("15.00"), Decimal("20.00")],
         )
+        self.assertEqual(
+            load_sale_discount_presets(None, normalize_discount_value=normalize_discount_value),
+            presets,
+        )
+
+    def test_load_sale_discount_presets_no_consulta_business_settings(self) -> None:
+        with patch(
+            "pos_uniformes.services.business_settings_service.BusinessSettingsService.get_or_create",
+            side_effect=AssertionError("no debe leer configuracion_negocio"),
+        ):
+            presets = load_sale_discount_presets(object(), normalize_discount_value=normalize_discount_value)
+        self.assertEqual(len(presets), 4)
 
     def test_resolve_sale_client_discount_ui_state(self) -> None:
         fake_module = SimpleNamespace(
