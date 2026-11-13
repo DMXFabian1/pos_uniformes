@@ -20,18 +20,17 @@ FLOW_GROUPS: "OrderedDict[str, dict[str, object]]" = OrderedDict(
                 # 2026-11-12: la Caja antigua (cobro, promo manual, cliente
                 # de la venta) se retiró del POS; quedan el PIN, el cliente
                 # escaneado de Presupuestos y la sesión/corte de caja.
+                # 2026-11-12: también se retiraron del POS Movimientos y la
+                # sesión/corte de caja (Daniel: «no lo necesito, retira
+                # también movimientos y el corte»); el corte vive en el
+                # kiosko y lo cubren sus propias pruebas (test_corte_*).
                 "covers": (
-                    "validacion del PIN administrativo",
                     "cliente con y sin QR",
-                    "apertura, movimiento y corte de caja",
                 ),
                 "tests": (
                     "pos_uniformes.tests.test_sale_payment_validation_service",
-                    "pos_uniformes.tests.test_sale_discount_context_service",
                     "pos_uniformes.tests.test_sale_client_sync_service",
                     "pos_uniformes.tests.test_scanned_client_flow_service",
-                    "pos_uniformes.tests.test_cash_session_action_service",
-                    "pos_uniformes.tests.test_cash_session_feedback_helper",
                 ),
             },
         ),

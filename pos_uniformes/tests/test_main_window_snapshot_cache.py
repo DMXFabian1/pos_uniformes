@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
 )
 
 from pos_uniformes.services.active_filter_service import ActiveFilterToken
-from pos_uniformes.database.models import RolUsuario, TipoMovimientoCaja
+from pos_uniformes.database.models import RolUsuario
 from pos_uniformes.ui.main_window import (
     CATALOG_PAGE_SIZE,
     INVENTORY_PAGE_SIZE,
@@ -100,65 +100,11 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertEqual(button.selected_labels(), [])
 
-    def test_cash_session_label_hides_expected_amount_from_hero(self) -> None:
+    def test_logout_shows_window_and_refreshes_for_new_user(self) -> None:
+        # 2026-11-12: el POS ya no abre ni revisa sesión de caja al cambiar de
+        # usuario (el corte vive en el kiosko); solo se muestra y refresca.
         window = MainWindow(user_id=1)
-        active_session = SimpleNamespace(id=5, monto_apertura="1000.00")
-        resumen = SimpleNamespace(esperado_en_caja="2450.00")
-
-        with patch("pos_uniformes.ui.main_window.caja_en_el_pos", return_value=True), patch(
-            "pos_uniformes.ui.main_window.CajaService.obtener_sesion_activa", return_value=active_session
-        ), patch(
-            "pos_uniformes.ui.main_window.CajaService.resumir_sesion",
-            return_value=resumen,
-        ), patch.object(window, "_is_stale_cash_session", return_value=True):
-            window._refresh_cash_session(object())
-
-        # Desde cc21062 el label es HTML con spans y, con corte pendiente,
-        # tampoco muestra el reactivo de apertura.
-        label_text = window.cash_session_label.text()
-        self.assertIn("Rol ADMIN", label_text)
-        self.assertIn("Corte pendiente", label_text)
-        self.assertNotIn("Esperado", label_text)
-        self.assertNotIn("2450", label_text)
-        self.assertNotIn("1000.00", label_text)
-
-    def test_cashier_role_sees_open_session_reactivo_in_hero(self) -> None:
-        window = MainWindow(user_id=1)
-        window.current_role = RolUsuario.CAJERO
-        active_session = SimpleNamespace(id=5, monto_apertura="1000.00")
-
-        with patch("pos_uniformes.ui.main_window.caja_en_el_pos", return_value=True), patch(
-            "pos_uniformes.ui.main_window.CajaService.obtener_sesion_activa", return_value=active_session
-        ), patch.object(window, "_is_stale_cash_session", return_value=False):
-            window._refresh_cash_session(object())
-
-        # Desde cc21062 el hero usa spans HTML y muestra "Reactivo $X" para
-        # todos los roles con caja abierta (antes, 6dbabe1 lo ocultaba a
-        # CAJERO). El monto esperado del corte sigue sin aparecer.
-        label_text = window.cash_session_label.text()
-        self.assertIn("Rol CAJERO", label_text)
-        self.assertIn("Caja abierta", label_text)
-        self.assertIn("Reactivo $1000.00", label_text)
-        self.assertNotIn("Reactivo inicial", label_text)
-        self.assertNotIn("Esperado", label_text)
-
-    def test_sin_caja_en_el_pos_el_hero_no_consulta_ni_pinta(self) -> None:
-        """Lo de hoy: la pestaña Caja está oculta, así que ni se toca la base."""
-        window = MainWindow(user_id=1)
-        antes = window.cash_session_label.text()
-
-        with patch(
-            "pos_uniformes.ui.main_window.CajaService.obtener_sesion_activa"
-        ) as consulta:
-            window._refresh_cash_session(object())
-
-        consulta.assert_not_called()
-        self.assertEqual(window.cash_session_label.text(), antes)
-        self.assertIsNone(window.active_cash_session_id)
-        self.assertFalse(window.cash_session_requires_cut)
-
-    def test_logout_shows_window_before_ensuring_cash_session_for_new_user(self) -> None:
-        window = MainWindow(user_id=1)
+        self.addCleanup(_cerrar_ventana, window)
         window.current_role = RolUsuario.ADMIN
         order: list[str] = []
 
@@ -218,20 +164,20 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             "activateWindow",
             side_effect=lambda: order.append("activate"),
         ), patch.object(
-            window,
-            "ensure_cash_session",
-            side_effect=lambda: order.append("ensure") or False,
-        ), patch.object(window, "refresh_all"):
+            window, "refresh_all", side_effect=lambda: order.append("refresh")
+        ):
             window._handle_logout()
 
+        self.assertFalse(hasattr(window, "ensure_cash_session"))
         self.assertIn("dialog-hide", order)
         self.assertIn("show", order)
-        self.assertIn("ensure", order)
-        self.assertLess(order.index("dialog-hide"), order.index("ensure"))
-        self.assertLess(order.index("show"), order.index("ensure"))
+        self.assertIn("refresh", order)
+        self.assertLess(order.index("dialog-hide"), order.index("show"))
+        self.assertLess(order.index("show"), order.index("refresh"))
 
     def test_logout_closes_and_resets_cached_dialogs(self) -> None:
         window = MainWindow(user_id=1)
+        self.addCleanup(_cerrar_ventana, window)
         window.current_role = RolUsuario.CAJERO
         dialog_attr_names = (
             "settings_users_dialog",
@@ -292,10 +238,8 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             "exec",
             return_value=int(QDialog.DialogCode.Accepted),
         ), patch("pos_uniformes.ui.main_window.LoginDialog", FakeLoginDialog), patch.object(
-            window,
-            "ensure_cash_session",
-            return_value=True,
-        ), patch.object(window, "refresh_all"), patch.object(
+            window, "refresh_all"
+        ), patch.object(
             window,
             "show",
         ), patch.object(window, "raise_"), patch.object(window, "activateWindow"):
@@ -796,56 +740,6 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertEqual(window.settings_employee_sale_detail_table.rowCount(), 1)
         self.assertEqual(window.settings_employee_sale_detail_table.item(0, 0).text(), "SKU-001")
         self.assertEqual(window.settings_employee_sale_detail_table.item(0, 1).text(), "Playera Polo")
-
-    def test_cashier_role_hides_admin_cash_cut_action(self) -> None:
-        window = MainWindow(user_id=1)
-        window.current_role = RolUsuario.CAJERO
-        window.active_cash_session_id = 10
-
-        window._refresh_permissions()
-
-        self.assertFalse(window.cash_admin_cut_action.isVisible())
-        self.assertFalse(window.cash_admin_cut_action.isEnabled())
-
-    def test_admin_role_shows_admin_cash_cut_action(self) -> None:
-        window = MainWindow(user_id=1)
-        window.current_role = RolUsuario.ADMIN
-        window.active_cash_session_id = 10
-
-        window._refresh_permissions()
-
-        self.assertTrue(window.cash_admin_cut_action.isVisible())
-        self.assertTrue(window.cash_admin_cut_action.isEnabled())
-
-    def test_handle_admin_cash_cut_registers_retiro_with_fixed_concept(self) -> None:
-        window = MainWindow(user_id=1)
-        window.current_role = RolUsuario.ADMIN
-        window.active_cash_session_id = 9
-        window.refresh_all = Mock()
-        window._prompt_admin_cash_authorization = Mock(return_value=True)
-        window._prompt_admin_cash_cut_data = Mock(
-            return_value={
-                "monto": Decimal("150.00"),
-                "concepto": "Corte administrativo | mantenimiento",
-                "nota": "mantenimiento",
-            }
-        )
-
-        with patch("pos_uniformes.ui.main_window.get_session") as get_session_mock, patch(
-            "pos_uniformes.ui.main_window.register_cash_movement_action"
-        ) as register_movement, patch("pos_uniformes.ui.main_window.QMessageBox.information"):
-            session = Mock()
-            context = Mock()
-            context.__enter__ = Mock(return_value=session)
-            context.__exit__ = Mock(return_value=False)
-            get_session_mock.return_value = context
-
-            window._handle_admin_cash_cut()
-
-        register_movement.assert_called_once()
-        self.assertEqual(register_movement.call_args.kwargs["movement_type"], TipoMovimientoCaja.RETIRO)
-        self.assertEqual(register_movement.call_args.kwargs["amount"], Decimal("150.00"))
-        self.assertEqual(register_movement.call_args.kwargs["concept"], "Corte administrativo | mantenimiento")
 
     def test_quote_cart_table_keeps_cashier_breathing_in_main_window(self) -> None:
         window = MainWindow(user_id=1)

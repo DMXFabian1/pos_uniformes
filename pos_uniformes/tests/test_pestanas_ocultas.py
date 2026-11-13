@@ -87,48 +87,117 @@ class CaidaSegura(unittest.TestCase):
         self.assertEqual(MainWindow._primera_pestana_visible({}, False), 0)
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class CajaFueraDelPosTests(unittest.TestCase):
-    """Con la pestaña Caja oculta, sobra todo lo que la acompañaba.
+    """2026-11-12, Daniel: «no lo necesito, retira también movimientos y el
+    corte».
 
-    En producción quedó una sesión abierta el 1 de junio que nunca se cerró:
-    eso hacía salir "Caja pendiente de corte" cada vez que abría el POS.
+    Antes la sesión y el corte de caja seguían en el POS, apagados con
+    caja_en_el_pos() = False. Ahora se retiraron: ni botón Movimientos, ni
+    sesión de caja al abrir o al cambiar de usuario, ni recordatorio de
+    corte de las 5. El corte vive en el kiosko (ver KioskoConservaSuCorteTests).
     """
 
+    def setUp(self) -> None:
+        self.ventana = MainWindow(user_id=1)
 
-    def test_la_caja_ya_no_vive_en_el_pos(self) -> None:
-        from pos_uniformes.ui.main_window import caja_en_el_pos
+    def tearDown(self) -> None:
+        _cerrar(self.ventana)
 
-        self.assertFalse(caja_en_el_pos())
+    def test_ya_no_existe_el_interruptor_caja_en_el_pos(self) -> None:
+        import pos_uniformes.ui.main_window as mw
 
-    def test_el_aviso_de_caja_pendiente_ya_no_aparece(self) -> None:
-        from pos_uniformes.ui.main_window import MainWindow
+        self.assertFalse(hasattr(mw, "caja_en_el_pos"))
 
-        ventana = MainWindow(user_id=1)
-        self.addCleanup(_cerrar, ventana)
-        # Si el gate corriera, abriría un diálogo modal y colgaría la prueba.
-        self.assertTrue(ventana.ensure_cash_session())
+    def test_no_hay_boton_movimientos_ni_corte(self) -> None:
+        from PyQt6.QtWidgets import QAbstractButton
 
-    def test_no_bloquea_operaciones_por_un_corte_de_junio(self) -> None:
-        from pos_uniformes.ui.main_window import MainWindow
+        textos = {b.text() for b in self.ventana.findChildren(QAbstractButton)}
+        for texto in ("Movimientos", "Corte de caja", "Corte", "Abrir caja"):
+            self.assertNotIn(texto, textos, texto)
+        for atributo in (
+            "cash_movement_button",
+            "cash_movement_menu",
+            "cash_cut_button",
+            "cash_session_label",
+            "cash_admin_cut_action",
+            "cash_reactivo_action",
+            "cash_ingreso_action",
+            "cash_retiro_action",
+            "cash_opening_correction_action",
+            "_handle_cash_movement",
+            "_handle_admin_cash_cut",
+            "_handle_correct_cash_opening",
+            "_handle_cash_cut",
+            "_prompt_admin_cash_authorization",
+        ):
+            self.assertFalse(hasattr(self.ventana, atributo), atributo)
 
-        ventana = MainWindow(user_id=1)
-        self.addCleanup(_cerrar, ventana)
-        ventana.cash_session_requires_cut = True
-        self.assertTrue(
-            ventana._ensure_cash_session_current_day_for_operation("registrar ventas")
-        )
+    def test_no_arranca_ni_revisa_sesion_de_caja(self) -> None:
+        for atributo in (
+            "ensure_cash_session",
+            "refresh_after_cash_session",
+            "_refresh_cash_session",
+            "_is_stale_cash_session",
+            "_ensure_cash_session_current_day_for_operation",
+            "active_cash_session_id",
+            "cash_session_requires_cut",
+        ):
+            self.assertFalse(hasattr(self.ventana, atributo), atributo)
 
-    def test_el_encabezado_no_muestra_estado_de_caja(self) -> None:
-        from pos_uniformes.ui.main_window import MainWindow
+    def test_el_arranque_no_pide_abrir_caja(self) -> None:
+        import inspect
 
-        ventana = MainWindow(user_id=1)
-        self.addCleanup(_cerrar, ventana)
-        self.assertFalse(ventana.cash_session_label.isVisible())
-        self.assertFalse(ventana.cash_cut_button.isVisible())
+        import pos_uniformes.main as main_module
+
+        fuente = inspect.getsource(main_module.main)
+        self.assertNotIn("ensure_cash_session", fuente)
+        self.assertNotIn("refresh_after_cash_session", fuente)
+
+    def test_no_hay_recordatorio_de_corte(self) -> None:
+        self.assertFalse(hasattr(self.ventana, "_run_operational_checks"))
+        self.assertFalse(hasattr(self.ventana, "operational_check_timer"))
+        self.assertFalse(hasattr(self.ventana, "cash_session_cut_reminder_key"))
+
+    def test_los_modulos_que_solo_servian_al_corte_del_pos_ya_no_estan(self) -> None:
+        import importlib
+
+        for modulo in (
+            "pos_uniformes.services.cash_session_action_service",
+            "pos_uniformes.services.sale_discount_context_service",
+            "pos_uniformes.ui.dialogs.cash_session_prompt_dialogs",
+            "pos_uniformes.ui.helpers.cash_session_feedback_helper",
+        ):
+            with self.assertRaises(ModuleNotFoundError, msg=modulo):
+                importlib.import_module(modulo)
+
+    def test_el_historial_de_cortes_de_configuracion_sigue(self) -> None:
+        """Solo lectura: muestra también los cortes hechos en el kiosko."""
+        self.assertTrue(hasattr(self.ventana, "settings_cash_history_button"))
+
+
+class KioskoConservaSuCorteTests(unittest.TestCase):
+    """El corte se hace en el kiosko y debe seguir igual."""
+
+    def test_el_kiosko_conserva_corte_retiro_e_historial(self) -> None:
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        for metodo in (
+            "_imprimir_corte_libreta",
+            "_apuntar_retiro_libreta",
+            "_abrir_historial_cortes",
+        ):
+            self.assertTrue(callable(getattr(QuoteSatelliteWindow, metodo, None)), metodo)
+
+    def test_los_dialogos_y_servicios_del_corte_siguen(self) -> None:
+        from pos_uniformes.services.caja_service import CajaService
+        from pos_uniformes.ui.dialogs import corte_caja_dialog
+
+        for nombre in ("hacer_corte_caja", "apuntar_retiro", "editar_parametros_caja"):
+            self.assertTrue(callable(getattr(corte_caja_dialog, nombre, None)), nombre)
+        for metodo in ("obtener_sesion_activa", "registrar_movimiento", "cerrar_sesion"):
+            self.assertTrue(callable(getattr(CajaService, metodo, None)), metodo)
+        import pos_uniformes.services.corte_caja_service  # noqa: F401
+        import pos_uniformes.services.retiros_service  # noqa: F401
 
 
 class CajaAntiguaRetiradaTests(unittest.TestCase):
@@ -209,15 +278,6 @@ class CajaAntiguaRetiradaTests(unittest.TestCase):
     def test_cobrar_presupuesto_ya_no_existe(self) -> None:
         self.assertFalse(hasattr(self.ventana, "quote_convert_button"))
 
-    def test_el_pin_del_corte_administrativo_sigue_validando(self) -> None:
-        """Usa el código de la promo manual; no debe irse con la Caja."""
-        from unittest.mock import patch
 
-        with patch(
-            "pos_uniformes.ui.main_window.QInputDialog.getText", return_value=("0000", True)
-        ), patch(
-            "pos_uniformes.ui.main_window.verify_sale_manual_promo_code",
-            side_effect=ValueError("Codigo invalido."),
-        ) as verificar, patch("pos_uniformes.ui.main_window.QMessageBox.warning"):
-            self.assertFalse(self.ventana._prompt_admin_cash_authorization())
-        verificar.assert_called_once()
+if __name__ == "__main__":
+    unittest.main()

@@ -149,15 +149,6 @@ def main() -> int:
         try:
             login_dialog.hide()
             startup_window = MainWindow(user_id=user_id)
-            if not startup_window.ensure_cash_session():
-                login_dialog.clear_loading_state()
-                login_dialog.show()
-                login_dialog.raise_()
-                login_dialog.activateWindow()
-                return
-            # Dirigido: MainWindow.__init__ ya corrió refresh_all() completa;
-            # aquí solo se repinta lo que depende de la caja recién resuelta.
-            startup_window.refresh_after_cash_session()
             startup_window._focus_default_tab_for_role()
         except Exception as exc:  # noqa: BLE001
             if startup_window is not None:

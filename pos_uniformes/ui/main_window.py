@@ -81,7 +81,6 @@ from pos_uniformes.database.models import (
     Proveedor,
     RolUsuario,
     SesionCaja,
-    TipoMovimientoCaja,
     TipoPieza,
     TipoPrenda,
     Usuario,
@@ -130,18 +129,6 @@ from pos_uniformes.services.employee_sales_history_service import (
 )
 from pos_uniformes.services.employee_ranking_service import build_ranking_period_dates
 from pos_uniformes.ui.helpers.settings_employee_ranking_helper import build_libreta_ranking_view
-from pos_uniformes.services.cash_session_action_service import (
-    close_and_reopen_cash_session_action,
-    close_cash_session_action,
-    correct_cash_opening_action,
-    load_cash_cut_prompt_snapshot,
-    load_cash_movement_target_snapshot,
-    load_cash_opening_amount,
-    load_cash_opening_suggested_amount,
-    load_cash_session_gate_snapshot,
-    open_cash_session_action,
-    register_cash_movement_action,
-)
 from pos_uniformes.services.cash_session_history_service import build_cash_session_history_amounts
 from pos_uniformes.services.caja_service import CajaService
 from pos_uniformes.services.client_service import ClientService
@@ -207,9 +194,6 @@ from pos_uniformes.services.layaway_closure_service import (
 from pos_uniformes.services.layaway_creation_service import create_layaway_from_payload
 from pos_uniformes.services.layaway_detail_service import load_layaway_detail_snapshot
 from pos_uniformes.services.layaway_payment_action_service import register_layaway_payment
-# El PIN del corte administrativo se valida con el mismo código de la promo
-# manual; es lo único que queda en main_window del servicio de la Caja antigua.
-from pos_uniformes.services.sale_discount_context_service import verify_sale_manual_promo_code
 from pos_uniformes.services.sale_document_view_service import (
     build_layaway_receipt_document_view,
     build_layaway_sale_ticket_document_view,
@@ -315,14 +299,6 @@ from pos_uniformes.ui.dialogs.inventory_label_batch_dialog import build_inventor
 from pos_uniformes.ui.dialogs.inventory_label_dialog import build_inventory_label_dialog
 from pos_uniformes.ui.dialogs.marketing_history_dialog import build_marketing_history_dialog
 from pos_uniformes.ui.dialogs.printable_text_dialog import open_printable_text_dialog
-from pos_uniformes.ui.dialogs.cash_session_prompt_dialogs import (
-    CashCutSummaryView,
-    prompt_admin_cash_cut_data,
-    prompt_cash_cut_data,
-    prompt_cash_movement_data,
-    prompt_cash_opening_correction,
-    prompt_open_cash_session,
-)
 from pos_uniformes.ui.helpers.busy_feedback_helper import BusyFeedbackController
 from pos_uniformes.ui.helpers.inventory_bulk_qr_helper import (
     InventoryBulkQrCancelled,
@@ -407,13 +383,6 @@ from pos_uniformes.ui.helpers.catalog_selection_helper import (
 )
 from pos_uniformes.ui.helpers.active_filter_chip_helper import rebuild_active_filter_chips
 from pos_uniformes.ui.helpers.catalog_summary_helper import build_catalog_summary_view
-from pos_uniformes.ui.helpers.cash_session_feedback_helper import (
-    build_cash_close_success_feedback,
-    build_cash_movement_success_feedback,
-    build_cash_opening_correction_success_feedback,
-    build_cash_session_gate_feedback,
-    build_cash_session_gate_html,
-)
 from pos_uniformes.ui.helpers.inventory_context_menu_helper import build_inventory_context_menu_actions
 from pos_uniformes.ui.helpers.inventory_filter_helper import (
     InventoryVisibleFilterState,
@@ -596,19 +565,11 @@ from pos_uniformes.services.nombres_empleadas_service import nombres_por_codigo
 # se retiró (pestaña, carrito, cobro, ventas recientes y sus atajos). Daniel:
 # «la caja antigua ya no es de utilidad, todo lo demás corre en libreta y
 # kioskos y es lo único que importa, es donde vive nuestra operación».
+# Después: «no lo necesito, retira también movimientos y el corte». Se fueron
+# el botón Movimientos y la sesión/corte de caja de esta ventana; el corte
+# vive en el kiosko.
 
 PESTANAS_MUDADAS_AL_KIOSKO = ("Presupuestos", "Apartados", "Catálogo")
-
-
-def caja_en_el_pos() -> bool:
-    """Si el POS todavía lleva la caja. Ya no: siempre False.
-
-    Sin la Caja antigua sobra todo lo que la acompañaba: la etiqueta de
-    estado del encabezado, el botón de corte, el recordatorio de las 5 y el
-    aviso de "caja pendiente de corte" al abrir. El corte de verdad se hace
-    desde el kiosko. (2026-11-12: la pestaña Caja se retiró del POS.)
-    """
-    return False
 
 LISTING_SEARCH_DEBOUNCE_MS = 300
 CATALOG_PAGE_SIZE = 25
@@ -1268,8 +1229,6 @@ class MainWindow(QMainWindow):
         self.current_role = RolUsuario.CAJERO
         self._busy_feedback = BusyFeedbackController()
         self._force_close = False
-        self.cash_session_requires_cut = False
-        self.cash_session_cut_reminder_key: tuple[int, date] | None = None
         self.catalog_rows: list[dict[str, object]] = []
         self.catalog_filtered_rows: list[dict[str, object]] = []
         self.catalog_page_index = 0
@@ -1313,8 +1272,6 @@ class MainWindow(QMainWindow):
         self.dashboard_operations_label = QLabel()
         self.dashboard_future_alerts_label = QLabel()
         self.layaway_alerts_label = QLabel()
-        self.cash_session_label = QLabel()
-        self.cash_session_label.setTextFormat(Qt.TextFormat.RichText)
         self.kpi_users_value = QLabel("0")
         self.kpi_products_value = QLabel("0")
         self.kpi_stock_value = QLabel("0")
@@ -1468,10 +1425,7 @@ class MainWindow(QMainWindow):
         self.quote_state_combo = QComboBox()
 
         self.seed_button = QPushButton("Cargar datos iniciales")
-        self.cash_cut_button = QPushButton("Corte de caja")
-        self.cash_movement_button = QToolButton()
         self.logout_button = QPushButton("Cerrar sesion")
-        self.active_cash_session_id: int | None = None
 
         self.inventory_variant_combo = QComboBox()
         self.inventory_adjustment_type_combo = QComboBox()
@@ -1747,10 +1701,6 @@ class MainWindow(QMainWindow):
         self.tabs: QTabWidget | None = None
         self.connection_button: QPushButton | None = None
         self.header_more_button: QToolButton | None = None
-        self.cash_movement_menu: QMenu | None = None
-        self.cash_reactivo_action: QAction | None = None
-        self.cash_ingreso_action: QAction | None = None
-        self.cash_retiro_action: QAction | None = None
         self.connection_action: QAction | None = None
         self.seed_action: QAction | None = None
         self.quick_backup_action: QAction | None = None
@@ -1763,10 +1713,6 @@ class MainWindow(QMainWindow):
         self._build_ui()
         self._configure_help_texts()
         self._configure_shortcuts()
-        self.operational_check_timer = QTimer(self)
-        self.operational_check_timer.setInterval(60_000)
-        self.operational_check_timer.timeout.connect(self._run_operational_checks)
-        self.operational_check_timer.start()
         self.refresh_all()
 
     def _make_search_debounce_timer(self, slot) -> QTimer:
@@ -1832,7 +1778,6 @@ class MainWindow(QMainWindow):
 
     def _build_ui(self) -> None:
         self.session_label.setObjectName("heroPrimaryText")
-        self.cash_session_label.setObjectName("heroMetaText")
         self.status_label.setObjectName("statusLine")
         self.metrics_label.setObjectName("subtleLine")
         self.analytics_label.setObjectName("analyticsLine")
@@ -1877,35 +1822,6 @@ class MainWindow(QMainWindow):
         self.page_help_button.setObjectName("toolbarSoftButton")
         self.page_help_button.setToolTip("Ayuda de la pestaña actual")
         self.page_help_button.clicked.connect(self._open_current_tab_help)
-        self.cash_cut_button.setObjectName("toolbarActionButton")
-        self.cash_cut_button.clicked.connect(self._handle_cash_cut)
-        self.cash_movement_menu = QMenu(self)
-        self.cash_movement_menu.setToolTipsVisible(True)
-        self.cash_opening_correction_action = self.cash_movement_menu.addAction("Corregir apertura")
-        self.cash_opening_correction_action.setToolTip("Corrige el monto inicial si se capturó mal al abrir caja")
-        self.cash_reactivo_action = self.cash_movement_menu.addAction("Ajustar reactivo")
-        self.cash_reactivo_action.setToolTip("Cambia el fondo fijo de caja (el dinero que siempre queda)")
-        self.cash_ingreso_action = self.cash_movement_menu.addAction("Ingreso")
-        self.cash_ingreso_action.setToolTip("Registra dinero que entra a caja (cambio, préstamo, etc.)")
-        self.cash_retiro_action = self.cash_movement_menu.addAction("Retiro")
-        self.cash_retiro_action.setToolTip("Registra dinero que sale de caja (pago a proveedor, gasto, etc.)")
-        self.cash_admin_cut_action = self.cash_movement_menu.addAction("Corte administrativo")
-        self.cash_admin_cut_action.setToolTip("Cierra la sesión de caja actual y abre una nueva en un solo paso")
-        self.cash_opening_correction_action.triggered.connect(self._handle_correct_cash_opening)
-        self.cash_reactivo_action.triggered.connect(
-            lambda: self._handle_cash_movement(TipoMovimientoCaja.REACTIVO)
-        )
-        self.cash_ingreso_action.triggered.connect(
-            lambda: self._handle_cash_movement(TipoMovimientoCaja.INGRESO)
-        )
-        self.cash_retiro_action.triggered.connect(
-            lambda: self._handle_cash_movement(TipoMovimientoCaja.RETIRO)
-        )
-        self.cash_admin_cut_action.triggered.connect(self._handle_admin_cash_cut)
-        self.cash_movement_button.setText("Movimientos")
-        self.cash_movement_button.setObjectName("toolbarSoftButton")
-        self.cash_movement_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
-        self.cash_movement_button.setMenu(self.cash_movement_menu)
         self.logout_button.setText("Salir")
         self.logout_button.setObjectName("toolbarDangerButton")
         self.logout_button.clicked.connect(self._handle_logout)
@@ -1915,9 +1831,6 @@ class MainWindow(QMainWindow):
         self.refresh_button.clicked.connect(self.refresh_all)
         top_actions.addWidget(self.page_help_button)
         top_actions.addWidget(self.header_more_button)
-        top_actions.addWidget(self.cash_cut_button)
-        self.cash_cut_button.setVisible(caja_en_el_pos())
-        top_actions.addWidget(self.cash_movement_button)
         top_actions.addWidget(self.logout_button)
         top_actions.addWidget(self.refresh_button)
         top_actions.addStretch()
@@ -1950,8 +1863,6 @@ class MainWindow(QMainWindow):
         hero_info_layout.setContentsMargins(12, 8, 12, 8)
         hero_info_layout.setSpacing(4)
         hero_info_layout.addWidget(self.session_label)
-        hero_info_layout.addWidget(self.cash_session_label)
-        self.cash_session_label.setVisible(caja_en_el_pos())
         hero_info_card.setLayout(hero_info_layout)
         hero_layout.addWidget(hero_info_card, 1)
         hero_layout.addLayout(top_actions, 0)
@@ -2023,8 +1934,6 @@ class MainWindow(QMainWindow):
             self.settings_business_button: "Abre la configuracion de negocio e impresion.",
             self.settings_marketing_save_button: "Guarda la regla de subida a Maximoda Leal.",
             self.settings_marketing_history_button: "Abre el historial de cambios en reglas y descuentos de marketing.",
-            self.cash_cut_button: "Abre el corte de caja actual o permite cerrar la caja abierta.",
-            self.cash_movement_button: "Registra movimientos manuales de caja: Corregir apertura, Ajustar reactivo, Ingreso o Retiro.",
             self.logout_button: "Cierra la sesion actual y permite entrar con otro usuario.",
             self.quick_backup_action: "Genera un respaldo rapido restaurable (.dump) sin abrir Configuracion.",
             self.settings_create_user_button: "Crea un usuario nuevo con rol y contrasena inicial.",
@@ -2262,65 +2171,6 @@ class MainWindow(QMainWindow):
         self.tabs.setCurrentIndex(preferida)
         self.tabs.update()
         self.tabs.repaint()
-
-    @staticmethod
-    def _is_stale_cash_session(active_session: SesionCaja) -> bool:
-        if active_session.abierta_at is None:
-            return False
-        current_date = (
-            datetime.now(active_session.abierta_at.tzinfo).date()
-            if active_session.abierta_at.tzinfo is not None
-            else date.today()
-        )
-        return active_session.abierta_at.date() < current_date
-
-    def _ensure_cash_session_current_day_for_operation(self, action_label: str) -> bool:
-        if not caja_en_el_pos():
-            return True
-        if not self.cash_session_requires_cut:
-            return True
-        QMessageBox.warning(
-            self,
-            "Corte pendiente",
-            (
-                "Hay una caja abierta de un dia anterior sin corte.\n\n"
-                f"Debes realizar el corte antes de {action_label.lower()}."
-            ),
-        )
-        return False
-
-    def _run_operational_checks(self) -> None:
-        if not caja_en_el_pos():
-            return
-        if self.active_cash_session_id is None or self.cash_session_requires_cut:
-            return
-        # Probe TCP corto antes de tocar SQLAlchemy: este chequeo corre cada
-        # 60s en el hilo de UI, y sin probe congelaba la app cada minuto
-        # cuando la PC de la base no respondía.
-        from pos_uniformes.services.satellite_startup_service import probe_database_host
-
-        if not probe_database_host(0.5):
-            return
-        try:
-            with get_session() as session:
-                active_session = session.get(SesionCaja, self.active_cash_session_id)
-                if active_session is None or active_session.cerrada_at is not None:
-                    return
-                current_dt = (
-                    datetime.now(active_session.abierta_at.tzinfo)
-                    if active_session.abierta_at is not None and active_session.abierta_at.tzinfo is not None
-                    else datetime.now(timezone.utc)
-                )
-                reminder_key = (active_session.id, current_dt.date())
-                if current_dt.hour >= 17 and self.cash_session_cut_reminder_key != reminder_key:
-                    self.cash_session_cut_reminder_key = reminder_key
-                    QMessageBox.information(
-                        self,
-                        "Recordatorio de corte",
-                        "Son las 5:00 PM o mas tarde y la caja sigue abierta. Si ya termino la operacion del dia, realiza el corte.",
-                    )
-        except Exception:
-            return
 
     def _build_dashboard_tab(self) -> QWidget:
         return build_dashboard_tab(self)
@@ -4725,292 +4575,6 @@ class MainWindow(QMainWindow):
             return None
         return field.text().strip()
 
-    def ensure_cash_session(self) -> bool:
-        if not caja_en_el_pos():
-            return True
-        try:
-            with get_session() as session:
-                gate_snapshot = load_cash_session_gate_snapshot(
-                    session,
-                    user_id=self.user_id,
-                    is_stale_session=self._is_stale_cash_session,
-                )
-                if gate_snapshot.has_active_session:
-                    self.active_cash_session_id = gate_snapshot.active_session_id
-                    self.cash_session_requires_cut = gate_snapshot.requires_cut
-                    title, html = build_cash_session_gate_html(
-                        requires_cut=gate_snapshot.requires_cut,
-                        opened_at_label=gate_snapshot.opened_at_label,
-                        opened_by=gate_snapshot.opened_by,
-                        opening_amount=gate_snapshot.opening_amount,
-                        elapsed_minutes=gate_snapshot.elapsed_minutes,
-                    )
-                    gate_dialog = QDialog(self)
-                    gate_dialog.setWindowTitle(title)
-                    gate_dialog.setMinimumWidth(420)
-                    gate_layout = QVBoxLayout()
-                    gate_layout.setSpacing(12)
-                    gate_label = QLabel(html)
-                    gate_label.setWordWrap(True)
-                    gate_label.setTextFormat(Qt.TextFormat.RichText)
-                    gate_layout.addWidget(gate_label)
-                    gate_ok = QPushButton("Continuar")
-                    gate_ok.setObjectName("primaryButton")
-                    gate_ok.clicked.connect(gate_dialog.accept)
-                    gate_btn_row = QHBoxLayout()
-                    gate_btn_row.addStretch()
-                    gate_btn_row.addWidget(gate_ok)
-                    gate_layout.addLayout(gate_btn_row)
-                    gate_dialog.setLayout(gate_layout)
-                    gate_dialog.exec()
-                    return True
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Caja no disponible", str(exc))
-            return False
-
-        payload = self._prompt_open_cash_session()
-        if payload is None:
-            return False
-
-        try:
-            with get_session() as session:
-                self.active_cash_session_id = open_cash_session_action(
-                    session,
-                    user_id=self.user_id,
-                    opening_amount=Decimal(payload["monto_apertura"]),
-                    opening_note=str(payload["observacion"]),
-                )
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "No se pudo abrir caja", str(exc))
-            return False
-        return True
-
-    def _prompt_open_cash_session(self) -> dict[str, object] | None:
-        suggested_amount: Decimal | None = None
-        try:
-            with get_session() as session:
-                suggested_amount = load_cash_opening_suggested_amount(session)
-        except Exception:
-            suggested_amount = None
-        return prompt_open_cash_session(
-            self,
-            suggested_amount=suggested_amount,
-        )
-
-    def _prompt_cash_movement_data(self, movement_type: TipoMovimientoCaja) -> dict[str, object] | None:
-        target_total: Decimal | None = None
-        try:
-            with get_session() as session:
-                target_snapshot = load_cash_movement_target_snapshot(
-                    session,
-                    active_cash_session_id=self.active_cash_session_id,
-                    movement_type=movement_type,
-                )
-                target_total = target_snapshot.target_total
-        except Exception:
-            target_total = None
-        return prompt_cash_movement_data(
-            self,
-            movement_type=movement_type,
-            target_total=target_total,
-        )
-
-    def _prompt_admin_cash_cut_data(self) -> dict[str, object] | None:
-        return prompt_admin_cash_cut_data(self)
-
-    def _prompt_cash_opening_correction(self) -> dict[str, object] | None:
-        current_amount = Decimal("0.00")
-        try:
-            with get_session() as session:
-                current_amount = load_cash_opening_amount(
-                    session,
-                    active_cash_session_id=self.active_cash_session_id,
-                )
-        except Exception:
-            current_amount = Decimal("0.00")
-        return prompt_cash_opening_correction(
-            self,
-            current_amount=current_amount,
-        )
-
-    def _handle_cash_movement(self, movement_type: TipoMovimientoCaja) -> None:
-        if self.current_role not in {RolUsuario.ADMIN, RolUsuario.CAJERO}:
-            QMessageBox.warning(self, "Sin permisos", "Tu usuario no puede registrar movimientos de caja.")
-            return
-        if self.active_cash_session_id is None:
-            if not self.ensure_cash_session():
-                return
-            self.refresh_all()
-        payload = self._prompt_cash_movement_data(movement_type)
-        if payload is None:
-            return
-        try:
-            with get_session() as session:
-                register_cash_movement_action(
-                    session,
-                    active_cash_session_id=int(self.active_cash_session_id),
-                    user_id=self.user_id,
-                    movement_type=movement_type,
-                    amount=Decimal(payload["monto"]),
-                    concept=str(payload["concepto"]) or None,
-                )
-        except Exception as exc:
-            QMessageBox.critical(self, "Movimiento no registrado", str(exc))
-            return
-        self.refresh_all()
-        feedback = build_cash_movement_success_feedback(
-            movement_type=movement_type,
-            amount=Decimal(payload["monto"]),
-            target_total=payload.get("total_objetivo"),
-        )
-        QMessageBox.information(self, feedback.title, feedback.message)
-
-    def _prompt_admin_cash_authorization(self) -> bool:
-        code, accepted = QInputDialog.getText(
-            self,
-            "Autorizar corte administrativo",
-            "Captura el PIN administrativo para registrar el corte.",
-            QLineEdit.EchoMode.Password,
-        )
-        if not accepted:
-            return False
-        try:
-            with get_session() as session:
-                verify_sale_manual_promo_code(session, code)
-                session.commit()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "PIN invalido", str(exc))
-            return False
-        return True
-
-    def _handle_admin_cash_cut(self) -> None:
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede registrar un corte administrativo.")
-            return
-        if self.active_cash_session_id is None:
-            if not self.ensure_cash_session():
-                return
-            self.refresh_all()
-        if not self._prompt_admin_cash_authorization():
-            return
-        payload = self._prompt_admin_cash_cut_data()
-        if payload is None:
-            return
-        try:
-            with get_session() as session:
-                register_cash_movement_action(
-                    session,
-                    active_cash_session_id=int(self.active_cash_session_id),
-                    user_id=self.user_id,
-                    movement_type=TipoMovimientoCaja.RETIRO,
-                    amount=Decimal(payload["monto"]),
-                    concept=str(payload["concepto"]) or None,
-                )
-        except Exception as exc:
-            QMessageBox.critical(self, "Corte no registrado", str(exc))
-            return
-        self.refresh_all()
-        QMessageBox.information(
-            self,
-            "Corte administrativo registrado",
-            f"Se registro un corte administrativo por ${Decimal(payload['monto']).quantize(Decimal('0.01'))}.",
-        )
-
-    def _handle_correct_cash_opening(self) -> None:
-        if self.current_role not in {RolUsuario.ADMIN, RolUsuario.CAJERO}:
-            QMessageBox.warning(self, "Sin permisos", "Tu usuario no puede corregir la apertura de caja.")
-            return
-        if self.active_cash_session_id is None:
-            if not self.ensure_cash_session():
-                return
-            self.refresh_all()
-        payload = self._prompt_cash_opening_correction()
-        if payload is None:
-            return
-        try:
-            with get_session() as session:
-                result = correct_cash_opening_action(
-                    session,
-                    active_cash_session_id=int(self.active_cash_session_id),
-                    user_id=self.user_id,
-                    new_amount=Decimal(payload["nuevo_monto"]),
-                    note=str(payload["motivo"]) or None,
-                )
-        except Exception as exc:
-            QMessageBox.critical(self, "Correccion no registrada", str(exc))
-            return
-        self.refresh_all()
-        feedback = build_cash_opening_correction_success_feedback(
-            previous_amount=result.previous_amount,
-            new_amount=result.new_amount,
-        )
-        QMessageBox.information(self, feedback.title, feedback.message)
-
-    def _handle_cash_cut(self) -> None:
-        if self.current_role not in {RolUsuario.ADMIN, RolUsuario.CAJERO}:
-            QMessageBox.warning(self, "Sin permisos", "Tu usuario no puede operar la caja.")
-            return
-        if self.active_cash_session_id is None:
-            if self.ensure_cash_session():
-                self.refresh_all()
-            return
-
-        try:
-            with get_session() as session:
-                prompt_snapshot = load_cash_cut_prompt_snapshot(
-                    session,
-                    active_cash_session_id=int(self.active_cash_session_id),
-                )
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Corte no disponible", str(exc))
-            return
-
-        payload = prompt_cash_cut_data(
-            self,
-            summary_view=CashCutSummaryView(
-                opened_at_label=prompt_snapshot.opened_at_label,
-                opening_amount=prompt_snapshot.opening_amount,
-                reactivo_count=prompt_snapshot.reactivo_count,
-                reactivo_total=prompt_snapshot.reactivo_total,
-                ingresos_count=prompt_snapshot.ingresos_count,
-                ingresos_total=prompt_snapshot.ingresos_total,
-                retiros_count=prompt_snapshot.retiros_count,
-                retiros_total=prompt_snapshot.retiros_total,
-                cash_sales_count=prompt_snapshot.cash_sales_count,
-                cash_sales_total=prompt_snapshot.cash_sales_total,
-                cash_payments_count=prompt_snapshot.cash_payments_count,
-                cash_payments_total=prompt_snapshot.cash_payments_total,
-                expected_amount=prompt_snapshot.expected_amount,
-                suggested_next_reactivo=prompt_snapshot.suggested_next_reactivo,
-            ),
-        )
-        if payload is None:
-            return
-
-        try:
-            with get_session() as session:
-                reopen_result = close_and_reopen_cash_session_action(
-                    session,
-                    active_cash_session_id=int(self.active_cash_session_id),
-                    user_id=self.user_id,
-                    counted_amount=Decimal(payload["monto_contado"]),
-                    closing_note=str(payload["observacion"]),
-                    next_reactivo=Decimal(payload["next_reactivo"]),
-                )
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "No se pudo cerrar caja", str(exc))
-            return
-
-        self.active_cash_session_id = reopen_result.new_session_id
-        self.refresh_all()
-        result = reopen_result.close_result
-        feedback = build_cash_close_success_feedback(
-            expected_amount=result.expected_amount,
-            counted_amount=result.counted_amount,
-            difference=result.difference,
-        )
-        QMessageBox.information(self, feedback.title, feedback.message)
-
     def _handle_logout(self) -> None:
         dialog = QDialog(self)
         dialog.setWindowTitle("Cerrar sesion")
@@ -5073,16 +4637,6 @@ class MainWindow(QMainWindow):
                 self.show()
                 self.raise_()
                 self.activateWindow()
-                if not self.ensure_cash_session():
-                    self.user_id = previous_user_id
-                    self.refresh_all()
-                    self.hide()
-                    dialog.clear_loading_state()
-                    dialog.show()
-                    dialog.raise_()
-                    dialog.activateWindow()
-                    return
-
                 self.refresh_all()
                 self._apply_role_navigation()
                 self._focus_default_tab_for_role()
@@ -7968,7 +7522,6 @@ class MainWindow(QMainWindow):
             with self._busy_scope("Estado: cargando datos..."), get_session() as session:
                 nombres_por_codigo(session)
                 self._refresh_current_user(session)
-                self._refresh_cash_session(session)
                 self._refresh_permissions()
                 self._refresh_summary(session)
                 self._refresh_combos(session)
@@ -7990,25 +7543,6 @@ class MainWindow(QMainWindow):
         self._refresh_settings_employees()
         self.status_label.setText("Estado: datos sincronizados con PostgreSQL.")
 
-    def refresh_after_cash_session(self) -> None:
-        """Refresco dirigido tras resolver la caja en el arranque.
-
-        El __init__ ya corrió refresh_all() completa; volver a llamarla desde
-        main.py duplicaba las ~45 queries del arranque. Aquí solo se repinta
-        lo que depende de la sesión de caja recién abierta/confirmada.
-        """
-        # Mientras la cajera contaba el fondo pudieron entrar ventas desde
-        # otras estaciones: invalidar los cachés de listados para que el
-        # próximo refresh de cada pestaña traiga datos frescos.
-        self._invalidate_listing_snapshot_caches()
-        try:
-            with get_session() as session:
-                self._refresh_cash_session(session)
-                self._refresh_summary(session)
-            self._refresh_permissions()
-        except Exception as exc:  # noqa: BLE001
-            self.status_label.setText(f"Estado: error al cargar datos - {exc}")
-
     def _refresh_current_user(self, session) -> None:
         user = session.get(Usuario, self.user_id)
         if user is None or not user.activo:
@@ -8019,43 +7553,10 @@ class MainWindow(QMainWindow):
         self.current_role = user.rol
         self.session_label.setText(f"{self.current_username} | {self.current_full_name}")
 
-    def _refresh_cash_session(self, session) -> None:
-        if not caja_en_el_pos():
-            # Sin caja en el POS no hay nada que consultar ni que pintar.
-            self.active_cash_session_id = None
-            self.cash_session_requires_cut = False
-            return
-        active_session = CajaService.obtener_sesion_activa(session)
-        self.active_cash_session_id = active_session.id if active_session is not None else None
-        if active_session is None:
-            self.cash_session_requires_cut = False
-            self.cash_session_label.setText(
-                f'<span style="color: #57606a;">Rol {self.current_role.value}</span>'
-                f' · <span style="color: #cf222e; font-weight: 700;">Caja cerrada</span>'
-            )
-            self.cash_cut_button.setText("Abrir caja")
-            return
-
-        self.cash_session_requires_cut = self._is_stale_cash_session(active_session)
-        if self.cash_session_requires_cut:
-            status_html = '<span style="color: #cf222e; font-weight: 700;">Corte pendiente</span>'
-        else:
-            reactivo = Decimal(active_session.monto_apertura)
-            status_html = (
-                f'<span style="color: #1a7f37; font-weight: 700;">Caja abierta</span>'
-                f' · <span style="color: #57606a;">Reactivo ${reactivo}</span>'
-            )
-        self.cash_session_label.setText(
-            f'<span style="color: #57606a;">Rol {self.current_role.value}</span> · {status_html}'
-        )
-        self.cash_cut_button.setText("Corte")
-
     def _refresh_permissions(self) -> None:
         is_admin = self.current_role == RolUsuario.ADMIN
         can_sell = self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
         can_manage_layaways = self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
-        has_cash_session = self.active_cash_session_id is not None
-        can_operate_open_cash = has_cash_session and not self.cash_session_requires_cut
         catalog_access_view = build_catalog_access_view(is_admin=is_admin)
         self._apply_role_navigation()
         self.category_button.setEnabled(is_admin)
@@ -8097,7 +7598,9 @@ class MainWindow(QMainWindow):
         self.inventory_adjust_button.setEnabled(is_admin)
         layaway_action_state = build_layaway_action_state(
             can_manage_layaways=can_manage_layaways,
-            can_operate_open_cash=can_operate_open_cash,
+            # 2026-11-12: sin sesión de caja en el POS (el corte vive en el
+            # kiosko) esto ya era siempre False; se deja igual.
+            can_operate_open_cash=False,
             is_admin=is_admin,
             has_selected_layaway=self._selected_layaway_id() is not None,
         )
@@ -8110,10 +7613,6 @@ class MainWindow(QMainWindow):
         self.layaway_receipt_button.setEnabled(layaway_action_state.receipt_enabled)
         self.layaway_sale_ticket_button.setEnabled(layaway_action_state.sale_ticket_enabled)
         self.layaway_whatsapp_button.setEnabled(layaway_action_state.whatsapp_enabled)
-        self.cash_cut_button.setEnabled(can_sell)
-        self.cash_movement_button.setEnabled(can_sell and has_cash_session)
-        self.cash_admin_cut_action.setVisible(is_admin)
-        self.cash_admin_cut_action.setEnabled(is_admin and has_cash_session)
         self.logout_button.setEnabled(True)
         self._apply_quote_action_state()
         self.settings_create_backup_button.setEnabled(is_admin)
@@ -10020,8 +9519,6 @@ class MainWindow(QMainWindow):
         if self.current_role not in {RolUsuario.ADMIN, RolUsuario.CAJERO}:
             QMessageBox.warning(self, "Sin permisos", "No tienes permisos para crear apartados.")
             return
-        if not self._ensure_cash_session_current_day_for_operation("crear apartados"):
-            return
         payload = build_create_layaway_dialog(
             self,
             initial_items=None,
@@ -10084,8 +9581,6 @@ class MainWindow(QMainWindow):
         if apartado_id is None:
             QMessageBox.warning(self, "Sin seleccion", "Selecciona un apartado para registrar abono.")
             return
-        if not self._ensure_cash_session_current_day_for_operation("registrar abonos"):
-            return
         payload = build_layaway_payment_dialog(self)
         if payload is None:
             return
@@ -10117,8 +9612,6 @@ class MainWindow(QMainWindow):
         apartado_id = self._selected_layaway_id()
         if apartado_id is None:
             QMessageBox.warning(self, "Sin seleccion", "Selecciona un apartado para entregarlo.")
-            return
-        if not self._ensure_cash_session_current_day_for_operation("entregar apartados"):
             return
         try:
             with get_session() as session:
