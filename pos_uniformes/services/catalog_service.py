@@ -7,7 +7,7 @@ from decimal import Decimal
 
 logger = logging.getLogger(__name__)
 
-from sqlalchemy import func, select
+from sqlalchemy import event, func, select
 from sqlalchemy.orm import Session
 
 from pos_uniformes.database.models import (
@@ -33,6 +33,10 @@ from pos_uniformes.services.catalog_audit_service import CatalogAuditService
 from pos_uniformes.services.inventario_service import InventarioService
 
 
+_MEILI_PENDIENTE = "catalogo_meili_pendiente"
+_MEILI_ESCUCHA = "catalogo_meili_escucha"
+
+
 class CatalogService:
     """Gestiona altas del catalogo con reglas basicas de negocio."""
 
@@ -41,7 +45,34 @@ class CatalogService:
     SKU_PADDING = 6
 
     @staticmethod
-    def _notify_meili() -> None:
+    def _notify_meili(session: Session | None = None) -> None:
+        """Avisa a la búsqueda que cambió el catálogo, DESPUÉS del commit.
+
+        Antes avisaba en cuanto se llamaba, dentro de la transacción: el hilo
+        de Meilisearch re-indexaba lo viejo (y un lote de 10 tallas lanzaba 10
+        re-indexados). Ahora se apunta en la sesión y se avisa una sola vez
+        cuando la sesión hace commit; si hace rollback, no se avisa."""
+        if session is None:
+            CatalogService._avisar_busqueda()
+            return
+        session.info[_MEILI_PENDIENTE] = True
+        if not session.info.get(_MEILI_ESCUCHA):
+            event.listen(session, "after_commit", CatalogService._despues_del_commit)
+            event.listen(session, "after_soft_rollback", CatalogService._despues_del_rollback)
+            session.info[_MEILI_ESCUCHA] = True
+
+    @staticmethod
+    def _despues_del_commit(session: Session) -> None:
+        if session.info.pop(_MEILI_PENDIENTE, False):
+            CatalogService._avisar_busqueda()
+
+    @staticmethod
+    def _despues_del_rollback(session: Session, previous_transaction) -> None:
+        del previous_transaction
+        session.info.pop(_MEILI_PENDIENTE, None)
+
+    @staticmethod
+    def _avisar_busqueda() -> None:
         try:
             from pos_uniformes.services.meilisearch_service import notify_catalog_changed
             notify_catalog_changed()
@@ -440,7 +471,7 @@ class CatalogService:
             cls._descripcion_producto(producto),
             "Producto creado.",
         )
-        cls._notify_meili()
+        cls._notify_meili(session)
         return producto
 
     @classmethod
@@ -536,7 +567,7 @@ class CatalogService:
                 "ubicacion": producto.ubicacion,
             },
         )
-        cls._notify_meili()
+        cls._notify_meili(session)
         return producto
 
     @classmethod
@@ -612,7 +643,7 @@ class CatalogService:
                 observacion="Stock inicial al crear variante.",
             )
 
-        cls._notify_meili()
+        cls._notify_meili(session)
         return variante
 
     @classmethod
@@ -697,7 +728,7 @@ class CatalogService:
                 "costo_referencia": variante.costo_referencia,
             },
         )
-        cls._notify_meili()
+        cls._notify_meili(session)
         return variante
 
     @classmethod
@@ -736,7 +767,7 @@ class CatalogService:
             valores_nuevos={"activo": producto.activo},
             accion_por_campo={"activo": TipoCambioCatalogo.ESTADO},
         )
-        cls._notify_meili()
+        cls._notify_meili(session)
         return producto
 
     @classmethod
@@ -761,7 +792,7 @@ class CatalogService:
             valores_nuevos={"activo": variante.activo},
             accion_por_campo={"activo": TipoCambioCatalogo.ESTADO},
         )
-        cls._notify_meili()
+        cls._notify_meili(session)
         return variante
 
     @classmethod
@@ -827,7 +858,7 @@ class CatalogService:
 
         if resumen["aplicadas"] == 0:
             raise ValueError("El lote no genera cambios efectivos de precio.")
-        cls._notify_meili()
+        cls._notify_meili(session)
         return resumen
 
     @staticmethod
@@ -874,6 +905,7 @@ class CatalogService:
         variantes = list(producto.variantes)
         if not variantes:
             session.delete(producto)
+            cls._notify_meili(session)
             return
 
         for variante in variantes:
@@ -896,3 +928,4 @@ class CatalogService:
             "Producto eliminado.",
         )
         session.delete(producto)
+        cls._notify_meili(session)
