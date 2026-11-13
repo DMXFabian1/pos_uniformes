@@ -399,7 +399,8 @@ class EvaluateAutoLevelTests(unittest.TestCase):
 # ---------------------------------------------------------------------------
 
 class RefreshNoBajaDeLealTests(unittest.TestCase):
-    """2026-11-12: una sola regla para Leal. El gasto solo sirve para subir;
+    """2026-11-12: el nivel viejo sigue a Leal en no bajar (la regla de
+    subida aún es distinta). El gasto solo sirve para subir;
     bajar a un cliente lo decide Daniel a mano («creo que es la misma»,
     Daniel). Antes, un LEAL con poco gasto en la ventana bajaba a BASICO con
     su siguiente venta en la Caja antigua, o al cancelarle una."""
@@ -435,6 +436,21 @@ class RefreshNoBajaDeLealTests(unittest.TestCase):
 
         self.assertEqual(client.nivel_lealtad, NivelLealtad.LEAL)
         self.assertEqual(client.descuento_preferente, Decimal("10.00"))
+
+    def test_subir_y_cancelar_la_misma_venta_deja_leal(self) -> None:
+        # 2026-11-12: documenta el comportamiento vigente. Sin historial de
+        # nivel no se sabe qué venta lo subió, así que cancelarla ya no
+        # deshace la subida. Pendiente de decisión de Daniel.
+        client = _make_client(nivel_lealtad=NivelLealtad.BASICO, descuento_preferente="5.00")
+
+        self._refrescar(client, count=1, total="3500.00")
+        self.assertEqual(client.nivel_lealtad, NivelLealtad.LEAL)
+
+        self._refrescar(client, count=0, total="0.00", reason="venta_cancelada")
+
+        self.assertEqual(client.nivel_lealtad, NivelLealtad.LEAL)
+        self.assertEqual(client.descuento_preferente, Decimal("10.00"))
+        self.assertEqual(client.nivel_asignacion_motivo, "venta_confirmada")
 
     def test_basico_que_cruza_el_umbral_sube_como_siempre(self) -> None:
         client = _make_client(nivel_lealtad=NivelLealtad.BASICO, descuento_preferente="5.00")

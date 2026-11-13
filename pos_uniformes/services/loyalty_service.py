@@ -183,7 +183,12 @@ class LoyaltyService:
         el ticket y el Monedero (`monedero_service.tasa_para_cliente`). Este
         nivel viejo solo da el descuento de la Caja y los Apartados antiguos
         del POS (`sale_selected_client_service`, `layaway_pricing_service`).
-        Comparte con Leal el umbral y la ventana, y como Leal, nunca baja."""
+        Comparte con Leal el umbral de gasto (`leal_spend_threshold`), la
+        ventana y que nunca baja, pero NO es la misma regla de subida: suma
+        `Venta.total` completo (con rebajado y saldo, sin quitar compras de
+        empleada) y además conserva la vía de «3 compras y $2,000»
+        (`leal_purchase_count_threshold` y `leal_purchase_sum_threshold`), que
+        Maximoda Leal no tiene (corregido 2026-11-12)."""
         if client is None:
             return None
         # E1-B (R4, opción A): un cliente SIN nivel se omite a propósito. No se
@@ -201,7 +206,7 @@ class LoyaltyService:
             return client
         normalized_level = cls.evaluate_auto_level(session, client, reference_time=reference_time)
         # 2026-11-12: esta revisión automática ya no baja a nadie de LEAL a
-        # BASICO. Es la misma regla que la subida a Maximoda Leal
+        # BASICO. En esto sigue a la subida a Maximoda Leal
         # (`services/fidelizacion/subida_leal_service.py`): el gasto solo
         # sirve para SUBIR, y bajar a un cliente lo decide Daniel a mano
         # («creo que es la misma», Daniel, 2026-11-12). Antes, un cliente
@@ -209,6 +214,10 @@ class LoyaltyService:
         # en la Caja antigua bajaba a BASICO con su siguiente venta, o al
         # cancelarle una, y su descuento de Caja pasaba de 10 % a 5 %.
         # Se deja todo como estaba (nivel, descuento y quién lo asignó).
+        # Ojo: también aplica al cancelar la MISMA venta que lo subió; la
+        # subida ya no se deshace (no hay historial de nivel para saber qué
+        # venta lo subió). Queda pendiente con Daniel; la Libreta tiene el
+        # mismo hueco porque subida_leal_service no corre al anular.
         if (
             cls.coerce_level(client.nivel_lealtad) == NivelLealtad.LEAL
             and normalized_level == NivelLealtad.BASICO
