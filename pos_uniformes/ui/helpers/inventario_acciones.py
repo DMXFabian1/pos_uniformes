@@ -12,6 +12,7 @@ en rojo si algún precio baja (`armar_aviso_bajas`) y pide confirmar.
 
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING
@@ -27,6 +28,8 @@ from pos_uniformes.services.compra_service import CompraItemInput, CompraService
 from pos_uniformes.services.inventario_service import AjusteMasivoFilaInput, InventarioService
 from pos_uniformes.services.inventario_precio_lote_service import (
     BajaDePrecio,
+    filas_con_precio_de_base,
+    leer_precios_actuales,
     precios_que_bajan,
     renglones_bajas,
     titulo_bajas,
@@ -36,6 +39,8 @@ from pos_uniformes.ui.helpers.inventory_selection_helper import collect_inventor
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
+
+logger = logging.getLogger(__name__)
 
 
 def corregir_existencia(window: "MainWindow") -> None:
@@ -179,9 +184,16 @@ def cambiar_precios_en_lote(window: "MainWindow") -> None:
         return
 
     # Tanda 5: si algún precio baja, aviso en rojo y Cancelar por defecto.
-    bajas = precios_que_bajan(items, window.inventory_filtered_rows)
-    if bajas and not confirmar_bajas_de_precio(window, bajas):
-        return
+    # Se compara contra el precio de la base AHORA, no contra el snapshot de
+    # la pestaña (puede tener horas y otra PC pudo subirlo mientras tanto).
+    filas, cambiaron = filas_con_precio_de_base(
+        window.inventory_filtered_rows, _precios_en_base([variante_id for variante_id, _ in items])
+    )
+    bajas = precios_que_bajan(items, filas)
+    if bajas:
+        cambiaron_y_bajan = sum(1 for baja in bajas if baja.variante_id in set(cambiaron))
+        if not confirmar_bajas_de_precio(window, bajas, cambiaron=cambiaron_y_bajan):
+            return
 
     reference = str(data["referencia"]).strip()
     motive = str(data["motivo"]).strip() or "Cambio masivo de precio desde interfaz POS."
@@ -218,6 +230,16 @@ def cambiar_precios_en_lote(window: "MainWindow") -> None:
             f"Sin cambios: {resumen['sin_cambios']}"
         ),
     )
+
+
+def _precios_en_base(variante_ids: list[int]) -> dict[int, dict[str, object]]:
+    """Precios de la base en una sesión corta; si no se puede leer, {} (se usa el snapshot)."""
+    try:
+        with get_session() as session:
+            return leer_precios_actuales(session, variante_ids)
+    except Exception:  # noqa: BLE001 — sin la lectura, se avisa con lo que hay en pantalla
+        logger.warning("Precios en lote: no se pudo leer el precio actual de la base.", exc_info=True)
+        return {}
 
 
 def conteo_fisico_viejo(window: "MainWindow") -> None:
@@ -391,7 +413,9 @@ ROJO = "#b3261e"
 TEXTO_CONFIRMAR_BAJA = "Sí, bajar precios"
 
 
-def armar_aviso_bajas(parent: QWidget | None, bajas: list[BajaDePrecio]) -> tuple[QMessageBox, QPushButton]:
+def armar_aviso_bajas(
+    parent: QWidget | None, bajas: list[BajaDePrecio], *, cambiaron: int = 0
+) -> tuple[QMessageBox, QPushButton]:
     """El aviso en rojo con la lista; Cancelar es el botón por defecto (y Esc)."""
     from html import escape
 
@@ -404,6 +428,7 @@ def armar_aviso_bajas(parent: QWidget | None, bajas: list[BajaDePrecio]) -> tupl
     caja.setText(
         f"<p style='color:{ROJO}; font-weight:800; font-size:15px'>{escape(titulo_bajas(len(bajas)))}</p>"
         f"<p style='color:{ROJO}; font-weight:600'>{renglones}</p>"
+        f"{_nota_cambiaron(cambiaron)}"
         "<p>La regla de la tienda es no bajar precios salvo que el dueño lo marque.<br>"
         "¿Los bajas de todos modos?</p>"
     )
@@ -426,9 +451,20 @@ def armar_aviso_bajas(parent: QWidget | None, bajas: list[BajaDePrecio]) -> tupl
     return caja, bajar
 
 
-def confirmar_bajas_de_precio(parent: QWidget | None, bajas: list[BajaDePrecio]) -> bool:
+def _nota_cambiaron(cambiaron: int) -> str:
+    """Si el precio de la base no es el que se veía en la pestaña, decirlo."""
+    if cambiaron <= 0:
+        return ""
+    if cambiaron == 1:
+        texto = "1 de estos precios cambió desde que se cargó Inventario; se compara con el de ahora."
+    else:
+        texto = f"{cambiaron:,} de estos precios cambiaron desde que se cargó Inventario; se comparan con los de ahora."
+    return f"<p style='color:{ROJO}'>{texto}</p>"
+
+
+def confirmar_bajas_de_precio(parent: QWidget | None, bajas: list[BajaDePrecio], *, cambiaron: int = 0) -> bool:
     """True solo si eligieron «Sí, bajar precios»; cerrar o Cancelar no cambia nada."""
-    caja, bajar = armar_aviso_bajas(parent, bajas)
+    caja, bajar = armar_aviso_bajas(parent, bajas, cambiaron=cambiaron)
     caja.exec()
     return caja.clickedButton() is bajar
 

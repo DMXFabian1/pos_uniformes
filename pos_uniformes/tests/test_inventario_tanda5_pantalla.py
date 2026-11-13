@@ -250,7 +250,7 @@ class InventarioTanda5PantallaTests(unittest.TestCase):
 
     # ── C. Aviso de precio que baja ──────────────────────────────────────
 
-    def _precios(self, nuevos: dict[int, str]):
+    def _precios(self, nuevos: dict[int, str], base: dict[int, str] | None = None):
         """Ventana ADMIN con el diálogo de «Precios en lote» ya contestado y la base de mentiras."""
         from unittest.mock import patch
 
@@ -266,6 +266,15 @@ class InventarioTanda5PantallaTests(unittest.TestCase):
             patch("pos_uniformes.ui.helpers.inventario_acciones.CatalogService.aplicar_cambio_masivo_precio", aplicar),
             patch("pos_uniformes.ui.helpers.inventario_acciones.QMessageBox.information"),
         ]
+        if base is not None:
+            parches.append(patch(
+                "pos_uniformes.ui.helpers.inventario_acciones._precios_en_base",
+                return_value={
+                    vid: {"variante_id": vid, "sku": f"SKU{vid:06d}", "talla": "8", "precio_venta": Decimal(p),
+                          "producto_nombre": "Pants 2pz Muestra"}
+                    for vid, p in base.items()
+                },
+            ))
         for parche in parches:
             parche.start()
             self.addCleanup(parche.stop)
@@ -315,6 +324,34 @@ class InventarioTanda5PantallaTests(unittest.TestCase):
         from PyQt6.QtWidgets import QMessageBox
 
         window, aplicar = self._precios({3: "310", 4: "289"})
+        vistas = []
+        with patch.object(QMessageBox, "exec", new=lambda caja: vistas.append(caja) or 0):
+            window._handle_inventory_bulk_price_update()
+        self.assertEqual(vistas, [])
+        aplicar.assert_called_once()
+
+    def test_compara_contra_el_precio_de_la_base_no_contra_la_pantalla(self) -> None:
+        """La pestaña dice $289, pero otra PC ya lo subió a $320: fijarlo en $300 SÍ es bajar."""
+        from unittest.mock import patch
+
+        from PyQt6.QtWidgets import QMessageBox
+
+        window, aplicar = self._precios({3: "300"}, base={3: "320"})
+        vistas = []
+        with patch.object(QMessageBox, "exec", new=lambda caja: vistas.append(caja) or 0):
+            window._handle_inventory_bulk_price_update()
+        self.assertEqual(len(vistas), 1)
+        self.assertIn("baja de $320 a $300", vistas[0].text())
+        self.assertIn("cambió desde que se cargó Inventario", vistas[0].text())
+        aplicar.assert_not_called()
+
+    def test_si_la_base_ya_esta_abajo_no_hay_aviso_de_mas(self) -> None:
+        """La pestaña dice $289, la base ya está en $250: fijarlo en $260 sube; sin aviso."""
+        from unittest.mock import patch
+
+        from PyQt6.QtWidgets import QMessageBox
+
+        window, aplicar = self._precios({3: "260"}, base={3: "250"})
         vistas = []
         with patch.object(QMessageBox, "exec", new=lambda caja: vistas.append(caja) or 0):
             window._handle_inventory_bulk_price_update()
