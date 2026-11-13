@@ -1272,7 +1272,7 @@ class CalendarioEncargadoDialog(QDialog):
             logger.exception("Encargado: no se pudo calcular el corte")
             QMessageBox.warning(self, "Sin conexión", "Inténtalo otra vez.")
             return
-        if not estado.resumen.operaciones and not avisos:
+        if not estado.resumen.hubo_movimiento and not avisos:
             self._mostrar_listo("Todavía no hay ventas desde el último corte.", con_deshacer=False)
             return
         self._corte_texto.setText(texto_previa_corte_encargado(estado, avisos))

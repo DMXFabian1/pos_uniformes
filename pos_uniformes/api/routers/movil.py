@@ -610,7 +610,7 @@ def encargado_corte_hoy(
         "esperado": str(estado.esperado),
         "operaciones": r.operaciones,
         "piezas": r.piezas,
-        "hay_ventas": r.operaciones > 0,
+        "hay_ventas": r.hubo_movimiento,  # no solo operaciones: la compra de empleada también se corta (2026-11-12)
         # Compatibilidad con la PWA anterior.
         "venta": str(r.efectivo),
     }

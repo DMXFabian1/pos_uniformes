@@ -54,6 +54,19 @@ class ResumenPeriodo:
     efectivo: Decimal        # ventas + abonos pagados en efectivo
     tarjeta_neto: Decimal = Decimal("0.00")   # lo que de verdad LLEGA por la terminal (tras el 4.5%)
     monedero: Decimal = Decimal("0.00")       # pagado con saldo de monedero: ni cajón ni terminal
+    #: Cuántos renglones de la Libreta hubo en el periodo, cuenten o no como
+    #: operación (2026-11-12). La compra de empleada con precio especial ya
+    #: no suma a `operaciones`, pero sí es movimiento: su dinero entró.
+    movimientos: int = 0
+
+    @property
+    def hubo_movimiento(self) -> bool:
+        """¿Hay algo que cortar? No basta con `operaciones` (2026-11-12):
+        si lo único del periodo fue la compra de una empleada con precio
+        especial, hay 0 operaciones pero su efectivo está en el cajón, y el
+        corte (automático, remoto, del encargado o del celular) debe salir.
+        Antes de esa regla, `operaciones > 0` decía lo mismo que esto."""
+        return bool(self.movimientos or self.operaciones or self.ventas or self.abonos or self.apartados)
 
 
 @dataclass(frozen=True)
@@ -89,9 +102,10 @@ def resumir_periodo(rows: list) -> ResumenPeriodo:
     quitadas por `sin_compras_a_cuenta`.)"""
     from pos_uniformes.services.libreta_service import cuenta_como_operacion, pagos_de
 
-    operaciones = piezas = 0
+    operaciones = piezas = movimientos = 0
     ventas = abonos = apartados = tarjeta = efectivo = tarjeta_neto = monedero = Decimal("0.00")
     for row in rows:
+        movimientos += 1
         if cuenta_como_operacion(row):
             operaciones += 1
             piezas += int(row.piezas or 0)
@@ -120,6 +134,7 @@ def resumir_periodo(rows: list) -> ResumenPeriodo:
         efectivo=efectivo.quantize(_CENT),
         tarjeta_neto=tarjeta_neto.quantize(_CENT),
         monedero=monedero.quantize(_CENT),
+        movimientos=movimientos,
     )
 
 

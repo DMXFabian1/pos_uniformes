@@ -215,5 +215,67 @@ class LibretaOfflineTests(unittest.TestCase):
         self.assertEqual(fila.comisiones, 0)
 
 
+class CorteConSoloLaCompraDeEmpleadaTests(unittest.TestCase):
+    """Si lo único del periodo fue la compra de una empleada con precio
+    especial, hay 0 operaciones pero su efectivo está en el cajón: las
+    puertas del corte (automático, Telegram, encargado, celular) deben
+    dejar pasar el corte (revisión, 2026-11-12)."""
+
+    def setUp(self) -> None:
+        engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+        Base.metadata.create_all(engine)
+        self.s = Session(engine)
+        self.addCleanup(self.s.close)
+        f = tabla()[1]   # venta de empleada, $400 en efectivo
+        self.s.add(LibretaVenta(
+            id=f.id, employee_code=f.employee_code, employee_name=f.employee_name, tipo=f.tipo,
+            piezas=f.piezas, comisiones=f.comisiones, monto_total=f.monto_total,
+            descuento_empleada=True, privado=False, created_at=f.created_at,
+        ))
+        self.s.commit()
+        self.ahora = datetime.combine(HOY, time(20, 0))
+
+    def test_resumen_dice_que_hubo_movimiento(self) -> None:
+        r = cc.resumir_periodo([tabla()[1]])
+        self.assertEqual((r.operaciones, r.piezas), (0, 0))
+        self.assertEqual(r.efectivo, Decimal("400.00"))
+        self.assertTrue(r.hubo_movimiento)
+
+    def test_periodo_vacio_no_tiene_movimiento(self) -> None:
+        self.assertFalse(cc.resumir_periodo([]).hubo_movimiento)
+
+    def test_estado_caja_y_corte_automatico(self) -> None:
+        from pos_uniformes.services.horario_tienda_service import decidir_corte_automatico, momento_corte
+
+        estado = cc.estado_caja(self.s, self.ahora)
+        self.assertEqual(estado.resumen.operaciones, 0)
+        self.assertEqual(estado.resumen.efectivo, Decimal("400.00"))
+        self.assertTrue(estado.resumen.hubo_movimiento)
+        decision = decidir_corte_automatico(momento_corte(HOY), None, estado.resumen.hubo_movimiento)
+        self.assertTrue(decision.hacer, decision.motivo)
+
+    def test_corte_remoto_no_dice_sin_corte(self) -> None:
+        from pos_uniformes.services import corte_remoto_service as crs
+
+        estado = cc.estado_caja(self.s, self.ahora)
+
+        class _Paso(Exception):
+            pass
+
+        with patch("pos_uniformes.services.corte_caja_service.estado_caja", return_value=estado), patch(
+            "pos_uniformes.services.corte_caja_service.pagos_que_tocan_hoy", return_value=[]
+        ), patch(
+            "pos_uniformes.services.corte_caja_service.ultimo_corte", return_value=None
+        ), patch(
+            "pos_uniformes.services.corte_caja_service.cerrar_corte_automatico", side_effect=_Paso
+        ) as cerrar:
+            try:
+                r = crs.hacer_corte_y_avisar(self.s, creado_por="VEND-1", ahora=self.ahora, sin_tarjeta=False)
+            except _Paso:
+                r = None
+        self.assertIsNone(r, getattr(r, "mensaje", r))
+        cerrar.assert_called_once()
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -56,7 +56,7 @@ def main(argv: list[str] | None = None) -> int:
         previo = ultimo_corte(session)
         estado = estado_caja(session, ahora)
         avisos = pagos_que_tocan_hoy(session, ahora.date())
-        hay_movimiento = estado.resumen.operaciones > 0 or bool(avisos)
+        hay_movimiento = estado.resumen.hubo_movimiento or bool(avisos)
         decision = decidir_corte_automatico(
             ahora, (previo.hasta or previo.created_at) if previo else None, hay_movimiento
         )
@@ -184,7 +184,7 @@ def _cerrar_si_nadie_contesto(*, simular: bool = False) -> int:
             hecho and propuesta.momento and _local(hecho) >= _local(propuesta.momento)
         )
         estado = estado_caja(session, ahora)
-        hubo_movimiento = estado.resumen.operaciones > 0
+        hubo_movimiento = estado.resumen.hubo_movimiento
         if not toca_cerrar_solo(
             propuesta,
             hoy=ahora.date(),

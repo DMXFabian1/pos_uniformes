@@ -213,7 +213,7 @@ def hacer_corte_y_avisar(
             sin_tarjeta = False
     estado = estado_caja(session, ahora)
     avisos = pagos_que_tocan_hoy(session, ahora.date())
-    if estado.resumen.operaciones == 0 and not avisos:
+    if not estado.resumen.hubo_movimiento and not avisos:
         return ResultadoCorte(False, "Sin corte: no hay ventas ni pagos desde el último corte.")
     from pos_uniformes.services.corte_caja_service import ultimo_corte
 
