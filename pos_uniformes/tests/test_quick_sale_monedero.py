@@ -474,13 +474,18 @@ class TicketVigenciaMonederoTest(_Base):
         ticket = self._cambio(w, a_favor="100", saldo=D("137.42"))
         self.assertIn("A FAVOR EN MONEDERO", ticket)
         renglones = ticket.split("\n")
-        i_saldo = next(i for i, r in enumerate(renglones) if "Saldo del Monedero:" in r)
-        self.assertEqual(renglones[i_saldo + 1:i_saldo + 3], helper.lineas_vigencia_monedero())
+        # «Este saldo vence en 12 meses», justo bajo lo a favor; no la leyenda
+        # de la venta («después de cada compra»): en un cambio no hubo compra.
+        i_favor = next(i for i, r in enumerate(renglones) if "A FAVOR EN MONEDERO" in r)
+        self.assertEqual(renglones[i_favor + 1], helper.lineas_vigencia_cambio()[0])
+        self.assertIn("Este saldo vence en 12 meses", renglones[i_favor + 1])
+        self.assertIn("Saldo del Monedero:", renglones[i_favor + 2])
+        self.assertNotIn("después de cada compra", ticket)
 
     def test_cambio_parejo_o_que_paga_no(self):
         w = self._widget()
-        self.assertNotIn("Monedero vence", self._cambio(w))
-        self.assertNotIn("Monedero vence", self._cambio(w, a_pagar="50"))
+        self.assertNotIn("vence", self._cambio(w))
+        self.assertNotIn("vence", self._cambio(w, a_pagar="50"))
 
     def test_no_sale_en_compra_de_empleada(self):
         w = self._widget()

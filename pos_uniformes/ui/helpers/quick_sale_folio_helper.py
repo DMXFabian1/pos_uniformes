@@ -248,14 +248,14 @@ class FolioVentaMixin:
             lines.append(tk_row(f"PAGA ({forma}):", f"${tk_fmt(c.a_pagar)}"))
         elif c.a_favor > 0:
             lines.append(tk_row("A FAVOR EN MONEDERO:", f"${tk_fmt(c.a_favor)}"))
+            # Lo a favor entra al Monedero como abono nuevo y vence a los 12
+            # meses de hoy. Va justo bajo el monto para que «este saldo» sea
+            # ese, no el saldo total (Daniel, 2026-11-12: «sí, aplica las tres»).
+            from pos_uniformes.ui.helpers.quick_sale_monedero_helper import lineas_vigencia_cambio
+
+            lines.extend(lineas_vigencia_cambio())
             if saldo is not None:
                 lines.append(tk_row("Saldo del Monedero:", f"${tk_fmt(saldo)}"))
-            # Lo a favor entra al Monedero y vence como cualquier abono: se
-            # avisa con la misma leyenda de la venta (Daniel, 2026-11-12:
-            # «solucionemos estos»).
-            from pos_uniformes.ui.helpers.quick_sale_monedero_helper import lineas_vigencia_monedero
-
-            lines.extend(lineas_vigencia_monedero())
         else:
             lines.append(tk_center("Queda parejo"))
         lines.append(tk_bot())

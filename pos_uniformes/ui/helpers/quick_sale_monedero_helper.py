@@ -62,6 +62,15 @@ def lineas_vigencia_monedero() -> list[str]:
     return [tk_center(r) for r in renglones]
 
 
+def lineas_vigencia_cambio() -> list[str]:
+    """«Este saldo vence en 12 meses», centrada, para el ticket de cambio con
+    saldo a favor (Daniel, 2026-11-12). Cabe en un renglón."""
+    from pos_uniformes.services.monedero_service import texto_vigencia_cambio
+    from pos_uniformes.ui.helpers.ticket_print_layout_helper import tk_center
+
+    return [tk_center(texto_vigencia_cambio())]
+
+
 def lineas_ticket_monedero(info: dict, tk_row, *, con_vigencia: bool = False) -> list[str]:
     """Renglones del monedero bajo el total del ticket.
 

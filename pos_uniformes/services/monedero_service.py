@@ -147,6 +147,15 @@ def texto_vigencia_ticket(meses: int = MESES_VIGENCIA) -> str:
     return f"Tu Monedero vence {int(meses)} {unidad} después de cada compra"
 
 
+def texto_vigencia_cambio(meses: int = MESES_VIGENCIA) -> str:
+    """La leyenda del ticket de cambio cuando lo a favor entra al Monedero.
+
+    En un cambio no hubo «compra»: lo a favor es un abono nuevo y vence a los
+    MESES_VIGENCIA de hoy (Daniel, 2026-11-12: «sí, aplica las tres»)."""
+    unidad = "mes" if int(meses) == 1 else "meses"
+    return f"Este saldo vence en {int(meses)} {unidad}"
+
+
 def importe_elegible(monto_total, monto_monedero=None) -> Decimal:
     """Lo que genera cashback: el total ya con descuentos y redondeo, menos lo
     pagado con el propio monedero. Nunca negativo."""
