@@ -5,9 +5,12 @@ la impresora de la tienda y devuelve el texto para responder.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -270,27 +273,27 @@ def hacer_corte_y_avisar(
     # perdían y el celular ya había dicho «Corte hecho» (2026-10-10).
     session.commit()
     rows = operaciones_del_periodo(session, auto.estado.desde, auto.estado.hasta)
-    try:
-        from pos_uniformes.services.retiros_service import retiros_del_periodo
-
-        retiros = retiros_del_periodo(session, auto.estado.desde, auto.estado.hasta)
-    except Exception:  # noqa: BLE001
-        session.rollback()
-        retiros = []
-    try:
-        from pos_uniformes.services.entradas_service import entradas_del_periodo
-
-        entradas = entradas_del_periodo(session, auto.estado.desde, auto.estado.hasta)
-    except Exception:  # noqa: BLE001
-        session.rollback()
-        entradas = []
     ya_pagados = pagos_previos_del_periodo(session, auto)
-    # El PAPEL se queda en la tienda: va sin los movimientos privados.
-    # El mensaje de Telegram (más abajo) llega solo al celular de Daniel y
-    # sí lleva todo.
+    # Retiros y entradas del papel. Si no se pueden leer, el corte ya quedó
+    # guardado (commit de arriba), pero el papel NO sale: antes salía sin
+    # retiros ni entradas, como si no hubiera habido (revisión de deuda,
+    # 2026-11-12). El mensaje lo dice y se reimprime desde 🧾 Cortes.
     from pos_uniformes.services.corte_caja_service import datos_ticket_encargado
+    from pos_uniformes.services.entradas_service import entradas_del_periodo
+    from pos_uniformes.services.retiros_service import retiros_del_periodo
 
-    datos = datos_ticket_encargado(session, auto.estado.desde, auto.estado.hasta)
+    try:
+        retiros = retiros_del_periodo(session, auto.estado.desde, auto.estado.hasta)
+        entradas = entradas_del_periodo(session, auto.estado.desde, auto.estado.hasta)
+        # El PAPEL se queda en la tienda: va sin los movimientos privados.
+        # El mensaje de Telegram (más abajo) llega solo al celular de Daniel y
+        # sí lleva todo.
+        datos = datos_ticket_encargado(session, auto.estado.desde, auto.estado.hasta)
+        papel_completo = True
+    except Exception:  # noqa: BLE001 — el corte ya está guardado; se avisa abajo
+        logger.exception("Corte remoto: no se leyeron retiros o entradas; el ticket no se imprime")
+        session.rollback()
+        retiros, entradas, datos, papel_completo = [], [], None, False
     # Con `retirar`, el papel habla de la venta que cuadra con esa cifra:
     # venta − pagos − lo que ya salió = lo que se retira.
     venta_papel = auto.estado.resumen.efectivo
@@ -301,15 +304,17 @@ def hacer_corte_y_avisar(
         # es venta, y sin restarlo el papel la inflaba (auditoría 2026-11-07, #6).
         entro = sum((Decimal(e.monto) for e in entradas), Decimal("0.00"))
         venta_papel = (Decimal(retirar) + total_pagos + ya_salio - entro).quantize(Decimal("0.01"))
-    texto = texto_ticket_corte_encargado(
-        auto.corte, venta_papel, auto.pagos, datos.por_empleada, retiros=datos.retiros,
-        tarjeta=datos.tarjeta, tarjeta_ops=datos.tarjeta_ops, ya_pagados=ya_pagados, tarjeta_neto=getattr(datos, "tarjeta_neto", None),
-        # El fondo de papá no salía en el ticket del corte del celular, sí en
-        # el del kiosko (auditoría 2026-11-07, #6).
-        entradas=entradas,
-    )
     impreso = False
     try:
+        if not papel_completo:
+            raise RuntimeError("sin retiros o entradas: no se imprime un papel incompleto")
+        texto = texto_ticket_corte_encargado(
+            auto.corte, venta_papel, auto.pagos, datos.por_empleada, retiros=datos.retiros,
+            tarjeta=datos.tarjeta, tarjeta_ops=datos.tarjeta_ops, ya_pagados=ya_pagados, tarjeta_neto=getattr(datos, "tarjeta_neto", None),
+            # El fondo de papá no salía en el ticket del corte del celular, sí en
+            # el del kiosko (auditoría 2026-11-07, #6).
+            entradas=entradas,
+        )
         # Como CORTE y no como TICKET: así cada PC decide si los imprime, y el
         # de la venta del día no sale en la que queda a la mano de cualquiera
         # (Daniel, 2026-10-07).
@@ -349,5 +354,11 @@ def hacer_corte_y_avisar(
         lineas.append(f"📝 Nota: «{nota}»")
     # «Encolado» y no «enviado»: lo imprime la PC que tenga la impresora
     # cuando lo tome; si está apagada, /pulso lo dice (2026-10-10).
-    lineas.append("🖨 Ticket en la cola de la impresora de la tienda." if impreso else "⚠️ El corte quedó guardado pero no se pudo encolar el ticket.")
+    if not papel_completo:
+        lineas.append(
+            "⚠️ El corte quedó guardado, pero no se pudieron leer sus retiros o entradas: "
+            "aquí no salen y el ticket no se imprimió. Reimprímelo desde 🧾 Cortes."
+        )
+    else:
+        lineas.append("🖨 Ticket en la cola de la impresora de la tienda." if impreso else "⚠️ El corte quedó guardado pero no se pudo encolar el ticket.")
     return ResultadoCorte(True, "\n".join(lineas), impreso)

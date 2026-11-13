@@ -117,7 +117,7 @@ class ElCorteSeGuardaAntesDelPapelTests(unittest.TestCase):
     fallaba, rollback, y el celular ya había dicho «Corte hecho» con un corte
     que no existía (2026-10-10)."""
 
-    def _correr(self, *, enviar):
+    def _correr(self, *, enviar, retiros_error=None):
         estado = _estado()
         corte = SimpleNamespace(
             monto_final=Decimal("7480.00"), reactivo_final=Decimal("1000.00"),
@@ -135,7 +135,8 @@ class ElCorteSeGuardaAntesDelPapelTests(unittest.TestCase):
              patch("pos_uniformes.services.corte_caja_service.operaciones_del_periodo", return_value=[]), \
              patch("pos_uniformes.services.corte_caja_service.datos_ticket_encargado", return_value=datos), \
              patch("pos_uniformes.services.corte_caja_service.cargar_parametros", return_value=SimpleNamespace(ocultar_tarjeta=False)), \
-             patch("pos_uniformes.services.retiros_service.retiros_del_periodo", return_value=[]), \
+             patch("pos_uniformes.services.retiros_service.retiros_del_periodo", return_value=[], side_effect=retiros_error), \
+             patch("pos_uniformes.services.entradas_service.entradas_del_periodo", return_value=[]), \
              patch("pos_uniformes.ui.dialogs.corte_caja_dialog.pagos_previos_del_periodo", return_value=[]), \
              patch("pos_uniformes.ui.dialogs.corte_caja_dialog.texto_ticket_corte_encargado", return_value="TICKET"), \
              patch("pos_uniformes.services.trabajos_service.enviar_corte", manager.enviar):
@@ -157,6 +158,16 @@ class ElCorteSeGuardaAntesDelPapelTests(unittest.TestCase):
         self.assertTrue(resultado.hecho)
         self.assertFalse(resultado.impreso)
         self.assertIn("quedó guardado", resultado.mensaje)
+
+    def test_sin_retiros_no_sale_un_papel_incompleto(self) -> None:
+        """Revisión de deuda, 2026-11-12: si no se leían los retiros, el papel
+        salía sin ellos, como si no hubiera habido."""
+        resultado, manager = self._correr(enviar=None, retiros_error=RuntimeError("se cayó la red"))
+        manager.enviar.assert_not_called()
+        self.assertTrue(resultado.hecho)
+        self.assertFalse(resultado.impreso)
+        self.assertIn("no se pudieron leer sus retiros o entradas", resultado.mensaje)
+        self.assertIn("Reimprímelo desde 🧾 Cortes", resultado.mensaje)
 
 
 class NoSeRetiraMasDeLoQueHayTests(unittest.TestCase):

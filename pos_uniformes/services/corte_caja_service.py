@@ -15,15 +15,19 @@ La lógica de sumas es pura; lo que lleva `session` toca la base.
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from decimal import Decimal
 
 from sqlalchemy import func, select
+from sqlalchemy.exc import ProgrammingError
 
 _CENT = Decimal("0.01")
 _SIN_CORTE_DIAS = 90
 DUENO_CODE = "VEND-1"  # Daniel: su cifra es la oficial; el real solo lo ve él  # sin corte previo: periodo abierto hacia atrás
+
+logger = logging.getLogger(__name__)
 
 
 def _d(valor) -> Decimal:
@@ -244,20 +248,15 @@ def estado_caja(session, ahora: datetime | None = None, otros_retiros=Decimal("0
     desde = inicio_periodo(session)
     params = cargar_parametros(session)
     rows = operaciones_del_periodo(session, desde, ahora)
-    try:
-        from pos_uniformes.services.retiros_service import total_retiros
+    # Sin red de «base sin la tabla todavía» (las tablas existen desde
+    # septiembre): si no se pueden leer, el esperado no se puede calcular y
+    # contar cero lo inventaba; además el rollback deshacía lo que quien
+    # llamó tenía sin commit (revisión de deuda, 2026-11-12).
+    from pos_uniformes.services.entradas_service import total_entradas
+    from pos_uniformes.services.retiros_service import total_retiros
 
-        retiros = total_retiros(session, desde, ahora)
-    except Exception:  # noqa: BLE001 — base sin la tabla todavía
-        session.rollback()
-        retiros = Decimal("0.00")
-    try:
-        from pos_uniformes.services.entradas_service import total_entradas
-
-        entradas = total_entradas(session, desde, ahora)
-    except Exception:  # noqa: BLE001 — base sin la tabla todavía
-        session.rollback()
-        entradas = Decimal("0.00")
+    retiros = total_retiros(session, desde, ahora)
+    entradas = total_entradas(session, desde, ahora)
     return EstadoCaja(
         desde=desde,
         hasta=ahora,
@@ -358,11 +357,12 @@ def ajustes_en_rango(session, desde, hasta) -> Decimal:
         if hasta is not None:
             stmt = stmt.where(LibretaCorte.hasta <= hasta)
         return _d(session.scalar(stmt))
-    except Exception:  # noqa: BLE001 — base sin las columnas nuevas
-        try:
-            session.rollback()
-        except Exception:  # noqa: BLE001
-            pass
+    except ProgrammingError:
+        # Solo una base sin las columnas nuevas vale cero. Una caída de red o
+        # cualquier otro error sube: el efectivo oficial sin los ajustes del
+        # dueño sería una cifra falsa (revisión de deuda, 2026-11-12).
+        logger.warning("Corte: la base no tiene las columnas de ajuste; se cuentan en cero", exc_info=True)
+        session.rollback()
         return Decimal("0.00")
 
 
@@ -458,13 +458,9 @@ def datos_ticket_encargado(session, desde: datetime | None, hasta: datetime) -> 
         ),
         Decimal("0.00"),
     )
-    try:
-        from pos_uniformes.services.retiros_service import retiros_del_periodo
+    from pos_uniformes.services.retiros_service import retiros_del_periodo
 
-        retiros = retiros_del_periodo(session, desde, hasta)
-    except Exception:  # noqa: BLE001 — base sin la tabla todavía
-        session.rollback()
-        retiros = []
+    retiros = retiros_del_periodo(session, desde, hasta)  # sin red: un papel sin retiros miente
     return DatosTicketEncargado(
         por_empleada=resumir_por_empleada(rows), tarjeta=tarjeta, tarjeta_ops=ops, retiros=retiros,
         tarjeta_neto=tarjeta_neto.quantize(_CENT),

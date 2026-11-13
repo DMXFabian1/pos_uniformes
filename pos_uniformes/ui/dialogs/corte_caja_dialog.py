@@ -500,24 +500,18 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
                 (p.id, _nombre_de(p.employee_name or p.employee_code, corto=True), Decimal(p.total), _cuando(p.created_at), bool(p.en_cajon))
                 for p in pagos_registrados_del_periodo(session, estado.desde, estado.hasta, solo_en_cajon=False)
             ]
-            try:
-                retiros_hechos = [
-                    (r.id, str(r.motivo or "Retiro"), Decimal(r.monto), _cuando(r.created_at), bool(r.en_cajon))
-                    for r in retiros_del_periodo(session, estado.desde, estado.hasta, solo_en_cajon=False)
-                ]
-            except Exception:  # noqa: BLE001
-                session.rollback()
-                retiros_hechos = []
-            try:
-                from pos_uniformes.services.entradas_service import entradas_del_periodo
+            # Sin red: si no se leen, la ventana no abre («Sin conexión») en
+            # vez de enseñar un corte sin retiros ni entradas (2026-11-12).
+            retiros_hechos = [
+                (r.id, str(r.motivo or "Retiro"), Decimal(r.monto), _cuando(r.created_at), bool(r.en_cajon))
+                for r in retiros_del_periodo(session, estado.desde, estado.hasta, solo_en_cajon=False)
+            ]
+            from pos_uniformes.services.entradas_service import entradas_del_periodo
 
-                entradas_hechas = [
-                    (str(e.motivo or "Entrada"), Decimal(e.monto), _cuando(e.created_at))
-                    for e in entradas_del_periodo(session, estado.desde, estado.hasta)
-                ]
-            except Exception:  # noqa: BLE001 — base sin la tabla todavía
-                session.rollback()
-                entradas_hechas = []
+            entradas_hechas = [
+                (str(e.motivo or "Entrada"), Decimal(e.monto), _cuando(e.created_at))
+                for e in entradas_del_periodo(session, estado.desde, estado.hasta)
+            ]
             # Los pagos que caen hoy y nadie ha registrado: se ofrecen aquí
             # mismo (Daniel 2026-09-13: "al hacer corte no me descontó los pagos").
             try:
@@ -890,13 +884,9 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
             from pos_uniformes.services.retiros_service import retiros_del_periodo
 
             retiros_periodo = retiros_del_periodo(session, estado.desde, estado.hasta)
-            try:
-                from pos_uniformes.services.entradas_service import entradas_del_periodo
+            from pos_uniformes.services.entradas_service import entradas_del_periodo
 
-                entradas_periodo = entradas_del_periodo(session, estado.desde, estado.hasta)
-            except Exception:  # noqa: BLE001
-                session.rollback()
-                entradas_periodo = []
+            entradas_periodo = entradas_del_periodo(session, estado.desde, estado.hasta)
             # Formato por defecto: el ticket SIMPLE (Daniel 2026-09-10), el
             # mismo que sale del encargado y de /corte. El completo (con
             # operaciones por empleada) se saca desde 🧾 Cortes.
