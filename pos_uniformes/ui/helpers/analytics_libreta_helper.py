@@ -118,8 +118,11 @@ def pintar(window, filas: list) -> None:
             f"precio promedio por pieza {_pesos(r.ticket_promedio_por_pieza)}"
         )
         pagos = an.por_forma_pago(filas)
+        # Es lo VENDIDO por forma de pago (apartados completos, tarjeta en
+        # bruto, sin abonos ni cambios), no el dinero cobrado: el cobrado de
+        # verdad está en la tarjeta «Cobrado» del tablero (2026-11-12).
         window.libreta_analytics_pago_label.setText(
-            "Cobro:  " + "   ·   ".join(f"{g.clave} {_pesos(g.importe)} ({g.piezas} pzas)" for g in pagos)
+            "Vendido por forma de pago:  " + "   ·   ".join(f"{g.clave} {_pesos(g.importe)} ({g.piezas} pzas)" for g in pagos)
         )
     for atributo, cortes in (
         ("libreta_top_productos_table", an.por_producto(filas)),

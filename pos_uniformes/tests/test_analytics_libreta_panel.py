@@ -54,6 +54,7 @@ class PanelTests(unittest.TestCase):
         self.assertIn("3 piezas", resumen)
         self.assertIn("$267.00", resumen)
         self.assertIn("Efectivo $267.00", ventana.libreta_analytics_pago_label.text())
+        self.assertTrue(ventana.libreta_analytics_pago_label.text().startswith("Vendido por forma de pago:"))
         productos = ventana.libreta_top_productos_table
         self.assertEqual(productos.rowCount(), 1)
         self.assertEqual(productos.item(0, 0).text(), "Playera Polo")
