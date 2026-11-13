@@ -163,7 +163,7 @@ class SeVaAAcabarTests(unittest.TestCase):
         self.assertEqual(motivo_para_atender(fila(1, 0, **{LLAVE_VENDIDAS: 13})), "Se acabó y se vende (3/sem)")
         self.assertEqual(motivo_para_atender(fila(1, 2, **{LLAVE_VENDIDAS: 12})), "Se va a acabar · alcanza para 5 días")
         self.assertEqual(tono_para_atender(fila(1, -1)), "danger")
-        self.assertEqual(tono_para_atender(fila(1, 0, **{LLAVE_PEDIDAS: 2})), "danger")
+        self.assertEqual(tono_para_atender(fila(1, 0, **{LLAVE_PEDIDAS: 2})), "warning")  # ámbar, no rojo
         self.assertEqual(tono_para_atender(fila(1, 2, **{LLAVE_VENDIDAS: 12})), "warning")
         self.assertEqual(tono_para_atender(fila(1, 0)), "muted")
 

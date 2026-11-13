@@ -1120,7 +1120,8 @@ class InventarioPantalla(QObject):
         ritmo = ritmo_de_fila(fila)
         if ritmo is not None:
             ficha.venta.setText(ritmo.texto())
-            tono = {ESTADO_SE_VA_A_ACABAR: "warning", SE_ACABO_Y_SE_VENDE: "danger"}.get(ritmo.estado or "", "")
+            # Ámbar las dos: el rojo es solo para el negativo y el precio que baja.
+            tono = {ESTADO_SE_VA_A_ACABAR: "warning", SE_ACABO_Y_SE_VENDE: "warning"}.get(ritmo.estado or "", "")
             ficha.venta.setProperty("tono", tono)
             _repulir(ficha.venta)
         for widget in (ficha.venta, ficha.venta_titulo):

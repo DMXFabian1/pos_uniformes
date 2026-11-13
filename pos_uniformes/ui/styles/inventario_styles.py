@@ -260,7 +260,7 @@ QLabel#invChip {{ border-radius: 10px; padding: 3px 10px; font-size: 12px; font-
 QLabel#invFichaLinea {{ font-size: 13px; color: {TEXTO}; }}
 QLabel#invFichaLinea[tono="warning"] {{ color: #a35a00; font-weight: 700; }}
 QLabel#invFichaLinea[tono="danger"] {{ color: #b3261e; font-weight: 700; }}
-QLabel#invFichaAlerta {{ font-size: 13px; color: #b3261e; font-weight: 700; }}
+QLabel#invFichaAlerta {{ font-size: 13px; color: #a35a00; font-weight: 700; }}
 QLabel#invFichaEtiqueta {{ font-size: 11px; font-weight: 800; color: {TENUE}; letter-spacing: 1px; }}
 QPushButton#invAccion {{
     background: {TARJETA}; color: {CAFE}; border: 1px solid {BORDE}; border-radius: 12px;

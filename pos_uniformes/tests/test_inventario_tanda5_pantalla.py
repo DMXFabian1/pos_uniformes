@@ -152,7 +152,7 @@ class InventarioTanda5PantallaTests(unittest.TestCase):
         ficha = pantalla.ficha
         pantalla.seleccionar(2)
         self.assertEqual(ficha.venta.text(), "Se vende ~1 por semana · ya no hay")
-        self.assertEqual(ficha.venta.property("tono"), "danger")
+        self.assertEqual(ficha.venta.property("tono"), "warning")  # ámbar: el rojo es del negativo
         self.assertEqual(ficha.pedidas.text(), "La pidieron 4 veces en 30 días y no había")
         self.assertFalse(ficha.pedidas.isHidden())
         pantalla.seleccionar(3)

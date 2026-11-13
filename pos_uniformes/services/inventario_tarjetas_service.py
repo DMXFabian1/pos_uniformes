@@ -262,12 +262,16 @@ def motivo_para_atender(fila: Mapping[str, object]) -> str:
 
 
 def tono_para_atender(fila: Mapping[str, object]) -> str:
-    """Rojo: negativo, o agotada que se vende o piden. Ámbar: se va a acabar. Gris: lo demás."""
+    """Rojo: solo el negativo. Ámbar: agotada que se vende o piden, y la que se va a acabar. Gris: lo demás.
+
+    El rojo queda para lo que está mal (negativo, precio que baja); una
+    agotada que piden es «hay que pedir», y ya destaca por subir en la lista.
+    """
     stock = _stock(fila)
     if stock < 0:
         return "danger"
     if stock == 0 and (pedidas_de_fila(fila) > 0 or estado_de_fila(fila) == SE_ACABO_Y_SE_VENDE):
-        return "danger"
+        return "warning"
     if stock > 0 and estado_de_fila(fila) == ESTADO_SE_VA_A_ACABAR:
         return "warning"
     return "muted"
