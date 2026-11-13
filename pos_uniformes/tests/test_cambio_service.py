@@ -170,6 +170,56 @@ class CambioTests(_Base):
             self._cambio(venta, {}, [self._linea(self.v[1], "100")])
 
 
+class LiquidacionTests(_Base):
+    """2026-11-12 (Daniel: «solucionemos estos»): lo de Liquidación no tiene
+    cambio ni devolución, como dice el ticket; solo el dueño lo autoriza."""
+
+    def _liq(self, v, precio, tipo="liquidacion"):
+        return self._linea(v, precio, rebaja=tipo, precio_normal="450")
+
+    def test_regla_pura(self):
+        self.assertTrue(cs.vendida_en_liquidacion({"rebaja": "liquidacion"}))
+        self.assertFalse(cs.vendida_en_liquidacion({"rebaja": "oferta"}))
+        self.assertFalse(cs.vendida_en_liquidacion({"rebaja": True}))   # venta vieja: no se sabe
+        self.assertFalse(cs.vendida_en_liquidacion({}))
+
+    def test_renglon_marcado(self):
+        venta = self._venta([self._liq(self.v[0], "200"), self._linea(self.v[1], "200")], "400")
+        r = cs.renglones_vendidos(self.s, venta)
+        self.assertEqual([x.liquidacion for x in r], [True, False])
+        self.assertEqual(cs.liquidacion_que_regresa(r, {0: 1, 1: 1}), [r[0]])
+
+    def test_regresar_liquidacion_sin_autorizacion_se_rechaza(self):
+        venta = self._venta([self._liq(self.v[0], "200")], "200")
+        with self.assertRaises(cs.EnLiquidacion) as e:
+            self._cambio(venta, {0: 1}, [self._linea(self.v[1], "200")])
+        self.assertEqual(str(e.exception), cs.MENSAJE_LIQUIDACION)
+        self.assertEqual(self._stock(self.v[0]), 2)                 # no se movió nada
+
+    def test_con_autorizacion_del_dueno_pasa(self):
+        venta = self._venta([self._liq(self.v[0], "200")], "200")
+        r = self._cambio(venta, {0: 1}, [self._linea(self.v[1], "200")], autorizo_dueno=True)
+        self.assertTrue(r.cambio.calculo["cambio"]["autorizo_dueno"])
+        self.assertEqual(self._stock(self.v[0]), 3)
+
+    def test_oferta_si_se_cambia(self):
+        venta = self._venta([self._liq(self.v[0], "200", "oferta")], "200")
+        r = self._cambio(venta, {0: 1}, [self._linea(self.v[1], "200")])
+        self.assertEqual(r.cuenta.a_pagar, D("0.00"))
+
+    def test_llevarse_liquidacion_si_se_puede(self):
+        venta = self._venta([self._linea(self.v[0], "200")], "200")
+        r = self._cambio(venta, {0: 1}, [self._liq(self.v[1], "200")])
+        self.assertEqual(r.lleva[0]["rebaja"], "liquidacion")
+
+    def test_venta_vieja_sin_tipo_se_permite(self):
+        venta = self._venta([self._linea(self.v[0], "200")], "200")
+        venta.detalle = [{**venta.detalle[0], "rebaja": True}]
+        self.s.flush()
+        r = self._cambio(venta, {0: 1}, [self._linea(self.v[1], "200")])
+        self.assertFalse(r.cambio.calculo["cambio"]["autorizo_dueno"])
+
+
 class NoSeBorraTests(_Base):
     def test_ni_el_cambio_ni_la_venta_con_cambios(self):
         venta = self._venta([self._linea(self.v[0], "450")], "450")

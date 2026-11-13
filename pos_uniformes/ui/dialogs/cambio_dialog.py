@@ -6,6 +6,10 @@ paga la diferencia, o le queda a favor en su Monedero, o queda parejo.
 
 La pantalla solo arma el cambio y enseña la cuenta (la misma función pura
 del servicio); registrar —Libreta, stock y Monedero— lo hace quien la abre.
+
+2026-11-12 (Daniel: «solucionemos estos»): lo vendido en Liquidación sale
+marcado «Liquidación · sin cambio» y no se puede elegir para regresar; con el
+gafete del dueño sí (la misma autorización que el plazo vencido).
 """
 
 from __future__ import annotations
@@ -96,7 +100,9 @@ class CambioDialog(QDialog):
         self.regresa: dict[int, int] = {}
         self.lleva: list[dict] = []
         self.tarjeta = False
-        self.autorizado = dias <= cs.PLAZO_DIAS
+        self.autorizado = dias <= cs.PLAZO_DIAS   # el plazo está bien (o lo autorizó el dueño)
+        self.dueno = False                        # el dueño escaneó su gafete
+        self._hay_liquidacion = any(r.liquidacion and r.disponibles for r in renglones)
 
         self.setWindowTitle(f"Cambio · Folio {datos_venta['folio']}")
         self.setMinimumWidth(920)
@@ -129,7 +135,7 @@ class CambioDialog(QDialog):
         self.gafete.returnPressed.connect(self._autorizar)
         plazo.addWidget(self.gafete)
         ly.addWidget(self.aviso_plazo)
-        self.aviso_plazo.setVisible(dias > cs.PLAZO_DIAS)
+        self.aviso_plazo.setVisible(dias > cs.PLAZO_DIAS or self._hay_liquidacion)
 
         # ── Regresa | Se lleva ──
         columnas = QHBoxLayout()
@@ -245,6 +251,8 @@ class CambioDialog(QDialog):
         if r.ya_cambiadas:
             detalle += f" · ya cambiada{'s' if r.ya_cambiadas != 1 else ''} {r.ya_cambiadas}"
         texto.addWidget(_etiqueta(detalle, f"color: {GRIS}; font-size: 13px;"))
+        if r.liquidacion:
+            texto.addWidget(_etiqueta("Liquidación · sin cambio", f"color: {VINO}; font-size: 13px; font-weight: 800;"))
         fila.addLayout(texto, 1)
         menos, mas = QPushButton("−"), QPushButton("+")
         for b in (menos, mas):
@@ -263,6 +271,8 @@ class CambioDialog(QDialog):
 
     def _mover(self, renglon: int, paso: int) -> None:
         r = self._renglones[renglon]
+        if paso > 0 and r.liquidacion and not self.dueno:
+            return   # Liquidación: sin cambio, salvo con el gafete del dueño
         nueva = min(max(self.regresa.get(renglon, 0) + paso, 0), r.disponibles)
         if nueva:
             self.regresa[renglon] = nueva
@@ -362,7 +372,8 @@ class CambioDialog(QDialog):
             etiqueta.setText(str(n))
             menos, mas = self._botones[i]
             menos.setEnabled(n > 0)
-            mas.setEnabled(n < self._renglones[i].disponibles)
+            r = self._renglones[i]
+            mas.setEnabled(n < r.disponibles and (self.dueno or not r.liquidacion))
         if not self.lleva and not self._filas_lleva.count():
             self._pintar_lleva()
         c = self.calcular()
@@ -397,17 +408,23 @@ class CambioDialog(QDialog):
         self.btn_hacer.setEnabled(bool(self.regresa) and self.autorizado and (not favor or self._cliente is not None))
 
     def _pintar_plazo(self) -> None:
-        if self.autorizado:
+        if self.autorizado and (self.dueno or not self._hay_liquidacion):
             self.aviso_plazo.setStyleSheet("QFrame#plazo { background: #e3f1e6; border-radius: 12px; }")
-            self.texto_plazo.setText(f"✓ Esta venta tiene {self._dias} días: el dueño autorizó el cambio.")
+            if self._dias > cs.PLAZO_DIAS:
+                self.texto_plazo.setText(f"✓ Esta venta tiene {self._dias} días: el dueño autorizó el cambio.")
+            else:
+                self.texto_plazo.setText("✓ El dueño autorizó el cambio de la prenda en Liquidación.")
             self.texto_plazo.setStyleSheet("background: transparent; color: #2f5d3a; font-size: 14px; font-weight: 700;")
             self.gafete.setVisible(False)
         else:
             self.aviso_plazo.setStyleSheet("QFrame#plazo { background: #fbefd5; border-radius: 12px; }")
-            self.texto_plazo.setText(
-                f"Esta venta tiene {self._dias} días y el plazo de cambio es de {cs.PLAZO_DIAS}. "
-                "Solo el dueño lo puede autorizar: escanea su gafete."
-            )
+            partes = []
+            if not self.autorizado:
+                partes.append(f"Esta venta tiene {self._dias} días y el plazo de cambio es de {cs.PLAZO_DIAS}.")
+            if self._hay_liquidacion and not self.dueno:
+                partes.append("Las prendas en Liquidación no tienen cambio ni devolución.")
+            partes.append("Solo el dueño lo puede autorizar: escanea su gafete.")
+            self.texto_plazo.setText(" ".join(partes))
             self.texto_plazo.setStyleSheet("background: transparent; color: #8a5a00; font-size: 14px; font-weight: 700;")
 
     def _autorizar(self) -> None:
@@ -415,10 +432,11 @@ class CambioDialog(QDialog):
         self.gafete.clear()
         if self._es_dueno(codigo):
             self.autorizado = True
+            self.dueno = True
             self._pintar()
             self.escaner.setFocus()
         else:
-            QMessageBox.warning(self, "Plazo de cambio", "Ese gafete no es del dueño.")
+            QMessageBox.warning(self, "Autorización del dueño", "Ese gafete no es del dueño.")
 
     def _pago(self, tarjeta: bool) -> None:
         self.tarjeta = tarjeta
@@ -438,7 +456,9 @@ class CambioDialog(QDialog):
             "lleva": [dict(it) for it in self.lleva],
             "cliente_id": self._cliente[0] if self._cliente else None,
             "pago_tarjeta": self.tarjeta and c.a_pagar > 0,
-            "autorizo_dueno": self._dias > cs.PLAZO_DIAS and self.autorizado,
+            "autorizo_dueno": self.dueno and (
+                self._dias > cs.PLAZO_DIAS or any(self._renglones[i].liquidacion for i in self.regresa)
+            ),
         })
         if error:
             QMessageBox.warning(self, "No se hizo el cambio", error)

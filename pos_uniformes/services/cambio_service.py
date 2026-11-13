@@ -13,6 +13,13 @@ Reglas que eligió Daniel (2026-11-12):
 3. Si queda **a favor del cliente**, va a su Monedero. Sin cliente registrado
    hay que identificarlo o darlo de alta antes de cerrar el cambio.
 4. **15 días** (lo que dice el ticket). Después, solo si el dueño lo autoriza.
+5. (2026-11-12, Daniel: «solucionemos estos») Lo vendido en **Liquidación**
+   no se regresa: el ticket dice «sin cambios ni devoluciones» y ahora el
+   sistema hace lo mismo. Solo el dueño lo puede autorizar (p. ej. una prenda
+   defectuosa), con la misma autorización que el plazo vencido. Lo de Oferta
+   sí se cambia, y llevarse algo en Liquidación en un cambio sí se puede.
+   Ventas viejas sin el tipo de rebaja (`"rebaja"` vacío o `true`): no se
+   sabe si fue Liquidación, así que se dejan cambiar.
 
 Lo que se lleva vale el precio de hoy (con su Oferta o Liquidación si la
 tiene). Lo que paga de diferencia se redondea como cualquier cobro (R1).
@@ -52,6 +59,13 @@ class FueraDePlazo(CambioError):
     """Pasaron más de 15 días: solo con autorización del dueño."""
 
 
+class EnLiquidacion(CambioError):
+    """Regresa una prenda vendida en Liquidación: solo con autorización del dueño."""
+
+
+MENSAJE_LIQUIDACION = "Las prendas en Liquidación no tienen cambio ni devolución. Solo el dueño lo puede autorizar."
+
+
 class NecesitaCliente(CambioError):
     """Queda saldo a favor y la venta no tiene cliente: hay que identificarlo."""
 
@@ -73,10 +87,27 @@ class RenglonVendido:
     ya_cambiadas: int
     valor_pieza: Decimal    # lo que pagó por pieza (con descuentos y redondeo)
     rebajada: bool          # Oferta/Liquidación: no generó Monedero
+    liquidacion: bool = False   # vendida en Liquidación: sin cambio (salvo el dueño)
 
     @property
     def disponibles(self) -> int:
         return max(self.vendidas - self.ya_cambiadas, 0)
+
+
+def vendida_en_liquidacion(linea: dict) -> bool:
+    """¿Este renglón de la venta se vendió en Liquidación? (2026-11-12)
+
+    Solo cuenta si el detalle lo dice («liquidacion»). Si dice «oferta», o
+    es una venta vieja que solo trae `true` o nada, no se sabe: se permite."""
+    from pos_uniformes.services.rebaja_service import LIQUIDACION
+
+    return str(linea.get("rebaja") or "").strip().lower() == LIQUIDACION
+
+
+def liquidacion_que_regresa(renglones: list[RenglonVendido], regresa: dict[int, int]) -> list[RenglonVendido]:
+    """Los renglones en Liquidación que se intentan regresar (regla pura)."""
+    return [renglones[int(i)] for i, q in regresa.items()
+            if int(q) > 0 and 0 <= int(i) < len(renglones) and renglones[int(i)].liquidacion]
 
 
 def _precio_cobrado(linea: dict, venta) -> Decimal:
@@ -125,7 +156,7 @@ def renglones_vendidos(session, venta) -> list[RenglonVendido]:
         RenglonVendido(
             renglon=i, sku=str(l.get("sku", "")), nombre=str(l.get("nombre", "")), talla=str(l.get("talla", "")),
             vendidas=int(l.get("cantidad", 0) or 0), ya_cambiadas=ya.get(i, 0), valor_pieza=valores[i],
-            rebajada=bool(l.get("rebaja")),
+            rebajada=bool(l.get("rebaja")), liquidacion=vendida_en_liquidacion(l),
         )
         for i, l in enumerate(venta.detalle or [])
     ]
@@ -304,6 +335,8 @@ def registrar_cambio(
             "Solo el dueño lo puede autorizar."
         )
     renglones, c = preparar(session, venta, regresa, lleva)
+    if liquidacion_que_regresa(renglones, regresa) and not autorizo_dueno:
+        raise EnLiquidacion(MENSAJE_LIQUIDACION)
     cliente_id = cliente_id or venta.cliente_id
     if c.a_favor > 0 and cliente_id is None:
         raise NecesitaCliente(

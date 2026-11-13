@@ -110,6 +110,32 @@ class CambioDialogTests(_Qt):
         dlg._autorizar()
         self.assertTrue(dlg.btn_hacer.isEnabled())
 
+    def test_liquidacion_sin_cambio_salvo_el_dueno(self):
+        """2026-11-12 (Daniel: «solucionemos estos»)."""
+        recibido = []
+        renglones = [
+            cs.RenglonVendido(0, "S1", "Pants", "8", 1, 0, D("200"), True, liquidacion=True),
+            cs.RenglonVendido(1, "S2", "Playera", "10", 1, 0, D("200"), True),   # Oferta
+        ]
+        dlg = self._dialogo(renglones=renglones, registrar=lambda d: recibido.append(d))
+        self.assertFalse(dlg.aviso_plazo.isHidden())
+        self.assertIn("Liquidación", dlg.texto_plazo.text())
+        self.assertFalse(dlg._botones[0][1].isEnabled())
+        self.assertTrue(dlg._botones[1][1].isEnabled())
+        dlg._mover(0, +1)
+        self.assertEqual(dlg.regresa, {})
+        dlg._mover(1, +1)                       # la de Oferta sí
+        dlg.agregar({"sku": "S9", "nombre": "Pants", "talla": "10", "precio": D("200")})
+        self.assertTrue(dlg.btn_hacer.isEnabled())
+        dlg.gafete.setText("VEND-1")
+        dlg._autorizar()
+        self.assertTrue(dlg._botones[0][1].isEnabled())
+        dlg._mover(0, +1)
+        self.assertEqual(dlg.regresa, {1: 1, 0: 1})
+        dlg.agregar({"sku": "S9", "nombre": "Pants", "talla": "10", "precio": D("200")})
+        dlg.btn_hacer.click()
+        self.assertTrue(recibido[0]["autorizo_dueno"])
+
     def test_si_falla_al_registrar_se_avisa_y_no_cierra(self):
         dlg = self._dialogo(registrar=lambda d: "No hay stock")
         dlg._mover(0, +1)
