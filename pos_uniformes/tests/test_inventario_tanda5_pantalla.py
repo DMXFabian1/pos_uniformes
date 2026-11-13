@@ -229,6 +229,9 @@ class InventarioTanda5PantallaTests(unittest.TestCase):
             "_handle_inventory_bulk_adjustment": "corregir_existencias_en_lote",
             "_handle_inventory_bulk_price_update": "cambiar_precios_en_lote",
             "_handle_inventory_count": "conteo_fisico_viejo",
+            "_handle_purchase": "registrar_entrada",
+            "_handle_inventory_print_label": "imprimir_etiquetas_elegidas",
+            "_handle_inventory_print_visible_labels": "imprimir_etiquetas_filtradas",
         }
         for metodo, funcion in movidos.items():
             with patch(f"pos_uniformes.ui.helpers.inventario_acciones.{funcion}") as doble:

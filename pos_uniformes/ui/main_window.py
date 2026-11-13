@@ -133,7 +133,6 @@ from pos_uniformes.services.catalog_mutation_service import (
     toggle_catalog_product_state,
     toggle_catalog_variant_state,
 )
-from pos_uniformes.services.compra_service import CompraItemInput, CompraService
 from pos_uniformes.services.customer_card_service import (
     COLOR_ESTANDAR_PRIMARIO,
     COLOR_ESTANDAR_SECUNDARIO,
@@ -344,7 +343,6 @@ from pos_uniformes.ui.helpers.inventory_overview_helper import (
     build_inventory_overview_view,
 )
 from pos_uniformes.ui.helpers.inventory_selection_helper import (
-    collect_inventory_row_variant_ids,
     collect_selected_inventory_variant_ids,
     find_catalog_row_by_variant_id,
     find_inventory_row_index_by_variant_id,
@@ -5888,63 +5886,7 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, result_view.title, result_view.message)
 
     def _handle_purchase(self) -> None:
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede registrar compras.")
-            return
-        try:
-            data = self._prompt_purchase_data()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "Datos incompletos", str(exc))
-            return
-        if data is None:
-            return
-
-        proveedor_id = data["proveedor_id"]
-        variante_id = data["variante_id"]
-        document = str(data["documento"]).strip() or f"COMP-{uuid4().hex[:8].upper()}"
-        cost_text = str(data["costo"]).strip()
-        if not proveedor_id or not variante_id:
-            QMessageBox.warning(self, "Datos incompletos", "Selecciona proveedor y presentacion.")
-            return
-        if not cost_text:
-            QMessageBox.warning(self, "Datos incompletos", "Captura el costo unitario.")
-            return
-
-        try:
-            costo = Decimal(cost_text)
-            if costo < 0:
-                raise ValueError
-        except (InvalidOperation, ValueError):
-            QMessageBox.warning(self, "Costo invalido", "El costo unitario debe ser un numero positivo.")
-            return
-
-        try:
-            with get_session() as session:
-                proveedor = session.get(Proveedor, int(proveedor_id))
-                usuario = session.get(Usuario, self.user_id)
-                if proveedor is None or usuario is None:
-                    raise ValueError("Proveedor o usuario no encontrado.")
-                compra = CompraService.crear_borrador(
-                    session=session,
-                    proveedor=proveedor,
-                    usuario=usuario,
-                    numero_documento=document,
-                    items=[
-                        CompraItemInput(
-                            variante_id=int(variante_id),
-                            cantidad=int(data["cantidad"]),
-                            costo_unitario=costo,
-                        )
-                    ],
-                )
-                CompraService.confirmar_compra(session, compra)
-                session.commit()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Compra fallida", str(exc))
-            return
-
-        self.refresh_all()
-        QMessageBox.information(self, "Compra registrada", f"Compra {document} confirmada correctamente.")
+        inventario_acciones.registrar_entrada(self)
 
     @classmethod
     def _format_discount_label(cls, value: Decimal) -> str:
@@ -7777,39 +7719,10 @@ class MainWindow(QMainWindow):
         return True
 
     def _handle_inventory_print_label(self) -> None:
-        selected_variant_ids = self._selected_inventory_variant_ids()
-        if len(selected_variant_ids) > 1:
-            self._handle_inventory_print_label_batch(selected_variant_ids)
-            return
-
-        variante_id = (
-            selected_variant_ids[0]
-            if len(selected_variant_ids) == 1
-            else self.inventory_variant_combo.currentData()
-        )
-        if not variante_id:
-            QMessageBox.warning(
-                self,
-                "Sin presentacion",
-                "Selecciona una presentacion para preparar la impresion de su etiqueta.",
-            )
-            return
-
-        self._open_inventory_label_dialog_for_variant(int(variante_id))
+        inventario_acciones.imprimir_etiquetas_elegidas(self)
 
     def _handle_inventory_print_visible_labels(self) -> None:
-        visible_variant_ids = collect_inventory_row_variant_ids(self.inventory_filtered_rows)
-        if not visible_variant_ids:
-            QMessageBox.warning(
-                self,
-                "Sin resultados",
-                "No hay presentaciones visibles en Inventario para preparar etiquetas.",
-            )
-            return
-        if len(visible_variant_ids) == 1:
-            self._open_inventory_label_dialog_for_variant(int(visible_variant_ids[0]))
-            return
-        self._handle_inventory_print_label_batch(visible_variant_ids)
+        inventario_acciones.imprimir_etiquetas_filtradas(self)
 
     def _handle_inventory_count_print_labels(self, variant_ids: list[int]) -> None:
         ordered_variant_ids = [int(variant_id) for variant_id in variant_ids if int(variant_id)]

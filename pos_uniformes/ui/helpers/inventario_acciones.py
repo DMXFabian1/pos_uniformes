@@ -13,7 +13,7 @@ en rojo si algún precio baja (`armar_aviso_bajas`) y pide confirmar.
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
@@ -21,8 +21,9 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import QMessageBox, QPushButton, QWidget
 
 from pos_uniformes.database.connection import get_session
-from pos_uniformes.database.models import RolUsuario, Usuario, Variante
+from pos_uniformes.database.models import Proveedor, RolUsuario, Usuario, Variante
 from pos_uniformes.services.catalog_service import CatalogService
+from pos_uniformes.services.compra_service import CompraItemInput, CompraService
 from pos_uniformes.services.inventario_service import AjusteMasivoFilaInput, InventarioService
 from pos_uniformes.services.inventario_precio_lote_service import (
     BajaDePrecio,
@@ -30,6 +31,8 @@ from pos_uniformes.services.inventario_precio_lote_service import (
     renglones_bajas,
     titulo_bajas,
 )
+
+from pos_uniformes.ui.helpers.inventory_selection_helper import collect_inventory_row_variant_ids
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
@@ -280,6 +283,106 @@ def conteo_fisico_viejo(window: "MainWindow") -> None:
         f"Conteo {reference} aplicado correctamente. Filas ajustadas: {len(conteos)}.",
     )
 
+
+
+def registrar_entrada(window: "MainWindow") -> None:
+    """«Registrar entrada» de mercancía (antes `MainWindow._handle_purchase`)."""
+    if window.current_role != RolUsuario.ADMIN:
+        QMessageBox.warning(window, "Sin permisos", "Solo ADMIN puede registrar compras.")
+        return
+    try:
+        data = window._prompt_purchase_data()
+    except Exception as exc:  # noqa: BLE001
+        QMessageBox.warning(window, "Datos incompletos", str(exc))
+        return
+    if data is None:
+        return
+
+    proveedor_id = data["proveedor_id"]
+    variante_id = data["variante_id"]
+    document = str(data["documento"]).strip() or f"COMP-{uuid4().hex[:8].upper()}"
+    cost_text = str(data["costo"]).strip()
+    if not proveedor_id or not variante_id:
+        QMessageBox.warning(window, "Datos incompletos", "Selecciona proveedor y presentacion.")
+        return
+    if not cost_text:
+        QMessageBox.warning(window, "Datos incompletos", "Captura el costo unitario.")
+        return
+
+    try:
+        costo = Decimal(cost_text)
+        if costo < 0:
+            raise ValueError
+    except (InvalidOperation, ValueError):
+        QMessageBox.warning(window, "Costo invalido", "El costo unitario debe ser un numero positivo.")
+        return
+
+    try:
+        with get_session() as session:
+            proveedor = session.get(Proveedor, int(proveedor_id))
+            usuario = session.get(Usuario, window.user_id)
+            if proveedor is None or usuario is None:
+                raise ValueError("Proveedor o usuario no encontrado.")
+            compra = CompraService.crear_borrador(
+                session=session,
+                proveedor=proveedor,
+                usuario=usuario,
+                numero_documento=document,
+                items=[
+                    CompraItemInput(
+                        variante_id=int(variante_id),
+                        cantidad=int(data["cantidad"]),
+                        costo_unitario=costo,
+                    )
+                ],
+            )
+            CompraService.confirmar_compra(session, compra)
+            session.commit()
+    except Exception as exc:  # noqa: BLE001
+        QMessageBox.critical(window, "Compra fallida", str(exc))
+        return
+
+    window.refresh_all()
+    QMessageBox.information(window, "Compra registrada", f"Compra {document} confirmada correctamente.")
+
+
+def imprimir_etiquetas_elegidas(window: "MainWindow") -> None:
+    """Etiqueta de la talla elegida, o lote si son varias (antes `MainWindow._handle_inventory_print_label`)."""
+    selected_variant_ids = window._selected_inventory_variant_ids()
+    if len(selected_variant_ids) > 1:
+        window._handle_inventory_print_label_batch(selected_variant_ids)
+        return
+
+    variante_id = (
+        selected_variant_ids[0]
+        if len(selected_variant_ids) == 1
+        else window.inventory_variant_combo.currentData()
+    )
+    if not variante_id:
+        QMessageBox.warning(
+            window,
+            "Sin presentacion",
+            "Selecciona una presentacion para preparar la impresion de su etiqueta.",
+        )
+        return
+
+    window._open_inventory_label_dialog_for_variant(int(variante_id))
+
+
+def imprimir_etiquetas_filtradas(window: "MainWindow") -> None:
+    """Etiquetas de todo lo filtrado (antes `MainWindow._handle_inventory_print_visible_labels`)."""
+    visible_variant_ids = collect_inventory_row_variant_ids(window.inventory_filtered_rows)
+    if not visible_variant_ids:
+        QMessageBox.warning(
+            window,
+            "Sin resultados",
+            "No hay presentaciones visibles en Inventario para preparar etiquetas.",
+        )
+        return
+    if len(visible_variant_ids) == 1:
+        window._open_inventory_label_dialog_for_variant(int(visible_variant_ids[0]))
+        return
+    window._handle_inventory_print_label_batch(visible_variant_ids)
 
 
 # ── Aviso de precio que baja (tanda 5) ─────────────────────────────────────
