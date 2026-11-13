@@ -207,6 +207,51 @@ def predicado_operacion(tipos: tuple[str, ...] = TIPOS_OPERACION):
     return and_(LibretaVenta.tipo.in_(tuple(tipos)), LibretaVenta.descuento_empleada.is_(False))
 
 
+# ─── Ventas unidas en UNA operación (Daniel, 2026-11-13) ─────────────────
+# «a veces mis empleadas venden e imprimen el ticket, pero esa misma persona
+# se decide y se lleva otra cosa, haciendo que sean dos operaciones y solo
+# debería ser una». El dueño las une a mano (`libreta_unir_service`). Las
+# dos ventas siguen valiendo: el dinero, las piezas, las comisiones, la
+# existencia y el Monedero NO cambian. Lo único que cambia es que, donde se
+# CUENTAN operaciones (o ventas, tickets, compras), el grupo cuenta como 1.
+# Por eso se cuenta por `clave_operacion` (distinta), no por fila.
+
+
+def clave_operacion(row):
+    """La operación a la que pertenece la fila: el id de la primera venta del
+    grupo si está unida; si no, su propio id. Una fila sin id (la cola sin
+    red) es una operación propia."""
+    grupo = getattr(row, "operacion_grupo_id", None)
+    if grupo is not None:
+        return int(grupo)
+    rid = getattr(row, "id", None)
+    return int(rid) if rid is not None else ("sin_id", id(row))
+
+
+def esta_unida(row) -> bool:
+    return getattr(row, "operacion_grupo_id", None) is not None
+
+
+def contar_operaciones(rows, tipos: tuple[str, ...] = TIPOS_OPERACION) -> int:
+    """Cuántas operaciones hay en `rows`: la regla de `cuenta_como_operacion`
+    y un grupo de ventas unidas cuenta como 1."""
+    return len({clave_operacion(r) for r in rows or () if cuenta_como_operacion(r, tipos)})
+
+
+def clave_operacion_sql():
+    """`clave_operacion` para SQL: coalesce(operacion_grupo_id, id)."""
+    from sqlalchemy import func
+
+    return func.coalesce(LibretaVenta.operacion_grupo_id, LibretaVenta.id)
+
+
+def contar_operaciones_sql():
+    """count(DISTINCT clave): el conteo de operaciones en un `select`."""
+    from sqlalchemy import func
+
+    return func.count(func.distinct(clave_operacion_sql()))
+
+
 @dataclass(frozen=True)
 class TotalesLibreta:
     """Las cifras de arriba de la Libreta del kiosko (vista de la empleada y
@@ -267,11 +312,13 @@ def totales_libreta(filas: list, a_cuenta=None) -> TotalesLibreta:
     cuentan = [r for r in filas if cuenta_como_operacion(r)]
     a_cuenta = a_cuenta or {}
     return TotalesLibreta(
-        operaciones=len(cuentan),
+        # Ventas unidas en una operación cuentan 1 (2026-11-13); las piezas
+        # y las comisiones, fila por fila como siempre.
+        operaciones=contar_operaciones(cuentan),
         piezas=sum(int(getattr(r, "piezas", 0) or 0) for r in cuentan),
         comisiones=sum(int(getattr(r, "comisiones", 0) or 0) for r in filas),
-        ventas=sum(1 for r in cuentan if str(getattr(r, "tipo", "venta") or "venta") == "venta"),
-        apartados=sum(1 for r in cuentan if str(getattr(r, "tipo", "")) == "apartado"),
+        ventas=contar_operaciones(cuentan, ("venta",)),
+        apartados=contar_operaciones(cuentan, ("apartado",)),
         filas_dinero=[r for r in filas if getattr(r, "id", None) not in a_cuenta] if a_cuenta else filas,
         abonos=sum(1 for r in filas if str(getattr(r, "tipo", "")) == "abono"),
     )
@@ -695,14 +742,17 @@ def resumir_por_empleada(rows: list[LibretaVenta]) -> list[ResumenEmpleada]:
                 "piezas": 0,
                 "comisiones": 0,
                 "monto": Decimal("0.00"),
+                "claves": set(),
             },
         )
         bucket["comisiones"] += int(getattr(row, "comisiones", 0) or 0)
         if cuenta_como_operacion(row):
             # Su propia compra con precio especial no le suma operación ni
             # piezas (Daniel, 2026-11-12); un abono tampoco (Daniel,
-            # 2026-11-12: «no cuentan como operación»).
-            bucket["operaciones"] += 1
+            # 2026-11-12: «no cuentan como operación»). Ventas unidas en
+            # una operación cuentan 1 (2026-11-13); sus piezas, todas.
+            bucket["claves"].add(clave_operacion(row))
+            bucket["operaciones"] = len(bucket["claves"])
             bucket["piezas"] += int(row.piezas or 0)
         if cuenta_como_operacion(row, TIPOS_CON_IMPORTE):
             # El importe no cambia con la regla del abono: lo cobrado en un
@@ -773,14 +823,17 @@ def resumir_por_dia(rows: list[LibretaVenta]) -> list[CorteDia]:
                 "apartados": Decimal("0.00"),
                 "abonos": Decimal("0.00"),
                 "en_caja": Decimal("0.00"),
+                "claves": set(),
             },
         )
         if cuenta_como_operacion(row):
             # La compra de la empleada con precio especial no es operación
             # ni piezas; su dinero sí entró (2026-11-12, regla única). El
             # abono tampoco es operación (Daniel, 2026-11-12); su dinero va
-            # abajo, en abonos y en caja, igual que antes.
-            bucket["operaciones"] += 1
+            # abajo, en abonos y en caja, igual que antes. Ventas unidas en
+            # una operación cuentan 1 (2026-11-13).
+            bucket["claves"].add(clave_operacion(row))
+            bucket["operaciones"] = len(bucket["claves"])
             bucket["piezas"] += int(row.piezas or 0)
         monto = Decimal(str(row.monto_total or 0))
         neto = Decimal(str(getattr(row, "monto_neto", None) or monto))
@@ -942,6 +995,11 @@ def _no_si_es_compra_a_cuenta(session, entry: LibretaVenta) -> None:
 
 
 def _borrar_operacion(session, entry: LibretaVenta, operacion_id: int) -> bool:
+    # Si estaba unida con otra venta (2026-11-13), sale de su grupo antes:
+    # el grupo no se queda apuntando a una venta borrada.
+    from pos_uniformes.services.libreta_unir_service import soltar_sin_permiso
+
+    soltar_sin_permiso(session, entry)
     try:
         devolver_stock(session, entry)   # lo que se llevó, regresa
     except Exception:  # noqa: BLE001 — borrar la operación vale más que el número
@@ -1166,6 +1224,11 @@ def reasignar_empleada(
         )
 
     comisiones = int(entry.comisiones or 0)
+    # Unida con otra venta de la empleada anterior (2026-11-13): un grupo es
+    # de una sola empleada, así que al moverla sale de su grupo.
+    from pos_uniformes.services.libreta_unir_service import soltar_sin_permiso
+
+    soltar_sin_permiso(session, entry)
     entry.employee_code = code
     entry.employee_name = nombre_nuevo
     auditoria_ausencias_service.registrar(
