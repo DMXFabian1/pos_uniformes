@@ -280,6 +280,16 @@ class KioskoConservaSuCorteTests(unittest.TestCase):
         import pos_uniformes.services.corte_caja_service  # noqa: F401
         import pos_uniformes.services.retiros_service  # noqa: F401
 
+    def test_el_dialogo_de_corte_nombra_el_servicio_que_usa(self) -> None:
+        """El docstring no debe mandar a buscar el CajaService retirado."""
+        import re
+
+        from pos_uniformes.ui.dialogs import corte_caja_dialog
+
+        doc = corte_caja_dialog.__doc__ or ""
+        self.assertIn("corte_caja_service.cerrar_corte", doc)
+        self.assertIsNone(re.search(r"(?<!corte_)caja_service", doc))
+
     def test_el_historial_de_cortes_del_kiosko_sigue(self) -> None:
         """El historial de cortes que importa vive en el kiosko (LibretaCorte)."""
         from pathlib import Path

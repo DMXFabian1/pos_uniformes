@@ -2,7 +2,7 @@
 
 Los usan el dueño (Libreta → Imprimir corte) y el encargado (su pantalla
 grande). El corte muestra lo que debería haber en el cajón, pide lo contado
-y cuánto se queda de fondo, guarda con `caja_service.cerrar_corte` e imprime.
+y cuánto se queda de fondo, guarda con `corte_caja_service.cerrar_corte` e imprime.
 """
 
 from __future__ import annotations
