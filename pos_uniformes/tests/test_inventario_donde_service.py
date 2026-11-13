@@ -24,8 +24,12 @@ class TextoDondeTests(unittest.TestCase):
         self.assertEqual(texto_donde(0), "—")
         self.assertEqual(texto_donde(-2), "—")
 
-    def test_negativo_pero_con_cajas_dice_las_cajas(self) -> None:
-        self.assertEqual(texto_donde(-1, bodega=2), "Bodega 2")
+    def test_negativo_pero_con_cajas_dice_las_cajas_con_marca_de_descuadre(self) -> None:
+        self.assertEqual(texto_donde(-1, bodega=2), "Bodega 2 ⚠")
+
+    def test_mas_en_cajas_que_el_total_lleva_marca(self) -> None:
+        self.assertEqual(texto_donde(2, bodega=6), "Bodega 6 ⚠")
+        self.assertEqual(texto_donde(8, bodega=6, piso=2), "Bodega 6 · Piso 2")
 
     def test_conjunto_es_raya(self) -> None:
         self.assertEqual(texto_donde(4, bodega=1, conjunto=True), "—")

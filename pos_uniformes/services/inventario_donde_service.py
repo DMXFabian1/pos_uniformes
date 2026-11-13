@@ -14,11 +14,18 @@ Criterio de la columna (corta, para que quepa a 1366 px):
 
 - Con algo en cajas, solo lo de cajas: «Bodega 6 · Piso 2», «Bodega 6», «Piso 2».
 - Sin nada en cajas y con existencia: «Tienda».
-- Sin nada (cero o negativo) o un conjunto armado de piezas: «—».
+- Sin nada (cero o negativo) y sin cajas, o un conjunto armado de piezas: «—».
+- **Descuadre**: si en cajas hay más de lo que dice el total (se vendió sin
+  sacarlo de la caja; también cuando el total está en negativo), la columna
+  sigue diciendo lo que hay en cajas, porque es lo que sirve para ir a buscarlo
+  y corregir, pero con una marca «⚠» para que no parezca que todo cuadra:
+  «Bodega 2 ⚠». El detalle va en el aviso al pasar el mouse.
+  (Criterio provisional de la tanda 2, 2026-11-13: pendiente de confirmar con
+  Daniel; la alternativa era «—» cuando el total es ≤ 0.)
 
 El reparto completo («Tienda 4 · Bodega 6 · Piso 2») va en el texto largo,
-para el aviso al pasar el mouse y la ficha. Si en cajas hay más de lo que dice
-el total (se vendió sin sacarlo de la caja), el texto largo lo avisa.
+para el aviso al pasar el mouse y la ficha. Si hay descuadre, el texto largo
+dice cuánto hay en cajas y cuánto dice el total.
 """
 
 from __future__ import annotations
@@ -28,6 +35,7 @@ from dataclasses import dataclass
 SEPARADOR = " · "
 VACIO = "—"
 TIENDA = "Tienda"
+MARCA_DESCUADRE = " ⚠"
 
 
 @dataclass(frozen=True)
@@ -58,7 +66,7 @@ def texto_donde(total: int, bodega: int = 0, piso: int = 0, *, conjunto: bool = 
     reparto = repartir(total, bodega, piso)
     partes = _partes(("Bodega", reparto.bodega), ("Piso", reparto.piso))
     if partes:
-        return SEPARADOR.join(partes)
+        return SEPARADOR.join(partes) + (MARCA_DESCUADRE if reparto.descuadre else "")
     return TIENDA if int(total or 0) > 0 else VACIO
 
 
