@@ -1,6 +1,7 @@
 """Las pestañas cuyo trabajo se mudó al kiosko ya no se muestran.
 
 2026-11-12: Caja y Apartados ya no solo se ocultan, se retiraron del POS.
+2026-11-13: Presupuestos también se retiró (ver PresupuestosRetiradosDelPosTests).
 
 Se ocultan, no se borran: el código y los datos siguen ahí. Lo que estas
 pruebas cuidan es que ocultarlas no deje al POS parado en una pestaña
@@ -25,8 +26,9 @@ from pos_uniformes.ui.main_window import (  # noqa: E402
 _APP = QApplication.instance() or QApplication([])
 
 # 2026-11-12: "Caja" y "Apartados" ya no están: se retiraron del POS.
+# 2026-11-13: "Presupuestos" tampoco.
 _ORDEN = [
-    "Resumen", "Presupuestos", "Catálogo", "Inventario",
+    "Resumen", "Catálogo", "Inventario",
     "Bodega", "Historial inventarios", "Panel Uniformes", "Analítica", "Configuración",
 ]
 
@@ -51,11 +53,12 @@ def _tabs() -> QTabWidget:
 
 
 class PestanasOcultasTests(unittest.TestCase):
-    def test_son_las_dos_que_se_mudaron(self) -> None:
-        """La Caja y Apartados ya no se ocultan: se retiraron (2026-11-12)."""
+    def test_solo_queda_catalogo(self) -> None:
+        """La Caja y Apartados ya no se ocultan: se retiraron (2026-11-12).
+        Presupuestos tampoco: se retiró (2026-11-13)."""
         self.assertEqual(
             set(PESTANAS_MUDADAS_AL_KIOSKO),
-            {"Presupuestos", "Catálogo"},
+            {"Catálogo"},
         )
 
     def test_todas_existen_todavia_en_el_orden_real(self) -> None:
@@ -358,7 +361,7 @@ class CajaAntiguaRetiradaTests(unittest.TestCase):
         # Ctrl+S / Cmd+S se quedan, pero solo para consultar (sin carrito).
         self.assertIn("Ctrl+S", atajos)
         self.assertIn("Meta+S", atajos)
-        # Escape sigue: limpia Presupuestos y Catálogo.
+        # Escape sigue: limpia el Catálogo.
         self.assertIn("Esc", atajos)
 
     def test_ctrl_s_abre_la_busqueda_solo_para_consultar(self) -> None:
@@ -412,7 +415,7 @@ class ApartadosRetiradosDelPosTests(unittest.TestCase):
         self.assertEqual(
             self._nombres(),
             [
-                "Resumen", "Presupuestos", "Catálogo", "Inventario", "Bodega",
+                "Resumen", "Catálogo", "Inventario", "Bodega",
                 "Historial inventarios", "Panel Uniformes", "Analítica", "Configuración",
             ],
         )
@@ -552,6 +555,192 @@ class KioskoConservaSusApartadosTests(unittest.TestCase):
 
         self.assertEqual(Apartado.__tablename__, "apartado")
         self.assertTrue(callable(getattr(ApartadoService, "obtener_apartado", None)))
+
+
+class PresupuestosRetiradosDelPosTests(unittest.TestCase):
+    """2026-11-13, Daniel: «también hay que quitar el código de presupuestos
+    en el POS, ya se hace desde los kioskos».
+
+    La pestaña Presupuestos del POS principal ya estaba oculta; ahora ya no
+    se construye. Los presupuestos se hacen en el kiosko (ver
+    KioskoConservaSusPresupuestosTests).
+    """
+
+    def setUp(self) -> None:
+        self.ventana = MainWindow(user_id=1)
+
+    def tearDown(self) -> None:
+        _cerrar(self.ventana)
+
+    def _nombres(self) -> list[str]:
+        return [
+            self.ventana.tabs.tabText(i).strip() for i in range(self.ventana.tabs.count())
+        ]
+
+    def _visibles(self) -> list[str]:
+        return [
+            self.ventana.tabs.tabText(i).strip()
+            for i in range(self.ventana.tabs.count())
+            if self.ventana.tabs.isTabVisible(i)
+        ]
+
+    def test_la_pestana_presupuestos_no_se_construye(self) -> None:
+        self.assertNotIn("Presupuestos", self._nombres())
+        self.assertEqual(self._nombres(), _ORDEN)
+
+    def test_presupuestos_ya_no_esta_en_las_mudadas(self) -> None:
+        self.assertNotIn("Presupuestos", PESTANAS_MUDADAS_AL_KIOSKO)
+
+    def test_el_admin_ve_todas_menos_catalogo(self) -> None:
+        from pos_uniformes.database.models import RolUsuario
+
+        self.ventana.current_role = RolUsuario.ADMIN
+        self.ventana._apply_role_navigation()
+        self.assertEqual(
+            self._visibles(),
+            ["Resumen", "Inventario", "Bodega", "Historial inventarios",
+             "Panel Uniformes", "Analítica", "Configuración"],
+        )
+        self.assertEqual(self.ventana.tabs.tabText(self.ventana.tabs.currentIndex()), "Resumen")
+
+    def test_quien_no_es_admin_no_ve_pestanas_de_admin(self) -> None:
+        from pos_uniformes.database.models import RolUsuario
+
+        self.ventana.current_role = RolUsuario.CAJERO
+        self.ventana._apply_role_navigation()
+        # Catálogo es la única para todos los roles y sigue oculta (mudada).
+        self.assertEqual(self._visibles(), [])
+
+    def test_la_visibilidad_va_por_nombre_y_no_por_indice(self) -> None:
+        """Si se retira otra pestaña, ninguna se cruza con la de al lado."""
+        from pos_uniformes.database.models import RolUsuario
+
+        self.ventana.tabs.removeTab(self._nombres().index("Bodega"))
+        self.ventana.current_role = RolUsuario.ADMIN
+        self.ventana._apply_role_navigation()
+        self.assertEqual(
+            self._visibles(),
+            ["Resumen", "Inventario", "Historial inventarios",
+             "Panel Uniformes", "Analítica", "Configuración"],
+        )
+        self.ventana._handle_open_uniforms_panel()
+        self.assertEqual(
+            self.ventana.tabs.tabText(self.ventana.tabs.currentIndex()), "Panel Uniformes"
+        )
+
+    def test_escape_no_truena_en_ninguna_pestana(self) -> None:
+        for i in range(self.ventana.tabs.count()):
+            self.ventana.tabs.setCurrentIndex(i)
+            self.ventana._handle_escape()
+
+    def test_no_quedan_widgets_ni_metodos_de_la_pestana(self) -> None:
+        for atributo in (
+            "quote_cart",
+            "quote_rows",
+            "selected_quote_state",
+            "selected_quote_phone",
+            "quote_sku_input",
+            "quote_client_combo",
+            "quote_create_client_button",
+            "quote_add_button",
+            "quote_save_button",
+            "quote_cancel_button",
+            "quote_whatsapp_button",
+            "quote_cart_table",
+            "quote_table",
+            "quote_detail_table",
+            "quote_search_input",
+            "quote_state_combo",
+            "_build_quotes_tab",
+            "_clear_quote_capture",
+            "_generate_quote_folio",
+            "_reset_quote_form",
+            "_prompt_quick_quote_client_data",
+            "_handle_create_quote_client",
+            "_handle_add_quote_item",
+            "_handle_remove_quote_item",
+            "_handle_save_quote",
+            "_handle_cancel_quote",
+            "_handle_open_quote_whatsapp",
+            "_handle_quote_filters_changed",
+            "_handle_quote_selection",
+            "_selected_quote_id",
+            "_apply_quote_action_state",
+            "_refresh_quotes",
+            "_refresh_quote_detail",
+            "_apply_quote_detail_view",
+            "_refresh_quote_cart_table",
+        ):
+            self.assertFalse(hasattr(self.ventana, atributo), atributo)
+
+    def test_no_hay_botones_de_presupuesto(self) -> None:
+        from PyQt6.QtWidgets import QAbstractButton
+
+        textos = {b.text() for b in self.ventana.findChildren(QAbstractButton)}
+        for texto in ("Agregar al presupuesto", "Guardar presupuesto",
+                      "Vaciar presupuesto", "Cancelar presupuesto"):
+            self.assertNotIn(texto, textos, texto)
+
+    def test_refresh_all_ya_no_lee_presupuestos(self) -> None:
+        import inspect
+
+        self.assertNotIn("_refresh_quotes", inspect.getsource(MainWindow.refresh_all))
+
+    def test_los_modulos_que_solo_servian_a_la_pestana_ya_no_estan(self) -> None:
+        import importlib
+
+        for modulo in (
+            "pos_uniformes.ui.views.quotes_view",
+            "pos_uniformes.ui.helpers.quote_history_helper",
+            "pos_uniformes.ui.helpers.quote_selection_helper",
+        ):
+            with self.assertRaises(ModuleNotFoundError, msg=modulo):
+                importlib.import_module(modulo)
+
+
+class KioskoConservaSusPresupuestosTests(unittest.TestCase):
+    """Los presupuestos viven en el kiosko y deben seguir igual.
+
+    Aquí solo se revisan los puntos de entrada; el flujo real lo ejercitan
+    test_quote_satellite_window.py y las pruebas de services/quote_*.
+    """
+
+    def test_el_kiosko_importa_y_se_construye(self) -> None:
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        ventana = QuoteSatelliteWindow(user_id=1)
+        try:
+            self.assertTrue(hasattr(ventana, "quote_cart"))
+            self.assertTrue(hasattr(ventana, "quote_table"))
+            for metodo in ("_handle_save_quote_draft", "_refresh_quotes", "_refresh_quote_cart_table"):
+                self.assertTrue(callable(getattr(ventana, metodo, None)), metodo)
+        finally:
+            ventana.close()
+            ventana.deleteLater()
+            QApplication.processEvents()
+
+    def test_el_arranque_del_kiosko_sigue(self) -> None:
+        import importlib
+
+        modulo = importlib.import_module("pos_uniformes.presupuestos_satelite_main")
+        self.assertTrue(callable(getattr(modulo, "main", None)))
+
+    def test_los_helpers_y_servicios_del_kiosko_siguen(self) -> None:
+        from pos_uniformes.database.models import Presupuesto
+        from pos_uniformes.services.presupuesto_service import PresupuestoService
+        import pos_uniformes.services.quote_action_service  # noqa: F401
+        import pos_uniformes.services.quote_detail_service  # noqa: F401
+        import pos_uniformes.services.quote_snapshot_service  # noqa: F401
+        import pos_uniformes.services.quote_whatsapp_service  # noqa: F401
+        import pos_uniformes.ui.helpers.quote_cart_view_helper  # noqa: F401
+        import pos_uniformes.ui.helpers.quote_detail_helper  # noqa: F401
+        import pos_uniformes.ui.helpers.quote_feedback_helper  # noqa: F401
+        import pos_uniformes.ui.helpers.quote_sports_uniform_helper  # noqa: F401
+        import pos_uniformes.ui.helpers.quote_summary_helper  # noqa: F401
+        import pos_uniformes.ui.helpers.quote_table_row_helper  # noqa: F401
+
+        self.assertEqual(Presupuesto.__tablename__, "presupuesto")
+        self.assertTrue(callable(getattr(PresupuestoService, "crear_presupuesto", None)))
 
 
 class SinCargarDatosInicialesTests(unittest.TestCase):

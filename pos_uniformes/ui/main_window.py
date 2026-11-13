@@ -68,7 +68,6 @@ from pos_uniformes.database.models import (
     Compra,
     Empleada,
     Escuela,
-    EstadoPresupuesto,
     EstadoCompra,
     Marca,
     MovimientoInventario,
@@ -122,7 +121,6 @@ from pos_uniformes.services.employee_sales_history_service import (
 )
 from pos_uniformes.services.employee_ranking_service import build_ranking_period_dates
 from pos_uniformes.ui.helpers.settings_employee_ranking_helper import build_libreta_ranking_view
-from pos_uniformes.services.client_service import ClientService
 from pos_uniformes.services.employee_identity_service import EmployeeIdentityService
 from pos_uniformes.services import conjunto_service
 from pos_uniformes.services import exportacion_libreta_service
@@ -158,16 +156,7 @@ from pos_uniformes.services.inventory_label_service import (
 from pos_uniformes.services.inventario_busqueda_service import combinar_hits_meili
 from pos_uniformes.services.inventory_overview_service import load_inventory_overview_snapshot
 from pos_uniformes.services.inventory_snapshot_service import load_inventory_snapshot_rows
-from pos_uniformes.services.presupuesto_service import PresupuestoService
-from pos_uniformes.services.quote_snapshot_service import (
-    build_quote_history_input_rows,
-    load_quote_snapshot_rows,
-)
-from pos_uniformes.services.quote_detail_service import load_quote_detail_snapshot
-from pos_uniformes.services.quote_action_service import cancel_quote
-from pos_uniformes.services.quote_whatsapp_service import build_quote_whatsapp_view
 from pos_uniformes.services.layaway_alerts_service import load_layaway_alerts_snapshot
-from pos_uniformes.services.sale_cart_update_service import update_sale_cart_item_quantity
 from pos_uniformes.services.sale_discount_service import format_discount_label
 from pos_uniformes.services.search_filter_service import (
     CATALOG_SEARCH_ALIAS_MAP,
@@ -381,31 +370,6 @@ from pos_uniformes.ui.helpers.inventory_toggle_helper import (
 from pos_uniformes.ui.helpers.inventory_table_row_helper import build_inventory_table_row_views
 from pos_uniformes.ui.helpers.layaway_alerts_helper import build_layaway_alerts_view
 from pos_uniformes.ui.helpers.window_close_helper import build_main_window_close_decision
-from pos_uniformes.ui.helpers.quote_cart_view_helper import build_quote_cart_view
-from pos_uniformes.ui.helpers.quote_history_helper import build_quote_history_rows
-from pos_uniformes.ui.helpers.quote_detail_helper import (
-    build_empty_quote_detail_view,
-    build_error_quote_detail_view,
-    build_quote_detail_view,
-)
-from pos_uniformes.ui.helpers.quote_sports_uniform_helper import (
-    add_quote_scan_variants,
-    build_quote_presupuesto_inputs,
-)
-from pos_uniformes.ui.helpers.quote_feedback_helper import (
-    build_quote_guard_feedback,
-    build_quote_result_feedback,
-)
-from pos_uniformes.ui.helpers.quote_selection_helper import (
-    build_quote_action_state,
-    resolve_selected_quote_id,
-)
-from pos_uniformes.ui.helpers.quote_summary_helper import build_quote_summary_view
-from pos_uniformes.ui.helpers.quote_table_row_helper import build_quote_table_row_views
-from pos_uniformes.ui.helpers.sale_sports_uniform_helper import (
-    restore_sports_uniform_playera_price_if_needed,
-)
-from pos_uniformes.services.quote_client_creation_feedback_service import build_quote_client_created_feedback
 from pos_uniformes.ui.helpers.size_option_sort_helper import group_size_options, sort_size_options
 from pos_uniformes.ui.helpers.snapshot_cache_helper import SnapshotCache
 from pos_uniformes.ui.helpers.settings_backup_helper import (
@@ -484,12 +448,11 @@ from pos_uniformes.ui.views.history_view import build_history_tab
 from pos_uniformes.ui.helpers.inventario_tabla_helper import pintar_filas_inventario
 from pos_uniformes.ui.views.inventory_view import build_inventory_tab
 from pos_uniformes.ui.views.products_view import build_products_tab
-from pos_uniformes.ui.views.quotes_view import build_quotes_tab
 from pos_uniformes.ui.views.bodega_view import build_bodega_tab
 from pos_uniformes.ui.views.panel_uniformes_view import build_panel_uniformes_tab
 from pos_uniformes.ui.views.settings_view import build_settings_tab
 from pos_uniformes.ui.styles.main_window_styles import build_main_window_stylesheet
-from pos_uniformes.utils.date_format import format_display_date, format_display_datetime, local_day_window
+from pos_uniformes.utils.date_format import format_display_date, format_display_datetime
 from pos_uniformes.utils.product_templates import merge_choice_lists
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 from pos_uniformes.utils.qr_generator import QrGenerator
@@ -497,8 +460,7 @@ from pos_uniformes.services.nombres_empleadas_service import mostrar as _nombre_
 from pos_uniformes.services.nombres_empleadas_service import nombres_por_codigo
 
 # Pestañas que dejaron de tener sentido aquí porque su trabajo se mudó al
-# kiosko: los presupuestos se hacen en Presupuesto guiado y el catálogo se
-# lleva desde Panel Uniformes e Inventario.
+# kiosko: el catálogo se lleva desde Panel Uniformes e Inventario.
 #
 # Se ocultan, NO se borran: fueron la base del sistema, sus datos siguen
 # intactos y el código completo sigue en el repositorio. Para volver a ver
@@ -518,8 +480,18 @@ from pos_uniformes.services.nombres_empleadas_service import nombres_por_codigo
 # Venta Rápida del kiosko y quedan en la Libreta; la tabla `apartado`, sus
 # datos y los servicios de dominio (services/apartado_service.py y
 # services/layaway_*) siguen intactos.
+#
+# 2026-11-13: la pestaña Presupuestos tampoco se oculta ya: se retiró (vista,
+# captura, guardar/cancelar/WhatsApp, su refresco, atajo Escape, tooltips y
+# permisos). Daniel: «también hay que quitar el código de presupuestos en el
+# POS, ya se hace desde los kioskos». Los presupuestos se hacen en el kiosko
+# (ui/quote_satellite_window.py); la tabla `presupuesto`, sus datos,
+# services/presupuesto_service.py, services/quote_* y la API siguen intactos.
 
-PESTANAS_MUDADAS_AL_KIOSKO = ("Presupuestos", "Catálogo")
+PESTANAS_MUDADAS_AL_KIOSKO = ("Catálogo",)
+
+# Pestañas que ve cualquier rol; las demás son solo de ADMIN.
+PESTANAS_PARA_TODOS_LOS_ROLES = ("Catálogo",)
 
 LISTING_SEARCH_DEBOUNCE_MS = 300
 CATALOG_PAGE_SIZE = 25
@@ -1207,10 +1179,6 @@ class MainWindow(QMainWindow):
             lambda: self._refresh_settings_employees()
         )
         self.history_rows: list[dict[str, object]] = []
-        self.quote_cart: list[dict[str, object]] = []
-        self.quote_rows: list[dict[str, object]] = []
-        self.selected_quote_state = ""
-        self.selected_quote_phone = ""
 
         self.setWindowTitle("POS Uniformes")
         self.resize(1320, 860)
@@ -1342,36 +1310,6 @@ class MainWindow(QMainWindow):
         # Daniel: «la caja antigua ya no es de utilidad, todo lo demás corre en
         # libreta y kioskos y es lo único que importa, es donde vive nuestra operación».
 
-        self.quote_sku_input = QLineEdit()
-        self.quote_qty_spin = QSpinBox()
-        self.quote_folio_input = QLabel()
-        self.quote_client_combo = QComboBox()
-        self.quote_create_client_button = QPushButton("Nuevo cliente")
-        self.quote_customer_input = QLineEdit()
-        self.quote_phone_input = QLineEdit()
-        self.quote_validity_input = QDateEdit()
-        self.quote_note_input = QTextEdit()
-        self.quote_add_button = QPushButton("Agregar al presupuesto")
-        self.quote_save_button = QPushButton("Guardar presupuesto")
-        self.quote_qty_down_button = QPushButton("-1")
-        self.quote_qty_up_button = QPushButton("+1")
-        self.quote_remove_button = QPushButton("Quitar línea")
-        self.quote_clear_button = QPushButton("Vaciar presupuesto")
-        self.quote_cancel_button = QPushButton("Cancelar presupuesto")
-        self.quote_whatsapp_button = QPushButton("WhatsApp")
-        self.quote_refresh_button = QPushButton("Refrescar")
-        self.quote_status_label = QLabel("Sin presupuestos cargados.")
-        self.quote_summary_label = QLabel("Presupuesto vacio.")
-        self.quote_total_label = QLabel("$0.00")
-        self.quote_total_meta_label = QLabel("Presupuesto estimado")
-        self.quote_customer_label = QLabel("Sin detalle.")
-        self.quote_meta_label = QLabel("")
-        self.quote_notes_label = QLabel("")
-        self.quote_cart_table = QTableWidget()
-        self.quote_table = QTableWidget()
-        self.quote_detail_table = QTableWidget()
-        self.quote_search_input = QLineEdit()
-        self.quote_state_combo = QComboBox()
 
         self.logout_button = QPushButton("Cerrar sesion")
 
@@ -1738,7 +1676,6 @@ class MainWindow(QMainWindow):
 
         self.tabs = QTabWidget()
         self.tabs.addTab(self._wrap_tab_scroll(self._build_dashboard_tab()), "Resumen")
-        self.tabs.addTab(self._wrap_tab_scroll(self._build_quotes_tab()), "Presupuestos")
         self.tabs.addTab(self._wrap_tab_scroll(self._build_catalog_tab()), "Catálogo")
         self.tabs.addTab(self._wrap_tab_scroll(self._build_inventory_tab()), "Inventario")
         self.tabs.addTab(self._build_bodega_tab(), "Bodega")
@@ -1789,16 +1726,6 @@ class MainWindow(QMainWindow):
             self.inventory_edit_button: "Editar la prenda o la talla elegida, su foto o sus precios.",
             self.inventory_stock_button: "Registrar una entrada, contar o corregir cuántas hay.",
             self.inventory_more_button: "Todo lo demás: tallas, existencias, precios, etiquetas y lo poco usado.",
-            self.quote_add_button: "Agrega el SKU capturado al presupuesto actual sin afectar inventario.",
-            self.quote_create_client_button: "Crea un cliente rapido desde Presupuestos usando solo nombre y telefono.",
-            self.quote_save_button: "Emite el presupuesto rapido actual con folio, cliente opcional y vigencia.",
-            self.quote_qty_down_button: "Reduce una pieza de la linea seleccionada del presupuesto.",
-            self.quote_qty_up_button: "Aumenta una pieza de la linea seleccionada del presupuesto.",
-            self.quote_remove_button: "Quita la linea seleccionada del presupuesto en armado.",
-            self.quote_clear_button: "Vacía por completo el presupuesto actual.",
-            self.quote_whatsapp_button: "Abre WhatsApp con un mensaje prellenado para el cliente del presupuesto seleccionado.",
-            self.quote_cancel_button: "Marca como cancelado el presupuesto seleccionado sin tocar inventario.",
-            self.quote_refresh_button: "Vuelve a leer los presupuestos recientes con los filtros actuales.",
             self.history_filter_button: "Aplica los filtros del historial de movimientos.",
             self.history_today_button: "Filtra movimientos del dia actual.",
             self.history_clear_button: "Limpia las fechas y el resto de filtros del historial.",
@@ -1937,7 +1864,7 @@ class MainWindow(QMainWindow):
         # Daniel: «la caja antigua ya no es de utilidad, todo lo demás corre en
         # libreta y kioskos». Ctrl+S / Cmd+S se queda solo para consultar precio
         # y existencia, sin agregar a ningún carrito. Escape se queda solo para
-        # limpiar Presupuestos y Catálogo.
+        # limpiar el Catálogo (Presupuestos se retiró el 2026-11-13).
         clear_capture_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
         clear_capture_shortcut.activated.connect(self._handle_escape)
         quick_backup_shortcut = QShortcut(QKeySequence("Ctrl+Shift+B"), self)
@@ -1967,49 +1894,47 @@ class MainWindow(QMainWindow):
         self._quick_kiosk_dialog.activateWindow()
 
     def _handle_escape(self) -> None:
+        # 2026-11-13: la pestaña Presupuestos se retiró; Escape solo limpia
+        # la búsqueda del Catálogo.
         idx = self.tabs.currentIndex() if self.tabs else -1
         tab_name = self.tabs.tabText(idx) if self.tabs and idx >= 0 else ""
-        if tab_name == "Presupuestos":
-            self._clear_quote_capture()
-        elif tab_name == "Catálogo":
+        if tab_name == "Catálogo":
             self._clear_catalog_capture()
-
-    def _clear_quote_capture(self) -> None:
-        self.quote_sku_input.clear()
-        self.quote_qty_spin.setValue(1)
-        self.quote_client_combo.setCurrentIndex(0)
 
     def _clear_catalog_capture(self) -> None:
         if hasattr(self, "catalog_search_input"):
             self.catalog_search_input.clear()
             self.catalog_search_input.setFocus()
 
+    def _indice_de_pestana(self, nombre: str) -> int | None:
+        """Índice de la pestaña por su nombre (los índices se corren al
+        retirar pestañas, los nombres no)."""
+        if self.tabs is None:
+            return None
+        for index in range(self.tabs.count()):
+            if self.tabs.tabText(index).strip() == nombre:
+                return index
+        return None
+
     def _apply_role_navigation(self) -> None:
         if self.tabs is None:
             return
 
         is_admin = self.current_role == RolUsuario.ADMIN
-        visible_by_index = {
-            # 2026-11-12: las pestañas Caja (antes índice 1) y Apartados
-            # (antes índice 2) ya no se construyen.
-            0: is_admin,  # Resumen
-            1: True,      # Presupuestos
-            2: True,      # Catalogo
-            3: is_admin,  # Inventario
-            4: is_admin,  # Bodega
-            5: is_admin,  # Historial inventarios
-            6: is_admin,  # Panel Uniformes
-            7: is_admin,  # Analitica
-            8: is_admin,  # Configuracion
-        }
-        # Estas ya no viven aquí: los presupuestos se hacen en Presupuesto
-        # guiado y el catálogo en Panel Uniformes e Inventario. Se ocultan,
-        # no se borran — sus datos siguen intactos. Para volver a verlas,
-        # vaciar PESTANAS_MUDADAS_AL_KIOSKO.
-        # (La Caja antigua y Apartados ya no se ocultan: se retiraron, 2026-11-12.)
+        # 2026-11-13: por nombre de pestaña, no por índice fijo. Al retirar
+        # Caja, Apartados (2026-11-12) y Presupuestos (2026-11-13) los índices
+        # se iban corriendo. Solo ADMIN ve las pestañas, salvo las de
+        # PESTANAS_PARA_TODOS_LOS_ROLES.
+        visible_by_index: dict[int, bool] = {}
         for index in range(self.tabs.count()):
-            if self.tabs.tabText(index).strip() in PESTANAS_MUDADAS_AL_KIOSKO:
-                visible_by_index[index] = False
+            nombre = self.tabs.tabText(index).strip()
+            visible = is_admin or nombre in PESTANAS_PARA_TODOS_LOS_ROLES
+            # Estas ya no viven aquí: el catálogo se lleva en Panel Uniformes
+            # e Inventario. Se ocultan, no se borran — sus datos siguen
+            # intactos. Para volver a verlas, vaciar PESTANAS_MUDADAS_AL_KIOSKO.
+            if nombre in PESTANAS_MUDADAS_AL_KIOSKO:
+                visible = False
+            visible_by_index[index] = visible
 
         for index, is_visible in visible_by_index.items():
             self.tabs.setTabVisible(index, is_visible)
@@ -2020,16 +1945,20 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _primera_pestana_visible(visible_by_index: dict, is_admin: bool) -> int:
-        """A dónde caer cuando la pestaña actual quedó oculta."""
-        preferida = 0 if is_admin else 1
-        if visible_by_index.get(preferida, False):
-            return preferida
+        """A dónde caer cuando la pestaña actual quedó oculta.
+
+        El dueño cae en Resumen (la 0); los demás, en la primera visible.
+        """
+        if is_admin and visible_by_index.get(0, False):
+            return 0
         return next((i for i, visible in sorted(visible_by_index.items()) if visible), 0)
 
     def _focus_default_tab_for_role(self) -> None:
         if self.tabs is None:
             return
-        preferida = 0 if self.current_role == RolUsuario.ADMIN else 1
+        preferida = 0
+        if self.current_role == RolUsuario.ADMIN:
+            preferida = self._indice_de_pestana("Resumen") or 0
         if not self.tabs.isTabVisible(preferida):
             preferida = next(
                 (i for i in range(self.tabs.count()) if self.tabs.isTabVisible(i)), 0
@@ -2054,9 +1983,6 @@ class MainWindow(QMainWindow):
 
     def _build_catalog_tab(self) -> QWidget:
         return build_products_tab(self)
-
-    def _build_quotes_tab(self) -> QWidget:
-        return build_quotes_tab(self)
 
     def _build_inventory_tab(self) -> QWidget:
         return build_inventory_tab(self)
@@ -2225,10 +2151,12 @@ class MainWindow(QMainWindow):
         open_meilisearch_settings_dialog(self)
 
     def _handle_open_uniforms_panel(self) -> None:
-        # Navegar a la pestaña Panel Uniformes (índice 6 desde que se
-        # retiraron las pestañas Caja y Apartados, 2026-11-12)
-        if self.tabs is not None:
-            self.tabs.setCurrentIndex(6)
+        # Navegar a la pestaña Panel Uniformes, por nombre: su índice se
+        # corrió al retirar Caja, Apartados (2026-11-12) y Presupuestos
+        # (2026-11-13).
+        indice = self._indice_de_pestana("Panel Uniformes")
+        if indice is not None:
+            self.tabs.setCurrentIndex(indice)
 
     def _refresh_business_settings_form(self) -> None:
         try:
@@ -6021,18 +5949,6 @@ class MainWindow(QMainWindow):
         self.refresh_all()
         QMessageBox.information(self, "Compra registrada", f"Compra {document} confirmada correctamente.")
 
-    @staticmethod
-    def _generate_quote_folio() -> str:
-        return f"PRE-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid4().hex[:4].upper()}"
-
-    def _reset_quote_form(self) -> None:
-        self.quote_sku_input.clear()
-        self.quote_qty_spin.setValue(1)
-        self.quote_client_combo.setCurrentIndex(0)
-        self.quote_validity_input.setDate(QDate.currentDate().addDays(7))
-        self.quote_note_input.clear()
-        self.quote_folio_input.setText(self._generate_quote_folio())
-
     @classmethod
     def _format_discount_label(cls, value: Decimal) -> str:
         return format_discount_label(value)
@@ -6057,368 +5973,6 @@ class MainWindow(QMainWindow):
         if len(preview_list) <= 4:
             return f"{preview_head} | rango {preview_list[0]} -> {preview_list[-1]}"
         return f"{preview_head} ... (+{len(preview_list) - 4}) | rango {preview_list[0]} -> {preview_list[-1]}"
-
-    def _prompt_quick_quote_client_data(self) -> dict[str, str] | None:
-        from PyQt6.QtCore import QRegularExpression
-        from PyQt6.QtGui import QRegularExpressionValidator
-
-        dialog, layout = self._create_modal_dialog(
-            "Nuevo cliente rapido",
-            "Registra un cliente con nombre y telefono para vincularlo al presupuesto.",
-            width=500,
-        )
-        name_label = QLabel("Nombre")
-        name_input = QLineEdit()
-        name_input.setPlaceholderText("Nombre completo del cliente")
-        name_input.setMinimumHeight(36)
-        phone_label = QLabel("Telefono")
-        phone_input = QLineEdit()
-        phone_input.setPlaceholderText("10 digitos")
-        phone_input.setMinimumHeight(36)
-        phone_input.setMaxLength(10)
-        phone_input.setValidator(QRegularExpressionValidator(QRegularExpression(r"\d{0,10}")))
-        error_label = QLabel("")
-        error_label.setStyleSheet("color: #c0392b; font-size: 12px;")
-        error_label.setVisible(False)
-        preview_label = QLabel("")
-        preview_label.setObjectName("subtleLine")
-        preview_label.setVisible(False)
-
-        def _update_preview() -> None:
-            name = name_input.text().strip()
-            phone = phone_input.text().strip()
-            if name:
-                parts = [f"<b>{name}</b>"]
-                if phone:
-                    parts.append(f" · Tel: {phone}")
-                preview_label.setText("".join(parts))
-                preview_label.setVisible(True)
-            else:
-                preview_label.setVisible(False)
-
-        name_input.textChanged.connect(_update_preview)
-        phone_input.textChanged.connect(_update_preview)
-
-        layout.addWidget(name_label)
-        layout.addWidget(name_input)
-        layout.addWidget(phone_label)
-        layout.addWidget(phone_input)
-        layout.addWidget(error_label)
-        layout.addWidget(preview_label)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
-        cancel_btn = buttons.button(QDialogButtonBox.StandardButton.Cancel)
-        if ok_btn is not None:
-            ok_btn.setText("Crear cliente")
-        if cancel_btn is not None:
-            cancel_btn.setText("Cancelar")
-
-        def _try_accept() -> None:
-            name = name_input.text().strip()
-            phone = phone_input.text().strip()
-            if not name:
-                error_label.setText("El nombre es obligatorio.")
-                error_label.setVisible(True)
-                name_input.setFocus()
-                return
-            if phone and len(phone) != 10:
-                error_label.setText("El telefono debe tener exactamente 10 digitos.")
-                error_label.setVisible(True)
-                phone_input.setFocus()
-                return
-            error_label.setVisible(False)
-            dialog.accept()
-
-        buttons.accepted.connect(_try_accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addWidget(buttons)
-        name_input.setFocus()
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return None
-        return {
-            "nombre": name_input.text().strip(),
-            "telefono": phone_input.text().strip(),
-        }
-
-    def _handle_create_quote_client(self) -> None:
-        feedback = build_quote_guard_feedback(
-            "create_client",
-            can_operate=self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO},
-        )
-        if feedback is not None:
-            QMessageBox.warning(self, feedback.title, feedback.message)
-            return
-        data = self._prompt_quick_quote_client_data()
-        if data is None:
-            return
-        try:
-            with get_session() as session:
-                usuario = session.get(Usuario, self.user_id)
-                if usuario is None:
-                    raise ValueError("Usuario no encontrado.")
-                client = ClientService.create_client_quick(
-                    session=session,
-                    usuario=usuario,
-                    nombre=data["nombre"],
-                    telefono=data["telefono"],
-                )
-                session.flush()
-                client_id = int(client.id)
-                client_message = build_quote_client_created_feedback(
-                    session,
-                    client_name=str(client.nombre),
-                    client_code=str(client.codigo_cliente),
-                )
-                session.commit()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "No se pudo crear", str(exc))
-            return
-
-        self.refresh_all()
-        for index in range(self.quote_client_combo.count()):
-            client_data = self.quote_client_combo.itemData(index)
-            if isinstance(client_data, dict) and int(client_data.get("id", 0)) == client_id:
-                self.quote_client_combo.setCurrentIndex(index)
-                break
-        QMessageBox.information(
-            self,
-            "Cliente creado",
-            client_message,
-        )
-
-    def _handle_add_quote_item(self) -> None:
-        feedback = build_quote_guard_feedback(
-            "add_item",
-            can_operate=self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO},
-        )
-        if feedback is not None:
-            QMessageBox.warning(self, feedback.title, feedback.message)
-            return
-
-        sku = self.quote_sku_input.text().strip().upper()
-        if not sku:
-            QMessageBox.warning(self, "Datos incompletos", "Captura un SKU antes de agregar al presupuesto.")
-            return
-
-        quantity = 1
-        try:
-            with get_session() as session:
-                variante = PresupuestoService.obtener_variante_por_sku(session, sku)
-                if variante is None:
-                    raise ValueError(f"El SKU '{sku}' no existe o esta inactivo.")
-                result = add_quote_scan_variants(
-                    self,
-                    session,
-                    quote_cart=self.quote_cart,
-                    scanned_variant=variante,
-                    quantity=quantity,
-                    variant_loader=PresupuestoService.obtener_variante_por_sku,
-                )
-                if result is None:
-                    self.quote_sku_input.setFocus()
-                    self.quote_sku_input.selectAll()
-                    return
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "No se pudo agregar", str(exc))
-            return
-
-        self.quote_sku_input.clear()
-        self._refresh_quote_cart_table()
-        self.quote_sku_input.setFocus()
-
-    def _handle_remove_quote_item(self) -> None:
-        selected_row = self.quote_cart_table.currentRow()
-        feedback = build_quote_guard_feedback(
-            "remove_item",
-            has_selection=0 <= selected_row < len(self.quote_cart),
-        )
-        if feedback is not None:
-            QMessageBox.warning(self, feedback.title, feedback.message)
-            return
-        removed_line_item = dict(self.quote_cart[selected_row])
-        self.quote_cart.pop(selected_row)
-        restore_message = restore_sports_uniform_playera_price_if_needed(
-            self.quote_cart,
-            removed_line_item=removed_line_item,
-        )
-        self._refresh_quote_cart_table()
-        if restore_message:
-            QMessageBox.information(self, "Precio restaurado", restore_message)
-
-    def _change_selected_quote_item_quantity(self, delta: int) -> None:
-        selected_row = self.quote_cart_table.currentRow()
-        if selected_row < 0 or selected_row >= len(self.quote_cart):
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona una linea del presupuesto.")
-            return
-
-        selected_item = self.quote_cart[selected_row]
-        current_quantity = int(selected_item.get("cantidad") or 1)
-        new_quantity = current_quantity + int(delta)
-        if new_quantity <= 0:
-            QMessageBox.information(
-                self,
-                "Cantidad minima",
-                "Usa 'Quitar linea' si quieres sacar por completo el articulo del presupuesto.",
-            )
-            return
-        try:
-            with get_session() as session:
-                update_sale_cart_item_quantity(
-                    session,
-                    sale_cart=self.quote_cart,
-                    row_index=selected_row,
-                    new_quantity=new_quantity,
-                    variant_loader=PresupuestoService.obtener_variante_por_sku,
-                    stock_validator=lambda _variante, _cantidad: None,
-                )
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "Cantidad no actualizada", str(exc))
-            return
-        self._refresh_quote_cart_table()
-        self.quote_cart_table.selectRow(selected_row)
-
-    def _handle_decrease_quote_item_quantity(self) -> None:
-        self._change_selected_quote_item_quantity(-1)
-
-    def _handle_increase_quote_item_quantity(self) -> None:
-        self._change_selected_quote_item_quantity(1)
-
-    def _handle_clear_quote_cart(self) -> None:
-        self.quote_cart.clear()
-        self._refresh_quote_cart_table()
-        self._reset_quote_form()
-
-    def _handle_save_quote(self) -> None:
-        feedback = build_quote_guard_feedback(
-            "save_quote",
-            can_operate=self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO},
-        )
-        if feedback is not None:
-            QMessageBox.warning(self, feedback.title, feedback.message)
-            return
-        if not self.quote_cart:
-            if self.quote_sku_input.text().strip():
-                self._handle_add_quote_item()
-                if not self.quote_cart:
-                    return
-            feedback = build_quote_guard_feedback("save_quote", has_items=bool(self.quote_cart))
-            if feedback is not None:
-                QMessageBox.warning(self, feedback.title, feedback.message)
-                return
-
-        selected_client = self.quote_client_combo.currentData()
-        client_id = int(selected_client["id"]) if isinstance(selected_client, dict) and selected_client.get("id") else None
-
-        try:
-            with get_session() as session:
-                usuario = session.get(Usuario, self.user_id)
-                if usuario is None:
-                    raise ValueError("Usuario no encontrado.")
-                cliente = session.get(Cliente, client_id) if client_id is not None else None
-                presupuesto = PresupuestoService.crear_presupuesto(
-                    session=session,
-                    usuario=usuario,
-                    folio=self.quote_folio_input.text().strip() or self._generate_quote_folio(),
-                    items=build_quote_presupuesto_inputs(self.quote_cart),
-                    cliente=cliente,
-                    cliente_nombre=cliente.nombre if cliente is not None else None,
-                    cliente_telefono=cliente.telefono if cliente is not None else None,
-                    vigencia_hasta=local_day_window(self.quote_validity_input.date().toPyDate())[0],
-                    observacion=self.quote_note_input.toPlainText().strip(),
-                    estado=EstadoPresupuesto.EMITIDO,
-                )
-                session.commit()
-                presupuesto_folio = presupuesto.folio
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "No se pudo guardar", str(exc))
-            return
-
-        self.quote_cart.clear()
-        self._refresh_quote_cart_table()
-        self._reset_quote_form()
-        self.refresh_all()
-        result_view = build_quote_result_feedback("save_quote", item_label=presupuesto_folio)
-        QMessageBox.information(self, result_view.title, result_view.message)
-
-    def _selected_quote_id(self) -> int | None:
-        return resolve_selected_quote_id(self.quote_table)
-
-    def _handle_quote_selection(self) -> None:
-        self._refresh_quote_detail(self._selected_quote_id())
-        self._apply_quote_action_state()
-        self._refresh_permissions()
-
-    def _apply_quote_action_state(self) -> None:
-        action_state = build_quote_action_state(
-            can_sell=self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO},
-            has_selection=self._selected_quote_id() is not None,
-            selected_state=self.selected_quote_state,
-            has_phone=bool(self.selected_quote_phone.strip()),
-        )
-        self.quote_cancel_button.setEnabled(action_state.cancel_enabled)
-        self.quote_whatsapp_button.setEnabled(action_state.whatsapp_enabled)
-
-    def _handle_quote_filters_changed(self) -> None:
-        try:
-            with get_session() as session:
-                self._refresh_quotes(session)
-        except SQLAlchemyError:
-            self.status_label.setText("Estado: no se pudieron aplicar los filtros de presupuestos.")
-
-    def _handle_cancel_quote(self) -> None:
-        quote_id = self._selected_quote_id()
-        feedback = build_quote_guard_feedback("cancel_quote", has_selection=quote_id is not None)
-        if feedback is not None:
-            QMessageBox.warning(self, feedback.title, feedback.message)
-            return
-        assert quote_id is not None
-        if QMessageBox.question(
-            self,
-            "Cancelar presupuesto",
-            "Este cambio no afecta inventario, pero el presupuesto quedara marcado como cancelado. ¿Continuar?",
-        ) != QMessageBox.StandardButton.Yes:
-            return
-        try:
-            with get_session() as session:
-                cancel_quote(session, quote_id=quote_id, user_id=self.user_id)
-                session.commit()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "No se pudo cancelar", str(exc))
-            return
-        self.refresh_all()
-        result_view = build_quote_result_feedback("cancel_quote")
-        QMessageBox.information(self, result_view.title, result_view.message)
-
-    def _handle_open_quote_whatsapp(self) -> None:
-        quote_id = self._selected_quote_id()
-        feedback = build_quote_guard_feedback("open_whatsapp", has_selection=quote_id is not None)
-        if feedback is not None:
-            QMessageBox.warning(self, feedback.title, feedback.message)
-            return
-
-        assert quote_id is not None
-        try:
-            with get_session() as session:
-                whatsapp_view = build_quote_whatsapp_view(session, quote_id=quote_id)
-            normalized_phone = self._normalize_whatsapp_phone(whatsapp_view.phone_number)
-            if len(normalized_phone) < 10:
-                raise ValueError("El telefono del cliente no parece valido para WhatsApp.")
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "WhatsApp no disponible", str(exc))
-            return
-
-        whatsapp_url = f"https://wa.me/{normalized_phone}?text={quote(whatsapp_view.message)}"
-        if not webbrowser.open(whatsapp_url):
-            QMessageBox.warning(
-                self,
-                "No se pudo abrir WhatsApp",
-                "No se pudo abrir WhatsApp automaticamente. Verifica que tengas navegador disponible.",
-            )
-            return
-
-        self.quote_status_label.setText(
-            f"WhatsApp preparado para {whatsapp_view.customer_label}."
-        )
 
     def _handle_inventory_adjustment(self) -> None:
         if self.current_role != RolUsuario.ADMIN:
@@ -6850,7 +6404,6 @@ class MainWindow(QMainWindow):
                 self._refresh_combos(session)
                 self._refresh_catalog(session)
                 self._refresh_inventory_table(session)
-                self._refresh_quotes(session)
                 self._refresh_analytics(session)
                 self._refresh_history(session)
         except Exception as exc:  # noqa: BLE001
@@ -6877,7 +6430,6 @@ class MainWindow(QMainWindow):
 
     def _refresh_permissions(self) -> None:
         is_admin = self.current_role == RolUsuario.ADMIN
-        can_sell = self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
         catalog_access_view = build_catalog_access_view(is_admin=is_admin)
         self._apply_role_navigation()
         self.category_button.setEnabled(is_admin)
@@ -6902,21 +6454,12 @@ class MainWindow(QMainWindow):
         self.purchase_button.setEnabled(is_admin)
         self.inventory_count_button.setEnabled(is_admin)
         self.inventory_print_label_button.setEnabled(is_admin)
-        self.quote_add_button.setEnabled(can_sell)
-        self.quote_create_client_button.setEnabled(can_sell)
-        self.quote_save_button.setEnabled(can_sell)
-        self.quote_qty_down_button.setEnabled(can_sell and bool(self.quote_cart))
-        self.quote_qty_up_button.setEnabled(can_sell and bool(self.quote_cart))
-        self.quote_remove_button.setEnabled(can_sell and bool(self.quote_cart))
-        self.quote_clear_button.setEnabled(can_sell and bool(self.quote_cart))
-        self.quote_refresh_button.setEnabled(can_sell)
         if self.header_more_button is not None:
             self.header_more_button.setVisible(is_admin)
         if self.connection_action is not None:
             self.connection_action.setEnabled(is_admin)
         self.inventory_adjust_button.setEnabled(is_admin)
         self.logout_button.setEnabled(True)
-        self._apply_quote_action_state()
         self.settings_create_backup_button.setEnabled(is_admin)
         self.settings_refresh_backups_button.setEnabled(True)
         self.settings_open_backups_button.setEnabled(True)
@@ -7580,19 +7123,6 @@ class MainWindow(QMainWindow):
             self.purchase_provider_combo,
             [(proveedor.nombre, proveedor.id) for proveedor in proveedores],
         )
-        self.quote_client_combo.blockSignals(True)
-        self.quote_client_combo.clear()
-        self.quote_client_combo.addItem("Sin cliente asignado", None)
-        for cliente in clientes:
-            self.quote_client_combo.addItem(
-                f"{cliente.codigo_cliente} · {cliente.nombre}",
-                {
-                    "id": int(cliente.id),
-                    "nombre": cliente.nombre,
-                    "telefono": cliente.telefono or "",
-                },
-            )
-        self.quote_client_combo.blockSignals(False)
         self._populate_filter_combo(
             self.analytics_client_combo,
             "Cliente: todos",
@@ -7621,116 +7151,6 @@ class MainWindow(QMainWindow):
             self.inventory_variant_combo.setCurrentIndex(-1)
         self._refresh_catalog_section_controls()
         self._refresh_inventory_selection_panel()
-
-    def _refresh_quotes(self, session) -> None:
-        selected_quote_id = self._selected_quote_id()
-        search_text = self.quote_search_input.text().strip().lower()
-        state_filter = str(self.quote_state_combo.currentData() or "")
-        quote_snapshots = build_quote_history_input_rows(load_quote_snapshot_rows(session, limit=200))
-        rows = build_quote_history_rows(
-            quote_snapshots=quote_snapshots,
-            search_text=search_text,
-            state_filter=state_filter,
-        )
-        quote_summary_view = build_quote_summary_view(
-            visible_count=len(rows),
-            search_text=self.quote_search_input.text(),
-            state_filter_value=self.quote_state_combo.currentData(),
-            state_filter_text=self.quote_state_combo.currentText(),
-        )
-
-        self.quote_rows = rows
-        row_views = build_quote_table_row_views(rows)
-        self.quote_table.setRowCount(len(row_views))
-        for row_index, row_view in enumerate(row_views):
-            for column_index, value in enumerate(row_view.values):
-                self.quote_table.setItem(row_index, column_index, _table_item(value))
-            self.quote_table.item(row_index, 0).setData(Qt.ItemDataRole.UserRole, row_view.quote_id)
-            status_item = self.quote_table.item(row_index, 2)
-            total_item = self.quote_table.item(row_index, 3)
-            if status_item is not None:
-                _set_table_badge_style(status_item, row_view.status_tone)
-            if total_item is not None:
-                _set_table_badge_style(total_item, row_view.total_tone)
-        self.quote_table.resizeColumnsToContents()
-        self.quote_status_label.setText(quote_summary_view.status_label)
-        self._apply_quote_action_state()
-
-        if selected_quote_id is not None:
-            self.quote_table.blockSignals(True)
-            for row_index in range(self.quote_table.rowCount()):
-                item = self.quote_table.item(row_index, 0)
-                if item is not None and item.data(Qt.ItemDataRole.UserRole) == selected_quote_id:
-                    self.quote_table.setCurrentCell(row_index, 0)
-                    self.quote_table.selectRow(row_index)
-                    break
-            self.quote_table.blockSignals(False)
-
-        self._refresh_quote_detail(self._selected_quote_id())
-        self._refresh_permissions()
-
-    def _refresh_quote_detail(self, quote_id: int | None) -> None:
-        if not quote_id:
-            self.selected_quote_state = ""
-            self.selected_quote_phone = ""
-            detail_view = build_empty_quote_detail_view()
-            self._apply_quote_detail_view(detail_view)
-            self._apply_quote_action_state()
-            return
-
-        try:
-            with get_session() as session:
-                quote_snapshot = load_quote_detail_snapshot(session, quote_id=quote_id)
-                self.selected_quote_state = str(quote_snapshot.status_label)
-                self.selected_quote_phone = (
-                    ""
-                    if str(quote_snapshot.phone_text).strip().lower() == "sin telefono"
-                    else str(quote_snapshot.phone_text).strip()
-                )
-                detail_view = build_quote_detail_view(
-                    folio=quote_snapshot.folio,
-                    client_name=quote_snapshot.customer_label,
-                    status_label=quote_snapshot.status_label,
-                    phone_text=quote_snapshot.phone_text,
-                    total=quote_snapshot.total,
-                    validity_label=quote_snapshot.validity_label,
-                    user_label=quote_snapshot.user_label,
-                    notes_text=quote_snapshot.notes_text,
-                    detail_rows=[
-                        {
-                            "sku": detail.sku,
-                            "description": detail.description,
-                            "size_label": detail.size_label,
-                            "quantity": detail.quantity,
-                            "unit_price": detail.unit_price,
-                            "subtotal": detail.subtotal,
-                        }
-                        for detail in quote_snapshot.detail_rows
-                    ],
-                )
-                self._apply_quote_detail_view(detail_view)
-        except Exception as exc:  # noqa: BLE001
-            self.selected_quote_state = ""
-            self.selected_quote_phone = ""
-            detail_view = build_error_quote_detail_view(str(exc))
-            self._apply_quote_detail_view(detail_view)
-        self._apply_quote_action_state()
-
-    def _apply_quote_detail_view(self, detail_view) -> None:
-        self.quote_customer_label.setText(detail_view.customer_label)
-        self.quote_meta_label.setText(detail_view.meta_label)
-        self.quote_notes_label.setText(detail_view.notes_label)
-        self.quote_detail_table.setRowCount(len(detail_view.detail_rows))
-        for row_index, detalle in enumerate(detail_view.detail_rows):
-            values = list(detalle.table_values)
-            for column_index, value in enumerate(values):
-                item = _table_item(value)
-                if column_index == 3:
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                elif column_index in {4, 5}:
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                self.quote_detail_table.setItem(row_index, column_index, item)
-        self.quote_detail_table.resizeColumnsToContents()
 
     def _refresh_inventory_table(self, session=None) -> None:
         current_variant_id = self.inventory_variant_combo.currentData()
@@ -8719,26 +8139,6 @@ class MainWindow(QMainWindow):
                 paper_mode={"continuous": "continuous", "dk1221": "die_cut"}.get(mode, "standard"),
             ),
         )
-
-    def _refresh_quote_cart_table(self) -> None:
-        quote_cart_view = build_quote_cart_view(self.quote_cart)
-        self.quote_cart_table.setRowCount(len(quote_cart_view.rows))
-        for row_index, row in enumerate(quote_cart_view.rows):
-            for column_index, value in enumerate(row.values):
-                item = _table_item(value)
-                if column_index == 0:
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                elif column_index in {5, 6}:
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                self.quote_cart_table.setItem(row_index, column_index, item)
-        self.quote_cart_table.resizeColumnsToContents()
-        self.quote_total_label.setText(quote_cart_view.summary.total_label)
-        self.quote_summary_label.setText(quote_cart_view.summary.summary_label)
-        can_sell = self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
-        self.quote_qty_down_button.setEnabled(can_sell and bool(self.quote_cart))
-        self.quote_qty_up_button.setEnabled(can_sell and bool(self.quote_cart))
-        self.quote_remove_button.setEnabled(can_sell and bool(self.quote_cart))
-        self.quote_clear_button.setEnabled(can_sell and bool(self.quote_cart))
 
     def _selected_catalog_row(self) -> dict[str, object] | None:
         inventory_variant_id = self._inventory_table_variant_id_at_row(self.inventory_table.currentRow())
