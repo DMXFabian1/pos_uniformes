@@ -695,7 +695,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertIsNotNone(window.settings_employee_day_sales_dialog)
         self.addCleanup(window.settings_employee_day_sales_dialog.close)  # cada prueba cierra lo que abre
         self.assertEqual(window.settings_employee_day_sales_table.rowCount(), 1)
-        self.assertEqual(window.settings_employee_day_sales_status_label.text(), "Tickets confirmados del dia: 1")
+        self.assertEqual(window.settings_employee_day_sales_status_label.text(), "Operaciones de la Libreta del dia: 1")
         self.assertEqual(window.settings_employee_day_sales_table.item(0, 1).text(), "VTA-010")
         self.assertTrue(window.settings_employee_view_ticket_button.isEnabled())
 

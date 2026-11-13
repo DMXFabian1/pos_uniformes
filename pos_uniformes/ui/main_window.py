@@ -2815,13 +2815,13 @@ class MainWindow(QMainWindow):
                 today_text = f"{today_text} | ${snapshot.period_amount:,.2f}"
             self.settings_employee_detail_today_label.setText(today_text)
             if snapshot.last_sale_at is None:
-                self.settings_employee_detail_last_sale_label.setText("Ultima venta: Sin ventas confirmadas.")
+                self.settings_employee_detail_last_sale_label.setText("Ultima venta: Sin ventas en la Libreta.")
             else:
                 self.settings_employee_detail_last_sale_label.setText(
                     f"Ultima venta: {format_display_datetime(snapshot.last_sale_at)}"
                 )
             self.settings_employee_activity_status_label.setText(
-                "Ultimos 7 dias de ventas confirmadas acreditadas a esta empleada."
+                "Ultimos 7 dias de lo que vendio en la Libreta (ventas y apartados; monto: solo ventas)."
             )
 
         self.settings_employee_activity_table.setRowCount(len(snapshot.day_rows) if has_selection else 0)
@@ -2898,9 +2898,9 @@ class MainWindow(QMainWindow):
             f"{visible_name or 'Empleada'} · {format_display_date(target_day)}"
         )
         self.settings_employee_day_sales_status_label.setText(
-            f"Tickets confirmados del dia: {len(rows)}"
+            f"Operaciones de la Libreta del dia: {len(rows)}"
             if rows
-            else "No hubo tickets confirmados acreditados en ese dia."
+            else "No vendio nada en la Libreta ese dia."
         )
         self.settings_employee_day_sales_table.setRowCount(len(rows))
         for row_index, row_view in enumerate(rows):

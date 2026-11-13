@@ -91,11 +91,14 @@ class BatchEmployeeActivityTests(unittest.TestCase):
 
     def test_sales_grouped_by_code_case_insensitive(self) -> None:
         employees = [self._employee(1, "VEND-1"), self._employee(2, "VEND-2")]
+        # 2026-11-12: la ficha lee la Libreta, no la tabla `venta`.
         venta = SimpleNamespace(
-            seller_employee_code="vend-1",
-            confirmada_at=datetime.now(timezone.utc),
-            detalles=[SimpleNamespace(cantidad=3)],
-            total="150.00",
+            employee_code="vend-1",
+            tipo="venta",
+            created_at=datetime.now(timezone.utc),
+            piezas=3,
+            monto_total="150.00",
+            descuento_empleada=False,
         )
         _session, snapshots = self._run(employees, ventas=[venta])
         self.assertEqual(snapshots[1].today_tickets, 1)

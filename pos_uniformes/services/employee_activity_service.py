@@ -1,4 +1,18 @@
-"""Resumen operativo para actividad reciente de empleadas."""
+"""Resumen operativo para actividad reciente de empleadas.
+
+2026-11-12, Daniel: «la caja antigua ya no es de utilidad, todo lo demás
+corre en libreta y kioskos» → «Pantallas con datos viejos». La ficha de
+Configuración › Empleadas leía la tabla `venta` de la Caja antigua (lo que la
+empleada se compraba a crédito) y todas salían «Sin actividad». Ahora lee la
+Libreta (`LibretaVenta.employee_code`) con el MISMO criterio que el ranking
+del mismo diálogo (`ranking_libreta_service`): lo que VENDE cada empleada.
+
+- Tickets y piezas: sus operaciones (`cuenta_como_operacion`: venta y
+  apartado; ni el abono ni su propia compra con precio especial).
+- Monto: el importe de sus ventas (solo tipo venta), como «Importe ventas»
+  del ranking; el apartado no suma su valor aquí.
+- Una operación anulada se borra de la Libreta: ya no cuenta.
+"""
 
 from __future__ import annotations
 
@@ -8,9 +22,8 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 from sqlalchemy import func, select
-from sqlalchemy.orm import selectinload
 
-from pos_uniformes.database.models import Empleada, EstadoVenta, ModoOrigenVenta, Venta
+from pos_uniformes.database.models import Empleada, LibretaVenta
 from pos_uniformes.utils.date_format import local_day_window
 
 
@@ -57,7 +70,7 @@ def build_employee_activity_snapshot(
     pin_ready: bool,
     qr_ready: bool,
     card_ready: bool,
-    sales: list[object] | tuple[object, ...],
+    operaciones: list[object] | tuple[object, ...],
     reference_date: date | None = None,
     history_days: int = 7,
     summary_days: int = 1,
@@ -87,14 +100,24 @@ def build_employee_activity_snapshot(
             amount=Decimal("0.00"),
         )
 
+    from pos_uniformes.services.libreta_service import cuenta_como_operacion
+
     last_sale_at: datetime | None = None
-    for sale in sales:
-        sale_datetime = getattr(sale, "confirmada_at", None) or getattr(sale, "created_at", None)
+    for sale in operaciones:
+        # El criterio del ranking: solo lo que cuenta como operación (venta y
+        # apartado, sin su propia compra con precio especial).
+        if not cuenta_como_operacion(sale):
+            continue
+        sale_datetime = getattr(sale, "created_at", None)
         if sale_datetime is None:
             continue
         sale_day = (sale_datetime.astimezone() if sale_datetime.tzinfo is not None else sale_datetime).date()
-        pieces = sum(int(getattr(detail, "cantidad", 0) or 0) for detail in getattr(sale, "detalles", ()))
-        amount = Decimal(str(getattr(sale, "total", Decimal("0.00")) or Decimal("0.00"))).quantize(Decimal("0.01"))
+        pieces = int(getattr(sale, "piezas", 0) or 0)
+        amount = (
+            Decimal(str(getattr(sale, "monto_total", None) or "0")).quantize(Decimal("0.01"))
+            if str(getattr(sale, "tipo", None) or "venta") == "venta"
+            else Decimal("0.00")
+        )
         if sale_day >= summary_start:
             period_pieces += pieces
             period_tickets += 1
@@ -200,8 +223,8 @@ def load_employee_activity_snapshots(
     history_days: int = 7,
     summary_days: int = 1,
 ) -> dict[int, EmployeeActivitySnapshot]:
-    """Versión batch de load_employee_activity_snapshot: UNA sola query de
-    ventas para todas las empleadas. La versión por-empleada dentro de un
+    """Versión batch de load_employee_activity_snapshot: UNA sola query a la
+    Libreta para todas las empleadas. La versión por-empleada dentro de un
     loop era un N+1 que congelaba la pestaña de Configuración."""
     from pos_uniformes.services.employee_card_service import EmployeeCardService
     from pos_uniformes.services.employee_identity_service import EmployeeIdentityService
@@ -219,22 +242,22 @@ def load_employee_activity_snapshots(
     window_start, _ = local_day_window(reference_date - timedelta(days=lookback_days - 1))
 
     codes = {str(employee.codigo).upper() for employee in employees}
-    sales_by_code: dict[str, list[Venta]] = {code: [] for code in codes}
-    ventas = session.scalars(
-        select(Venta)
-        .options(selectinload(Venta.detalles))
+    from pos_uniformes.services.libreta_service import predicado_operacion
+
+    sales_by_code: dict[str, list[LibretaVenta]] = {code: [] for code in codes}
+    operaciones = session.scalars(
+        select(LibretaVenta)
         .where(
-            Venta.estado == EstadoVenta.CONFIRMADA,
-            Venta.credit_mode == ModoOrigenVenta.EMPLOYEE,
-            func.upper(Venta.seller_employee_code).in_(codes),
-            Venta.confirmada_at >= window_start,
+            predicado_operacion(),
+            func.upper(LibretaVenta.employee_code).in_(codes),
+            LibretaVenta.created_at >= window_start,
         )
-        .order_by(Venta.confirmada_at.desc())
+        .order_by(LibretaVenta.created_at.desc())
     ).all()
-    for venta in ventas:
-        code = str(venta.seller_employee_code or "").upper()
+    for operacion in operaciones:
+        code = str(operacion.employee_code or "").upper()
         if code in sales_by_code:
-            sales_by_code[code].append(venta)
+            sales_by_code[code].append(operacion)
 
     return {
         int(employee.id): build_employee_activity_snapshot(
@@ -242,7 +265,7 @@ def load_employee_activity_snapshots(
             pin_ready=EmployeeIdentityService.has_pin(employee),
             qr_ready=QrGenerator.exists_for_employee(employee),
             card_ready=EmployeeCardService.exists_for_employee(employee),
-            sales=sales_by_code.get(str(employee.codigo).upper(), ()),
+            operaciones=sales_by_code.get(str(employee.codigo).upper(), ()),
             reference_date=reference_date,
             history_days=history_days,
             summary_days=summary_days,
@@ -258,6 +281,6 @@ def build_employee_activity_empty_snapshot() -> EmployeeActivitySnapshot:
         pin_ready=False,
         qr_ready=False,
         card_ready=False,
-        sales=(),
+        operaciones=(),
         visible_name_builder=lambda _value: "",
     )

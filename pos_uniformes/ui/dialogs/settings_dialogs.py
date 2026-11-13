@@ -420,7 +420,7 @@ def build_employee_day_sales_dialog(window: "MainWindow") -> QDialog:
     dialog, layout = _create_settings_dialog(
         window,
         "Tickets del dia",
-        "Consulta los tickets confirmados acreditados a la empleada en la fecha seleccionada.",
+        "Consulta lo que vendio la empleada en la Libreta en la fecha seleccionada.",
         width=860,
     )
     window.settings_employee_day_sales_status_label.setObjectName("subtleLine")
@@ -467,7 +467,7 @@ def build_employee_sale_detail_dialog(window: "MainWindow") -> QDialog:
     dialog, layout = _create_settings_dialog(
         window,
         "Detalle de ticket",
-        "Consulta los productos incluidos en el ticket seleccionado.",
+        "Consulta los productos de la operacion de la Libreta seleccionada.",
         width=980,
     )
     window.settings_employee_sale_detail_status_label.setObjectName("subtleLine")
