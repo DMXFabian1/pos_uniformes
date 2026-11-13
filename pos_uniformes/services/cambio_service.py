@@ -187,15 +187,22 @@ def roles_promo_3pz(detalle: list[dict], calculo: dict | None) -> list[str]:
 
 
 def playeras_sin_monedero(detalle: list[dict], calculo: dict | None, roles: list[str],
-                          vendida_en: datetime | None = None) -> list[bool]:
+                          vendida_en: datetime | None = None,
+                          sin_foto: bool | None = None) -> list[bool]:
     """Qué playeras de la promo 3pz NO generaron Monedero en esa venta (pura).
 
     Daniel (2026-11-13): «Solo la playera». Para no quitarle de más ni de
     menos al regresar algo, se sigue lo que de verdad pasó en la venta:
     - Con fotografía del motor, lo dice el motivo `3PZ_PLAYERA_SIN_MONEDERO`
       de su línea (las fotografías de antes no lo traen: esa playera ganó).
-    - Sin fotografía, la cuenta de antes (`base_cashback_legada`): desde el
-      13/11/2026 la playera no gana; una venta de antes sí ganó."""
+      Se lee el mismo cálculo que usa el abono (`monedero_service.
+      _base_de_la_fotografia`): primero el del servidor, pero saltándose uno
+      sin la parte del Monedero (bloqueado, p. ej. cliente inactivo al
+      recalcular: ahí el motor no marca la playera y el abono sale del
+      cálculo del kiosko).
+    - Sin fotografía, la cuenta de antes (`base_cashback_legada`): `sin_foto`
+      si se sabe con cuál cuenta se abonó (`playera_sin_monedero_segun_abono`);
+      si no, por fecha: desde el 13/11/2026 la playera no gana."""
     from pos_uniformes.services.beneficios.motivos import TRES_PZ_PLAYERA_SIN_MONEDERO
     from pos_uniformes.services.sports_uniform_pricing_service import playera_3pz_sin_monedero_en
 
@@ -207,6 +214,9 @@ def playeras_sin_monedero(detalle: list[dict], calculo: dict | None, roles: list
         lineas = calc.get("lineas") if isinstance(calc, dict) else None
         if not isinstance(lineas, list) or not lineas:
             continue
+        parte = calc.get("monedero")
+        if not isinstance(parte, dict) or parte.get("base") in (None, ""):
+            continue  # bloqueado: el abono no sale de este cálculo
         hay_foto = True
         for linea in lineas:
             if not isinstance(linea, dict):
@@ -215,7 +225,7 @@ def playeras_sin_monedero(detalle: list[dict], calculo: dict | None, roles: list
                 if isinstance(origen, (list, tuple)) and origen:
                     motivos_por_uid.setdefault(str(origen[0]), set(linea.get("motivos") or ()))
         break
-    regla_nueva = playera_3pz_sin_monedero_en(vendida_en)
+    regla_nueva = playera_3pz_sin_monedero_en(vendida_en) if sin_foto is None else bool(sin_foto)
     salida = []
     for l, rol in zip(detalle, roles):
         if rol != PLAYERA_3PZ or l.get("rebaja"):
@@ -227,6 +237,32 @@ def playeras_sin_monedero(detalle: list[dict], calculo: dict | None, roles: list
         else:
             salida.append(regla_nueva)
     return salida
+
+
+def playera_sin_monedero_segun_abono(session, venta) -> bool | None:
+    """Venta sin fotografía: ¿se abonó SIN la playera 3pz? (2026-11-13)
+
+    La regla rige desde que se instaló, no desde las 00:00 del 13/11: una
+    venta de ese día abonada antes por el servidor viejo sí ganó por la
+    playera. El movimiento de cashback guarda la base con la que se abonó
+    (`base_calculo`); se compara con las dos cuentas de antes. None si no
+    hay abono con base o no se distingue (se usa la fecha)."""
+    from pos_uniformes.services import monedero_service as mon
+
+    bases = [m.base_calculo for m in mon.movimientos_de_operacion(session, venta.id)
+             if m.tipo == mon.CASHBACK and m.base_calculo is not None]
+    if not bases:
+        return None
+    base = _d(bases[0]).quantize(_CENT)
+    con = mon.base_cashback_legada(venta, excluir_playeras=False)[0].quantize(_CENT)
+    sin = mon.base_cashback_legada(venta, excluir_playeras=True)[0].quantize(_CENT)
+    if con == sin:
+        return None
+    if base == con:
+        return False
+    if base == sin:
+        return True
+    return None
 
 
 def _pants_rebajados_que_lleva(lleva: list[dict]) -> int:
@@ -287,7 +323,8 @@ def renglones_vendidos(session, venta) -> list[RenglonVendido]:
     detalle = list(venta.detalle or [])
     calculo = venta.calculo if isinstance(venta.calculo, dict) else None
     roles = roles_promo_3pz(detalle, calculo)
-    sin_monedero = playeras_sin_monedero(detalle, calculo, roles, getattr(venta, "created_at", None))
+    sin_foto = playera_sin_monedero_segun_abono(session, venta) if PLAYERA_3PZ in roles else None
+    sin_monedero = playeras_sin_monedero(detalle, calculo, roles, getattr(venta, "created_at", None), sin_foto)
     normales = _precios_normales(
         session, {str(l.get("sku", "")) for l, rol in zip(detalle, roles) if rol == PLAYERA_3PZ}
     )

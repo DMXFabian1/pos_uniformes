@@ -184,24 +184,47 @@ def base_sin_comision_tarjeta(libreta_venta, base) -> tuple[Decimal, bool]:
     return base_monedero_con_comision(base, pagado, comision), True
 
 
-def base_cashback_legada(libreta_venta) -> tuple[Decimal, bool]:
+def base_cashback_legada(libreta_venta, excluir_playeras: bool | None = None) -> tuple[Decimal, bool]:
     """La cuenta de antes del motor: (lo cobrado − el saldo − lo rebajado −
     las playeras de la promo 3pz), luego sin la comisión de la terminal. Solo
     para ventas SIN fotografía (ventas viejas o cobradas con el cálculo de
-    respaldo)."""
-    base = importe_elegible(libreta_venta.monto_total, getattr(libreta_venta, "monto_monedero", None))
+    respaldo).
+
+    `excluir_playeras`: None sigue la fecha de la venta (desde el 13/11/2026
+    la playera no gana); True/False fuerza una de las dos cuentas (para ver
+    con cuál se abonó una venta, cambio_service)."""
+    pagado = importe_elegible(libreta_venta.monto_total, getattr(libreta_venta, "monto_monedero", None))
     # E7: lo cobrado en Oferta o Liquidación no genera Monedero.
     from pos_uniformes.services.rebaja_service import importe_rebajado
     from pos_uniformes.services import sports_uniform_pricing_service as spp
 
     detalle = getattr(libreta_venta, "detalle", None) or []
     sin_monedero = importe_rebajado(detalle)
-    if spp.playera_3pz_sin_monedero_en(getattr(libreta_venta, "created_at", None)):
+    if excluir_playeras is None:
+        excluir_playeras = spp.playera_3pz_sin_monedero_en(getattr(libreta_venta, "created_at", None))
+    if excluir_playeras:
         # 2026-11-13 (Daniel: «Solo la playera»): la playera a $100 del 3pz
         # tampoco. Una venta de antes se queda con la cuenta de entonces.
-        sin_monedero += spp.importe_playeras_promo_3pz(detalle)
-    base = max(base - sin_monedero, _CERO)
+        # Como el motor, solo se resta lo que la playera pagó SIN saldo: el
+        # saldo que cae en ella ya se restó arriba (si no, se restaba dos
+        # veces y el abono salía menor que el «ganaste» del ticket).
+        sin_monedero += parte_sin_saldo(
+            spp.importe_playeras_promo_3pz(detalle), libreta_venta.monto_total, pagado
+        )
+    base = max(pagado - sin_monedero, _CERO)
     return base_sin_comision_tarjeta(libreta_venta, base)
+
+
+def parte_sin_saldo(importe, total, pagado) -> Decimal:
+    """De `importe` (parte de una venta de `total`), lo que se pagó sin saldo
+    cuando de ese total se pagaron `pagado` sin saldo: el saldo se reparte en
+    proporción, como en el motor (2026-11-13)."""
+    importe, total, pagado = _d(importe), _d(total), _d(pagado)
+    if importe <= 0:
+        return _CERO
+    if total <= 0 or pagado >= total:
+        return importe.quantize(_CENT)
+    return min((importe * pagado / total).quantize(_CENT), importe).quantize(_CENT)
 
 
 def _base_del_calculo(calc: dict, libreta_venta) -> tuple[Decimal, bool] | None:

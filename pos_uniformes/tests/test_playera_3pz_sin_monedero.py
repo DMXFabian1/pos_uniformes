@@ -144,6 +144,29 @@ class CuentaDeAntesTests(unittest.TestCase):
         venta = self._venta(created_at=datetime(2026, 11, 12, 18, 0, tzinfo=UTC))
         self.assertEqual(mon.base_cashback_legada(venta), (D("580.00"), False))
 
+    def test_con_saldo_no_resta_dos_veces_el_saldo_de_la_playera(self):
+        # Pants 3pz $350 + playera $100 = $450 con $100 de saldo: el motor da
+        # 350 − 77.78 = 272.22; la cuenta de antes debe decir lo mismo.
+        _, c = _calculo([_pants_base(precio=D("350")), _playera_promo()],
+                        usar_saldo=True, saldo_disponible=D("100"))
+        self.assertEqual((c.total, c.saldo_usado), (D("450.00"), D("100.00")))
+        detalle = [{"sku": "PB-8", "nombre": "Pants 2pz Deportivo", "cantidad": 1, "precio": "350"},
+                   {"sku": "PLY-8", "nombre": "Playera Deportiva (promo 3pz)", "cantidad": 1, "precio": "100"}]
+        venta = SimpleNamespace(id=2, monto_total=D("450"), monto_monedero=D("100"), pago_tarjeta=False,
+                                detalle=detalle, calculo=None, created_at=HOY)
+        base, _ = mon.base_cashback_legada(venta)
+        self.assertLessEqual(abs(base - c.monedero.base), D("0.01"))
+        self.assertEqual(base, D("272.22"))
+        # La cuenta de una venta de antes no cambia.
+        self.assertEqual(mon.base_cashback_legada(venta, excluir_playeras=False)[0], D("350.00"))
+
+    def test_kiosko_cuenta_de_antes_con_saldo(self):
+        from pos_uniformes.ui.helpers.quick_sale_monedero_helper import MonederoVentaMixin
+
+        w = SimpleNamespace(_items=[_pants_base(precio=D("350")), _playera_promo()],
+                            _importe_rebajado_carrito=lambda: D("0"))
+        self.assertEqual(MonederoVentaMixin._base_cashback_legada(w, D("450"), D("100")), D("272.22"))
+
     def test_playera_rebajada_no_se_cuenta_dos_veces(self):
         detalle = [{"nombre": "Playera (promo 3pz)", "precio": "100", "cantidad": 1, "rebaja": "oferta"}]
         self.assertEqual(spp.importe_playeras_promo_3pz(detalle), D("0.00"))
@@ -162,14 +185,20 @@ class CambioTests(unittest.TestCase):
          "cantidad": 1},
     ]
 
-    def _foto(self, motivo_playera: bool):
-        return {"entrada": {"lineas": [{"linea_uid": "u-pants", "promo_3pz": True},
-                                       {"linea_uid": "u-playera", "promo_3pz": True}]},
-                "calculo": {"lineas": [
+    @staticmethod
+    def _calc(motivo_playera: bool, bloqueado: bool = False):
+        return {"monedero": None if bloqueado else {"base": "300.00"},
+                "motivos_ticket": [M.CLIENTE_INACTIVO] if bloqueado else [],
+                "lineas": [
                     {"lineas_origen": [["u-pants", 1]], "motivos": []},
                     {"lineas_origen": [["u-playera", 1]],
                      "motivos": [M.TRES_PZ_PLAYERA_SIN_MONEDERO] if motivo_playera else []},
-                ]}}
+                ]}
+
+    def _foto(self, motivo_playera: bool):
+        return {"entrada": {"lineas": [{"linea_uid": "u-pants", "promo_3pz": True},
+                                       {"linea_uid": "u-playera", "promo_3pz": True}]},
+                "calculo": self._calc(motivo_playera)}
 
     def _flags(self, foto, vendida_en=HOY):
         roles = cs.roles_promo_3pz(self.DETALLE, foto)
@@ -183,6 +212,40 @@ class CambioTests(unittest.TestCase):
     def test_sin_fotografia_por_fecha(self):
         self.assertEqual(self._flags(None), [False, True])
         self.assertEqual(self._flags(None, datetime(2026, 11, 10, tzinfo=UTC)), [False, False])
+
+    def test_servidor_bloqueado_se_lee_el_calculo_del_kiosko(self):
+        # El servidor recalculó con el monedero inactivo (sin parte del
+        # Monedero ni motivo en la playera); el abono sale del kiosko, que
+        # sí excluyó la playera: el reparto debe seguir al kiosko.
+        foto = self._foto(True)
+        foto["servidor"] = {"calculo": self._calc(False, bloqueado=True)}
+        self.assertEqual(self._flags(foto), [False, True])
+        # Los dos bloqueados: ningún cálculo manda, se va por la fecha.
+        foto["calculo"] = self._calc(False, bloqueado=True)
+        self.assertEqual(self._flags(foto), [False, True])
+        self.assertEqual(self._flags(foto, datetime(2026, 11, 10, tzinfo=UTC)), [False, False])
+
+    def test_sin_fotografia_manda_con_que_se_abono(self):
+        roles = cs.roles_promo_3pz(self.DETALLE, None)
+        # Venta del 13/11 abonada por el servidor viejo con la playera: ganó.
+        self.assertEqual(cs.playeras_sin_monedero(self.DETALLE, None, roles, HOY, False), [False, False])
+        self.assertEqual(cs.playeras_sin_monedero(self.DETALLE, None, roles, HOY, True), [False, True])
+
+    def test_segun_abono_compara_con_las_dos_cuentas(self):
+        from unittest import mock
+
+        venta = SimpleNamespace(id=7, monto_total=D("400"), monto_monedero=None, pago_tarjeta=False,
+                                detalle=self.DETALLE, calculo=None, created_at=HOY)
+
+        def con_base(base):
+            movs = [SimpleNamespace(tipo=mon.CASHBACK, base_calculo=base)] if base is not None else []
+            with mock.patch.object(mon, "movimientos_de_operacion", return_value=movs):
+                return cs.playera_sin_monedero_segun_abono(None, venta)
+
+        self.assertIs(con_base(D("400.00")), False)   # abonado con la playera (antes de instalar)
+        self.assertIs(con_base(D("300.00")), True)    # abonado ya sin la playera
+        self.assertIsNone(con_base(D("123.00")))      # no se distingue: por fecha
+        self.assertIsNone(con_base(None))             # sin abono
 
     def _renglones(self, playera_sin_monedero: bool):
         return [

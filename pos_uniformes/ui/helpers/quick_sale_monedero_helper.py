@@ -337,13 +337,15 @@ class MonederoVentaMixin:
         """La cuenta de antes del motor (cobrado − saldo − rebajado − playeras 3pz)."""
         from pos_uniformes.services.beneficios.motor import base_monedero_con_comision, neto_con_comision
         from pos_uniformes.services.libreta_service import TERMINAL_COMMISSION_PERCENT
-        from pos_uniformes.services.monedero_service import importe_elegible
+        from pos_uniformes.services.monedero_service import importe_elegible, parte_sin_saldo
         from pos_uniformes.services.sports_uniform_pricing_service import importe_playeras_promo_3pz
 
         pagado = importe_elegible(total, canje)
         # E7: lo que va en Oferta o Liquidación no suma Monedero; la playera
-        # a $100 del 3pz tampoco (2026-11-13, «Solo la playera»).
-        sin_monedero = self._importe_rebajado_carrito() + importe_playeras_promo_3pz(getattr(self, "_items", []) or [])
+        # a $100 del 3pz tampoco (2026-11-13, «Solo la playera»), y de ella
+        # solo lo pagado sin saldo (el saldo ya se restó en `pagado`).
+        playeras = importe_playeras_promo_3pz(getattr(self, "_items", []) or [])
+        sin_monedero = self._importe_rebajado_carrito() + parte_sin_saldo(playeras, total, pagado)
         base = max(pagado - sin_monedero, _CERO)
         if tarjeta and pagado > 0:
             # Regla B (Daniel, 2026-11-12): con tarjeta, sobre lo que deja la terminal.
