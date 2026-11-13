@@ -280,7 +280,6 @@ from pos_uniformes.services.settings_employee_action_service import (
 )
 from pos_uniformes.services.supplier_service import SupplierService
 from pos_uniformes.services.user_service import UserService
-from pos_uniformes.services.venta_service import VentaService
 from pos_uniformes.ui.login_dialog import LoginDialog
 from pos_uniformes.ui.dialogs.settings_dialogs import (
     build_backup_settings_dialog,
