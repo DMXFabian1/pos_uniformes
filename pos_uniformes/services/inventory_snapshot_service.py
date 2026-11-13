@@ -73,6 +73,9 @@ def _build_inventory_snapshot_row(row: tuple[object, ...]) -> dict[str, object]:
             "ultimo_conteo_at": row[21],
             "stock_minimo": int(row[22]) if row[22] is not None else None,
             "producto_id": int(row[23]) if len(row) > 23 and row[23] is not None else None,
+            # Tiene receta en conjunto_componente (Pants 3pz / Chamarra armados
+            # de piezas): mismo criterio que conjunto_service.filtro_sin_conjuntos.
+            "es_conjunto": bool(row[24]) if len(row) > 24 else False,
             "qr_exists": qr_exists,
             "origen_etiqueta": "LEGACY" if row[10] else "NUEVO",
             "variante_estado": "ACTIVA" if row[19] else "INACTIVA",
@@ -103,7 +106,7 @@ def invalidate_inventory_qr_exists_cache(*, sku: str | None = None) -> None:
 
 
 def _execute_inventory_snapshot_query(session) -> list[tuple[object, ...]]:
-    from sqlalchemy import func, literal, select, and_
+    from sqlalchemy import exists, func, literal, select, and_
 
     from pos_uniformes.database.models import (
         Apartado,
@@ -112,6 +115,7 @@ def _execute_inventory_snapshot_query(session) -> list[tuple[object, ...]]:
         BodegaContenido,
         BodegaUbicacion,
         Categoria,
+        ConjuntoComponente,
         Escuela,
         EstadoApartado,
         ImportacionCatalogoFila,
@@ -183,6 +187,7 @@ def _execute_inventory_snapshot_query(session) -> list[tuple[object, ...]]:
             Variante.ultimo_conteo_at,
             Variante.stock_minimo,
             Producto.id,
+            exists().where(ConjuntoComponente.conjunto_id == Producto.id).label("es_conjunto"),
         )
         .join(Variante.producto)
         .join(Producto.categoria)

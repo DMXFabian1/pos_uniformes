@@ -9,6 +9,7 @@ from pos_uniformes.services.inventario_existencia_service import (
     coincide_filtro_existencia,
     contar_existencias,
     es_conjunto_o_virtual,
+    es_fila_virtual,
     texto_existencia,
     tono_existencia,
 )
@@ -36,12 +37,25 @@ class ClasificarExistenciaTests(unittest.TestCase):
         self.assertEqual(tono_existencia(6), "positive")
 
     def test_minimo_negativo_es_virtual(self) -> None:
-        self.assertEqual(clasificar_existencia(0, stock_minimo=-1), "virtual")
-        self.assertEqual(tono_existencia(0, stock_minimo=-1), "neutral")
+        self.assertEqual(clasificar_existencia(2, stock_minimo=-1), "virtual")
+        self.assertEqual(tono_existencia(2, stock_minimo=-1), "neutral")
 
-    def test_conjunto_se_muestra_neutral(self) -> None:
-        self.assertEqual(texto_existencia(0, virtual=True), "0 Conjunto")
-        self.assertEqual(tono_existencia(-1, virtual=True), "neutral")
+    def test_conjunto_con_existencia_se_muestra_neutral(self) -> None:
+        self.assertEqual(texto_existencia(3, virtual=True), "3 Conjunto")
+        self.assertEqual(tono_existencia(3, virtual=True), "neutral")
+        # «Conjunto» no es «bajo»: su número sale de las piezas.
+        self.assertEqual(texto_existencia(2, virtual=True), "2 Conjunto")
+
+    def test_conjunto_en_cero_dice_agotado_en_rojo(self) -> None:
+        # Pants 3pz talla 8 en 0 (se acabó la playera): no se puede vender.
+        self.assertEqual(clasificar_existencia(0, virtual=True), "agotado")
+        self.assertEqual(texto_existencia(0, virtual=True), "0 Agotado")
+        self.assertEqual(tono_existencia(0, virtual=True), "danger")
+        self.assertEqual(texto_existencia(0, stock_minimo=-1), "0 Agotado")
+
+    def test_conjunto_en_negativo_dice_negativo_en_rojo(self) -> None:
+        self.assertEqual(texto_existencia(-1, virtual=True), "\u22121 Negativo")
+        self.assertEqual(tono_existencia(-1, virtual=True), "danger")
 
     def test_negativo_se_ve_en_rojo_con_texto_claro(self) -> None:
         self.assertEqual(clasificar_existencia(-2), "negativo")
@@ -52,26 +66,26 @@ class ClasificarExistenciaTests(unittest.TestCase):
         self.assertEqual(clasificar_existencia(-1, stock_minimo=5), "negativo")
 
 
-def _fila(stock: int, minimo: int | None = None, pieza: str = "Playera") -> dict[str, object]:
-    return {"stock_actual": stock, "stock_minimo": minimo, "tipo_pieza_nombre": pieza}
+def _fila(
+    stock: int, minimo: int | None = None, pieza: str = "Playera", *, receta: bool = False
+) -> dict[str, object]:
+    return {"stock_actual": stock, "stock_minimo": minimo, "tipo_pieza_nombre": pieza, "es_conjunto": receta}
 
 
 class ConjuntoOVirtualTests(unittest.TestCase):
-    def test_pants_3pz_y_chamarra_son_conjunto(self) -> None:
-        self.assertTrue(es_conjunto_o_virtual(tipo_pieza_nombre="Pants 3pz"))
-        self.assertTrue(es_conjunto_o_virtual(tipo_pieza_nombre="Chamarra"))
-        self.assertFalse(es_conjunto_o_virtual(tipo_pieza_nombre="Pants 2pz"))
-        self.assertFalse(es_conjunto_o_virtual(tipo_pieza_nombre=None))
+    def test_conjunto_es_el_que_tiene_receta(self) -> None:
+        self.assertTrue(es_conjunto_o_virtual(es_conjunto=True))
+        self.assertFalse(es_conjunto_o_virtual(es_conjunto=False))
+        self.assertFalse(es_conjunto_o_virtual())
+
+    def test_el_nombre_del_tipo_no_decide(self) -> None:
+        # Chamarra nueva SIN receta: guarda stock propio y sí se cuenta.
+        self.assertFalse(es_fila_virtual(_fila(0, pieza="Chamarra")))
+        self.assertTrue(es_fila_virtual(_fila(0, pieza="Chamarra", receta=True)))
 
     def test_marcador_viejo_minimo_negativo(self) -> None:
-        self.assertTrue(es_conjunto_o_virtual(tipo_pieza_nombre="Playera", stock_minimo=-1))
-        self.assertFalse(es_conjunto_o_virtual(tipo_pieza_nombre="Playera", stock_minimo=0))
-
-    def test_misma_lista_que_conteo(self) -> None:
-        from pos_uniformes.services.conjunto_service import TIPOS_CONJUNTO
-        from pos_uniformes.services.conteo_service import _TIPOS_VIRTUALES
-
-        self.assertEqual(set(TIPOS_CONJUNTO), set(_TIPOS_VIRTUALES))
+        self.assertTrue(es_conjunto_o_virtual(stock_minimo=-1))
+        self.assertFalse(es_conjunto_o_virtual(stock_minimo=0))
 
 
 class ContarExistenciasTests(unittest.TestCase):
@@ -85,14 +99,18 @@ class ContarExistenciasTests(unittest.TestCase):
     def test_conjuntos_no_se_cuentan_dos_veces(self) -> None:
         filas = [
             _fila(4, pieza="Pants 2pz"),
-            _fila(0, pieza="Pants 3pz"),
-            _fila(-1, pieza="Chamarra"),
-            _fila(2, pieza="Pants 3pz"),
+            _fila(0, pieza="Pants 3pz", receta=True),
+            _fila(-1, pieza="Chamarra", receta=True),
+            _fila(2, pieza="Pants 3pz", receta=True),
             _fila(0, minimo=-1),
         ]
         conteo = contar_existencias(filas)
         self.assertEqual((conteo.negativos, conteo.agotados, conteo.bajos), (0, 0, 0))
         self.assertEqual(conteo.piezas, 4)
+
+    def test_chamarra_sin_receta_si_se_cuenta(self) -> None:
+        conteo = contar_existencias([_fila(0, pieza="Chamarra"), _fila(2, pieza="Pants 3pz")])
+        self.assertEqual((conteo.agotados, conteo.bajos, conteo.piezas), (1, 1, 2))
 
 
 class FiltroExistenciaTests(unittest.TestCase):
@@ -119,14 +137,24 @@ class FiltroExistenciaTests(unittest.TestCase):
         self.assertTrue(coincide_filtro_existencia(0, "below_min", stock_minimo=5))
         self.assertTrue(coincide_filtro_existencia(6, "low", stock_minimo=8))
 
-    def test_conjunto_solo_sin_filtro_o_en_disponible(self) -> None:
-        self.assertFalse(coincide_filtro_existencia(0, "zero", virtual=True))
-        self.assertFalse(coincide_filtro_existencia(-1, "negative", virtual=True))
+    def test_conjunto_en_cero_no_es_disponible_y_si_agotado(self) -> None:
+        self.assertFalse(coincide_filtro_existencia(0, "available", virtual=True))
+        self.assertTrue(coincide_filtro_existencia(0, "zero", virtual=True))
+        self.assertFalse(coincide_filtro_existencia(0, "low", virtual=True))
         self.assertTrue(coincide_filtro_existencia(0, "", virtual=True))
 
-    def test_virtual_solo_en_disponible(self) -> None:
-        self.assertTrue(coincide_filtro_existencia(0, "available", stock_minimo=-1))
-        self.assertFalse(coincide_filtro_existencia(0, "zero", stock_minimo=-1))
+    def test_conjunto_en_negativo_sale_en_negativo(self) -> None:
+        self.assertTrue(coincide_filtro_existencia(-1, "negative", virtual=True))
+        self.assertFalse(coincide_filtro_existencia(-1, "available", virtual=True))
+
+    def test_conjunto_con_existencia_solo_en_disponible(self) -> None:
+        self.assertTrue(coincide_filtro_existencia(2, "available", virtual=True))
+        self.assertFalse(coincide_filtro_existencia(2, "low", virtual=True))
+        self.assertFalse(coincide_filtro_existencia(2, "below_min", stock_minimo=-1))
+
+    def test_virtual_viejo_en_cero(self) -> None:
+        self.assertFalse(coincide_filtro_existencia(0, "available", stock_minimo=-1))
+        self.assertTrue(coincide_filtro_existencia(0, "zero", stock_minimo=-1))
 
 
 if __name__ == "__main__":

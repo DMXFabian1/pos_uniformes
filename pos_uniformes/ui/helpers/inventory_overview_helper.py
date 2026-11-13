@@ -95,9 +95,10 @@ def build_inventory_overview_view(
     movement_type: str | None,
     movement_quantity: int | None,
     movement_date: str,
+    es_conjunto: bool = False,
 ) -> InventoryOverviewView:
     clean_product_name = sanitize_product_display_name(product_name)
-    virtual = es_conjunto_o_virtual(tipo_pieza_nombre=tipo_pieza_nombre, stock_minimo=stock_minimo)
+    virtual = es_conjunto_o_virtual(es_conjunto=es_conjunto, stock_minimo=stock_minimo)
     clase = clasificar_existencia(stock_actual, stock_minimo=stock_minimo, virtual=virtual)
     stock_status = _ESTADO_FICHA.get(clase, "saludable")
     stock_tone = tono_existencia(stock_actual, stock_minimo=stock_minimo, virtual=virtual)

@@ -123,5 +123,17 @@ class InventoryTableRowHelperTests(unittest.TestCase):
         self.assertEqual(view.row_tone, "danger")
 
 
+    def test_pants_3pz_con_receta_en_cero_y_con_existencia(self) -> None:
+        base = {
+            "variante_id": 5, "sku": "SKU-005", "producto_nombre_base": "Pants 3pz Gales",
+            "talla": "8", "color": "Azul", "apartado_cantidad": 0, "variante_activa": True,
+            "qr_exists": True, "ultimo_conteo_at": None, "stock_minimo": None,
+            "tipo_pieza_nombre": "Pants 3pz", "es_conjunto": True,
+        }
+        cero = build_inventory_table_row_view({**base, "stock_actual": 0})
+        self.assertEqual((cero.values[4], cero.stock_tone, cero.row_tone), ("0 Agotado", "danger", "danger"))
+        dos = build_inventory_table_row_view({**base, "stock_actual": 2})
+        self.assertEqual((dos.values[4], dos.stock_tone), ("2 Conjunto", "neutral"))
+
 if __name__ == "__main__":
     unittest.main()

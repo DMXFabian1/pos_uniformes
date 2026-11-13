@@ -171,5 +171,52 @@ class OrdenFilasInventarioTests(unittest.TestCase):
         self.assertEqual([f["sku"] for f in ordenar_filas_inventario(filas)], ["B", "D", "A", "C"])
 
 
+class SnapshotEsConjuntoSqlTests(unittest.TestCase):
+    """`es_conjunto` sale de la receta (conjunto_componente), no del nombre del tipo."""
+
+    def test_solo_el_conjunto_con_receta_se_marca(self) -> None:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import Session
+
+        from pos_uniformes.database.connection import Base
+        from pos_uniformes.database.models import (
+            Categoria, ConjuntoComponente, Marca, Producto, TipoPieza, Variante,
+        )
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        with Session(engine) as s:
+            cat, marca = Categoria(nombre="Uniformes"), Marca(nombre="G")
+            piezas = {n: TipoPieza(nombre=n) for n in ("Pants 3pz", "Pants 2pz", "Chamarra")}
+            s.add_all([cat, marca, *piezas.values()])
+            s.flush()
+
+            def prod(nombre: str, pieza: str) -> Producto:
+                p = Producto(nombre=nombre, nombre_base=nombre, categoria_id=cat.id, marca_id=marca.id,
+                             tipo_pieza_id=piezas[pieza].id)
+                s.add(p)
+                s.flush()
+                s.add(Variante(producto_id=p.id, sku=f"S{p.id}", talla="10", color="Rojo",
+                               precio_venta=100, stock_actual=0))
+                return p
+
+            p3 = prod("Pants 3pz JS", "Pants 3pz")
+            p2 = prod("Pants 2pz JS", "Pants 2pz")
+            cham = prod("Chamarra nueva sin receta", "Chamarra")
+            s.add(ConjuntoComponente(conjunto_id=p3.id, componente_id=p2.id, cantidad=1, grupo=0))
+            s.commit()
+            id3, id2, idc = p3.id, p2.id, cham.id
+
+            with patch(
+                "pos_uniformes.services.inventory_snapshot_service._inventory_qr_exists",
+                return_value=False,
+            ):
+                filas = {f["producto_id"]: f for f in load_inventory_snapshot_rows(s)}
+
+        self.assertTrue(filas[id3]["es_conjunto"])
+        self.assertFalse(filas[id2]["es_conjunto"])
+        self.assertFalse(filas[idc]["es_conjunto"])
+
+
 if __name__ == "__main__":
     unittest.main()

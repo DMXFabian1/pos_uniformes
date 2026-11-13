@@ -125,5 +125,44 @@ class InventoryOverviewServiceTests(unittest.TestCase):
             )
 
 
+    def test_ficha_toma_el_conjunto_de_la_variante_aunque_catalogo_este_filtrado(self) -> None:
+        variant = SimpleNamespace(
+            id=10,
+            producto_id=77,
+            sku="SKU-010",
+            talla="10",
+            color="Rojo",
+            stock_actual=0,
+            stock_minimo=None,
+            precio_venta=Decimal("450.00"),
+            activo=True,
+            producto=SimpleNamespace(
+                id=77, nombre="Pants 3pz JS", tipo_pieza=SimpleNamespace(nombre="Pants 3pz")
+            ),
+        )
+
+        def scalar(query):
+            return True if "conjunto_componente" in str(query) else None
+
+        session = SimpleNamespace(get=lambda _model, _variant_id: variant, scalar=scalar)
+
+        snapshot = load_inventory_overview_snapshot(session, variant_id=10, catalog_rows=[])
+
+        self.assertTrue(snapshot.es_conjunto)
+        self.assertEqual(snapshot.tipo_pieza_nombre, "Pants 3pz")
+
+    def test_sin_receta_no_es_conjunto(self) -> None:
+        variant = SimpleNamespace(
+            id=11, producto_id=78, sku="SKU-011", talla="10", color="Rojo", stock_actual=2,
+            stock_minimo=None, precio_venta=Decimal("450.00"), activo=True,
+            producto=SimpleNamespace(id=78, nombre="Chamarra", tipo_pieza=SimpleNamespace(nombre="Chamarra")),
+        )
+
+        def scalar(query):
+            return False if "conjunto_componente" in str(query) else None
+
+        session = SimpleNamespace(get=lambda _model, _variant_id: variant, scalar=scalar)
+        self.assertFalse(load_inventory_overview_snapshot(session, variant_id=11, catalog_rows=[]).es_conjunto)
+
 if __name__ == "__main__":
     unittest.main()

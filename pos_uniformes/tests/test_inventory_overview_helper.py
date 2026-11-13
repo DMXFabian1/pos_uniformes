@@ -120,5 +120,33 @@ class InventoryOverviewHelperTests(unittest.TestCase):
         self.assertEqual(view.stock_badge.tone, "danger")
 
 
+    def _ficha_3pz(self, stock: int, *, es_conjunto: bool):
+        return build_inventory_overview_view(
+            sku="SKU-3PZ",
+            product_name="Pants 3pz JS",
+            product_active=True,
+            variant_active=True,
+            stock_actual=stock,
+            apartado_cantidad=0,
+            talla="10",
+            color="Rojo",
+            precio_venta=Decimal("450.00"),
+            origen_etiqueta="NUEVO",
+            escuela_nombre="Justo Sierra",
+            tipo_prenda_nombre="Deportivo",
+            tipo_pieza_nombre="-",  # la fila de Catálogo no estaba en su filtro
+            movement_type=None,
+            movement_quantity=None,
+            movement_date="",
+            es_conjunto=es_conjunto,
+        )
+
+    def test_ficha_de_conjunto_clasifica_igual_que_la_tabla(self) -> None:
+        self.assertEqual(self._ficha_3pz(2, es_conjunto=True).stock_badge.text, "Conjunto")
+        self.assertEqual(self._ficha_3pz(2, es_conjunto=True).stock_badge.tone, "neutral")
+        cero = self._ficha_3pz(0, es_conjunto=True)
+        self.assertEqual((cero.stock_badge.text, cero.stock_badge.tone), ("Agotado", "danger"))
+        self.assertEqual(self._ficha_3pz(2, es_conjunto=False).stock_badge.text, "Bajo")
+
 if __name__ == "__main__":
     unittest.main()

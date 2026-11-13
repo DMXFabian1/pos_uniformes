@@ -9139,6 +9139,7 @@ class MainWindow(QMainWindow):
                         movement_type=overview_snapshot.movement_type,
                         movement_quantity=overview_snapshot.movement_quantity,
                         movement_date=overview_snapshot.movement_date,
+                        es_conjunto=overview_snapshot.es_conjunto,
                     )
                 )
         except Exception:  # noqa: BLE001
