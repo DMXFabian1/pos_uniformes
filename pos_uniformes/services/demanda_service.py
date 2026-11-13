@@ -264,3 +264,65 @@ def resumen(filas) -> ResumenDemanda:
             if getattr(f, "tipo", "") == TALLA_AGOTADA
         ),
     )
+
+
+# ─── Por SKU (Inventario, tanda 5) ──────────────────────────────────────
+#: «La pidieron N veces en 30 días»: la ventana que mira Inventario.
+DIAS_DE_DEMANDA = 30
+
+
+def pedidas_por_sku(filas) -> dict[str, int]:
+    """Cuántas veces tocaron cada talla estando agotada (puro).
+
+    Solo `talla_agotada` trae SKU: una búsqueda vacía es texto (puede ser un
+    sinónimo) y un carrito cancelado no dice que faltara algo.
+    """
+    cuentas: dict[str, int] = defaultdict(int)
+    for f in filas or []:
+        sku = str(getattr(f, "sku", "") or "").strip()
+        if getattr(f, "tipo", "") == TALLA_AGOTADA and sku:
+            cuentas[sku] += 1
+    return dict(cuentas)
+
+
+def cargar_pedidas_por_sku(session, *, ahora: datetime | None = None, dias: int = DIAS_DE_DEMANDA) -> dict[str, int]:
+    """Lo mismo, contado en la base con una sola consulta agrupada.
+
+    Si la tabla aún no existe en esa base (migración `z9b0c1d2e3f4` sin
+    correr), devuelve {} y deja la sesión usable: Inventario sigue sin el dato.
+    """
+    from sqlalchemy import func, select
+    from sqlalchemy.exc import ProgrammingError
+
+    from pos_uniformes.database.models import DemandaNoAtendida
+
+    desde = (ahora or datetime.now()) - timedelta(days=dias)
+    consulta = (
+        select(DemandaNoAtendida.sku, func.count(DemandaNoAtendida.id))
+        .where(
+            DemandaNoAtendida.tipo == TALLA_AGOTADA,
+            DemandaNoAtendida.created_at >= desde,
+            DemandaNoAtendida.sku != "",
+        )
+        .group_by(DemandaNoAtendida.sku)
+    )
+    try:
+        return {str(sku): int(veces) for sku, veces in session.execute(consulta)}
+    except ProgrammingError:
+        session.rollback()
+        return {}
+
+
+def cargar_pedidas() -> dict[str, int]:
+    """Abre su propia sesión (para la caché de Inventario)."""
+    from pos_uniformes.database.connection import get_session
+
+    with get_session() as session:
+        return cargar_pedidas_por_sku(session)
+
+
+def texto_pedidas(veces: int, *, dias: int = DIAS_DE_DEMANDA) -> str:
+    """«La pidieron 4 veces en 30 días»; vacío si nadie la pidió."""
+    if veces <= 0:
+        return ""
+    return f"La pidieron {veces} {'vez' if veces == 1 else 'veces'} en {dias} días"
