@@ -9,7 +9,6 @@ import os
 from pathlib import Path
 import subprocess
 import sys
-from time import monotonic
 from types import SimpleNamespace
 import unicodedata
 from urllib.parse import quote
@@ -76,7 +75,6 @@ from pos_uniformes.database.models import (
     EstadoCompra,
     EstadoVenta,
     Marca,
-    ModoOrigenVenta,
     MovimientoInventario,
     NivelEducativo,
     Producto,
@@ -193,7 +191,7 @@ from pos_uniformes.services.quote_snapshot_service import (
     load_quote_snapshot_rows,
 )
 from pos_uniformes.services.quote_detail_service import load_quote_detail_snapshot
-from pos_uniformes.services.quote_action_service import cancel_quote, convert_quote_to_cart
+from pos_uniformes.services.quote_action_service import cancel_quote
 from pos_uniformes.services.quote_whatsapp_service import build_quote_whatsapp_view
 from pos_uniformes.services.layaway_alerts_service import load_layaway_alerts_snapshot
 from pos_uniformes.services.layaway_closure_service import (
@@ -209,43 +207,15 @@ from pos_uniformes.services.layaway_closure_service import (
 from pos_uniformes.services.layaway_creation_service import create_layaway_from_payload
 from pos_uniformes.services.layaway_detail_service import load_layaway_detail_snapshot
 from pos_uniformes.services.layaway_payment_action_service import register_layaway_payment
-from pos_uniformes.services.sale_payment_context_service import build_sale_payment_note_context
-from pos_uniformes.services.sale_checkout_action_service import complete_sale_checkout
-from pos_uniformes.services.sale_discount_context_service import (
-    build_sale_discount_context,
-    build_sale_manual_promo_snapshot,
-    calculate_sale_discount_pricing,
-    calculate_sale_discount_totals,
-    clear_sale_manual_promo_snapshot,
-    load_sale_discount_presets,
-    resolve_sale_client_discount_ui_state,
-    resolve_sale_manual_discount_transition,
-    verify_sale_manual_promo_code,
-)
-from pos_uniformes.services.sale_discount_option_service import (
-    build_sale_discount_options,
-    expected_discount_option_label,
-)
+# El PIN del corte administrativo se valida con el mismo código de la promo
+# manual; es lo único que queda en main_window del servicio de la Caja antigua.
+from pos_uniformes.services.sale_discount_context_service import verify_sale_manual_promo_code
 from pos_uniformes.services.sale_document_view_service import (
     build_layaway_receipt_document_view,
     build_layaway_sale_ticket_document_view,
-    build_sale_ticket_document_view,
 )
-from pos_uniformes.services.sale_cart_update_service import (
-    add_sale_cart_manual_line,
-    add_sale_cart_variants,
-    update_sale_cart_item_quantity,
-)
-from pos_uniformes.services.sale_selected_client_service import (
-    find_active_sale_client_by_code,
-    load_sale_selected_client_discount_percent,
-)
-from pos_uniformes.services.sale_discount_service import (
-    format_discount_label,
-    normalize_discount_value,
-)
-from pos_uniformes.services.recent_sale_service import list_recent_sale_rows
-from pos_uniformes.services.recent_sale_action_service import cancel_recent_sale
+from pos_uniformes.services.sale_cart_update_service import update_sale_cart_item_quantity
+from pos_uniformes.services.sale_discount_service import format_discount_label
 from pos_uniformes.services.search_filter_service import (
     CATALOG_SEARCH_ALIAS_MAP,
     CATALOG_SEARCH_GENERAL_FIELDS,
@@ -486,16 +456,7 @@ from pos_uniformes.ui.helpers.layaway_delivery_feedback_helper import (
 from pos_uniformes.ui.helpers.layaway_history_helper import build_layaway_history_rows
 from pos_uniformes.ui.helpers.layaway_summary_helper import build_layaway_summary_view
 from pos_uniformes.ui.helpers.layaway_table_row_helper import build_layaway_table_row_views
-from pos_uniformes.ui.helpers.recent_sale_table_helper import build_recent_sale_table_row_views
-from pos_uniformes.ui.helpers.recent_sale_selection_helper import (
-    build_recent_sale_action_state,
-    resolve_selected_recent_sale_id,
-)
 from pos_uniformes.ui.helpers.window_close_helper import build_main_window_close_decision
-from pos_uniformes.ui.helpers.recent_sale_feedback_helper import (
-    build_recent_sale_guard_feedback,
-    build_recent_sale_permission_label,
-)
 from pos_uniformes.ui.helpers.quote_cart_view_helper import build_quote_cart_view
 from pos_uniformes.ui.helpers.quote_history_helper import build_quote_history_rows
 from pos_uniformes.ui.helpers.quote_detail_helper import (
@@ -518,30 +479,8 @@ from pos_uniformes.ui.helpers.quote_selection_helper import (
 from pos_uniformes.ui.helpers.quote_summary_helper import build_quote_summary_view
 from pos_uniformes.ui.helpers.quote_table_row_helper import build_quote_table_row_views
 from pos_uniformes.ui.helpers.printable_document_flow_helper import open_printable_document_flow
-from pos_uniformes.ui.helpers.sale_client_selection_helper import (
-    build_empty_sale_client_selection_ui_state,
-)
-from pos_uniformes.ui.helpers.sale_cashier_panel_helper import build_sale_cashier_panel_view
-from pos_uniformes.ui.helpers.sale_checkout_feedback_helper import (
-    build_sale_checkout_error_message,
-)
-from pos_uniformes.ui.helpers.sale_post_action_feedback_helper import (
-    SalePostActionView,
-    build_sale_cancel_post_action_view,
-    build_sale_checkout_post_action_view,
-)
-from pos_uniformes.ui.helpers.sale_payment_helper import collect_sale_payment_details
-from pos_uniformes.ui.helpers.sale_scanned_client_helper import build_sale_scanned_client_ui_state
 from pos_uniformes.ui.helpers.sale_sports_uniform_helper import (
-    attach_sports_uniform_trace_to_cart_lines,
-    build_sports_uniform_prototype_note,
-    collect_internal_sale_cart_notes,
-    resolve_sale_scan_variants,
     restore_sports_uniform_playera_price_if_needed,
-)
-from pos_uniformes.services.sports_uniform_pricing_service import (
-    THREE_PIECE_PLAYERA_PRICE,
-    build_three_piece_playera_price_override,
 )
 from pos_uniformes.services.quote_client_creation_feedback_service import build_quote_client_created_feedback
 from pos_uniformes.ui.helpers.size_option_sort_helper import group_size_options, sort_size_options
@@ -629,7 +568,6 @@ from pos_uniformes.ui.helpers.qt_image_scale_helper import (
 from pos_uniformes.ui.helpers.inventory_label_print_helper import build_inventory_label_print_layout
 from pos_uniformes.ui.helpers.inventory_label_windows_print_helper import print_inventory_label_via_windows
 from pos_uniformes.ui.views.analytics_view import build_analytics_tab
-from pos_uniformes.ui.views.cashier_view import build_cashier_tab
 from pos_uniformes.ui.views.dashboard_view import build_dashboard_tab
 from pos_uniformes.ui.views.history_view import build_history_tab
 from pos_uniformes.ui.views.inventory_view import build_inventory_tab
@@ -648,26 +586,30 @@ from pos_uniformes.services.nombres_empleadas_service import mostrar as _nombre_
 from pos_uniformes.services.nombres_empleadas_service import nombres_por_codigo
 
 # Pestañas que dejaron de tener sentido aquí porque su trabajo se mudó al
-# kiosko: la caja se cierra con el corte del satélite, los presupuestos se
-# hacen en Presupuesto guiado, los apartados en Venta Rápida y el catálogo
-# se lleva desde Panel Uniformes e Inventario.
+# kiosko: los presupuestos se hacen en Presupuesto guiado, los apartados en
+# Venta Rápida y el catálogo se lleva desde Panel Uniformes e Inventario.
 #
 # Se ocultan, NO se borran: fueron la base del sistema, sus datos siguen
 # intactos y el código completo sigue en el repositorio. Para volver a ver
 # alguna, quitar su nombre de esta tupla.
+#
+# 2026-11-12: la Caja antigua ya no está en la tupla porque ya no se oculta,
+# se retiró (pestaña, carrito, cobro, ventas recientes y sus atajos). Daniel:
+# «la caja antigua ya no es de utilidad, todo lo demás corre en libreta y
+# kioskos y es lo único que importa, es donde vive nuestra operación».
 
-PESTANAS_MUDADAS_AL_KIOSKO = ("Caja", "Presupuestos", "Apartados", "Catálogo")
+PESTANAS_MUDADAS_AL_KIOSKO = ("Presupuestos", "Apartados", "Catálogo")
 
 
 def caja_en_el_pos() -> bool:
-    """Si el POS todavía lleva la caja.
+    """Si el POS todavía lleva la caja. Ya no: siempre False.
 
-    Con la pestaña Caja oculta no la lleva, así que sobra todo lo que la
-    acompañaba: la etiqueta de estado del encabezado, el botón de corte, el
-    recordatorio de las 5 y el aviso de "caja pendiente de corte" al abrir.
-    El corte de verdad se hace desde el kiosko.
+    Sin la Caja antigua sobra todo lo que la acompañaba: la etiqueta de
+    estado del encabezado, el botón de corte, el recordatorio de las 5 y el
+    aviso de "caja pendiente de corte" al abrir. El corte de verdad se hace
+    desde el kiosko. (2026-11-12: la pestaña Caja se retiró del POS.)
     """
-    return "Caja" not in PESTANAS_MUDADAS_AL_KIOSKO
+    return False
 
 LISTING_SEARCH_DEBOUNCE_MS = 300
 CATALOG_PAGE_SIZE = 25
@@ -1355,7 +1297,6 @@ class MainWindow(QMainWindow):
         self.settings_employees_debounce_timer = self._make_search_debounce_timer(
             lambda: self._refresh_settings_employees()
         )
-        self.sale_cart: list[dict[str, object]] = []
         self.layaway_rows: list[dict[str, object]] = []
         self.history_rows: list[dict[str, object]] = []
         self.quote_cart: list[dict[str, object]] = []
@@ -1419,7 +1360,6 @@ class MainWindow(QMainWindow):
         self.products_quick_setup_box: QWidget | None = None
 
         self.catalog_table = QTableWidget()
-        self.recent_sales_table = QTableWidget()
         self.top_products_table = QTableWidget()
         self.movements_table = QTableWidget()
 
@@ -1493,48 +1433,9 @@ class MainWindow(QMainWindow):
         self.purchase_button = QPushButton("Confirmar compra")
         self.purchase_permission_label = QLabel()
 
-        self.sale_sku_input = QLineEdit()
-        self.sale_qty_spin = QSpinBox()
-        self.sale_folio_input = QLabel()
-        self.sale_client_combo = QComboBox()
-        self.sale_client_display_label = QLabel("Mostrador / sin cliente")
-        self.sale_origin_value_label = QLabel("Sin asignar")
-        self.sale_origin_identify_button = QPushButton("Identificar")
-        self.sale_origin_direct_button = QPushButton("Tomar directo")
-        self.sale_origin_release_button = QPushButton("Liberar")
-        self.sale_payment_combo = QComboBox()
-        self.sale_discount_field_label = QLabel("Desc.")
-        self.sale_discount_combo = QComboBox()
-        self.sale_add_button = QPushButton("Agregar al carrito")
-        self.sale_button = QPushButton("Confirmar venta")
-        self.sale_layaway_button = QPushButton("Convertir a apartado")
-        self.sale_recent_button = QPushButton("Ventas recientes")
-        self.sale_ticket_button = QPushButton("Ver ticket")
-        self.cancel_button = QPushButton("Cancelar venta seleccionada")
-        self.cancel_permission_label = QLabel()
-        self.sale_cart_table = QTableWidget()
-        self.sale_qty_down_button = QPushButton("-1")
-        self.sale_qty_up_button = QPushButton("+1")
-        self.sale_remove_button = QPushButton("Quitar línea")
-        self.sale_clear_button = QPushButton("Vaciar carrito")
-        self.sale_summary_label = QLabel("Carrito vacio.")
-        self.sale_context_label = QLabel("Pago: Efectivo | Descuento: Sin descuento")
-        self.sale_total_label = QLabel("$0.00")
-        self.sale_total_meta_label = QLabel("Total a cobrar")
-        self.sale_status_label = QLabel("Escanea un SKU para empezar a vender.")
-        self.sale_feedback_label = QLabel("Listo para escanear.")
-        self.sales_dialog: QDialog | None = None
-        self.sale_processing = False
-        self.sale_credit_mode = ModoOrigenVenta.UNASSIGNED
-        self.sale_seller_employee_code = ""
-        self.sale_seller_employee_display_name = ""
-        self.sale_last_scanned_sku = ""
-        self.sale_last_scanned_at = 0.0
-        self.sale_discount_locked_to_client = False
-        self.sale_locked_discount_percent = Decimal("0.00")
-        self.sale_locked_discount_source = ""
-        self.sale_manual_promo_authorized = False
-        self.sale_manual_promo_authorized_percent = Decimal("0.00")
+        # 2026-11-12: se retiró la Caja antigua (carrito, cobro, ventas recientes).
+        # Daniel: «la caja antigua ya no es de utilidad, todo lo demás corre en
+        # libreta y kioskos y es lo único que importa, es donde vive nuestra operación».
 
         self.quote_sku_input = QLineEdit()
         self.quote_qty_spin = QSpinBox()
@@ -1552,7 +1453,6 @@ class MainWindow(QMainWindow):
         self.quote_remove_button = QPushButton("Quitar línea")
         self.quote_clear_button = QPushButton("Vaciar presupuesto")
         self.quote_cancel_button = QPushButton("Cancelar presupuesto")
-        self.quote_convert_button = QPushButton("Cobrar presupuesto")
         self.quote_whatsapp_button = QPushButton("WhatsApp")
         self.quote_refresh_button = QPushButton("Refrescar")
         self.quote_status_label = QLabel("Sin presupuestos cargados.")
@@ -2025,7 +1925,6 @@ class MainWindow(QMainWindow):
 
         self.tabs = QTabWidget()
         self.tabs.addTab(self._wrap_tab_scroll(self._build_dashboard_tab()), "Resumen")
-        self.tabs.addTab(self._wrap_tab_scroll(self._build_cashier_tab()), "Caja")
         self.tabs.addTab(self._wrap_tab_scroll(self._build_quotes_tab()), "Presupuestos")
         self.tabs.addTab(self._wrap_tab_scroll(self._build_layaway_tab()), "Apartados")
         self.tabs.addTab(self._wrap_tab_scroll(self._build_catalog_tab()), "Catálogo")
@@ -2099,7 +1998,6 @@ class MainWindow(QMainWindow):
             self.layaway_receipt_button: "Abre un comprobante del apartado seleccionado para revisar o imprimir.",
             self.layaway_sale_ticket_button: "Abre el ticket de la venta generada al entregar el apartado.",
             self.layaway_whatsapp_button: "Abre WhatsApp con un recordatorio prellenado para el cliente del apartado.",
-            self.sale_layaway_button: "Convierte el carrito actual en un apartado y reserva el stock de sus lineas.",
             self.quote_add_button: "Agrega el SKU capturado al presupuesto actual sin afectar inventario.",
             self.quote_create_client_button: "Crea un cliente rapido desde Presupuestos usando solo nombre y telefono.",
             self.quote_save_button: "Emite el presupuesto rapido actual con folio, cliente opcional y vigencia.",
@@ -2109,15 +2007,7 @@ class MainWindow(QMainWindow):
             self.quote_clear_button: "Vacía por completo el presupuesto actual.",
             self.quote_whatsapp_button: "Abre WhatsApp con un mensaje prellenado para el cliente del presupuesto seleccionado.",
             self.quote_cancel_button: "Marca como cancelado el presupuesto seleccionado sin tocar inventario.",
-            self.quote_convert_button: "Carga los items del presupuesto emitido al carrito de venta y lo marca como convertido.",
             self.quote_refresh_button: "Vuelve a leer los presupuestos recientes con los filtros actuales.",
-            self.sale_add_button: "Agrega una linea manual de cobro rapido sin afectar inventario.",
-            self.sale_button: "Confirma la venta de todos los productos del carrito.",
-            self.sale_recent_button: "Abre las ventas recientes en una ventana separada para consultar o cancelar.",
-            self.sale_ticket_button: "Abre una vista de ticket para la venta seleccionada.",
-            self.cancel_button: "Cancela la venta seleccionada y revierte el inventario. Solo ADMIN.",
-            self.sale_remove_button: "Quita la linea seleccionada del carrito.",
-            self.sale_clear_button: "Vacía por completo el carrito actual.",
             self.seed_button: "Carga datos demo para pruebas del sistema. Solo ADMIN.",
             self.history_filter_button: "Aplica los filtros del historial de movimientos.",
             self.history_today_button: "Filtra movimientos del dia actual.",
@@ -2167,10 +2057,6 @@ class MainWindow(QMainWindow):
         self.inventory_table.setToolTip("Selecciona una presentacion para gestionar inventario, precio, QR o estado.")
         self.layaway_table.setToolTip("Consulta apartados, saldo pendiente y fechas de vencimiento.")
         self.layaway_due_combo.setToolTip("Filtra apartados por vencimiento.")
-        self.recent_sales_table.setToolTip("Historial reciente de ventas registradas en el sistema.")
-        self.sale_payment_combo.setToolTip("Selecciona el metodo de pago de la venta actual.")
-        self.sale_discount_combo.setToolTip("Aplica un descuento porcentual predefinido a la venta actual.")
-        self.sale_client_combo.setToolTip("Asocia un cliente a la venta si aplica. Puedes dejar Mostrador para venta general.")
         self.movements_table.setToolTip("Historial de movimientos de inventario con filtros por fecha, SKU y tipo.")
 
     def _create_page_help_button(self, page_key: str) -> QPushButton:
@@ -2186,7 +2072,6 @@ class MainWindow(QMainWindow):
         current_label = self.tabs.tabText(self.tabs.currentIndex()).strip().lower()
         page_key = {
             "resumen": "dashboard",
-            "caja": "cashier",
             "apartados": "layaway",
             "catalogo": "products",
             "inventario": "inventory",
@@ -2212,14 +2097,6 @@ class MainWindow(QMainWindow):
                     "Esta pestaña es de consulta rapida para caja.",
                     "Puedes buscar por SKU, marca, producto, talla o color y filtrar por categoria, marca, estado o apartados.",
                     "Las altas, cambios de precio y existencias se administran desde Inventario.",
-                ],
-            ),
-            "cashier": (
-                "Ayuda de caja",
-                [
-                    "Captura o escanea el SKU y presiona Enter para agregarlo al carrito.",
-                    "Elige metodo de pago y cobra cuando el carrito este listo.",
-                    "Desde aqui tambien puedes convertir el carrito en apartado.",
                 ],
             ),
             "inventory": (
@@ -2280,24 +2157,17 @@ class MainWindow(QMainWindow):
         dialog.exec()
 
     def _configure_shortcuts(self) -> None:
-        focus_sku_shortcut = QShortcut(QKeySequence("F8"), self)
-        focus_sku_shortcut.activated.connect(self._focus_sale_capture)
-        sell_shortcut = QShortcut(QKeySequence("F2"), self)
-        sell_shortcut.activated.connect(self._handle_sale)
-        recent_shortcut = QShortcut(QKeySequence("F6"), self)
-        recent_shortcut.activated.connect(self._open_recent_sales_dialog)
-        remove_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Delete), self)
-        remove_shortcut.activated.connect(self._handle_remove_sale_item)
+        # 2026-11-12: F2 (cobrar), F8 (captura de SKU), F6 (ventas recientes),
+        # Supr (quitar línea) y Ctrl+S / Cmd+S (búsqueda que agregaba al carrito)
+        # eran de la Caja antigua y se retiraron con ella. Daniel: «la caja
+        # antigua ya no es de utilidad, todo lo demás corre en libreta y kioskos».
+        # Escape se queda solo para limpiar Presupuestos y Catálogo.
         clear_capture_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
         clear_capture_shortcut.activated.connect(self._handle_escape)
         quick_backup_shortcut = QShortcut(QKeySequence("Ctrl+Shift+B"), self)
         quick_backup_shortcut.activated.connect(self._handle_quick_backup)
         quick_backup_shortcut_mac = QShortcut(QKeySequence("Meta+Shift+B"), self)
         quick_backup_shortcut_mac.activated.connect(self._handle_quick_backup)
-        quick_search_shortcut = QShortcut(QKeySequence("Ctrl+S"), self)
-        quick_search_shortcut.activated.connect(self._open_quick_product_search)
-        quick_search_shortcut_mac = QShortcut(QKeySequence("Meta+S"), self)
-        quick_search_shortcut_mac.activated.connect(self._open_quick_product_search)
         # Ctrl+Shift+M mapa de escuelas · Ctrl+Shift+E tipos de escocés (2026-11-07).
         from pos_uniformes.ui.helpers.abrir_consultas import instalar_atajos
 
@@ -2317,38 +2187,13 @@ class MainWindow(QMainWindow):
         self._quick_kiosk_dialog.raise_()
         self._quick_kiosk_dialog.activateWindow()
 
-    def _focus_sale_capture(self) -> None:
-        self.sale_sku_input.setFocus()
-        self.sale_sku_input.selectAll()
-
     def _handle_escape(self) -> None:
         idx = self.tabs.currentIndex() if self.tabs else -1
         tab_name = self.tabs.tabText(idx) if self.tabs and idx >= 0 else ""
-        if tab_name == "Caja":
-            self._clear_sale_capture()
-        elif tab_name == "Presupuestos":
+        if tab_name == "Presupuestos":
             self._clear_quote_capture()
         elif tab_name == "Catálogo":
             self._clear_catalog_capture()
-
-    def _clear_sale_capture(self) -> None:
-        self.sale_sku_input.clear()
-        self.sale_qty_spin.setValue(1)
-        self.sale_last_scanned_sku = ""
-        self.sale_last_scanned_at = 0.0
-        self.sale_client_combo.setCurrentIndex(0)
-        self._refresh_sale_client_display()
-        self._apply_sale_client_selection_ui_state(
-            build_empty_sale_client_selection_ui_state(
-                normalize_discount_value=self._normalize_discount_value,
-                format_discount_label=self._format_discount_label,
-            )
-        )
-        self._refresh_sale_discount_options(selected_discount=Decimal("0.00"))
-        self.sale_seller_employee_code = ""
-        self.sale_seller_employee_display_name = ""
-        self._refresh_sale_origin_ui()
-        self._set_sale_feedback("Captura limpia. Puedes escribir o escanear.", "neutral", auto_clear_ms=1200)
 
     def _clear_quote_capture(self) -> None:
         self.quote_sku_input.clear()
@@ -2367,23 +2212,23 @@ class MainWindow(QMainWindow):
         is_admin = self.current_role == RolUsuario.ADMIN
         can_manage_layaways = self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
         visible_by_index = {
+            # 2026-11-12: la pestaña Caja (antes índice 1) ya no se construye.
             0: is_admin,  # Resumen
-            1: True,      # Caja
-            2: True,      # Presupuestos
-            3: can_manage_layaways,  # Apartados
-            4: True,      # Catalogo
-            5: is_admin,  # Inventario
-            6: is_admin,  # Bodega
-            7: is_admin,  # Historial inventarios
-            8: is_admin,  # Panel Uniformes
-            9: is_admin,  # Analitica
-            10: is_admin, # Configuracion
+            1: True,      # Presupuestos
+            2: can_manage_layaways,  # Apartados
+            3: True,      # Catalogo
+            4: is_admin,  # Inventario
+            5: is_admin,  # Bodega
+            6: is_admin,  # Historial inventarios
+            7: is_admin,  # Panel Uniformes
+            8: is_admin,  # Analitica
+            9: is_admin,  # Configuracion
         }
-        # Estas tres ya no viven aquí: la caja se cierra con el corte del
-        # kiosko, los presupuestos se hacen en Presupuesto guiado y los
-        # apartados en Venta Rápida. Se ocultan, no se borran — fueron la
-        # base y sus datos siguen intactos. Para volver a verlas, vaciar
-        # PESTANAS_MUDADAS_AL_KIOSKO.
+        # Estas ya no viven aquí: los presupuestos se hacen en Presupuesto
+        # guiado, los apartados en Venta Rápida y el catálogo en Panel
+        # Uniformes e Inventario. Se ocultan, no se borran — sus datos siguen
+        # intactos. Para volver a verlas, vaciar PESTANAS_MUDADAS_AL_KIOSKO.
+        # (La Caja antigua ya no se oculta: se retiró, 2026-11-12.)
         for index in range(self.tabs.count()):
             if self.tabs.tabText(index).strip() in PESTANAS_MUDADAS_AL_KIOSKO:
                 visible_by_index[index] = False
@@ -2490,9 +2335,6 @@ class MainWindow(QMainWindow):
 
     def _build_catalog_tab(self) -> QWidget:
         return build_products_tab(self)
-
-    def _build_cashier_tab(self) -> QWidget:
-        return build_cashier_tab(self)
 
     def _build_quotes_tab(self) -> QWidget:
         return build_quotes_tab(self)
@@ -2679,9 +2521,10 @@ class MainWindow(QMainWindow):
         open_meilisearch_settings_dialog(self)
 
     def _handle_open_uniforms_panel(self) -> None:
-        # Navegar a la pestaña Panel Uniformes (índice 8)
+        # Navegar a la pestaña Panel Uniformes (índice 7 desde que se retiró
+        # la pestaña Caja, 2026-11-12)
         if self.tabs is not None:
-            self.tabs.setCurrentIndex(8)
+            self.tabs.setCurrentIndex(7)
 
     def _refresh_settings_cash_history(self) -> None:
         estado = self.settings_cash_history_state_combo.currentData() or "todas"
@@ -3061,7 +2904,6 @@ class MainWindow(QMainWindow):
                 self.settings_business_status_label.setText("Configuración cargada correctamente.")
                 self.settings_marketing_status_label.setText("Reglas de marketing cargadas correctamente.")
                 self.settings_whatsapp_status_label.setText("Plantillas cargadas correctamente.")
-                self._refresh_sale_discount_options()
                 self._refresh_marketing_summary(session)
                 self._refresh_whatsapp_preview()
         except Exception as exc:  # noqa: BLE001
@@ -5178,7 +5020,7 @@ class MainWindow(QMainWindow):
         title.setStyleSheet("font-size: 18px; font-weight: 700; color: #1a1a1a;")
         desc = QLabel(
             "Se cerrara la sesion actual y volveras a la pantalla de acceso.\n"
-            "El carrito y los datos no guardados se perderan."
+            "Los datos no guardados se perderan."
         )
         desc.setWordWrap(True)
         desc.setObjectName("subtleLine")
@@ -5214,7 +5056,6 @@ class MainWindow(QMainWindow):
                 return
 
         previous_user_id = self.user_id
-        previous_cart = list(self.sale_cart)
         self._close_cached_logout_dialogs()
 
         self.hide()
@@ -5231,7 +5072,6 @@ class MainWindow(QMainWindow):
                 self.activateWindow()
                 if not self.ensure_cash_session():
                     self.user_id = previous_user_id
-                    self.sale_cart = previous_cart
                     self.refresh_all()
                     self.hide()
                     dialog.clear_loading_state()
@@ -5240,15 +5080,11 @@ class MainWindow(QMainWindow):
                     dialog.activateWindow()
                     return
 
-                self.sale_cart.clear()
-                self._reset_sale_form()
-                self.sales_dialog = None
                 self.refresh_all()
                 self._apply_role_navigation()
                 self._focus_default_tab_for_role()
             except Exception as exc:  # noqa: BLE001
                 self.user_id = previous_user_id
-                self.sale_cart = previous_cart
                 self.refresh_all()
                 self.hide()
                 dialog.clear_loading_state()
@@ -5271,11 +5107,9 @@ class MainWindow(QMainWindow):
         self.show()
         self.raise_()
         self.activateWindow()
-        self._set_sale_feedback("Sesion actualizada correctamente.", "positive", auto_clear_ms=1800)
 
     def _close_cached_logout_dialogs(self) -> None:
         dialog_attr_names = (
-            "sales_dialog",
             "settings_users_dialog",
             "settings_suppliers_dialog",
             "settings_clients_dialog",
@@ -7218,75 +7052,6 @@ class MainWindow(QMainWindow):
         self.refresh_all()
         QMessageBox.information(self, "Compra registrada", f"Compra {document} confirmada correctamente.")
 
-    def _open_recent_sales_dialog(self) -> None:
-        if self.sales_dialog is None:
-            dialog = QDialog(self)
-            dialog.setWindowTitle("Ventas recientes")
-            dialog.resize(980, 560)
-            layout = QVBoxLayout()
-            layout.setSpacing(10)
-
-            helper = QLabel("Consulta ventas recientes. Selecciona una confirmada si necesitas cancelarla.")
-            helper.setObjectName("subtleLine")
-            helper.setWordWrap(True)
-            self.cancel_permission_label.setObjectName("cashierWarningLine")
-            self.cancel_permission_label.setWordWrap(True)
-            self.sale_ticket_button.setObjectName("toolbarSecondaryButton")
-            self.recent_sales_table.itemSelectionChanged.connect(self._apply_recent_sale_action_state)
-            self.cancel_button.clicked.connect(self._handle_cancel_sale)
-            self.sale_ticket_button.clicked.connect(self._handle_view_sale_ticket)
-
-            header = QHBoxLayout()
-            header.addWidget(helper, 1)
-            header.addWidget(self.sale_ticket_button)
-            header.addWidget(self.cancel_button)
-
-            layout.addLayout(header)
-            layout.addWidget(self.cancel_permission_label)
-            layout.addWidget(self.recent_sales_table, 1)
-            dialog.setLayout(layout)
-            self.sales_dialog = dialog
-
-        self._apply_recent_sale_action_state()
-        self.recent_sales_table.resizeColumnsToContents()
-        self.sales_dialog.show()
-        self.sales_dialog.raise_()
-        self.sales_dialog.activateWindow()
-
-    def _selected_recent_sale_id(self) -> int | None:
-        return resolve_selected_recent_sale_id(self.recent_sales_table)
-
-    def _apply_recent_sale_action_state(self) -> None:
-        action_state = build_recent_sale_action_state(
-            has_selection=self._selected_recent_sale_id() is not None,
-            is_admin=self.current_role == RolUsuario.ADMIN,
-        )
-        self.sale_ticket_button.setEnabled(action_state.ticket_enabled)
-        self.cancel_button.setEnabled(action_state.cancel_enabled)
-
-    def _handle_view_sale_ticket(self) -> None:
-        sale_id = self._selected_recent_sale_id()
-        feedback = build_recent_sale_guard_feedback(
-            "view_ticket",
-            has_selection=sale_id is not None,
-            is_admin=self.current_role == RolUsuario.ADMIN,
-        )
-        if feedback is not None:
-            QMessageBox.warning(self, feedback.title, feedback.message)
-            return
-        assert sale_id is not None
-
-        try:
-            open_printable_document_flow(
-                parent=self,
-                session_factory=get_session,
-                build_document_view=lambda session: build_sale_ticket_document_view(session, sale_id=sale_id),
-                open_dialog=open_printable_text_dialog,
-            )
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Ticket no disponible", str(exc))
-            return
-
     def _handle_view_layaway_receipt(self) -> None:
         apartado_id = self._selected_layaway_id()
         if apartado_id is None:
@@ -7322,104 +7087,8 @@ class MainWindow(QMainWindow):
             return
 
     @staticmethod
-    def _generate_sale_folio() -> str:
-        return f"VTA-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid4().hex[:4].upper()}"
-
-    @staticmethod
     def _generate_quote_folio() -> str:
         return f"PRE-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid4().hex[:4].upper()}"
-
-    def _reset_sale_form(self) -> None:
-        self.sale_sku_input.clear()
-        self.sale_qty_spin.setValue(1)
-        self.sale_payment_combo.setCurrentText("Efectivo")
-        self.sale_client_combo.setCurrentIndex(0)
-        self.sale_credit_mode = ModoOrigenVenta.UNASSIGNED
-        self.sale_seller_employee_code = ""
-        self.sale_seller_employee_display_name = ""
-        self._refresh_sale_client_display()
-        self._refresh_sale_origin_ui()
-        self._apply_sale_client_selection_ui_state(
-            build_empty_sale_client_selection_ui_state(
-                normalize_discount_value=self._normalize_discount_value,
-                format_discount_label=self._format_discount_label,
-            )
-        )
-        self._refresh_sale_discount_options(selected_discount=Decimal("0.00"))
-        self.sale_folio_input.setText(self._generate_sale_folio())
-        self.sale_last_scanned_sku = ""
-        self.sale_last_scanned_at = 0.0
-        self._refresh_payment_fields()
-
-    def _refresh_sale_client_display(self) -> None:
-        current_label = self.sale_client_combo.currentText().strip() or "Mostrador / sin cliente"
-        self.sale_client_display_label.setText(current_label)
-
-    def _sale_origin_visible_label(self) -> str:
-        if self.sale_credit_mode == ModoOrigenVenta.OPERATOR_DIRECT:
-            return "Directa"
-        if self.sale_credit_mode == ModoOrigenVenta.EMPLOYEE:
-            return self.sale_seller_employee_display_name.strip() or "Sin asignar"
-        return "Sin asignar"
-
-    def _refresh_sale_origin_ui(self) -> None:
-        visible_label = self._sale_origin_visible_label()
-        self.sale_origin_value_label.setText(visible_label)
-        self.sale_origin_value_label.setToolTip(f"Responsable: {visible_label}")
-        is_unassigned = self.sale_credit_mode == ModoOrigenVenta.UNASSIGNED
-        self.sale_origin_release_button.setEnabled(not is_unassigned)
-        self.sale_origin_direct_button.setEnabled(self.sale_credit_mode != ModoOrigenVenta.OPERATOR_DIRECT)
-
-    def _handle_sale_origin_identify(self, scanned_code: str | None = None) -> None:
-        if not scanned_code:
-            self._set_sale_feedback("Escanea un QR EMP valido para asignar responsable.", "warning", auto_clear_ms=1800)
-            self.sale_sku_input.setFocus()
-            self.sale_sku_input.selectAll()
-            return
-        try:
-            with get_session() as session:
-                employee = EmployeeIdentityService.resolve_employee_by_qr_code(session, scanned_code)
-        except Exception as exc:  # noqa: BLE001
-            self._set_sale_feedback(str(exc), "warning", auto_clear_ms=2200)
-            self.sale_sku_input.setFocus()
-            self.sale_sku_input.selectAll()
-            return
-        if employee is None:
-            self._set_sale_feedback(
-                f"No se encontro una empleada activa para {scanned_code}.",
-                "warning",
-                auto_clear_ms=2200,
-            )
-            self.sale_sku_input.setFocus()
-            self.sale_sku_input.selectAll()
-            return
-        self.sale_credit_mode = ModoOrigenVenta.EMPLOYEE
-        self.sale_seller_employee_code = str(employee.codigo)
-        self.sale_seller_employee_display_name = EmployeeIdentityService.build_visible_employee_name(
-            str(employee.nombre_completo)
-        )
-        self._refresh_sale_origin_ui()
-        self._set_sale_feedback(
-            f"Responsable: {self.sale_seller_employee_display_name}.",
-            "neutral",
-            auto_clear_ms=1600,
-        )
-        self.sale_sku_input.setFocus()
-        self.sale_sku_input.selectAll()
-
-    def _handle_sale_origin_direct(self) -> None:
-        self.sale_credit_mode = ModoOrigenVenta.OPERATOR_DIRECT
-        self.sale_seller_employee_code = ""
-        self.sale_seller_employee_display_name = ""
-        self._refresh_sale_origin_ui()
-        self._set_sale_feedback("Responsable cambiado a Directa.", "neutral", auto_clear_ms=1600)
-
-    def _handle_sale_origin_release(self) -> None:
-        self.sale_credit_mode = ModoOrigenVenta.UNASSIGNED
-        self.sale_seller_employee_code = ""
-        self.sale_seller_employee_display_name = ""
-        self._refresh_sale_origin_ui()
-        self._set_sale_feedback("Responsable liberado.", "neutral", auto_clear_ms=1600)
 
     def _reset_quote_form(self) -> None:
         self.quote_sku_input.clear()
@@ -7428,53 +7097,6 @@ class MainWindow(QMainWindow):
         self.quote_validity_input.setDate(QDate.currentDate().addDays(7))
         self.quote_note_input.clear()
         self.quote_folio_input.setText(self._generate_quote_folio())
-
-    def _play_sale_feedback_sound(self) -> None:
-        QApplication.beep()
-
-    def _set_sale_feedback(self, text: str, tone: str = "neutral", auto_clear_ms: int | None = None) -> None:
-        self.sale_feedback_label.setText(text)
-        self.sale_feedback_label.setProperty("tone", tone)
-        self.sale_feedback_label.style().unpolish(self.sale_feedback_label)
-        self.sale_feedback_label.style().polish(self.sale_feedback_label)
-        self.sale_feedback_label.update()
-        if auto_clear_ms:
-            QTimer.singleShot(auto_clear_ms, self._clear_sale_feedback)
-
-    def _clear_sale_feedback(self) -> None:
-        if self.sale_feedback_label.text() == "Listo para escanear.":
-            return
-        self._set_sale_feedback("Listo para escanear.", "neutral")
-
-    def _apply_sale_post_action_view(self, view: SalePostActionView) -> None:
-        if view.play_feedback_sound:
-            self._play_sale_feedback_sound()
-        if view.clear_sale_cart:
-            self.sale_cart.clear()
-            self._refresh_sale_cart_table()
-        if view.reset_sale_form:
-            self._reset_sale_form()
-        if view.refresh_all:
-            self.refresh_all()
-        if view.focus_sale_input:
-            self.sale_sku_input.setFocus()
-        self._set_sale_feedback(
-            view.feedback_message,
-            view.feedback_tone,
-            auto_clear_ms=view.feedback_auto_clear_ms,
-        )
-        if view.notice_title and view.notice_message:
-            QMessageBox.information(self, view.notice_title, view.notice_message)
-
-    def _set_sale_processing(self, active: bool) -> None:
-        self.sale_processing = active
-        self.sale_button.setEnabled(not active and self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO})
-        self.sale_button.setText("Procesando..." if active else "Cobrar")
-        self._refresh_payment_fields()
-
-    @staticmethod
-    def _normalize_discount_value(value: object | None) -> Decimal:
-        return normalize_discount_value(value)
 
     @classmethod
     def _format_discount_label(cls, value: Decimal) -> str:
@@ -7500,734 +7122,6 @@ class MainWindow(QMainWindow):
         if len(preview_list) <= 4:
             return f"{preview_head} | rango {preview_list[0]} -> {preview_list[-1]}"
         return f"{preview_head} ... (+{len(preview_list) - 4}) | rango {preview_list[0]} -> {preview_list[-1]}"
-
-    def _apply_scanned_client_to_sale(self, session, client: Cliente, scanned_code: str) -> bool:
-        ui_state = build_sale_scanned_client_ui_state(
-            current_client_id=self.sale_client_combo.currentData(),
-            current_client_label=self.sale_client_combo.currentText().strip() or "Cliente actual",
-            scanned_client_id=client.id,
-            scanned_client_code=client.codigo_cliente,
-            scanned_client_name=client.nombre,
-            has_sale_cart=bool(self.sale_cart),
-            discount_percent=load_sale_selected_client_discount_percent(
-                session,
-                selected_client_id=client.id,
-                normalize_discount_value=self._normalize_discount_value,
-            ),
-            format_discount_label=self._format_discount_label,
-        )
-        if ui_state.action == "already_linked":
-            self.sale_sku_input.clear()
-            self.sale_qty_spin.setValue(1)
-            assert ui_state.immediate_feedback is not None
-            self._set_sale_feedback(
-                ui_state.immediate_feedback.message,
-                ui_state.immediate_feedback.tone,
-                auto_clear_ms=ui_state.immediate_feedback.auto_clear_ms,
-            )
-            self.sale_sku_input.setFocus()
-            return True
-
-        if ui_state.action == "confirm_replace":
-            confirmation = QMessageBox.question(
-                self,
-                "Cambiar cliente de la venta",
-                ui_state.confirmation_message,
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-            if confirmation != QMessageBox.StandardButton.Yes:
-                self.sale_sku_input.clear()
-                self.sale_qty_spin.setValue(1)
-                assert ui_state.rejected_feedback is not None
-                self._set_sale_feedback(
-                    ui_state.rejected_feedback.message,
-                    ui_state.rejected_feedback.tone,
-                    auto_clear_ms=ui_state.rejected_feedback.auto_clear_ms,
-                )
-                self.sale_sku_input.setFocus()
-                return True
-
-        combo_index = self.sale_client_combo.findData(int(client.id))
-        if combo_index < 0:
-            raise ValueError(f"El cliente escaneado '{scanned_code}' no esta disponible en Caja.")
-
-        self.sale_client_combo.setCurrentIndex(combo_index)
-        self._refresh_sale_client_display()
-        self.sale_last_scanned_sku = client.codigo_cliente
-        self.sale_last_scanned_at = monotonic()
-        self.sale_sku_input.clear()
-        self.sale_qty_spin.setValue(1)
-        self._play_sale_feedback_sound()
-        assert ui_state.applied_feedback is not None
-        self._set_sale_feedback(
-            ui_state.applied_feedback.message,
-            ui_state.applied_feedback.tone,
-            auto_clear_ms=ui_state.applied_feedback.auto_clear_ms,
-        )
-        self.sale_sku_input.setFocus()
-        return True
-
-    def _sale_discount_presets(self) -> list[Decimal]:
-        try:
-            with get_session() as session:
-                return load_sale_discount_presets(
-                    session,
-                    normalize_discount_value=self._normalize_discount_value,
-                )
-        except Exception:
-            return load_sale_discount_presets(
-                None,
-                normalize_discount_value=self._normalize_discount_value,
-            )
-
-    def _refresh_sale_discount_options(self, *, selected_discount: Decimal | int | float | str | None = None) -> None:
-        current_discount = (
-            self._normalize_discount_value(selected_discount)
-            if selected_discount is not None
-            else self._normalize_discount_value(self.sale_discount_combo.currentData())
-        )
-        deduped_options = build_sale_discount_options(
-            preset_values=self._sale_discount_presets(),
-            current_discount=current_discount,
-            normalize_discount_value=self._normalize_discount_value,
-            format_discount_label=self._format_discount_label,
-        )
-
-        self.sale_discount_combo.blockSignals(True)
-        self.sale_discount_combo.clear()
-        for label, value in deduped_options:
-            self.sale_discount_combo.addItem(label, float(value))
-        index = self.sale_discount_combo.findData(float(current_discount))
-        self.sale_discount_combo.setCurrentIndex(index if index >= 0 else 0)
-        self.sale_discount_combo.blockSignals(False)
-
-    def _ensure_sale_discount_option(self, discount_percent: Decimal | str | int | float) -> int:
-        normalized = self._normalize_discount_value(discount_percent)
-        for index in range(self.sale_discount_combo.count()):
-            option_value = self._normalize_discount_value(self.sale_discount_combo.itemData(index))
-            if option_value == normalized:
-                current_label = self.sale_discount_combo.itemText(index).strip()
-                expected_label = expected_discount_option_label(
-                    normalized,
-                    normalize_discount_value=self._normalize_discount_value,
-                    format_discount_label=self._format_discount_label,
-                )
-                if current_label != expected_label:
-                    self.sale_discount_combo.setItemText(index, expected_label)
-                return index
-        label = expected_discount_option_label(
-            normalized,
-            normalize_discount_value=self._normalize_discount_value,
-            format_discount_label=self._format_discount_label,
-        )
-        self.sale_discount_combo.addItem(label, float(normalized))
-        return self.sale_discount_combo.count() - 1
-
-    def _set_sale_discount_combo_percent(self, discount_percent: Decimal | str | int | float) -> None:
-        index = self._ensure_sale_discount_option(discount_percent)
-        previous_state = self.sale_discount_combo.blockSignals(True)
-        self.sale_discount_combo.setCurrentIndex(index)
-        self.sale_discount_combo.blockSignals(previous_state)
-
-    def _clear_sale_manual_promo_authorization(self) -> None:
-        state = clear_sale_manual_promo_snapshot()
-        self.sale_manual_promo_authorized = state.authorized
-        self.sale_manual_promo_authorized_percent = state.authorized_percent
-
-    def _sale_manual_promo_state(self):
-        return build_sale_manual_promo_snapshot(
-            authorized=self.sale_manual_promo_authorized,
-            authorized_percent=self.sale_manual_promo_authorized_percent,
-        )
-
-    def _apply_sale_manual_promo_state(self, state) -> None:
-        self.sale_manual_promo_authorized = state.authorized
-        self.sale_manual_promo_authorized_percent = state.authorized_percent
-
-    def _apply_sale_client_selection_ui_state(self, ui_state) -> None:
-        if ui_state.combo_discount_percent is not None:
-            self._set_sale_discount_combo_percent(ui_state.combo_discount_percent)
-        if ui_state.clear_manual_promo:
-            self._clear_sale_manual_promo_authorization()
-        self.sale_discount_locked_to_client = ui_state.lock_state.locked
-        self.sale_locked_discount_percent = ui_state.lock_state.discount_percent
-        self.sale_locked_discount_source = ui_state.lock_state.source_label
-        self.sale_discount_combo.setToolTip(ui_state.lock_tooltip)
-
-    def _current_manual_promo_percent(self) -> Decimal:
-        return build_sale_discount_context(
-            locked_to_client=self.sale_discount_locked_to_client,
-            locked_discount_percent=self.sale_locked_discount_percent,
-            locked_source_label=self.sale_locked_discount_source,
-            selected_discount_percent=self.sale_discount_combo.currentData(),
-            manual_promo_authorized=self.sale_manual_promo_authorized,
-            manual_promo_authorized_percent=self.sale_manual_promo_authorized_percent,
-        ).promo_discount
-
-    def _prompt_manual_promo_authorization(self, promo_percent: Decimal) -> bool:
-        code, accepted = QInputDialog.getText(
-            self,
-            "Autorizar promocion manual",
-            (
-                f"Captura el codigo para autorizar la promocion manual de "
-                f"{self._format_discount_label(promo_percent)}."
-            ),
-            QLineEdit.EchoMode.Password,
-        )
-        if not accepted:
-            return False
-        try:
-            with get_session() as session:
-                verify_sale_manual_promo_code(session, code)
-                session.commit()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "Codigo invalido", str(exc))
-            return False
-        return True
-
-    def _handle_sale_discount_changed(self) -> None:
-        transition = resolve_sale_manual_discount_transition(
-            selected_percent=self.sale_discount_combo.currentData(),
-            authorized=self.sale_manual_promo_authorized,
-            authorized_percent=self.sale_manual_promo_authorized_percent,
-            format_discount_label=self._format_discount_label,
-            authorize_manual_promo=self._prompt_manual_promo_authorization,
-        )
-        self._apply_sale_manual_promo_state(transition.next_state)
-        self._set_sale_discount_combo_percent(transition.combo_percent)
-        if transition.feedback_message:
-            self._set_sale_feedback(
-                transition.feedback_message,
-                transition.feedback_tone,
-                auto_clear_ms=transition.feedback_auto_clear_ms,
-            )
-        self._refresh_sale_cart_table()
-
-    def _sync_sale_discount_with_selected_client(self, *, reset_manual: bool = False) -> None:
-        try:
-            with get_session() as session:
-                ui_state = resolve_sale_client_discount_ui_state(
-                    session,
-                    selected_client_id=self.sale_client_combo.currentData(),
-                    reset_manual=reset_manual,
-                    normalize_discount_value=self._normalize_discount_value,
-                    format_discount_label=self._format_discount_label,
-                )
-        except Exception:
-            ui_state = resolve_sale_client_discount_ui_state(
-                None,
-                selected_client_id=None,
-                reset_manual=reset_manual,
-                normalize_discount_value=self._normalize_discount_value,
-                format_discount_label=self._format_discount_label,
-            )
-        self._apply_sale_client_selection_ui_state(ui_state)
-        self._refresh_sale_cart_table()
-
-    def _handle_sale_client_changed(self) -> None:
-        self._refresh_sale_client_display()
-        self._sync_sale_discount_with_selected_client(reset_manual=True)
-
-    def _effective_sale_discount_percent(self) -> Decimal:
-        return build_sale_discount_context(
-            locked_to_client=self.sale_discount_locked_to_client,
-            locked_discount_percent=self.sale_locked_discount_percent,
-            locked_source_label=self.sale_locked_discount_source,
-            selected_discount_percent=self.sale_discount_combo.currentData(),
-            manual_promo_authorized=self.sale_manual_promo_authorized,
-            manual_promo_authorized_percent=self.sale_manual_promo_authorized_percent,
-        ).effective_discount
-
-    def _sale_discount_breakdown(self) -> dict[str, object]:
-        return build_sale_discount_context(
-            locked_to_client=self.sale_discount_locked_to_client,
-            locked_discount_percent=self.sale_locked_discount_percent,
-            locked_source_label=self.sale_locked_discount_source,
-            selected_discount_percent=self.sale_discount_combo.currentData(),
-            manual_promo_authorized=self.sale_manual_promo_authorized,
-            manual_promo_authorized_percent=self.sale_manual_promo_authorized_percent,
-        ).breakdown
-
-    def _calculate_sale_totals(self) -> tuple[Decimal, Decimal, Decimal, Decimal]:
-        return calculate_sale_discount_totals(
-            self.sale_cart,
-            locked_to_client=self.sale_discount_locked_to_client,
-            locked_discount_percent=self.sale_locked_discount_percent,
-            selected_discount_percent=self.sale_discount_combo.currentData(),
-            manual_promo_authorized=self.sale_manual_promo_authorized,
-            manual_promo_authorized_percent=self.sale_manual_promo_authorized_percent,
-        )
-
-    def _calculate_sale_pricing(self):
-        return calculate_sale_discount_pricing(
-            self.sale_cart,
-            locked_to_client=self.sale_discount_locked_to_client,
-            locked_discount_percent=self.sale_locked_discount_percent,
-            selected_discount_percent=self.sale_discount_combo.currentData(),
-            manual_promo_authorized=self.sale_manual_promo_authorized,
-            manual_promo_authorized_percent=self.sale_manual_promo_authorized_percent,
-        )
-
-    def _refresh_payment_fields(self) -> None:
-        panel_view = build_sale_cashier_panel_view(
-            sale_cart=self.sale_cart,
-            subtotal=Decimal("0.00"),
-            applied_discount=Decimal("0.00"),
-            rounding_adjustment=Decimal("0.00"),
-            collected_total=Decimal("0.00"),
-            payment_method=self.sale_payment_combo.currentText(),
-            winner_label="",
-            can_sell=self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO},
-            has_cash_session=self.active_cash_session_id is not None,
-            is_processing=self.sale_processing,
-        )
-        self.sale_feedback_label.setToolTip(panel_view.payment_tooltip)
-        self.sale_context_label.setText(panel_view.context_label)
-        self.sale_status_label.setText(panel_view.status_label)
-        self.sale_status_label.setProperty("tone", panel_view.status_tone)
-        self.sale_status_label.style().unpolish(self.sale_status_label)
-        self.sale_status_label.style().polish(self.sale_status_label)
-        self.sale_status_label.update()
-
-    def _open_quick_product_search(self) -> None:
-        from pos_uniformes.ui.dialogs.quick_product_search_dialog import QuickProductSearchDialog
-
-        catalog_rows = self._load_catalog_snapshot_rows()
-        dialog = QuickProductSearchDialog(self, catalog_rows=catalog_rows)
-        added_skus: list[str] = []
-
-        def _on_sku_selected(sku: str, qty: int) -> None:
-            for _ in range(qty):
-                self.sale_sku_input.setText(sku)
-                self._handle_add_sale_item()
-            added_skus.append(sku)
-
-        dialog.sku_selected.connect(_on_sku_selected)
-        dialog.exec()
-
-        # Al cerrar, ofrecer imprimir etiquetas de lo agregado
-        if added_skus:
-            self._show_label_print_confirmation(added_skus, catalog_rows)
-
-    def _show_label_print_confirmation(self, skus: list[str], catalog_rows: list[dict]) -> None:
-        """Muestra confirmación con las etiquetas a imprimir tras búsqueda rápida."""
-        from PyQt6.QtWidgets import QCheckBox
-
-        dlg = QDialog(self)
-        dlg.setWindowTitle("Imprimir etiquetas")
-        dlg.setMinimumWidth(520)
-        dlg_layout = QVBoxLayout()
-        dlg_layout.setContentsMargins(16, 14, 16, 14)
-        dlg_layout.setSpacing(12)
-
-        title = QLabel(f"Se agregaron {len(skus)} producto(s) desde búsqueda.")
-        title.setStyleSheet("font-size: 14px; font-weight: 600; color: #3a2a1a;")
-        dlg_layout.addWidget(title)
-
-        hint = QLabel("Selecciona las etiquetas que quieres imprimir:")
-        hint.setStyleSheet("font-size: 12px; color: #8a7a6a;")
-        dlg_layout.addWidget(hint)
-
-        # Checkboxes por SKU
-        checks: list[tuple[QCheckBox, str]] = []
-        for sku in skus:
-            row = next((r for r in catalog_rows if str(r.get("sku", "")) == sku), None)
-            nombre = str(row.get("producto_nombre_base", "")) if row else ""
-            talla = str(row.get("talla", "")) if row else ""
-            color = str(row.get("color", "")) if row else ""
-            parts = [sku]
-            if nombre:
-                parts.append(nombre)
-            if talla:
-                parts.append(f"T:{talla}")
-            if color and color.lower() not in ("sin color", "ad hoc"):
-                parts.append(color)
-            cb = QCheckBox(" · ".join(parts))
-            cb.setChecked(True)
-            cb.setStyleSheet("font-size: 13px; padding: 4px 0;")
-            dlg_layout.addWidget(cb)
-            checks.append((cb, sku))
-
-        # Botones select all / none
-        toggle_row = QHBoxLayout()
-        select_all_btn = QPushButton("Todas")
-        select_all_btn.setObjectName("ghostButton")
-        select_all_btn.clicked.connect(lambda: [cb.setChecked(True) for cb, _ in checks])
-        select_none_btn = QPushButton("Ninguna")
-        select_none_btn.setObjectName("ghostButton")
-        select_none_btn.clicked.connect(lambda: [cb.setChecked(False) for cb, _ in checks])
-        toggle_row.addWidget(select_all_btn)
-        toggle_row.addWidget(select_none_btn)
-        toggle_row.addStretch()
-        dlg_layout.addLayout(toggle_row)
-
-        # Acciones
-        actions = QHBoxLayout()
-        actions.setSpacing(10)
-        print_btn = QPushButton("Imprimir seleccionadas")
-        print_btn.setObjectName("primaryButton")
-        print_btn.setMinimumHeight(38)
-        skip_btn = QPushButton("No imprimir")
-        skip_btn.setObjectName("ghostButton")
-        skip_btn.setMinimumHeight(38)
-        skip_btn.clicked.connect(dlg.reject)
-        actions.addStretch()
-        actions.addWidget(skip_btn)
-        actions.addWidget(print_btn)
-        dlg_layout.addLayout(actions)
-
-        def _do_print():
-            selected = [sku for cb, sku in checks if cb.isChecked()]
-            dlg.accept()
-            for sku in selected:
-                try:
-                    with get_session() as session:
-                        variante = VentaService.obtener_variante_por_sku(session, sku)
-                        if variante is None:
-                            continue
-                        result = render_inventory_label(session, variante.id, mode="standard", requested_copies=1)
-                    self._print_image_path(
-                        result.image_path,
-                        title=f"Etiqueta {sku}",
-                        copies=1,
-                    )
-                except Exception:  # noqa: BLE001
-                    pass
-
-        print_btn.clicked.connect(_do_print)
-        print_btn.setDefault(True)
-        QShortcut(QKeySequence("Return"), dlg).activated.connect(_do_print)
-        dlg.setLayout(dlg_layout)
-        dlg.exec()
-
-    def _handle_add_sale_item(self) -> None:
-        raw_input = self.sale_sku_input.text().strip()
-        sku = raw_input.upper()
-        if EmployeeIdentityService.looks_like_employee_qr(raw_input):
-            self._handle_sale_origin_identify(scanned_code=raw_input)
-            self.sale_sku_input.clear()
-            return
-        if self.current_role not in {RolUsuario.ADMIN, RolUsuario.CAJERO}:
-            QMessageBox.warning(self, "Sin permisos", "Tu usuario no puede registrar ventas.")
-            return
-        if self.active_cash_session_id is None:
-            QMessageBox.information(self, "Caja cerrada", "Abre caja antes de registrar ventas.")
-            self._handle_cash_cut()
-            return
-        if not self._ensure_cash_session_current_day_for_operation("registrar ventas"):
-            return
-
-        if not sku:
-            QMessageBox.warning(self, "Datos incompletos", "Captura un SKU antes de agregar al carrito.")
-            return
-
-        quantity = 1
-        now = monotonic()
-        if (
-            quantity == 1
-            and sku == self.sale_last_scanned_sku
-            and now - self.sale_last_scanned_at <= 0.8
-        ):
-            self.sale_sku_input.clear()
-            self.sale_qty_spin.setValue(1)
-            self._set_sale_feedback(
-                f"Se ignoro un posible doble escaneo de {sku}.",
-                "warning",
-                auto_clear_ms=1800,
-            )
-            self.sale_sku_input.setFocus()
-            return
-
-        try:
-            with get_session() as session:
-                client = find_active_sale_client_by_code(session, sku)
-                if client is not None:
-                    if self._apply_scanned_client_to_sale(session, client, sku):
-                        return
-                variante = VentaService.obtener_variante_por_sku(session, sku)
-                if variante is None:
-                    raise ValueError(f"El SKU '{sku}' no existe o esta inactivo.")
-                resolution = resolve_sale_scan_variants(self, session, variante)
-                if resolution is None:
-                    self.sale_sku_input.setFocus()
-                    self.sale_sku_input.selectAll()
-                    return
-
-                add_sale_cart_variants(
-                    self.sale_cart,
-                    variants=list(resolution.variants),
-                    quantity=quantity,
-                    stock_validator=VentaService.validar_stock_disponible,
-                    line_overrides_by_sku=(
-                        {
-                            str(getattr(resolution.variants[1], "sku", "") or "").strip().upper(): (
-                                build_three_piece_playera_price_override(resolution.variants[1])
-                            )
-                        }
-                        if resolution.composed_as_three_pieces and len(resolution.variants) >= 2
-                        else None
-                    ),
-                )
-                if resolution.composed_as_three_pieces and len(resolution.variants) >= 2:
-                    trace_note = build_sports_uniform_prototype_note(
-                        resolution.variants[0],
-                        resolution.variants[1],
-                    )
-                    affected_lines = [
-                        item
-                        for item in self.sale_cart
-                        if str(item.get("sku") or "").strip().upper()
-                        in {
-                            str(getattr(resolution.variants[0], "sku", "") or "").strip().upper(),
-                            str(getattr(resolution.variants[1], "sku", "") or "").strip().upper(),
-                        }
-                    ]
-                    attach_sports_uniform_trace_to_cart_lines(
-                        affected_lines,
-                        trace_note=trace_note,
-                        base_sku=str(getattr(resolution.variants[0], "sku", "") or ""),
-                        playera_sku=str(getattr(resolution.variants[1], "sku", "") or ""),
-                    )
-        except Exception as exc:  # noqa: BLE001
-            message = str(exc)
-            if "Stock insuficiente" in message:
-                message = f"No hay stock suficiente para agregar {quantity} pieza(s) de '{sku}'."
-            QMessageBox.warning(self, "No se pudo agregar", message)
-            self.sale_sku_input.setFocus()
-            self.sale_sku_input.selectAll()
-            return
-
-        self.sale_last_scanned_sku = sku
-        self.sale_last_scanned_at = now
-        self._play_sale_feedback_sound()
-        feedback_message = f"{sku} agregado al carrito."
-        if resolution.composed_as_three_pieces and resolution.selected_playera_sku:
-            feedback_message = (
-                "Prueba deportivo 3pz: "
-                f"{sku} + {resolution.selected_playera_sku}. "
-                f"Playera aplicada a ${THREE_PIECE_PLAYERA_PRICE}. Se guardo trazabilidad interna."
-            )
-            if resolution.size_hint:
-                feedback_message = f"{feedback_message} {resolution.size_hint}"
-        self._set_sale_feedback(
-            feedback_message,
-            "positive",
-            auto_clear_ms=1600,
-        )
-        self.sale_sku_input.clear()
-        self.sale_qty_spin.setValue(1)
-        self._refresh_sale_cart_table()
-        self.sale_sku_input.setFocus()
-
-    def _prompt_sale_manual_line(self) -> dict[str, object] | None:
-        dialog, layout = self._create_modal_dialog(
-            "Agregar sin codigo",
-            "Registra un cobro rapido sin SKU. Esta linea entra a la venta y al ticket, pero no afecta inventario.",
-            width=420,
-        )
-        form = QFormLayout()
-        price_input = QDoubleSpinBox()
-        price_input.setDecimals(2)
-        price_input.setRange(0.01, 999999.99)
-        price_input.setSingleStep(10.00)
-        price_input.setPrefix("$")
-        price_input.setValue(1.00)
-        quick_name_input = QLineEdit()
-        quick_name_input.setPlaceholderText("Venta manual")
-        quick_name_hint = QLabel("Nombre rapido")
-        quick_name_hint.setObjectName("inventoryFilterLabel")
-        quick_name_chips = QHBoxLayout()
-        quick_name_chips.setSpacing(6)
-        quick_name_presets = (
-            "Accesorio",
-            "Bordado",
-            "Parche",
-            "Ajuste",
-            "Playera",
-            "Otro",
-        )
-        for preset in quick_name_presets:
-            preset_button = QPushButton(preset)
-            preset_button.setObjectName("toolbarGhostButton")
-            preset_button.setMinimumWidth(0)
-            if preset == "Otro":
-                preset_button.clicked.connect(lambda _checked=False: quick_name_input.clear())
-            else:
-                preset_button.clicked.connect(
-                    lambda _checked=False, value=preset: quick_name_input.setText(value)
-                )
-            quick_name_chips.addWidget(preset_button)
-        quick_name_chips.addStretch()
-        form.addRow("Precio", price_input)
-        form.addRow("Nombre rapido", quick_name_input)
-        layout.addLayout(form)
-        layout.addWidget(quick_name_hint)
-        layout.addLayout(quick_name_chips)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        ok_button = buttons.button(QDialogButtonBox.StandardButton.Ok)
-        cancel_button = buttons.button(QDialogButtonBox.StandardButton.Cancel)
-        if ok_button is not None:
-            ok_button.setText("Agregar")
-        if cancel_button is not None:
-            cancel_button.setText("Cancelar")
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addWidget(buttons)
-        price_input.setFocus()
-        price_input.selectAll()
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return None
-        return {
-            "descripcion": quick_name_input.text().strip() or "Venta manual",
-            "precio_unitario": Decimal(str(price_input.value())).quantize(Decimal("0.01")),
-        }
-
-    def _handle_add_sale_manual_line(self) -> None:
-        if self.current_role not in {RolUsuario.ADMIN, RolUsuario.CAJERO}:
-            QMessageBox.warning(self, "Sin permisos", "Tu usuario no puede registrar ventas.")
-            return
-        if self.active_cash_session_id is None:
-            QMessageBox.information(self, "Caja cerrada", "Abre caja antes de registrar ventas.")
-            self._handle_cash_cut()
-            return
-        if not self._ensure_cash_session_current_day_for_operation("registrar ventas"):
-            return
-
-        payload = self._prompt_sale_manual_line()
-        if payload is None:
-            self.sale_sku_input.setFocus()
-            return
-
-        try:
-            add_sale_cart_manual_line(
-                self.sale_cart,
-                description=str(payload["descripcion"]),
-                unit_price=payload["precio_unitario"],
-            )
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "No se pudo agregar", str(exc))
-            self.sale_sku_input.setFocus()
-            return
-
-        self._set_sale_feedback(
-            f"{payload['descripcion']} agregado como linea manual.",
-            "positive",
-            auto_clear_ms=1600,
-        )
-        self._refresh_sale_cart_table()
-        self.sale_sku_input.setFocus()
-
-    def _handle_remove_sale_item(self) -> None:
-        selected_row = self.sale_cart_table.currentRow()
-        if selected_row < 0 or selected_row >= len(self.sale_cart):
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona una linea del carrito.")
-            return
-
-        removed_line_item = dict(self.sale_cart[selected_row])
-        self.sale_cart.pop(selected_row)
-        restore_message = restore_sports_uniform_playera_price_if_needed(
-            self.sale_cart,
-            removed_line_item=removed_line_item,
-        )
-        self._refresh_sale_cart_table()
-        if restore_message:
-            self._set_sale_feedback(restore_message, "warning", auto_clear_ms=2200)
-
-    def _change_selected_sale_item_quantity(self, delta: int) -> None:
-        selected_row = self.sale_cart_table.currentRow()
-        if selected_row < 0 or selected_row >= len(self.sale_cart):
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona una linea del carrito.")
-            return
-
-        selected_item = self.sale_cart[selected_row]
-        current_quantity = int(selected_item.get("cantidad") or 1)
-        new_quantity = current_quantity + int(delta)
-        if new_quantity <= 0:
-            QMessageBox.information(
-                self,
-                "Cantidad minima",
-                "Usa 'Quitar linea' si quieres sacar por completo el articulo del carrito.",
-            )
-            return
-        try:
-            with get_session() as session:
-                update_sale_cart_item_quantity(
-                    session,
-                    sale_cart=self.sale_cart,
-                    row_index=selected_row,
-                    new_quantity=new_quantity,
-                )
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "Cantidad no actualizada", str(exc))
-            return
-        self._refresh_sale_cart_table()
-        self.sale_cart_table.selectRow(selected_row)
-
-    def _handle_decrease_sale_item_quantity(self) -> None:
-        self._change_selected_sale_item_quantity(-1)
-
-    def _handle_increase_sale_item_quantity(self) -> None:
-        self._change_selected_sale_item_quantity(1)
-
-    def _handle_clear_sale_cart(self) -> None:
-        self.sale_cart.clear()
-        self._refresh_sale_cart_table()
-        self._reset_sale_form()
-        self._set_sale_feedback("Carrito limpiado.", "neutral", auto_clear_ms=1400)
-
-    def _handle_sale_cart_item_double_click(self, item) -> None:
-        if item is None:
-            return
-        self._handle_update_sale_item_quantity()
-
-    def _handle_update_sale_item_quantity(self) -> None:
-        selected_row = self.sale_cart_table.currentRow()
-        if selected_row < 0 or selected_row >= len(self.sale_cart):
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona una linea del carrito.")
-            return
-
-        selected_item = self.sale_cart[selected_row]
-        sku = str(selected_item.get("sku") or "").strip().upper()
-        line_label = (
-            str(selected_item.get("producto_nombre") or "").strip()
-            if str(selected_item.get("line_type") or "").upper() == "MANUAL"
-            else sku
-        )
-        current_quantity = int(selected_item.get("cantidad") or 1)
-        new_quantity, accepted = QInputDialog.getInt(
-            self,
-            "Actualizar cantidad",
-            f"Cantidad para {line_label}:",
-            current_quantity,
-            1,
-            1000,
-            1,
-        )
-        if not accepted or new_quantity == current_quantity:
-            return
-
-        try:
-            with get_session() as session:
-                update_sale_cart_item_quantity(
-                    session,
-                    sale_cart=self.sale_cart,
-                    row_index=selected_row,
-                    new_quantity=new_quantity,
-                )
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "Cantidad no actualizada", str(exc))
-            return
-
-        self._refresh_sale_cart_table()
-        if 0 <= selected_row < self.sale_cart_table.rowCount():
-            self.sale_cart_table.setCurrentCell(selected_row, 2)
-            self.sale_cart_table.selectRow(selected_row)
-        self._set_sale_feedback(
-            f"{line_label} actualizado a {new_quantity} pieza(s).",
-            "positive",
-            auto_clear_ms=1600,
-        )
 
     def _prompt_quick_quote_client_data(self) -> dict[str, str] | None:
         from PyQt6.QtCore import QRegularExpression
@@ -8528,7 +7422,6 @@ class MainWindow(QMainWindow):
         )
         self.quote_cancel_button.setEnabled(action_state.cancel_enabled)
         self.quote_whatsapp_button.setEnabled(action_state.whatsapp_enabled)
-        self.quote_convert_button.setEnabled(action_state.convert_enabled)
 
     def _handle_quote_filters_changed(self) -> None:
         try:
@@ -8561,36 +7454,6 @@ class MainWindow(QMainWindow):
         result_view = build_quote_result_feedback("cancel_quote")
         QMessageBox.information(self, result_view.title, result_view.message)
 
-    def _handle_convert_quote_to_sale(self) -> None:
-        quote_id = self._selected_quote_id()
-        if quote_id is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona un presupuesto emitido.")
-            return
-        if self.sale_cart:
-            if QMessageBox.question(
-                self,
-                "Carrito con items",
-                "El carrito de venta ya tiene items. ¿Reemplazar con los items del presupuesto?",
-            ) != QMessageBox.StandardButton.Yes:
-                return
-        try:
-            with get_session() as session:
-                cart_items = convert_quote_to_cart(session, quote_id=quote_id, user_id=self.user_id)
-                session.commit()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "No se pudo convertir", str(exc))
-            return
-        self.sale_cart.clear()
-        self.sale_cart.extend(cart_items)
-        self._refresh_sale_cart_table()
-        self.refresh_all()
-        self.tabs.setCurrentIndex(1)  # Caja
-        QMessageBox.information(
-            self,
-            "Presupuesto cargado",
-            "Los items del presupuesto se cargaron al carrito de venta. Ya puedes cobrar.",
-        )
-
     def _handle_open_quote_whatsapp(self) -> None:
         quote_id = self._selected_quote_id()
         feedback = build_quote_guard_feedback("open_whatsapp", has_selection=quote_id is not None)
@@ -8621,115 +7484,6 @@ class MainWindow(QMainWindow):
         self.quote_status_label.setText(
             f"WhatsApp preparado para {whatsapp_view.customer_label}."
         )
-
-    def _handle_sale(self) -> None:
-        if self.sale_processing:
-            return
-        if self.active_cash_session_id is None:
-            QMessageBox.information(self, "Caja cerrada", "Abre caja antes de cobrar.")
-            self._handle_cash_cut()
-            return
-        if not self._ensure_cash_session_current_day_for_operation("cobrar"):
-            return
-        folio = self.sale_folio_input.text().strip() or self._generate_sale_folio()
-        if not self.sale_cart:
-            if self.sale_sku_input.text().strip():
-                self._handle_add_sale_item()
-            if not self.sale_cart:
-                QMessageBox.warning(self, "Carrito vacio", "Agrega al menos una linea al carrito.")
-                return
-
-        pricing = self._calculate_sale_pricing()
-        subtotal = pricing.subtotal
-        discount_percent = pricing.discount_percent
-        applied_discount = pricing.applied_discount
-        rounding_adjustment = pricing.rounding_adjustment
-        total = pricing.collected_total
-        payment_method = self.sale_payment_combo.currentText().strip() or "Efectivo"
-        selected_client_id = self.sale_client_combo.currentData()
-        breakdown = self._sale_discount_breakdown()
-        payment_details = collect_sale_payment_details(
-            self,
-            payment_method=payment_method,
-            total=total,
-        )
-        if payment_details is None:
-            return
-        payment_context = build_sale_payment_note_context(
-            payment_method=payment_method,
-            discount_percent=discount_percent,
-            applied_discount=applied_discount,
-            rounding_adjustment=rounding_adjustment,
-            breakdown=breakdown,
-            format_discount_label=self._format_discount_label,
-            payment_details=payment_details,
-        )
-        internal_note_parts = collect_internal_sale_cart_notes(
-            self.sale_cart,
-            scope="SPORTS_UNIFORM_PROTOTYPE",
-        )
-
-        self._set_sale_processing(True)
-        try:
-            with get_session() as session:
-                result = complete_sale_checkout(
-                    session,
-                    user_id=self.user_id,
-                    folio=folio,
-                    sale_cart=self.sale_cart,
-                    subtotal=subtotal,
-                    discount_percent=discount_percent,
-                    applied_discount=applied_discount,
-                    total=total,
-                    selected_client_id=selected_client_id,
-                    breakdown=breakdown,
-                payment_method=payment_context.payment_method,
-                note_parts=list(payment_context.note_parts),
-                internal_note_parts=internal_note_parts,
-                credit_mode=self.sale_credit_mode,
-                seller_employee_code=self.sale_seller_employee_code or None,
-                seller_employee_display_name=self.sale_seller_employee_display_name or None,
-            )
-                session.commit()
-        except Exception as exc:  # noqa: BLE001
-            self._set_sale_processing(False)
-            QMessageBox.critical(
-                self,
-                "Venta no completada",
-                build_sale_checkout_error_message(str(exc)),
-            )
-            return
-        finally:
-            self._set_sale_processing(False)
-
-        post_action_view = build_sale_checkout_post_action_view(
-            folio=result.folio,
-            total=result.total,
-            payment_method=result.payment_method,
-        )
-        self._apply_sale_post_action_view(post_action_view)
-
-    def _handle_cancel_sale(self) -> None:
-        sale_id = self._selected_recent_sale_id()
-        feedback = build_recent_sale_guard_feedback(
-            "cancel_sale",
-            has_selection=sale_id is not None,
-            is_admin=self.current_role == RolUsuario.ADMIN,
-        )
-        if feedback is not None:
-            QMessageBox.warning(self, feedback.title, feedback.message)
-            return
-        assert sale_id is not None
-
-        try:
-            with get_session() as session:
-                cancel_recent_sale(session, sale_id=sale_id, admin_user_id=self.user_id)
-                session.commit()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Cancelacion fallida", str(exc))
-            return
-
-        self._apply_sale_post_action_view(build_sale_cancel_post_action_view())
 
     def _handle_inventory_adjustment(self) -> None:
         if self.current_role != RolUsuario.ADMIN:
@@ -9219,7 +7973,6 @@ class MainWindow(QMainWindow):
                 self._refresh_inventory_table(session)
                 self._refresh_quotes(session)
                 self._refresh_layaways(session)
-                self._refresh_sales_table(session)
                 self._refresh_analytics(session)
                 self._refresh_history(session)
         except Exception as exc:  # noqa: BLE001
@@ -9344,7 +8097,6 @@ class MainWindow(QMainWindow):
             can_operate_open_cash=can_operate_open_cash,
             is_admin=is_admin,
             has_selected_layaway=self._selected_layaway_id() is not None,
-            has_sale_cart=bool(self.sale_cart),
         )
         self.layaway_create_button.setEnabled(layaway_action_state.create_enabled)
         self.layaway_payment_button.setEnabled(layaway_action_state.payment_enabled)
@@ -9355,46 +8107,12 @@ class MainWindow(QMainWindow):
         self.layaway_receipt_button.setEnabled(layaway_action_state.receipt_enabled)
         self.layaway_sale_ticket_button.setEnabled(layaway_action_state.sale_ticket_enabled)
         self.layaway_whatsapp_button.setEnabled(layaway_action_state.whatsapp_enabled)
-        self.sale_layaway_button.setEnabled(layaway_action_state.convert_sale_enabled)
-        self.sale_layaway_button.setVisible(layaway_action_state.convert_sale_visible)
         self.cash_cut_button.setEnabled(can_sell)
         self.cash_movement_button.setEnabled(can_sell and has_cash_session)
         self.cash_admin_cut_action.setVisible(is_admin)
         self.cash_admin_cut_action.setEnabled(is_admin and has_cash_session)
         self.logout_button.setEnabled(True)
-        self.sale_add_button.setEnabled(can_sell and can_operate_open_cash)
-        self.sale_button.setEnabled(can_sell and can_operate_open_cash)
-        self.sale_recent_button.setEnabled(True)
-        self.sale_origin_direct_button.setEnabled(
-            can_sell and self.sale_credit_mode != ModoOrigenVenta.OPERATOR_DIRECT
-        )
-        self.sale_origin_release_button.setEnabled(
-            can_sell and self.sale_credit_mode != ModoOrigenVenta.UNASSIGNED
-        )
         self._apply_quote_action_state()
-        self._apply_recent_sale_action_state()
-        self.sale_remove_button.setEnabled(can_sell and can_operate_open_cash and bool(self.sale_cart))
-        self.sale_clear_button.setEnabled(can_sell and can_operate_open_cash and bool(self.sale_cart))
-        self.sale_layaway_button.setEnabled(can_manage_layaways and can_operate_open_cash and bool(self.sale_cart))
-        self.sale_client_combo.setEnabled(False)
-        self.sale_discount_combo.setEnabled(is_admin)
-        self.sale_discount_field_label.setVisible(is_admin)
-        self.sale_discount_combo.setVisible(is_admin)
-        if is_admin:
-            self.sale_client_display_label.setToolTip(
-                "El cliente visible en Caja se enlaza al escanear su QR o codigo. Por defecto la venta queda en Mostrador."
-            )
-            self.sale_discount_combo.setToolTip(
-                "Aplica una promocion manual no acumulable. Si hay lealtad, se aplicara el mayor beneficio."
-            )
-        else:
-            self.sale_client_display_label.setToolTip(
-                "Para CAJERO, el cliente solo se enlaza al escanear su QR o codigo."
-            )
-            self.sale_discount_combo.setToolTip(
-                "Para CAJERO, el descuento se refleja automaticamente segun el cliente escaneado."
-            )
-        self.sale_origin_value_label.setToolTip(f"Responsable: {self._sale_origin_visible_label()}")
         self.settings_create_backup_button.setEnabled(is_admin)
         self.settings_refresh_backups_button.setEnabled(True)
         self.settings_open_backups_button.setEnabled(True)
@@ -9451,7 +8169,6 @@ class MainWindow(QMainWindow):
         self.purchase_permission_label.setText(
             "" if is_admin else "Compras y carga de datos demo disponibles solo para ADMIN."
         )
-        self.cancel_permission_label.setText(build_recent_sale_permission_label(is_admin=is_admin))
         self.inventory_permission_label.setText(
             "" if is_admin else "Las altas, entradas, conteos, ajustes, cambios de precio y eliminacion estan restringidos a ADMIN."
         )
@@ -10091,13 +8808,6 @@ class MainWindow(QMainWindow):
             self.purchase_provider_combo,
             [(proveedor.nombre, proveedor.id) for proveedor in proveedores],
         )
-        self._populate_filter_combo(
-            self.sale_client_combo,
-            "Mostrador / sin cliente",
-            [(f"{cliente.codigo_cliente} · {cliente.nombre}", cliente.id) for cliente in clientes],
-        )
-        self._refresh_sale_client_display()
-        self._refresh_sale_discount_options()
         self.quote_client_combo.blockSignals(True)
         self.quote_client_combo.clear()
         self.quote_client_combo.addItem("Sin cliente asignado", None)
@@ -10139,16 +8849,6 @@ class MainWindow(QMainWindow):
             self.inventory_variant_combo.setCurrentIndex(-1)
         self._refresh_catalog_section_controls()
         self._refresh_selected_qr_preview()
-
-    def _refresh_sales_table(self, session) -> None:
-        row_views = build_recent_sale_table_row_views(list_recent_sale_rows(session, limit=20))
-        self.recent_sales_table.setRowCount(len(row_views))
-        for row_index, row_view in enumerate(row_views):
-            for column_index, value in enumerate(row_view.values):
-                self.recent_sales_table.setItem(row_index, column_index, _table_item(value))
-        self.recent_sales_table.resizeColumnsToContents()
-        self._apply_recent_sale_action_state()
-        self._refresh_sale_cart_table()
 
     def _refresh_quotes(self, session) -> None:
         selected_quote_id = self._selected_quote_id()
@@ -11346,65 +10046,6 @@ class MainWindow(QMainWindow):
         self._select_layaway(apartado_id)
         QMessageBox.information(self, "Apartado creado", f"Apartado {apartado_folio} registrado correctamente.")
 
-    def _handle_convert_sale_cart_to_layaway(self) -> None:
-        if self.current_role not in {RolUsuario.ADMIN, RolUsuario.CAJERO}:
-            QMessageBox.warning(self, "Sin permisos", "No tienes permisos para convertir el carrito en apartado.")
-            return
-        if self.active_cash_session_id is None:
-            QMessageBox.information(self, "Caja cerrada", "Abre caja antes de convertir el carrito en apartado.")
-            self._handle_cash_cut()
-            return
-        if not self._ensure_cash_session_current_day_for_operation("convertir a apartado"):
-            return
-        if not self.sale_cart:
-            if self.sale_sku_input.text().strip():
-                self._handle_add_sale_item()
-            if not self.sale_cart:
-                QMessageBox.warning(self, "Carrito vacio", "Agrega al menos una linea antes de convertirla en apartado.")
-                return
-
-        payload = build_create_layaway_dialog(
-            self,
-            initial_items=self.sale_cart,
-            selected_catalog_row=self._selected_catalog_row(),
-        )
-        if payload is None:
-            return
-
-        try:
-            with get_session() as session:
-                result = create_layaway_from_payload(
-                    session=session,
-                    user_id=self.user_id,
-                    folio=self._generate_layaway_folio(),
-                    payload=payload,
-                    default_note="Creado desde Caja.",
-                )
-                session.commit()
-                apartado_id = result.layaway_id
-                apartado_folio = result.layaway_folio
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "No se pudo convertir", str(exc))
-            return
-
-        self.sale_cart.clear()
-        self._refresh_sale_cart_table()
-        self._reset_sale_form()
-        self.refresh_all()
-        self._select_layaway(apartado_id)
-        if self.tabs is not None:
-            self.tabs.setCurrentIndex(2)
-        self._set_sale_feedback(
-            f"Carrito convertido en apartado {apartado_folio}.",
-            "positive",
-            auto_clear_ms=2200,
-        )
-        QMessageBox.information(
-            self,
-            "Apartado creado",
-            f"El carrito actual se convirtio en el apartado {apartado_folio}.",
-        )
-
     def _registrar_abono_en_libreta(self, session, payload, apartado_id: int) -> None:
         """Todo abono queda en la Libreta (registrado, pero sin comisión).
 
@@ -12143,51 +10784,6 @@ class MainWindow(QMainWindow):
             Qt.TransformationMode.SmoothTransformation,
         )
         self.qr_preview_label.setPixmap(scaled)
-
-    def _refresh_sale_cart_table(self) -> None:
-        self.sale_cart_table.setRowCount(len(self.sale_cart))
-        pricing = self._calculate_sale_pricing()
-        breakdown = self._sale_discount_breakdown()
-        panel_view = build_sale_cashier_panel_view(
-            sale_cart=self.sale_cart,
-            subtotal=pricing.subtotal,
-            applied_discount=pricing.applied_discount,
-            rounding_adjustment=pricing.rounding_adjustment,
-            collected_total=pricing.collected_total,
-            payment_method=self.sale_payment_combo.currentText().strip() or "Efectivo",
-            winner_label=str(breakdown["winner_label"]),
-            can_sell=self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO},
-            has_cash_session=self.active_cash_session_id is not None,
-            is_processing=self.sale_processing,
-        )
-        for row_index, row in enumerate(panel_view.cashier_view.table_view.rows):
-            for column_index, value in enumerate(row.values):
-                item = _table_item(value)
-                if column_index == 0:
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                elif column_index in {2, 3}:
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-                self.sale_cart_table.setItem(row_index, column_index, item)
-        self.sale_cart_table.resizeRowsToContents()
-        for column_index in (0, 2, 3):
-            self.sale_cart_table.resizeColumnToContents(column_index)
-        self.sale_total_label.setText(panel_view.cashier_view.summary.total_label)
-        self.sale_total_meta_label.setText(panel_view.cashier_view.summary.meta_label)
-        self.sale_summary_label.setText(panel_view.cashier_view.summary.summary_label)
-        self.sale_context_label.setText(panel_view.context_label)
-        self.sale_status_label.setText(panel_view.status_label)
-        self.sale_status_label.setProperty("tone", panel_view.status_tone)
-        self.sale_status_label.style().unpolish(self.sale_status_label)
-        self.sale_status_label.style().polish(self.sale_status_label)
-        self.sale_status_label.update()
-        self.sale_feedback_label.setToolTip(panel_view.payment_tooltip)
-        self.sale_qty_down_button.setEnabled(panel_view.quick_adjust_enabled)
-        self.sale_qty_up_button.setEnabled(panel_view.quick_adjust_enabled)
-        self.sale_remove_button.setEnabled(panel_view.remove_enabled)
-        self.sale_clear_button.setEnabled(panel_view.clear_enabled)
-        can_manage_layaways = self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
-        can_operate_open_cash = self.active_cash_session_id is not None and not self.cash_session_requires_cut
-        self.sale_layaway_button.setEnabled(can_manage_layaways and can_operate_open_cash and bool(self.sale_cart))
 
     def _refresh_quote_cart_table(self) -> None:
         quote_cart_view = build_quote_cart_view(self.quote_cart)

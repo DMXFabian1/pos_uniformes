@@ -16,8 +16,8 @@ class LayawayActionState:
     receipt_enabled: bool
     sale_ticket_enabled: bool
     whatsapp_enabled: bool
-    convert_sale_enabled: bool
-    convert_sale_visible: bool
+    # 2026-11-12: se quitaron convert_sale_enabled/visible (botón "Convertir
+    # a apartado" de la Caja antigua, que se retiró).
 
 
 def build_layaway_action_state(
@@ -26,7 +26,6 @@ def build_layaway_action_state(
     can_operate_open_cash: bool,
     is_admin: bool,
     has_selected_layaway: bool,
-    has_sale_cart: bool,
 ) -> LayawayActionState:
     return LayawayActionState(
         create_enabled=can_manage_layaways and can_operate_open_cash,
@@ -38,6 +37,4 @@ def build_layaway_action_state(
         receipt_enabled=can_manage_layaways,
         sale_ticket_enabled=can_manage_layaways and has_selected_layaway,
         whatsapp_enabled=can_manage_layaways and has_selected_layaway,
-        convert_sale_enabled=can_manage_layaways and can_operate_open_cash and has_sale_cart,
-        convert_sale_visible=can_manage_layaways,
     )

@@ -50,7 +50,6 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
     window.quote_remove_button.setObjectName("toolbarSecondaryButton")
     window.quote_clear_button.setObjectName("toolbarGhostButton")
     window.quote_cancel_button.setObjectName("cashierDangerButton")
-    window.quote_convert_button.setObjectName("toolbarPrimaryButton")
     window.quote_whatsapp_button.setObjectName("toolbarGhostButton")
     window.quote_refresh_button.setObjectName("toolbarGhostButton")
     window.quote_total_label.setObjectName("cashierTotalValue")
@@ -166,10 +165,12 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
     filters_row.addWidget(window.quote_state_combo)
     filters_row.addWidget(window.quote_refresh_button)
 
+    # 2026-11-12: se quitó "Cobrar presupuesto": solo cargaba el presupuesto
+    # al carrito de la Caja antigua, que se retiró («la caja antigua ya no es
+    # de utilidad, todo lo demás corre en libreta y kioskos» — Daniel).
     actions_row.addStretch()
     actions_row.addWidget(window.quote_whatsapp_button)
     actions_row.addWidget(window.quote_cancel_button)
-    actions_row.addWidget(window.quote_convert_button)
 
     window.quote_table.setColumnCount(7)
     window.quote_table.setHorizontalHeaderLabels(
@@ -261,7 +262,6 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
     window.quote_refresh_button.clicked.connect(window._handle_quote_filters_changed)
     window.quote_whatsapp_button.clicked.connect(window._handle_open_quote_whatsapp)
     window.quote_cancel_button.clicked.connect(window._handle_cancel_quote)
-    window.quote_convert_button.clicked.connect(window._handle_convert_quote_to_sale)
     window.quote_create_client_button.clicked.connect(window._handle_create_quote_client)
     window.quote_search_input.textChanged.connect(window._handle_quote_filters_changed)
     window.quote_state_combo.currentIndexChanged.connect(window._handle_quote_filters_changed)

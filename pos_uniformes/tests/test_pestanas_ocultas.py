@@ -22,8 +22,9 @@ from pos_uniformes.ui.main_window import (  # noqa: E402
 
 _APP = QApplication.instance() or QApplication([])
 
+# 2026-11-12: "Caja" ya no está: la Caja antigua se retiró del POS.
 _ORDEN = [
-    "Resumen", "Caja", "Presupuestos", "Apartados", "Catálogo", "Inventario",
+    "Resumen", "Presupuestos", "Apartados", "Catálogo", "Inventario",
     "Bodega", "Historial inventarios", "Panel Uniformes", "Analítica", "Configuración",
 ]
 
@@ -36,10 +37,11 @@ def _tabs() -> QTabWidget:
 
 
 class PestanasOcultasTests(unittest.TestCase):
-    def test_son_las_cuatro_que_se_mudaron(self) -> None:
+    def test_son_las_tres_que_se_mudaron(self) -> None:
+        """La Caja ya no se oculta: se retiró (2026-11-12)."""
         self.assertEqual(
             set(PESTANAS_MUDADAS_AL_KIOSKO),
-            {"Caja", "Presupuestos", "Apartados", "Catálogo"},
+            {"Presupuestos", "Apartados", "Catálogo"},
         )
 
     def test_todas_existen_todavia_en_el_orden_real(self) -> None:
@@ -84,11 +86,10 @@ class CajaFueraDelPosTests(unittest.TestCase):
     eso hacía salir "Caja pendiente de corte" cada vez que abría el POS.
     """
 
-    def test_el_criterio_sale_de_la_pestana(self) -> None:
+    def test_la_caja_ya_no_vive_en_el_pos(self) -> None:
         from pos_uniformes.ui.main_window import caja_en_el_pos
 
         self.assertFalse(caja_en_el_pos())
-        self.assertIn("Caja", PESTANAS_MUDADAS_AL_KIOSKO)
 
     def test_el_aviso_de_caja_pendiente_ya_no_aparece(self) -> None:
         from pos_uniformes.ui.main_window import MainWindow
@@ -112,3 +113,74 @@ class CajaFueraDelPosTests(unittest.TestCase):
         ventana = MainWindow(user_id=1)
         self.assertFalse(ventana.cash_session_label.isVisible())
         self.assertFalse(ventana.cash_cut_button.isVisible())
+
+
+class CajaAntiguaRetiradaTests(unittest.TestCase):
+    """2026-11-12, Daniel: «la caja antigua ya no es de utilidad, todo lo demás
+    corre en libreta y kioskos y es lo único que importa, es donde vive
+    nuestra operación».
+
+    La pestaña Caja ya no se construye y ningún atajo puede cobrar ni abrir
+    lo que quedaba de ella.
+    """
+
+    def setUp(self) -> None:
+        from pos_uniformes.ui.main_window import MainWindow
+
+        self.ventana = MainWindow(user_id=1)
+
+    def test_la_pestana_caja_no_se_construye(self) -> None:
+        nombres = [
+            self.ventana.tabs.tabText(i).strip() for i in range(self.ventana.tabs.count())
+        ]
+        self.assertNotIn("Caja", nombres)
+        self.assertEqual(nombres, _ORDEN)
+
+    def test_no_queda_carrito_ni_cobro_de_la_caja(self) -> None:
+        for atributo in (
+            "sale_cart",
+            "sale_sku_input",
+            "sale_button",
+            "recent_sales_table",
+            "_handle_sale",
+            "_handle_cancel_sale",
+            "_open_recent_sales_dialog",
+            "_open_quick_product_search",
+            "_handle_convert_sale_cart_to_layaway",
+            "_handle_convert_quote_to_sale",
+        ):
+            self.assertFalse(hasattr(self.ventana, atributo), atributo)
+
+    def test_f2_y_los_atajos_de_la_caja_ya_no_existen(self) -> None:
+        from PyQt6.QtGui import QKeySequence, QShortcut
+
+        atajos = {
+            sc.key().toString(QKeySequence.SequenceFormat.PortableText)
+            for sc in self.ventana.findChildren(QShortcut)
+        }
+        for tecla in ("F2", "F6", "F8", "Del", "Ctrl+S", "Meta+S"):
+            self.assertNotIn(tecla, atajos, tecla)
+        # Escape sigue: limpia Presupuestos y Catálogo.
+        self.assertIn("Esc", atajos)
+
+    def test_escape_ya_no_toca_la_caja(self) -> None:
+        # Sin pestaña Caja, Escape en cualquier pestaña no debe tronar.
+        for i in range(self.ventana.tabs.count()):
+            self.ventana.tabs.setCurrentIndex(i)
+            self.ventana._handle_escape()
+
+    def test_cobrar_presupuesto_ya_no_existe(self) -> None:
+        self.assertFalse(hasattr(self.ventana, "quote_convert_button"))
+
+    def test_el_pin_del_corte_administrativo_sigue_validando(self) -> None:
+        """Usa el código de la promo manual; no debe irse con la Caja."""
+        from unittest.mock import patch
+
+        with patch(
+            "pos_uniformes.ui.main_window.QInputDialog.getText", return_value=("0000", True)
+        ), patch(
+            "pos_uniformes.ui.main_window.verify_sale_manual_promo_code",
+            side_effect=ValueError("Codigo invalido."),
+        ) as verificar, patch("pos_uniformes.ui.main_window.QMessageBox.warning"):
+            self.assertFalse(self.ventana._prompt_admin_cash_authorization())
+        verificar.assert_called_once()

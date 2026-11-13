@@ -15,7 +15,6 @@ class LayawayActionHelperTests(unittest.TestCase):
             can_operate_open_cash=False,
             is_admin=False,
             has_selected_layaway=True,
-            has_sale_cart=True,
         )
 
         self.assertEqual(
@@ -30,8 +29,6 @@ class LayawayActionHelperTests(unittest.TestCase):
                 receipt_enabled=True,
                 sale_ticket_enabled=True,
                 whatsapp_enabled=True,
-                convert_sale_enabled=False,
-                convert_sale_visible=True,
             ),
         )
 

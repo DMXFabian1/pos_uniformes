@@ -23,7 +23,7 @@ from PyQt6.QtWidgets import (
 )
 
 from pos_uniformes.services.active_filter_service import ActiveFilterToken
-from pos_uniformes.database.models import ModoOrigenVenta, RolUsuario, TipoMovimientoCaja
+from pos_uniformes.database.models import RolUsuario, TipoMovimientoCaja
 from pos_uniformes.ui.main_window import (
     CATALOG_PAGE_SIZE,
     INVENTORY_PAGE_SIZE,
@@ -157,16 +157,6 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertIsNone(window.active_cash_session_id)
         self.assertFalse(window.cash_session_requires_cut)
 
-    def test_cashier_role_hides_manual_discount_controls(self) -> None:
-        window = MainWindow(user_id=1)
-        window.current_role = RolUsuario.CAJERO
-
-        window._apply_role_navigation()
-        window._refresh_permissions()
-
-        self.assertTrue(window.sale_discount_field_label.isHidden())
-        self.assertTrue(window.sale_discount_combo.isHidden())
-
     def test_logout_shows_window_before_ensuring_cash_session_for_new_user(self) -> None:
         window = MainWindow(user_id=1)
         window.current_role = RolUsuario.ADMIN
@@ -231,7 +221,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             window,
             "ensure_cash_session",
             side_effect=lambda: order.append("ensure") or False,
-        ), patch.object(window, "refresh_all"), patch.object(window, "_set_sale_feedback"):
+        ), patch.object(window, "refresh_all"):
             window._handle_logout()
 
         self.assertIn("dialog-hide", order)
@@ -244,7 +234,6 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         window = MainWindow(user_id=1)
         window.current_role = RolUsuario.CAJERO
         dialog_attr_names = (
-            "sales_dialog",
             "settings_users_dialog",
             "settings_suppliers_dialog",
             "settings_clients_dialog",
@@ -306,7 +295,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             window,
             "ensure_cash_session",
             return_value=True,
-        ), patch.object(window, "refresh_all"), patch.object(window, "_set_sale_feedback"), patch.object(
+        ), patch.object(window, "refresh_all"), patch.object(
             window,
             "show",
         ), patch.object(window, "raise_"), patch.object(window, "activateWindow"):
@@ -314,118 +303,6 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         for attr_name in dialog_attr_names:
             self.assertIsNone(getattr(window, attr_name))
-
-    def test_cashier_view_hides_sale_context_band(self) -> None:
-        window = MainWindow(user_id=1)
-
-        self.assertFalse(window.sale_context_label.isVisible())
-
-    def test_cashier_view_places_manual_line_button_in_header(self) -> None:
-        window = MainWindow(user_id=1)
-
-        self.assertFalse(window.sale_add_button.isHidden())
-        self.assertEqual(window.sale_add_button.text(), "Agregar sin codigo")
-
-    def test_handle_add_sale_manual_line_appends_manual_cart_line(self) -> None:
-        window = MainWindow(user_id=1)
-        window.current_role = RolUsuario.ADMIN
-        window.active_cash_session_id = 10
-
-        with patch.object(window, "_ensure_cash_session_current_day_for_operation", return_value=True), patch.object(
-            window,
-            "_prompt_sale_manual_line",
-            return_value={"descripcion": "Venta manual", "precio_unitario": Decimal("75.00")},
-        ), patch.object(window, "_refresh_sale_cart_table"), patch.object(window, "_set_sale_feedback"):
-            window._handle_add_sale_manual_line()
-
-        self.assertEqual(len(window.sale_cart), 1)
-        self.assertEqual(window.sale_cart[0]["line_type"], "MANUAL")
-        self.assertEqual(window.sale_cart[0]["producto_nombre"], "Venta manual")
-        self.assertEqual(window.sale_cart[0]["precio_unitario"], Decimal("75.00"))
-
-    def test_sale_origin_defaults_to_unassigned_after_reset(self) -> None:
-        window = MainWindow(user_id=1)
-
-        window._reset_sale_form()
-
-        self.assertEqual(window.sale_credit_mode, ModoOrigenVenta.UNASSIGNED)
-        self.assertEqual(window.sale_origin_value_label.text(), "Sin asignar")
-
-    def test_sale_origin_direct_and_release_update_visible_label(self) -> None:
-        window = MainWindow(user_id=1)
-
-        window._handle_sale_origin_direct()
-        self.assertEqual(window.sale_credit_mode, ModoOrigenVenta.OPERATOR_DIRECT)
-        self.assertEqual(window.sale_origin_value_label.text(), "Directa")
-
-        window._handle_sale_origin_release()
-        self.assertEqual(window.sale_credit_mode, ModoOrigenVenta.UNASSIGNED)
-        self.assertEqual(window.sale_origin_value_label.text(), "Sin asignar")
-
-    def test_sale_origin_buttons_stay_available_without_open_cash_session(self) -> None:
-        window = MainWindow(user_id=1)
-        window.current_role = RolUsuario.ADMIN
-        window.active_cash_session_id = None
-        window.cash_session_requires_cut = False
-
-        window._refresh_permissions()
-
-        self.assertTrue(window.sale_origin_direct_button.isEnabled())
-        self.assertFalse(window.sale_origin_release_button.isEnabled())
-
-    def test_sale_origin_identify_button_is_not_visible_in_cashier_ui(self) -> None:
-        window = MainWindow(user_id=1)
-
-        self.assertFalse(window.sale_origin_identify_button.isVisible())
-
-    def test_sale_origin_identify_assigns_employee_from_emp_qr(self) -> None:
-        window = MainWindow(user_id=1)
-        fake_employee = SimpleNamespace(codigo="VEND-1", nombre_completo="Guadalupe Gomez Ruiz", activo=True)
-
-        with patch("pos_uniformes.ui.main_window.get_session") as get_session_mock, patch(
-            "pos_uniformes.ui.main_window.EmployeeIdentityService.resolve_employee_by_qr_code",
-            return_value=fake_employee,
-        ):
-            session = Mock()
-            context = Mock()
-            context.__enter__ = Mock(return_value=session)
-            context.__exit__ = Mock(return_value=False)
-            get_session_mock.return_value = context
-
-            window._handle_sale_origin_identify(scanned_code="EMP:VEND-1")
-
-        self.assertEqual(window.sale_credit_mode, ModoOrigenVenta.EMPLOYEE)
-        self.assertEqual(window.sale_seller_employee_code, "VEND-1")
-        self.assertEqual(window.sale_origin_value_label.text(), "Guadalupe Ruiz")
-
-    def test_sale_origin_identify_keeps_state_when_employee_qr_is_invalid(self) -> None:
-        window = MainWindow(user_id=1)
-        window._handle_sale_origin_direct()
-
-        with patch("pos_uniformes.ui.main_window.get_session") as get_session_mock, patch(
-            "pos_uniformes.ui.main_window.EmployeeIdentityService.resolve_employee_by_qr_code",
-            return_value=None,
-        ):
-            session = Mock()
-            context = Mock()
-            context.__enter__ = Mock(return_value=session)
-            context.__exit__ = Mock(return_value=False)
-            get_session_mock.return_value = context
-
-            window._handle_sale_origin_identify(scanned_code="EMP:VEND-404")
-
-        self.assertEqual(window.sale_credit_mode, ModoOrigenVenta.OPERATOR_DIRECT)
-        self.assertEqual(window.sale_origin_value_label.text(), "Directa")
-
-    def test_handle_add_sale_item_routes_scanner_layout_variant_to_employee_origin(self) -> None:
-        window = MainWindow(user_id=1)
-        window.sale_sku_input.setText("EMPÑVEND´1")
-
-        with patch.object(window, "_handle_sale_origin_identify") as identify_mock:
-            window._handle_add_sale_item()
-
-        identify_mock.assert_called_once_with(scanned_code="EMPÑVEND´1")
-        self.assertEqual(window.sale_sku_input.text(), "")
 
     def test_settings_employee_detail_panel_formats_recent_activity(self) -> None:
         window = MainWindow(user_id=1)
@@ -919,16 +796,6 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertEqual(window.settings_employee_sale_detail_table.rowCount(), 1)
         self.assertEqual(window.settings_employee_sale_detail_table.item(0, 0).text(), "SKU-001")
         self.assertEqual(window.settings_employee_sale_detail_table.item(0, 1).text(), "Playera Polo")
-
-    def test_admin_role_keeps_manual_discount_controls_visible(self) -> None:
-        window = MainWindow(user_id=1)
-        window.current_role = RolUsuario.ADMIN
-
-        window._apply_role_navigation()
-        window._refresh_permissions()
-
-        self.assertFalse(window.sale_discount_field_label.isHidden())
-        self.assertFalse(window.sale_discount_combo.isHidden())
 
     def test_cashier_role_hides_admin_cash_cut_action(self) -> None:
         window = MainWindow(user_id=1)
