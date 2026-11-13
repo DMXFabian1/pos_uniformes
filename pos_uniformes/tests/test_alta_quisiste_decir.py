@@ -133,6 +133,7 @@ class VentanitaTests(unittest.TestCase):
                 return
             vistos.append((caja.windowTitle(), caja.text(), [b.text() for b in caja.buttons()],
                            caja.defaultButton().text()))
+            self.ultimo_info = caja.informativeText()
             for b in caja.buttons():
                 if b.text() == texto_boton:
                     b.click()
@@ -169,6 +170,32 @@ class VentanitaTests(unittest.TestCase):
         eleccion = preguntar_quisiste_decir(None, revision, False)
         self.assertEqual(vistos[0][2], ["Corregir"])
         self.assertEqual(eleccion.accion, ACCION_CORREGIR)
+        self.assertNotIn("¿Crear", vistos[0][1])
+        self.assertIn("pide a un ADMIN", vistos[0][1])
+
+    def test_blanca_explica_por_que_se_propone_blanco(self) -> None:
+        vistos: list = []
+        revision = cv.revisar_valor(cv.CAMPO_COLOR, "Blanca", USOS[cv.CAMPO_COLOR])
+        self._responder("Corregir", vistos)
+        preguntar_quisiste_decir(None, revision)
+        self.assertIn("Para lo nuevo se usa una sola forma: «Blanco».", self.ultimo_info)
+
+    def test_sin_parecido_crear_no_es_el_boton_por_defecto(self) -> None:
+        for campo, escrito in ((cv.CAMPO_TALLA, "S"), (cv.CAMPO_ESCUELA, "Rancho Nuevo")):
+            with self.subTest(escrito=escrito):
+                vistos: list = []
+                revision = cv.revisar_valor(campo, escrito, USOS[campo])
+                self._responder("Corregir", vistos)
+                preguntar_quisiste_decir(None, revision, True)
+                self.assertEqual(vistos[0][3], "Corregir")
+
+    def test_parecido_solo_de_letras_tiene_corregir_por_defecto(self) -> None:
+        vistos: list = []
+        revision = cv.revisar_valor(cv.CAMPO_TIPO_PIEZA, "Chamara", USOS[cv.CAMPO_TIPO_PIEZA])
+        self._responder("Corregir", vistos)
+        preguntar_quisiste_decir(None, revision, True)
+        self.assertIn("Usar Chamarra", vistos[0][2])
+        self.assertEqual(vistos[0][3], "Corregir")
 
 
 class _VentanaFalsa(QWidget):

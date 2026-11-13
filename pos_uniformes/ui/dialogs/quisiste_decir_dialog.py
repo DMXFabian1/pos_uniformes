@@ -7,9 +7,12 @@ o color no es un valor que ya existe (o es una escritura vieja como «Uni» o
     «Blanca» se parece a «Blanco» (125 tallas).
     [Usar Blanco]  [Es otro, crearlo]  [Corregir]
 
-«Usar…» es el botón por defecto. Nada nuevo se crea sin que el usuario toque
-«Es otro, crearlo». Una escuela nueva pregunta «¿Es la misma que…?» y solo
-ADMIN la puede crear.
+«Usar…» es el botón por defecto cuando la propuesta es la misma palabra
+escrita de otra forma (sinónimo o acentos) y «Sí, es…» en escuelas. Si solo
+se parecen las letras, o no hay nada parecido, el botón por defecto es
+«Corregir»: crear o unir nunca queda a un Enter. Nada nuevo se crea sin que
+el usuario toque «Es otro, crearlo». Una escuela nueva pregunta «¿Es la
+misma que…?» y solo ADMIN la puede crear.
 
 La decisión (qué preguntar) vive en `services/catalogo_valores_service.py`;
 aquí solo está la ventanita y el recorrido de los campos del formulario.
@@ -72,9 +75,12 @@ def preguntar_quisiste_decir(parent: QWidget | None, revision: Revision, puede_c
     box.setObjectName("quisisteDecirDialog")
     box.setIcon(QMessageBox.Icon.Question)
     box.setWindowTitle("¿Es la misma escuela?" if es_escuela else "¿Quisiste decir…?")
-    box.setText(revision.texto_pregunta())
-    if not puede_crear:
-        box.setInformativeText("Solo ADMIN puede crear una escuela nueva.")
+    box.setText(revision.texto_pregunta(puede_crear))
+    if revision.texto_motivo():
+        box.setInformativeText(revision.texto_motivo())
+    elif not puede_crear:
+        if revision.sugerencias:
+            box.setInformativeText("Solo ADMIN puede crear una escuela nueva.")
     elif revision.sugerencias and not revision.existe:
         box.setInformativeText(
             "Si de verdad es otra, créala; si no, usa la que ya existe para no duplicar."
@@ -83,11 +89,13 @@ def preguntar_quisiste_decir(parent: QWidget | None, revision: Revision, puede_c
         )
     botones: dict[object, Eleccion] = {}
     primero = None
+    usar_por_defecto = es_escuela or revision.sugerencia_segura
     for parecido in revision.sugerencias:
         texto = f"Sí, es «{parecido.valor}»" if es_escuela else f"Usar {parecido.valor}"
         boton = box.addButton(texto, QMessageBox.ButtonRole.AcceptRole)
         botones[boton] = Eleccion(ACCION_USAR, parecido.valor)
-        primero = primero or boton
+        if usar_por_defecto:
+            primero = primero or boton
     if revision.existe:
         boton = box.addButton(f"Dejar «{revision.escrito}»", QMessageBox.ButtonRole.ActionRole)
         botones[boton] = Eleccion(ACCION_DEJAR, revision.escrito)
@@ -98,7 +106,6 @@ def preguntar_quisiste_decir(parent: QWidget | None, revision: Revision, puede_c
             texto = "Es otro, crearlo"
         boton = box.addButton(texto, QMessageBox.ButtonRole.ActionRole)
         botones[boton] = Eleccion(ACCION_CREAR, revision.escrito)
-        primero = primero or boton
     corregir = box.addButton("Corregir", QMessageBox.ButtonRole.RejectRole)
     botones[corregir] = Eleccion(ACCION_CORREGIR)
     box.setDefaultButton(primero or corregir)
