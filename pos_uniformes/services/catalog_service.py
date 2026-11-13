@@ -22,6 +22,7 @@ from pos_uniformes.database.models import (
     Producto,
     RolUsuario,
     SkuSequence,
+    TipoMovimientoInventario,
     TipoPieza,
     TipoCambioCatalogo,
     TipoEntidadCatalogo,
@@ -536,7 +537,11 @@ class CatalogService:
         genero: str | None = None,
         escudo: str | None = None,
         ubicacion: str | None = None,
+        observacion: str | None = None,
     ) -> Producto:
+        """`observacion` dice en la bitácora de dónde salió el alta («Alta desde
+        POS · modelo: …», «Claude», «Copia de escuela…»). Sin ella queda la de
+        siempre («Producto creado.»)."""
         cls._validar_admin(usuario)
         raw_name = nombre.strip()
         if not raw_name:
@@ -581,7 +586,7 @@ class CatalogService:
             TipoEntidadCatalogo.PRODUCTO,
             producto.id,
             cls._descripcion_producto(producto),
-            "Producto creado.",
+            (observacion or "").strip() or "Producto creado.",
         )
         cls._notify_meili(session)
         return producto
@@ -697,7 +702,9 @@ class CatalogService:
         precio_venta: Decimal,
         costo_referencia: Decimal | None = None,
         stock_inicial: int = 0,
+        observacion: str | None = None,
     ) -> Variante:
+        """`observacion`: el origen del alta para la bitácora (ver `crear_producto`)."""
         cls._validar_admin(usuario)
         cls.validar_precio_venta(precio_venta)
         talla = talla.strip()
@@ -745,7 +752,7 @@ class CatalogService:
             TipoEntidadCatalogo.PRESENTACION,
             variante.id,
             cls._descripcion_presentacion(variante),
-            "Presentacion creada.",
+            (observacion or "").strip() or "Presentacion creada.",
         )
 
         if stock_inicial > 0:
@@ -1010,16 +1017,47 @@ class CatalogService:
         cls._notify_meili(session)
         return resumen
 
+    #: Movimientos que no traban el borrado de una talla en 0: la entrada al
+    #: dar de alta y sus correcciones. Se borran con la talla (y la bitácora
+    #: lo dice).
+    _MOVIMIENTOS_CORREGIBLES = frozenset({
+        TipoMovimientoInventario.AJUSTE_ENTRADA,
+        TipoMovimientoInventario.AJUSTE_SALIDA,
+    })
+
     @staticmethod
     def _validar_variante_eliminable(session: Session, variante: Variante) -> None:
         if variante.stock_actual != 0:
             raise ValueError("No se puede eliminar una presentacion con stock. Primero deja el stock en 0.")
 
-        movimientos = session.scalar(
-            select(func.count(MovimientoInventario.id)).where(MovimientoInventario.variante_id == variante.id)
-        ) or 0
-        if movimientos:
+        # Lo que entró al dar de alta (o se contó a mano) y se corrigió a 0 no
+        # traba el borrado: Daniel, 2026-11-13, «la existencia inicial entra
+        # como entrada normal, se puede corregir y la talla se puede borrar».
+        # Antes cualquier movimiento la dejaba imposible de borrar (hallazgo 8).
+        # Ventas, compras, apartados, conteos, lotes o bodega sí la traban.
+        tipos = set(
+            session.scalars(
+                select(MovimientoInventario.tipo_movimiento)
+                .where(MovimientoInventario.variante_id == variante.id)
+                .distinct()
+            ).all()
+        )
+        if tipos - CatalogService._MOVIMIENTOS_CORREGIBLES:
             raise ValueError("No se puede eliminar una presentacion con movimientos de inventario. Desactiva en su lugar.")
+        from pos_uniformes.database.models import (
+            AjusteInventarioLoteDetalle,
+            ApartadoDetalle,
+            BodegaContenido,
+            BodegaMovimiento,
+            ConteoInventario,
+        )
+
+        for modelo in (AjusteInventarioLoteDetalle, ConteoInventario, ApartadoDetalle, BodegaContenido, BodegaMovimiento):
+            usada = session.scalar(select(func.count()).select_from(modelo).where(modelo.variante_id == variante.id)) or 0
+            if usada:
+                raise ValueError(
+                    "No se puede eliminar una presentacion con movimientos de inventario. Desactiva en su lugar."
+                )
 
         compras = session.scalar(
             select(func.count(CompraDetalle.id)).where(CompraDetalle.variante_id == variante.id)
@@ -1033,6 +1071,15 @@ class CatalogService:
         if ventas:
             raise ValueError("No se puede eliminar una presentacion con historial de ventas. Desactiva en su lugar.")
 
+    @staticmethod
+    def _nota_movimientos_borrados(session: Session, variante: Variante) -> str:
+        cuantos = session.scalar(
+            select(func.count(MovimientoInventario.id)).where(MovimientoInventario.variante_id == variante.id)
+        ) or 0
+        if not cuantos:
+            return ""
+        return f" Se borran con ella {cuantos} movimiento(s) de entrada y corrección que dejaban la existencia en 0."
+
     @classmethod
     def eliminar_variante(cls, session: Session, usuario: Usuario, variante: Variante) -> None:
         cls._validar_admin(usuario)
@@ -1043,7 +1090,7 @@ class CatalogService:
             TipoEntidadCatalogo.PRESENTACION,
             variante.id,
             cls._descripcion_presentacion(variante),
-            "Presentacion eliminada.",
+            "Presentacion eliminada." + cls._nota_movimientos_borrados(session, variante),
         )
         session.delete(variante)
         cls._notify_meili(session)
@@ -1103,7 +1150,7 @@ class CatalogService:
                 TipoEntidadCatalogo.PRESENTACION,
                 variante.id,
                 cls._descripcion_presentacion(variante),
-                "Presentacion eliminada junto con su producto.",
+                "Presentacion eliminada junto con su producto." + cls._nota_movimientos_borrados(session, variante),
             )
 
         cls._registrar_eliminacion(

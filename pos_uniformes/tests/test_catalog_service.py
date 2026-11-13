@@ -7,17 +7,19 @@ import unittest
 from decimal import Decimal
 from unittest.mock import patch
 
-from sqlalchemy import create_engine, event, select
+from sqlalchemy import create_engine, event, func, select
 from sqlalchemy.dialects import postgresql
 from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from pos_uniformes.database.connection import Base
 from pos_uniformes.database.models import (
+    CambioCatalogo,
     Categoria,
     ConjuntoComponente,
     Escuela,
     Marca,
+    MovimientoInventario,
     Producto,
     RolUsuario,
     SkuSequence,
@@ -374,6 +376,67 @@ class BorrarYReactivarTests(_ConBase):
         self.s.flush()
         C.cambiar_estado_producto(self.s, self.admin, p, True)
         self.assertEqual([t4.activo, t6.activo], [True, True])
+
+
+class OrigenEnBitacoraTests(_ConBase):
+    def test_sin_origen_queda_la_observacion_de_siempre(self) -> None:
+        p = self._producto("Short", None)
+        v = self._talla(p, "4")
+        self.s.flush()
+        obs = self.s.scalars(select(CambioCatalogo.observacion).order_by(CambioCatalogo.id)).all()
+        self.assertEqual(obs, ["Producto creado.", "Presentacion creada."])
+        self.assertTrue(v.id)
+
+    def test_el_origen_queda_en_la_bitacora(self) -> None:
+        origen = "Alta desde POS · modelo: Pants Suelto Miguel Hidalgo"
+        p = C.crear_producto(self.s, self.admin, self.cat, self.marca, "Pants Suelto", escuela=self.allende,
+                             observacion=origen)
+        C.crear_variante(self.s, self.admin, p, None, "4", "Sin color", Decimal("245"), observacion=origen)
+        self.s.flush()
+        obs = self.s.scalars(select(CambioCatalogo.observacion).order_by(CambioCatalogo.id)).all()
+        self.assertEqual(obs, [origen, origen])
+
+
+class BorrarTallaConEntradaTests(_ConBase):
+    def _entrada(self, v: Variante, cantidad: int) -> None:
+        from pos_uniformes.services.inventario_service import InventarioService
+
+        InventarioService.registrar_ajuste_manual(self.s, v, cantidad, self.admin, referencia="ALTA-ENTRADA")
+        self.s.flush()
+
+    def test_la_entrada_corregida_a_cero_deja_borrar_la_talla(self) -> None:
+        p = self._producto("Short", None)
+        v = self._talla(p, "4")
+        self._entrada(v, 5)
+        with self.assertRaisesRegex(ValueError, "con stock"):
+            C.eliminar_variante(self.s, self.admin, v)
+        self._entrada(v, -5)
+        C.eliminar_variante(self.s, self.admin, v)
+        self.s.flush()
+        self.assertIsNone(self.s.get(Variante, v.id))
+        self.assertEqual(self.s.scalar(select(func.count(MovimientoInventario.id))), 0)
+        obs = self.s.scalars(select(CambioCatalogo.observacion).order_by(CambioCatalogo.id.desc())).first()
+        self.assertIn("2 movimiento(s)", obs)
+
+    def test_la_prenda_entera_tambien_se_borra(self) -> None:
+        p = self._producto("Short", None)
+        v = self._talla(p, "4")
+        self._entrada(v, 3)
+        self._entrada(v, -3)
+        C.eliminar_producto(self.s, self.admin, p)
+        self.s.flush()
+        self.assertIsNone(self.s.get(Producto, p.id))
+
+    def test_una_venta_si_traba_el_borrado(self) -> None:
+        from pos_uniformes.services.inventario_service import InventarioService
+
+        p = self._producto("Short", None)
+        v = self._talla(p, "4")
+        self._entrada(v, 1)
+        InventarioService.registrar_salida_venta(self.s, v, 1, referencia="V-1")
+        self.s.flush()
+        with self.assertRaisesRegex(ValueError, "movimientos de inventario"):
+            C.eliminar_variante(self.s, self.admin, v)
 
 
 if __name__ == "__main__":
