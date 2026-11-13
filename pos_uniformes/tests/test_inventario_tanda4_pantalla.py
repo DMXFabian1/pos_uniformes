@@ -213,6 +213,21 @@ class InventarioTanda4PantallaTests(unittest.TestCase):
         self.assertTrue(barra.isHidden())
         self.assertEqual(pantalla.ficha.estado(), VACIA)
 
+    def test_las_acciones_de_lote_salen_una_sola_vez_en_la_barra(self) -> None:
+        from PyQt6.QtWidgets import QPushButton
+
+        window = self._ventana()
+        pantalla = window.inventario_pantalla
+        self._elegir(pantalla.prendas, pantalla.prendas.modelo.index(0, 0))
+        self.assertEqual(pantalla.ficha.estado(), LOTE)
+        pagina_lote = pantalla.ficha.paginas.widget(LOTE)
+        self.assertEqual(pagina_lote.findChildren(QPushButton), [])
+        self.assertIn("barra de arriba", pantalla.ficha.lote_donde.text())
+        barra = pantalla.barra_lote
+        self.assertEqual([barra.existencias.text(), barra.precio.text(), barra.quitar.text()],
+                         ["🧮  Corregir existencias", "💲  Cambiar precio", "✕  Quitar selección"])
+        self.assertIs(pantalla.boton_lote_etiquetas, barra.etiquetas)
+
     def test_etiquetas_de_mas_de_200_tallas_piden_confirmar_desde_la_barra(self) -> None:
         filas = [_fila(i, 1, talla=str(i)) for i in range(1, 206)]
         window = self._ventana(filas)

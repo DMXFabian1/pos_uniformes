@@ -440,14 +440,26 @@ class FichaInventario(QFrame):
         self.lote_nota = _etiqueta("Con Ctrl/Cmd + clic sumas o quitas tallas; con Shift, un rango.", "invFichaSub", envolver=True)
         caja.addWidget(self.lote_nota)
         layout.addWidget(total)
-        self.lote_acciones = QVBoxLayout()
-        self.lote_acciones.setSpacing(8)
-        layout.addLayout(self.lote_acciones)
+        # Las acciones de lote viven SOLO en la barra de arriba de la lista (sin repetirlas aquí).
+        self.lote_donde = _etiqueta(AVISO_ACCIONES_EN_BARRA, "invFichaSub", envolver=True)
+        layout.addWidget(self.lote_donde)
         layout.addStretch(1)
         return pagina
 
     def estado(self) -> int:
         return self.paginas.currentIndex()
+
+
+#: Palabras de las acciones de lote (una sola vez, en la barra de arriba de la lista).
+TEXTO_LOTE_ETIQUETAS = "🏷  Imprimir etiquetas"
+TEXTO_LOTE_EXISTENCIAS = "🧮  Corregir existencias"
+TEXTO_LOTE_PRECIO = "💲  Cambiar precio"
+TEXTO_LOTE_QUITAR = "✕  Quitar selección"
+AVISO_ACCIONES_EN_BARRA = "Imprimir, corregir existencias o cambiar el precio de estas tallas: en la barra de arriba de la lista."
+
+
+def texto_imprimir_etiquetas(cantidad: int) -> str:
+    return f"🏷  Imprimir {cantidad:,} {'etiqueta' if cantidad == 1 else 'etiquetas'}"
 
 
 def boton_accion(texto: str, aviso: str = "") -> QPushButton:
@@ -474,10 +486,10 @@ class BarraLote(QFrame):
         self.texto = _etiqueta("", "invLoteTexto")
         layout.addWidget(self.texto)
         layout.addStretch(1)
-        self.etiquetas = self._boton("🏷  Imprimir etiquetas", "Imprime la etiqueta de cada talla elegida")
-        self.existencias = self._boton("🧮  Corregir existencias", "Corregir cuántas hay de varias tallas a la vez")
-        self.precio = self._boton("💲  Cambiar precio", "Cambiar el precio de las tallas elegidas")
-        self.quitar = self._boton("✕  Quitar selección", "Soltar las tallas elegidas (Esc)")
+        self.etiquetas = self._boton(TEXTO_LOTE_ETIQUETAS, "Imprime la etiqueta de cada talla elegida")
+        self.existencias = self._boton(TEXTO_LOTE_EXISTENCIAS, "Corregir cuántas hay de varias tallas a la vez")
+        self.precio = self._boton(TEXTO_LOTE_PRECIO, "Cambiar el precio de las tallas elegidas")
+        self.quitar = self._boton(TEXTO_LOTE_QUITAR, "Soltar las tallas elegidas (Esc)")
         for boton in (self.etiquetas, self.existencias, self.precio, self.quitar):
             layout.addWidget(boton)
         self.setVisible(False)
@@ -927,7 +939,7 @@ class InventarioPantalla(QObject):
         filas = [f for f in self.window.inventory_filtered_rows if f.get("variante_id") in ids]
         resumen = resumir_lote(filas) if filas else resumir_lote({"stock_actual": 0} for _ in elegidas)
         barra.texto.setText(resumen.texto)
-        barra.etiquetas.setText(f"🏷  Imprimir {len(elegidas):,} etiquetas")
+        barra.etiquetas.setText(texto_imprimir_etiquetas(len(elegidas)))
         barra.setVisible(True)
 
     # ── Ficha ────────────────────────────────────────────────────────────
@@ -1012,9 +1024,6 @@ class InventarioPantalla(QObject):
         filas = [f for f in self.window.inventory_filtered_rows if f.get("variante_id") in ids]
         resumen = resumir_lote(filas) if filas else resumir_lote({"stock_actual": 0} for _ in elegidas)
         self.ficha.lote_total.setText(resumen.texto)
-        self.boton_lote_etiquetas.setText(
-            f"🏷  Imprimir {len(elegidas):,} {'etiqueta' if len(elegidas) == 1 else 'etiquetas'}"
-        )
         self._habilitar_acciones()
         self.ficha.paginas.setCurrentIndex(LOTE)
 
@@ -1024,13 +1033,10 @@ class InventarioPantalla(QObject):
         for boton in (
             self.boton_corregir,
             self.boton_editar,
-            self.boton_lote_existencias,
-            self.boton_lote_precio,
             self.barra_lote.existencias,
             self.barra_lote.precio,
         ):
             boton.setEnabled(admin)
-        self.boton_lote_etiquetas.setEnabled(w.inventory_print_label_button.isEnabled())
         self.barra_lote.etiquetas.setEnabled(w.inventory_print_label_button.isEnabled())
         self.boton_movimientos.setEnabled(admin and _indice_pestana(w, "Historial inventarios") is not None)
 
@@ -1064,29 +1070,18 @@ class InventarioPantalla(QObject):
         ficha.mas.setMenu(menu)
         self.menu_ficha = menu
 
-        self.boton_lote_etiquetas = boton_accion("🏷  Imprimir etiquetas", "Imprime la etiqueta de cada talla elegida")
-        self.boton_lote_etiquetas.clicked.connect(self.imprimir_elegidas)
-        self.boton_lote_existencias = boton_accion(
-            "🧮  Corregir existencias en lote", "Corregir cuántas hay de varias tallas a la vez"
-        )
-        self.boton_lote_existencias.clicked.connect(lambda: self._llamar("_handle_inventory_bulk_adjustment"))
-        self.boton_lote_precio = boton_accion("💲  Cambiar precio", "Cambiar el precio de las tallas elegidas")
-        self.boton_lote_precio.clicked.connect(lambda: self._llamar("_handle_inventory_bulk_price_update"))
-        self.boton_lote_quitar = boton_accion("✕  Quitar la selección")
-        self.boton_lote_quitar.clicked.connect(self.quitar_seleccion)
-        # La barra de lote reusa los mismos manejadores (sin lógica propia).
+        # Las acciones de lote van una sola vez, en la barra de arriba de la lista;
+        # reusan los mismos manejadores (sin lógica propia).
         barra = self.barra_lote
         barra.etiquetas.clicked.connect(self.imprimir_elegidas)
         barra.existencias.clicked.connect(lambda: self._llamar("_handle_inventory_bulk_adjustment"))
         barra.precio.clicked.connect(lambda: self._llamar("_handle_inventory_bulk_price_update"))
         barra.quitar.clicked.connect(self.quitar_seleccion)
-        for boton in (
-            self.boton_lote_etiquetas,
-            self.boton_lote_existencias,
-            self.boton_lote_precio,
-            self.boton_lote_quitar,
-        ):
-            ficha.lote_acciones.addWidget(boton)
+        # Nombres de la tanda 3 (la ficha tenía sus propios botones): ahora son los de la barra.
+        self.boton_lote_etiquetas = barra.etiquetas
+        self.boton_lote_existencias = barra.existencias
+        self.boton_lote_precio = barra.precio
+        self.boton_lote_quitar = barra.quitar
 
     def _sincronizar_desactivar(self) -> None:
         w = self.window

@@ -194,7 +194,7 @@ QTreeView#invPrendas QHeaderView::section:hover {{ color: {VINO}; }}
 
 /* ── Barra de lote: discreta, vino suave, arriba de la lista ── */
 QFrame#invLote {{ background: {VINO_SUAVE}; border: 1px solid #e3c6d1; border-radius: 12px; }}
-QLabel#invLoteTexto {{ font-size: 13px; font-weight: 800; color: {VINO}; }}
+QLabel#invLoteTexto {{ font-size: 13px; font-weight: 700; color: {VINO}; }}
 QPushButton#invLoteAccion {{
     background: transparent; color: {VINO}; border: none; border-radius: 9px;
     padding: 0 9px; min-height: 30px; font-size: 13px; font-weight: 700;
