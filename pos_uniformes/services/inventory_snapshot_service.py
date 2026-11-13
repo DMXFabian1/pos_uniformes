@@ -12,7 +12,7 @@ from pos_uniformes.services.search_filter_service import (
 
 _inventory_qr_exists_cache: dict[str, bool] = {}
 
-from pos_uniformes.ui.helpers.size_option_sort_helper import _size_sort_key
+from pos_uniformes.services.talla_orden_service import clave_talla
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 
 
@@ -29,14 +29,14 @@ def clave_orden_inventario(row: dict[str, object]) -> tuple[object, ...]:
     """Agrupa por producto (y color) y ordena las tallas como talla, no como SKU.
 
     Usa el mismo orden de tallas que los filtros y Bodega
-    (`size_option_sort_helper`): números y rangos ascendentes, luego
-    CH, CH-MD, MD, GD, GD-EXG, EXG, UNI/UNITALLA y al final lo raro.
+    (`talla_orden_service.clave_talla`): números y rangos ascendentes,
+    luego XCH, CH…EXG, XS…XXL, UNI/UNITALLA y al final lo raro.
     """
     return (
         str(row.get("producto_nombre") or "").casefold(),
         int(row.get("producto_id") or 0),
         str(row.get("color") or "").casefold(),
-        _size_sort_key(str(row.get("talla") or "")),
+        clave_talla(row.get("talla")),
         str(row.get("sku") or ""),
     )
 
