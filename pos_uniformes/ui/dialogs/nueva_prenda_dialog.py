@@ -27,6 +27,7 @@ para no dejar nada tomado.
 
 from __future__ import annotations
 
+import time
 from collections.abc import Callable
 from typing import Any
 
@@ -77,6 +78,10 @@ from pos_uniformes.ui.styles.nueva_prenda_styles import (
 )
 
 PUERTA, ESCUELA, FALTA, PRINCIPAL, CONFIRMAR, LISTO = range(6)
+
+#: Tras guardar, «Imprimir etiquetas» se queda apagado este rato: el segundo
+#: clic de un doble clic en «Sí, dar de alta» no debe imprimir ni cerrar.
+PAUSA_LISTO_MS = 600
 
 TARJETA_ESCUELA = "escuela"
 TARJETA_IGUAL = "igual"
@@ -235,6 +240,8 @@ class NuevaPrendaDialog(QDialog):
         self.resultado: alta.ResultadoAlta | None = None
         self._color_elegido = False
         self._mas_tocado = False  # «Más datos» tocado a mano: se queda al cambiar de modelo
+        self._guardando = False
+        self._pausa_hasta = 0.0
         self.escuelas: list[nps.EscuelaParaElegir] = []
         self.ops = nps.Opciones()
 
@@ -378,6 +385,8 @@ class NuevaPrendaDialog(QDialog):
                 self._ir(FALTA)
 
     def _al_principal(self) -> None:
+        if self._guardando or time.monotonic() < self._pausa_hasta:
+            return  # doble clic: el segundo no vuelve a guardar ni imprime
         paso = self.pasos.currentIndex()
         if paso == PRINCIPAL:
             # La descripción no avisa al escribir: se pasa al plan (y a las
@@ -1092,6 +1101,10 @@ class NuevaPrendaDialog(QDialog):
                 raise PermissionError("No se encontró el usuario.")
             return alta.aplicar(s, self.planes, usuario, alta.ORIGEN_POS, commit=True)
 
+        if self._guardando:
+            return
+        self._guardando = True
+        self.principal.setEnabled(False)
         try:
             self.resultado = self._con_sesion(guardar)
         except PermissionError:
@@ -1103,14 +1116,29 @@ class NuevaPrendaDialog(QDialog):
         except (ValueError, SQLAlchemyError) as exc:
             self._error_al_guardar(str(exc).split("\n")[0] or exc.__class__.__name__)
             return
-        if self.al_terminar is not None:
-            self.al_terminar(self.resultado)
+        finally:
+            self._guardando = False
         self.texto_listo.setText(nps.frase_listo(self.resultado))
         self._ir(LISTO)
+        # «Imprimir etiquetas» espera un momento (el segundo clic de un doble clic).
+        self._pausa_hasta = time.monotonic() + PAUSA_LISTO_MS / 1000
+        self.principal.setEnabled(False)
+        QTimer.singleShot(PAUSA_LISTO_MS, self._fin_pausa_listo)
+        # El refresco de la ventana principal procesa eventos (`_busy_scope`):
+        # va después de pasar a Listo, ya con el botón apagado.
+        if self.al_terminar is not None:
+            terminar, resultado = self.al_terminar, self.resultado
+            QTimer.singleShot(0, lambda: terminar(resultado))
+
+    def _fin_pausa_listo(self) -> None:
+        self._pausa_hasta = 0.0
+        if self.pasos.currentIndex() == LISTO:
+            self.principal.setEnabled(True)
 
     def _error_al_guardar(self, texto: str) -> None:
         self.error_confirmar.setText(f"No se dio de alta: {texto}")
         self.error_confirmar.show()
+        self.principal.setEnabled(True)
 
     # ── 5. Listo ──────────────────────────────────────────────────────────
     def _armar_listo(self) -> QWidget:
@@ -1172,4 +1200,4 @@ class NuevaPrendaDialog(QDialog):
         self._cargar_inicio()
 
 
-__all__ = ["NuevaPrendaDialog", "PUERTA", "ESCUELA", "FALTA", "PRINCIPAL", "CONFIRMAR", "LISTO"]
+__all__ = ["NuevaPrendaDialog", "PAUSA_LISTO_MS", "PUERTA", "ESCUELA", "FALTA", "PRINCIPAL", "CONFIRMAR", "LISTO"]

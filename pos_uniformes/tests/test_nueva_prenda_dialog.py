@@ -117,6 +117,7 @@ class RecorridoTests(_Base):
         self.assertEqual(d.frase.text(), esperado.resumen)
         d.principal.click()  # «Sí, dar de alta»
         self.assertEqual(d.pasos.currentIndex(), npd.LISTO, d.error_confirmar.text())
+        _procesar()
         self.al_terminar.assert_called_once()
 
         producto = self.s.scalar(select(Producto).where(Producto.nombre == esperado.nombre))
@@ -132,12 +133,38 @@ class RecorridoTests(_Base):
         self.assertTrue(any("Alta desde POS · modelo:" in (o or "") for o in bitacora))
         self.assertIn("10 tallas de Pants Suelto Ignacio Allende (Jaral), de $245 a $295.", d.texto_listo.text())
 
-        # [Imprimir etiquetas] manda las tallas creadas.
+        # [Imprimir etiquetas] manda las tallas creadas (tras la pausa del doble clic).
         ids = d.variantes_creadas()
+        QTest.qWait(npd.PAUSA_LISTO_MS + 100)
+        self.assertTrue(d.principal.isEnabled())
         d.principal.click()
         _procesar()
         self.al_imprimir.assert_called_once_with(ids)
         self.assertEqual(len(ids), 10)
+
+    def test_doble_clic_en_si_dar_de_alta_guarda_una_vez_y_no_imprime(self) -> None:
+        d = self.dialogo()
+        self.a_principal(d)
+        d.principal.click()
+        self.assertEqual(d.pasos.currentIndex(), npd.CONFIRMAR)
+        aplicar = Mock(wraps=alta.aplicar)
+        # Como `refresh_all`, que procesa eventos: el segundo clic llega mientras refresca.
+        self.al_terminar.side_effect = lambda _r: d._al_principal()
+        with patch.object(npd.alta, "aplicar", aplicar):
+            d._al_principal()
+            self.assertFalse(d.principal.isEnabled())  # «Imprimir etiquetas» espera
+            d._al_principal()  # el segundo clic del doble clic
+            _procesar()
+        self.assertEqual(aplicar.call_count, 1)
+        self.al_terminar.assert_called_once()
+        self.assertEqual(d.pasos.currentIndex(), npd.LISTO)
+        self.assertEqual(d.result(), 0)  # «Imprimir etiquetas» no la cerró
+        self.al_imprimir.assert_not_called()
+        self.s.expire_all()
+        self.assertEqual(self.s.scalar(select(func.count()).select_from(Producto).where(
+            Producto.nombre == "Pants Suelto Ignacio Allende (Jaral)")), 1)
+        QTest.qWait(npd.PAUSA_LISTO_MS + 100)
+        self.assertTrue(d.principal.isEnabled())
 
     def test_cancelar_no_crea_nada(self) -> None:
         antes = self.foto()
