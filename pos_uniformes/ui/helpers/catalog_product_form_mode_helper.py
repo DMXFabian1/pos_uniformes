@@ -195,7 +195,7 @@ def build_catalog_product_form_mode_view(mode_key: str) -> CatalogProductFormMod
         category_locked=True,
         locked_category_label="Uniformes",
         base_hint=(
-            "Empieza por plantilla, marca y nombre base. La categoria se maneja internamente como Uniformes."
+            "Empieza por plantilla, marca y nombre base. La categoría se maneja internamente como Uniformes."
         ),
         context_hint=(
             "Define el contexto escolar del producto. Aqui decides tipo de uniforme, nivel, pieza y detalles."

@@ -206,7 +206,7 @@ def build_catalog_product_dialog(
 
     dialog, layout = window._create_modal_dialog(
         "Producto",
-        "Captura los datos base del producto. Esta accion no altera inventario por si sola.",
+        "Captura los datos base del producto. Esta acción no altera el inventario por sí sola.",
         width=1040,
         expand_to_screen=True,
     )
@@ -258,7 +258,7 @@ def build_catalog_product_dialog(
     add_brand_button.setToolTip("Crear una marca nueva sin salir de esta ventana.")
     uniform_category_label = QLabel("Uniformes")
     uniform_category_label.setObjectName("readOnlyField")
-    category_mode_label = QLabel("Categoria")
+    category_mode_label = QLabel("Categoría")
     category_mode_label.setObjectName("inventoryFilterLabel")
     product_mode_label = QLabel("Modo de captura")
     product_mode_label.setObjectName("inventoryFilterLabel")
@@ -370,7 +370,7 @@ def build_catalog_product_dialog(
     live_name_card_layout.setSpacing(4)
     live_name_caption = QLabel("Nombre del producto")
     live_name_caption.setObjectName("liveNameCaption")
-    live_name_title = QLabel("Nombre en construccion")
+    live_name_title = QLabel("Nombre en construcción")
     live_name_title.setWordWrap(True)
     live_name_title.setObjectName("liveNameValue")
     live_name_hint = QLabel("Se construye conforme avanzas en base, contexto y presentaciones.")
@@ -817,10 +817,10 @@ def build_catalog_product_dialog(
         final_name_preview.setText(
             preview_text
             if preview_text != "Nombre final pendiente."
-            else "El nombre completo aparecera arriba en cuanto haya base suficiente."
+            else "El nombre completo aparecerá arriba en cuanto haya base suficiente."
         )
         live_name_title.setText(
-            preview_text if preview_text != "Nombre final pendiente." else "Nombre en construccion"
+            preview_text if preview_text != "Nombre final pendiente." else "Nombre en construcción"
         )
 
     def selected_sizes_for_pricing() -> list[str]:
@@ -1510,7 +1510,7 @@ def build_catalog_product_dialog(
     template_box_layout = QVBoxLayout()
     template_box_layout.setContentsMargins(16, 18, 16, 16)
     template_box_layout.setSpacing(14)
-    template_hint = QLabel("Empieza por plantilla, marca y nombre base. La categoria se maneja internamente como Uniformes.")
+    template_hint = QLabel("Empieza por plantilla, marca y nombre base. La categoría se maneja internamente como Uniformes.")
     template_hint.setWordWrap(True)
     template_hint.setObjectName("subtleLine")
     base_templates_panel = QFrame()
@@ -1538,7 +1538,7 @@ def build_catalog_product_dialog(
     base_fields_layout.addLayout(marca_row, 1, 1, 1, 3)
     base_fields_layout.addWidget(QLabel("Nombre base"), 2, 0)
     base_fields_layout.addLayout(name_row, 2, 1, 1, 3)
-    base_fields_layout.addWidget(QLabel("Descripcion"), 3, 0)
+    base_fields_layout.addWidget(QLabel("Descripción"), 3, 0)
     base_fields_layout.addWidget(descripcion_input, 3, 1, 1, 3)
     base_fields_layout.addWidget(final_name_preview, 4, 0, 1, 4)
     base_fields_layout.setColumnStretch(1, 3)
