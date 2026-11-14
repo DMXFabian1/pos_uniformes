@@ -273,6 +273,22 @@ class RecorridoTests(_Base):
             Producto.nombre == "Pants Suelto Ignacio Allende (Jaral)", Variante.talla == "10"))
         self.assertEqual(v.stock_actual, 5)
 
+    def test_descripcion_escrita_al_final_se_guarda(self) -> None:
+        # Se escribe la descripción y se toca directo «Dar de alta» (sin que la
+        # descripción avise nada): se guarda en esta escuela y en las otras.
+        d = self.dialogo()
+        self.a_principal(d, pieza="Chaleco")
+        d.marcar_otra_escuela("Miguel Hidalgo")
+        d.mas_datos.setChecked(True)
+        d.descripcion.setPlainText("Tela antipilling")
+        d.principal.click()
+        self.assertEqual(d.pasos.currentIndex(), npd.CONFIRMAR)
+        d.principal.click()
+        self.assertEqual(d.pasos.currentIndex(), npd.LISTO, d.error_confirmar.text())
+        descripciones = self.s.scalars(select(Producto.descripcion).where(Producto.nombre.in_(
+            ["Chaleco Rojo Ignacio Allende (Jaral)", "Chaleco Rojo Miguel Hidalgo"]))).all()
+        self.assertEqual(descripciones, ["Tela antipilling", "Tela antipilling"])
+
     def test_otra_igual_desde_ultimas_altas(self) -> None:
         d = self.dialogo()
         ultima = d.ultimas[0]

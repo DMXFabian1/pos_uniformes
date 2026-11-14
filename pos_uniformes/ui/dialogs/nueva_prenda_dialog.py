@@ -379,6 +379,9 @@ class NuevaPrendaDialog(QDialog):
     def _al_principal(self) -> None:
         paso = self.pasos.currentIndex()
         if paso == PRINCIPAL:
+            # La descripción no avisa al escribir: se pasa al plan (y a las
+            # otras escuelas) justo antes de confirmar, para guardar lo que se ve.
+            self._rehacer_planes()
             if self.planes and all(p.puede_aplicar for p in self.planes):
                 self._ir(CONFIRMAR)
         elif paso == CONFIRMAR:
