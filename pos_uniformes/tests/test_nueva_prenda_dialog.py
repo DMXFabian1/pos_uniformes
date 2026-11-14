@@ -17,7 +17,7 @@ from unittest.mock import Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt6.QtCore import QEvent
+from PyQt6.QtCore import QEvent, QRect
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QAbstractButton, QApplication, QCheckBox, QLabel, QMessageBox, QPushButton, QToolButton
 from sqlalchemy import create_engine, func, select
@@ -30,9 +30,13 @@ from pos_uniformes.ui.dialogs import nueva_prenda_dialog as npd
 from pos_uniformes.ui.dialogs.quisiste_decir_dialog import ACCION_CORREGIR, ACCION_CREAR, ACCION_USAR, Eleccion
 from pos_uniformes.ui.helpers import nueva_prenda_abrir
 from pos_uniformes.ui.helpers import nueva_prenda_tallas as npt
+from pos_uniformes.ui.styles import nueva_prenda_styles as nps_estilos
 from tests._ayuda_mini_caja import ESCALERAS, MiniCaja
 
 JARAL = "Ignacio Allende (Jaral)"
+#: Área libre de 1366×768 sin la barra de tareas de Windows, a 100 % y a 125 %.
+AREA_100 = QRect(0, 0, 1366, 728)
+AREA_125 = QRect(0, 0, 1093, 574)
 D = Decimal
 
 
@@ -53,6 +57,10 @@ class _Base(unittest.TestCase):
         quieto = patch.object(CatalogService, "_avisar_busqueda")
         quieto.start()
         self.addCleanup(quieto.stop)
+        # La pantalla offscreen mide 800×800: se hace como la de la caja.
+        self.area = patch.object(npd, "_area_disponible", return_value=AREA_100)
+        self.area.start()
+        self.addCleanup(self.area.stop)
         self.al_terminar = Mock()
         self.al_imprimir = Mock()
         self.al_ver = Mock()
@@ -485,8 +493,9 @@ class TamanoTests(_Base):
         self.assertFalse(d.scroll_principal.widget().isAncestorOf(d.otras))
         self.assertTrue(d.otras.isVisible())
         self.assertIn("le falta a 3", d.otras.text())
-        abajo = d.otras.mapTo(d.ficha, d.otras.rect().bottomLeft()).y()
-        self.assertLessEqual(abajo, d.ficha.height())
+        vista = d.scroll_ficha.viewport()
+        abajo = d.otras.mapTo(vista, d.otras.rect().bottomLeft()).y()
+        self.assertLessEqual(abajo, vista.height())
         d.otras.click()
         _procesar()
         barra = d.scroll_principal.verticalScrollBar()
@@ -505,10 +514,13 @@ class TamanoTests(_Base):
         padre.setStyleSheet(build_main_window_stylesheet())
         self.addCleanup(padre.deleteLater)
         d = self.dialogo(padre=padre)
-        self.assertLessEqual(d.width(), 1366)
-        self.assertLessEqual(d.height(), 768 - 40)  # la barra de Windows
         d.show()
         _procesar()
+        # Con su marco (barra de título y bordes de Windows) cabe arriba de la barra de tareas.
+        self.assertLessEqual(d.width() + nps_estilos.MARCO_ANCHO, AREA_100.width())
+        self.assertLessEqual(d.height() + nps_estilos.MARCO_ALTO, AREA_100.height())
+        self.assertLessEqual(d.frameGeometry().height(), AREA_100.height())
+        self.assertGreaterEqual(d.frameGeometry().top(), AREA_100.top())
         self.assertEqual(self._cortados(d), [], "puerta")
         self.a_principal(d, pieza="Chaleco")
         d.marcar_otra_escuela("Miguel Hidalgo")
@@ -528,6 +540,69 @@ class TamanoTests(_Base):
         _procesar()
         self.assertEqual(d.pasos.currentIndex(), npd.LISTO)
         self.assertEqual(self._cortados(d), [], "listo")
+
+
+    def test_medidas_contra_la_pantalla(self) -> None:
+        for area in (AREA_100, AREA_125, QRect(0, 0, 1920, 1040)):
+            ancho, alto, min_ancho, min_alto = nps_estilos.medidas_ventana(area.width(), area.height())
+            self.assertLessEqual(ancho + nps_estilos.MARCO_ANCHO, area.width())
+            self.assertLessEqual(alto + nps_estilos.MARCO_ALTO, area.height())
+            self.assertLessEqual((min_ancho, min_alto), (ancho, alto))
+        self.assertEqual(nps_estilos.medidas_ventana(1366, 728), (1240, 688, 1000, 520))
+        self.assertEqual(nps_estilos.medidas_ventana(1093, 574), (1077, 534, 1000, 520))
+        self.assertEqual(nps_estilos.medidas_ventana(1920, 1040), (1240, 700, 1000, 520))
+
+    def test_a_125_por_ciento_cabe_y_el_boton_se_ve(self) -> None:
+        # 1366×768 con la escala de Windows al 125 %: pantalla de 1093×614 lógicos.
+        self.area.stop()
+        area = patch.object(npd, "_area_disponible", return_value=AREA_125)
+        area.start()
+        self.addCleanup(area.stop)
+        d = self.dialogo()
+        d.show()
+        _procesar()
+        self.assertLessEqual(d.frameGeometry().height(), AREA_125.height())
+        self.assertLessEqual(d.height() + nps_estilos.MARCO_ALTO, AREA_125.height())
+
+        def revisar(nombre: str) -> None:
+            _procesar()
+            pagina = d.pasos.currentWidget()
+            self.assertGreaterEqual(d.pasos.height(), pagina.minimumSizeHint().height(), nombre)
+            if d.principal.isVisible():
+                abajo = d.principal.mapTo(d, d.principal.rect().bottomLeft()).y()
+                self.assertLessEqual(abajo, d.height(), nombre)
+            self.assertEqual(self._cortados(d), [], nombre)
+
+        revisar("puerta")
+        self.a_principal(d, pieza="Chaleco")
+        d.marcar_otra_escuela("Miguel Hidalgo")
+        revisar("principal")
+        self.assertTrue(d.otras.isVisible())
+        vista = d.scroll_ficha.viewport()
+        abajo = d.otras.mapTo(vista, d.otras.rect().bottomLeft()).y()
+        self.assertLessEqual(abajo, vista.height())
+        for paso in (npd.ESCUELA, npd.FALTA):
+            d._ir(paso)
+            revisar(str(paso))
+        d._ir(npd.PRINCIPAL)
+        d.principal.click()
+        revisar("confirmar")
+        d.principal.click()
+        self.assertEqual(d.pasos.currentIndex(), npd.LISTO)
+        revisar("listo")
+
+    def test_se_acomoda_si_el_marco_no_cabe(self) -> None:
+        # Si con el marco real se sale de la pantalla, se achica y se sube.
+        self.area.stop()
+        area = patch.object(npd, "_area_disponible", return_value=QRect(0, 0, 1366, 600))
+        area.start()
+        self.addCleanup(area.stop)
+        d = self.dialogo()
+        d.resize(1240, 700)
+        d.move(0, 200)
+        d._caber_en_pantalla()
+        self.assertLessEqual(d.frameGeometry().bottom(), 599)
+        self.assertGreaterEqual(d.frameGeometry().top(), 0)
 
 
 if __name__ == "__main__":

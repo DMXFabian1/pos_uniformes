@@ -31,9 +31,10 @@ import time
 from collections.abc import Callable
 from typing import Any
 
-from PyQt6.QtCore import QEvent, QObject, QPointF, Qt, QTimer
+from PyQt6.QtCore import QEvent, QObject, QPointF, QRect, Qt, QTimer
 from PyQt6.QtGui import QColor, QPainter, QPolygonF
 from PyQt6.QtWidgets import (
+    QApplication,
     QCheckBox,
     QComboBox,
     QDialog,
@@ -74,6 +75,7 @@ from pos_uniformes.ui.styles.nueva_prenda_styles import (
     ANCHO,
     ANCHO_FICHA,
     build_nueva_prenda_stylesheet,
+    medidas_ventana,
     sombra,
 )
 
@@ -91,6 +93,13 @@ TEXTO_PRONTO_IGUAL = (
     "«Escuela igual a otra» llega en la próxima actualización. Mientras, da de alta pieza por pieza "
     "con «Prenda para una escuela»: al terminar, «Esta misma pieza para otra escuela» la repite."
 )
+
+
+def _area_disponible(widget: QWidget | None) -> QRect:
+    """El área libre de la pantalla donde se abre (sin la barra de tareas)."""
+    pantalla = widget.screen() if widget is not None else None
+    pantalla = pantalla or QApplication.primaryScreen()
+    return pantalla.availableGeometry() if pantalla is not None else QRect(0, 0, ANCHO + 16, ALTO + 40)
 
 
 def _etiqueta(nombre: str, texto: str = "", *, envolver: bool = False) -> QLabel:
@@ -249,8 +258,11 @@ class NuevaPrendaDialog(QDialog):
         self.setWindowTitle("Nueva prenda")
         self.setModal(True)
         self.setStyleSheet(build_nueva_prenda_stylesheet())
-        self.resize(ANCHO, ALTO)
-        self.setMinimumSize(1080, 640)
+        # Cabe con su marco en la pantalla (1366×768 a 100 % o a 125 %).
+        area = _area_disponible(parent)
+        ancho, alto, min_ancho, min_alto = medidas_ventana(area.width(), area.height())
+        self.resize(ancho, alto)
+        self.setMinimumSize(min_ancho, min_alto)
 
         raiz = QVBoxLayout(self)
         raiz.setContentsMargins(26, 18, 26, 16)
@@ -295,6 +307,26 @@ class NuevaPrendaDialog(QDialog):
 
         self._cargar_inicio()
         self._ir(PUERTA)
+
+    def showEvent(self, evento) -> None:  # noqa: N802 - API de Qt
+        super().showEvent(evento)
+        QTimer.singleShot(0, self._caber_en_pantalla)
+
+    def _caber_en_pantalla(self) -> None:
+        """Con el marco real ya puesto: si se sale del área libre, se achica y se
+        mueve para que el pie (donde está el botón) quede a la vista."""
+        area = _area_disponible(self)
+        marco = self.frameGeometry()
+        extra_alto = max(0, marco.height() - self.height())
+        extra_ancho = max(0, marco.width() - self.width())
+        if marco.height() > area.height() or marco.width() > area.width():
+            self.resize(min(self.width(), area.width() - extra_ancho),
+                        min(self.height(), area.height() - extra_alto))
+            marco = self.frameGeometry()
+        x = max(area.left(), min(marco.x(), area.right() + 1 - marco.width()))
+        y = max(area.top(), min(marco.y(), area.bottom() + 1 - marco.height()))
+        if (x, y) != (marco.x(), marco.y()):
+            self.move(x, y)
 
     # ── Sesiones ──────────────────────────────────────────────────────────
     def _con_sesion(self, hacer: Callable[[Any], Any]) -> Any:
@@ -438,7 +470,19 @@ class NuevaPrendaDialog(QDialog):
         self.rejilla_ultimas.setVerticalSpacing(10)
         caja.addLayout(self.rejilla_ultimas)
         caja.addStretch(1)
-        return pagina
+        # En una pantalla bajita (1366×768 a 125 %) las últimas altas bajan con scroll.
+        return self._con_scroll(pagina)
+
+    @staticmethod
+    def _con_scroll(pagina: QWidget) -> QScrollArea:
+        scroll = QScrollArea()
+        scroll.setObjectName("npScroll")
+        scroll.setWidgetResizable(True)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        pagina.setObjectName("npScrollVista")
+        scroll.setWidget(pagina)
+        return scroll
 
     def _mostrar_ultimas(self, ultimas: list[nps.UltimaAlta]) -> None:
         self.ultimas = list(ultimas)
@@ -778,9 +822,13 @@ class NuevaPrendaDialog(QDialog):
         izq.addStretch(1)
 
         self.ficha = FichaAsiQueda()
-        self.ficha.setFixedWidth(ANCHO_FICHA)
         self.ficha.poner_accion(self.otras)
-        caja.addWidget(self.ficha)
+        # La ficha también baja con scroll si no cabe (varias escuelas, pantalla bajita).
+        scroll_ficha = self._con_scroll(self.ficha)
+        self.ficha.setObjectName("npFicha")
+        scroll_ficha.setFixedWidth(ANCHO_FICHA)
+        self.scroll_ficha = scroll_ficha
+        caja.addWidget(scroll_ficha)
         return pagina
 
     def _llenar_opciones(self) -> None:

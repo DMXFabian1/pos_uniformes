@@ -34,12 +34,31 @@ ROJO = "#b3261e"
 VERDE = "#245241"
 GRIS_POSIBLE = "#a39a90"
 
-#: Medidas: cabe en 1366×768 con la barra de Windows.
+#: Medidas ideales; se achican a lo que deje la pantalla (`medidas_ventana`).
 ANCHO = 1240
 ALTO = 700
 ANCHO_FICHA = 420
+#: Lo que suman la barra de título y los bordes de Windows (31 + 2×4 aprox.).
+MARCO_ANCHO = 16
+MARCO_ALTO = 40
+#: Lo menos: la columna izquierda tiene scroll, así que puede ser bajita.
+MIN_ANCHO = 1000
+MIN_ALTO = 520
 
-__all__ = ["ALTO", "ANCHO", "ANCHO_FICHA", "AMBAR", "GRIS_POSIBLE", "ROJO", "VERDE", "build_nueva_prenda_stylesheet", "sombra"]
+__all__ = [
+    "ALTO", "ANCHO", "ANCHO_FICHA", "AMBAR", "GRIS_POSIBLE", "MARCO_ALTO", "MARCO_ANCHO", "MIN_ALTO", "MIN_ANCHO",
+    "ROJO", "VERDE", "build_nueva_prenda_stylesheet", "medidas_ventana", "sombra",
+]
+
+
+def medidas_ventana(disponible_ancho: int, disponible_alto: int) -> tuple[int, int, int, int]:
+    """(ancho, alto, ancho mínimo, alto mínimo) de la ventana por dentro para
+    que, con su marco, quepa en el área libre de la pantalla (sin la barra de
+    tareas). 1366×768 a 100 % deja 1366×728 → 1240×688; a 125 % deja
+    1093×574 → 1077×534."""
+    ancho = max(1, min(ANCHO, int(disponible_ancho) - MARCO_ANCHO))
+    alto = max(1, min(ALTO, int(disponible_alto) - MARCO_ALTO))
+    return ancho, alto, min(MIN_ANCHO, ancho), min(MIN_ALTO, alto)
 
 
 def build_nueva_prenda_stylesheet() -> str:
