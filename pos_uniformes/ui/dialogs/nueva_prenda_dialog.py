@@ -234,6 +234,7 @@ class NuevaPrendaDialog(QDialog):
         self.otras_marcadas: set[int] = set()
         self.resultado: alta.ResultadoAlta | None = None
         self._color_elegido = False
+        self._mas_tocado = False  # «Más datos» tocado a mano: se queda al cambiar de modelo
         self.escuelas: list[nps.EscuelaParaElegir] = []
         self.ops = nps.Opciones()
 
@@ -729,6 +730,7 @@ class NuevaPrendaDialog(QDialog):
         self.genero.activated.connect(lambda _i: self._al_mas_datos())
         self.escudo.activated.connect(lambda _i: self._al_mas_datos())
         self.costo.editingFinished.connect(self._al_mas_datos)
+        self.descripcion.textChanged.connect(self._al_escribir_descripcion)
         self.panel_mas.hide()
         izq.addWidget(self.panel_mas)
 
@@ -781,6 +783,7 @@ class NuevaPrendaDialog(QDialog):
 
     def _abrir_principal(self) -> None:
         self._color_elegido = False
+        self._mas_tocado = False
         self.otras_marcadas = set()
         self.otras.setChecked(False)
         self.mas_datos.setChecked(False)
@@ -809,7 +812,9 @@ class NuevaPrendaDialog(QDialog):
             combo.setCurrentIndex(max(0, combo.findData(valor)))
         costos = {t.costo for t in plan.tallas if t.costo is not None}
         self.costo.setText(texto_precio(costos.pop()) if len(costos) == 1 else "")
+        self.descripcion.blockSignals(True)
         self.descripcion.setPlainText(plan.descripcion or "")
+        self.descripcion.blockSignals(False)
 
     def _llenar_otras(self) -> None:
         self._vaciar(self.rejilla_otras)
@@ -911,10 +916,14 @@ class NuevaPrendaDialog(QDialog):
         else:
             self.ficha.mostrar(self.planes)
 
+    def _al_escribir_descripcion(self) -> None:
+        self._mas_tocado = True
+
     def _al_mas_datos(self) -> None:
         plan = self.plan
         if plan is None:
             return
+        self._mas_tocado = True
         plan.marca = self.marca.currentData() or plan.marca
         plan.genero = self.genero.currentData()
         plan.escudo = self.escudo.currentData()
@@ -956,12 +965,30 @@ class NuevaPrendaDialog(QDialog):
         self._completar()
 
     def cambiar_modelo(self, modelo_id: int) -> None:
-        color = self.plan.color if self._color_elegido else None
-        llegan = {t.talla: t.llegan for t in self.plan.tallas if t.llegan}
+        """Otro molde para «Copiado de»: cambian tallas y precios; lo que ya se
+        decidió (color confirmado como nuevo, lo que llega, costo y «Más
+        datos» si se tocaron) se queda."""
+        anterior = self.plan
+        color = anterior.color if self._color_elegido else None
+        llegan = {t.talla: t.llegan for t in anterior.tallas if t.llegan}
+        costos = {t.talla: t.costo for t in anterior.tallas + anterior.tallas_posibles if t.costo is not None}
+        costo_unico = leer_precio(self.costo.text()) if self._mas_tocado else None
         self.modelo_forzado = int(modelo_id)
-        self.plan = self._con_sesion(lambda s: alta.planear_desde_modelo(
-            s, self.escuela.escuela_id, self.pieza, nivel=self.nivel, modelo_id=self.modelo_forzado,
-            color=color, llegan=llegan))
+
+        def planear(s):
+            plan = alta.planear_desde_modelo(
+                s, self.escuela.escuela_id, self.pieza, nivel=self.nivel, modelo_id=self.modelo_forzado,
+                color=color, llegan=llegan, costos=costos, confirmados=anterior.confirmados)
+            if self._mas_tocado:
+                plan.marca = anterior.marca or plan.marca
+                plan.genero, plan.escudo = anterior.genero, anterior.escudo
+                plan.descripcion = self.descripcion.toPlainText().strip() or None
+                for t in plan.tallas + plan.tallas_posibles:
+                    t.costo = costo_unico if costo_unico is not None else t.costo
+                alta.completar(s, plan)
+            return plan
+
+        self.plan = self._con_sesion(planear)
         self._pintar_mas_datos()
         self._rehacer_planes()
 

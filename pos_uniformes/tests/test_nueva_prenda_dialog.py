@@ -26,7 +26,7 @@ from pos_uniformes.database.models import CambioCatalogo, Producto, RolUsuario, 
 from pos_uniformes.services import alta_prenda_service as alta
 from pos_uniformes.services.catalog_service import CatalogService
 from pos_uniformes.ui.dialogs import nueva_prenda_dialog as npd
-from pos_uniformes.ui.dialogs.quisiste_decir_dialog import ACCION_CORREGIR, ACCION_USAR, Eleccion
+from pos_uniformes.ui.dialogs.quisiste_decir_dialog import ACCION_CORREGIR, ACCION_CREAR, ACCION_USAR, Eleccion
 from pos_uniformes.ui.helpers import nueva_prenda_abrir
 from tests._ayuda_mini_caja import ESCALERAS, MiniCaja
 
@@ -195,6 +195,26 @@ class RecorridoTests(_Base):
         d.color.lineEdit().editingFinished.emit()
         d.preguntar.assert_not_called()
         self.assertEqual(d.plan.nombre, "Chaleco Azul Ignacio Allende (Jaral)")
+
+    def test_cambiar_modelo_conserva_color_nuevo_costo_y_mas_datos(self) -> None:
+        d = self.dialogo()
+        d.preguntar = lambda *_a: Eleccion(ACCION_CREAR)
+        self.a_principal(d)
+        d.color.setEditText("Vino Tinto")
+        d.color.lineEdit().editingFinished.emit()
+        self.assertTrue(d.plan.puede_aplicar, d.plan.todos_los_errores)
+        d.mas_datos.setChecked(True)
+        d.costo.setText("150")
+        d.costo.editingFinished.emit()
+        d.descripcion.setPlainText("Tela antipilling")
+        self.assertTrue(d.plan.alternativas)
+        d.cambiar_modelo(d.plan.alternativas[0].producto_id)
+        self.assertEqual(d.plan.color, "Vino Tinto")
+        self.assertTrue(d.plan.puede_aplicar, d.plan.todos_los_errores)
+        self.assertTrue(d.principal.isEnabled())
+        self.assertEqual({t.costo for t in d.plan.tallas}, {D(150)})
+        self.assertEqual(d.costo.text(), "150")
+        self.assertEqual(d.descripcion.toPlainText(), "Tela antipilling")
 
     def test_precio_en_cero_o_vacio_bloquea(self) -> None:
         d = self.dialogo()
