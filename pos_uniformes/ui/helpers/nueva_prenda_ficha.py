@@ -62,6 +62,12 @@ class FichaAsiQueda(QFrame):
             caja.addWidget(w)
         caja.addStretch(1)
 
+    def poner_accion(self, boton: QWidget) -> None:
+        """Un botón fijo en la ficha, arriba de los avisos (siempre a la vista;
+        a la izquierda la tabla puede necesitar scroll)."""
+        caja = self.layout()
+        caja.insertWidget(caja.indexOf(self.titulo_avisos), boton)
+
     @staticmethod
     def _poner(etiqueta: QLabel, texto: str) -> None:
         etiqueta.setText(texto)

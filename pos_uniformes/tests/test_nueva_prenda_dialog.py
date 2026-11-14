@@ -288,6 +288,7 @@ class RecorridoTests(_Base):
         self.assertFalse(exg.marca.isChecked())
         self.assertEqual(exg.donde.text(), "la tienen 1 de 4")
         self.assertFalse(exg.precio.isEnabled())
+        self.assertEqual(exg.llegan.placeholderText(), "")  # sin «—» en la fila gris
         exg.marca.setChecked(True)
         self.assertEqual(d.principal.text(), "Dar de alta 11 tallas")
         self.assertEqual(d.plan.tallas[-1].talla, "EXG")
@@ -472,6 +473,27 @@ class TamanoTests(_Base):
             if w.width() + 1 < ancho + extra:
                 cortados.append(f"{texto!r} {w.width()} < {ancho + extra}")
         return cortados
+
+    def test_hacer_la_misma_a_la_vista_sin_bajar(self) -> None:
+        # «Hacer la misma para otras escuelas» va fijo en la ficha, no al pie del
+        # scroll; al abrirlo se baja hasta las casillas.
+        d = self.dialogo()
+        d.show()
+        self.a_principal(d, pieza="Chaleco")
+        _procesar()
+        self.assertTrue(d.ficha.isAncestorOf(d.otras))
+        self.assertFalse(d.scroll_principal.widget().isAncestorOf(d.otras))
+        self.assertTrue(d.otras.isVisible())
+        self.assertIn("le falta a 3", d.otras.text())
+        abajo = d.otras.mapTo(d.ficha, d.otras.rect().bottomLeft()).y()
+        self.assertLessEqual(abajo, d.ficha.height())
+        d.otras.click()
+        _procesar()
+        barra = d.scroll_principal.verticalScrollBar()
+        self.assertGreater(barra.value(), 0)
+        # LLEGAN HOY dice que es opcional, sin tooltip.
+        self.assertIn("opcional", d.nota_llegan.text())
+        self.assertEqual(d.tabla.filas["4"].llegan.placeholderText(), "—")
 
     def test_a_1366_nada_cortado(self) -> None:
         # Con el tema de la ventana principal de padre (pinta todo QWidget), como en la caja.

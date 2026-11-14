@@ -179,11 +179,19 @@ QPushButton#npEnlace {{
 }}
 QPushButton#npEnlace:hover {{ text-decoration: underline; }}
 
-QScrollBar:vertical {{ background: transparent; width: 10px; margin: 2px; }}
-QScrollBar::handle:vertical {{ background: #d8ccbd; border-radius: 4px; min-height: 30px; }}
-QScrollBar::handle:vertical:hover {{ background: #c4b4a1; }}
+/* Que se lea como scroll (carril claro, barra más oscura y delgada), no como separador. */
+QScrollBar:vertical {{ background: #efe7dc; width: 8px; margin: 4px 0; border-radius: 4px; }}
+QScrollBar::handle:vertical {{ background: #b9a58f; border-radius: 4px; min-height: 40px; }}
+QScrollBar::handle:vertical:hover {{ background: {CAFE}; }}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
 QScrollBar::add-page:vertical, QScrollBar::sub-page:vertical {{ background: transparent; }}
+QLabel#npNotaChica {{ font-size: 12px; color: {TENUE}; }}
+QPushButton#npOtras {{
+    background: {VINO_SUAVE}; color: {VINO}; border: 1px solid #e6c9d3; border-radius: 14px;
+    padding: 10px 14px; text-align: left; font-size: 14px; font-weight: 700;
+}}
+QPushButton#npOtras:hover {{ border-color: {VINO}; }}
+QPushButton#npOtras:checked {{ background: {TARJETA}; border-color: {VINO}; }}
 QLabel#npFaltaNombre {{ font-size: 15px; font-weight: 800; color: {TEXTO}; }}
 QLabel#npFaltaNota {{ font-size: 13px; color: {TENUE}; }}
 

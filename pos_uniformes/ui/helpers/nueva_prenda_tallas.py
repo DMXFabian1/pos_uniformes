@@ -1,7 +1,7 @@
 """La tabla de tallas de «Nueva prenda» (tanda 3 del alta, 2026-11-13).
 
     TALLA   PRECIO   DE DÓNDE                    LLEGAN
-    ☑ 4     $245     como las demás              [  ]
+    ☑ 4     $245     como las demás              [ — ]   ← LLEGAN HOY (opcional)
     ☑ GD    $289     a mano   ¿$289? → [¿$295?]  [  ]
     ☐ EXG   $305     la tienen 1 de 4            (gris)
 
@@ -34,7 +34,7 @@ from PyQt6.QtWidgets import (
 
 from pos_uniformes.services.talla_orden_service import clave_talla
 
-ALTO_FILA = 36
+ALTO_FILA = 32
 #: Pausa tras la última tecla antes de pasar el precio al plan: así el botón
 #: «Dar de alta» se enciende sin tener que dar Enter o Tab (un clic en un botón
 #: apagado no le quita el foco al campo y nunca llegaría `editingFinished`).
@@ -104,6 +104,7 @@ class FilaTalla:
         self.llegan.setFixedWidth(78)
         self.llegan.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.llegan.setValidator(QIntValidator(0, 9999))
+        self.llegan.setPlaceholderText("—")
         self.llegan.setToolTip("Cuántas llegan ahora (opcional). Entra como una entrada normal: se puede corregir.")
 
         self.rebote = QTimer(self.precio)
@@ -137,6 +138,7 @@ class FilaTalla:
             self._precio_mostrado = texto
             self.precio.setEnabled(marcada)
             self.llegan.setEnabled(marcada)
+            self.llegan.setPlaceholderText("—" if marcada else "")
             cuantas = int(t.llegan or 0) if marcada else 0
             if not self.llegan.hasFocus() or not marcada:
                 self.llegan.setText(str(cuantas) if cuantas else "")
@@ -190,10 +192,10 @@ class TablaTallas(QFrame):
         self.rejilla.setColumnMinimumWidth(0, 110)
         self.rejilla.setColumnStretch(2, 1)
         caja.addLayout(self.rejilla)
-        for col, titulo in enumerate(("TALLA", "PRECIO", "DE DÓNDE", "", "LLEGAN")):
+        for col, titulo in enumerate(("TALLA", "PRECIO", "DE DÓNDE", "", "LLEGAN HOY")):
             etiqueta = QLabel(titulo)
             etiqueta.setObjectName("npColTitulo")
-            if titulo in ("PRECIO", "LLEGAN"):
+            if titulo in ("PRECIO", "LLEGAN HOY"):
                 etiqueta.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self.rejilla.addWidget(etiqueta, 0, col)
         self.rejilla.setRowMinimumHeight(0, 28)

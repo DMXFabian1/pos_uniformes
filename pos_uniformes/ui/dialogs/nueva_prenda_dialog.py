@@ -700,11 +700,15 @@ class NuevaPrendaDialog(QDialog):
         self.tabla.llegan_cambiado.connect(self._al_llegan)
         izq.addWidget(self.tabla)
         otra_talla = QHBoxLayout()
+        otra_talla.setSpacing(12)
         self.otra_talla = _Combo()
-        self.otra_talla.setMinimumWidth(220)
+        self.otra_talla.setMinimumWidth(200)
         self.otra_talla.activated.connect(lambda _i: self._al_otra_talla())
-        otra_talla.addWidget(self.otra_talla)
-        otra_talla.addStretch(1)
+        otra_talla.addWidget(self.otra_talla, 0, Qt.AlignmentFlag.AlignTop)
+        self.nota_llegan = _etiqueta(
+            "npNotaChica", "LLEGAN HOY es opcional: anota las piezas que ya tienes; si no, déjalo vacío.",
+            envolver=True)
+        otra_talla.addWidget(self.nota_llegan, 1)
         izq.addLayout(otra_talla)
 
         # ▸ Más datos
@@ -743,13 +747,14 @@ class NuevaPrendaDialog(QDialog):
         self.panel_mas.hide()
         izq.addWidget(self.panel_mas)
 
-        # ＋ Hacer la misma para otras escuelas
-        self.otras = QToolButton()
-        self.otras.setObjectName("npPlegable")
+        # ＋ Hacer la misma para otras escuelas: el botón va fijo en la ficha (a la
+        # vista sin bajar); las casillas se abren al pie de esta columna.
+        self.otras = QPushButton()
+        self.otras.setObjectName("npOtras")
         self.otras.setCheckable(True)
+        self.otras.setAutoDefault(False)
         self.otras.setCursor(Qt.CursorShape.PointingHandCursor)
         self.otras.toggled.connect(self._plegar_otras)
-        izq.addWidget(self.otras, 0, Qt.AlignmentFlag.AlignLeft)
         self.panel_otras = QFrame()
         self.panel_otras.setObjectName("npPanel")
         caja_otras = QVBoxLayout(self.panel_otras)
@@ -774,6 +779,7 @@ class NuevaPrendaDialog(QDialog):
 
         self.ficha = FichaAsiQueda()
         self.ficha.setFixedWidth(ANCHO_FICHA)
+        self.ficha.poner_accion(self.otras)
         caja.addWidget(self.ficha)
         return pagina
 
@@ -831,7 +837,7 @@ class NuevaPrendaDialog(QDialog):
         escuelas = [e for e in (self.sin_pieza.escuelas if self.sin_pieza else ())
                     if e.escuela_id != self.escuela.escuela_id]
         nivel = (self.nivel or "").lower()
-        self.otras.setText(f"＋ Hacer la misma para otras escuelas (le falta a {len(escuelas)} de {nivel})")
+        self.otras.setText(f"＋ Hacer la misma para otras escuelas\n     le falta a {len(escuelas)} de {nivel}")
         self.otras.setVisible(bool(escuelas))
         for i, e in enumerate(escuelas):
             casilla = QCheckBox(e.escuela)
@@ -847,6 +853,12 @@ class NuevaPrendaDialog(QDialog):
     def _plegar_otras(self, abierto: bool) -> None:
         self.panel_otras.setVisible(abierto)
         self.otras.setText(("▾" if abierto else "＋") + self.otras.text()[1:])
+        if abierto:  # las casillas quedan al pie de la columna: se baja hasta ellas
+            QTimer.singleShot(0, self._bajar_a_otras)
+
+    def _bajar_a_otras(self) -> None:
+        if self.panel_otras.isVisible():
+            self.scroll_principal.ensureWidgetVisible(self.panel_otras, 0, 0)
 
     def _marcar_otras(self, valor: bool) -> None:
         for casilla in self.casillas_otras.values():
