@@ -686,6 +686,13 @@ class NuevaPrendaDialog(QDialog):
         self.tabla.sugerencia_aceptada.connect(self._al_sugerencia)
         self.tabla.llegan_cambiado.connect(self._al_llegan)
         izq.addWidget(self.tabla)
+        otra_talla = QHBoxLayout()
+        self.otra_talla = _Combo()
+        self.otra_talla.setMinimumWidth(220)
+        self.otra_talla.activated.connect(lambda _i: self._al_otra_talla())
+        otra_talla.addWidget(self.otra_talla)
+        otra_talla.addStretch(1)
+        izq.addLayout(otra_talla)
 
         # ▸ Más datos
         self.mas_datos = QToolButton()
@@ -850,6 +857,30 @@ class NuevaPrendaDialog(QDialog):
         self._con_sesion(lambda s: hacer(s, self.plan, talla))
         self._rehacer_planes()
 
+    def _llenar_otra_talla(self) -> None:
+        """«＋ Otra talla…»: las de la lista oficial que no están en la tabla
+        (para una pieza sin modelo o una talla que nadie tiene todavía)."""
+        en_tabla = {valores.normalizar(t.talla) for t in self.plan.tallas + self.plan.tallas_posibles}
+        self.otra_talla.blockSignals(True)
+        self.otra_talla.clear()
+        self.otra_talla.addItem("＋ Otra talla…", None)
+        for talla in valores.TALLAS_SUGERIDAS:
+            if valores.normalizar(talla) not in en_tabla:
+                self.otra_talla.addItem(talla, talla)
+        self.otra_talla.setCurrentIndex(0)
+        self.otra_talla.blockSignals(False)
+
+    def agregar_talla(self, talla: str) -> None:
+        """Una talla que no trae el modelo ni sus hermanas: entra marcada y sin precio."""
+        self.plan.tallas_posibles.append(alta.TallaPlan(talla=talla, precio=None))
+        self._con_sesion(lambda s: alta.marcar_talla(s, self.plan, talla))
+        self._rehacer_planes()
+
+    def _al_otra_talla(self) -> None:
+        talla = self.otra_talla.currentData()
+        if talla:
+            self.agregar_talla(talla)
+
     def _talla(self, talla: str):
         return next((t for t in self.plan.tallas if t.talla == talla), None)
 
@@ -988,6 +1019,7 @@ class NuevaPrendaDialog(QDialog):
         self.boton_modelo.setVisible(bool(plan.alternativas))
         self._pintar_color()
         self.tabla.mostrar(plan)
+        self._llenar_otra_talla()
         self.ficha.mostrar(self.planes)
         if self.pasos.currentIndex() == PRINCIPAL:
             self._pintar_barra_principal()

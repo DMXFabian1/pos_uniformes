@@ -246,6 +246,20 @@ class RecorridoTests(_Base):
         self.assertEqual(d.principal.text(), "Dar de alta 10 tallas")
         self.assertNotIn("4", [t.talla for t in d.plan.tallas])
 
+    def test_otra_talla_entra_sin_precio(self) -> None:
+        d = self.dialogo()
+        self.a_principal(d)
+        d.otra_talla.setCurrentIndex(d.otra_talla.findData("18"))
+        d.otra_talla.activated.emit(d.otra_talla.currentIndex())
+        self.assertIn("18", [t.talla for t in d.plan.tallas])
+        self.assertEqual(d.bloqueo.text(), "Falta precio en 1 talla.")
+        self.assertEqual(d.otra_talla.findData("18"), -1)
+        fila = d.tabla.filas["18"]
+        fila.precio.setText("305")
+        fila.precio.editingFinished.emit()
+        self.assertEqual(d.principal.text(), "Dar de alta 11 tallas")
+        self.assertTrue(d.principal.isEnabled())
+
     def test_llegan_entra_como_entrada(self) -> None:
         d = self.dialogo()
         self.a_principal(d)
