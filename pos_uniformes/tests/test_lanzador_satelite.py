@@ -304,10 +304,18 @@ class ScriptsDelKioskoSinSecretosTests(unittest.TestCase):
                          {"lanzador_satelite.ps1", "instalar_kiosko_aqui.bat", "preparar_share_updates.bat"})
         self.assertEqual(len(encontradas), 3)
         self.assertEqual(_texto(_PS1).count("/user:"), 1)
+        # La contraseña NO se escribe aquí (repo público): se saca de la línea
+        # `net use` del .ps1 (el token antes de «/user:»).
+        import re
+
+        coincide = re.search(r"^net use \S+ (\S+) /user:", _texto(_PS1), re.MULTILINE)
+        self.assertIsNotNone(coincide)
+        clave = coincide.group(1)
         for ruta in (_BAT, _REPARAR, _FORZAR, _PUBLICAR):
             texto = _texto(ruta)
-            for prohibido in ("/user:", "net use", "pos2026"):
+            for prohibido in ("/user:", "net use", clave):
                 self.assertNotIn(prohibido, texto, f"{ruta.name}: {prohibido}")
+        self.assertNotIn(clave, Path(__file__).read_text(encoding="utf-8"))
 
     def test_sin_ips_nuevas(self) -> None:
         import re
@@ -322,6 +330,99 @@ class ScriptsDelKioskoSinSecretosTests(unittest.TestCase):
             self.assertTrue(crudo.isascii(), ruta.name)
             self.assertEqual(crudo.count(b"\n"), crudo.count(b"\r\n"), ruta.name)
             self.assertFalse(crudo.startswith(b"\xef\xbb\xbf"), ruta.name)
+
+
+# ---------------------------------------------------------------------------
+# Revisión del 2026-11-13: .bat cortados, espacios en el .env, Replace que
+# falla a medias y el orden de forzar_update.
+# ---------------------------------------------------------------------------
+
+_FIN_REPARAR = "rem Fin del reparador del satelite"
+
+
+def _ultima_linea_empieza(texto: str, marca: str) -> bool:
+    """Lo que hace Test-ArchivoLanzador con un .bat: TrimEnd (no quita ceros),
+    última línea, StartsWith ordinal."""
+    return texto.rstrip(" \t\r\n").split("\n")[-1].startswith(marca)
+
+
+class BatCortadoNoSeInstalaTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.ps1 = _texto(_PS1)
+        self.valida = self.ps1.split("function Test-ArchivoLanzador", 1)[1].split("\nfunction ", 1)[0]
+
+    def test_la_validacion_pide_marca_de_fin_a_los_bat(self) -> None:
+        self.assertIn(f'"lanzador_satelite.bat" = "{_FIN_BAT}"', self.ps1)
+        self.assertIn(f'"reparar_satelite.bat" = "{_FIN_REPARAR}"', self.ps1)
+        rama_bat = self.valida.split('StartsWith("@echo off", $ordinal)', 1)[1]
+        self.assertIn("$finBat = $marcasFinBat[$nombre]", rama_bat)
+        self.assertIn("if (-not $finBat) { return $false }", rama_bat)
+        self.assertIn("$ultima.StartsWith($finBat, $ordinal)", rama_bat)
+
+    def test_cada_bat_termina_con_su_marca_y_uno_cortado_no(self) -> None:
+        for ruta, marca in ((_BAT, _FIN_BAT), (_REPARAR, _FIN_REPARAR)):
+            texto = _texto(ruta)
+            self.assertTrue(_ultima_linea_empieza(texto, marca), ruta.name)
+            self.assertEqual(sum(l.startswith(marca) for l in texto.split("\n")), 1, ruta.name)
+            self.assertFalse(_ultima_linea_empieza(texto[: len(texto) // 2], marca), ruta.name)
+            self.assertFalse(_ultima_linea_empieza(texto + "\0" * 512, marca), ruta.name)
+
+    def test_publicar_tampoco_publica_un_bat_sin_marca(self) -> None:
+        pub = _texto(_PUBLICAR)
+        self.assertIn(f'"lanzador_satelite.bat" = "{_FIN_BAT}"', pub)
+        self.assertIn(f'"reparar_satelite.bat" = "{_FIN_REPARAR}"', pub)
+        self.assertIn('throw "$nombre no termina con su marca de fin"', pub)
+
+
+class ServidorSinEspaciosTests(unittest.TestCase):
+    def test_los_bat_toman_solo_el_host(self) -> None:
+        for ruta in (_BAT, _REPARAR, _FORZAR):
+            texto = _texto(ruta)
+            self.assertIn('for /f "usebackq eol=# tokens=1,2 delims== " %%a', texto, ruta.name)
+            self.assertNotIn("tokens=1,*", texto, ruta.name)
+
+
+class ReplaceAMediasTests(unittest.TestCase):
+    def test_el_lanzador_no_borra_la_unica_copia(self) -> None:
+        ps1 = _texto(_PS1)
+        huerfano = ps1.split("function Restore-Huerfano", 1)[1].split("\nfunction ", 1)[0]
+        i_existe = huerfano.index("if (Test-Path -LiteralPath $destino) { return $false }")
+        i_valida = huerfano.index("if (-not (Test-ArchivoLanzador $tmp $nombre)) { return $false }")
+        i_move = huerfano.index("[System.IO.File]::Move($tmp, $destino)")
+        self.assertLess(i_existe, i_move)
+        self.assertLess(i_valida, i_move)
+        captura = ps1.split("function Copy-Seguro", 1)[1].split("\nfunction ", 1)[0].split("} catch {", 1)[1]
+        self.assertLess(captura.index("Restore-Huerfano $tmp $destino $nombre"),
+                        captura.index("Remove-Item -LiteralPath $tmp"))
+        # La limpieza del arranque también rescata un .nuevo huérfano válido.
+        limpieza = ps1.split("# Restos de una copia interrumpida", 1)[1].split("\nfunction ", 1)[0]
+        self.assertLess(limpieza.index('Restore-Huerfano "$viejo.nuevo" $viejo $f'),
+                        limpieza.index('Remove-Item -LiteralPath "$viejo.nuevo"'))
+
+    def test_publicar_no_borra_la_unica_copia(self) -> None:
+        pub = _texto(_PUBLICAR)
+        funcion = pub.split("function Publicar-Archivo", 1)[1].split("\n}\n", 1)[0]
+        captura = funcion.split("\n    } catch {\n", 1)[1]
+        i_rescate = captura.index("[System.IO.File]::Move($tmp, $destino)")
+        i_borra = captura.index("Remove-Item -LiteralPath $tmp")
+        self.assertLess(i_rescate, i_borra)
+        self.assertIn("if (-not $conservar) { Remove-Item", captura)
+        self.assertIn("$copiado -and (Test-Path -LiteralPath $tmp) -and -not (Test-Path -LiteralPath $destino)", captura)
+        self.assertLess(funcion.index('throw "copia incompleta de $nombre"'), funcion.index("$copiado = $true"))
+
+
+class ForzarPrefiereRespaldoACortadoTests(unittest.TestCase):
+    def test_orden_sin_servidor(self) -> None:
+        traer = _bloque(_texto(_FORZAR), ":traer")
+        orden = [
+            r'call :copiar_validado "C:\pos_updates\%~1"',
+            r'call :copiar_validado "\\%SERVIDOR%\pos_updates\%~1"',
+            'call :es_bueno "%ARCH%" "%~2" "%~3"',
+            'call :copiar_validado "%ARCH%.respaldo"',
+            'call :es_bueno "%ARCH%" "%~2" ""',
+        ]
+        posiciones = [traer.index(paso) for paso in orden]
+        self.assertEqual(posiciones, sorted(posiciones))
 
 
 if __name__ == "__main__":

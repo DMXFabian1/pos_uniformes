@@ -71,6 +71,7 @@ function Publicar-Archivo($nombre, [switch]$Opcional) {
     $origen = Join-Path $PSScriptRoot $nombre
     $destino = Join-Path $updatesDir $nombre
     $tmp = "$destino.nuevo"
+    $copiado = $false   # el .nuevo es de ESTA publicacion y llego completo
     try {
         if (-not (Test-Path -LiteralPath $origen)) { throw "no existe $origen" }
         if ($nombre -eq "lanzador_satelite.ps1") {
@@ -83,6 +84,17 @@ function Publicar-Archivo($nombre, [switch]$Opcional) {
             if ($errores -and ($errores.Count -gt 0)) { throw "lanzador_satelite.ps1 tiene errores de sintaxis" }
             if (-not $texto.TrimEnd().EndsWith("# Fin del lanzador del satelite", [System.StringComparison]::Ordinal)) {
                 throw "lanzador_satelite.ps1 no termina con su marca de fin"
+            }
+        }
+        # Los .bat del lanzador tambien: los kioskos rechazan uno sin su marca.
+        $finBat = @{
+            "lanzador_satelite.bat" = "rem Fin del lanzador del satelite"
+            "reparar_satelite.bat" = "rem Fin del reparador del satelite"
+        }[$nombre]
+        if ($finBat) {
+            $ultima = ([System.IO.File]::ReadAllText($origen).TrimEnd().Split("`n"))[-1]
+            if (-not $ultima.StartsWith($finBat, [System.StringComparison]::Ordinal)) {
+                throw "$nombre no termina con su marca de fin"
             }
         }
         if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force }
@@ -99,6 +111,7 @@ function Publicar-Archivo($nombre, [switch]$Opcional) {
             $entrada.Dispose()
         }
         if ((Get-Item -LiteralPath $tmp).Length -ne (Get-Item -LiteralPath $origen).Length) { throw "copia incompleta de $nombre" }
+        $copiado = $true
         # Si un kiosko lo esta leyendo en este instante, Replace puede fallar:
         # se reintenta unos segundos.
         for ($intento = 1; $true; $intento++) {
@@ -115,12 +128,27 @@ function Publicar-Archivo($nombre, [switch]$Opcional) {
             }
         }
     } catch {
-        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        # Replace puede fallar DESPUES de quitar el publicado (ReplaceFile:
+        # ERROR_UNABLE_TO_MOVE_REPLACEMENT 1176/1177): sin destino, el .nuevo
+        # completo es la unica copia y se pone en su lugar, nunca se borra.
+        $error1 = $_
+        $rescatado = $false
+        $conservar = $false
+        try {
+            if ($copiado -and (Test-Path -LiteralPath $tmp) -and -not (Test-Path -LiteralPath $destino) -and
+                ((Get-Item -LiteralPath $tmp).Length -eq (Get-Item -LiteralPath $origen).Length)) {
+                $conservar = $true
+                [System.IO.File]::Move($tmp, $destino)
+                $rescatado = $true
+            }
+        } catch { }
+        if ($rescatado) { return }
+        if (-not $conservar) { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
         if ($Opcional) {
-            Write-Host "  (No se publico $nombre`: $($_.Exception.Message))"
+            Write-Host "  (No se publico $nombre`: $($error1.Exception.Message))"
             return
         }
-        throw
+        throw $error1
     }
 }
 

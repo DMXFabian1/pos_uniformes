@@ -7,6 +7,8 @@ rem  Cierra la app, trae un lanzador BUENO (de la PC
 rem  principal; si no se alcanza, del respaldo local),
 rem  borra la marca de version y abre el lanzador, que
 rem  copia todo completo otra vez.
+rem  La ULTIMA linea es su marca de fin: el lanzador no
+rem  instala un reparador cortado. No borrarla.
 rem =====================================================
 setlocal
 
@@ -16,10 +18,11 @@ if exist "C:\PresupuestosSatelite\" set "DESTINO=C:\PresupuestosSatelite\"
 if "%DESTINO:~0,2%"=="\\" set "DESTINO=C:\PresupuestosSatelite\"
 if not exist "%DESTINO%" mkdir "%DESTINO%"
 
-rem El servidor se lee del .env de la app, igual que el lanzador.
+rem El servidor se lee del .env de la app, igual que el lanzador (tokens=1,2:
+rem sin los espacios que pueda traer al final, como el .Trim() del .ps1).
 set "SERVIDOR=192.168.0.10"
 set "ENVAPP=%LOCALAPPDATA%\PresupuestosSatelite\app\pos_uniformes.env"
-if exist "%ENVAPP%" for /f "usebackq eol=# tokens=1,* delims== " %%a in ("%ENVAPP%") do if /i "%%a"=="POS_UNIFORMES_SERVER_HOST" set "SERVIDOR=%%b"
+if exist "%ENVAPP%" for /f "usebackq eol=# tokens=1,2 delims== " %%a in ("%ENVAPP%") do if /i "%%a"=="POS_UNIFORMES_SERVER_HOST" set "SERVIDOR=%%b"
 
 echo Cerrando el satelite si esta abierto...
 taskkill /F /IM "PresupuestosSatelite*" >nul 2>&1
@@ -74,3 +77,4 @@ if not "%T1%"=="%T2%" (del /q "%~2.nuevo" >nul 2>&1 & exit /b 1)
 call :es_bueno "%~2.nuevo" "%~3" "%~4" || (del /q "%~2.nuevo" >nul 2>&1 & exit /b 1)
 move /y "%~2.nuevo" "%~2" >nul 2>&1 || exit /b 1
 exit /b 0
+rem Fin del reparador del satelite

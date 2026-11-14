@@ -52,6 +52,13 @@ net use "\\$serverHost\pos_updates" pos2026 /user:kiosko /persistent:no 2>$null 
 # un apagon entre los dos pasos deja al kiosko sin lanzador.
 $archivosLanzador = @("lanzador_satelite.ps1", "lanzador_satelite.bat", "reparar_satelite.bat")
 $marcaFinPs1 = "# Fin del lanzador del satelite"
+# Los .bat tambien llevan marca de fin en su ULTIMA linea: uno cortado empieza
+# con "@echo off" pero le faltan etiquetas (cmd truena con "no se encuentra la
+# etiqueta") y nadie revisa al .bat antes de abrirlo.
+$marcasFinBat = @{
+    "lanzador_satelite.bat" = "rem Fin del lanzador del satelite"
+    "reparar_satelite.bat" = "rem Fin del reparador del satelite"
+}
 
 function Test-ArchivoLanzador($ruta, $nombre) {
     # $nombre es el nombre logico (lanzador_satelite.ps1, ...): decide la marca.
@@ -71,11 +78,34 @@ function Test-ArchivoLanzador($ruta, $nombre) {
             if ($errores -and ($errores.Count -gt 0)) { return $false }
         } else {
             if (-not $texto.StartsWith("@echo off", $ordinal)) { return $false }
+            $finBat = $marcasFinBat[$nombre]
+            if (-not $finBat) { return $false }
+            # TrimEnd no quita ceros: un .bat con ceros al final tampoco pasa.
+            $ultima = ($texto.TrimEnd().Split("`n"))[-1]
+            if (-not $ultima.StartsWith($finBat, $ordinal)) { return $false }
         }
         return $true
     } catch {
         return $false
     }
+}
+
+function Restore-Huerfano($tmp, $destino, $nombre) {
+    # ReplaceFile puede fallar DESPUES de quitar el archivo viejo
+    # (ERROR_UNABLE_TO_MOVE_REPLACEMENT 1176/1177, p.ej. el antivirus abrio el
+    # .nuevo): el destino ya no existe y el .nuevo validado es la UNICA copia.
+    # Entonces se pone en su lugar en vez de borrarlo.
+    if (Test-Path -LiteralPath $destino) { return $false }
+    if (-not (Test-ArchivoLanzador $tmp $nombre)) { return $false }
+    for ($intento = 1; $intento -le 5; $intento++) {
+        try {
+            [System.IO.File]::Move($tmp, $destino)
+            return $true
+        } catch {
+            Start-Sleep -Seconds 1
+        }
+    }
+    return $false
 }
 
 function Copy-Seguro($origen, $destino, $nombre) {
@@ -106,7 +136,12 @@ function Copy-Seguro($origen, $destino, $nombre) {
         }
         return $true
     } catch {
-        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        if (Restore-Huerfano $tmp $destino $nombre) { return $true }
+        # Sin destino, un .nuevo valido no se borra: el proximo arranque lo
+        # pone en su lugar (ver la limpieza de abajo).
+        if ((Test-Path -LiteralPath $destino) -or -not (Test-ArchivoLanzador $tmp $nombre)) {
+            Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        }
         return $false
     }
 }
@@ -147,11 +182,17 @@ function Save-RespaldoLanzador {
     }
 }
 
-# Restos de una copia interrumpida (apagon): nunca se usan, se borran.
+# Restos de una copia interrumpida (apagon): se borran. Solo si el archivo
+# de verdad ya no existe (Replace fallo a medias) y el .nuevo es valido, el
+# .nuevo se pone en su lugar.
 foreach ($f in $archivosLanzador) {
     $viejo = Join-Path $PSScriptRoot $f
-    Remove-Item -LiteralPath "$viejo.nuevo" -Force -ErrorAction SilentlyContinue
-    Remove-Item -LiteralPath "$viejo.respaldo.nuevo" -Force -ErrorAction SilentlyContinue
+    if (-not (Restore-Huerfano "$viejo.nuevo" $viejo $f)) {
+        Remove-Item -LiteralPath "$viejo.nuevo" -Force -ErrorAction SilentlyContinue
+    }
+    if (-not (Restore-Huerfano "$viejo.respaldo.nuevo" "$viejo.respaldo" $f)) {
+        Remove-Item -LiteralPath "$viejo.respaldo.nuevo" -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Get-VersionDe($dir) {

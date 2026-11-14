@@ -17,7 +17,8 @@ echo El lanzador de este kiosko esta danado; buscando una copia buena...
 call :restaurar "%PS1%.respaldo" && goto :abrir
 set "SERVIDOR=192.168.0.10"
 set "ENVAPP=%LOCALAPPDATA%\PresupuestosSatelite\app\pos_uniformes.env"
-if exist "%ENVAPP%" for /f "usebackq eol=# tokens=1,* delims== " %%a in ("%ENVAPP%") do if /i "%%a"=="POS_UNIFORMES_SERVER_HOST" set "SERVIDOR=%%b"
+if exist "%ENVAPP%" for /f "usebackq eol=# tokens=1,2 delims== " %%a in ("%ENVAPP%") do if /i "%%a"=="POS_UNIFORMES_SERVER_HOST" set "SERVIDOR=%%b"
+rem tokens=1,2 (no 1,*): un espacio al final del .env no entra a la ruta.
 if exist "C:\pos_updates\lanzador_satelite.ps1" call :restaurar "C:\pos_updates\lanzador_satelite.ps1" && goto :abrir
 call :restaurar "\\%SERVIDOR%\pos_updates\lanzador_satelite.ps1" && goto :abrir
 rem Sin copia buena: si al menos empieza bien, se intenta abrir igual.

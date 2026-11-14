@@ -20,10 +20,11 @@ if not exist C:\PresupuestosSatelite\lanzador_satelite.bat (
 )
 set "DESTINO=C:\PresupuestosSatelite\"
 
-rem El servidor se lee del .env de la app, igual que el lanzador.
+rem El servidor se lee del .env de la app, igual que el lanzador (tokens=1,2:
+rem sin los espacios que pueda traer al final, como el .Trim() del .ps1).
 set "SERVIDOR=192.168.0.10"
 set "ENVAPP=%LOCALAPPDATA%\PresupuestosSatelite\app\pos_uniformes.env"
-if exist "%ENVAPP%" for /f "usebackq eol=# tokens=1,* delims== " %%a in ("%ENVAPP%") do if /i "%%a"=="POS_UNIFORMES_SERVER_HOST" set "SERVIDOR=%%b"
+if exist "%ENVAPP%" for /f "usebackq eol=# tokens=1,2 delims== " %%a in ("%ENVAPP%") do if /i "%%a"=="POS_UNIFORMES_SERVER_HOST" set "SERVIDOR=%%b"
 
 rem Trae el lanzador nuevo del servidor (por si el arreglo vive ahi): a .nuevo,
 rem validado, y solo entonces reemplaza. Si no se puede, se queda el que hay.
@@ -43,8 +44,11 @@ rem %1 archivo, %2 marca de inicio, %3 marca de fin.
 set "ARCH=%DESTINO%%~1"
 call :copiar_validado "C:\pos_updates\%~1" "%ARCH%" "%~2" "%~3" && (echo   %~1: traido de la PC principal & exit /b 0)
 call :copiar_validado "\\%SERVIDOR%\pos_updates\%~1" "%ARCH%" "%~2" "%~3" && (echo   %~1: traido de la PC principal por red & exit /b 0)
-call :es_bueno "%ARCH%" "%~2" "" && (echo   %~1: no se alcanzo el servidor, se queda el que hay & exit /b 0)
+rem Sin servidor: el que hay solo si esta COMPLETO (las dos marcas); si no, el
+rem respaldo; uno que solo empieza bien (cortado) es el ultimo recurso.
+call :es_bueno "%ARCH%" "%~2" "%~3" && (echo   %~1: no se alcanzo el servidor, se queda el que hay & exit /b 0)
 call :copiar_validado "%ARCH%.respaldo" "%ARCH%" "%~2" "%~3" && (echo   %~1: restaurado del respaldo local & exit /b 0)
+call :es_bueno "%ARCH%" "%~2" "" && (echo   %~1: parece incompleto y no hay respaldo; se usa el que hay & exit /b 0)
 echo   %~1: NO hay copia buena; corre reparar_satelite.bat
 exit /b 1
 
