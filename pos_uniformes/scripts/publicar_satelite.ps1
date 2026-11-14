@@ -61,14 +61,78 @@ if ($LASTEXITCODE -ge 8) {
 # VERSION.txt lleva fecha + commit: los kioskos se actualizan solos en CADA
 # build publicada. Se escribe al final: es lo que les dice "ya hay algo nuevo".
 Set-Content -Path (Join-Path $publishDir "VERSION.txt") -Value $publishedVersion
+
+# Los archivos del lanzador se publican con temporal + reemplazo: un kiosko
+# que arranca justo ahora lee el viejo o el nuevo, nunca uno a medias. Se
+# copia a "<nombre>.nuevo" en la misma carpeta, se fuerza a disco, se revisa
+# el tamano y se pone en su lugar con [System.IO.File]::Replace (una sola
+# operacion del sistema de archivos; Move-Item -Force borra y luego mueve).
+function Publicar-Archivo($nombre, [switch]$Opcional) {
+    $origen = Join-Path $PSScriptRoot $nombre
+    $destino = Join-Path $updatesDir $nombre
+    $tmp = "$destino.nuevo"
+    try {
+        if (-not (Test-Path -LiteralPath $origen)) { throw "no existe $origen" }
+        if ($nombre -eq "lanzador_satelite.ps1") {
+            # Un lanzador que PowerShell no puede leer no se publica: los
+            # kioskos lo rechazarian igual, pero mejor enterarse aqui.
+            $texto = [System.IO.File]::ReadAllText($origen)
+            $tokens = $null
+            $errores = $null
+            [void][System.Management.Automation.Language.Parser]::ParseInput($texto, [ref]$tokens, [ref]$errores)
+            if ($errores -and ($errores.Count -gt 0)) { throw "lanzador_satelite.ps1 tiene errores de sintaxis" }
+            if (-not $texto.TrimEnd().EndsWith("# Fin del lanzador del satelite", [System.StringComparison]::Ordinal)) {
+                throw "lanzador_satelite.ps1 no termina con su marca de fin"
+            }
+        }
+        if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force }
+        $entrada = [System.IO.File]::OpenRead($origen)
+        try {
+            $salida = New-Object System.IO.FileStream($tmp, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+            try {
+                $entrada.CopyTo($salida)
+                $salida.Flush($true)
+            } finally {
+                $salida.Dispose()
+            }
+        } finally {
+            $entrada.Dispose()
+        }
+        if ((Get-Item -LiteralPath $tmp).Length -ne (Get-Item -LiteralPath $origen).Length) { throw "copia incompleta de $nombre" }
+        # Si un kiosko lo esta leyendo en este instante, Replace puede fallar:
+        # se reintenta unos segundos.
+        for ($intento = 1; $true; $intento++) {
+            try {
+                if (Test-Path -LiteralPath $destino) {
+                    [System.IO.File]::Replace($tmp, $destino, [NullString]::Value)
+                } else {
+                    [System.IO.File]::Move($tmp, $destino)
+                }
+                break
+            } catch {
+                if ($intento -ge 5) { throw }
+                Start-Sleep -Seconds 1
+            }
+        }
+    } catch {
+        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        if ($Opcional) {
+            Write-Host "  (No se publico $nombre`: $($_.Exception.Message))"
+            return
+        }
+        throw
+    }
+}
+
 # El lanzador tambien se publica: instalar un kiosko nuevo = copiar
 # lanzador_satelite.bat + .ps1 desde la carpeta compartida.
-Copy-Item (Join-Path $PSScriptRoot "lanzador_satelite.ps1") $updatesDir -Force
-Copy-Item (Join-Path $PSScriptRoot "lanzador_satelite.bat") $updatesDir -Force
-# Reparador para el kiosko (cuando el .exe se copia a medias).
-Copy-Item (Join-Path $PSScriptRoot "reparar_satelite.bat") $updatesDir -Force -ErrorAction SilentlyContinue
+Publicar-Archivo "lanzador_satelite.ps1"
+Publicar-Archivo "lanzador_satelite.bat"
+# Reparador para el kiosko (cuando el .exe se copia a medias o el lanzador
+# se dano).
+Publicar-Archivo "reparar_satelite.bat" -Opcional
 # El instalador del servidor de impresion del kiosko tambien: ahi no hay
 # repo ni Python, asi que tiene que llegar por la carpeta compartida.
-Copy-Item (Join-Path $PSScriptRoot "instalar_servidor_impresion_kiosko.bat") $updatesDir -Force -ErrorAction SilentlyContinue
+Publicar-Archivo "instalar_servidor_impresion_kiosko.bat" -Opcional
 Write-Host "  Publicado para kioskos en: $publishDir ($publishedVersion)"
 exit 0
