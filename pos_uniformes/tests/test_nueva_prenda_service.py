@@ -63,6 +63,19 @@ class EscuelasTests(unittest.TestCase):
         self.assertEqual(ultimas[0].tipo_pieza, "Pants Suelto")
         self.assertEqual(ultimas[0].nivel, "Primaria")
 
+    def test_opciones_listas_cerradas(self) -> None:
+        ops = np.opciones(self.s)
+        self.assertEqual(ops.colores[0], "Sin color")
+        self.assertIn("Gris", ops.colores)
+        self.assertIn("Blanco", ops.colores)
+        self.assertNotIn("Blanca", ops.colores)
+        self.assertEqual(ops.marcas, ("Sin marca",))
+        self.assertEqual(ops.generos, ("Unisex",))
+        self.assertEqual(ops.escudos, ("Con Escudo",))
+        self.assertEqual(ops.niveles, ("Primaria", "Secundaria"))
+        self.assertIn("Pants Suelto", ops.piezas)
+        self.assertGreater(ops.usos_color["Gris"], 0)
+
 
 class _T:
     def __init__(self, talla, precio, error=""):
@@ -104,6 +117,20 @@ class TextosTests(unittest.TestCase):
             "Se crean 3 prendas de Pants Suelto (6 tallas), una para cada escuela: A, B y C, "
             "de $245 a $295. Quedan en su uniforme Deportivo.",
         )
+
+    def test_detalle_confirmar(self) -> None:
+        a = _P("Jaral", [_T("4", 245), _T("6", 245)])
+        a.receta_texto = "Receta Chamarra: se completa."
+        a.tallas[0].llegan, a.tallas[1].llegan = 4, 2
+        b = _P("B", [_T("4", 245)])
+        b.receta_texto = ""
+        b.tallas[0].llegan = 0
+        self.assertEqual(np.detalle_confirmar([a, b]),
+                         "Receta Chamarra: se completa.\nLlegan 6 piezas de Jaral: entran como entrada normal.")
+        a.receta_texto, a.tallas[1].llegan = "", 0
+        a.tallas[0].llegan = 1
+        self.assertEqual(np.detalle_confirmar([a]), "Llega 1 pieza de Jaral: entra como entrada normal.")
+        self.assertEqual(np.detalle_confirmar([]), "")
 
     def test_frase_listo(self) -> None:
         t = [alta.TallaCreada(1, "SKU1", "4", "Gris", Decimal(245)),

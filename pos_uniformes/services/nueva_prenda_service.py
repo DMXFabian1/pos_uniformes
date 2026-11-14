@@ -23,7 +23,8 @@ from typing import Iterable, Sequence
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from pos_uniformes.database.models import Escuela, NivelEducativo, Producto, TipoPieza
+from pos_uniformes.database.models import Escuela, Marca, NivelEducativo, Producto, TipoPieza
+from pos_uniformes.services import catalogo_valores_service as valores
 from pos_uniformes.services.catalogo_valores_service import normalizar
 
 MESES = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
@@ -131,6 +132,55 @@ def ultimas_altas(session: Session, limite: int = ULTIMAS_ALTAS) -> list[UltimaA
     ]
 
 
+# ── Listas cerradas de la pantalla ─────────────────────────────────────────
+
+SIN_COLOR = "Sin color"
+
+
+@dataclass(frozen=True)
+class Opciones:
+    """Lo que ofrecen los combos (listas cerradas, una forma por valor)."""
+
+    colores: tuple[str, ...] = ()
+    #: Cuántas tallas usan cada color (para «¿Quisiste decir…?»).
+    usos_color: dict = None  # type: ignore[assignment]
+    marcas: tuple[str, ...] = ()
+    generos: tuple[str, ...] = ()
+    escudos: tuple[str, ...] = ()
+    niveles: tuple[str, ...] = ()
+    piezas: tuple[str, ...] = ()
+
+
+def _distintos(session: Session, columna) -> list[str]:
+    filas = session.execute(
+        select(columna, func.count(Producto.id))
+        .where(Producto.activo.is_(True), columna.is_not(None))
+        .group_by(columna)
+        .order_by(func.count(Producto.id).desc(), columna)
+    ).all()
+    return [valores.limpiar(v) for v, _n in filas if valores.limpiar(v)]
+
+
+def opciones(session: Session) -> Opciones:
+    """Colores (los sugeridos y los que ya existen, en su forma oficial, del
+    más usado al menos), marcas, géneros, escudos, niveles y piezas."""
+    usos_color = valores.contar_usos(session, valores.CAMPO_COLOR)
+    por_uso = sorted(usos_color, key=lambda c: (-usos_color[c], normalizar(c)))
+    colores = valores.depurar_opciones(valores.CAMPO_COLOR, [SIN_COLOR], list(valores.COLORES_SUGERIDOS), por_uso)
+    return Opciones(
+        colores=tuple(colores),
+        usos_color=usos_color,
+        marcas=tuple(sorted((str(m) for m in session.scalars(select(Marca.nombre).where(Marca.activo.is_(True)))),
+                            key=normalizar)),
+        generos=tuple(_distintos(session, Producto.genero)),
+        escudos=tuple(_distintos(session, Producto.escudo)),
+        niveles=tuple(str(n) for n in session.scalars(
+            select(NivelEducativo.nombre).where(NivelEducativo.activo.is_(True)).order_by(NivelEducativo.id))),
+        piezas=tuple(sorted((str(n) for n in session.scalars(
+            select(TipoPieza.nombre).where(TipoPieza.activo.is_(True)))), key=normalizar)),
+    )
+
+
 # ── Textos de la pantalla (puros) ──────────────────────────────────────────
 
 def _tallas(n: int) -> str:
@@ -209,6 +259,19 @@ def frase_confirmar(planes: Sequence) -> str:
     return texto
 
 
+def detalle_confirmar(planes: Sequence) -> str:
+    """Lo que acompaña a la frase: la receta y lo que llega («Llegan 6
+    piezas: entran como entrada normal.»). Vacío si no hay nada."""
+    if not planes:
+        return ""
+    lineas = [t for t in dict.fromkeys(p.receta_texto for p in planes) if t]
+    llegan = sum(int(t.llegan or 0) for t in planes[0].tallas)
+    if llegan:
+        lineas.append(f"Llega{'' if llegan == 1 else 'n'} {llegan} {'pieza' if llegan == 1 else 'piezas'} "
+                      f"de {planes[0].escuela}: {'entra' if llegan == 1 else 'entran'} como entrada normal.")
+    return "\n".join(lineas)
+
+
 def frase_listo(resultado) -> str:
     """«10 tallas de Pants Suelto Ignacio Allende (Jaral), de $245 a $295.
     Quedó en su uniforme Deportivo y en la receta de Chamarra.»"""
@@ -244,13 +307,16 @@ def frase_listo(resultado) -> str:
 
 __all__ = [
     "EscuelaParaElegir",
+    "Opciones",
     "UltimaAlta",
     "escuelas_para_elegir",
     "fecha_corta",
     "filtrar_escuelas",
+    "detalle_confirmar",
     "frase_confirmar",
     "frase_listo",
     "nota_bloqueo",
+    "opciones",
     "texto_boton",
     "ultimas_altas",
 ]
