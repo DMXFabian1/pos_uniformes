@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
 
-from PyQt6.QtCore import QRegularExpression, Qt, pyqtSignal
+from PyQt6.QtCore import QRegularExpression, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QIntValidator, QRegularExpressionValidator
 from PyQt6.QtWidgets import (
     QCheckBox,
@@ -35,6 +35,10 @@ from PyQt6.QtWidgets import (
 from pos_uniformes.services.talla_orden_service import clave_talla
 
 ALTO_FILA = 36
+#: Pausa tras la última tecla antes de pasar el precio al plan: así el botón
+#: «Dar de alta» se enciende sin tener que dar Enter o Tab (un clic en un botón
+#: apagado no le quita el foco al campo y nunca llegaría `editingFinished`).
+REBOTE_PRECIO_MS = 300
 
 
 def leer_precio(texto: str) -> Decimal | None:
@@ -102,8 +106,18 @@ class FilaTalla:
         self.llegan.setValidator(QIntValidator(0, 9999))
         self.llegan.setToolTip("Cuántas llegan ahora (opcional). Entra como una entrada normal: se puede corregir.")
 
+        self.rebote = QTimer(self.precio)
+        self.rebote.setSingleShot(True)
+        self.rebote.setInterval(REBOTE_PRECIO_MS)
+
+        def pasar_precio() -> None:
+            self.rebote.stop()
+            tabla._al_editar_precio(self.talla, self.precio.text())
+
         self.marca.toggled.connect(lambda v: tabla._al_marcar(self.talla, v))
-        self.precio.editingFinished.connect(lambda: tabla._al_editar_precio(self.talla, self.precio.text()))
+        self.precio.textEdited.connect(lambda _t: self.rebote.start())
+        self.rebote.timeout.connect(pasar_precio)
+        self.precio.editingFinished.connect(pasar_precio)
         self.sugerencia.clicked.connect(lambda: tabla.sugerencia_aceptada.emit(self.talla))
         self.llegan.editingFinished.connect(lambda: tabla._al_llegan(self.talla, leer_cantidad(self.llegan.text())))
         self._precio_mostrado = ""

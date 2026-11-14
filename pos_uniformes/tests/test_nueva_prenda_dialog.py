@@ -18,6 +18,7 @@ from unittest.mock import Mock, patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtCore import QEvent
+from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QAbstractButton, QApplication, QCheckBox, QLabel, QMessageBox, QPushButton, QToolButton
 from sqlalchemy import create_engine, func, select
 from sqlalchemy.orm import Session
@@ -28,6 +29,7 @@ from pos_uniformes.services.catalog_service import CatalogService
 from pos_uniformes.ui.dialogs import nueva_prenda_dialog as npd
 from pos_uniformes.ui.dialogs.quisiste_decir_dialog import ACCION_CORREGIR, ACCION_CREAR, ACCION_USAR, Eleccion
 from pos_uniformes.ui.helpers import nueva_prenda_abrir
+from pos_uniformes.ui.helpers import nueva_prenda_tallas as npt
 from tests._ayuda_mini_caja import ESCALERAS, MiniCaja
 
 JARAL = "Ignacio Allende (Jaral)"
@@ -279,6 +281,24 @@ class RecorridoTests(_Base):
         fila.precio.editingFinished.emit()
         self.assertEqual(d.principal.text(), "Dar de alta 11 tallas")
         self.assertTrue(d.principal.isEnabled())
+
+    def test_precio_escrito_enciende_el_boton_sin_perder_el_foco(self) -> None:
+        # Se escribe el precio que faltaba y se va directo al botón: sin Enter ni
+        # Tab (un clic en un botón apagado no le quita el foco al campo).
+        d = self.dialogo()
+        d.show()
+        self.a_principal(d)
+        d.agregar_talla("18")
+        self.assertFalse(d.principal.isEnabled())
+        fila = d.tabla.filas["18"]
+        fila.precio.setFocus()
+        QTest.keyClicks(fila.precio, "305")
+        QTest.qWait(npt.REBOTE_PRECIO_MS + 150)
+        self.assertTrue(d.principal.isEnabled(), d.bloqueo.text())
+        self.assertEqual(d._talla("18").precio, D(305))
+        self.assertEqual(fila.precio.text(), "305")
+        d.principal.click()
+        self.assertEqual(d.pasos.currentIndex(), npd.CONFIRMAR)
 
     def test_llegan_entra_como_entrada(self) -> None:
         d = self.dialogo()
