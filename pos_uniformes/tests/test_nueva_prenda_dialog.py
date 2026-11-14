@@ -325,6 +325,29 @@ class PuertaTests(_Base):
             self.assertIsNone(nueva_prenda_abrir.abrir_nueva_prenda(ventana))
         aviso.assert_called_once()
 
+    def test_abrir_desde_inventario_conecta_con_la_ventana(self) -> None:
+        ventana = Mock()
+        ventana.current_role = RolUsuario.ADMIN
+        ventana.user_id = self.caja.admin.id
+        with patch.object(npd, "NuevaPrendaDialog") as clase:
+            nueva_prenda_abrir.abrir_nueva_prenda(ventana, session_factory=Mock())
+        clase.return_value.open.assert_called_once_with()
+        self.assertEqual(clase.call_args.kwargs["usuario_id"], self.caja.admin.id)
+        d = SimpleNamespace(**clase.call_args.kwargs)
+        d.al_formulario_anterior()
+        ventana._handle_create_product.assert_called_once_with()
+        d.al_imprimir([7])
+        ventana._open_inventory_label_dialog_for_variant.assert_called_once_with(7)
+        d.al_imprimir([7, 8])
+        ventana._handle_inventory_print_label_batch.assert_called_once_with([7, 8])
+        resultado = alta.ResultadoAlta(productos=(alta.ProductoCreado(
+            5, "Pants Suelto Jaral", "Jaral", (alta.TallaCreada(9, "SKU9", "4", "Gris", D(245)),)),))
+        d.al_ver(resultado)
+        ventana.inventory_search_input.setText.assert_called_once_with("Pants Suelto Jaral")
+        ventana.inventario_pantalla.seleccionar.assert_called_once_with(9)
+        d.al_terminar(resultado)
+        ventana.refresh_all.assert_called_once_with()
+
     def test_una_cajera_no_puede_guardar(self) -> None:
         antes = self.contar(Producto)
         d = self.dialogo(usuario=self.caja.cajera)

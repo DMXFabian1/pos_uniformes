@@ -34,6 +34,7 @@ from pos_uniformes.ui.helpers.inventario_tabla_helper import ALTO_FILA, Delegado
 from pos_uniformes.ui.helpers.inventory_help_texts import AYUDA_IMPRIMIR_ETIQUETA
 from pos_uniformes.ui.helpers.inventory_table_row_helper import INVENTORY_TABLE_HEADERS
 from pos_uniformes.ui.helpers.inventory_toggle_helper import etiqueta_boton_prenda, etiqueta_boton_talla
+from pos_uniformes.ui.helpers.nueva_prenda_abrir import abrir_nueva_prenda
 from pos_uniformes.ui.styles.inventario_styles import build_inventario_stylesheet, sombra
 
 if TYPE_CHECKING:
@@ -193,7 +194,8 @@ def _encabezado(window: "MainWindow", pantalla: InventarioPantalla) -> QHBoxLayo
     nueva.setText("＋ Nueva prenda")
     nueva.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
     nueva.setCursor(Qt.CursorShape.PointingHandCursor)
-    nueva.clicked.connect(lambda: window._handle_create_product())
+    # Tanda 3 del alta: la ventana nueva; el asistente viejo sigue en «⋯ → Usar el formulario anterior».
+    nueva.clicked.connect(lambda: abrir_nueva_prenda(window))
     fila.addWidget(nueva)
 
     mas = window.inventory_more_button

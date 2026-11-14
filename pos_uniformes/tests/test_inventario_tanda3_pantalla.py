@@ -59,6 +59,7 @@ FILAS = [
 ACCIONES_VIEJAS = {
     "_handle_create_category": "Categoría nueva",
     "_handle_create_brand": "Marca nueva",
+    "_handle_create_product": "Usar el formulario anterior",
     "_handle_create_variant": "Agregar talla o color",
     "_handle_duplicate_variant": "Duplicar la talla elegida",
     "_handle_update_product": "Editar la prenda elegida",
@@ -114,9 +115,10 @@ class InventarioTanda3PantallaTests(unittest.TestCase):
         self.assertEqual(window.inventory_new_button.text(), "＋ Nueva prenda")
         self.assertIsNone(window.inventory_new_button.menu())
         self.assertEqual(window.inventory_more_button.text(), "⋯")
-        window._handle_create_product = Mock()
-        window.inventory_new_button.click()
-        window._handle_create_product.assert_called_once_with()
+        # Tanda 3 del alta (2026-11-13): abre la ventana nueva; el asistente viejo va en «⋯».
+        with patch("pos_uniformes.ui.views.inventory_view.abrir_nueva_prenda") as abrir:
+            window.inventory_new_button.click()
+        abrir.assert_called_once_with(window)
         self.assertEqual(window.inventario_pantalla.subtitulo.text(), "6 tallas · 21 piezas")
 
     def test_sin_tarjeta_de_acciones_rapidas(self) -> None:

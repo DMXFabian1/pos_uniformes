@@ -1374,6 +1374,8 @@ def armar_menu_mas(window: "MainWindow", pantalla: InventarioPantalla) -> QMenu:
     menu = QMenu(window.inventory_more_button)
     menu.setObjectName("invMenu")
     menu.setToolTipsVisible(True)
+    _accion(menu, "📝  Usar el formulario anterior", llamar("_handle_create_product"),
+            "El asistente de antes para dar de alta una prenda (por si acaso; la ventana nueva es «＋ Nueva prenda»)")
     _accion(menu, "➕  Agregar talla o color", llamar("_handle_create_variant"),
             "Agregar una talla o color (con su precio) a una prenda que ya existe")
     _accion(menu, "⧉  Duplicar la talla elegida", llamar("_handle_duplicate_variant"),
