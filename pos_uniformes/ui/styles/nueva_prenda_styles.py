@@ -47,7 +47,11 @@ def build_nueva_prenda_stylesheet() -> str:
 QDialog#npDialogo, QWidget#npRaiz {{
     background: {CREMA}; color: {TEXTO}; font-family: {FUENTE}; font-size: 14px;
 }}
-QWidget#npRaiz QLabel {{ background: transparent; }}
+/* La ventana principal pinta TODO QWidget de crema: aquí las letras van sin fondo
+   (si no, se ven recuadros crema sobre las tarjetas blancas) y con Segoe UI en Windows. */
+QWidget {{ font-family: {FUENTE}; }}
+QLabel {{ background: transparent; }}
+QCheckBox {{ background: {TARJETA}; }}  /* las casillas van siempre sobre tarjeta blanca */
 QStackedWidget#npPasos, QWidget#npPaso {{ background: transparent; }}
 QScrollArea#npScroll, QWidget#npScrollVista {{ background: transparent; border: none; }}
 

@@ -56,9 +56,9 @@ class _Base(unittest.TestCase):
         self.al_ver = Mock()
         self.al_anterior = Mock()
 
-    def dialogo(self, usuario=None) -> npd.NuevaPrendaDialog:
+    def dialogo(self, usuario=None, padre=None) -> npd.NuevaPrendaDialog:
         d = npd.NuevaPrendaDialog(
-            None,
+            padre,
             session_factory=lambda: Session(self.engine, expire_on_commit=False),
             usuario_id=(usuario or self.caja.admin).id,
             al_imprimir=self.al_imprimir, al_ver=self.al_ver,
@@ -377,7 +377,15 @@ class TamanoTests(_Base):
         return cortados
 
     def test_a_1366_nada_cortado(self) -> None:
-        d = self.dialogo()
+        # Con el tema de la ventana principal de padre (pinta todo QWidget), como en la caja.
+        from PyQt6.QtWidgets import QWidget
+
+        from pos_uniformes.ui.styles.main_window_styles import build_main_window_stylesheet
+
+        padre = QWidget()
+        padre.setStyleSheet(build_main_window_stylesheet())
+        self.addCleanup(padre.deleteLater)
+        d = self.dialogo(padre=padre)
         self.assertLessEqual(d.width(), 1366)
         self.assertLessEqual(d.height(), 768 - 40)  # la barra de Windows
         d.show()
