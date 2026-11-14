@@ -157,7 +157,7 @@ class _Combo(QComboBox):
 
 
 class _BotonFalta(QPushButton):
-    """«＋ Pants Suelto ……… lo tienen 41 de 44» (y si es conjunto, de qué se arma)."""
+    """«＋ Pants Suelto ……… la tienen 41 de las 44 escuelas» (y si es conjunto, de qué se arma)."""
 
     def __init__(self, pieza: str, nota: str) -> None:
         super().__init__()
@@ -369,8 +369,7 @@ class NuevaPrendaDialog(QDialog):
         elif paso == FALTA:
             self.titulo.setText(self.escuela.nombre if self.escuela else "")
             nivel = (self.nivel or "").lower()
-            self.sub.setText(f"Lo que ya tiene y lo que le falta, comparada con las demás de {nivel}."
-                             if nivel else "¿De qué nivel es la prenda?")
+            self.sub.setText("Toca la pieza que le falta." if nivel else "¿De qué nivel es la prenda?")
         elif paso == PRINCIPAL:
             self.titulo.setText(f"{self.pieza} para {self.escuela.nombre}" if self.escuela else "")
             self.sub.setText("Revisa tallas y precios; lo demás ya viene de la prenda modelo.")
@@ -644,12 +643,14 @@ class NuevaPrendaDialog(QDialog):
             self.caja_falta.addWidget(_etiqueta("npNota", str(exc), envolver=True))
             return
         self.comparacion = comp
-        titulo = f"LE FALTA · COMPARADA CON {comp.escuelas_del_nivel} DE {comp.nivel.upper()}"
+        n = comp.escuelas_del_nivel
+        contra = "LA OTRA ESCUELA" if n == 1 else f"LAS {n} ESCUELAS"
+        titulo = f"LE FALTA · COMPARADA CON {contra} DE {comp.nivel.upper()}"
         self.caja_falta.addWidget(_etiqueta("npSeccion", titulo))
         self.botones_falta: dict[str, QPushButton] = {}
         if comp.le_falta:
             for pieza in comp.le_falta:
-                nota = pieza.texto
+                nota = nps.texto_pieza_comparada(pieza.escuelas_con_ella, pieza.escuelas_del_nivel)
                 if pieza.tipo_pieza in conjunto_service.TIPOS_CONJUNTO:
                     nota = f"es un conjunto: se le propone su receta · {nota}"
                 boton = _BotonFalta(pieza.tipo_pieza, nota)
@@ -884,8 +885,8 @@ class NuevaPrendaDialog(QDialog):
         self.casillas_otras = {}
         escuelas = [e for e in (self.sin_pieza.escuelas if self.sin_pieza else ())
                     if e.escuela_id != self.escuela.escuela_id]
-        nivel = (self.nivel or "").lower()
-        self.otras.setText(f"＋ Hacer la misma para otras escuelas\n     le falta a {len(escuelas)} de {nivel}")
+        self.otras.setText("＋ Hacer la misma para otras escuelas\n     "
+                           + nps.texto_le_falta_a(len(escuelas), self.nivel))
         self.otras.setVisible(bool(escuelas))
         for i, e in enumerate(escuelas):
             casilla = QCheckBox(e.escuela)

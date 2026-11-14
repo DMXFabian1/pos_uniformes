@@ -100,6 +100,9 @@ class TallaPlan:
     sku: str = ""  # previsto (el real sale del ensayo)
     #: «la tienen 3 de 14» (cuántas hermanas tienen esta talla).
     texto_cobertura: str = ""
+    #: Los mismos dos números, para decir de qué es el total en pantalla.
+    cobertura_tienen: int = 0
+    cobertura_total: int = 0
 
 
 @dataclass
@@ -629,6 +632,8 @@ def _talla_sugerida(s, m, hermanas, llegan: Mapping, costos: Mapping) -> TallaPl
         llegan=int(llegan.get(s.talla, 0)), costo=costos.get(s.talla),
         precio_modelo=(m.precios.get(s.talla) if m else None),
         texto_cobertura=cobertura.texto if cobertura else "",
+        cobertura_tienen=cobertura.prendas if cobertura else 0,
+        cobertura_total=cobertura.total if cobertura else 0,
     )
 
 

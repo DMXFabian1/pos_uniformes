@@ -145,6 +145,20 @@ class TextosTests(unittest.TestCase):
         )
         self.assertEqual(np.frase_listo(alta.ResultadoAlta()), "")
 
+    def test_conteos_dicen_de_que_es_el_total(self) -> None:
+        # «Le falta», la talla gris y «Hacer la misma…» cuentan cosas distintas:
+        # cada frase nombra su total.
+        self.assertEqual(np.texto_pieza_comparada(4, 10), "la tienen 4 de las 10 escuelas")
+        self.assertEqual(np.texto_pieza_comparada(1, 1), "la tienen 1 de 1 escuela")
+        t = alta.TallaPlan(talla="EXG", precio=None, texto_cobertura="la tienen 1 de 4",
+                           cobertura_tienen=1, cobertura_total=4)
+        self.assertEqual(np.texto_cobertura_talla(t, "Pants Suelto"), "la tienen 1 de las 4 prendas de Pants Suelto")
+        self.assertEqual(np.texto_cobertura_talla(t, None), "la tienen 1 de las 4 prendas")
+        sin = alta.TallaPlan(talla="18", precio=None)
+        self.assertEqual(np.texto_cobertura_talla(sin, "Pants Suelto"), "")
+        self.assertEqual(np.texto_le_falta_a(6, "Primaria"), "le falta a 6 escuelas de primaria")
+        self.assertEqual(np.texto_le_falta_a(1, None), "le falta a 1 escuela")
+
     def test_fecha_corta(self) -> None:
         self.assertEqual(np.fecha_corta(datetime(2026, 11, 8)), "8-nov")
         self.assertEqual(np.fecha_corta(None), "")

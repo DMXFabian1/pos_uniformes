@@ -3,7 +3,7 @@
     TALLA   PRECIO   DE DÓNDE                    LLEGAN
     ☑ 4     $245     como las demás              [ — ]   ← LLEGAN HOY (opcional)
     ☑ GD    $289     a mano   ¿$289? → [¿$295?]  [  ]
-    ☐ EXG   $305     la tienen 1 de 4            (gris)
+    ☐ EXG   $305     la tienen 1 de las 4 prendas de Pants Suelto   (gris)
 
 Las tallas no se escriben: se marcan. Las que no trae el modelo salen en gris
 con cuántas hermanas las tienen. El precio se edita; «de dónde» lo recalcula
@@ -32,6 +32,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from pos_uniformes.services import nueva_prenda_service as nps
 from pos_uniformes.services.talla_orden_service import clave_talla
 
 ALTO_FILA = 32
@@ -126,7 +127,7 @@ class FilaTalla:
     def widgets(self) -> list[QWidget]:
         return [self.marca, self.precio, self.donde, self.sugerencia, self.llegan]
 
-    def mostrar(self, t, *, marcada: bool) -> None:
+    def mostrar(self, t, *, marcada: bool, cobertura: str = "") -> None:
         for w in (self.marca, self.precio, self.llegan):
             w.blockSignals(True)
         try:
@@ -147,7 +148,7 @@ class FilaTalla:
                 w.blockSignals(False)
 
         if not marcada:
-            self.donde.setText(t.texto_cobertura or "no la trae el modelo")
+            self.donde.setText(cobertura or t.texto_cobertura or "no la trae el modelo")
             tono, estado = "", ""
         elif t.error:
             self.donde.setText(t.error)
@@ -158,7 +159,7 @@ class FilaTalla:
         else:
             self.donde.setText(t.origen_precio)
             tono, estado = "", ""
-        self.donde.setToolTip("\n".join(x for x in (t.aviso if marcada else "", t.texto_cobertura) if x))
+        self.donde.setToolTip("\n".join(x for x in (t.aviso if marcada else "", cobertura) if x))
         self.donde.setProperty("tono", tono)
         self.donde.setProperty("posible", "no" if marcada else "si")
         self.precio.setProperty("estado", estado)
@@ -211,10 +212,9 @@ class TablaTallas(QFrame):
             self._rehacer(orden)
         for talla in orden:
             fila = self.filas[talla]
-            if talla in marcadas:
-                fila.mostrar(marcadas[talla], marcada=True)
-            else:
-                fila.mostrar(posibles[talla], marcada=False)
+            t = marcadas.get(talla) or posibles[talla]
+            fila.mostrar(t, marcada=talla in marcadas,
+                         cobertura=nps.texto_cobertura_talla(t, getattr(plan, "tipo_pieza", None)))
 
     def _rehacer(self, orden: list[str]) -> None:
         for fila in self.filas.values():

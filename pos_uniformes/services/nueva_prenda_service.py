@@ -203,6 +203,36 @@ def _rango(precios: Sequence) -> str:
     return f"a ${lo:.0f}" if lo == hi else f"de ${lo:.0f} a ${hi:.0f}"
 
 
+def _de_cuantas(total: int, singular: str, plural: str) -> str:
+    """«de las 10 escuelas» / «de 1 escuela»."""
+    return f"de {total} {singular}" if total == 1 else f"de las {total} {plural}"
+
+
+def texto_pieza_comparada(con_ella: int, del_nivel: int) -> str:
+    """«Le falta»: cuántas escuelas del nivel tienen la pieza, diciendo de
+    qué es el total («la tienen 4 de las 10 escuelas»)."""
+    return f"la tienen {con_ella} {_de_cuantas(del_nivel, 'escuela', 'escuelas')}"
+
+
+def texto_cobertura_talla(talla, tipo_pieza: str | None) -> str:
+    """La fila gris de una talla que no trae el modelo: cuántas de las prendas
+    hermanas la tienen, nombrando el total («la tienen 1 de las 4 prendas de
+    Pants Suelto»). Así no se confunde con «la tienen 4 de las 10 escuelas»."""
+    total = int(getattr(talla, "cobertura_total", 0) or 0)
+    if not total:
+        return getattr(talla, "texto_cobertura", "") or ""
+    tienen = int(getattr(talla, "cobertura_tienen", 0) or 0)
+    de = _de_cuantas(total, "prenda", "prendas")
+    return f"la tienen {tienen} {de} de {tipo_pieza}" if tipo_pieza else f"la tienen {tienen} {de}"
+
+
+def texto_le_falta_a(escuelas: int, nivel: str | None) -> str:
+    """«le falta a 6 escuelas de primaria»."""
+    sujeto = "escuela" if escuelas == 1 else "escuelas"
+    nivel = f" de {nivel.lower()}" if nivel else ""
+    return f"le falta a {escuelas} {sujeto}{nivel}"
+
+
 def texto_boton(planes: Sequence) -> str:
     """«Dar de alta 10 tallas» / «Dar de alta 3 prendas (30 tallas)»."""
     total = sum(len(p.tallas) for p in planes)
@@ -318,5 +348,8 @@ __all__ = [
     "nota_bloqueo",
     "opciones",
     "texto_boton",
+    "texto_cobertura_talla",
+    "texto_le_falta_a",
+    "texto_pieza_comparada",
     "ultimas_altas",
 ]

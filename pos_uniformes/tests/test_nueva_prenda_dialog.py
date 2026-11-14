@@ -190,7 +190,7 @@ class RecorridoTests(_Base):
         antes = self.contar(Producto)
         d = self.dialogo()
         self.a_principal(d, pieza="Chaleco")
-        self.assertIn("le falta a 3 de primaria", d.otras.text())
+        self.assertIn("le falta a 3 escuelas de primaria", d.otras.text())
         d.marcar_otra_escuela("Miguel Hidalgo")
         d.marcar_otra_escuela("Justo Sierra")
         self.assertEqual(d.principal.text(), "Dar de alta 3 prendas (21 tallas)")
@@ -294,7 +294,7 @@ class RecorridoTests(_Base):
         self.a_principal(d)
         exg = d.tabla.filas["EXG"]
         self.assertFalse(exg.marca.isChecked())
-        self.assertEqual(exg.donde.text(), "la tienen 1 de 4")
+        self.assertEqual(exg.donde.text(), "la tienen 1 de las 4 prendas de Pants Suelto")
         self.assertFalse(exg.precio.isEnabled())
         self.assertEqual(exg.llegan.placeholderText(), "")  # sin «—» en la fila gris
         exg.marca.setChecked(True)
