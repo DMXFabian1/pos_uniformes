@@ -12,6 +12,9 @@
 #   2. Crear acceso directo al .bat en el Escritorio (y/o en la carpeta de
 #      Inicio para que abra solo al prender la PC).
 #   Despues de eso, las actualizaciones llegan solas.
+#
+# La ULTIMA linea de este archivo es su marca de fin: lanzador_satelite.bat
+# revisa la de inicio (linea 1) y la de fin antes de abrirlo. No borrarlas.
 
 $ErrorActionPreference = "SilentlyContinue"
 
@@ -28,11 +31,128 @@ if (Test-Path $envFile) {
     }
 }
 $share = "\\$serverHost\pos_updates\PresupuestosSatelite"
+$updatesRoot = "\\$serverHost\pos_updates"
 
 # Autenticarse al share en CADA arranque: Windows 11 bloquea el acceso como
 # invitado y la credencial guardada con /persistent no siempre se reconecta
 # a tiempo tras reiniciar. Si ya hay sesion, el error se ignora.
 net use "\\$serverHost\pos_updates" pos2026 /user:kiosko /persistent:no 2>$null | Out-Null
+
+# --- Archivos del lanzador: escritura que no puede quedar a medias ---------
+# 2026-11-13: el Kiosko Principal se apago mientras el lanzador se copiaba a
+# si mismo y al prender el .ps1 estaba lleno de ceros. Desde entonces NADA se
+# escribe directo sobre un archivo bueno:
+#   1. se copia a "<nombre>.nuevo" en la MISMA carpeta y se fuerza a disco;
+#   2. se valida (no vacio, mismo tamano que el origen, su marca de inicio y,
+#      el .ps1, su marca de fin y que PowerShell lo pueda leer sin errores);
+#   3. solo entonces se pone en su lugar con [System.IO.File]::Replace.
+# Replace (ReplaceFile de Windows) cambia el archivo en una sola operacion del
+# sistema de archivos: si se va la luz queda el viejo o el nuevo, nunca uno a
+# medias. Move-Item -Force en PowerShell 5.1 BORRA el destino y luego mueve:
+# un apagon entre los dos pasos deja al kiosko sin lanzador.
+$archivosLanzador = @("lanzador_satelite.ps1", "lanzador_satelite.bat", "reparar_satelite.bat")
+$marcaFinPs1 = "# Fin del lanzador del satelite"
+
+function Test-ArchivoLanzador($ruta, $nombre) {
+    # $nombre es el nombre logico (lanzador_satelite.ps1, ...): decide la marca.
+    $ErrorActionPreference = "Stop"
+    try {
+        if (-not (Test-Path -LiteralPath $ruta)) { return $false }
+        $bytes = [System.IO.File]::ReadAllBytes($ruta)
+        if ($bytes.Length -eq 0) { return $false }
+        $texto = [System.Text.Encoding]::ASCII.GetString($bytes)
+        $ordinal = [System.StringComparison]::Ordinal
+        if ($nombre -like "*.ps1") {
+            if (-not $texto.StartsWith("# Lanzador del satelite", $ordinal)) { return $false }
+            if (-not $texto.TrimEnd().EndsWith($marcaFinPs1, $ordinal)) { return $false }
+            $tokens = $null
+            $errores = $null
+            [void][System.Management.Automation.Language.Parser]::ParseInput($texto, [ref]$tokens, [ref]$errores)
+            if ($errores -and ($errores.Count -gt 0)) { return $false }
+        } else {
+            if (-not $texto.StartsWith("@echo off", $ordinal)) { return $false }
+        }
+        return $true
+    } catch {
+        return $false
+    }
+}
+
+function Copy-Seguro($origen, $destino, $nombre) {
+    # Deja $destino igual a $origen sin pasar nunca por un archivo a medias.
+    $ErrorActionPreference = "Stop"
+    $tmp = "$destino.nuevo"
+    try {
+        if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Force }
+        $entrada = [System.IO.File]::OpenRead($origen)
+        try {
+            $salida = New-Object System.IO.FileStream($tmp, [System.IO.FileMode]::CreateNew, [System.IO.FileAccess]::Write, [System.IO.FileShare]::None)
+            try {
+                $entrada.CopyTo($salida)
+                $salida.Flush($true)   # a disco de verdad ANTES de cambiar el nombre
+            } finally {
+                $salida.Dispose()
+            }
+        } finally {
+            $entrada.Dispose()
+        }
+        if ((Get-Item -LiteralPath $tmp).Length -ne (Get-Item -LiteralPath $origen).Length) { throw "tamano distinto" }
+        if (-not (Test-ArchivoLanzador $tmp $nombre)) { throw "no paso la validacion" }
+        if (Test-Path -LiteralPath $destino) {
+            # [NullString]::Value: con $null PowerShell mandaria "" y Replace falla.
+            [System.IO.File]::Replace($tmp, $destino, [NullString]::Value)
+        } else {
+            [System.IO.File]::Move($tmp, $destino)
+        }
+        return $true
+    } catch {
+        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        return $false
+    }
+}
+
+function Test-MismoArchivo($a, $b) {
+    if (-not (Test-Path -LiteralPath $a) -or -not (Test-Path -LiteralPath $b)) { return $false }
+    if ((Get-Item -LiteralPath $a).Length -ne (Get-Item -LiteralPath $b).Length) { return $false }
+    return ((Get-FileHash -LiteralPath $a).Hash -eq (Get-FileHash -LiteralPath $b).Hash)
+}
+
+function Update-ArchivosLanzador($origenDir) {
+    # Trae del share los archivos del lanzador que cambiaron (aplica en el
+    # SIGUIENTE arranque). Si no cambio nada, no escribe nada.
+    foreach ($f in $archivosLanzador) {
+        $origen = Join-Path $origenDir $f
+        $destino = Join-Path $PSScriptRoot $f
+        if (-not (Test-Path -LiteralPath $origen)) { continue }
+        if (Test-MismoArchivo $origen $destino) { continue }
+        # Lo publicado a medias (o roto) no se copia: el kiosko se queda con el suyo.
+        if (-not (Test-ArchivoLanzador $origen $f)) { continue }
+        if (Copy-Seguro $origen $destino $f) {
+            Write-Host "Lanzador actualizado: $f"
+        } else {
+            Write-Host "(No se pudo actualizar $f; se intenta en el proximo arranque)"
+        }
+    }
+}
+
+function Save-RespaldoLanzador {
+    # Copia buena local para lanzador_satelite.bat y reparar_satelite.bat:
+    # si el .ps1 se dana, lo restauran de aqui aunque la PC principal no este.
+    foreach ($f in @("lanzador_satelite.ps1", "lanzador_satelite.bat")) {
+        $actual = Join-Path $PSScriptRoot $f
+        $respaldo = "$actual.respaldo"
+        if (-not (Test-ArchivoLanzador $actual $f)) { continue }
+        if (Test-MismoArchivo $actual $respaldo) { continue }
+        [void](Copy-Seguro $actual $respaldo $f)
+    }
+}
+
+# Restos de una copia interrumpida (apagon): nunca se usan, se borran.
+foreach ($f in $archivosLanzador) {
+    $viejo = Join-Path $PSScriptRoot $f
+    Remove-Item -LiteralPath "$viejo.nuevo" -Force -ErrorAction SilentlyContinue
+    Remove-Item -LiteralPath "$viejo.respaldo.nuevo" -Force -ErrorAction SilentlyContinue
+}
 
 function Get-VersionDe($dir) {
     $file = Join-Path $dir "VERSION.txt"
@@ -86,15 +206,6 @@ if ($versionRemota -and ($versionRemota -ne $versionLocal)) {
     }
 }
 
-# El lanzador tambien se refresca a si mismo desde el share (aplica en el
-# SIGUIENTE arranque): instalar mejoras del lanzador ya no requiere USB.
-if (Test-Path $share) {
-    $updatesRoot = "\\$serverHost\pos_updates"
-    foreach ($f in @("lanzador_satelite.ps1", "lanzador_satelite.bat", "reparar_satelite.bat")) {
-        Copy-Item (Join-Path $updatesRoot $f) $PSScriptRoot -Force -ErrorAction SilentlyContinue
-    }
-}
-
 $exe = Get-ChildItem $appDir -Filter "*.exe" -ErrorAction SilentlyContinue |
     Select-Object -First 1
 
@@ -131,11 +242,25 @@ try {
     # Sin acceso directo no pasa nada: la app abre igual.
 }
 
+$arranco = $false
 if ($exe) {
-    Start-Process $exe.FullName -WorkingDirectory $appDir
-} else {
+    $proceso = Start-Process $exe.FullName -WorkingDirectory $appDir -PassThru
+    if ($proceso) { $arranco = $true }
+}
+
+# Este lanzador llego hasta abrir la app: es una copia buena. Se respalda
+# ANTES de refrescarlo del share, para que el respaldo sea el que si funciono.
+if ($arranco) { Save-RespaldoLanzador }
+
+# El lanzador tambien se refresca a si mismo desde el share (aplica en el
+# SIGUIENTE arranque): instalar mejoras del lanzador ya no requiere USB.
+# Va despues de abrir la app: el kiosko no espera por esto.
+if (Test-Path $share) { Update-ArchivosLanzador $updatesRoot }
+
+if (-not $exe) {
     Write-Host ""
     Write-Host "No hay app instalada en este kiosko y no se alcanzo la PC principal."
     Write-Host "Enciende la PC principal (o revisa la red) y vuelve a abrir este acceso."
     Read-Host "Enter para cerrar"
 }
+# Fin del lanzador del satelite
