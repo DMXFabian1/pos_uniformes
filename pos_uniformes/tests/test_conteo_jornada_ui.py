@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import unittest
-from datetime import datetime
+from datetime import datetime, timezone
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -351,8 +351,7 @@ class RevisionDialogTests(unittest.TestCase):
         from pos_uniformes.database.models import ConteoInventario
 
         d = self._dialogo()
-        with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.QMessageBox.question",
-                   return_value=QMessageBox.StandardButton.Yes), \
+        with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs._elegir", return_value="si"), \
              patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.QMessageBox.information"):
             d._aplicar()
         self.assertEqual(d.resultado, "aplicada")
@@ -422,7 +421,7 @@ class RevisionDialogTests(unittest.TestCase):
                                diferencia=0, contado_por="x", contado_at=datetime.now() - timedelta(days=20)))
         s.commit()
         d = self._dialogo()
-        with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes), \
+        with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs._elegir", return_value="si"), \
              patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.QMessageBox.information"):
             d._aplicar()
         self.assertEqual(d.resultado, "aplicada")
@@ -445,8 +444,7 @@ class RevisionDialogTests(unittest.TestCase):
 
     def test_descartar_no_toca_el_stock(self) -> None:
         d = self._dialogo()
-        with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.QMessageBox.question",
-                   return_value=QMessageBox.StandardButton.Yes):
+        with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs._elegir", return_value="si"):
             d._descartar()
         self.assertEqual(d.resultado, "descartada")
         s = self.factory()
@@ -455,13 +453,193 @@ class RevisionDialogTests(unittest.TestCase):
 
     def test_una_empleada_no_puede_aplicar_ni_pedir(self) -> None:
         d = self._dialogo(quien="VEND-4")
-        with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.QMessageBox.question",
-                   return_value=QMessageBox.StandardButton.Yes), \
+        with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs._elegir", return_value="si"), \
              patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.QMessageBox.critical") as err:
             d._aplicar()
         err.assert_called_once()
         self.assertEqual(d.resultado, "")
 
+
+    # --- tanda 1 (2026-11-15): textos honestos, fecha, ya revisado, cerrar ---------
+    def test_la_confirmacion_de_aplicar_es_en_espanol_y_dice_lo_que_pasa(self) -> None:
+        d = self._dialogo()
+        with patch(f"{_D}._elegir", return_value="no") as preg:
+            d._aplicar()
+        self.assertEqual(d.resultado, "")
+        titulo, texto, opciones = preg.call_args.args[1:4]
+        self.assertEqual([o[1] for o in opciones], ["Volver", "Sí, corregir"])
+        self.assertIn("A cada talla se le suma la diferencia que encontró Stayce el ", texto)
+        self.assertIn("Se corrigen 1 talla (faltan 3, sobran 0).", texto)   # 7 contra 10; la otra cuadra
+        self.assertNotIn("quedará como lo contó", texto)
+        s = self.factory()
+        self.assertIsNone(s.get(ConteoJornada, self.foto.id).revisada_at)   # Volver no aplica
+
+    def test_descartar_tambien_pregunta_en_espanol(self) -> None:
+        d = self._dialogo()
+        with patch(f"{_D}._elegir", return_value="no") as preg:
+            d._descartar()
+        self.assertEqual(d.resultado, "")
+        self.assertEqual([o[1] for o in preg.call_args.args[3]], ["Volver", "Sí, no usar este conteo"])
+
+    def _envejecer(self, dias: int) -> None:
+        from datetime import timedelta
+
+        s = self.factory()
+        j = s.get(ConteoJornada, self.foto.id)
+        j.terminada_at = datetime.now(timezone.utc).replace(tzinfo=None) - timedelta(days=dias)   # SQLite: UTC sin zona
+        s.commit(); s.close()
+
+    def test_la_fecha_del_conteo_y_el_aviso_si_es_viejo(self) -> None:
+        d = self._dialogo()
+        self.assertIn("hoy", d._cuando_label.text())
+        self.assertTrue(d._aviso_label.isHidden())
+        self._envejecer(41)
+        d = self._dialogo()
+        self.assertIn("hace 41 días", d._cuando_label.text())
+        self.assertFalse(d._aviso_label.isHidden())
+        self.assertIn("Conteo de hace 41 días: conviene recontar antes de corregir", d._aviso_label.text())
+        with patch(f"{_D}._elegir", return_value="no") as preg:
+            d._aplicar()
+        self.assertIn("Sí, corregir con un conteo de hace 41 días", [o[1] for o in preg.call_args.args[3]])
+
+    def test_a_los_diez_dias_avisa_pero_el_boton_no_cambia(self) -> None:
+        self._envejecer(10)
+        d = self._dialogo()
+        self.assertFalse(d._aviso_label.isHidden())
+        with patch(f"{_D}._elegir", return_value="no") as preg:
+            d._aplicar()
+        self.assertEqual([o[1] for o in preg.call_args.args[3]], ["Volver", "Sí, corregir"])
+
+    def test_ya_revisada_no_deja_aplicar_ni_descartar_pero_si_pedir(self) -> None:
+        from pos_uniformes.database.models import ConteoInventario
+
+        d = self._dialogo()
+        with patch(f"{_D}._elegir", return_value="si"), patch(f"{_D}.QMessageBox.information"):
+            d._aplicar()
+        self.assertEqual(d.resultado, "aplicada")
+        # Desde el Historial («Ver el pedido que decidiste») se abre la misma ventana.
+        d2 = self._dialogo()
+        self.assertTrue(d2._aplicar_btn.isHidden())
+        self.assertTrue(d2._descartar_btn.isHidden())
+        self.assertFalse(d2._revisada_label.isHidden())
+        self.assertIn("Corregido el ", d2._revisada_label.text())
+        self.assertTrue(d2._aviso_label.isHidden())
+        with patch(f"{_D}._elegir") as preg:
+            d2._aplicar(); d2._descartar()
+        preg.assert_not_called()
+        s = self.factory()
+        self.assertEqual(jn.ref(s.get(ConteoJornada, self.foto.id)).estado, "Aplicada")
+        s.close()
+        # El pedido sigue editable y se guarda.
+        fila = self._fila(d2, "6")
+        d2._table.item(fila, 4).setText("5")
+        with patch(f"{_D}.QMessageBox.information"):
+            self.assertTrue(d2._guardar_pedidos())
+        s = self.factory()
+        c = s.scalars(select(ConteoInventario).where(ConteoInventario.variante_id == self.v_ids[0])).one()
+        self.assertEqual(c.pedido, 5)
+
+    def test_descartada_dice_que_no_se_uso(self) -> None:
+        d = self._dialogo()
+        with patch(f"{_D}._elegir", return_value="si"):
+            d._descartar()
+        d2 = self._dialogo()
+        self.assertIn("No se usó (", d2._revisada_label.text())
+        self.assertTrue(d2._aplicar_btn.isHidden())
+
+    def test_contada_en_cero_sin_demanda_dice_se_acabo(self) -> None:
+        from pos_uniformes.database.models import ConteoInventario, LibretaVenta
+
+        s = self.factory()
+        c = s.scalars(select(ConteoInventario).where(ConteoInventario.variante_id == self.v_ids[1])).one()
+        c.stock_fisico = 0
+        s.query(LibretaVenta).delete()
+        s.commit(); s.close()
+        d = self._dialogo()
+        self.assertEqual(d._table.item(self._fila(d, "8"), 3).text(), "se acabó")
+        self.assertEqual(d._table.item(self._fila(d, "6"), 3).text(), "sin datos")
+        texto = d._resumen_label.text()
+        self.assertIn("1 se acabó y nadie la pidió", texto)
+        self.assertNotIn("faltan ventas", texto)
+
+    def test_el_motivo_real_cuando_lo_que_hay_alcanza(self) -> None:
+        from pos_uniformes.database.models import ConteoInventario
+
+        s = self.factory()
+        c = s.scalars(select(ConteoInventario).where(ConteoInventario.variante_id == self.v_ids[0])).one()
+        c.stock_fisico = 40     # 7/sem × 4 = 28 < 40: bien
+        s.commit(); s.close()
+        d = self._dialogo()
+        texto = d._resumen_label.text()
+        self.assertIn("lo que hay alcanza (1 talla)", texto)
+        self.assertIn("1 talla sin ventas", texto)
+        self.assertNotIn("faltan días", texto)
+
+    def test_tarjeta_en_cero_se_apaga_aunque_este_prendida(self) -> None:
+        from pos_uniformes.database.models import LibretaVenta
+
+        s = self.factory()
+        s.query(LibretaVenta).delete()
+        s.commit(); s.close()
+        d = self._dialogo()
+        urgente = d._tarjetas["URGENTE"]
+        self.assertTrue(urgente.isChecked())       # el filtro inicial prende todas
+        self.assertFalse(urgente.isEnabled())
+        d.show(); _APP.processEvents()
+        color = urgente.grab().toImage().pixelColor(6, urgente.height() // 2)
+        self.assertGreater(color.red(), 230)       # crema, no rojo sólido
+        self.assertGreater(color.green(), 230)
+        self.assertFalse(d._hoja_btn.isEnabled())
+        d.hide()
+
+    def test_cerrar_sin_cambios_no_pregunta(self) -> None:
+        d = self._dialogo()     # el pedido arranca prellenado con el sugerido: eso no es un cambio
+        with patch(f"{_D}._elegir") as preg:
+            d.reject()
+        preg.assert_not_called()
+
+    def test_cerrar_con_el_pedido_cambiado_pregunta(self) -> None:
+        from pos_uniformes.database.models import ConteoInventario
+
+        d = self._dialogo()
+        d.show(); _APP.processEvents()
+        d._table.item(self._fila(d, "6"), 4).setText("30")
+        with patch(f"{_D}._elegir", return_value="volver") as preg:
+            d.reject()
+        self.assertTrue(d.isVisible())                       # Volver: sigue abierta
+        self.assertEqual(preg.call_args.args[2], "Cambiaste el pedido y no lo guardaste.")
+        self.assertEqual([o[1] for o in preg.call_args.args[3]], ["Guardar", "No guardar", "Volver"])
+        with patch(f"{_D}._elegir", return_value="guardar"):
+            d.close()                                        # la ✕ pasa por lo mismo
+        self.assertFalse(d.isVisible())
+        s = self.factory()
+        c = s.scalars(select(ConteoInventario).where(ConteoInventario.variante_id == self.v_ids[0])).one()
+        self.assertEqual(c.pedido, 30)
+
+    def test_no_guardar_cierra_sin_tocar_la_base(self) -> None:
+        from pos_uniformes.database.models import ConteoInventario
+
+        d = self._dialogo()
+        d.show(); _APP.processEvents()
+        d._table.item(self._fila(d, "6"), 4).setText("30")
+        with patch(f"{_D}._elegir", return_value="no_guardar"):
+            d.reject()
+        self.assertFalse(d.isVisible())
+        s = self.factory()
+        c = s.scalars(select(ConteoInventario).where(ConteoInventario.variante_id == self.v_ids[0])).one()
+        self.assertIsNone(c.pedido)
+
+    def test_despues_de_guardar_ya_no_pregunta(self) -> None:
+        d = self._dialogo()
+        d._table.item(self._fila(d, "6"), 4).setText("30")
+        with patch(f"{_D}.QMessageBox.information"):
+            d._guardar_pedidos()
+        with patch(f"{_D}._elegir") as preg:
+            d.reject()
+        preg.assert_not_called()
+
+
+_D = "pos_uniformes.ui.dialogs.conteo_jornada_dialogs"
 
 if __name__ == "__main__":
     unittest.main()

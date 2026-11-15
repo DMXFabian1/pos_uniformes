@@ -78,7 +78,37 @@ _ESTILO_TARJETAS = """
     QLabel#tarjetaValor { font-size: 26px; font-weight: 800; }
     QLabel#tarjetaSub { font-size: 11px; }
     QLabel#porQue { background: #f5ebe0; color: #2c2a27; border-radius: 8px; padding: 8px 12px; font-size: 13px; }
+    QLabel#cuandoConteo { color: #6b5d50; font-size: 13px; }
+    QLabel#avisoViejo { background: #fdf1d8; color: #7a4d00; border: 1px solid #f0d49a;
+                        border-radius: 8px; padding: 7px 12px; font-size: 13px; font-weight: 700; }
+    QLabel#yaRevisada { background: #eef3ea; color: #2f5130; border: 1px solid #cfdcc8;
+                        border-radius: 8px; padding: 7px 12px; font-size: 13px; font-weight: 700; }
 """
+
+
+def _elegir(parent: QWidget | None, titulo: str, texto: str, opciones, *, default: str, escape: str) -> str:
+    """Una pregunta con botones propios en español (nada de Yes/No).
+
+    `opciones` = [(clave, texto del botón, QMessageBox.ButtonRole), …].
+    Devuelve la clave del botón tocado; Esc o la ✕ devuelven `escape`."""
+    caja = QMessageBox(parent)
+    caja.setIcon(QMessageBox.Icon.Question)
+    caja.setWindowTitle(titulo)
+    caja.setText(texto)
+    botones = {}
+    for clave, etiqueta, rol in opciones:
+        botones[clave] = caja.addButton(etiqueta, rol)
+    caja.setDefaultButton(botones[default])
+    caja.setEscapeButton(botones[escape])
+    caja.exec()
+    tocado = caja.clickedButton()
+    return next((clave for clave, b in botones.items() if b is tocado), escape)
+
+
+def _preguntar(parent: QWidget | None, titulo: str, texto: str, *, si: str, no: str = "Volver") -> bool:
+    """«Volver» / «Sí, …»: True solo si tocaron el botón del sí."""
+    opciones = [("no", no, QMessageBox.ButtonRole.RejectRole), ("si", si, QMessageBox.ButtonRole.AcceptRole)]
+    return _elegir(parent, titulo, texto, opciones, default="no", escape="no") == "si"
 
 
 def _default_session_factory() -> Session:
@@ -564,6 +594,7 @@ class ConteoRevisionDialog(QDialog):
         jornada,
         revisada_por: str,
         session_factory: Callable[[], Session] | None = None,
+        hoy: date | None = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(f"Revisar conteo · {jornada.titulo}")
@@ -576,6 +607,12 @@ class ConteoRevisionDialog(QDialog):
         self._pedidos: dict[int, int | None] = {}   # conteo_id → lo que Daniel escribió
         self._pintando = False
         self._por_fila: dict[int, int] = {}          # fila → conteo_id (las de prenda no están)
+        self._hoy = hoy                              # None = hoy en la tienda (las pruebas lo fijan)
+        self._pedidos_base: dict[int, int | None] = {}   # lo guardado (o el sugerido): no cuenta como cambio
+        self._contado_at = None                      # cuándo se terminó el conteo
+        self._dias = None                            # días desde el conteo
+        self._diferencias: list[int] = []            # de las tallas que Aplicar todavía corregiría
+        self._ya_revisada = False
 
         layout = QVBoxLayout()
         layout.setSpacing(10)
@@ -583,6 +620,20 @@ class ConteoRevisionDialog(QDialog):
         self._resumen_label.setWordWrap(True)
         self._resumen_label.setStyleSheet("font-size: 13px;")
         layout.addWidget(self._resumen_label)
+        # Cuándo se contó, y los avisos: conteo viejo (ámbar) o ya revisado.
+        self._cuando_label = QLabel("")
+        self._cuando_label.setObjectName("cuandoConteo")
+        layout.addWidget(self._cuando_label)
+        self._aviso_label = QLabel("")
+        self._aviso_label.setObjectName("avisoViejo")
+        self._aviso_label.setWordWrap(True)
+        self._aviso_label.setVisible(False)
+        layout.addWidget(self._aviso_label)
+        self._revisada_label = QLabel("")
+        self._revisada_label.setObjectName("yaRevisada")
+        self._revisada_label.setWordWrap(True)
+        self._revisada_label.setVisible(False)
+        layout.addWidget(self._revisada_label)
 
         # Las cuatro tarjetas: cifra grande, y son el filtro.
         tarjetas = QHBoxLayout()
@@ -634,11 +685,11 @@ class ConteoRevisionDialog(QDialog):
         self._comparar_btn.clicked.connect(self._comparar)
         acciones.addWidget(self._comparar_btn)
         acciones.addStretch()
-        descartar = QPushButton("Descartar")
-        descartar.setObjectName("dangerButton")
-        descartar.setAutoDefault(False)
-        descartar.clicked.connect(self._descartar)
-        acciones.addWidget(descartar)
+        self._descartar_btn = QPushButton("Descartar")
+        self._descartar_btn.setObjectName("dangerButton")
+        self._descartar_btn.setAutoDefault(False)
+        self._descartar_btn.clicked.connect(self._descartar)
+        acciones.addWidget(self._descartar_btn)
         self._guardar_btn = QPushButton("Guardar pedido")
         self._guardar_btn.setAutoDefault(False)
         self._guardar_btn.clicked.connect(self._guardar_pedidos)
@@ -672,12 +723,26 @@ class ConteoRevisionDialog(QDialog):
     # --- datos ---------------------------------------------------------------------
     def _cargar(self) -> None:
         from pos_uniformes.database.models import ConteoJornada
+        from pos_uniformes.services import conteo_revision_vista_service as vista
+        from pos_uniformes.services.conteo_jornada_service import DESCARTADA, resumen_para_revisar
+        from pos_uniformes.services.nombres_empleadas_service import mostrar, nombres_por_codigo
         from pos_uniformes.services.revision_service import PEDIR, SURTIR, URGENTE, revisar
 
         session = self._session_factory()
         try:
             j = session.get(ConteoJornada, self._jornada.id)
             self._revision = revisar(session, j)
+            # La diferencia de cada talla se guardó al capturar; Aplicar suma
+            # las que todavía no se ajustan.
+            self._diferencias = [l.diferencia for l in resumen_para_revisar(session, j).lineas]
+            self._contado_at = j.terminada_at or j.iniciada_at
+            self._ya_revisada = vista.ya_revisada(j)
+            revisada_txt = ""
+            if self._ya_revisada:
+                por = mostrar(j.revisada_por, nombres_por_codigo(session)) if j.revisada_por else ""
+                revisada_txt = vista.texto_ya_revisada(
+                    revisada_at=j.revisada_at, aplicada=(j.notas or "") != DESCARTADA, por=por,
+                )
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Error", f"No se pudo leer la jornada:\n{exc}")
             self._revision = None
@@ -689,6 +754,8 @@ class ConteoRevisionDialog(QDialog):
             l.conteo_id: (l.pedido if l.pedido is not None else (l.sugerido or None))
             for l in self._revision.lineas
         }
+        self._pedidos_base = dict(self._pedidos)   # el prellenado no es «un cambio sin guardar»
+        self._encabezado_fecha(revisada_txt)
         # Filtro inicial: lo que pide acción. Si no hay nada de eso, todas.
         hay_accion = any(l.estado in (URGENTE, PEDIR, SURTIR) for l in self._revision.lineas)
         self._pintando = True
@@ -697,6 +764,28 @@ class ConteoRevisionDialog(QDialog):
         self._pintando = False
         self._resumen()
         self._pintar()
+
+    def _encabezado_fecha(self, revisada_txt: str) -> None:
+        """«Contado el lun 5 oct · hace 41 días», el aviso ámbar si ya es viejo,
+        y si ya se revisó: el letrero y sin Aplicar ni Descartar (el pedido sigue)."""
+        from pos_uniformes.services import conteo_revision_vista_service as vista
+
+        self._dias = vista.dias_desde(self._contado_at, self._hoy)
+        cuando = vista.cuando_se_conto(self._contado_at, self._hoy)
+        self._cuando_label.setText(f"Contado el {cuando}" if cuando else "")
+        self._cuando_label.setVisible(bool(cuando))
+        aviso = "" if self._ya_revisada else vista.aviso_conteo_viejo(self._dias)
+        self._aviso_label.setText(f"⚠ {aviso}" if aviso else "")
+        self._aviso_label.setVisible(bool(aviso))
+        if self._ya_revisada:
+            self._revisada_label.setText(f"✓ {revisada_txt}. El pedido se puede seguir escribiendo y guardando.")
+        self._revisada_label.setVisible(self._ya_revisada)
+        self._aplicar_btn.setVisible(not self._ya_revisada)
+        self._descartar_btn.setVisible(not self._ya_revisada)
+
+    def _pedido_cambiado(self) -> bool:
+        """¿Daniel escribió en Pedido algo distinto de lo guardado (o lo sugerido)?"""
+        return self._revision is not None and self._pedidos != self._pedidos_base
 
     def _conteo(self, clave: str) -> tuple[int, int, int]:
         """(tallas, piezas sugeridas, piezas a surtir) de un grupo del filtro."""
@@ -713,8 +802,12 @@ class ConteoRevisionDialog(QDialog):
         texto = f"<b>{r.quien}</b> contó <b>{len(r.lineas)}</b> tallas de <b>{r.titulo}</b>  ·  tu pedido va en <b>{piezas}</b> piezas en {tallas} tallas"
         if not r.lineas:
             texto += "<br><span style='color:#8a8a8a'>Esta jornada no tiene tallas capturadas.</span>"
-        elif not any(l.estado in ("URGENTE", "PEDIR", "SURTIR") for l in r.lineas):
-            texto += "<br><span style='color:#8a8a8a'>Nada que pedir ni surtir todavía (faltan ventas para sacar el ritmo).</span>"
+        else:
+            from pos_uniformes.services.conteo_revision_vista_service import motivo_sin_accion
+
+            motivo = motivo_sin_accion(r.lineas)
+            if motivo:
+                texto += f"<br><span style='color:#8a8a8a'>{motivo}</span>"
         self._resumen_label.setText(texto)
         self._hoja_btn.setEnabled(piezas > 0)
         # Las tarjetas: cifra grande + una línea chica.
@@ -744,24 +837,15 @@ class ConteoRevisionDialog(QDialog):
 
     # --- pintura -------------------------------------------------------------------
     def _que_hacer(self, l) -> str:
-        from pos_uniformes.services.revision_service import NO_SE_MUEVE, SIN_DATOS, URGENTE
+        from pos_uniformes.services.conteo_revision_vista_service import que_hacer
 
-        if l.estado == SIN_DATOS:
-            return "sin datos"
-        if l.estado == NO_SE_MUEVE:
-            return "no se mueve"
-        partes = []
-        if l.sugerido:
-            partes.append(f"pedir {l.sugerido}")
-        if l.surtir:
-            partes.append(f"surtir {l.surtir}")
-        texto = " · ".join(partes) if partes else "bien"
-        return f"¡URGENTE! {texto}" if l.estado == URGENTE else texto
+        return que_hacer(l)
 
     def _pintar(self, *_a) -> None:
         if self._revision is None or self._pintando:
             return
         from pos_uniformes.services.conteo_hoja_carta_service import nombre_para_hoja
+        from pos_uniformes.services.conteo_revision_vista_service import etiqueta_sin_ritmo
         from pos_uniformes.services.revision_service import NO_SE_MUEVE, SIN_DATOS, SURTIR, URGENTE
 
         self._pintando = True
@@ -823,10 +907,8 @@ class ConteoRevisionDialog(QDialog):
             else:
                 vendidas = f"{l.vendidas} en {l.dias_observados} d" if l.dias_observados else "—"
                 alcanza = "—" if l.semanas_cubiertas is None else (f"{l.semanas_cubiertas:g} sem" if l.semanas_cubiertas < 99 else "+")
-                if l.estado == SIN_DATOS:
-                    sugerido = "sin datos"
-                elif l.estado == NO_SE_MUEVE:
-                    sugerido = "no se mueve"
+                if l.estado in (SIN_DATOS, NO_SE_MUEVE):
+                    sugerido = etiqueta_sin_ritmo(l)
                 elif l.estado == URGENTE:
                     sugerido = f"{l.sugerido}  ¡urgente!"
                 else:
@@ -955,6 +1037,7 @@ class ConteoRevisionDialog(QDialog):
             return False
         finally:
             session.close()
+        self._pedidos_base = dict(self._pedidos)
         if avisar:
             QMessageBox.information(self, "Pedido guardado", f"Quedó tu pedido en {n} tallas. La próxima revisión lo va a recordar.")
         return True
@@ -1001,15 +1084,14 @@ class ConteoRevisionDialog(QDialog):
         ).exec()
 
     def _aplicar(self) -> None:
-        if self._revision is None:
+        if self._revision is None or self._ya_revisada:
             return
-        n = len(self._revision.lineas)
-        r = QMessageBox.question(
-            self, "Aplicar al inventario",
-            f"El inventario quedará como lo contó {self._revision.quien} ({n} tallas) y se guarda tu pedido.\n\n¿Aplicar?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        from pos_uniformes.services import conteo_revision_vista_service as vista
+
+        texto = vista.texto_confirmar_aplicar(
+            quien=self._revision.quien, contado=self._contado_at, diferencias=self._diferencias, hoy=self._hoy,
         )
-        if r != QMessageBox.StandardButton.Yes:
+        if not _preguntar(self, "Aplicar al inventario", texto, si=vista.boton_corregir(self._dias), no=vista.BOTON_VOLVER):
             return
         if not self._guardar_pedidos(avisar=False):
             return
@@ -1035,12 +1117,11 @@ class ConteoRevisionDialog(QDialog):
         self.accept()
 
     def _descartar(self) -> None:
-        r = QMessageBox.question(
-            self, "Descartar conteo",
-            "El conteo se guarda como historia pero NO se aplica al inventario.\n\n¿Descartar?",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if r != QMessageBox.StandardButton.Yes:
+        if self._ya_revisada:
+            return
+        from pos_uniformes.services import conteo_revision_vista_service as vista
+
+        if not _preguntar(self, "Descartar conteo", vista.TEXTO_CONFIRMAR_DESCARTAR, si=vista.BOTON_DESCARTAR, no=vista.BOTON_VOLVER):
             return
         from pos_uniformes.database.models import ConteoJornada
         from pos_uniformes.services.conteo_jornada_service import descartar_jornada
@@ -1058,6 +1139,25 @@ class ConteoRevisionDialog(QDialog):
             session.close()
         self.resultado = "descartada"
         self.accept()
+
+    def reject(self) -> None:
+        """Cerrar (botón, ✕ o Esc): si cambiaste el pedido a mano y no lo
+        guardaste, pregunta. El prellenado con el sugerido no cuenta."""
+        if self._pedido_cambiado():
+            opcion = _elegir(
+                self, "Pedido sin guardar", "Cambiaste el pedido y no lo guardaste.",
+                [
+                    ("guardar", "Guardar", QMessageBox.ButtonRole.AcceptRole),
+                    ("no_guardar", "No guardar", QMessageBox.ButtonRole.DestructiveRole),
+                    ("volver", "Volver", QMessageBox.ButtonRole.RejectRole),
+                ],
+                default="guardar", escape="volver",
+            )
+            if opcion == "volver":
+                return
+            if opcion == "guardar" and not self._guardar_pedidos(avisar=False):
+                return
+        super().reject()
 
 
 class PedidoHojaDialog(QDialog):
