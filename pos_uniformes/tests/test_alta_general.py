@@ -154,5 +154,23 @@ class GeneralTests(unittest.TestCase):
         self.assertEqual((self.contar(Producto), self.contar(Variante)), antes)
 
 
+    # ── Revisión 2026-11-15: lo que ya dice el nombre ─────────────────────
+
+    def test_sugerir_pieza_y_genero_del_nombre(self) -> None:
+        piezas, generos = ("Chaleco", "Pants", "Pants Suelto", "Suéter"), ("Mujer", "Unisex", "Niña")
+        self.assertEqual(alta.sugerir_de_nombre("Chaleco Mujer KY18005", piezas, generos), ("Chaleco", "Mujer"))
+        self.assertEqual(alta.sugerir_de_nombre("pants suelto niña", piezas, generos), ("Pants Suelto", "Niña"))
+        self.assertEqual(alta.sugerir_de_nombre("Sueter Gris", piezas, generos), ("Suéter", None))
+        self.assertEqual(alta.sugerir_de_nombre("Calceta Blanca", piezas, generos), (None, None))
+        self.assertEqual(alta.sugerir_de_nombre("", piezas, generos), (None, None))
+        # Una palabra suelta no es la pieza de dos («Suelto» no es «Pants Suelto»).
+        self.assertEqual(alta.sugerir_de_nombre("Short Suelto", piezas, generos), (None, None))
+
+    def test_tipo_de_prenda_sale_de_la_pieza_y_prefiere_las_generales(self) -> None:
+        self.assertEqual(alta.tipo_prenda_para(self.s, "Chaleco"), "Temporada")
+        self.assertIsNone(alta.tipo_prenda_para(self.s, None))
+        self.assertIsNone(alta.tipo_prenda_para(self.s, "Pieza que no existe"))
+
+
 if __name__ == "__main__":
     unittest.main()

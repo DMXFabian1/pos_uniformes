@@ -5,12 +5,17 @@ pantalla, a la izquierda lo que se escribe y a la derecha la ficha «Así queda�
 
 - NOMBRE. Si hay una prenda general parecida, se ofrece «Igual que esta,
   otro modelo» (copia tallas, precios, marca y tipo; solo cambia el nombre).
+  Si las tallas del modelo no son uno de los juegos, se copian tal cual
+  («Como el modelo: CH · MD · GD»), con sus precios.
 - TALLAS: un juego cerrado (Unitalla, Infantil·Adulto, Infantil·Juvenil·Adulto
   o CH·MD·GD·EXG).
-- PRECIO: uno para todas o, con «Precio por talla», uno por talla. LLEGAN HOY
-  y COSTO son opcionales.
-- MARCA y COLOR se eligen siempre; TIPO DE PRENDA y PIEZA de listas cerradas.
-  La CATEGORÍA se llena sola con la que más usa ese tipo.
+- PRECIO: uno para todas o, con «Precio por talla», uno por talla. Llegan hoy
+  y Costo son opcionales.
+- MARCA y COLOR se eligen siempre (no se adivinan). PIEZA y GÉNERO se
+  proponen con lo que dice el nombre («Chaleco Mujer…») y TIPO DE PRENDA con
+  la pieza; lo que se elige a mano ya no se toca. La CATEGORÍA se llena sola
+  con la que más usa ese tipo (casi siempre es el mismo nombre) y solo se
+  enseña con «Cambiar».
 
 El plan lo arma `alta_prenda_service.planear_general` (el mismo motor que la
 prenda de escuela); aquí solo hay pantalla. Lo que todavía falta (el color,
@@ -52,6 +57,9 @@ SOLA = "Se llena sola"
 REBOTE_MS = 300
 #: Lo que solo dice «falta elegir»: va en la barra (ámbar), no en la ficha (rojo).
 PENDIENTES = ("Elige ", "Falta la ", "Falta el ", "Marca al menos")
+#: Las tallas del modelo cuando no son uno de los juegos de un toque.
+JUEGO_MODELO = "Como el modelo"
+NOTA_PIE = "Pieza, género y tipo salen del nombre (cámbialos si no van). Llegan hoy y Costo son opcionales."
 
 
 def _etiqueta(nombre: str, texto: str = "", *, envolver: bool = False) -> QLabel:
@@ -125,6 +133,10 @@ class FormularioGeneral(QWidget):
         self.confirmados: list[str] = []
         self.color_elegido = ""
         self.juego: str | None = None
+        self.tallas_modelo: tuple[str, ...] = ()
+        #: Combos que la persona eligió a mano: la sugerencia del nombre ya no los toca.
+        self.a_mano: set[str] = set()
+        self._sugerido_para = ""
         self.por_talla = False
         self.campos: dict[str, tuple[QLineEdit, QLineEdit]] = {}
         self._buscado = ""
@@ -190,6 +202,13 @@ class FormularioGeneral(QWidget):
             self.grupo_juegos.addButton(boton)
             self.juegos[nombre] = boton
             flujo.addWidget(boton)
+        self.boton_modelo = _boton("npJuego", JUEGO_MODELO)
+        self.boton_modelo.setCheckable(True)
+        self.boton_modelo.clicked.connect(lambda _=False: self.elegir_juego(JUEGO_MODELO))
+        self.boton_modelo.hide()
+        self.grupo_juegos.addButton(self.boton_modelo)
+        self.juegos[JUEGO_MODELO] = self.boton_modelo
+        flujo.addWidget(self.boton_modelo)
         fila.addWidget(caja_juegos, 1)
         izq.addLayout(fila)
 
@@ -220,7 +239,7 @@ class FormularioGeneral(QWidget):
         self.tabla.hide()
         izq.addWidget(self.tabla)
 
-        # MARCA, COLOR, TIPO, PIEZA, CATEGORÍA, GÉNERO, COSTO
+        # MARCA, COLOR, TIPO, PIEZA, GÉNERO, COSTO (y la categoría, plegada)
         datos = QGridLayout()
         datos.setHorizontalSpacing(12)
         datos.setVerticalSpacing(8)
@@ -235,26 +254,42 @@ class FormularioGeneral(QWidget):
         self.costo.setPlaceholderText("$ por pieza (opcional)")
         for i, (titulo, w) in enumerate((("MARCA", self.marca), ("COLOR", self.color),
                                          ("TIPO DE PRENDA", self.tipo_prenda), ("PIEZA", self.pieza),
-                                         ("CATEGORÍA", self.categoria), ("GÉNERO", self.genero),
-                                         ("COSTO", self.costo))):
+                                         ("GÉNERO", self.genero), ("COSTO", self.costo))):
             datos.addWidget(self._titulo(titulo), i // 2, (i % 2) * 2)
             datos.addWidget(w, i // 2, (i % 2) * 2 + 1)
+        # La categoría casi siempre es el tipo de prenda: se llena sola y solo
+        # se enseña si se pide (antes salían dos combos con «Temporada»).
+        self.titulo_categoria = self._titulo("CATEGORÍA")
+        datos.addWidget(self.titulo_categoria, 3, 0)
+        datos.addWidget(self.categoria, 3, 1)
+        self.titulo_categoria.hide()
+        self.categoria.hide()
         datos.setColumnStretch(1, 1)
         datos.setColumnStretch(3, 1)
         izq.addLayout(datos)
+        fila = QHBoxLayout()
+        fila.setSpacing(6)
+        self.nota_categoria = _etiqueta("npNotaChica")
+        self.boton_categoria = _boton("npEnlace", "Cambiar")
+        self.boton_categoria.clicked.connect(self.mostrar_categoria)
+        fila.addWidget(self.nota_categoria)
+        fila.addWidget(self.boton_categoria)
+        fila.addStretch(1)
+        # «Usar el formulario anterior» en el mismo renglón: a 1366×768 todo cabe sin desplazar.
+        self.boton_anterior = _boton("npEnlace", "Usar el formulario anterior")
+        self.boton_anterior.clicked.connect(self.anterior.emit)
+        fila.addWidget(self.boton_anterior)
+        izq.addLayout(fila)
         self.marca.activated.connect(lambda _i: self._al_marca())
         self.marca.lineEdit().editingFinished.connect(self._al_marca)
         self.color.activated.connect(lambda _i: self._al_color())
         self.color.lineEdit().editingFinished.connect(self._al_color)
-        for combo in (self.tipo_prenda, self.pieza, self.categoria, self.genero):
-            combo.activated.connect(lambda _i: self.replanear())
+        for nombre, combo in (("tipo_prenda", self.tipo_prenda), ("pieza", self.pieza),
+                              ("categoria", self.categoria), ("genero", self.genero)):
+            combo.activated.connect(lambda _i, n=nombre: self._elegido_a_mano(n))
         self.costo.textChanged.connect(lambda _t: self.rebote.start())
-        izq.addWidget(_etiqueta("npNotaChica", "LLEGAN HOY y COSTO son opcionales. Sin escuela: no entra en "
-                                               "ningún uniforme.", envolver=True))
+        izq.addWidget(_etiqueta("npNotaChica", NOTA_PIE, envolver=True))
         izq.addStretch(1)
-        self.boton_anterior = _boton("npEnlace", "Usar el formulario anterior")
-        self.boton_anterior.clicked.connect(self.anterior.emit)
-        izq.addWidget(self.boton_anterior, 0, Qt.AlignmentFlag.AlignLeft)
 
         self.ficha = FichaAsiQueda()
         scroll_ficha = QScrollArea()
@@ -298,6 +333,13 @@ class FormularioGeneral(QWidget):
         self.confirmados = []
         self.color_elegido = ""
         self.juego = None
+        self.tallas_modelo = ()
+        self.a_mano = set()
+        self._sugerido_para = ""
+        self.boton_modelo.hide()
+        self.titulo_categoria.hide()
+        self.categoria.hide()
+        self.boton_categoria.show()
         self._buscado = ""
         self.parecidas = []
         self.nombre.blockSignals(True)
@@ -324,6 +366,15 @@ class FormularioGeneral(QWidget):
     def escribir_nombre(self, texto: str) -> None:
         self.nombre.setText(texto)
         self.replanear()
+
+    def _elegido_a_mano(self, nombre: str) -> None:
+        self.a_mano.add(nombre)
+        self.replanear()
+
+    def mostrar_categoria(self) -> None:
+        self.titulo_categoria.show()
+        self.categoria.show()
+        self.boton_categoria.hide()
 
     def elegir_juego(self, juego: str, precios: dict | None = None) -> None:
         self.juego = juego
@@ -356,7 +407,7 @@ class FormularioGeneral(QWidget):
                 item.widget().hide()
                 item.widget().deleteLater()
         self.campos = {}
-        tallas = valores.JUEGOS_TALLAS.get(self.juego or "", ())
+        tallas = self.tallas_elegidas()
         self.tabla.setVisible(bool(tallas))
         if not tallas:
             return
@@ -437,9 +488,34 @@ class FormularioGeneral(QWidget):
         self.replanear()
 
     def elegir(self, combo: QComboBox, texto: str) -> None:
-        """Para pruebas y para «Igual que esta»: elige en un combo cerrado."""
+        """Para pruebas: elige en un combo cerrado, como a mano."""
         _poner_combo(combo, texto)
+        for nombre in ("tipo_prenda", "pieza", "categoria", "genero"):
+            if getattr(self, nombre) is combo:
+                self.a_mano.add(nombre)
         self.replanear()
+
+    def _sugerir(self) -> None:
+        """Pieza y género desde el nombre, y el tipo desde la pieza. Solo lo que
+        no se eligió a mano ni vino de un modelo; el color nunca."""
+        texto = valores.limpiar(self.nombre.text())
+        if texto == self._sugerido_para or self.modelo is not None:
+            return
+        self._sugerido_para = texto
+        pieza, genero = alta.sugerir_de_nombre(texto, self.ops.piezas, self.ops.generos)
+        if "pieza" not in self.a_mano:
+            _poner_combo(self.pieza, pieza)
+        if "genero" not in self.a_mano:
+            _poner_combo(self.genero, genero)
+        if "tipo_prenda" not in self.a_mano:
+            pieza = _texto(self.pieza)
+            try:
+                tipo = self.con_sesion(lambda s: alta.tipo_prenda_para(s, pieza)) if pieza else None
+            except Exception:  # noqa: BLE001 - sin sugerencia, se elige a mano
+                tipo = None
+            if tipo is not None and self.tipo_prenda.findText(tipo) < 0:
+                tipo = None  # solo de la lista cerrada
+            _poner_combo(self.tipo_prenda, tipo)
 
     # ── «Igual que esta, otro modelo» ─────────────────────────────────────
     def _buscar_parecidas(self) -> None:
@@ -490,6 +566,14 @@ class FormularioGeneral(QWidget):
             tallas = [t for t, _p in datos.tallas]
             juego = next((j for j, ts in valores.JUEGOS_TALLAS.items() if list(ts) == tallas), None)
             precios = datos.precios
+            if juego is None and tallas:
+                # Tallas que no son un juego (CH·MD·GD, 2·4·6…): se copian tal cual.
+                juego = JUEGO_MODELO
+                self.tallas_modelo = tuple(tallas)
+                self.boton_modelo.setText(f"{JUEGO_MODELO}: {' · '.join(tallas)}")
+                self.boton_modelo.show()
+            else:
+                self.boton_modelo.hide()
             if juego:
                 distintos = len(set(precios.values())) > 1
                 self.precio_por_talla(distintos, replanear=False)
@@ -502,6 +586,17 @@ class FormularioGeneral(QWidget):
                 _poner_combo(combo, valor)
             # El color no se copia: el modelo nuevo casi siempre es otro color.
             self.parecidas = []
+        else:
+            self._sugerido_para = ""  # sin modelo, el nombre vuelve a proponer pieza y género
+            if self.juego == JUEGO_MODELO:
+                # Sus tallas ya no valen: a elegir un juego otra vez.
+                self.juego = None
+                self.tallas_modelo = ()
+                self.grupo_juegos.setExclusive(False)
+                self.boton_modelo.setChecked(False)
+                self.grupo_juegos.setExclusive(True)
+                self._armar_tabla({})
+            self.boton_modelo.hide()
         self._pintar_parecidas()
         self._pintar_modelo()
         self.replanear()
@@ -515,11 +610,14 @@ class FormularioGeneral(QWidget):
 
     # ── Plan ──────────────────────────────────────────────────────────────
     def tallas_elegidas(self) -> list[str]:
+        if self.juego == JUEGO_MODELO:
+            return list(self.tallas_modelo)
         return list(valores.JUEGOS_TALLAS.get(self.juego or "", ()))
 
     def replanear(self) -> None:
         self.rebote.stop()
         self._buscar_parecidas()
+        self._sugerir()
         tallas = self.tallas_elegidas()
         por_talla = None
         if self.por_talla:
@@ -537,6 +635,8 @@ class FormularioGeneral(QWidget):
         )
         nombre = self.nombre.text()
         self.plan = self.con_sesion(lambda s: alta.planear_general(s, nombre, **datos))
+        self.nota_categoria.setText(f"Categoría: {self.plan.categoria} (sale sola del tipo)."
+                                    if self.plan.categoria else "La categoría sale sola del tipo de prenda.")
         self._pintar_ficha()
         self.cambio.emit()
 

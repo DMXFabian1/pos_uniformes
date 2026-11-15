@@ -915,6 +915,49 @@ def _clave_general(talla: str) -> tuple:
     return clave_talla(talla)
 
 
+def sugerir_de_nombre(nombre: str, piezas: Iterable[str], generos: Iterable[str]) -> tuple[str | None, str | None]:
+    """Puro: la pieza y el género que ya dice el nombre («Chaleco Mujer KY18005»
+    → Chaleco, Mujer). Solo de las listas cerradas; la pieza más larga que
+    aparezca palabra por palabra gana («Pants Suelto» sobre «Pants»). Es una
+    sugerencia: la pantalla deja cambiarla. El color NO se saca del nombre:
+    se elige siempre."""
+    palabras = valores.normalizar(nombre).split()
+    if not palabras:
+        return None, None
+
+    def aparece(frase: str) -> int:
+        """Dónde aparece la frase completa en el nombre (-1 si no)."""
+        trozos = valores.normalizar(frase).split()
+        n = len(trozos)
+        for i in range(len(palabras) - n + 1):
+            if n and palabras[i:i + n] == trozos:
+                return i
+        return -1
+
+    candidatas = [(len(valores.normalizar(p).split()), -aparece(p), p) for p in piezas if aparece(p) >= 0]
+    pieza = max(candidatas)[2] if candidatas else None
+    genero = next((g for g in generos if aparece(g) >= 0), None)
+    return pieza, genero
+
+
+def tipo_prenda_para(session: Session, tipo_pieza: str | None) -> str | None:
+    """El tipo de prenda que más usan las prendas generales activas de esa
+    pieza (o, si no hay generales, cualquiera de esa pieza). Una consulta."""
+    if not tipo_pieza:
+        return None
+    filas = session.execute(
+        select(TipoPrenda.nombre, Producto.escuela_id.is_(None), func.count(Producto.id))
+        .join(Producto, Producto.tipo_prenda_id == TipoPrenda.id)
+        .join(TipoPieza, TipoPieza.id == Producto.tipo_pieza_id)
+        .where(Producto.activo.is_(True), TipoPieza.nombre == tipo_pieza)
+        .group_by(TipoPrenda.nombre, Producto.escuela_id.is_(None))
+    ).all()
+    if not filas:
+        return None
+    nombre, _general, _n = max(filas, key=lambda f: (bool(f[1]), int(f[2]), str(f[0])))
+    return str(nombre)
+
+
 def categoria_para(session: Session, tipo_prenda: str | None) -> str | None:
     """La categoría que más usan las prendas activas de ese tipo (la categoría
     es casi un espejo del tipo de prenda: se llena sola)."""
@@ -1257,6 +1300,8 @@ __all__ = [
     "ORIGEN_GENERAL",
     "Parecida",
     "categoria_para",
+    "sugerir_de_nombre",
+    "tipo_prenda_para",
     "datos_de_modelo",
     "parecidas_generales",
     "planear_general",

@@ -237,5 +237,81 @@ class RecorridoGeneralTests(_Base):
                                         d.principal.fontMetrics().horizontalAdvance(d.principal.text()))
 
 
+
+class RevisionGeneralTests(_Base):
+    """Revisión 2026-11-15: modelo con tallas que no son un juego, lo que dice el nombre, categoría."""
+
+    def modelo_ch_md_gd(self, precios=(389, 389, 389)) -> Producto:
+        p = Producto(nombre="Chaleco Mujer KY17000", nombre_base="Chaleco Mujer KY17000",
+                     categoria_id=self.chaleco.categoria_id, marca_id=self.chaleco.marca_id,
+                     tipo_prenda_id=self.chaleco.tipo_prenda_id, tipo_pieza_id=self.chaleco.tipo_pieza_id,
+                     genero="Mujer")
+        self.s.add(p)
+        self.s.flush()
+        for i, (talla, precio) in enumerate(zip(("CH", "MD", "GD"), precios), start=950):
+            self.s.add(Variante(producto_id=p.id, sku=f"SKU{i:06d}", talla=talla, color="Surtido",
+                                precio_venta=D(precio), stock_actual=0))
+        self.s.commit()
+        return p
+
+    def test_modelo_con_tallas_que_no_son_juego_copia_sus_tallas_y_precio(self) -> None:
+        modelo = self.modelo_ch_md_gd()
+        d = self.dialogo()
+        g = d.general
+        g.elegir_juego("CH · MD · GD · EXG")  # algo ya elegido antes
+        g.precio.setText("450")
+        g.escribir_nombre("Chaleco Mujer KY18005")
+        g.botones_parecidas[modelo.id].click()
+        self.assertEqual(g.juego, npg.JUEGO_MODELO)
+        self.assertEqual(g.tallas_elegidas(), ["CH", "MD", "GD"])
+        self.assertEqual(g.boton_modelo.text(), "Como el modelo: CH · MD · GD")
+        self.assertTrue(g.boton_modelo.isChecked())
+        self.assertEqual(g.precio.text(), "389")
+        g.elegir_color("Negro")
+        self.assertEqual({t.talla: t.precio for t in g.plan.tallas}, {"CH": D(389), "MD": D(389), "GD": D(389)})
+        self.assertTrue(d.principal.isEnabled(), d.bloqueo.text())
+        # «Quitar» el modelo: sus tallas ya no valen.
+        g.quitar_modelo.click()
+        self.assertIsNone(g.juego)
+        self.assertTrue(g.boton_modelo.isHidden())
+        self.assertEqual(g.plan.tallas, [])
+
+    def test_modelo_con_precios_distintos_los_pone_por_talla(self) -> None:
+        modelo = self.modelo_ch_md_gd((389, 389, 409))
+        d = self.dialogo()
+        g = d.general
+        g.escribir_nombre("Chaleco Mujer KY18005")
+        g.botones_parecidas[modelo.id].click()
+        self.assertTrue(g.por_talla)
+        g.elegir_color("Negro")
+        self.assertEqual({t.talla: t.precio for t in g.plan.tallas}, {"CH": D(389), "MD": D(389), "GD": D(409)})
+
+    def test_el_nombre_propone_pieza_genero_y_tipo(self) -> None:
+        d = self.dialogo()
+        g = d.general
+        g.escribir_nombre("Chaleco Mujer KY99999")
+        self.assertEqual((npg._texto(g.pieza), npg._texto(g.genero), npg._texto(g.tipo_prenda)),
+                         ("Chaleco", "Mujer", "Temporada"))
+        self.assertEqual(npg._texto(g.color), "")  # el color no se adivina
+        # Lo elegido a mano ya no se toca; lo demás sigue al nombre.
+        g.elegir(g.pieza, "Suéter")
+        g.escribir_nombre("Chaleco Unisex KY99999")
+        self.assertEqual((npg._texto(g.pieza), npg._texto(g.genero)), ("Suéter", "Unisex"))
+
+    def test_la_categoria_va_plegada_y_sale_sola(self) -> None:
+        d = self.dialogo()
+        g = self.llenar(d)
+        self.assertTrue(g.categoria.isHidden())
+        self.assertIn("Deportivo", g.nota_categoria.text())  # «Categoría: …, sale sola del tipo de prenda.»
+        g.boton_categoria.click()
+        self.assertFalse(g.categoria.isHidden())
+
+    def test_nota_al_pie_sin_mayusculas_a_media_frase(self) -> None:
+        d = self.dialogo()
+        textos = [w.text() for w in d.general.findChildren(QLabel)]
+        self.assertIn(npg.NOTA_PIE, textos)
+        self.assertNotIn("LLEGAN HOY y COSTO", npg.NOTA_PIE)
+
+
 if __name__ == "__main__":
     unittest.main()
