@@ -421,7 +421,11 @@ class PuertaTests(_Base):
         d.tarjetas[npd.TARJETA_IGUAL].click()
         self.assertFalse(d.nota_puerta.isHidden())
         self.assertEqual(d.pasos.currentIndex(), npd.PUERTA)
+        # Tanda 4: la prenda general tiene su pantalla; el formulario anterior queda en un enlace.
         d.tarjetas[npd.TARJETA_GENERAL].click()
+        self.assertEqual(d.pasos.currentIndex(), npd.GENERAL)
+        self.al_anterior.assert_not_called()
+        d.general.boton_anterior.click()
         _procesar()
         self.al_anterior.assert_called_once_with()
 

@@ -23,7 +23,7 @@ from typing import Iterable, Sequence
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from pos_uniformes.database.models import Escuela, Marca, NivelEducativo, Producto, TipoPieza
+from pos_uniformes.database.models import Categoria, Escuela, Marca, NivelEducativo, Producto, TipoPieza, TipoPrenda
 from pos_uniformes.services import catalogo_valores_service as valores
 from pos_uniformes.services.catalogo_valores_service import normalizar
 
@@ -149,6 +149,9 @@ class Opciones:
     escudos: tuple[str, ...] = ()
     niveles: tuple[str, ...] = ()
     piezas: tuple[str, ...] = ()
+    #: Para la prenda general (tanda 4): tipos de prenda y categorías activas.
+    tipos_prenda: tuple[str, ...] = ()
+    categorias: tuple[str, ...] = ()
 
 
 def _distintos(session: Session, columna) -> list[str]:
@@ -178,6 +181,10 @@ def opciones(session: Session) -> Opciones:
             select(NivelEducativo.nombre).where(NivelEducativo.activo.is_(True)).order_by(NivelEducativo.id))),
         piezas=tuple(sorted((str(n) for n in session.scalars(
             select(TipoPieza.nombre).where(TipoPieza.activo.is_(True)))), key=normalizar)),
+        tipos_prenda=tuple(sorted((str(n) for n in session.scalars(
+            select(TipoPrenda.nombre).where(TipoPrenda.activo.is_(True)))), key=normalizar)),
+        categorias=tuple(sorted((str(n) for n in session.scalars(
+            select(Categoria.nombre).where(Categoria.activo.is_(True)))), key=normalizar)),
     )
 
 
@@ -297,8 +304,9 @@ def detalle_confirmar(planes: Sequence) -> str:
     lineas = [t for t in dict.fromkeys(p.receta_texto for p in planes) if t]
     llegan = sum(int(t.llegan or 0) for t in planes[0].tallas)
     if llegan:
-        lineas.append(f"Llega{'' if llegan == 1 else 'n'} {llegan} {'pieza' if llegan == 1 else 'piezas'} "
-                      f"de {planes[0].escuela}: {'entra' if llegan == 1 else 'entran'} como entrada normal.")
+        de = f" de {planes[0].escuela}" if planes[0].escuela else ""
+        lineas.append(f"Llega{'' if llegan == 1 else 'n'} {llegan} {'pieza' if llegan == 1 else 'piezas'}"
+                      f"{de}: {'entra' if llegan == 1 else 'entran'} como entrada normal.")
     return "\n".join(lineas)
 
 

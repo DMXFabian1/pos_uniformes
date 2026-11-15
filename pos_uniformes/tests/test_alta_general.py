@@ -140,6 +140,14 @@ class GeneralTests(unittest.TestCase):
         self.assertTrue(plan.puede_aplicar, plan.todos_los_errores)
         self.assertEqual(alta.origen_bitacora(plan), f"{alta.ORIGEN_GENERAL} · modelo: Chaleco Mujer KY17002")
 
+    def test_opciones_traen_tipos_y_categorias(self) -> None:
+        from pos_uniformes.services import nueva_prenda_service as nps
+
+        ops = nps.opciones(self.s)
+        self.assertIn("Temporada", ops.tipos_prenda)
+        self.assertIn("Temporada", ops.categorias)
+        self.assertEqual(list(ops.tipos_prenda), sorted(ops.tipos_prenda, key=valores.normalizar))
+
     def test_el_plan_no_escribe(self) -> None:
         antes = (self.contar(Producto), self.contar(Variante))
         self.plan()

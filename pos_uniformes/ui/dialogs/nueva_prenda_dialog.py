@@ -5,8 +5,9 @@ formulario anterior»). El recorrido para una prenda de escuela:
 
 0. **¿Qué vas a dar de alta?** Tres tarjetas y abajo «Últimas altas · Hacer
    otra igual». «Escuela igual a otra» llega en la tanda 5 (se ve como
-   «Próximamente»); «Prenda general o de temporada», hasta la tanda 4, abre
-   el formulario anterior.
+   «Próximamente»); «Prenda general o de temporada» (tanda 4) va a su propia
+   pantalla (6, `nueva_prenda_general.FormularioGeneral`) y luego a los
+   mismos pasos 4 y 5.
 1. **¿Para qué escuela?** Buscador sin acentos; cada escuela con su nivel y
    cuántas prendas tiene.
 2. **Ya tiene / Le falta**, comparada con las de su nivel. Se toca la pieza.
@@ -68,6 +69,7 @@ from pos_uniformes.ui.dialogs.quisiste_decir_dialog import (
     preguntar_quisiste_decir,
 )
 from pos_uniformes.ui.helpers.nueva_prenda_ficha import FichaAsiQueda
+from pos_uniformes.ui.helpers.nueva_prenda_general import FormularioGeneral
 from pos_uniformes.ui.helpers.nueva_prenda_tallas import TablaTallas, leer_precio, texto_precio
 from pos_uniformes.ui.styles.inventario_styles import CAFE
 from pos_uniformes.ui.styles.nueva_prenda_styles import (
@@ -80,6 +82,10 @@ from pos_uniformes.ui.styles.nueva_prenda_styles import (
 )
 
 PUERTA, ESCUELA, FALTA, PRINCIPAL, CONFIRMAR, LISTO = range(6)
+#: Tanda 4: la prenda general o de temporada (sin escuela), antes de Confirmar.
+GENERAL = 6
+MODO_ESCUELA = "escuela"
+MODO_GENERAL = "general"
 
 #: Tras guardar, «Imprimir etiquetas» se queda apagado este rato: el segundo
 #: clic de un doble clic en «Sí, dar de alta» no debe imprimir ni cerrar.
@@ -242,6 +248,7 @@ class NuevaPrendaDialog(QDialog):
         self.pieza: str | None = None
         self.modelo_forzado: int | None = None
         self.directo = False  # «Hacer otra igual»: de la escuela a la pantalla principal
+        self.modo = MODO_ESCUELA  # o MODO_GENERAL: a dónde vuelven «Revisar otra vez» y Listo
         self.plan: alta.PlanPrenda | None = None
         self.planes: list[alta.PlanPrenda] = []
         self.sin_pieza: hermanos_service.SinPieza | None = None
@@ -283,7 +290,7 @@ class NuevaPrendaDialog(QDialog):
         self.pasos.setObjectName("npPasos")
         raiz.addWidget(self.pasos, 1)
         for armar in (self._armar_puerta, self._armar_escuela, self._armar_falta, self._armar_principal,
-                      self._armar_confirmar, self._armar_listo):
+                      self._armar_confirmar, self._armar_listo, self._armar_general):
             self.pasos.addWidget(armar())
 
         # Barra de abajo.
@@ -344,11 +351,12 @@ class NuevaPrendaDialog(QDialog):
         self._mostrar_ultimas(ultimas)
         self._llenar_lista_escuelas()
         self._llenar_opciones()
+        self.general.poner_opciones(self.ops)
 
     # ── Navegación ────────────────────────────────────────────────────────
     def _ir(self, paso: int) -> None:
         self.pasos.setCurrentIndex(paso)
-        self.atras.setVisible(paso in (ESCUELA, FALTA, PRINCIPAL))
+        self.atras.setVisible(paso in (ESCUELA, FALTA, PRINCIPAL, GENERAL))
         self.cancelar.setText("Cerrar" if paso == LISTO else "Cancelar")
         for boton in self.secundarios:
             self._fila_barra.removeWidget(boton)
@@ -356,7 +364,7 @@ class NuevaPrendaDialog(QDialog):
             boton.deleteLater()
         self.secundarios = []
         self.bloqueo.clear()
-        self.principal.setVisible(paso in (PRINCIPAL, CONFIRMAR, LISTO))
+        self.principal.setVisible(paso in (PRINCIPAL, CONFIRMAR, LISTO, GENERAL))
         self.principal.setEnabled(True)
         if paso == PUERTA:
             self.titulo.setText("Nueva prenda")
@@ -374,9 +382,14 @@ class NuevaPrendaDialog(QDialog):
             self.titulo.setText(f"{self.pieza} para {self.escuela.nombre}" if self.escuela else "")
             self.sub.setText("Revisa tallas y precios; lo demás ya viene de la prenda modelo.")
             self._pintar_barra_principal()
+        elif paso == GENERAL:
+            self.titulo.setText("Prenda general o de temporada")
+            self.sub.setText("Sin escuela: escribe el nombre, elige las tallas y el precio.")
+            self._pintar_barra_general()
         elif paso == CONFIRMAR:
             self.titulo.setText("¿Damos de alta?")
-            self.sub.setText("Se guarda todo junto: la prenda, sus tallas, su lugar en el uniforme y la receta.")
+            self.sub.setText("Se guarda todo junto: la prenda y sus tallas." if self.modo == MODO_GENERAL else
+                             "Se guarda todo junto: la prenda, sus tallas, su lugar en el uniforme y la receta.")
             self.error_confirmar.clear()
             self.error_confirmar.hide()
             self.frase.setText(nps.frase_confirmar(self.planes))
@@ -384,14 +397,18 @@ class NuevaPrendaDialog(QDialog):
             self.detalle_confirmar.setText(detalle)
             self.detalle_confirmar.setVisible(bool(detalle))
             self.principal.setText("Sí, dar de alta")
-            self._secundario("Revisar otra vez", lambda: self._ir(PRINCIPAL))
+            volver = GENERAL if self.modo == MODO_GENERAL else PRINCIPAL
+            self._secundario("Revisar otra vez", lambda: self._ir(volver))
         elif paso == LISTO:
             self.titulo.setText("Nueva prenda")
             self.sub.setText("Ya está en Inventario. ¿Qué sigue?")
             self.principal.setText("Imprimir etiquetas")
             self._secundario("Ver en Inventario", self._ver_en_inventario)
-            self._secundario("Esta misma pieza para otra escuela", self._misma_para_otra)
-            self._secundario("Otra prenda para esta escuela", self._otra_para_esta)
+            if self.modo == MODO_GENERAL:
+                self._secundario("Otra prenda general", self._otra_general)
+            else:
+                self._secundario("Esta misma pieza para otra escuela", self._misma_para_otra)
+                self._secundario("Otra prenda para esta escuela", self._otra_para_esta)
 
     def _secundario(self, texto: str, alHacer: Callable[[], object]) -> QPushButton:
         boton = _boton("npSecundario", texto)
@@ -414,6 +431,8 @@ class NuevaPrendaDialog(QDialog):
             else:
                 self.modelo_forzado = None
                 self._ir(FALTA)
+        elif paso == GENERAL:
+            self._ir(PUERTA)
 
     def _al_principal(self) -> None:
         if self._guardando or time.monotonic() < self._pausa_hasta:
@@ -423,6 +442,12 @@ class NuevaPrendaDialog(QDialog):
             # La descripción no avisa al escribir: se pasa al plan (y a las
             # otras escuelas) justo antes de confirmar, para guardar lo que se ve.
             self._rehacer_planes()
+            if self.planes and all(p.puede_aplicar for p in self.planes):
+                self._ir(CONFIRMAR)
+        elif paso == GENERAL:
+            self.general.replanear()
+            self.planes = self.general.planes
+            self.plan = self.general.plan
             if self.planes and all(p.puede_aplicar for p in self.planes):
                 self._ir(CONFIRMAR)
         elif paso == CONFIRMAR:
@@ -450,11 +475,11 @@ class NuevaPrendaDialog(QDialog):
             TARJETA_GENERAL: _TarjetaGrande(
                 "👕", "Prenda general o de temporada",
                 "Calcetas, batas, chamarras de temporada… sin escuela.",
-                "Por ahora abre el formulario anterior"),
+                "Nombre → tallas → precio"),
         }
         self.tarjetas[TARJETA_ESCUELA].clicked.connect(self._empezar_escuela)
         self.tarjetas[TARJETA_IGUAL].clicked.connect(self._pronto_igual)
-        self.tarjetas[TARJETA_GENERAL].clicked.connect(self._formulario_anterior)
+        self.tarjetas[TARJETA_GENERAL].clicked.connect(self._empezar_general)
         for t in self.tarjetas.values():
             tarjetas.addWidget(t, 1)
         caja.addLayout(tarjetas)
@@ -503,10 +528,16 @@ class NuevaPrendaDialog(QDialog):
             self.rejilla_ultimas.addWidget(marco, i // 2, i % 2)
 
     def _empezar_escuela(self) -> None:
+        self.modo = MODO_ESCUELA
         self.directo = False
         self.modelo_forzado = None
         self.pieza = None
         self._ir(ESCUELA)
+
+    def _empezar_general(self) -> None:
+        self.modo = MODO_GENERAL
+        self.general.empezar()
+        self._ir(GENERAL)
 
     def _pronto_igual(self) -> None:
         self.nota_puerta.setText(TEXTO_PRONTO_IGUAL)
@@ -518,6 +549,7 @@ class NuevaPrendaDialog(QDialog):
             QTimer.singleShot(0, self.al_formulario_anterior)
 
     def _hacer_otra_igual(self, u: nps.UltimaAlta) -> None:
+        self.modo = MODO_ESCUELA
         self.directo = True
         self.pieza = u.tipo_pieza
         self.modelo_forzado = u.producto_id
@@ -1160,7 +1192,8 @@ class NuevaPrendaDialog(QDialog):
             usuario = s.get(Usuario, self.usuario_id)
             if usuario is None:
                 raise PermissionError("No se encontró el usuario.")
-            return alta.aplicar(s, self.planes, usuario, alta.ORIGEN_POS, commit=True)
+            origen = self.planes[0].origen if self.modo == MODO_GENERAL else alta.ORIGEN_POS
+            return alta.aplicar(s, self.planes, usuario, origen, commit=True)
 
         if self._guardando:
             return
@@ -1180,6 +1213,9 @@ class NuevaPrendaDialog(QDialog):
         finally:
             self._guardando = False
         self.texto_listo.setText(nps.frase_listo(self.resultado))
+        self.nota_listo.setText(
+            ("" if self.modo == MODO_GENERAL else "Las etiquetas salen sin precio, como las de uniforme. ")
+            + "La existencia que llegó entró como entrada normal: se puede corregir.")
         self._ir(LISTO)
         # «Imprimir etiquetas» espera un momento (el segundo clic de un doble clic).
         self._pausa_hasta = time.monotonic() + PAUSA_LISTO_MS / 1000
@@ -1216,9 +1252,8 @@ class NuevaPrendaDialog(QDialog):
         dentro.addWidget(_etiqueta("npListo", "✓ Listo"))
         self.texto_listo = _etiqueta("npFrase", envolver=True)
         dentro.addWidget(self.texto_listo)
-        dentro.addWidget(_etiqueta(
-            "npNota", "Las etiquetas salen sin precio, como las de uniforme. "
-            "La existencia que llegó entró como entrada normal: se puede corregir.", envolver=True))
+        self.nota_listo = _etiqueta("npNota", envolver=True)
+        dentro.addWidget(self.nota_listo)
         caja.addWidget(marco)
         caja.addStretch(1)
         return pagina
@@ -1255,10 +1290,37 @@ class NuevaPrendaDialog(QDialog):
         self.buscar.clear()
         self._ir(ESCUELA)
 
+    # ── 6. Prenda general o de temporada ──────────────────────────────────
+    def _armar_general(self) -> QWidget:
+        self.general = FormularioGeneral(con_sesion=self._con_sesion, preguntar=self._preguntar)
+        self.general.cambio.connect(self._al_cambiar_general)
+        self.general.anterior.connect(self._formulario_anterior)
+        return self.general
+
+    def _preguntar(self, padre, revision, crear):
+        # A través del atributo: las pruebas cambian `self.preguntar`.
+        return self.preguntar(padre, revision, crear)
+
+    def _al_cambiar_general(self) -> None:
+        if self.pasos.currentIndex() == GENERAL:
+            self._pintar_barra_general()
+
+    def _pintar_barra_general(self) -> None:
+        self.principal.setText(nps.texto_boton(self.general.planes))
+        nota = self.general.nota_bloqueo()
+        self.bloqueo.setText(nota)
+        self.principal.setEnabled(not nota)
+
+    def _otra_general(self) -> None:
+        self._recargar()
+        self.general.empezar()
+        self._ir(GENERAL)
+
     def _recargar(self) -> None:
         """Después de un alta cambian las prendas de cada escuela y las últimas altas."""
         self._vaciar(self.rejilla_ultimas)
         self._cargar_inicio()
 
 
-__all__ = ["NuevaPrendaDialog", "PAUSA_LISTO_MS", "PUERTA", "ESCUELA", "FALTA", "PRINCIPAL", "CONFIRMAR", "LISTO"]
+__all__ = ["NuevaPrendaDialog", "PAUSA_LISTO_MS", "PUERTA", "ESCUELA", "FALTA", "PRINCIPAL", "CONFIRMAR", "LISTO",
+           "GENERAL"]
