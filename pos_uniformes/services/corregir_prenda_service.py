@@ -281,8 +281,11 @@ def aplicar_correccion(
     *,
     permitir_bajar: bool = False,
     commit: bool = False,
+    observacion: str = ORIGEN_CORREGIR,
 ) -> ResultadoCorreccion:
-    """Cambia nombre, color y precios de la prenda, todo o nada (savepoint)."""
+    """Cambia nombre, color y precios de la prenda, todo o nada (savepoint).
+    `observacion` es el origen para la bitácora («Copia de escuela: …» cuando
+    lo usa «Escuela igual a otra»)."""
     if plan.errores:
         raise CorreccionNoValida("\n".join(plan.errores))
     if not plan.hay_cambios:
@@ -318,7 +321,7 @@ def aplicar_correccion(
                 descripcion=producto.descripcion, escuela=producto.escuela, tipo_prenda=producto.tipo_prenda,
                 tipo_pieza=producto.tipo_pieza, nivel_educativo=producto.nivel_educativo,
                 atributo=producto.atributo, genero=producto.genero, escudo=producto.escudo,
-                ubicacion=producto.ubicacion, observacion=ORIGEN_CORREGIR,
+                ubicacion=producto.ubicacion, observacion=observacion,
             )
         apagadas = {d.variante_id for d in plan.desactivadas} if plan.cambia_color else set()
         for v in variantes:
@@ -332,7 +335,7 @@ def aplicar_correccion(
                 continue
             CatalogService.actualizar_variante(
                 session, usuario, v, producto, v.sku, v.talla, color, precio,
-                costo_referencia=v.costo_referencia, stock_minimo=v.stock_minimo, observacion=ORIGEN_CORREGIR,
+                costo_referencia=v.costo_referencia, stock_minimo=v.stock_minimo, observacion=observacion,
             )
             cambiadas += 1
         session.flush()
