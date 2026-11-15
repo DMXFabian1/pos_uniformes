@@ -418,8 +418,11 @@ class PuertaTests(_Base):
         self.assertEqual(d.pasos.currentIndex(), npd.PUERTA)
         self.assertEqual([t.titulo.text() for t in d.tarjetas.values()],
                          ["Prenda para una escuela", "Escuela igual a otra", "Prenda general o de temporada"])
+        # Tanda 5: «Escuela igual a otra» ya no dice «Próximamente».
         d.tarjetas[npd.TARJETA_IGUAL].click()
-        self.assertFalse(d.nota_puerta.isHidden())
+        self.assertTrue(d.nota_puerta.isHidden())
+        self.assertEqual(d.pasos.currentIndex(), npd.COPIAR_ESCUELAS)
+        d.atras.click()
         self.assertEqual(d.pasos.currentIndex(), npd.PUERTA)
         # Tanda 4: la prenda general tiene su pantalla; el formulario anterior queda en un enlace.
         d.tarjetas[npd.TARJETA_GENERAL].click()

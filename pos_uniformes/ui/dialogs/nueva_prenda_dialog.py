@@ -4,10 +4,11 @@ Reemplaza al asistente de 4 pasos y ~25 campos (que queda en «⋯ → Usar el
 formulario anterior»). El recorrido para una prenda de escuela:
 
 0. **¿Qué vas a dar de alta?** Tres tarjetas y abajo «Últimas altas · Hacer
-   otra igual». «Escuela igual a otra» llega en la tanda 5 (se ve como
-   «Próximamente»); «Prenda general o de temporada» (tanda 4) va a su propia
-   pantalla (6, `nueva_prenda_general.FormularioGeneral`) y luego a los
-   mismos pasos 4 y 5.
+   otra igual». «Prenda general o de temporada» (tanda 4) va a su propia
+   pantalla (6, `nueva_prenda_general.FormularioGeneral`) y «Escuela igual a
+   otra» (tanda 5) a las suyas (7 y 8, `nueva_prenda_copiar.FormularioCopiar`:
+   de qué escuela y para cuál, y la lista con NUEVA / YA ESTÁ / CAMBIA COLOR);
+   las dos siguen con los mismos pasos 4 y 5.
 1. **¿Para qué escuela?** Buscador sin acentos; cada escuela con su nivel y
    cuántas prendas tiene.
 2. **Ya tiene / Le falta**, comparada con las de su nivel. Se toca la pieza.
@@ -57,10 +58,11 @@ from PyQt6.QtWidgets import (
 )
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
-from pos_uniformes.database.models import Usuario
+from pos_uniformes.database.models import RolUsuario, Usuario
 from pos_uniformes.services import alta_prenda_service as alta
 from pos_uniformes.services import catalogo_valores_service as valores
 from pos_uniformes.services import conjunto_service, hermanos_service
+from pos_uniformes.services import copiar_escuela_service as ce
 from pos_uniformes.services import nueva_prenda_service as nps
 from pos_uniformes.ui.dialogs.quisiste_decir_dialog import (
     ACCION_CREAR,
@@ -68,6 +70,7 @@ from pos_uniformes.ui.dialogs.quisiste_decir_dialog import (
     ACCION_USAR,
     preguntar_quisiste_decir,
 )
+from pos_uniformes.ui.helpers.nueva_prenda_copiar import FormularioCopiar
 from pos_uniformes.ui.helpers.nueva_prenda_ficha import FichaAsiQueda
 from pos_uniformes.ui.helpers.nueva_prenda_general import FormularioGeneral
 from pos_uniformes.ui.helpers.nueva_prenda_tallas import TablaTallas, leer_precio, texto_precio
@@ -84,8 +87,11 @@ from pos_uniformes.ui.styles.nueva_prenda_styles import (
 PUERTA, ESCUELA, FALTA, PRINCIPAL, CONFIRMAR, LISTO = range(6)
 #: Tanda 4: la prenda general o de temporada (sin escuela), antes de Confirmar.
 GENERAL = 6
+#: Tanda 5: «Escuela igual a otra» (de qué escuela y para cuál; la lista).
+COPIAR_ESCUELAS, COPIAR = 7, 8
 MODO_ESCUELA = "escuela"
 MODO_GENERAL = "general"
+MODO_COPIA = "copia"
 
 #: Tras guardar, «Imprimir etiquetas» se queda apagado este rato: el segundo
 #: clic de un doble clic en «Sí, dar de alta» no debe imprimir ni cerrar.
@@ -95,10 +101,7 @@ TARJETA_ESCUELA = "escuela"
 TARJETA_IGUAL = "igual"
 TARJETA_GENERAL = "general"
 
-TEXTO_PRONTO_IGUAL = (
-    "«Escuela igual a otra» llega en la próxima actualización. Mientras, da de alta pieza por pieza "
-    "con «Prenda para una escuela»: al terminar, «Esta misma pieza para otra escuela» la repite."
-)
+TEXTO_SOLO_ADMIN_COPIA = "Solo un ADMIN puede copiar una escuela."
 
 
 def _area_disponible(widget: QWidget | None) -> QRect:
@@ -254,6 +257,8 @@ class NuevaPrendaDialog(QDialog):
         self.sin_pieza: hermanos_service.SinPieza | None = None
         self.otras_marcadas: set[int] = set()
         self.resultado: alta.ResultadoAlta | None = None
+        self.resultado_copia: ce.ResultadoCopia | None = None
+        self.es_admin = False
         self._color_elegido = False
         self._mas_tocado = False  # «Más datos» tocado a mano: se queda al cambiar de modelo
         self._guardando = False
@@ -292,6 +297,11 @@ class NuevaPrendaDialog(QDialog):
         for armar in (self._armar_puerta, self._armar_escuela, self._armar_falta, self._armar_principal,
                       self._armar_confirmar, self._armar_listo, self._armar_general):
             self.pasos.addWidget(armar())
+        self.copia = FormularioCopiar(con_sesion=self._con_sesion, preguntar=self._preguntar,
+                                      puede_crear_escuela=lambda: self.es_admin, parent=self)
+        self.copia.cambio.connect(self._al_cambiar_copia)
+        self.pasos.addWidget(self.copia.pagina_escuelas)
+        self.pasos.addWidget(self.copia.pagina_lista)
 
         # Barra de abajo.
         barra = QFrame()
@@ -345,18 +355,22 @@ class NuevaPrendaDialog(QDialog):
 
     def _cargar_inicio(self) -> None:
         def leer(s):
-            return nps.escuelas_para_elegir(s), nps.ultimas_altas(s), nps.opciones(s)
+            usuario = s.get(Usuario, self.usuario_id)
+            es_admin = usuario is not None and usuario.activo and usuario.rol == RolUsuario.ADMIN
+            return (nps.escuelas_para_elegir(s), nps.ultimas_altas(s), nps.opciones(s),
+                    ce.escuelas_para_copiar(s), bool(es_admin))
 
-        self.escuelas, ultimas, self.ops = self._con_sesion(leer)
+        self.escuelas, ultimas, self.ops, para_copiar, self.es_admin = self._con_sesion(leer)
         self._mostrar_ultimas(ultimas)
         self._llenar_lista_escuelas()
         self._llenar_opciones()
         self.general.poner_opciones(self.ops)
+        self.copia.poner_escuelas(para_copiar, self.ops)
 
     # ── Navegación ────────────────────────────────────────────────────────
     def _ir(self, paso: int) -> None:
         self.pasos.setCurrentIndex(paso)
-        self.atras.setVisible(paso in (ESCUELA, FALTA, PRINCIPAL, GENERAL))
+        self.atras.setVisible(paso in (ESCUELA, FALTA, PRINCIPAL, GENERAL, COPIAR_ESCUELAS, COPIAR))
         self.cancelar.setText("Cerrar" if paso == LISTO else "Cancelar")
         for boton in self.secundarios:
             self._fila_barra.removeWidget(boton)
@@ -364,7 +378,7 @@ class NuevaPrendaDialog(QDialog):
             boton.deleteLater()
         self.secundarios = []
         self.bloqueo.clear()
-        self.principal.setVisible(paso in (PRINCIPAL, CONFIRMAR, LISTO, GENERAL))
+        self.principal.setVisible(paso in (PRINCIPAL, CONFIRMAR, LISTO, GENERAL, COPIAR_ESCUELAS, COPIAR))
         self.principal.setEnabled(True)
         if paso == PUERTA:
             self.titulo.setText("Nueva prenda")
@@ -386,6 +400,26 @@ class NuevaPrendaDialog(QDialog):
             self.titulo.setText("Prenda general o de temporada")
             self.sub.setText("Sin escuela: escribe el nombre, elige las tallas y el precio.")
             self._pintar_barra_general()
+        elif paso == COPIAR_ESCUELAS:
+            self.titulo.setText("Escuela igual a otra")
+            self.sub.setText("Elige de qué escuela copias y para cuál. Busca sin acentos.")
+            self._pintar_barra_copia()
+        elif paso == COPIAR:
+            plan = self.copia.plan
+            self.titulo.setText(f"{plan.destino} igual que {plan.origen}" if plan else "")
+            self.sub.setText("Desmarca lo que no lleva y elige los colores. Mismos precios que el origen.")
+            self._pintar_barra_copia()
+        elif paso == CONFIRMAR and self.modo == MODO_COPIA:
+            self.titulo.setText("¿Copiamos?")
+            self.sub.setText("Se guarda todo junto: las prendas, sus tallas, su lugar en el uniforme y las recetas.")
+            self.error_confirmar.clear()
+            self.error_confirmar.hide()
+            self.frase.setText(self.copia.plan.resumen())
+            detalle = "\n".join(dict.fromkeys(p.receta_texto for p in self.copia.plan.planes if p.receta_texto))
+            self.detalle_confirmar.setText(detalle)
+            self.detalle_confirmar.setVisible(bool(detalle))
+            self.principal.setText("Sí, copiar")
+            self._secundario("Revisar otra vez", lambda: self._ir(COPIAR))
         elif paso == CONFIRMAR:
             self.titulo.setText("¿Damos de alta?")
             self.sub.setText("Se guarda todo junto: la prenda y sus tallas." if self.modo == MODO_GENERAL else
@@ -404,7 +438,9 @@ class NuevaPrendaDialog(QDialog):
             self.sub.setText("Ya está en Inventario. ¿Qué sigue?")
             self.principal.setText("Imprimir etiquetas")
             self._secundario("Ver en Inventario", self._ver_en_inventario)
-            if self.modo == MODO_GENERAL:
+            if self.modo == MODO_COPIA:
+                self._secundario("Copiar otra escuela", self._otra_copia)
+            elif self.modo == MODO_GENERAL:
                 self._secundario("Otra prenda general", self._otra_general)
             else:
                 self._secundario("Esta misma pieza para otra escuela", self._misma_para_otra)
@@ -431,8 +467,10 @@ class NuevaPrendaDialog(QDialog):
             else:
                 self.modelo_forzado = None
                 self._ir(FALTA)
-        elif paso == GENERAL:
+        elif paso in (GENERAL, COPIAR_ESCUELAS):
             self._ir(PUERTA)
+        elif paso == COPIAR:
+            self._ir(COPIAR_ESCUELAS)
 
     def _al_principal(self) -> None:
         if self._guardando or time.monotonic() < self._pausa_hasta:
@@ -450,6 +488,14 @@ class NuevaPrendaDialog(QDialog):
             self.plan = self.general.plan
             if self.planes and all(p.puede_aplicar for p in self.planes):
                 self._ir(CONFIRMAR)
+        elif paso == COPIAR_ESCUELAS:
+            if self.copia.abrir_lista():
+                self._ir(COPIAR)
+        elif paso == COPIAR:
+            if self.copia.plan is not None and self.copia.plan.puede_aplicar:
+                self._ir(CONFIRMAR)
+        elif paso == CONFIRMAR and self.modo == MODO_COPIA:
+            self._copiar()
         elif paso == CONFIRMAR:
             self._dar_de_alta()
         elif paso == LISTO:
@@ -471,14 +517,15 @@ class NuevaPrendaDialog(QDialog):
                 "Escuela → pieza que le falta → revisar"),
             TARJETA_IGUAL: _TarjetaGrande(
                 "⧉", "Escuela igual a otra",
-                "Copia el uniforme completo de una escuela, con otros colores.", pronto=True),
+                "Copia el uniforme completo de una escuela, con otros colores. Mismos precios.",
+                "De qué escuela → para cuál → colores"),
             TARJETA_GENERAL: _TarjetaGrande(
                 "👕", "Prenda general o de temporada",
                 "Calcetas, batas, chamarras de temporada… sin escuela.",
                 "Nombre → tallas → precio"),
         }
         self.tarjetas[TARJETA_ESCUELA].clicked.connect(self._empezar_escuela)
-        self.tarjetas[TARJETA_IGUAL].clicked.connect(self._pronto_igual)
+        self.tarjetas[TARJETA_IGUAL].clicked.connect(self._empezar_copia)
         self.tarjetas[TARJETA_GENERAL].clicked.connect(self._empezar_general)
         for t in self.tarjetas.values():
             tarjetas.addWidget(t, 1)
@@ -539,9 +586,14 @@ class NuevaPrendaDialog(QDialog):
         self.general.empezar()
         self._ir(GENERAL)
 
-    def _pronto_igual(self) -> None:
-        self.nota_puerta.setText(TEXTO_PRONTO_IGUAL)
-        self.nota_puerta.show()
+    def _empezar_copia(self) -> None:
+        if not self.es_admin:
+            self.nota_puerta.setText(TEXTO_SOLO_ADMIN_COPIA)
+            self.nota_puerta.show()
+            return
+        self.modo = MODO_COPIA
+        self.copia.empezar()
+        self._ir(COPIAR_ESCUELAS)
 
     def _formulario_anterior(self) -> None:
         self.reject()
@@ -1259,6 +1311,8 @@ class NuevaPrendaDialog(QDialog):
         return pagina
 
     def variantes_creadas(self) -> list[int]:
+        if self.modo == MODO_COPIA:
+            return self.resultado_copia.variantes_para_etiquetas if self.resultado_copia else []
         if self.resultado is None:
             return []
         return [t.variante_id for p in self.resultado.productos for t in p.tallas]
@@ -1316,6 +1370,69 @@ class NuevaPrendaDialog(QDialog):
         self.general.empezar()
         self._ir(GENERAL)
 
+    # ── 7 y 8. Escuela igual a otra ───────────────────────────────────────
+    def _al_cambiar_copia(self) -> None:
+        if self.pasos.currentIndex() in (COPIAR_ESCUELAS, COPIAR):
+            self._pintar_barra_copia()
+
+    def _pintar_barra_copia(self) -> None:
+        if self.pasos.currentIndex() == COPIAR_ESCUELAS:
+            self.principal.setText("Ver las prendas")
+            nota = self.copia.nota_escuelas()
+        else:
+            plan = self.copia.plan
+            self.principal.setText(plan.texto_boton() if plan else "Copiar")
+            nota = plan.nota_bloqueo() if plan else "Elige las escuelas."
+        self.bloqueo.setText(nota)
+        self.principal.setEnabled(not nota)
+
+    def _copiar(self) -> None:
+        def guardar(s):
+            usuario = s.get(Usuario, self.usuario_id)
+            if usuario is None:
+                raise PermissionError("No se encontró el usuario.")
+            # Se vuelve a planear con lo de este momento (otra caja pudo dar de alta algo).
+            plan = ce.replanear(s, self.copia.plan)
+            if not plan.puede_aplicar:
+                raise ValueError(plan.nota_bloqueo() or "Revisa la copia otra vez.")
+            return plan, ce.aplicar_copia(s, plan, usuario, commit=True)
+
+        if self._guardando:
+            return
+        self._guardando = True
+        self.principal.setEnabled(False)
+        try:
+            plan, self.resultado_copia = self._con_sesion(guardar)
+        except PermissionError:
+            self._error_al_guardar("solo un ADMIN puede copiar una escuela.")
+            return
+        except IntegrityError:
+            self._error_al_guardar("otra caja dio de alta algo igual mientras tanto. Revisa otra vez.")
+            return
+        except (ValueError, SQLAlchemyError) as exc:
+            self._error_al_guardar(str(exc).split("\n")[0] or exc.__class__.__name__)
+            return
+        finally:
+            self._guardando = False
+        self.resultado = self.resultado_copia.alta
+        self.copia.plan = plan
+        self.texto_listo.setText(plan.texto_listo())
+        self.nota_listo.setText("Las etiquetas salen sin precio, como las de uniforme"
+                                + (" (también las de las prendas que cambiaron de color)" if plan.cambian else "")
+                                + ". Las prendas nuevas entraron sin existencia.")
+        self._ir(LISTO)
+        self._pausa_hasta = time.monotonic() + PAUSA_LISTO_MS / 1000
+        self.principal.setEnabled(False)
+        QTimer.singleShot(PAUSA_LISTO_MS, self._fin_pausa_listo)
+        if self.al_terminar is not None:
+            terminar, resultado = self.al_terminar, self.resultado
+            QTimer.singleShot(0, lambda: terminar(resultado))
+
+    def _otra_copia(self) -> None:
+        self._recargar()
+        self.copia.empezar()
+        self._ir(COPIAR_ESCUELAS)
+
     def _recargar(self) -> None:
         """Después de un alta cambian las prendas de cada escuela y las últimas altas."""
         self._vaciar(self.rejilla_ultimas)
@@ -1323,4 +1440,4 @@ class NuevaPrendaDialog(QDialog):
 
 
 __all__ = ["NuevaPrendaDialog", "PAUSA_LISTO_MS", "PUERTA", "ESCUELA", "FALTA", "PRINCIPAL", "CONFIRMAR", "LISTO",
-           "GENERAL"]
+           "GENERAL", "COPIAR_ESCUELAS", "COPIAR"]

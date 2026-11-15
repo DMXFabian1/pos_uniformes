@@ -223,6 +223,20 @@ QPushButton#npOtras:checked {{ background: {TARJETA}; border-color: {VINO}; }}
 QLabel#npFaltaNombre {{ font-size: 15px; font-weight: 800; color: {TEXTO}; }}
 QLabel#npFaltaNota {{ font-size: 13px; color: {TENUE}; }}
 
+/* «Escuela igual a otra» (tanda 5): cada prenda con su estado. */
+QWidget#npCeldaEstado {{ background: transparent; }}
+QLabel#npCopiaNombre {{ font-size: 14px; font-weight: 800; color: {TEXTO}; }}
+QLabel#npCopiaNombre[marcada="no"] {{ color: {GRIS_POSIBLE}; font-weight: 700; }}
+QLabel#npEstado {{
+    border-radius: 10px; padding: 3px 10px; font-size: 11px; font-weight: 800; letter-spacing: 0.5px;
+    background: #efe7dc; color: {TENUE};
+}}
+QLabel#npEstado[estado="nueva"] {{ background: #e3efe8; color: {VERDE}; }}
+QLabel#npEstado[estado="ya"] {{ background: #efe7dc; color: {CAFE}; }}
+QLabel#npEstado[estado="cambia"] {{ background: #fbefd3; color: {AMBAR}; }}
+QLabel#npEstado[estado="liga"] {{ background: {VINO_SUAVE}; color: {VINO}; }}
+QLabel#npEstado[estado="fuera"] {{ background: transparent; color: {GRIS_POSIBLE}; }}
+
 /* ── Ficha «Así queda» ── */
 QFrame#npFicha {{ background: {TARJETA}; border: 1px solid {TARJETA_BORDE}; border-radius: 20px; }}
 QFrame#npFichaTotal {{
