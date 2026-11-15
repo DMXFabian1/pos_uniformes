@@ -548,6 +548,22 @@ class RevisionDialogTests(unittest.TestCase):
         self.assertTrue(d2._aplicar_btn.isHidden())
 
     def test_contada_en_cero_sin_demanda_dice_se_acabo(self) -> None:
+        from pos_uniformes.database.models import ConteoInventario
+
+        s = self.factory()
+        c6 = s.scalars(select(ConteoInventario).where(ConteoInventario.variante_id == self.v_ids[0])).one()
+        c6.stock_fisico = 40    # la 6 alcanza (7/sem × 4 = 28 < 40): bien
+        c8 = s.scalars(select(ConteoInventario).where(ConteoInventario.variante_id == self.v_ids[1])).one()
+        c8.stock_fisico = 0     # la 8 no se vende en 14 días y la contaron en 0
+        s.commit(); s.close()
+        d = self._dialogo()
+        self.assertEqual(d._table.item(self._fila(d, "8"), 3).text(), "se acabó")
+        texto = d._resumen_label.text()
+        self.assertIn("1 se acabó y nadie la pidió", texto)
+        self.assertNotIn("faltan", texto)
+
+    def test_en_cero_sin_dias_observados_sigue_sin_datos(self) -> None:
+        # Sin Libreta no hay días observados: no se sabe si se acabó ni si la habrían pedido.
         from pos_uniformes.database.models import ConteoInventario, LibretaVenta
 
         s = self.factory()
@@ -556,11 +572,11 @@ class RevisionDialogTests(unittest.TestCase):
         s.query(LibretaVenta).delete()
         s.commit(); s.close()
         d = self._dialogo()
-        self.assertEqual(d._table.item(self._fila(d, "8"), 3).text(), "se acabó")
+        self.assertEqual(d._table.item(self._fila(d, "8"), 3).text(), "sin datos")
         self.assertEqual(d._table.item(self._fila(d, "6"), 3).text(), "sin datos")
         texto = d._resumen_label.text()
-        self.assertIn("1 se acabó y nadie la pidió", texto)
-        self.assertNotIn("faltan ventas", texto)
+        self.assertNotIn("se acabó", texto)
+        self.assertIn("faltan días para saber el ritmo (2 tallas)", texto)
 
     def test_el_motivo_real_cuando_lo_que_hay_alcanza(self) -> None:
         from pos_uniformes.database.models import ConteoInventario
@@ -611,6 +627,36 @@ class RevisionDialogTests(unittest.TestCase):
         self.assertEqual([o[1] for o in preg.call_args.args[3]], ["Guardar", "No guardar", "Volver"])
         with patch(f"{_D}._elegir", return_value="guardar"):
             d.close()                                        # la ✕ pasa por lo mismo
+        self.assertFalse(d.isVisible())
+        s = self.factory()
+        c = s.scalars(select(ConteoInventario).where(ConteoInventario.variante_id == self.v_ids[0])).one()
+        self.assertEqual(c.pedido, 30)
+
+    def test_cerrar_con_la_x_mientras_escribes_pregunta(self) -> None:
+        # Editor abierto en Pedido (sin Enter) y se cierra con la ✕: lo escrito cuenta.
+        from PyQt6.QtTest import QTest
+        from PyQt6.QtWidgets import QAbstractItemView
+
+        from pos_uniformes.database.models import ConteoInventario
+
+        d = self._dialogo()
+        d.show(); d.activateWindow(); _APP.processEvents()
+        item = d._table.item(self._fila(d, "6"), 4)
+        d._table.setCurrentItem(item)
+        d._table.editItem(item)
+        _APP.processEvents()
+        self.assertEqual(d._table.state(), QAbstractItemView.State.EditingState)
+        editor = _APP.focusWidget() or next(
+            w for w in d._table.viewport().children() if isinstance(w, QWidget) and w.isVisible()
+        )
+        editor.selectAll()
+        QTest.keyClicks(editor, "30")
+        with patch(f"{_D}._elegir", return_value="volver") as preg:
+            d.close()
+        preg.assert_called_once()
+        self.assertTrue(d.isVisible())
+        with patch(f"{_D}._elegir", return_value="guardar"):
+            d.close()
         self.assertFalse(d.isVisible())
         s = self.factory()
         c = s.scalars(select(ConteoInventario).where(ConteoInventario.variante_id == self.v_ids[0])).one()

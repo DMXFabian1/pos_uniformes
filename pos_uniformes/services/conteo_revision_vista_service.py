@@ -8,7 +8,7 @@ La ventana (`ConteoRevisionDialog`) solo pinta; aquí se decide qué decir:
   talla (lo que hay alcanza, sin ventas, se acabó, faltan días), en vez de un
   texto fijo.
 - **Qué hacer con una talla**: «pedir 6 · surtir 2», «¡URGENTE! …», «se acabó»
-  (contaron 0 y nadie la pidió), «no se mueve», «sin datos».
+  (contaron 0 y nadie la pidió en días suficientes), «no se mueve», «sin datos».
 - **La confirmación de aplicar y de descartar**, con botones en español y lo
   que de verdad pasa: a cada talla se le SUMA la diferencia de aquel día.
 - **Ya revisado**: «Corregido el 22 sep por Daniel» / «No se usó (22 sep)».
@@ -117,12 +117,14 @@ def aviso_conteo_viejo(dias: int | None) -> str:
 # --- qué hacer con cada talla -------------------------------------------------------
 
 def se_acabo(linea) -> bool:
-    """Contaron 0, no hay en cajas y nadie la compró ni la pidió.
+    """Contaron 0, no hay en cajas y nadie la compró ni la pidió en una ventana
+    con días suficientes (NO_SE_MUEVE).
 
-    La regla la deja en NO_SE_MUEVE o SIN_DATOS porque no tiene ritmo; pero con
-    0 piezas no se podía vender: lo cierto es que se acabó. (Con ventas o con
-    «pidieron» la regla ya la marca URGENTE.)"""
-    return linea.estado in (NO_SE_MUEVE, SIN_DATOS) and linea.conto <= 0 and linea.en_cajas <= 0
+    Con 0 piezas no se podía vender: lo cierto es que se acabó. (Con ventas o
+    con «pidieron» la regla ya la marca URGENTE.) Una talla SIN_DATOS en 0 NO
+    cuenta: sin días observados no se sabe si se acabó ni si alguien la habría
+    pedido; sigue diciendo «sin datos» y entra en «faltan días»."""
+    return linea.estado == NO_SE_MUEVE and linea.conto <= 0 and linea.en_cajas <= 0
 
 
 def etiqueta_sin_ritmo(linea) -> str:
@@ -179,11 +181,19 @@ def motivo_sin_accion(lineas: Iterable) -> str:
 
 # --- confirmaciones -----------------------------------------------------------------
 
-def boton_corregir(dias: int | None) -> str:
-    """El botón que confirma aplicar: dice la edad del conteo si ya es viejo."""
+def boton_corregir(dias: int | None, diferencias: Iterable[int] | None = None) -> str:
+    """El botón que confirma aplicar: dice la edad del conteo si ya es viejo.
+
+    Si se pasan las `diferencias` y ninguna es distinta de 0, no se corrige
+    nada: el botón dice «Sí, marcar como revisado» (sin alarmar por la edad)."""
+    if diferencias is not None and not any(int(d) != 0 for d in diferencias):
+        return BOTON_MARCAR_REVISADO
     if dias is not None and dias >= DIAS_BOTON_VIEJO:
         return f"Sí, corregir con un conteo de hace {dias} días"
     return "Sí, corregir"
+
+
+BOTON_MARCAR_REVISADO = "Sí, marcar como revisado"
 
 
 def texto_confirmar_aplicar(

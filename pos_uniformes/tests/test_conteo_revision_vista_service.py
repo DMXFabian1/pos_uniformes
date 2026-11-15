@@ -51,7 +51,8 @@ class FechaTests(unittest.TestCase):
 class QueHacerTests(unittest.TestCase):
     def test_contada_en_cero_sin_demanda_se_acabo(self) -> None:
         self.assertEqual(vista.que_hacer(_l(NO_SE_MUEVE, conto=0)), "se acabó")
-        self.assertEqual(vista.que_hacer(_l(SIN_DATOS, conto=0)), "se acabó")
+        # Sin días observados no se sabe si se acabó: sigue «sin datos».
+        self.assertEqual(vista.que_hacer(_l(SIN_DATOS, conto=0)), "sin datos")
 
     def test_con_piezas_sigue_siendo_no_se_mueve_o_sin_datos(self) -> None:
         self.assertEqual(vista.que_hacer(_l(NO_SE_MUEVE, conto=3)), "no se mueve")
@@ -92,6 +93,11 @@ class MotivoTests(unittest.TestCase):
             "Nada que pedir ni surtir: 1 se acabó y nadie la pidió · faltan días para saber el ritmo (1 talla).",
         )
 
+    def test_en_cero_sin_datos_cuenta_en_faltan_dias(self) -> None:
+        texto = vista.motivo_sin_accion([_l(SIN_DATOS, conto=0)] * 6)
+        self.assertEqual(texto, "Nada que pedir ni surtir: faltan días para saber el ritmo (6 tallas).")
+        self.assertNotIn("se acab", texto)
+
 
 class ConfirmacionTests(unittest.TestCase):
     def test_suma_la_diferencia_y_cuenta_tallas_y_piezas(self) -> None:
@@ -116,6 +122,12 @@ class ConfirmacionTests(unittest.TestCase):
         self.assertEqual(vista.boton_corregir(None), "Sí, corregir")
         self.assertEqual(vista.boton_corregir(14), "Sí, corregir con un conteo de hace 14 días")
         self.assertEqual(vista.boton_corregir(41), "Sí, corregir con un conteo de hace 41 días")
+        self.assertEqual(vista.boton_corregir(20, [-1, 0]), "Sí, corregir con un conteo de hace 20 días")
+
+    def test_sin_diferencias_el_boton_solo_marca_revisado(self) -> None:
+        self.assertEqual(vista.boton_corregir(20, [0, 0]), "Sí, marcar como revisado")
+        self.assertEqual(vista.boton_corregir(3, []), "Sí, marcar como revisado")
+        self.assertEqual(vista.boton_corregir(3, [2]), "Sí, corregir")
 
 
 class YaRevisadaTests(unittest.TestCase):

@@ -14,6 +14,8 @@ from datetime import date
 from PyQt6.QtCore import QRectF, Qt
 from PyQt6.QtGui import QBrush, QColor, QPainter, QPen
 from PyQt6.QtWidgets import (
+    QAbstractItemDelegate,
+    QAbstractItemView,
     QApplication,
     QCheckBox,
     QComboBox,
@@ -1091,7 +1093,7 @@ class ConteoRevisionDialog(QDialog):
         texto = vista.texto_confirmar_aplicar(
             quien=self._revision.quien, contado=self._contado_at, diferencias=self._diferencias, hoy=self._hoy,
         )
-        if not _preguntar(self, "Aplicar al inventario", texto, si=vista.boton_corregir(self._dias), no=vista.BOTON_VOLVER):
+        if not _preguntar(self, "Aplicar al inventario", texto, si=vista.boton_corregir(self._dias, self._diferencias), no=vista.BOTON_VOLVER):
             return
         if not self._guardar_pedidos(avisar=False):
             return
@@ -1140,9 +1142,28 @@ class ConteoRevisionDialog(QDialog):
         self.resultado = "descartada"
         self.accept()
 
+    def _cerrar_editor_abierto(self) -> None:
+        """Si hay una celda de Pedido a medio escribir, la guarda antes de preguntar.
+
+        Con la ✕ el editor no pierde el foco: sin esto, lo escrito entraba a
+        `_pedidos` hasta que la ventana ya se ocultaba, después de la pregunta."""
+        if self._table.state() != QAbstractItemView.State.EditingState:
+            return
+        viewport = self._table.viewport()
+        editor = QApplication.focusWidget()
+        while editor is not None and editor.parentWidget() is not viewport:
+            editor = editor.parentWidget()
+        editores = [editor] if editor is not None else [
+            w for w in viewport.children() if isinstance(w, QWidget) and w.isVisible()
+        ]
+        for editor in editores:
+            self._table.commitData(editor)
+            self._table.closeEditor(editor, QAbstractItemDelegate.EndEditHint.NoHint)
+
     def reject(self) -> None:
         """Cerrar (botón, ✕ o Esc): si cambiaste el pedido a mano y no lo
         guardaste, pregunta. El prellenado con el sugerido no cuenta."""
+        self._cerrar_editor_abierto()
         if self._pedido_cambiado():
             opcion = _elegir(
                 self, "Pedido sin guardar", "Cambiaste el pedido y no lo guardaste.",
