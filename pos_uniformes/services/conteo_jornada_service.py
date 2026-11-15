@@ -684,6 +684,26 @@ class JornadaYaRevisada(ValueError):
     aplicada la marcaba «Descartada» con el stock ya corregido."""
 
 
+def _bloquear_sin_revisar(session: Session, jornada: ConteoJornada) -> ConteoJornada:
+    """Bloquea la fila de la jornada (SELECT … FOR UPDATE) y la relee de la base.
+
+    Si el kiosko y el POS tocan Aplicar casi a la vez, la segunda transacción
+    espera aquí a que la primera haga commit, ve `revisada_at` ya puesto y
+    lanza `JornadaYaRevisada`, en vez de volver a sumar las diferencias.
+    (En SQLite el FOR UPDATE se ignora; la relectura sigue valiendo.)"""
+    if jornada.id is not None:
+        bloqueada = session.scalars(
+            select(ConteoJornada)
+            .where(ConteoJornada.id == jornada.id)
+            .with_for_update()
+            .execution_options(populate_existing=True)
+        ).one_or_none()
+        if bloqueada is not None:
+            jornada = bloqueada
+    _no_revisada(jornada)
+    return jornada
+
+
 def _no_revisada(jornada: ConteoJornada) -> None:
     if jornada.revisada_at is not None:
         hecho = "se descartó" if (jornada.notas or "") == DESCARTADA else "ya se aplicó al inventario"
@@ -699,7 +719,7 @@ def aplicar_jornada(session: Session, jornada: ConteoJornada, *, revisada_por: s
 
     if (revisada_por or "").strip().upper() != DUENO_CODE:
         raise PermissionError("Solo el dueño aplica un conteo al inventario.")
-    _no_revisada(jornada)
+    jornada = _bloquear_sin_revisar(session, jornada)
     ids = list(
         session.scalars(
             select(ConteoInventario.id).where(
@@ -721,7 +741,7 @@ def descartar_jornada(session: Session, jornada: ConteoJornada, *, revisada_por:
     """La marca revisada sin aplicar nada. Los renglones quedan como historia."""
     if (revisada_por or "").strip().upper() != DUENO_CODE:
         raise PermissionError("Solo el dueño descarta un conteo.")
-    _no_revisada(jornada)
+    jornada = _bloquear_sin_revisar(session, jornada)
     jornada.revisada_at = func.now()
     jornada.revisada_por = revisada_por.strip().upper()
     jornada.notas = DESCARTADA

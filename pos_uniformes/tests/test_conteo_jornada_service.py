@@ -13,6 +13,7 @@ from pos_uniformes.database.connection import Base
 from pos_uniformes.database.models import (
     Categoria,
     ConteoInventario,
+    ConteoJornada,
     Escuela,
     Marca,
     Producto,
@@ -438,6 +439,27 @@ class JornadaTests(unittest.TestCase):
             jn.descartar_jornada(self.s, j, revisada_por="VEND-1")
         self.s.rollback()
         self.assertEqual(self.s.get(Variante, v[0].id).stock_actual, 10)
+
+    def test_el_candado_relee_la_jornada_de_la_base(self) -> None:
+        # Otro equipo la aplicó mientras esta sesión tenía la jornada vieja en memoria.
+        from sqlalchemy import func, update
+
+        j = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4")
+        v = self._variantes()
+        registrar_conteos_lote(self.s, [ConteoInput(v[0].id, 7)], "x", jornada_id=j.id)
+        jn.terminar_jornada(self.s, j, empleada_code="VEND-4")
+        self.s.flush()
+        self.s.execute(
+            update(ConteoJornada).where(ConteoJornada.id == j.id)
+            .values(revisada_at=func.now(), revisada_por="VEND-1")
+            .execution_options(synchronize_session=False)
+        )
+        self.assertIsNone(j.revisada_at)        # la copia en memoria no se enteró
+        with self.assertRaises(jn.JornadaYaRevisada):
+            jn.aplicar_jornada(self.s, j, revisada_por="VEND-1")
+        with self.assertRaises(jn.JornadaYaRevisada):
+            jn.descartar_jornada(self.s, j, revisada_por="VEND-1")
+        self.assertEqual(self.s.get(Variante, v[0].id).stock_actual, 10)   # no se sumó nada
 
     def test_la_empleada_sigue_viendo_el_permiso_antes_que_el_candado(self) -> None:
         j = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4")
