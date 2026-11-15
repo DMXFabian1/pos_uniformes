@@ -1,46 +1,46 @@
 #!/usr/bin/env python3
-"""Genera el plan para que una escuela tenga el mismo uniforme que otra (SOLO LECTURA).
+"""Deja una escuela con el mismo uniforme que otra, con el motor del POS.
 
-Compara la escuela ORIGEN con la DESTINO (que ya debe existir) y escribe un
-plan para aplicar_alta.py:
-  - ALTAS: productos del origen que el destino no tiene (mismos precios por talla,
-    color cambiado según las reglas, color cambiado también en el nombre).
-  - EDITAR: productos que el destino ya tiene pero con otro color o nombre.
-  - LIGAR: piezas del uniforme del origen (incluidas las generales, sin escuela)
-    que faltan en el uniforme del destino, con su grupo y orden.
+Usa `services/copiar_escuela_service.py`, lo mismo que la pantalla «Nueva
+prenda → Escuela igual a otra»: cada prenda del origen sale
+
+  NUEVA         el destino no la tiene: se da de alta con los MISMOS PRECIOS
+                del origen, existencia 0, el mismo lugar en el uniforme y la
+                receta propuesta (Pants 3pz / Chamarra);
+  YA ESTÁ       el destino ya la tiene (misma pieza y nombre sin color): no se
+                toca; si faltaba en su uniforme, se liga;
+  CAMBIA COLOR  ya la tiene pero se eligió otro color para ella: cambia el
+                color (y el nombre si lo lleva) de toda la prenda, sin tocar
+                SKU, precios ni existencia;
+  SE LIGA       pieza general (sin escuela) del uniforme del origen que falta
+                en el del destino.
+
+Todo en una transacción y la bitácora dice «Copia de escuela: A → B · modelo: …».
 
 Uso (desde la raíz del repo):
-    python .claude/skills/alta-productos/scripts/copiar_escuela.py \
-        --origen "Ignacio Allende" --destino "Ignacio Allende (Jaral)" \
-        --colores Rojo=Azul --color-de "Pants Suelto=Gris" --excluir Boina \
-        --salida /tmp/plan_jaral.json [--env-file ...]
+    python .claude/skills/alta-productos/scripts/copiar_escuela.py \\
+        --origen "Ignacio Allende" --destino "Ignacio Allende (Jaral)" \\
+        --colores Rojo=Azul --color-de "Pants Suelto=Gris" --excluir Boina [--env-file ...]
+    ... --ensayo      # hace la copia y la deshace: enseña los SKU reales
+    ... --aplicar     # guarda (solo con el OK de Daniel)
 
-  --colores ORIGEN=DESTINO     cambio general de color (repetible)
-  --color-de PATRÓN=COLOR      color fijo para productos cuyo nombre o tipo de pieza
-                               contiene PATRÓN (repetible; gana sobre --colores)
-  --excluir PATRÓN             no copiar esos productos (repetible)
+  --colores ORIGEN=DESTINO   color para todas las prendas de ese color del origen (repetible)
+  --color-de PATRÓN=COLOR    color de las prendas cuyo nombre o tipo de pieza contiene PATRÓN
+                             (repetible; gana sobre --colores)
+  --excluir PATRÓN           prendas del origen que el destino no lleva (repetible)
+  --escuela-nueva            el destino no existe y Daniel ya dijo que NO es ninguna de las
+                             parecidas: se crea (con un usuario ADMIN)
+  --confirmar VALOR          un color nuevo que Daniel aprobó crear (repetible)
 
-Los productos se emparejan por tipo de pieza + nombre sin escuela y sin color.
-No crea la escuela destino: si no existe, se da de alta en el POS primero.
-Las altas del plan las crea `aplicar_alta.py` con el motor del alta del POS
-(`services/alta_prenda_service.py`): mismos precios que el origen, existencia
-0, receta propuesta y bitácora «Copia de escuela: ORIGEN → DESTINO».
+Sin --ensayo ni --aplicar solo lee (conexión de solo lectura) y enseña el plan.
+Las prendas nuevas toman el color que el destino ya usa para ese color del
+origen («Sin color» → «Gris» en Jaral) si no se elige otro.
 """
 from __future__ import annotations
 
 import argparse
-import json
-import re
-import unicodedata
-from collections import Counter
-from pathlib import Path
 
 import _comun
-
-
-def norm(valor: str | None) -> str:
-    valor = unicodedata.normalize("NFKD", (valor or "").strip().lower())
-    return " ".join("".join(c for c in valor if not unicodedata.combining(c)).split())
 
 
 def pares(valores: list[str], opcion: str) -> list[tuple[str, str]]:
@@ -53,34 +53,6 @@ def pares(valores: list[str], opcion: str) -> list[tuple[str, str]]:
     return salida
 
 
-SQL_PRODUCTOS = """
-SELECT p.id, p.nombre, p.nombre_base, p.genero, p.escudo, p.ubicacion,
-       c.nombre categoria, m.nombre marca, tpr.nombre prenda, tpi.nombre pieza,
-       ne.nombre nivel, a.nombre atributo
-FROM producto p
-JOIN escuela e ON e.id = p.escuela_id
-JOIN categoria c ON c.id = p.categoria_id
-JOIN marca m ON m.id = p.marca_id
-LEFT JOIN tipo_prenda tpr ON tpr.id = p.tipo_prenda_id
-LEFT JOIN tipo_pieza tpi ON tpi.id = p.tipo_pieza_id
-LEFT JOIN nivel_educativo ne ON ne.id = p.nivel_educativo_id
-LEFT JOIN atributo_producto a ON a.id = p.atributo_id
-WHERE e.nombre = :escuela AND p.activo
-ORDER BY p.id
-"""
-SQL_VARIANTES = """
-SELECT talla, color, precio_venta, costo_referencia FROM variante
-WHERE producto_id = :pid AND activo ORDER BY id
-"""
-SQL_UNIFORME = """
-SELECT up.producto_id, up.grupo, up.orden, up.obligatoria, p.nombre, p.escuela_id
-FROM uniforme u JOIN escuela e ON e.id = u.escuela_id
-JOIN uniforme_pieza up ON up.uniforme_id = u.id AND up.activo
-JOIN producto p ON p.id = up.producto_id
-WHERE e.nombre = :escuela ORDER BY up.orden, up.id
-"""
-
-
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--origen", required=True)
@@ -88,151 +60,109 @@ def main() -> int:
     ap.add_argument("--colores", action="append", default=[])
     ap.add_argument("--color-de", action="append", default=[])
     ap.add_argument("--excluir", action="append", default=[])
-    ap.add_argument("--salida", type=Path, required=True, help="JSON del plan (fuera del repo)")
+    ap.add_argument("--escuela-nueva", action="store_true")
+    ap.add_argument("--confirmar", action="append", default=[])
+    modo = ap.add_mutually_exclusive_group()
+    modo.add_argument("--ensayo", action="store_true", help="hace la copia y la deshace (ROLLBACK)")
+    modo.add_argument("--aplicar", action="store_true", help="hace COMMIT")
+    ap.add_argument("--usuario", help="usuario ADMIN que firma (por defecto, el primer ADMIN activo)")
     _comun.agregar_argumentos_db(ap)
     args = ap.parse_args()
 
-    mapa_colores = {norm(a): b for a, b in pares(args.colores, "--colores")}
-    color_de = [(norm(a), b) for a, b in pares(args.color_de, "--color-de")]
+    escribe = args.ensayo or args.aplicar
+    engine = _comun.motor(args, solo_lectura=not escribe)
+
+    from sqlalchemy import select
+    from sqlalchemy.exc import ProgrammingError
+    from sqlalchemy.orm import Session
+
+    from pos_uniformes.database.models import RolUsuario, Usuario
+    from pos_uniformes.services import catalogo_valores_service as valores
+    from pos_uniformes.services import copiar_escuela_service as ce
+
+    norm = valores.normalizar
+    colores = dict(pares(args.colores, "--colores"))
+    color_de_patron = [(norm(a), b) for a, b in pares(args.color_de, "--color-de")]
     excluir = [norm(x) for x in args.excluir]
 
-    from sqlalchemy import text
+    def coincide(o: ce.PiezaOrigen, patron: str) -> bool:
+        return patron in norm(o.nombre_sin_escuela) or patron == norm(o.tipo_pieza)
 
-    engine = _comun.motor(args, solo_lectura=True)
-    with engine.connect() as conn:
-        escuelas = {r[0] for r in conn.execute(text("SELECT nombre FROM escuela"))}
-        for nombre in (args.origen, args.destino):
-            if nombre not in escuelas:
-                parecidas = [e for e in escuelas if norm(nombre.split("(")[0]) in norm(e)][:6]
-                raise SystemExit(f"ERROR: la escuela «{nombre}» no existe (nombre exacto). Parecidas: {parecidas}")
+    with Session(engine, autoflush=False, expire_on_commit=False) as session:
+        try:
+            plan = ce.planear_copia(session, args.origen, args.destino, colores=colores,
+                                    escuela_nueva=args.escuela_nueva, confirmados=args.confirmar)
+            color_de = {}
+            for p in plan.piezas:
+                for patron, color in color_de_patron:
+                    if coincide(p.origen, patron):
+                        color_de[p.origen.producto_id] = color
+                        break
+            quitar = [p.origen.producto_id for p in plan.piezas if any(coincide(p.origen, x) for x in excluir)]
+            if color_de or quitar:
+                plan = ce.replanear(session, plan, color_de=color_de, quitar=quitar)
+        except ValueError as exc:
+            print(f"ERROR: {exc}")
+            return 1
+        except ProgrammingError as exc:
+            print(f"ERROR: la base no coincide con el código de esta rama ({type(exc.orig).__name__}). "
+                  "Probablemente le faltan migraciones (alembic upgrade head). No se guardó nada.")
+            return 1
 
-        colores_bd = sorted(
-            {r[0] for r in conn.execute(text("SELECT DISTINCT color FROM variante")) if r[0] and r[0] != "Sin color"},
-            key=len, reverse=True,
-        )
+        nueva = " (ESCUELA NUEVA)" if plan.es_nueva else ""
+        print(f"\nOrigen «{plan.origen}» → destino «{plan.destino}»{nueva}\n")
+        for p in plan.piezas:
+            marca = "  " if p.marcada else "✗ "
+            estado = p.texto_estado if p.marcada else "NO SE COPIA"
+            print(f"{marca}{estado:<34} «{p.nombre}» · {p.color} · {p.origen.texto_rango}")
+            if p.marcada:
+                for e in p.todos_los_errores:
+                    print(f"      ERROR {e}")
+                for a in p.avisos:
+                    print(f"      ⚠ {a}")
+        if plan.solo_en_destino:
+            print(f"\nSolo en el destino (no se tocan): {list(plan.solo_en_destino)}")
+        if plan.parecidas:
+            print(f"Escuelas parecidas: {[f'{x.valor} ({x.usos} prendas)' for x in plan.parecidas]}")
+        for a in plan.avisos:
+            print(f"⚠ {a}")
+        for p in plan.planes:
+            for a in p.todos_los_avisos:
+                print(f"⚠ {p.nombre}: {a}")
+            if p.receta_texto:
+                print(f"  {p.nombre}: {p.receta_texto}")
+        print(f"\n{plan.resumen()}")
 
-        def cargar(escuela: str) -> list[dict]:
-            productos = []
-            for r in conn.execute(text(SQL_PRODUCTOS), {"escuela": escuela}).mappings():
-                p = dict(r)
-                p["variantes"] = [dict(v) for v in conn.execute(text(SQL_VARIANTES), {"pid": p["id"]}).mappings()]
-                cuenta = Counter(v["color"] for v in p["variantes"])
-                p["color"] = cuenta.most_common(1)[0][0] if cuenta else "Sin color"
-                base = p["nombre_base"] or p["nombre"]
-                p["base"] = base[: -len(escuela)].strip() if base.endswith(escuela) else base
-                sin_color = p["base"]
-                for c in colores_bd:
-                    sin_color = re.sub(rf"\b{re.escape(c)}\b", "", sin_color, flags=re.IGNORECASE)
-                p["clave"] = f"{norm(p['pieza'])}|{norm(sin_color)}"
-                productos.append(p)
-            return productos
+        if not plan.puede_aplicar:
+            print(f"\nNo se puede copiar todavía: {plan.nota_bloqueo()}")
+            return 1
+        if not escribe:
+            print("\nSOLO LECTURA. Siguiente: --ensayo (SKU reales) y, con el OK de Daniel, --aplicar.")
+            return 0
 
-        origen, destino = cargar(args.origen), cargar(args.destino)
-        uni_origen = [dict(r) for r in conn.execute(text(SQL_UNIFORME), {"escuela": args.origen}).mappings()]
-        uni_destino = {r["producto_id"] for r in conn.execute(text(SQL_UNIFORME), {"escuela": args.destino}).mappings()}
+        filtro = [Usuario.rol == RolUsuario.ADMIN, Usuario.activo.is_(True)]
+        if args.usuario:
+            filtro.append(Usuario.username == args.usuario)
+        admin = session.scalar(select(Usuario).where(*filtro).order_by(Usuario.id).limit(1))
+        if admin is None:
+            print(f"ERROR: no hay usuario ADMIN activo{f' «{args.usuario}»' if args.usuario else ''}.")
+            return 2
 
-    def coincide(p: dict, patron: str) -> bool:
-        return patron in norm(p["base"]) or patron == norm(p["pieza"])
-
-    def color_objetivo(p: dict) -> str:
-        for patron, color in color_de:
-            if coincide(p, patron):
-                return color
-        return mapa_colores.get(norm(p["color"]), p["color"])
-
-    def nombre_objetivo(p: dict, nuevo: str) -> str:
-        if nuevo == p["color"] or p["color"] == "Sin color":
-            return p["base"]
-        return re.sub(rf"\b{re.escape(p['color'])}\b", nuevo, p["base"], flags=re.IGNORECASE)
-
-    por_clave_destino = {p["clave"]: p for p in destino}
-    pieza_origen = {u["producto_id"]: u for u in uni_origen}
-    plan_editar, plan_altas, plan_ligar = [], [], []
-    excluidos, avisos = [], []
-    destino_de_origen: dict[int, int | None] = {}
-
-    print(f"\nOrigen «{args.origen}»: {len(origen)} productos · Destino «{args.destino}»: {len(destino)} productos\n")
-    for p in origen:
-        if any(coincide(p, x) for x in excluir):
-            excluidos.append(p["nombre"])
-            continue
-        color = color_objetivo(p)
-        nombre = nombre_objetivo(p, color)
-        d = por_clave_destino.get(p["clave"])
-        if d:
-            destino_de_origen[p["id"]] = d["id"]
-            cambio: dict = {}
-            if norm(d["color"]) != norm(color):
-                cambio["color"] = color
-            if norm(d["base"]) != norm(nombre):
-                cambio["nombre"] = nombre
-            faltan = {v["talla"] for v in p["variantes"]} - {v["talla"] for v in d["variantes"]}
-            if faltan:
-                avisos.append(f"«{d['nombre']}» no tiene las tallas {sorted(faltan)} del origen (no se agregan solas)")
-            if cambio:
-                plan_editar.append({"producto": d["nombre"], "producto_id": d["id"], **cambio})
-                print(f"EDITAR  «{d['nombre']}»: " + ", ".join(
-                    f"{k} {d['color'] if k == 'color' else d['base']} → {v}" for k, v in cambio.items()))
-            else:
-                print(f"YA ESTÁ «{d['nombre']}»")
-            continue
-        destino_de_origen[p["id"]] = None
-        spec = {
-            "producto": {
-                "nombre": nombre, "categoria": p["categoria"], "marca": p["marca"], "escuela": args.destino,
-                "tipo_prenda": p["prenda"], "tipo_pieza": p["pieza"], "nivel_educativo": p["nivel"],
-                "atributo": p["atributo"], "genero": p["genero"], "escudo": p["escudo"], "ubicacion": p["ubicacion"],
-            },
-            "color": color,
-            "variantes": [
-                {"talla": v["talla"], "precio": float(v["precio_venta"]), "origen_precio": "del modelo",
-                 **({"costo": float(v["costo_referencia"])} if v["costo_referencia"] is not None else {})}
-                for v in p["variantes"]
-            ],
-            # Para la bitácora del motor del alta («Copia de escuela: A → B · modelo: …»).
-            "modelo": p["nombre"],
-            "origen": f"Copia de escuela: {args.origen} → {args.destino}",
-            # Sin pieza en el uniforme del origen, tampoco se liga en el destino.
-            "uniforme": False,
-        }
-        if p["id"] in pieza_origen:
-            u = pieza_origen[p["id"]]
-            spec["uniforme"] = {"grupo": u["grupo"], "orden": u["orden"], "obligatoria": u["obligatoria"]}
-        plan_altas.append(spec)
-        escalera = " ".join(f"{v['talla']}:{float(v['precio_venta']):.0f}" for v in p["variantes"])
-        print(f"ALTA    «{nombre} {args.destino}» · {color} · {len(p['variantes'])} tallas · {escalera}")
-
-    for u in uni_origen:
-        if u["escuela_id"] is None:                       # pieza general (sin escuela)
-            if u["producto_id"] not in uni_destino:
-                plan_ligar.append({"producto": u["nombre"], "producto_id": u["producto_id"],
-                                   "grupo": u["grupo"], "orden": u["orden"], "obligatoria": u["obligatoria"]})
-                print(f"LIGAR   «{u['nombre']}» (general) · {u['grupo']} · orden {u['orden']}")
-            continue
-        dest_id = destino_de_origen.get(u["producto_id"])
-        if dest_id and dest_id not in uni_destino:
-            d = next(x for x in destino if x["id"] == dest_id)
-            plan_ligar.append({"producto": d["nombre"], "producto_id": dest_id,
-                               "grupo": u["grupo"], "orden": u["orden"], "obligatoria": u["obligatoria"]})
-            print(f"LIGAR   «{d['nombre']}» · {u['grupo']} · orden {u['orden']}")
-
-    sobran = [d["nombre"] for d in destino if d["id"] not in destino_de_origen.values()]
-    if excluidos:
-        print(f"\nExcluidos: {excluidos}")
-    if sobran:
-        print(f"Solo en el destino (no se tocan): {sobran}")
-    for a in avisos:
-        print(f"⚠ {a}")
-
-    plan: list[dict] = []
-    if plan_editar:
-        plan.append({"editar": plan_editar})
-    plan.extend(plan_altas)
-    if plan_ligar:
-        plan.append({"escuela": args.destino, "ligar_al_uniforme": plan_ligar})
-    args.salida.write_text(json.dumps(plan, ensure_ascii=False, indent=1), encoding="utf-8")
-    print(f"\nPlan: {len(plan_altas)} altas · {len(plan_editar)} ediciones · {len(plan_ligar)} piezas a ligar → {args.salida}")
-    print("Siguiente: aplicar_alta.py <plan> (ensayo) y, con el OK de Daniel, --aplicar.")
+        if args.ensayo:
+            resultado = ce.ensayar_copia(session, plan, admin)
+            session.rollback()
+            print("\nENSAYO (rollback, no se guardó nada):")
+            print(resultado.texto())
+            return 0 if resultado.ok else 1
+        try:
+            resultado = ce.aplicar_copia(session, plan, admin)
+        except (ValueError, PermissionError) as exc:
+            session.rollback()
+            print(f"\nERROR del POS: {exc}\nNo se guardó nada.")
+            return 1
+        session.commit()
+        print("\n" + resultado.texto())
+        print("\nCOMMIT hecho. Quedó registro en cambio_catalogo.")
     return 0
 
 

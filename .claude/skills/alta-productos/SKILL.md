@@ -10,7 +10,7 @@ Scripts en `scripts/`, todos desde la raíz del repo con el Python del proyecto 
 | Script | Qué hace | Escribe |
 |---|---|---|
 | `buscar_hermanos.py` | Valores de catálogo, casi-duplicados, productos hermanos con su patrón, lo que ya tiene la escuela y (§4) lo que elige el motor del alta: modelo, precio por talla con su origen y «Ya tiene / Le falta» | No (solo lectura) |
-| `copiar_escuela.py` | Compara escuela origen con destino y **genera el plan**: altas, ediciones de color o nombre, piezas del uniforme | No (solo lectura) |
+| `copiar_escuela.py` | Deja una escuela igual a otra con **`services/copiar_escuela_service.py`**, lo mismo que la pantalla «Nueva prenda → Escuela igual a otra»: cada prenda sale `NUEVA` / `YA ESTÁ` / `CAMBIA COLOR` / `SE LIGA`. Solo lee sin opciones; `--ensayo` hace la copia y la deshace; `--aplicar` guarda | Solo con `--ensayo` (rollback) o `--aplicar` |
 | `aplicar_alta.py` | Ejecuta uno o varios planes **en una sola transacción**. Las altas van por el **motor del alta del POS** (`services/alta_prenda_service.py`, el mismo de la pantalla «Nueva prenda»); `editar` y `ligar_al_uniforme` por `CatalogService` y `uniforme_service`. Ensayo por defecto; guarda solo con `--aplicar` | Sí |
 
 **El motor del alta** (tanda 2, 2026-11-13) hace que Claude y la pantalla den de alta igual: revisa los valores (nada se crea sin confirmar), arma el nombre sin repetir la escuela, crea prenda y tallas, **liga la prenda a su uniforme**, **propone la receta** del Pants 3pz o la Chamarra (o completa la de los conjuntos de la escuela que no tenían; una receta que ya existe no se toca, ni la de un conjunto con existencia propia: eso solo se avisa), da entrada a lo que llegó como **ENTRADA normal** por talla (`ALTA-ENTRADA`, corregible; la talla se puede borrar mientras solo tenga esa entrada y sus correcciones) y deja en la bitácora **el origen**: «Claude (skill alta-productos) · modelo: …» o «Copia de escuela: A → B · modelo: …». Todo junto o nada. Si la escuela tiene varios niveles, hay que decir el nivel. Los avisos de precio salen por talla («Talla GD: queda más bajo…») y, si la pieza tiene dos escaleras en la base (Pants 2pz de secundaria), se toma la del modelo y se avisa. Servicios: `hermanos_service` (modelo, «igual en N escuelas», «Ya tiene / Le falta»), `precio_sugerido_service` (precio por talla «como las demás» / «del modelo» / «a mano», 5/9 solo sugerido) y `alta_prenda_service` (plan → ensayo → aplicar).
@@ -19,15 +19,18 @@ Scripts en `scripts/`, todos desde la raíz del repo con el Python del proyecto 
 
 ## Caso A — Escuela igual a otra (lo más común)
 
-La escuela destino debe existir. Si no existe, se da de alta en el POS; los scripts no crean escuelas.
+Un solo script, sobre el mismo servicio que la pantalla (`copiar_escuela_service`, encima del motor del alta, todo en una transacción):
 ```bash
 "$PY" .claude/skills/alta-productos/scripts/copiar_escuela.py --origen "Ignacio Allende" --destino "Ignacio Allende (Jaral)" \
-    --colores Rojo=Azul --color-de "Pants Suelto=Gris" --excluir Boina --salida /scratchpad/plan.json [--env-file …]
+    --colores Rojo=Azul --color-de "Pants Suelto=Gris" --excluir Boina [--env-file …]          # 1. solo lee: el plan
+"$PY" … mismas opciones … --ensayo     # 2. hace la copia y la deshace: enseña los SKU reales
+"$PY" … mismas opciones … --aplicar    # 3. guarda (solo con el OK de Daniel)
 ```
-- `--colores A=B` cambia el color en general; `--color-de PATRÓN=COLOR` fija el color de un producto (gana sobre `--colores`); `--excluir PATRÓN` deja productos fuera. Todos se pueden repetir.
-- El color cambia **también en el nombre** ("Suéter Botones M Rojo" → "… Azul"). Lo que el destino ya tiene sale como `YA ESTÁ` o `EDITAR`, nunca duplicado. Las piezas generales del uniforme (falda, pantalón de vestir) se ligan con su grupo y orden.
-- Revisar los avisos `⚠` (tallas que faltan en productos que ya existen, que no se agregan solas) y "Solo en el destino".
-- Correr el plan en ensayo con `aplicar_alta.py` (paso 3). Volver a correr `copiar_escuela.py` después de aplicar debe dar **0 cambios**.
+- `--colores A=B` cambia el color de todas las prendas de ese color; `--color-de PATRÓN=COLOR` fija el de una prenda (gana sobre `--colores`); `--excluir PATRÓN` deja prendas fuera; `--confirmar VALOR` crea un color nuevo que Daniel aprobó. Todos se pueden repetir.
+- Las prendas `NUEVA` salen con **los mismos precios del origen** (talla por talla), existencia 0, el mismo lugar en el uniforme y la receta (Pants 3pz / Chamarra). Si no se elige color, toman el que el destino ya usa para ese color del origen («Sin color» → «Gris»).
+- `YA ESTÁ` no se toca (nunca se duplica ni se bajan precios). `CAMBIA COLOR` solo cuando se eligió otro color: cambia color y nombre ("Suéter Botones M Rojo" → "… Azul") sin tocar SKU, precios ni existencia. `SE LIGA`: pieza general del uniforme del origen que faltaba en el del destino.
+- **Escuela nueva:** si el destino no existe, el script enseña las escuelas parecidas (sin acentos, y las del mismo nombre con otro lugar) y no deja seguir. Preguntar a Daniel «¿Es la misma que …?». Si dice que es otra, repetir con `--escuela-nueva` (la crea un usuario ADMIN).
+- Revisar los avisos `⚠` y "Solo en el destino". La bitácora queda «Copia de escuela: A → B · modelo: …». Volver a correr el script después de aplicar debe decir «El destino ya tiene todo lo marcado».
 
 ## Caso B — Producto suelto
 
