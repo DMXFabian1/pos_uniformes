@@ -208,6 +208,68 @@ class CorregirTests(_Base):
         self.s.expire_all()
         self.assertEqual(self.s.get(Producto, sueter.id).nombre, "Suéter Botones M Rojo Ignacio Allende")
 
+    # ── Revisión 2026-11-15 ────────────────────────────────────────────────
+
+    def test_subtitulo_no_promete_que_los_precios_se_quedan(self) -> None:
+        sueter = self.prod("Ignacio Allende", "Suéter")
+        d = self.abrir(fpd.CorregirPrendaDialog, producto_id=sueter.id)
+        self.assertEqual(d.sub.text(), fpd.SUB_CORREGIR)
+        self.assertIn("los precios, solo si los cambias", d.sub.text())
+
+    def test_precio_que_otra_caja_subio_no_se_regresa(self) -> None:
+        sueter = self.prod("Ignacio Allende", "Suéter")
+        confirmar = Mock(return_value=False)
+        d = self.abrir(fpd.CorregirPrendaDialog, producto_id=sueter.id, confirmar_bajas=confirmar)
+        vid = next(iter(d.campos_precio))
+        self.s.get(Variante, vid).precio_venta = D(325)  # otra caja, con la ventanita abierta
+        self.s.commit()
+        d.cambiar_color("Azul")
+        self.assertEqual(d.campos_precio[vid].text(), "325")  # el campo que no se tocó se pone al día
+        self.assertFalse(d.bajan.isVisible())
+        d.principal.click()
+        confirmar.assert_not_called()
+        self.assertEqual(d.result(), d.DialogCode.Accepted)
+        self.s.expire_all()
+        v = self.s.get(Variante, vid)
+        self.assertEqual((v.color, v.precio_venta), ("Azul", D(325)))
+
+    def test_varios_colores_rotula_talla_y_color(self) -> None:
+        sueter = self.prod("Ignacio Allende", "Suéter")
+        self.s.add(Variante(producto_id=sueter.id, sku="SKUAZUL04", talla="4", color="Azul",
+                            precio_venta=D(270), stock_actual=0))
+        self.s.commit()
+        d = self.abrir(fpd.CorregirPrendaDialog, producto_id=sueter.id)
+        rotulos = [w.text() for w in d.panel.widget().findChildren(fpd.QLabel)]
+        self.assertIn("4 · Rojo", rotulos)
+        self.assertIn("4 · Azul", rotulos)
+        azul = self.s.scalar(select(Variante.id).where(Variante.sku == "SKUAZUL04"))
+        self.assertEqual(d.campos_precio[azul].accessibleName(), "Precio 4 · Azul")
+
+    def test_el_rojo_espera_a_que_termines_de_escribir(self) -> None:
+        sueter = self.prod("Ignacio Allende", "Suéter")
+        d = self.abrir(fpd.CorregirPrendaDialog, producto_id=sueter.id)
+        d.plegable.setChecked(True)
+        campo = next(iter(d.campos_precio.values()))
+        campo.setText("3")
+        campo.textEdited.emit("3")  # a medio escribir «315»
+        d.replanear()  # lo que hace el rebote
+        self.assertTrue(d.bajan.isHidden())
+        campo.setText("289")
+        campo.editingFinished.emit()  # terminó de escribir: ahora sí baja
+        self.assertIn("🔻 1 precio baja", d.bajan.text())
+        self.assertFalse(d.bajan.isHidden())
+
+    def test_talla_nueva_sin_rojo_mientras_se_teclea(self) -> None:
+        pants = self.prod("Miguel Hidalgo", "Pants Suelto")
+        d = self.abrir(fpd.TallaNuevaDialog, producto_id=pants.id, talla="EXG")
+        d.precio.setText("0")
+        d.precio.textEdited.emit("0")
+        d.replanear()
+        self.assertEqual(d.donde.property("tono"), "")
+        self.assertFalse(d.principal.isEnabled())
+        d.precio.editingFinished.emit()
+        self.assertEqual(d.donde.property("tono"), "danger")
+
 
 class SeccionPrendaTests(_Base):
     def test_escalera_con_las_tallas_que_faltan_en_gris(self) -> None:

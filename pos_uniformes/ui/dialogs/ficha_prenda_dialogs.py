@@ -10,7 +10,9 @@ Desde la ficha de Inventario, ya con la prenda elegida:
   color de toda la prenda y, plegados, los precios de cada talla. Si un
   precio baja, sale el aviso rojo de Inventario antes de guardar.
 
-Un solo botón vino por ventana; Cancelar no crea ni cambia nada. Las reglas
+Un solo botón vino por ventana; Cancelar no crea ni cambia nada. Nada se
+pinta en rojo mientras se teclea un precio: el aviso de que baja (o de que
+falta) sale al terminar de escribirlo (`editingFinished`) o al guardar. Las reglas
 viven en `services/alta_ficha_service.py` y `services/corregir_prenda_service.py`;
 aquí solo hay pantalla. Cada consulta abre y cierra su sesión.
 """
@@ -94,6 +96,8 @@ class _Ventanita(QDialog):
         self.preguntar = preguntar
         self.resultado = None
         self._guardando = False
+        #: Se está escribiendo un precio: el rojo espera a que se termine.
+        self._tecleando = False
         self.setObjectName("npDialogo")
         self.setWindowTitle(titulo)
         self.setModal(True)
@@ -162,6 +166,7 @@ class _Ventanita(QDialog):
         if self._guardando or not self.principal.isEnabled():
             return
         self.rebote.stop()
+        self._tecleando = False
         self.replanear()
         if not self.principal.isEnabled():
             return
@@ -181,6 +186,21 @@ class _Ventanita(QDialog):
             self.accept()
         else:
             self.principal.setEnabled(True)  # se canceló un aviso: se puede volver a intentar
+
+    def _escuchar_precio(self, campo: QLineEdit) -> None:
+        """Mientras se teclea, se replanea sin rojo; al terminar, ya con él."""
+        def tecleo(_t: str) -> None:
+            self._tecleando = True
+            self.rebote.start()
+
+        def termino() -> None:
+            if self._tecleando:
+                self._tecleando = False
+                self.rebote.stop()
+                self.replanear()
+
+        campo.textEdited.connect(tecleo)
+        campo.editingFinished.connect(termino)
 
     def _fallo(self, texto: str) -> None:
         self.error.setText(f"No se guardó nada: {texto}")
@@ -250,7 +270,7 @@ class TallaNuevaDialog(_Ventanita):
         self.nota = _etiqueta("npNota", nota_hermanas)
         self.nota.setVisible(bool(nota_hermanas))
         self.cuerpo.addWidget(self.nota)
-        self.precio.textEdited.connect(lambda _t: self.rebote.start())
+        self._escuchar_precio(self.precio)
         self.llegan.textEdited.connect(lambda _t: self.rebote.start())
         self._primera = True
         self.replanear()
@@ -276,7 +296,8 @@ class TallaNuevaDialog(_Ventanita):
         self.frase.setText(self.plan.resumen)
         if t.error:
             self.donde.setText(t.error)
-            tono = "danger" if self.precio.text().strip() or t.precio is not None else ""
+            escrito = self.precio.text().strip() or t.precio is not None
+            tono = "danger" if escrito and not self._tecleando else ""
         elif t.aviso:
             self.donde.setText(t.aviso)
             tono = "warning"
@@ -405,6 +426,15 @@ class OtroColorDialog(_Ventanita):
 
 # ── Corregir prenda ────────────────────────────────────────────────────────
 
+SUB_CORREGIR = ("Cambia el nombre y el color de todas las tallas a la vez. Se quedan los códigos y la "
+                "existencia; los precios, solo si los cambias.")
+
+
+def rotulo_talla(talla: cp.TallaACorregir, varios_colores: bool) -> str:
+    """«10», o «10 · Azul» si la prenda tiene tallas de varios colores."""
+    return f"{talla.talla} · {talla.color}" if varios_colores else talla.talla
+
+
 def _confirmar_bajas(parent, bajas) -> bool:
     from pos_uniformes.ui.helpers.inventario_acciones import confirmar_bajas_de_precio
 
@@ -425,8 +455,7 @@ class CorregirPrendaDialog(_Ventanita):
         self.plan: cp.PlanCorreccion = self._con_sesion(lambda s: cp.planear_correccion(s, self.producto_id))
         plan = self.plan
         self.color_elegido = plan.color_antes
-        self.sub.setText("Cambia el nombre y el color de todas las tallas a la vez. "
-                         "Se quedan los códigos, los precios y la existencia.")
+        self.sub.setText(SUB_CORREGIR)
 
         self.nombre = QLineEdit(plan.nombre_sin_escuela_antes)
         self.nombre.setObjectName("npCampo")
@@ -461,7 +490,7 @@ class CorregirPrendaDialog(_Ventanita):
         self.panel.setObjectName("npScroll")
         self.panel.setWidgetResizable(True)
         self.panel.setFrameShape(QFrame.Shape.NoFrame)
-        filas = (len(plan.tallas) + 3) // 4
+        filas = -(-len(plan.tallas) // (3 if len(plan.colores_antes) > 1 else 4))
         self.panel.setFixedHeight(min(170, filas * 42 + 4))
         vista = QWidget()
         vista.setObjectName("npScrollVista")
@@ -470,16 +499,23 @@ class CorregirPrendaDialog(_Ventanita):
         rejilla.setHorizontalSpacing(10)
         rejilla.setVerticalSpacing(4)
         self.campos_precio: dict[int, QLineEdit] = {}
+        #: Lo que decía cada campo al ponerlo: solo se manda lo que se cambió.
+        self._precio_puesto: dict[int, str] = {}
+        varios = len(plan.colores_antes) > 1
+        por_renglon = 3 if varios else 4
         for i, t in enumerate(plan.tallas):
-            fila, col = divmod(i, 4)
-            rejilla.addWidget(_etiqueta("npTallaGeneral", t.talla, envolver=False), fila, col * 2)
+            fila, col = divmod(i, por_renglon)
+            rotulo = rotulo_talla(t, varios)
+            rejilla.addWidget(_etiqueta("npTallaGeneral", rotulo, envolver=False), fila, col * 2)
             campo = QLineEdit(texto_precio(t.precio))
             campo.setObjectName("npPrecio")
+            campo.setAccessibleName(f"Precio {rotulo}")
             campo.setFixedWidth(84)
             campo.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-            campo.textEdited.connect(lambda _t: self.rebote.start())
+            self._escuchar_precio(campo)
             rejilla.addWidget(campo, fila, col * 2 + 1)
             self.campos_precio[t.variante_id] = campo
+            self._precio_puesto[t.variante_id] = campo.text()
         self.panel.setWidget(vista)
         self.panel.hide()
         self.cuerpo.addWidget(self.panel)
@@ -523,7 +559,20 @@ class CorregirPrendaDialog(_Ventanita):
         self.replanear()
 
     def precios_escritos(self) -> dict[int, object]:
-        return {vid: leer_precio(c.text()) for vid, c in self.campos_precio.items()}
+        """Solo los precios que se cambiaron: los demás se quedan como estén en la base."""
+        return {vid: leer_precio(c.text()) for vid, c in self.campos_precio.items()
+                if c.text() != self._precio_puesto.get(vid)}
+
+    def _al_dia(self, plan: cp.PlanCorreccion) -> None:
+        """Un campo que no se tocó enseña el precio de la base (otra caja pudo cambiarlo)."""
+        for t in plan.tallas:
+            campo = self.campos_precio.get(t.variante_id)
+            if campo is None or campo.text() != self._precio_puesto.get(t.variante_id):
+                continue
+            texto = texto_precio(t.precio)
+            if texto != campo.text():
+                campo.setText(texto)
+                self._precio_puesto[t.variante_id] = texto
 
     def replanear(self) -> None:
         color = self.color_elegido if self.color.isEnabled() else None
@@ -531,11 +580,12 @@ class CorregirPrendaDialog(_Ventanita):
             s, self.producto_id, nombre_sin_escuela=self.nombre.text(), color=color,
             precios_nuevos=self.precios_escritos(), confirmados=self.confirmados))
         plan = self.plan
+        self._al_dia(plan)
         self.vista_previa.setText(plan.nombre or plan.nombre_antes)
         self.frase.setText(plan.resumen)
         _poner(self.etiquetas, plan.texto_etiquetas)
         _poner(self.bajan, (f"🔻 {len(plan.bajas)} {'precio baja' if len(plan.bajas) == 1 else 'precios bajan'}: "
-                            "se te pedirá confirmar.") if plan.bajas else "")
+                            "se te pedirá confirmar.") if plan.bajas and not self._tecleando else "")
         bloqueo = _primer_error(plan.errores) or ("" if plan.hay_cambios else "Sin cambios todavía.")
         self._pintar_barra("Guardar cambios", bloqueo)
 
