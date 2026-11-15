@@ -47,7 +47,7 @@ GRIS = "#8a8177"
 GRIS_FONDO = "#f6f2ec"
 
 ESTILO = f"""
-QFrame#invPrenda {{ background: transparent; font-family: {FUENTE}; }}
+QFrame#invPrenda, QWidget#invPrendaRejilla {{ background: transparent; font-family: {FUENTE}; }}
 QLabel#invPrendaTitulo {{ font-size: 11px; font-weight: 800; color: {VINO}; letter-spacing: 1.5px; }}
 QPushButton#invPrendaEnlace {{
     background: transparent; color: {VINO}; border: none; font-size: 13px; font-weight: 700; padding: 2px 4px;
@@ -177,6 +177,8 @@ class SeccionPrenda(QFrame):
         cabeza.addWidget(self.boton_corregir)
         caja.addLayout(cabeza)
         self.rejilla = QWidget()
+        self.rejilla.setObjectName("invPrendaRejilla")
+        self.rejilla.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.flujo = Flujo(self.rejilla)
         caja.addWidget(self.rejilla)
         self.nota = QLabel()

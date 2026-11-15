@@ -98,7 +98,7 @@ class _Ventanita(QDialog):
         self.setWindowTitle(titulo)
         self.setModal(True)
         self.setStyleSheet(build_nueva_prenda_stylesheet())
-        self.setMinimumWidth(self.ANCHO)
+        self.setFixedWidth(self.ANCHO)
         raiz = QVBoxLayout(self)
         raiz.setContentsMargins(24, 18, 24, 16)
         raiz.setSpacing(10)
@@ -191,6 +191,21 @@ class _Ventanita(QDialog):
         self.principal.setText(texto_boton)
         self.bloqueo.setText(bloqueo)
         self.principal.setEnabled(not bloqueo)
+        self.ajustar()
+
+    def showEvent(self, evento) -> None:  # noqa: N802 - API de Qt
+        super().showEvent(evento)
+        self.ajustar()  # ya con la hoja de estilo puesta: las letras miden lo que miden
+        QTimer.singleShot(0, self.ajustar)
+
+    def ajustar(self) -> None:
+        """Alto justo para lo que hay (los textos de dos renglones no se aplastan)."""
+        caja = self.layout()
+        caja.activate()
+        alto = caja.totalHeightForWidth(self.width()) if caja.hasHeightForWidth() else -1
+        alto = max(alto, caja.totalMinimumSize().height(), caja.totalSizeHint().height() if alto < 0 else 0)
+        self.setMinimumHeight(alto)
+        self.resize(self.width(), alto)
 
     # Las subclases ponen:
     def replanear(self) -> None:  # pragma: no cover - abstracto
@@ -446,7 +461,8 @@ class CorregirPrendaDialog(_Ventanita):
         self.panel.setObjectName("npScroll")
         self.panel.setWidgetResizable(True)
         self.panel.setFrameShape(QFrame.Shape.NoFrame)
-        self.panel.setMaximumHeight(170)
+        filas = (len(plan.tallas) + 3) // 4
+        self.panel.setFixedHeight(min(170, filas * 42 + 4))
         vista = QWidget()
         vista.setObjectName("npScrollVista")
         rejilla = QGridLayout(vista)
@@ -455,8 +471,8 @@ class CorregirPrendaDialog(_Ventanita):
         rejilla.setVerticalSpacing(4)
         self.campos_precio: dict[int, QLineEdit] = {}
         for i, t in enumerate(plan.tallas):
-            fila, col = divmod(i, 3)
-            rejilla.addWidget(_etiqueta("npTalla", t.talla, envolver=False), fila, col * 2)
+            fila, col = divmod(i, 4)
+            rejilla.addWidget(_etiqueta("npTallaGeneral", t.talla, envolver=False), fila, col * 2)
             campo = QLineEdit(texto_precio(t.precio))
             campo.setObjectName("npPrecio")
             campo.setFixedWidth(84)
@@ -469,7 +485,7 @@ class CorregirPrendaDialog(_Ventanita):
         self.cuerpo.addWidget(self.panel)
 
         self.cuerpo.addWidget(_etiqueta("npSeccion", "ASÍ QUEDA", envolver=False))
-        self.vista_previa = _etiqueta("npFichaNombre")
+        self.vista_previa = _etiqueta("npFrase")
         self.frase = _etiqueta("npFichaLinea")
         self.etiquetas = _etiqueta("npNota")
         self.bajan = _etiqueta("npFichaLinea")
@@ -482,7 +498,7 @@ class CorregirPrendaDialog(_Ventanita):
     def _plegar(self, abierto: bool) -> None:
         self.panel.setVisible(abierto)
         self.plegable.setText(("▾" if abierto else "▸") + self.plegable.text()[1:])
-        self.adjustSize()
+        self.ajustar()
 
     def _al_color(self) -> None:
         if not self.color.isEnabled():

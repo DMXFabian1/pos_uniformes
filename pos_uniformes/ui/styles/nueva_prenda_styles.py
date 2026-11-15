@@ -197,6 +197,15 @@ QPushButton#npEnlace {{
     font-size: 13px; font-weight: 700; text-align: left;
 }}
 QPushButton#npEnlace:hover {{ text-decoration: underline; }}
+/* Prenda general (tanda 4): juegos de tallas como fichas que se eligen. */
+QPushButton#npJuego {{
+    background: {TARJETA}; color: {TEXTO}; border: 1px solid {BORDE}; border-radius: 14px;
+    padding: 6px 12px; font-size: 13px; font-weight: 700; min-height: 22px;
+}}
+QPushButton#npJuego:hover {{ border-color: {VINO}; color: {VINO}; }}
+QPushButton#npJuego:checked {{ background: {VINO_SUAVE}; color: {VINO}; border-color: {VINO}; }}
+QFrame#npParecida {{ background: {VINO_SUAVE}; border: 1px solid #e6c9d3; border-radius: 14px; }}
+QLabel#npTallaGeneral {{ font-size: 14px; font-weight: 700; color: {TEXTO}; }}
 
 /* Que se lea como scroll (carril claro, barra más oscura y delgada), no como separador. */
 QScrollBar:vertical {{ background: #efe7dc; width: 8px; margin: 4px 0; border-radius: 4px; }}
