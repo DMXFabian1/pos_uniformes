@@ -60,8 +60,9 @@ ACCIONES_VIEJAS = {
     "_handle_create_category": "Categoría nueva",
     "_handle_create_brand": "Marca nueva",
     "_handle_create_product": "Usar el formulario anterior",
-    "_handle_create_variant": "Agregar talla o color",
-    "_handle_duplicate_variant": "Duplicar la talla elegida",
+    # Tanda 4 del alta: «Agregar talla o color» lleva a la ficha; el asistente viejo
+    # queda en «Poco usado» y «Duplicar» en el «⋯» de la ficha (ver test_inventario_ficha_prenda).
+    "_handle_create_variant": "Talla con el formulario anterior",
     "_handle_update_product": "Editar la prenda elegida",
     "_handle_product_photo": "Foto del modelo",
     "_handle_update_variant": "Editar la talla elegida",

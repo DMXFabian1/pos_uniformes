@@ -36,7 +36,16 @@ from PyQt6.QtWidgets import (
     QWidgetAction,
 )
 
+from pos_uniformes.database.models import RolUsuario
+from pos_uniformes.services.alta_ficha_service import leer_ficha
 from pos_uniformes.services.inventario_donde_service import texto_donde_completo
+from pos_uniformes.ui.helpers.inventario_ficha_prenda import (
+    TEXTO_ELIGE_PRENDA,
+    SeccionPrenda,
+    agregar_color,
+    agregar_talla,
+    corregir_prenda,
+)
 from pos_uniformes.ui.helpers.history_filter_state_helper import build_history_clear_filter_state
 from pos_uniformes.services.inventario_existencia_service import es_fila_virtual
 from pos_uniformes.services.inventario_precio_service import LLAVE_PRECIO, LLAVE_TIPO, precio_efectivo
@@ -446,6 +455,10 @@ class FichaInventario(QFrame):
         self.acciones.setVerticalSpacing(8)
         layout.addSpacing(2)
         layout.addLayout(self.acciones)
+        # Tanda 4 del alta: la escalera de la prenda con lo que le falta (solo ADMIN).
+        layout.addSpacing(6)
+        self.prenda = SeccionPrenda()
+        layout.addWidget(self.prenda)
         layout.addStretch(1)
         return pagina
 
@@ -618,6 +631,17 @@ class InventarioPantalla(QObject):
         self.chip_acabarse.clicked.connect(lambda: self.tocar_tarjeta(SE_VA_A_ACABAR))
         self.ficha.acabarse_boton.clicked.connect(lambda: self.tocar_tarjeta(SE_VA_A_ACABAR))
         self._armar_acciones_ficha()
+        # Tanda 4 del alta: «LA PRENDA» en la ficha. Se lee una vez por prenda
+        # y refresco; quien prueba puede cambiar `cargar_prenda` o `session_factory`.
+        self.session_factory: Callable = _get_session
+        self.cargar_prenda: Callable[[int], object] = self._leer_prenda
+        self._prendas: dict[int, object] = {}
+        self._producto_ficha: int | None = None
+        seccion = self.ficha.prenda
+        seccion.talla_tocada.connect(self.agregar_talla)
+        seccion.otra_talla.connect(self.agregar_talla)
+        seccion.otro_color.connect(self.agregar_color)
+        seccion.corregir.connect(self.corregir_prenda)
 
     # ── Avisos de la ventana ─────────────────────────────────────────────
 
@@ -684,6 +708,7 @@ class InventarioPantalla(QObject):
     def al_refrescar(self) -> None:
         """Fin de `_refresh_inventory_table`: encabezado, tarjetas, filtros, páginas y ficha."""
         w = self.window
+        self._prendas = {}
         resumen = w.inventory_results_label.text()
         principal, _, aviso = resumen.partition(_SEPARADOR_AVISO)
         self.subtitulo.setText(resumen_prendas(self.grupos) if self.por_prenda() else principal)
@@ -1112,8 +1137,62 @@ class InventarioPantalla(QObject):
         else:
             ficha.movimiento.setText("—")
         self._mostrar_venta(fila)
+        self._mostrar_prenda(fila, virtual=virtual)
         self._habilitar_acciones()
         ficha.paginas.setCurrentIndex(TALLA)
+
+    # ── «LA PRENDA» (tanda 4 del alta) ───────────────────────────────────
+
+    def es_admin(self) -> bool:
+        return getattr(self.window, "current_role", None) == RolUsuario.ADMIN
+
+    def _leer_prenda(self, producto_id: int) -> object:
+        with self.session_factory() as session:
+            return leer_ficha(session, producto_id)
+
+    def _mostrar_prenda(self, fila: Mapping[str, object], *, virtual: bool = False) -> None:
+        seccion = self.ficha.prenda
+        producto_id = fila.get("producto_id")
+        self._producto_ficha = int(producto_id) if producto_id else None
+        if virtual or not self._producto_ficha or not self.es_admin():
+            seccion.mostrar(None)
+            return
+        if self._producto_ficha not in self._prendas:
+            try:
+                self._prendas[self._producto_ficha] = self.cargar_prenda(self._producto_ficha)
+            except Exception:  # noqa: BLE001 - sin la escalera, la ficha sigue
+                self._prendas[self._producto_ficha] = None
+        seccion.mostrar(self._prendas[self._producto_ficha], str(fila.get("talla") or ""))
+
+    def _nota_hermanas(self) -> str:
+        ficha = self.ficha.prenda.ficha
+        return ficha.texto_hermanas if ficha is not None else ""
+
+    def agregar_talla(self, talla: str) -> object | None:
+        if self._producto_ficha is None:
+            return None
+        return agregar_talla(self.window, self.session_factory, self._producto_ficha, talla, self._nota_hermanas())
+
+    def agregar_color(self) -> object | None:
+        if self._producto_ficha is None:
+            return None
+        return agregar_color(self.window, self.session_factory, self._producto_ficha)
+
+    def corregir_prenda(self) -> object | None:
+        if self._producto_ficha is None:
+            return None
+        return corregir_prenda(self.window, self.session_factory, self._producto_ficha)
+
+    def tallas_o_color_desde_menu(self) -> None:
+        """«⋯» de arriba: lleva a la ficha. Sin talla elegida, dice dónde está ahora."""
+        fila = self.fila_de(self.variante_actual())
+        if fila is None or not fila.get("producto_id"):
+            QMessageBox.information(self.window, "Agregar talla o color", TEXTO_ELIGE_PRENDA)
+            return
+        self.ficha.prenda.setFocus()
+        for area in self.ficha.scrolls:
+            if area.widget() is self.ficha.prenda.parentWidget():
+                area.ensureWidgetVisible(self.ficha.prenda)
 
     def _mostrar_venta(self, fila: Mapping[str, object]) -> None:
         """«Se vende ~3 por semana · alcanza para 5 días» y «La pidieron 4 veces en 30 días»."""
@@ -1376,10 +1455,10 @@ def armar_menu_mas(window: "MainWindow", pantalla: InventarioPantalla) -> QMenu:
     menu.setToolTipsVisible(True)
     _accion(menu, "📝  Usar el formulario anterior", llamar("_handle_create_product"),
             "El asistente de antes para dar de alta una prenda (por si acaso; la ventana nueva es «＋ Nueva prenda»)")
-    _accion(menu, "➕  Agregar talla o color", llamar("_handle_create_variant"),
-            "Agregar una talla o color (con su precio) a una prenda que ya existe")
-    _accion(menu, "⧉  Duplicar la talla elegida", llamar("_handle_duplicate_variant"),
-            "Usar la talla elegida como base para crear otra")
+    # Tanda 4 del alta: «Agregar talla o color» y «Duplicar talla» viven en la ficha,
+    # con la prenda ya elegida. Aquí queda una entrada que lleva a ella.
+    _accion(menu, "➕  Agregar talla o color", pantalla.tallas_o_color_desde_menu,
+            "Ahora está en la ficha de la talla elegida, bajo «LA PRENDA»")
     _accion(menu, "✏️  Editar la talla elegida", llamar("_handle_update_variant"),
             "Cambiar código, talla, color o precio de la talla elegida")
     _accion(menu, "✏️  Editar la prenda elegida", llamar("_handle_update_product"),
@@ -1414,6 +1493,8 @@ def armar_menu_mas(window: "MainWindow", pantalla: InventarioPantalla) -> QMenu:
     poco = _submenu(menu, "🗂  Poco usado")
     _accion(poco, "Categoría nueva", llamar("_handle_create_category"), "Crear una categoría (p. ej. Uniformes, Accesorios)")
     _accion(poco, "Marca nueva", llamar("_handle_create_brand"), "Crear una marca (p. ej. Fertoni, Ykan)")
+    _accion(poco, "Talla con el formulario anterior", llamar("_handle_create_variant"),
+            "El asistente de antes para agregar una talla o color a cualquier prenda (por si acaso)")
     poco.addSeparator()
     _accion(poco, "Calendario de conteos", disparar("conteo_calendario_action"), "Qué escuela toca contar cada día")
     _accion(poco, "Mercancía por nombrar", disparar("por_nombrar_action"), "Lo que llegó sin nombre todavía")
@@ -1434,6 +1515,12 @@ def armar_menu_mas(window: "MainWindow", pantalla: InventarioPantalla) -> QMenu:
 
 
 # ── Utilidades ───────────────────────────────────────────────────────────
+
+
+def _get_session():
+    from pos_uniformes.database.connection import get_session
+
+    return get_session()
 
 
 def _tamano_pagina() -> int:
