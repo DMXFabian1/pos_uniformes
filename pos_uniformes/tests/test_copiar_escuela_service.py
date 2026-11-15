@@ -281,9 +281,14 @@ class EscuelaNuevaTests(_Base):
     def test_pregunta_si_es_la_misma(self) -> None:
         plan = ce.planear_copia(self.s, ORIGEN, self.NUEVA)
         self.assertTrue(plan.es_nueva)
-        self.assertEqual({p.valor for p in plan.parecidas}, {JARAL, ORIGEN})
+        # La de origen no se ofrece (de ella se copia).
+        self.assertEqual([p.valor for p in plan.parecidas], [JARAL])
         self.assertFalse(plan.puede_aplicar)
-        self.assertIn("es la misma que «Ignacio Allende", plan.nota_bloqueo())
+        self.assertIn(f"es la misma que «{JARAL}»", plan.nota_bloqueo())
+        # Sin la de origen fuera, también sale (mismo nombre, otro lugar).
+        self.assertEqual({p.valor for p in ce.escuelas_parecidas(self.s, "Ignacio Allende Rancho Nuevo")},
+                         {JARAL, ORIGEN})
+        self.assertEqual(ce.escuelas_parecidas(self.s, JARAL), ())
         # Mientras no se conteste no hay planes, pero sí la lista.
         self.assertEqual(len(plan.piezas), 7)
         self.assertEqual({p.estado for p in plan.piezas}, {ce.ESTADO_NUEVA})

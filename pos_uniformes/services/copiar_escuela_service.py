@@ -533,27 +533,40 @@ def _orden_aplicar(p: PiezaACopiar) -> tuple:
     return (p.origen.es_conjunto, _orden_lista(p.origen))
 
 
-def escuelas_parecidas(session: Session, nombre: str) -> tuple[valores.Parecido, ...]:
-    """Las escuelas que se parecen a `nombre` sin acentos ni mayúsculas
-    («Ignacio Allende» ~ «Ignacio Allende (Jaral)»), para «¿Es la misma que…?».
-    Vacío si ya existe tal cual."""
+def escuelas_parecidas(session: Session, nombre: str, *, excluir: Iterable[str] = ()) -> tuple[valores.Parecido, ...]:
+    """Las escuelas que se parecen a `nombre` sin acentos ni mayúsculas, para
+    «¿Es la misma que…?»: las de letras parecidas y las del mismo nombre con
+    otro lugar («Ignacio Allende Rancho Nuevo» ~ «Ignacio Allende» e «Ignacio
+    Allende (Jaral)»). Vacío si ya existe tal cual. `excluir`: nombres que no
+    se ofrecen (la escuela de la que se copia)."""
     usos = valores.contar_usos(session, valores.CAMPO_ESCUELA)
+    fuera = {valores.normalizar(x) for x in excluir}
+    usos = {v: n for v, n in usos.items() if valores.normalizar(v) not in fuera}
     escrito = valores.limpiar(nombre)
     if not escrito or escrito in usos:
         return ()
     rev = valores.revisar_valor(valores.CAMPO_ESCUELA, escrito, usos)
     if rev.estado == valores.ESTADO_OK and rev.valor in usos:
         return (valores.Parecido(rev.valor, usos.get(rev.valor, 0)),)
-    # Además, las del mismo nombre con otro lugar entre paréntesis:
-    # «Ignacio Allende (Rancho Nuevo)» ~ «Ignacio Allende» e «Ignacio Allende (Jaral)».
-    base = _sin_lugar(escrito)
-    mismas = sorted(((n, valor) for valor, n in usos.items() if base and _sin_lugar(valor) == base),
+    escritas = _sin_lugar(escrito).split()
+    mismas = sorted(((n, valor) for valor, n in usos.items() if _mismo_nombre(escritas, _sin_lugar(valor).split())),
                     key=lambda nv: (-nv[0], nv[1]))
     salida = list(rev.sugerencias)
     for n, valor in mismas:
         if all(p.valor != valor for p in salida):
             salida.append(valores.Parecido(valor, n))
     return tuple(salida[: valores.MAX_SUGERENCIAS + 2])
+
+
+def _mismo_nombre(a: list[str], b: list[str]) -> bool:
+    """Puro: uno empieza con todas las palabras del otro (al menos dos, o una
+    larga): «ignacio allende rancho nuevo» y «ignacio allende»."""
+    if not a or not b:
+        return False
+    corto, largo = (a, b) if len(a) <= len(b) else (b, a)
+    if len(corto) < 2 and len(corto[0]) < 6:
+        return False
+    return largo[: len(corto)] == corto
 
 
 def _sin_lugar(nombre: str) -> str:
@@ -614,7 +627,7 @@ def planear_copia(
         return plan
     confirmados_alta = tuple(plan.confirmados)
     if plan.es_nueva:
-        plan.parecidas = escuelas_parecidas(session, destino_nombre)
+        plan.parecidas = escuelas_parecidas(session, destino_nombre, excluir=(plan.origen,))
         if not escuela_nueva:
             primera = plan.parecidas[0].valor if plan.parecidas else None
             plan.errores.append(
