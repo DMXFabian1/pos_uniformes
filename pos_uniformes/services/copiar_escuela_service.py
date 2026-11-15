@@ -39,7 +39,7 @@ from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Iterable, Mapping
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError, InvalidRequestError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -313,6 +313,59 @@ def clave_pieza(tipo_pieza: str | None, nombre_sin_escuela: str, colores: Iterab
     return f"{valores.normalizar(tipo_pieza)}|{nombre_sin_color(nombre_sin_escuela, colores)}"
 
 
+def _mismo_color(a: str | None, b: str | None) -> bool:
+    return bool(a) and bool(b) and valores.normalizar(_color(a)) == valores.normalizar(_color(b))
+
+
+def emparejar(
+    del_origen: Iterable[PiezaOrigen],
+    del_destino: Iterable[PiezaOrigen],
+    colores: Iterable[Iterable[str]],
+    elegidos: Mapping[int, str | None] | None = None,
+) -> dict[int, PiezaOrigen]:
+    """Puro: qué prenda del destino corresponde a cada prenda del origen
+    (producto del origen → prenda del destino). Cada prenda del destino se usa
+    UNA sola vez: si el origen tiene «Calceta Blanca» y «Calceta Azul Marino» y
+    el destino solo «Calceta Blanca», la blanca se empareja con la blanca y la
+    azul sale NUEVA. Primero las del mismo color, luego las del color elegido,
+    al final cualquiera de la misma pieza («Suéter Rojo» ↔ «Suéter Gris»)."""
+    colores = [list(c) for c in colores]
+    elegidos = dict(elegidos or {})
+    origen = [o for o in del_origen if not o.general]
+    libres: dict[str, list[PiezaOrigen]] = {}
+    for d in del_destino:
+        if not d.general:
+            libres.setdefault(clave_pieza(d.tipo_pieza, d.nombre_sin_escuela, colores), []).append(d)
+    pareja: dict[int, PiezaOrigen] = {}
+    pruebas = (
+        lambda o, d: _mismo_color(o.color, d.color),
+        lambda o, d: _mismo_color(elegidos.get(o.producto_id), d.color),
+        lambda o, d: True,
+    )
+    for prueba in pruebas:
+        for o in origen:
+            if o.producto_id in pareja:
+                continue
+            candidatas = libres.get(clave_pieza(o.tipo_pieza, o.nombre_sin_escuela, colores), [])
+            d = next((d for d in candidatas if prueba(o, d)), None)
+            if d is not None:
+                pareja[o.producto_id] = d
+                candidatas.remove(d)
+    return pareja
+
+
+def _existencia(session: Session, producto_id: int | None) -> int:
+    if producto_id is None:
+        return 0
+    total = session.scalar(select(func.coalesce(func.sum(Variante.stock_actual), 0)).where(
+        Variante.producto_id == int(producto_id), Variante.activo.is_(True)))
+    return max(int(total or 0), 0)
+
+
+def _texto_piezas(n: int) -> str:
+    return "1 pieza" if n == 1 else f"{n} piezas"
+
+
 # ── El plan ────────────────────────────────────────────────────────────────
 
 @dataclass
@@ -327,6 +380,8 @@ class PiezaACopiar:
     destino_id: int | None = None
     destino_nombre: str | None = None
     destino_color: str | None = None
+    #: Piezas en existencia de la prenda del destino (solo se cuenta si CAMBIA COLOR).
+    existencia: int = 0
     #: Ya existe en el destino pero falta en su uniforme (o es general): se liga.
     ligar: bool = False
     plan: alta.PlanPrenda | None = None
@@ -508,7 +563,11 @@ class PlanCopia:
         c = len(self.cambian)
         if c:
             verbo = ("cambió" if c == 1 else "cambiaron") if pasado else ("cambia" if c == 1 else "cambian")
-            partes.append(f"{c} {verbo} de color")
+            texto = f"{c} {verbo} de color"
+            existencia = sum(p.existencia for p in self.cambian)
+            if existencia and not pasado:
+                texto += f" (con {_texto_piezas(existencia)} en existencia, que también cambian)"
+            partes.append(texto)
         sueltas = [p for p in self.ligan if p.estado != ESTADO_NUEVA]
         if sueltas:
             s = len(sueltas)
@@ -654,10 +713,8 @@ def planear_copia(
     del_origen = piezas_de_escuela(session, esc_origen.id)
     del_destino = piezas_de_escuela(session, esc_destino.id) if esc_destino is not None else []
     uniforme_destino = set(_uniforme_de(session, esc_destino.id)) if esc_destino is not None else set()
-    por_clave = {}
-    for d in del_destino:
-        if not d.general:
-            por_clave.setdefault(clave_pieza(d.tipo_pieza, d.nombre_sin_escuela, lista_colores), d)
+    pareja = emparejar(del_origen, del_destino, lista_colores,
+                       {o.producto_id: _color_elegido(o, colores, color_de) for o in del_origen})
     usados: set[int] = set()
 
     for o in del_origen:
@@ -671,7 +728,7 @@ def planear_copia(
             pieza.destino_color = o.color
             plan.piezas.append(pieza)
             continue
-        d = por_clave.get(clave_pieza(o.tipo_pieza, o.nombre_sin_escuela, lista_colores))
+        d = pareja.get(o.producto_id)
         if d is None:
             pieza.color = elegido or _color(o.color)
             plan.piezas.append(pieza)
@@ -701,6 +758,11 @@ def planear_copia(
             CatalogService.nombre_sin_escuela(p.destino_nombre or "", plan.destino), p.destino_color, p.color)
         p.correccion = corregir.planear_correccion(
             session, p.destino_id, nombre_sin_escuela=nombre, color=p.color, confirmados=plan.confirmados)
+        p.existencia = _existencia(session, p.destino_id)
+        if p.existencia > 0:
+            p.avisos.append(
+                f"Tiene {_texto_piezas(p.existencia)} en existencia: también quedan como {p.color}."
+            )
     if not plan.marcadas:
         plan.errores.append("Marca al menos una prenda.")
     return plan
@@ -914,6 +976,7 @@ __all__ = [
     "ResultadoCopia",
     "aplicar_copia",
     "clave_pieza",
+    "emparejar",
     "ensayar_copia",
     "escuelas_parecidas",
     "escuelas_para_copiar",

@@ -330,6 +330,55 @@ class EscuelaNuevaTests(_Base):
         self.assertEqual(self.foto(), antes)
 
 
+class DosColoresTests(_Base):
+    """Dos prendas del origen que solo difieren en el color no caen en la
+    misma del destino (hallazgo de la revisión de la tanda 5)."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        calceta = TipoPieza(nombre="Calceta")
+        self.s.add(calceta)
+        self.s.flush()
+        self.caja.pieza["Calceta"] = calceta
+        tallas = {t: 45 for t in ("4", "6", "8")}
+        self.blanca = self.caja.prod(ORIGEN, "Calceta", nombre="Calceta Blanca", prenda="Oficial",
+                                     color="Blanco", precios=tallas)
+        self.azul = self.caja.prod(ORIGEN, "Calceta", nombre="Calceta Azul Marino", prenda="Oficial",
+                                   color="Azul Marino", precios=tallas)
+        self.destino = self.caja.prod(JARAL, "Calceta", nombre="Calceta Blanca", prenda="Oficial",
+                                      color="Blanco", precios=tallas)
+        self.s.commit()
+
+    def de(self, plan: ce.PlanCopia, producto: Producto) -> ce.PiezaACopiar:
+        return next(p for p in plan.piezas if p.origen.producto_id == producto.id)
+
+    def test_la_del_otro_color_sale_nueva(self) -> None:
+        plan = ce.planear_copia(self.s, ORIGEN, JARAL)
+        self.assertEqual(self.de(plan, self.blanca).estado, ce.ESTADO_YA_ESTA)
+        self.assertEqual(self.de(plan, self.blanca).destino_id, self.destino.id)
+        azul = self.de(plan, self.azul)
+        self.assertEqual(azul.estado, ce.ESTADO_NUEVA)
+        self.assertIsNone(azul.destino_id)
+        self.assertEqual(azul.nombre, f"Calceta Azul Marino {JARAL}")
+
+    def test_dos_colores_elegidos_no_pisan_la_misma(self) -> None:
+        plan = ce.planear_copia(self.s, ORIGEN, JARAL, colores={"Blanco": "Gris", "Azul Marino": "Verde"})
+        destinos = [p.destino_id for p in plan.cambian]
+        self.assertEqual(destinos, [self.destino.id])
+        self.assertEqual(self.de(plan, self.azul).estado, ce.ESTADO_NUEVA)
+
+    def test_cambia_color_avisa_la_existencia(self) -> None:
+        for v in self.destino.variantes:
+            v.stock_actual = 4
+        self.s.commit()
+        plan = ce.planear_copia(self.s, ORIGEN, JARAL, color_de={self.blanca.id: "Gris"})
+        p = self.de(plan, self.blanca)
+        self.assertEqual(p.estado, ce.ESTADO_CAMBIA_COLOR)
+        self.assertEqual(p.existencia, 12)
+        self.assertIn("Tiene 12 piezas en existencia: también quedan como Gris.", p.avisos)
+        self.assertIn("con 12 piezas en existencia, que también cambian", plan.resumen())
+
+
 class PurasTests(unittest.TestCase):
     def test_nombre_sin_color(self) -> None:
         colores = [["azul", "marino"], ["azul"], ["rojo"], ["blanco"], ["gris"]]
