@@ -293,6 +293,9 @@ class EscuelaNuevaTests(_Base):
         self.assertEqual(len(plan.piezas), 7)
         self.assertEqual({p.estado for p in plan.piezas}, {ce.ESTADO_NUEVA})
         self.assertEqual(plan.planes, [])
+        # El resumen ya cuenta las tallas del origen (no «0 tallas»).
+        self.assertIn("se crean 7 prendas (64 tallas", plan.resumen())
+        self.assertEqual(plan.texto_boton(), "Copiar 7 prendas (64 tallas)")
 
     def test_sin_acentos_es_la_que_ya_existe(self) -> None:
         plan = ce.planear_copia(self.s, ORIGEN, "ignacio allende (JARAL)")

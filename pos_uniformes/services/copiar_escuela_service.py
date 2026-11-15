@@ -411,7 +411,19 @@ class PlanCopia:
 
     @property
     def tallas_nuevas(self) -> int:
-        return sum(len(p.tallas) for p in self.planes)
+        """Las tallas que se crean. Mientras no hay plan (escuela nueva sin
+        confirmar) cuentan las del origen, que son las que se copiarán."""
+        return sum(len(p.plan.tallas) if p.plan is not None else len(p.origen.tallas)
+                   for p in self.nuevas)
+
+    def _precios_nuevos(self) -> list[Decimal]:
+        precios: list[Decimal] = []
+        for p in self.nuevas:
+            if p.plan is not None:
+                precios.extend(t.precio for t in p.plan.tallas if t.precio is not None)
+            else:
+                precios.extend(precio for _t, precio in p.origen.tallas if precio is not None)
+        return precios
 
     @property
     def hay_cambios(self) -> bool:
@@ -488,7 +500,7 @@ class PlanCopia:
             tallas = self.tallas_nuevas
             verbo = ("se creó" if n == 1 else "se crearon") if pasado else ("se crea" if n == 1 else "se crean")
             texto = f"{verbo} {'1 prenda' if n == 1 else f'{n} prendas'} ({tallas} {'talla' if tallas == 1 else 'tallas'}"
-            todos = [t.precio for p in self.planes for t in p.tallas if t.precio is not None]
+            todos = self._precios_nuevos()
             if todos:
                 lo, hi = min(todos), max(todos)
                 texto += f", a ${lo:.0f}" if lo == hi else f", de ${lo:.0f} a ${hi:.0f}"
