@@ -161,6 +161,24 @@ class DatosPrendaTests(unittest.TestCase):
         with self.assertRaises(dp.DatosNoValidos):
             dp.aplicar_datos(self.s, plan, self.admin)
 
+    def test_lo_que_no_se_toca_se_queda_aunque_este_inactivo(self) -> None:
+        # Escuela desactivada y pieza inactiva sin gemela activa: editar solo la
+        # ubicación no las borra (antes `_buscar` solo veía activas → NULL).
+        p = self.s.get(Producto, self.sueter.id)
+        escuela, pieza = p.escuela, p.tipo_pieza
+        escuela.activo = False
+        pieza.activo = False
+        self.s.commit()
+        nombre = p.nombre
+        plan = dp.planear_datos(self.s, self.sueter.id, cambios={"ubicacion": "Anaquel 9"})
+        self.assertTrue(plan.puede_aplicar, plan.errores)
+        self.assertEqual(plan.nombre, nombre)
+        dp.aplicar_datos(self.s, plan, self.admin, commit=True)
+        self.s.expire_all()
+        p = self.s.get(Producto, self.sueter.id)
+        self.assertEqual((p.escuela_id, p.tipo_pieza_id, p.ubicacion, p.nombre),
+                         (escuela.id, pieza.id, "Anaquel 9", nombre))
+
 
 if __name__ == "__main__":
     unittest.main()

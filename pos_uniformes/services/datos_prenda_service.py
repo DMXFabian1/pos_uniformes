@@ -321,8 +321,18 @@ def aplicar_datos(session: Session, plan: PlanDatos, usuario: Usuario, *, commit
             raise ValueError("Esa prenda ya no existe.")
         if datos_de(producto) != plan.antes:
             raise DatosNoValidos("La prenda cambió mientras la editabas: revisa otra vez.")
-        filas = {campo: (_buscar(session, LISTAS[campo][0], plan.datos[campo]) if plan.datos[campo] else None)
-                 for campo in LISTAS}
+        # Solo se vuelve a buscar lo que de verdad cambió. Lo demás conserva la
+        # relación que ya tiene la prenda, aunque esa fila esté inactiva (una
+        # escuela desactivada, un atributo retirado): si no, `_buscar` (solo
+        # activas) la dejaría en NULL sin que nadie tocara ese campo.
+        tocados = {c.campo for c in plan.cambios}
+        filas = {
+            campo: (
+                (_buscar(session, LISTAS[campo][0], plan.datos[campo]) if plan.datos[campo] else None)
+                if campo in tocados else getattr(producto, LISTAS[campo][1])
+            )
+            for campo in LISTAS
+        }
         if filas["marca"] is None or filas["categoria"] is None:
             raise DatosNoValidos("Falta la marca o la categoría.")
         cambian_producto = [c for c in plan.cambios if c.campo != "costo"]
