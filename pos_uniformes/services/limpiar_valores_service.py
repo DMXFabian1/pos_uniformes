@@ -17,6 +17,9 @@ No se tocan (se listan aparte):
 
 - **Choques**: dos tallas de la misma prenda y el mismo color que quedarían
   iguales (por ejemplo «XL» y «EXG» juntas): se arreglan a mano.
+- **Choques de receta**: la receta (Pants 3pz, Chamarra) empata el conjunto y
+  su pieza por el texto de la talla. Si de un lado la talla cambia y del otro
+  no (porque allá es un choque), ninguno de los dos se toca.
 - **Colores**: decisión de Daniel (2026-11-13): una sola forma para lo nuevo,
   sin tocar todavía lo que ya existe. Se listan como informativo.
 - Escuelas y marcas con dos escrituras, y valores parecidos pero no iguales
@@ -41,6 +44,7 @@ from sqlalchemy.orm import Session
 from pos_uniformes.database.models import (
     AtributoProducto,
     Categoria,
+    ConjuntoComponente,
     Escuela,
     Marca,
     NivelEducativo,
@@ -121,12 +125,15 @@ class FusionTaxonomia:
     a_id: int
     a_nombre: str
     productos: list[int] = field(default_factory=list)
+    #: La forma que se queda estaba inactiva: se vuelve a activar.
+    reactiva: bool = False
 
     @property
     def texto(self) -> str:
         etiqueta = valores.ETIQUETA_CAMPO.get(self.campo, self.campo)
+        extra = f"; «{self.a_nombre}» vuelve a quedar activo" if self.reactiva else ""
         return (f"{etiqueta}: «{self.de_nombre}» → «{self.a_nombre}» "
-                f"({_n(len(self.productos), 'prenda', 'prendas')}; «{self.de_nombre}» queda inactivo)")
+                f"({_n(len(self.productos), 'prenda', 'prendas')}; «{self.de_nombre}» queda inactivo{extra})")
 
 
 @dataclass(frozen=True)
@@ -145,6 +152,8 @@ class NombreRepetido:
 class PlanLimpieza:
     tallas: list[CambioTalla] = field(default_factory=list)
     choques: list[Choque] = field(default_factory=list)
+    #: Recetas cuyo conjunto y pieza dejarían de empatar en una talla: esa talla no se toca.
+    choques_receta: list[str] = field(default_factory=list)
     taxonomias: list[FusionTaxonomia] = field(default_factory=list)
     nombres: list[NombreRepetido] = field(default_factory=list)
     #: variante_id → talla nueva (lo que se escribe).
@@ -172,6 +181,9 @@ class PlanLimpieza:
                 [c.texto for c in self.tallas], "nada")
         seccion(f"CHOQUES: NO SE TOCAN ({len(self.choques)}; arreglar a mano):",
                 [c.texto for c in self.choques], "ninguno")
+        if self.choques_receta:
+            seccion(f"RECETAS: NO SE TOCAN ({len(self.choques_receta)}; el conjunto y su pieza "
+                    "dejarían de empatar):", self.choques_receta, "ninguna")
         seccion(f"TAXONOMÍAS CON DOS ESCRITURAS ({len(self.taxonomias)}):",
                 [f.texto for f in self.taxonomias], "nada")
         seccion(f"NOMBRES QUE REPITEN LA ESCUELA ({len(self.nombres)}):",
@@ -225,6 +237,59 @@ def _planear_tallas(session: Session, plan: PlanLimpieza) -> None:
     plan.tallas = sorted(por_cambio.values(), key=lambda c: (-len(c.variantes), c.antes))
 
 
+def _quitar_del_plan(plan: PlanLimpieza, ids: set[int]) -> None:
+    for vid in ids:
+        plan.variantes.pop(vid, None)
+    for cambio in plan.tallas:
+        cambio.variantes = [v for v in cambio.variantes if v not in ids]
+    plan.tallas = [c for c in plan.tallas if c.variantes]
+
+
+def _revisar_recetas(session: Session, plan: PlanLimpieza) -> None:
+    """La receta empata conjunto y pieza por el texto de la talla (mayúsculas,
+    sin espacios) entre tallas activas (`conjunto_service._variantes_por_talla`).
+    Si hoy empatan en una talla y después de la limpieza no (un lado cambia y el
+    otro es un choque o no cambia), esa talla no se toca en ninguno de los dos.
+    Se repite hasta que no haya nada que quitar (quitar una puede romper otra)."""
+    recetas = session.execute(select(ConjuntoComponente.conjunto_id, ConjuntoComponente.componente_id)).all()
+    if not recetas or not plan.variantes:
+        return
+    ids = {int(i) for par in recetas for i in par}
+    tallas: dict[int, dict[str, list[tuple[int, str]]]] = defaultdict(lambda: defaultdict(list))
+    nombres: dict[int, str] = {}
+    for vid, pid, talla, nombre in session.execute(
+        select(Variante.id, Variante.producto_id, Variante.talla, Producto.nombre)
+        .join(Producto, Variante.producto_id == Producto.id)
+        .where(Variante.producto_id.in_(ids), Variante.activo.is_(True))
+    ).all():
+        tallas[int(pid)][_texto_talla(talla)].append((int(vid), str(talla)))
+        nombres[int(pid)] = str(nombre)
+    vistos: set[tuple[int, int, str]] = set()
+    cambio = True
+    while cambio:
+        cambio = False
+        for conjunto_id, componente_id in recetas:
+            a, b = tallas.get(int(conjunto_id), {}), tallas.get(int(componente_id), {})
+            for texto in sorted(set(a) & set(b)):
+                juntas = a[texto] + b[texto]
+                finales = {_texto_talla(plan.variantes.get(vid, talla)) for vid, talla in juntas}
+                if len(finales) < 2:
+                    continue
+                _quitar_del_plan(plan, {vid for vid, _t in juntas})
+                cambio = True
+                clave = (int(conjunto_id), int(componente_id), texto)
+                if clave not in vistos:
+                    vistos.add(clave)
+                    plan.choques_receta.append(
+                        f"«{texto}» de {nombres.get(int(conjunto_id), conjunto_id)} y "
+                        f"{nombres.get(int(componente_id), componente_id)}"
+                    )
+
+
+def _texto_talla(talla: object) -> str:
+    return str(talla or "").strip().upper()
+
+
 def _filas_vivas(session: Session, modelo, columna) -> list[tuple[object, int]]:
     """(fila, prendas que la usan) de las activas o con alguna prenda."""
     usos = dict(session.execute(
@@ -256,7 +321,8 @@ def _planear_taxonomias(session: Session, plan: PlanLimpieza) -> None:
                 productos = [int(i) for i in session.scalars(
                     select(Producto.id).where(columna == fila.id).order_by(Producto.id)).all()]
                 plan.taxonomias.append(FusionTaxonomia(campo, int(fila.id), str(fila.nombre),
-                                                       int(destino.id), str(destino.nombre), productos))
+                                                       int(destino.id), str(destino.nombre), productos,
+                                                       reactiva=not destino.activo))
         _parecidos(campo, [f.nombre for f, _u in vivas], plan)
     for campo, (modelo, columna) in SOLO_INFORMATIVO.items():
         vivas = _filas_vivas(session, modelo, columna)
@@ -305,6 +371,7 @@ def planear_limpieza(session: Session) -> PlanLimpieza:
     """Lo que haría la limpieza. Solo lee."""
     plan = PlanLimpieza()
     _planear_tallas(session, plan)
+    _revisar_recetas(session, plan)
     _planear_taxonomias(session, plan)
     _planear_nombres(session, plan)
     _planear_colores(session, plan)
@@ -355,6 +422,11 @@ def aplicar_limpieza(session: Session, plan: PlanLimpieza, usuario: Usuario, *, 
             de, a = session.get(modelo, fusion.de_id), session.get(modelo, fusion.a_id)
             if de is None or a is None:
                 raise PlanDesactualizado("Una taxonomía cambió desde el plan: vuelve a correr sin --aplicar.")
+            if not a.activo:
+                # La forma con acento estaba inactiva (pero con prendas): si no se
+                # reactiva, no quedaría ninguna forma activa de ese valor y saldría
+                # de las listas del alta y de «Más datos».
+                a.activo = True
             for p in session.scalars(select(Producto).where(columna == de.id).order_by(Producto.id)).all():
                 CatalogAuditService.registrar_cambio(
                     session=session, usuario=usuario, entidad_tipo=TipoEntidadCatalogo.PRODUCTO,

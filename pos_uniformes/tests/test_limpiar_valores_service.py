@@ -185,6 +185,69 @@ class LimpiarValoresTests(unittest.TestCase):
         with self.assertRaises(lv.PlanDesactualizado):
             lv.aplicar_limpieza(self.s, plan, self.admin)
 
+    # ── Recetas y forma acentuada inactiva (revisión de la tanda 5) ──────
+
+    def _talla(self, producto: Producto, talla: str, *, activo: bool = True) -> Variante:
+        self.sku += 1
+        v = Variante(producto_id=producto.id, sku=f"SKU{self.sku:06d}", talla=talla, color="Sin color",
+                     precio_venta=D(600), stock_actual=3, activo=activo)
+        self.s.add(v)
+        self.s.flush()
+        return v
+
+    def test_la_receta_no_se_rompe_si_la_pieza_queda_en_choque(self) -> None:
+        tres = self.caja.productos[("Miguel Hidalgo", "Pants 3pz")]
+        dos = self.caja.productos[("Miguel Hidalgo", "Pants 2pz")]
+        conjunto_xl = self._talla(tres, "XL")
+        pieza_xl = self._talla(dos, "XL")
+        self._talla(dos, "EXG", activo=False)  # intento viejo: hace choque en el Pants 2pz
+        self.s.commit()
+        plan = lv.planear_limpieza(self.s)
+        self.assertTrue(any(c.producto_id == dos.id for c in plan.choques))
+        self.assertNotIn(conjunto_xl.id, plan.variantes)
+        self.assertNotIn(pieza_xl.id, plan.variantes)
+        self.assertEqual(len(plan.choques_receta), 1)
+        self.assertIn("«XL» de Pants 3pz Deportivo Miguel Hidalgo", plan.choques_receta[0])
+        self.assertIn("RECETAS: NO SE TOCAN (1;", plan.texto())
+        # Lo demás sí se limpia.
+        self.assertIn(self.camisa.id, {pid for c in plan.tallas for pid in c.productos})
+
+    def test_la_receta_no_se_rompe_si_el_conjunto_queda_en_choque(self) -> None:
+        tres = self.caja.productos[("Miguel Hidalgo", "Pants 3pz")]
+        dos = self.caja.productos[("Miguel Hidalgo", "Pants 2pz")]
+        self._talla(tres, "XL")
+        self._talla(tres, "EXG", activo=False)
+        pieza_xl = self._talla(dos, "XL")
+        self.s.commit()
+        plan = lv.planear_limpieza(self.s)
+        self.assertNotIn(pieza_xl.id, plan.variantes)
+        lv.aplicar_limpieza(self.s, plan, self.admin, commit=True)
+        self.s.expire_all()
+        self.assertEqual(self.s.get(Variante, pieza_xl.id).talla, "XL")
+
+    def test_la_receta_que_cambia_de_los_dos_lados_si_se_limpia(self) -> None:
+        tres = self.caja.productos[("Miguel Hidalgo", "Pants 3pz")]
+        dos = self.caja.productos[("Miguel Hidalgo", "Pants 2pz")]
+        conjunto_xl, pieza_xl = self._talla(tres, "XL"), self._talla(dos, "XL")
+        self.s.commit()
+        plan = lv.planear_limpieza(self.s)
+        self.assertEqual((plan.variantes.get(conjunto_xl.id), plan.variantes.get(pieza_xl.id)), ("EXG", "EXG"))
+        self.assertEqual(plan.choques_receta, [])
+
+    def test_la_forma_con_acento_inactiva_se_reactiva(self) -> None:
+        self.atributo_acentuado.activo = False
+        otra = self._general("Corbata Azul", [("Unitalla", "Azul")], atributo=self.atributo_acentuado)
+        self.s.commit()
+        plan = lv.planear_limpieza(self.s)
+        fusion = next(f for f in plan.taxonomias if f.campo == "atributo")
+        self.assertEqual((fusion.de_nombre, fusion.a_nombre, fusion.reactiva), ("Basico", "Básico", True))
+        self.assertIn("«Básico» vuelve a quedar activo", fusion.texto)
+        lv.aplicar_limpieza(self.s, plan, self.admin, commit=True)
+        self.s.expire_all()
+        self.assertTrue(self.s.get(AtributoProducto, self.atributo_acentuado.id).activo)
+        self.assertFalse(self.s.get(AtributoProducto, self.atributo_basico.id).activo)
+        self.assertEqual({self.s.get(Producto, i).atributo.nombre for i in (self.mono.id, otra.id)}, {"Básico"})
+
 
 if __name__ == "__main__":
     unittest.main()
