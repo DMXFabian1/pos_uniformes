@@ -59,12 +59,9 @@ FILAS = [
 ACCIONES_VIEJAS = {
     "_handle_create_category": "Categoría nueva",
     "_handle_create_brand": "Marca nueva",
-    "_handle_create_product": "Usar el formulario anterior",
-    # Tanda 4 del alta: «Agregar talla o color» lleva a la ficha; el asistente viejo
-    # queda en «Poco usado» y «Duplicar» en el «⋯» de la ficha (ver test_inventario_ficha_prenda).
-    "_handle_create_variant": "Talla con el formulario anterior",
-    # Tanda 4 (revisión): un solo lápiz; el editor viejo de la prenda va en «Poco usado».
-    "_handle_update_product": "Prenda con el formulario anterior",
+    # Tanda 5 del alta: el asistente viejo y el editor viejo de la prenda se retiraron.
+    # Altas en «＋ Nueva prenda»; tallas y colores en la ficha; los datos de la prenda en
+    # «Más datos de la prenda elegida» (ver test_todo_lo_del_editor_viejo_tiene_reemplazo).
     "_handle_product_photo": "Foto del modelo",
     "_handle_update_variant": "Editar la talla elegida",
     "_handle_inventory_bulk_price_update": "Precios en lote",
@@ -141,6 +138,19 @@ class InventarioTanda3PantallaTests(unittest.TestCase):
             setattr(window, manejador, doble)
             acciones[texto].trigger()
             doble.assert_called_once_with()
+
+    def test_todo_lo_del_editor_viejo_tiene_reemplazo(self) -> None:
+        window = self._ventana()
+        acciones = self._todas_las_acciones(window.inventory_more_button.menu())
+        for vieja in ("Usar el formulario anterior", "Talla con el formulario anterior",
+                      "Prenda con el formulario anterior"):
+            self.assertNotIn(vieja, acciones)
+        for nueva in ("Corregir la prenda elegida", "Más datos de la prenda elegida", "Agregar talla o color"):
+            self.assertIn(nueva, acciones)
+        with patch.object(window.inventario_pantalla, "editar_datos") as editar, \
+                patch.object(window.inventario_pantalla, "fila_de", return_value={"producto_id": 7}):
+            acciones["Más datos de la prenda elegida"].trigger()
+        editar.assert_called_once_with()
 
     def test_eliminar_al_final_en_rojo_y_pide_escribir_el_nombre(self) -> None:
         window = self._ventana()

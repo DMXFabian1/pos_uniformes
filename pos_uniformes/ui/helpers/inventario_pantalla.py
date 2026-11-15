@@ -45,6 +45,7 @@ from pos_uniformes.ui.helpers.inventario_ficha_prenda import (
     agregar_color,
     agregar_talla,
     corregir_prenda,
+    editar_datos,
 )
 from pos_uniformes.ui.helpers.history_filter_state_helper import build_history_clear_filter_state
 from pos_uniformes.services.inventario_existencia_service import es_fila_virtual
@@ -645,6 +646,7 @@ class InventarioPantalla(QObject):
         seccion.otra_talla.connect(self.agregar_talla)
         seccion.otro_color.connect(self.agregar_color)
         seccion.corregir.connect(self.corregir_prenda)
+        seccion.datos.connect(self.editar_datos)
 
     # ── Avisos de la ventana ─────────────────────────────────────────────
 
@@ -1195,6 +1197,20 @@ class InventarioPantalla(QObject):
         self._producto_ficha = int(fila["producto_id"])
         self.corregir_prenda()
 
+    def editar_datos(self) -> object | None:
+        if self._producto_ficha is None:
+            return None
+        return editar_datos(self.window, self.session_factory, self._producto_ficha)
+
+    def datos_desde_menu(self) -> None:
+        """«⋯»: «Más datos de la prenda elegida» (reemplaza al editor viejo, tanda 5)."""
+        fila = self.fila_de(self.variante_actual())
+        if fila is None or not fila.get("producto_id"):
+            QMessageBox.information(self.window, "Más datos de la prenda", TEXTO_ELIGE_PRENDA)
+            return
+        self._producto_ficha = int(fila["producto_id"])
+        self.editar_datos()
+
     def tallas_o_color_desde_menu(self) -> None:
         """«⋯» de arriba: lleva a la ficha. Sin talla elegida, dice dónde está ahora."""
         fila = self.fila_de(self.variante_actual())
@@ -1264,7 +1280,7 @@ class InventarioPantalla(QObject):
 
         menu = QMenu(ficha.mas)
         menu.setObjectName("invMenu")
-        _accion(menu, "📝  Prenda con el formulario anterior", lambda: self._llamar("_handle_update_product"))
+        _accion(menu, "📝  Más datos de la prenda", self.editar_datos)
         _accion(menu, "📷  Foto del modelo", lambda: self._llamar("_handle_product_photo"))
         _accion(menu, "⧉  Duplicar esta talla", lambda: self._llamar("_handle_duplicate_variant"))
         _accion(menu, "📦  Registrar entrada", lambda: self._llamar("_handle_purchase"))
@@ -1466,18 +1482,18 @@ def armar_menu_mas(window: "MainWindow", pantalla: InventarioPantalla) -> QMenu:
     menu = QMenu(window.inventory_more_button)
     menu.setObjectName("invMenu")
     menu.setToolTipsVisible(True)
-    _accion(menu, "📝  Usar el formulario anterior", llamar("_handle_create_product"),
-            "El asistente de antes para dar de alta una prenda (por si acaso; la ventana nueva es «＋ Nueva prenda»)")
     # Tanda 4 del alta: «Agregar talla o color» y «Duplicar talla» viven en la ficha,
     # con la prenda ya elegida. Aquí queda una entrada que lleva a ella.
     _accion(menu, "➕  Agregar talla o color", pantalla.tallas_o_color_desde_menu,
             "Ahora está en la ficha de la talla elegida, bajo «LA PRENDA»")
     # Un solo lápiz por menú (tanda 4 del alta): «Corregir prenda» cambia nombre y color
-    # de toda la prenda con vista previa; el editor viejo queda en «Poco usado».
+    # de toda la prenda con vista previa; «Más datos» lo demás (tanda 5: el editor viejo se retiró).
     _accion(menu, "🔧  Editar la talla elegida", llamar("_handle_update_variant"),
             "Cambiar código, talla, color o precio de la talla elegida")
     _accion(menu, "✏️  Corregir la prenda elegida", pantalla.corregir_desde_menu,
             "Cambiar el nombre o el color de todas sus tallas a la vez, con vista previa")
+    _accion(menu, "📝  Más datos de la prenda elegida", pantalla.datos_desde_menu,
+            "Marca, categoría, tipo, pieza, escuela, género, escudo, ubicación, descripción o costo")
     _accion(menu, "📷  Foto del modelo", llamar("_handle_product_photo"),
             "Tomar con la webcam (o elegir archivo) la foto que sale en el kiosko")
     menu.addSeparator()
@@ -1508,10 +1524,6 @@ def armar_menu_mas(window: "MainWindow", pantalla: InventarioPantalla) -> QMenu:
     poco = _submenu(menu, "🗂  Poco usado")
     _accion(poco, "Categoría nueva", llamar("_handle_create_category"), "Crear una categoría (p. ej. Uniformes, Accesorios)")
     _accion(poco, "Marca nueva", llamar("_handle_create_brand"), "Crear una marca (p. ej. Fertoni, Ykan)")
-    _accion(poco, "Talla con el formulario anterior", llamar("_handle_create_variant"),
-            "El asistente de antes para agregar una talla o color a cualquier prenda (por si acaso)")
-    _accion(poco, "Prenda con el formulario anterior", llamar("_handle_update_product"),
-            "El editor de antes: nombre, escuela, marca o tipo de la prenda elegida (por si acaso)")
     poco.addSeparator()
     _accion(poco, "Calendario de conteos", disparar("conteo_calendario_action"), "Qué escuela toca contar cada día")
     _accion(poco, "Mercancía por nombrar", disparar("por_nombrar_action"), "Lo que llegó sin nombre todavía")

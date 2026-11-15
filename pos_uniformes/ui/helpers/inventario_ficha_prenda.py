@@ -12,7 +12,7 @@ tienen sus hermanas y esta no, en gris con su precio sugerido. Un toque abre
 la confirmación corta (`TallaNuevaDialog`). «＋ Otra talla» (un enlace en su
 renglón, no un chip: no se confunde con las sugeridas) ofrece la lista
 oficial. «✏️ Corregir prenda» es el único lápiz de la ficha: «Editar talla»
-y el formulario anterior de la prenda van sin él. «Agregar talla o color» y «Duplicar talla» viven aquí, ya con la
+y «📝 Más datos» (marca, tipo, escuela…; tanda 5, reemplaza al editor viejo) van sin él. «Agregar talla o color» y «Duplicar talla» viven aquí, ya con la
 prenda elegida (antes, en el «⋯» de arriba, con una lista de 580 prendas).
 
 Aquí solo hay pantalla y cableado: la escalera la arma
@@ -154,6 +154,7 @@ class SeccionPrenda(QFrame):
     otra_talla = pyqtSignal(str)
     otro_color = pyqtSignal()
     corregir = pyqtSignal()
+    datos = pyqtSignal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -174,8 +175,12 @@ class SeccionPrenda(QFrame):
                                   "Copia todas las tallas, con sus precios, en un color nuevo")
         self.boton_corregir = _boton("invPrendaEnlace", "✏️ Corregir prenda",
                                      "Cambiar el nombre o el color de todas las tallas a la vez")
+        # Tanda 5: «Más datos» reemplaza al editor viejo de la prenda (marca, tipo, escuela…).
+        self.boton_datos = _boton("invPrendaEnlace", "📝 Más datos",
+                                  "Marca, categoría, tipo, pieza, escuela, género, escudo, costo…")
         self.boton_color.clicked.connect(self.otro_color.emit)
         self.boton_corregir.clicked.connect(self.corregir.emit)
+        self.boton_datos.clicked.connect(self.datos.emit)
         cabeza.addWidget(self.boton_color)
         cabeza.addWidget(self.boton_corregir)
         caja.addLayout(cabeza)
@@ -193,7 +198,13 @@ class SeccionPrenda(QFrame):
         self.menu_otra = QMenu(self.boton_otra)
         self.menu_otra.setObjectName("invMenu")
         self.boton_otra.setMenu(self.menu_otra)
-        caja.addWidget(self.boton_otra, 0, Qt.AlignmentFlag.AlignLeft)
+        # «📝 Más datos» abajo a la derecha: en la cabeza no cabe a 1366×768.
+        pie = QHBoxLayout()
+        pie.setSpacing(4)
+        pie.addWidget(self.boton_otra, 0, Qt.AlignmentFlag.AlignLeft)
+        pie.addStretch(1)
+        pie.addWidget(self.boton_datos)
+        caja.addLayout(pie)
         self.nota = QLabel()
         self.nota.setObjectName("invPrendaNota")
         self.nota.setWordWrap(True)
@@ -237,6 +248,7 @@ class SeccionPrenda(QFrame):
         self.nota.setVisible(bool(ficha.texto_hermanas))
         for w in (self.boton_color, self.boton_corregir, self.boton_otra, *self.chips_faltan.values()):
             w.setEnabled(ficha.activa)
+        self.boton_datos.setEnabled(True)  # los datos de una prenda apagada también se corrigen
         self.rejilla.updateGeometry()
         self.setVisible(True)
 
@@ -308,10 +320,21 @@ def corregir_prenda(window, session_factory: Callable, producto_id: int) -> obje
     return _abrir(window, dialogo)
 
 
+def editar_datos(window, session_factory: Callable, producto_id: int) -> object | None:
+    """«📝 Más datos»: el reemplazo del editor viejo de la prenda (tanda 5)."""
+    if _sin_permiso(window):
+        return None
+    from pos_uniformes.ui.dialogs.datos_prenda_dialog import DatosPrendaDialog
+
+    dialogo = DatosPrendaDialog(window, session_factory=session_factory, usuario_id=int(window.user_id),
+                                producto_id=producto_id)
+    return _abrir(window, dialogo)
+
+
 #: Lo que dice el «⋯» de arriba cuando no hay prenda elegida.
 TEXTO_ELIGE_PRENDA = (
     "Elige en la lista una talla de la prenda. En su ficha, bajo «LA PRENDA», están las tallas que le "
-    "faltan, «＋ Otra talla», «＋ Otro color» y «✏️ Corregir prenda»."
+    "faltan, «＋ Otra talla», «＋ Otro color», «✏️ Corregir prenda» y «📝 Más datos»."
 )
 
 
@@ -322,4 +345,5 @@ __all__ = [
     "agregar_color",
     "agregar_talla",
     "corregir_prenda",
+    "editar_datos",
 ]
