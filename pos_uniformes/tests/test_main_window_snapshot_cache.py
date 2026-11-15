@@ -29,7 +29,6 @@ from pos_uniformes.ui.main_window import (
     INVENTORY_PAGE_SIZE,
     PESTANAS_MUDADAS_AL_KIOSKO,
     MainWindow,
-    MultiSelectPickerButton,
     _TableSpinTabNavigator,
     _build_bulk_selection_label,
     _catalog_toggle_feedback_action,
@@ -93,19 +92,6 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
             self.assertEqual(reloaded_rows, first_rows)
             self.assertEqual(loader.call_count, 2)
-
-    def test_multi_select_picker_button_opens_without_missing_group_attr(self) -> None:
-        button = MultiSelectPickerButton(
-            "Tallas: ninguna",
-            title="Seleccionar tallas",
-            helper_text="Selecciona varias tallas.",
-        )
-        button.set_items([("12", "12"), ("14", "14")])
-
-        with patch("pos_uniformes.ui.main_window.QDialog.exec", return_value=0):
-            button._open_picker()
-
-        self.assertEqual(button.selected_labels(), [])
 
     def test_logout_shows_window_and_refreshes_for_new_user(self) -> None:
         # 2026-11-12: el POS ya no abre ni revisa sesión de caja al cambiar de

@@ -29,9 +29,6 @@ from pos_uniformes.database.models import (
     Variante,
 )
 from pos_uniformes.services.catalog_service import CatalogService as C
-from pos_uniformes.ui.helpers.catalog_product_form_summary_helper import (
-    build_catalog_product_display_name_preview,
-)
 
 
 class ArmarNombreTests(unittest.TestCase):
@@ -165,20 +162,16 @@ class NombreAlGuardarTests(_ConBase):
         ]
         for i, (escrito, escuela) in enumerate(casos):
             with self.subTest(escrito=escrito):
-                previa = build_catalog_product_display_name_preview(
-                    base_name=escrito,
-                    context_values=(escuela.nombre if escuela else "", "Deportivo", "Pants 3pz"),
-                )
+                # La vista previa de las pantallas nuevas («Así queda») usa armar_nombre.
+                previa = C.armar_nombre(escrito, escuela.nombre if escuela else None)
                 marca = Marca(nombre=f"M{i}")
                 self.s.add(marca)
                 self.s.flush()
                 p = C.crear_producto(self.s, self.admin, self.cat, marca, escrito, escuela=escuela)
                 self.assertEqual(previa, p.nombre)
-                # Y al editar con lo que el asistente carga, sigue igual.
+                # Y al editar con el nombre sin escuela (Corregir prenda / Más datos), sigue igual.
                 cargado = C.nombre_sin_escuela(p.nombre_base, escuela.nombre if escuela else None)
-                previa_edicion = build_catalog_product_display_name_preview(
-                    base_name=cargado, context_values=(escuela.nombre if escuela else "", "", "")
-                )
+                previa_edicion = C.armar_nombre(cargado, escuela.nombre if escuela else None)
                 C.actualizar_producto(self.s, self.admin, p, self.cat, marca, cargado, escuela=escuela)
                 self.assertEqual(previa_edicion, p.nombre)
 

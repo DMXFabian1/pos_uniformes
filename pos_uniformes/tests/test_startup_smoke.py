@@ -27,7 +27,6 @@ class StartupSmokeTests(unittest.TestCase):
             "pos_uniformes.services.manual_promo_service",
             "pos_uniformes.services.marketing_audit_service",
             "pos_uniformes.utils.label_generator",
-            "pos_uniformes.utils.product_templates",
         )
         for module_name in modules:
             with self.subTest(module=module_name):

@@ -7,7 +7,7 @@ from typing import Callable
 
 from pos_uniformes.services.inventario_existencia_service import coincide_filtro_existencia, es_fila_virtual
 from pos_uniformes.services.inventario_precio_service import precio_efectivo
-from pos_uniformes.ui.helpers.catalog_product_form_mode_helper import UNIFORM_CATEGORIES
+from pos_uniformes.ui.helpers.categorias_catalogo import UNIFORM_CATEGORIES
 from pos_uniformes.ui.helpers.listing_visibility_helper import (
     matches_active_state,
     matches_selected_values,

@@ -72,10 +72,12 @@
 
 - `ui/dialogs/settings_dialogs.py`
   - Dialogs de configuracion y ajustes administrativos.
-- `ui/dialogs/catalog_product_dialog.py`
-  - Alta y edicion de producto con modos `Uniforme escolar` y `Ropa normal`.
+- `ui/dialogs/nueva_prenda_dialog.py`
+  - «＋ Nueva prenda» (tandas 3-5 del alta, nov-2026). El asistente viejo `catalog_product_dialog.py` se retiró en la tanda 5.
+- `ui/dialogs/ficha_prenda_dialogs.py` y `ui/dialogs/datos_prenda_dialog.py`
+  - Desde la ficha de Inventario: talla que falta, otro color, «Corregir prenda» y «Más datos» (el reemplazo del editor viejo).
 - `ui/dialogs/catalog_variant_dialog.py`
-  - Alta y edicion de presentaciones simples o por lote.
+  - «Editar talla» y «Duplicar esta talla», siempre con la prenda ya elegida.
 - `ui/dialogs/create_layaway_dialog.py`
   - Alta operativa de apartados con calendario, botones rapidos de vencimiento y pricing alineado al cliente.
 - `ui/dialogs/layaway_payment_dialog.py`
@@ -170,8 +172,6 @@
   - Generacion de etiquetas.
 - `utils/date_format.py`
   - Formato visible consistente de fechas y horas en todo el POS.
-- `utils/product_templates.py`
-  - Plantillas y sugerencias de productos.
 - `utils/config.py`
   - Variables de entorno y configuracion local.
 

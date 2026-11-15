@@ -1,7 +1,7 @@
 """«＋ Nueva prenda»: primero a qué se parece, luego un solo paso (tanda 3, 2026-11-13).
 
-Reemplaza al asistente de 4 pasos y ~25 campos (que queda en «⋯ → Usar el
-formulario anterior»). El recorrido para una prenda de escuela:
+Reemplaza al asistente de 4 pasos y ~25 campos (retirado en la tanda 5,
+2026-11-15). El recorrido para una prenda de escuela:
 
 0. **¿Qué vas a dar de alta?** Tres tarjetas y abajo «Últimas altas · Hacer
    otra igual». «Prenda general o de temporada» (tanda 4) va a su propia
@@ -220,7 +220,6 @@ class NuevaPrendaDialog(QDialog):
     Callbacks (los pone `nueva_prenda_abrir`; en pruebas se dejan vacíos):
     - `al_imprimir(ids)`: abrir las etiquetas de las tallas creadas.
     - `al_ver(resultado)`: llevar Inventario a lo que se creó.
-    - `al_formulario_anterior()`: abrir el asistente viejo.
     - `al_terminar(resultado)`: refrescar la ventana principal tras guardar.
     """
 
@@ -232,7 +231,6 @@ class NuevaPrendaDialog(QDialog):
         usuario_id: int,
         al_imprimir: Callable[[list[int]], object] | None = None,
         al_ver: Callable[[alta.ResultadoAlta], object] | None = None,
-        al_formulario_anterior: Callable[[], object] | None = None,
         al_terminar: Callable[[alta.ResultadoAlta], object] | None = None,
         preguntar=preguntar_quisiste_decir,
     ) -> None:
@@ -241,7 +239,6 @@ class NuevaPrendaDialog(QDialog):
         self.usuario_id = int(usuario_id)
         self.al_imprimir = al_imprimir
         self.al_ver = al_ver
-        self.al_formulario_anterior = al_formulario_anterior
         self.al_terminar = al_terminar
         self.preguntar = preguntar
 
@@ -594,11 +591,6 @@ class NuevaPrendaDialog(QDialog):
         self.modo = MODO_COPIA
         self.copia.empezar()
         self._ir(COPIAR_ESCUELAS)
-
-    def _formulario_anterior(self) -> None:
-        self.reject()
-        if self.al_formulario_anterior is not None:
-            QTimer.singleShot(0, self.al_formulario_anterior)
 
     def _hacer_otra_igual(self, u: nps.UltimaAlta) -> None:
         self.modo = MODO_ESCUELA
@@ -1348,7 +1340,6 @@ class NuevaPrendaDialog(QDialog):
     def _armar_general(self) -> QWidget:
         self.general = FormularioGeneral(con_sesion=self._con_sesion, preguntar=self._preguntar)
         self.general.cambio.connect(self._al_cambiar_general)
-        self.general.anterior.connect(self._formulario_anterior)
         return self.general
 
     def _preguntar(self, padre, revision, crear):

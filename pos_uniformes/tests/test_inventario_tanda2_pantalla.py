@@ -76,11 +76,14 @@ class InventarioTanda2PantallaTests(unittest.TestCase):
     def test_alta_de_talla_ya_no_pregunta_por_el_qr(self) -> None:
         window = self._ventana()
         window.current_role = RolUsuario.ADMIN
+        # Tanda 5 del alta: la talla suelta se agrega desde la ficha; «Duplicar» sigue aquí.
         window._create_or_edit_presentation = Mock(return_value=("SKU-NUEVO", 7))
+        window._inventory_table_variant_id_at_row = Mock(return_value=3)
+        window._selected_catalog_row = Mock(return_value={"producto_id": 1, "variante_id": 3})
         window.refresh_all = Mock()
         window._set_combo_value = Mock()
         with patch.object(QMessageBox, "question") as pregunta, patch.object(QMessageBox, "information") as aviso:
-            window._handle_create_variant()
+            window._handle_duplicate_variant()
         pregunta.assert_not_called()
         aviso.assert_called_once()
         self.assertNotIn("QR", aviso.call_args.args[2])
@@ -89,13 +92,15 @@ class InventarioTanda2PantallaTests(unittest.TestCase):
         window = self._ventana()
         window.current_role = RolUsuario.ADMIN
         window._create_or_edit_presentation = Mock(return_value=("SKU000004", 7))
+        window._inventory_table_variant_id_at_row = Mock(return_value=3)
+        window._selected_catalog_row = Mock(return_value={"producto_id": 1, "variante_id": 3})
         window.refresh_all = Mock()
         window._set_combo_value = Mock()
         window._load_inventory_snapshot_rows = Mock(
             return_value=[{"variante_id": 7, "talla": "10", "color": "Azul", "producto_nombre_base": "Pants"}]
         )
         with patch.object(QMessageBox, "information") as aviso:
-            window._handle_create_variant()
+            window._handle_duplicate_variant()
         self.assertEqual(aviso.call_args.args[2], "Talla 10 (Azul) de «Pants» lista.")
 
     # ── Sin Apartado ni Estado; la desactivada en gris ──────────────────

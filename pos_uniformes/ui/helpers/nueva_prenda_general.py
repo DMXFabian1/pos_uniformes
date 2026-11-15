@@ -115,8 +115,6 @@ class FormularioGeneral(QWidget):
     """La pantalla de la prenda general. Avisa con `cambio` cada vez que hay plan nuevo."""
 
     cambio = pyqtSignal()
-    #: «Usar el formulario anterior» (por si acaso, como en la tanda 3).
-    anterior = pyqtSignal()
 
     def __init__(self, *, con_sesion: Callable[[Callable[[Any], Any]], Any], preguntar,
                  confirmar_marca: Callable[[QWidget, str], bool] | None = None,
@@ -275,10 +273,6 @@ class FormularioGeneral(QWidget):
         fila.addWidget(self.nota_categoria)
         fila.addWidget(self.boton_categoria)
         fila.addStretch(1)
-        # «Usar el formulario anterior» en el mismo renglón: a 1366×768 todo cabe sin desplazar.
-        self.boton_anterior = _boton("npEnlace", "Usar el formulario anterior")
-        self.boton_anterior.clicked.connect(self.anterior.emit)
-        fila.addWidget(self.boton_anterior)
         izq.addLayout(fila)
         self.marca.activated.connect(lambda _i: self._al_marca())
         self.marca.lineEdit().editingFinished.connect(self._al_marca)

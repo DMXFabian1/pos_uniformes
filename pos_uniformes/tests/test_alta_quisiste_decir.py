@@ -1,7 +1,10 @@
-"""«¿Quisiste decir…?» en el asistente de alta (tanda 1, 2026-11-13).
+"""«¿Quisiste decir…?» (tanda 1, 2026-11-13) y la ventana de una talla.
 
-Lo que se prueba: el asistente ofrece el parecido, no crea nada sin que el
-usuario lo elija, bloquea el $0 y editar no duplica la escuela."""
+Lo que se prueba: la ventanita ofrece el parecido, no crea nada sin que el
+usuario lo elija y la talla bloquea el $0. Las pruebas del asistente viejo de
+la prenda se fueron con él (tanda 5, 2026-11-15): el nombre sin escuela
+repetida se prueba en test_catalog_service, test_corregir_prenda_service y
+test_datos_prenda_service."""
 
 from __future__ import annotations
 
@@ -24,7 +27,7 @@ from PyQt6.QtWidgets import (  # noqa: E402
     QVBoxLayout,
     QWidget,
 )
-from sqlalchemy import create_engine, select  # noqa: E402
+from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
@@ -43,7 +46,6 @@ from pos_uniformes.database.models import (  # noqa: E402
 )
 from pos_uniformes.services import catalogo_valores_service as cv  # noqa: E402
 from pos_uniformes.services.catalog_service import CatalogService  # noqa: E402
-from pos_uniformes.ui.dialogs import catalog_product_dialog as cpd  # noqa: E402
 from pos_uniformes.ui.dialogs import catalog_variant_dialog as cvd  # noqa: E402
 from pos_uniformes.ui.dialogs.quisiste_decir_dialog import (  # noqa: E402
     ACCION_CORREGIR,
@@ -247,7 +249,7 @@ class _ConBase(unittest.TestCase):
             self.admin_id, self.marca_id, self.producto_id = admin.id, marca.id, p.id
         self.ventana = _VentanaFalsa(self.admin_id)
         self.addCleanup(self.ventana.deleteLater)
-        for modulo in (cpd, cvd):
+        for modulo in (cvd,):
             parche = patch.object(modulo, "get_session", self._sesion)
             parche.start()
             self.addCleanup(parche.stop)
@@ -279,153 +281,34 @@ class _ConBase(unittest.TestCase):
         QTimer.singleShot(0, buscar)
 
 
-class DialogoProductoTests(_ConBase):
-    def _abrir(self, pasos, pregunta, initial=None):
-        self._con_dialogo("Producto", pasos)
-        return cpd.build_catalog_product_dialog(
-            self.ventana,
-            initial=initial,
-            picker_button_class=__import__("pos_uniformes.ui.main_window", fromlist=["x"]).MultiSelectPickerButton,
-            product_templates=[],
-            common_sizes=list(cv.TALLAS_SUGERIDAS),
-            common_colors=list(cv.COLORES_SUGERIDOS),
-            default_variant_size="Unitalla",
-            default_variant_color="Sin color",
-            preguntar_valor=pregunta,
-        )
-
-    def _llenar(self, d: QDialog, *, escuela: str, precio: str, tallas=(), colores=()) -> None:
-        d.findChild(QComboBox, "altaMarca").setCurrentIndex(
-            d.findChild(QComboBox, "altaMarca").findData(self.marca_id)
-        )
-        d.findChild(QLineEdit, "altaNombre").setText("Playera Deportiva")
-        d.findChild(QComboBox, "altaEscuela").setEditText(escuela)
-        for nombre, valores in (("altaTallas", tallas), ("altaColores", colores)):
-            if valores:
-                picker = d.findChild(QPushButton, nombre)
-                # Como si se escribieran a mano en el selector («Otro…»).
-                faltan = [(v, v) for v in valores if v not in picker.selected_values() | {x for _, x in picker._items}]
-                picker.set_items(picker._items + faltan)
-                picker.set_selected_values(list(valores))
-        d.alta_modo_precio.setCurrentIndex(d.alta_modo_precio.findData("single"))
-        d.alta_precio.setText(precio)
-
-    def test_ofrece_el_parecido_y_no_crea_sin_elegir(self) -> None:
-        pregunta = PreguntaFalsa(ACCION_CORREGIR, ACCION_USAR)
-        estado = {}
-
-        def pasos(d):
-            self._llenar(d, escuela="ESTV 15", precio="245")
-            guardar = d.findChild(QPushButton, "altaGuardar")
-            guardar.click()                       # primero: «Corregir»
-            estado["abierto"] = d.isVisible()
-            guardar.click()                       # luego: «Usar ESTV 154»
-
-        payload = self._abrir(pasos, pregunta)
-        self.assertTrue(estado["abierto"])
-        self.assertEqual(pregunta.preguntas[0][0].sugerencias[0].valor, "ESTV 154")
-        self.assertEqual(payload["escuela"], "ESTV 154")
-        self.assertEqual(payload["valores_nuevos"], {})
-        with self._sesion() as s:
-            self.assertEqual(len(s.scalars(select(Escuela)).all()), 1)
-
-    def test_tallas_y_colores_viejos_pasan_a_su_forma_oficial(self) -> None:
-        pregunta = PreguntaFalsa(ACCION_USAR, ACCION_USAR)
-
-        def pasos(d):
-            self._llenar(d, escuela="ESTV 154", precio="245", tallas=["CH", "Uni"], colores=["Blanca"])
-            d.findChild(QPushButton, "altaGuardar").click()
-
-        payload = self._abrir(pasos, pregunta)
-        self.assertIsNotNone(payload)
-        preguntados = [r.escrito for r, _ in pregunta.preguntas]
-        self.assertEqual(sorted(preguntados), ["Blanca", "Uni"])
-        self.assertEqual(payload["tallas"], ["CH", "Unitalla"])
-        self.assertEqual(payload["colores"], ["Blanco"])
-
-    def test_plantilla_con_uni_marca_unitalla_con_su_precio(self) -> None:
-        # «Boina escolta» trae talla «Uni» y precio {"Uni": 80}: debe quedar
-        # Unitalla marcada y con sus $80, no sin tallas ni «faltan precios».
-        pregunta = PreguntaFalsa()
-        estado = {}
-
-        def pasos(d):
-            self._llenar(d, escuela="ESTV 154", precio="1")
-            combo = next(c for c in d.findChildren(QComboBox) if c.findText("Boina escolta") >= 0)
-            combo.setCurrentIndex(combo.findText("Boina escolta"))
-            next(b for b in d.findChildren(QPushButton) if b.text() == "Aplicar presentaciones").click()
-            estado["tallas"] = set(d.findChild(QPushButton, "altaTallas").selected_values())
-            d.findChild(QPushButton, "altaGuardar").click()
-
-        # Una plantilla vieja (o de fuera) con «Uni» también se normaliza.
-        vieja = {"label": "Boina escolta", "sizes": ["Uni"], "prices": {"Uni": "80"}}
-        with patch.object(
-            cpd, "load_step_product_templates", lambda paso: [dict(vieja)] if paso == "presentation" else []
-        ):
-            payload = self._abrir(pasos, pregunta)
-        self.assertEqual(estado["tallas"], {"Unitalla"})
-        self.assertEqual(payload["tallas"], ["Unitalla"])
-        self.assertEqual(payload["precio_modo"], "manual")
-        self.assertEqual(payload["precios_por_talla"], {"Unitalla": "80"})
-
-    def test_las_plantillas_ya_no_traen_uni(self) -> None:
-        from pos_uniformes.utils.product_templates import PRESENTATION_STEP_TEMPLATES
-
-        for plantilla in PRESENTATION_STEP_TEMPLATES:
-            self.assertNotIn("Uni", plantilla.get("sizes", []), plantilla["label"])
-
-    def test_precio_en_cero_no_deja_guardar(self) -> None:
-        pregunta = PreguntaFalsa()
-        estado = {}
-
-        def pasos(d):
-            self._llenar(d, escuela="ESTV 154", precio="0", tallas=["CH"])
-            with patch.object(cpd.QMessageBox, "warning") as aviso:
-                d.findChild(QPushButton, "altaGuardar").click()
-            estado["abierto"] = d.isVisible()
-            estado["aviso"] = aviso.call_args[0][2] if aviso.called else ""
-
-        payload = self._abrir(pasos, pregunta)
-        self.assertIsNone(payload)
-        self.assertTrue(estado["abierto"])
-        self.assertIn("$0", estado["aviso"])
-
-    def test_editar_carga_el_nombre_sin_escuela_y_no_la_duplica(self) -> None:
-        estado = {}
-
-        def pasos(d):
-            estado["nombre"] = d.findChild(QLineEdit, "altaNombre").text()
-            d.findChild(QPushButton, "altaGuardar").click()
-
-        pregunta = PreguntaFalsa()
-        payload = self._abrir(pasos, pregunta, initial={"producto_id": self.producto_id})
-        self.assertEqual(estado["nombre"], "Pants 3pz Deportivo")
-        self.assertEqual(pregunta.preguntas, [])  # nada cambió: nada que preguntar
-        with self._sesion() as s:
-            producto = s.get(Producto, self.producto_id)
-            usuario = s.get(Usuario, self.admin_id)
-            CatalogService.actualizar_producto(
-                s, usuario, producto, producto.categoria, producto.marca, payload["nombre"],
-                escuela=producto.escuela,
-            )
-            self.assertEqual(producto.nombre, "Pants 3pz Deportivo ESTV 154")
-
-
 class DialogoTallaTests(_ConBase):
     def _abrir(self, pasos, pregunta, prefill=None):
         self._con_dialogo("Presentacion", pasos)
-        with patch.object(cvd, "load_legacy_config_choices", return_value={}):
-            return cvd.build_catalog_variant_dialog(
-                self.ventana,
-                prefill=prefill,
-                include_stock=True,
-                default_product_id=self.producto_id,
-                common_sizes=list(cv.TALLAS_SUGERIDAS),
-                common_colors=list(cv.COLORES_SUGERIDOS),
-                default_variant_size="Unitalla",
-                default_variant_color="Sin color",
-                preguntar_valor=pregunta,
-            )
+        return cvd.build_catalog_variant_dialog(
+            self.ventana,
+            prefill=prefill,
+            include_stock=True,
+            default_product_id=self.producto_id,
+            preguntar_valor=pregunta,
+        )
+
+    def test_sin_prenda_elegida_no_abre(self) -> None:
+        # Ya no hay lista de todas las prendas: la talla se agrega desde la ficha.
+        with self.assertRaises(ValueError):
+            cvd.build_catalog_variant_dialog(self.ventana, include_stock=True)
+
+    def test_una_sola_prenda_y_el_codigo_no_se_teclea(self) -> None:
+        estado = {}
+
+        def pasos(d):
+            combos = d.findChildren(QComboBox)
+            estado["prendas"] = combos[0].count()
+            estado["prenda_fija"] = not combos[0].isEnabled()
+            sku = [w for w in d.findChildren(QLineEdit) if w.placeholderText() == "Se genera solo"][0]
+            estado["sku_solo_lectura"] = sku.isReadOnly()
+
+        self._abrir(pasos, PreguntaFalsa())
+        self.assertEqual(estado, {"prendas": 1, "prenda_fija": True, "sku_solo_lectura": True})
 
     def test_cero_se_queda_abierto_y_uni_pasa_a_unitalla(self) -> None:
         pregunta = PreguntaFalsa(ACCION_USAR)
@@ -472,22 +355,6 @@ class DialogoTallaTests(_ConBase):
         self.assertEqual(pregunta.preguntas, [])
         self.assertEqual(payload["color"], "Blanca")
         self.assertEqual(payload["talla"], "16")
-
-
-class ResolverEnMainWindowTests(_ConBase):
-    def test_guardar_sin_confirmar_no_crea(self) -> None:
-        from pos_uniformes.ui.main_window import MainWindow
-
-        with self._sesion() as s:
-            with self.assertRaises(cv.ValorNoConfirmado):
-                MainWindow._resolve_named_taxonomy(self.ventana, s, TipoPieza, "Overol", {"valores_nuevos": {}})
-            nueva = MainWindow._resolve_named_taxonomy(
-                self.ventana, s, TipoPieza, "Overol", {"valores_nuevos": {cv.CAMPO_TIPO_PIEZA: ["Overol"]}}
-            )
-            self.assertEqual(nueva.nombre, "Overol")
-            self.assertEqual(
-                MainWindow._resolve_named_taxonomy(self.ventana, s, Escuela, "estv 154", {}).nombre, "ESTV 154"
-            )
 
 
 if __name__ == "__main__":

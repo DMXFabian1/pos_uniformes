@@ -401,7 +401,7 @@ _PIEZA_ORDER = {
 _TIPOS_VIRTUALES = {"Pants 3pz", "Chamarra"}
 
 # Lo que NO es uniforme y por eso no entra a básicos (misma lista que el
-# formulario de catálogo usa para "ropa normal": ui/helpers/catalog_product_form_mode_helper).
+# formulario de catálogo usa para "ropa normal": ui/helpers/categorias_catalogo).
 # En minúsculas: se compara contra categoría y tipo de prenda.
 CATEGORIAS_ROPA_NORMAL = frozenset({
     "ropa casual", "casual", "calzado", "accesorios", "temporada", "ropa interior", "interior", "pijamas", "descanso", "deportivo casual", "formal",

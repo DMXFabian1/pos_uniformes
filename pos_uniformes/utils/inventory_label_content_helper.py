@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
-from pos_uniformes.ui.helpers.catalog_product_form_mode_helper import UNIFORM_CATEGORIES
+from pos_uniformes.ui.helpers.categorias_catalogo import UNIFORM_CATEGORIES
 
 
 @dataclass(frozen=True)

@@ -3,8 +3,8 @@
 Se prueba sobre la caja en miniatura (SQLite) con la pantalla de verdad
 (offscreen): el recorrido completo crea lo mismo que el plan del motor,
 Cancelar no crea nada, varias escuelas de una vez, «¿Quisiste decir…?» en el
-color, el $0 bloqueado, el formulario anterior sigue alcanzable y nada se
-corta a 1366×768.
+color, el $0 bloqueado y nada se corta a 1366×768 (el formulario anterior se
+retiró en la tanda 5).
 """
 
 from __future__ import annotations
@@ -64,7 +64,6 @@ class _Base(unittest.TestCase):
         self.al_terminar = Mock()
         self.al_imprimir = Mock()
         self.al_ver = Mock()
-        self.al_anterior = Mock()
 
     def dialogo(self, usuario=None, padre=None) -> npd.NuevaPrendaDialog:
         d = npd.NuevaPrendaDialog(
@@ -72,7 +71,7 @@ class _Base(unittest.TestCase):
             session_factory=lambda: Session(self.engine, expire_on_commit=False),
             usuario_id=(usuario or self.caja.admin).id,
             al_imprimir=self.al_imprimir, al_ver=self.al_ver,
-            al_formulario_anterior=self.al_anterior, al_terminar=self.al_terminar,
+            al_terminar=self.al_terminar,
         )
         self.addCleanup(self._cerrar, d)
         return d
@@ -413,7 +412,7 @@ class RecorridoTests(_Base):
 
 
 class PuertaTests(_Base):
-    def test_tres_tarjetas_y_el_formulario_anterior(self) -> None:
+    def test_tres_tarjetas_sin_formulario_anterior(self) -> None:
         d = self.dialogo()
         self.assertEqual(d.pasos.currentIndex(), npd.PUERTA)
         self.assertEqual([t.titulo.text() for t in d.tarjetas.values()],
@@ -424,13 +423,11 @@ class PuertaTests(_Base):
         self.assertEqual(d.pasos.currentIndex(), npd.COPIAR_ESCUELAS)
         d.atras.click()
         self.assertEqual(d.pasos.currentIndex(), npd.PUERTA)
-        # Tanda 4: la prenda general tiene su pantalla; el formulario anterior queda en un enlace.
+        # Tanda 4: la prenda general tiene su pantalla; tanda 5: el formulario anterior se retiró.
         d.tarjetas[npd.TARJETA_GENERAL].click()
         self.assertEqual(d.pasos.currentIndex(), npd.GENERAL)
-        self.al_anterior.assert_not_called()
-        d.general.boton_anterior.click()
-        _procesar()
-        self.al_anterior.assert_called_once_with()
+        self.assertFalse(hasattr(d.general, "boton_anterior"))
+        self.assertFalse(hasattr(d, "al_formulario_anterior"))
 
     def test_solo_admin(self) -> None:
         ventana = SimpleNamespace(current_role=RolUsuario.CAJERO, user_id=self.caja.cajera.id)
@@ -447,8 +444,7 @@ class PuertaTests(_Base):
         clase.return_value.open.assert_called_once_with()
         self.assertEqual(clase.call_args.kwargs["usuario_id"], self.caja.admin.id)
         d = SimpleNamespace(**clase.call_args.kwargs)
-        d.al_formulario_anterior()
-        ventana._handle_create_product.assert_called_once_with()
+        self.assertNotIn("al_formulario_anterior", clase.call_args.kwargs)
         d.al_imprimir([7])
         ventana._open_inventory_label_dialog_for_variant.assert_called_once_with(7)
         d.al_imprimir([7, 8])

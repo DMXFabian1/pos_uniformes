@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass
 from decimal import Decimal
 
-from pos_uniformes.ui.helpers.catalog_product_form_mode_helper import REGULAR_CATEGORY_EXCLUSION_SET
+from pos_uniformes.ui.helpers.categorias_catalogo import REGULAR_CATEGORY_EXCLUSION_SET
 from pos_uniformes.utils.text_normalization import normalize_text_unicode as _normalize_text
 
 

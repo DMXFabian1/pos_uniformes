@@ -62,7 +62,6 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from pos_uniformes.database.connection import engine, get_session, test_connection
 from pos_uniformes.database.models import (
-    AtributoProducto,
     Categoria,
     Cliente,
     Compra,
@@ -71,7 +70,6 @@ from pos_uniformes.database.models import (
     EstadoCompra,
     Marca,
     MovimientoInventario,
-    NivelEducativo,
     Producto,
     Proveedor,
     RolUsuario,
@@ -126,12 +124,6 @@ from pos_uniformes.services import conjunto_service
 from pos_uniformes.services import exportacion_libreta_service
 from pos_uniformes.services import resumen_pos_service
 from pos_uniformes.services.catalog_service import CatalogService
-from pos_uniformes.services.catalogo_valores_service import (
-    CAMPO_POR_MODELO,
-    COLORES_SUGERIDOS,
-    TALLAS_SUGERIDAS,
-    resolver_o_crear,
-)
 from pos_uniformes.services.catalog_snapshot_service import load_catalog_snapshot_rows
 from pos_uniformes.services.catalog_mutation_service import (
     delete_catalog_product,
@@ -244,9 +236,7 @@ from pos_uniformes.ui.dialogs.settings_prompt_dialogs import (
     prompt_role_change,
     prompt_supplier_data,
 )
-from pos_uniformes.ui.dialogs.catalog_product_dialog import build_catalog_product_dialog
 from pos_uniformes.ui.dialogs.catalog_variant_dialog import (
-    build_catalog_batch_variant_dialog,
     build_catalog_variant_dialog,
 )
 from pos_uniformes.ui.dialogs.inventory_context_menu_dialog import prompt_inventory_context_action
@@ -279,7 +269,6 @@ from pos_uniformes.ui.helpers.catalog_macro_filter_helper import (
     resolve_catalog_uniform_macro_selection,
 )
 from pos_uniformes.ui.helpers.catalog_form_payload_helper import (
-    validate_catalog_product_submission,
     validate_catalog_variant_submission,
 )
 from pos_uniformes.ui.helpers.analytics_payment_helper import build_analytics_payment_rows
@@ -356,9 +345,7 @@ from pos_uniformes.ui.helpers.inventory_selection_helper import (
 )
 from pos_uniformes.ui.helpers.inventory_summary_helper import INVENTORY_SEARCH_LIMIT, build_inventory_summary_view
 from pos_uniformes.ui.helpers.inventory_alta_texts import (
-    TITULO_ERROR_LOTE,
     mensaje_talla_creada,
-    mensaje_tallas_creadas,
 )
 from pos_uniformes.ui.helpers.inventory_help_texts import aplicar_ayudas_inventario
 from pos_uniformes.ui.helpers.inventory_toggle_helper import (
@@ -370,7 +357,7 @@ from pos_uniformes.ui.helpers.inventory_toggle_helper import (
 from pos_uniformes.ui.helpers.inventory_table_row_helper import build_inventory_table_row_views
 from pos_uniformes.ui.helpers.layaway_alerts_helper import build_layaway_alerts_view
 from pos_uniformes.ui.helpers.window_close_helper import build_main_window_close_decision
-from pos_uniformes.ui.helpers.size_option_sort_helper import group_size_options, sort_size_options
+from pos_uniformes.ui.helpers.size_option_sort_helper import sort_size_options
 from pos_uniformes.ui.helpers.snapshot_cache_helper import SnapshotCache
 from pos_uniformes.ui.helpers.settings_backup_helper import (
     build_settings_backup_error_view,
@@ -454,7 +441,6 @@ from pos_uniformes.ui.views.panel_uniformes_view import build_panel_uniformes_ta
 from pos_uniformes.ui.views.settings_view import build_settings_tab
 from pos_uniformes.ui.styles.main_window_styles import build_main_window_stylesheet
 from pos_uniformes.utils.date_format import format_display_date, format_display_datetime
-from pos_uniformes.utils.product_templates import merge_choice_lists
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 from pos_uniformes.utils.qr_generator import QrGenerator
 from pos_uniformes.services.nombres_empleadas_service import mostrar as _nombre_de
@@ -685,307 +671,6 @@ class MultiSelectFilterButton(QToolButton):
         self.setToolTip(f"{self._short_label}: {', '.join(labels)}")
 
 
-class MultiSelectPickerButton(QPushButton):
-    selectionChanged = pyqtSignal()
-
-    def __init__(
-        self,
-        default_label: str,
-        *,
-        title: str,
-        helper_text: str,
-        columns: int = 4,
-        group_values_by_format: bool = False,
-        allow_custom: bool = False,
-        presets: list[tuple[str, list[str] | Callable[[list[str]], list[str]]]] | None = None,
-    ) -> None:
-        super().__init__(default_label)
-        self._default_label = default_label
-        self._short_label = default_label.split(":", 1)[0]
-        self._title = title
-        self._helper_text = helper_text
-        self._columns = max(1, columns)
-        self._group_values_by_format = group_values_by_format
-        self._allow_custom = allow_custom
-        self._items: list[tuple[str, str]] = []
-        self._selected_values: set[str] = set()
-        self._presets = presets or []
-        self.clicked.connect(self._open_picker)
-        self._update_text()
-
-    def set_items(self, items: list[tuple[str, str]]) -> None:
-        self._items = [(str(label), str(data)) for label, data in items if str(label).strip() and str(data).strip()]
-        valid_values = {data for _label, data in self._items}
-        self._selected_values = {value for value in self._selected_values if value in valid_values}
-        self._update_text()
-
-    def selected_values(self) -> set[str]:
-        return set(self._selected_values)
-
-    def selected_labels(self) -> list[str]:
-        selected = self.selected_values()
-        return [label for label, data in self._items if data in selected]
-
-    def clear_selection(self) -> None:
-        if not self._selected_values:
-            return
-        self._selected_values.clear()
-        self._update_text()
-        self.selectionChanged.emit()
-
-    def set_selected_values(self, values: list[str] | set[str]) -> None:
-        normalized = {str(value).strip() for value in values if str(value).strip()}
-        valid_values = {data for _label, data in self._items}
-        new_values = {value for value in normalized if value in valid_values}
-        if new_values == self._selected_values:
-            return
-        self._selected_values = new_values
-        self._update_text()
-        self.selectionChanged.emit()
-
-    def _update_text(self) -> None:
-        labels = self.selected_labels()
-        if not labels:
-            self.setText(self._default_label)
-            self.setToolTip(self._default_label)
-            return
-        joined = ", ".join(labels[:2])
-        if len(labels) <= 2 and len(joined) <= 28:
-            self.setText(joined)
-        else:
-            self.setText(f"{self._short_label}: {len(labels)}")
-        self.setToolTip(f"{self._short_label}: {', '.join(labels)}")
-
-    def _open_picker(self) -> None:
-        dialog = QDialog(self.window())
-        dialog.setWindowTitle(self._title)
-        dialog.setModal(True)
-        dialog.setMinimumWidth(560)
-        layout = QVBoxLayout()
-        layout.setSpacing(12)
-
-        helper_label = QLabel(self._helper_text)
-        helper_label.setWordWrap(True)
-        helper_label.setObjectName("subtleLine")
-        layout.addWidget(helper_label)
-
-        search_input = QLineEdit()
-        search_input.setPlaceholderText("Filtrar opciones")
-        layout.addWidget(search_input)
-
-        actions_row = QHBoxLayout()
-        select_all_button = QPushButton("Todas")
-        clear_button = QPushButton("Ninguna")
-        count_label = QLabel()
-        count_label.setObjectName("subtleLine")
-        actions_row.addWidget(select_all_button)
-        actions_row.addWidget(clear_button)
-        actions_row.addWidget(count_label, 1)
-        layout.addLayout(actions_row)
-
-        if self._presets:
-            preset_row = QHBoxLayout()
-            preset_row.setSpacing(8)
-
-            def current_values() -> list[str]:
-                return [data for _label, data in self._items]
-
-            def apply_preset(raw_values: list[str] | Callable[[list[str]], list[str]]) -> None:
-                if callable(raw_values):
-                    values = raw_values(current_values())
-                else:
-                    values = list(raw_values)
-                normalized = {str(value).strip() for value in values if str(value).strip()}
-                valid_values = {data for _label, data in self._items}
-                for checkbox, _label, data in checkboxes:
-                    checkbox.setChecked(data in normalized and data in valid_values)
-                refresh_count()
-
-            for label, values in self._presets:
-                button = QPushButton(label)
-                button.setObjectName("chipButton")
-                button.clicked.connect(lambda _checked=False, preset=values: apply_preset(preset))
-                preset_row.addWidget(button)
-            preset_row.addStretch(1)
-            layout.addLayout(preset_row)
-
-        # ── Custom value input ───────────────────────────────────────────
-        if self._allow_custom:
-            custom_row = QHBoxLayout()
-            custom_row.setSpacing(8)
-            custom_input = QLineEdit()
-            custom_input.setPlaceholderText("Escribir nuevo valor y presionar Agregar...")
-            custom_add_btn = QPushButton("+ Agregar")
-            custom_add_btn.setObjectName("chipButton")
-            custom_add_btn.setStyleSheet(
-                "QPushButton { background: #2e7d32; color: white; font-weight: 600;"
-                " padding: 4px 14px; border-radius: 6px; font-size: 12px; }"
-                "QPushButton:hover { background: #1b5e20; }"
-            )
-            custom_row.addWidget(custom_input, 1)
-            custom_row.addWidget(custom_add_btn)
-            layout.addLayout(custom_row)
-
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        content = QWidget()
-        content_layout = QVBoxLayout()
-        content_layout.setContentsMargins(4, 4, 4, 4)
-        content_layout.setSpacing(10)
-        checkboxes: list[tuple[QCheckBox, str, str]] = []
-        checkbox_groups: list[tuple[QWidget, list[QCheckBox]]] = []
-
-        # Grupo especial para valores custom añadidos en esta sesión
-        custom_group_widget: QWidget | None = None
-        custom_grid: QGridLayout | None = None
-        custom_checkboxes: list[QCheckBox] = []
-
-        def add_group(group_label: str | None, items: list[tuple[str, str]]) -> None:
-            group_widget = QWidget()
-            group_layout = QVBoxLayout()
-            group_layout.setContentsMargins(0, 0, 0, 0)
-            group_layout.setSpacing(6)
-            visible_checkboxes: list[QCheckBox] = []
-            if group_label:
-                title = QLabel(group_label)
-                title.setObjectName("catalogSectionHint")
-                group_layout.addWidget(title)
-            grid = QGridLayout()
-            grid.setContentsMargins(0, 0, 0, 0)
-            grid.setHorizontalSpacing(10)
-            grid.setVerticalSpacing(8)
-            for index, (label, data) in enumerate(items):
-                checkbox = QCheckBox(label)
-                checkbox.setChecked(data in self._selected_values)
-                checkbox.setProperty("search_text", label.casefold())
-                grid.addWidget(checkbox, index // self._columns, index % self._columns)
-                checkboxes.append((checkbox, label, data))
-                visible_checkboxes.append(checkbox)
-            group_layout.addLayout(grid)
-            group_widget.setLayout(group_layout)
-            content_layout.addWidget(group_widget)
-            checkbox_groups.append((group_widget, visible_checkboxes))
-
-        if self._group_values_by_format:
-            grouped_items = [
-                (group_label, [(value, value) for value in group_values])
-                for group_label, group_values in group_size_options([data for _label, data in self._items])
-            ]
-            for group_label, items in grouped_items:
-                add_group(group_label, items)
-        else:
-            add_group(None, self._items)
-
-        def _add_custom_value() -> None:
-            nonlocal custom_group_widget, custom_grid
-            if not self._allow_custom:
-                return
-            value = custom_input.text().strip()
-            if not value:
-                return
-            # No duplicar
-            existing = {data for _cb, _lbl, data in checkboxes}
-            if value in existing:
-                # Si ya existe, solo marcarlo
-                for cb, _lbl, data in checkboxes:
-                    if data == value:
-                        cb.setChecked(True)
-                        break
-                custom_input.clear()
-                refresh_count()
-                return
-            # Crear grupo "Nuevos" si no existe
-            if custom_group_widget is None:
-                custom_group_widget = QWidget()
-                cg_layout = QVBoxLayout()
-                cg_layout.setContentsMargins(0, 0, 0, 0)
-                cg_layout.setSpacing(6)
-                cg_title = QLabel("Nuevos")
-                cg_title.setObjectName("catalogSectionHint")
-                cg_title.setStyleSheet("font-weight:700; color:#2e7d32;")
-                cg_layout.addWidget(cg_title)
-                custom_grid = QGridLayout()
-                custom_grid.setContentsMargins(0, 0, 0, 0)
-                custom_grid.setHorizontalSpacing(10)
-                custom_grid.setVerticalSpacing(8)
-                cg_layout.addLayout(custom_grid)
-                custom_group_widget.setLayout(cg_layout)
-                # Insertar al inicio del content_layout
-                content_layout.insertWidget(0, custom_group_widget)
-                checkbox_groups.append((custom_group_widget, custom_checkboxes))
-            # Añadir checkbox
-            idx = len(custom_checkboxes)
-            cb = QCheckBox(value)
-            cb.setChecked(True)
-            cb.setProperty("search_text", value.casefold())
-            cb.toggled.connect(lambda _: refresh_count())
-            custom_grid.addWidget(cb, idx // self._columns, idx % self._columns)
-            checkboxes.append((cb, value, value))
-            custom_checkboxes.append(cb)
-            self._items.append((value, value))
-            custom_input.clear()
-            refresh_count()
-
-        if self._allow_custom:
-            custom_add_btn.clicked.connect(_add_custom_value)
-            custom_input.returnPressed.connect(_add_custom_value)
-
-        content_layout.addStretch(1)
-        content.setLayout(content_layout)
-        scroll.setWidget(content)
-        layout.addWidget(scroll)
-
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Aplicar")
-        buttons.button(QDialogButtonBox.StandardButton.Cancel).setText("Cancelar")
-        layout.addWidget(buttons)
-        dialog.setLayout(layout)
-
-        def refresh_count() -> None:
-            selected_count = sum(1 for checkbox, _label, _data in checkboxes if checkbox.isChecked())
-            count_label.setText(f"Seleccionadas: {selected_count}")
-
-        def apply_search(text: str) -> None:
-            needle = text.strip().casefold()
-            for checkbox, label, _data in checkboxes:
-                visible = not needle or needle in label.casefold()
-                checkbox.setVisible(visible)
-            for group_widget, group_checkboxes in checkbox_groups:
-                group_widget.setVisible(any(checkbox.isVisible() for checkbox in group_checkboxes))
-
-        def set_all_visible(checked: bool) -> None:
-            for checkbox, _label, _data in checkboxes:
-                if checkbox.isVisible():
-                    checkbox.setChecked(checked)
-            refresh_count()
-
-        search_input.textChanged.connect(apply_search)
-        select_all_button.clicked.connect(lambda: set_all_visible(True))
-        clear_button.clicked.connect(lambda: set_all_visible(False))
-        for checkbox, _label, _data in checkboxes:
-            checkbox.toggled.connect(lambda _checked: refresh_count())
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        refresh_count()
-
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return
-
-        selected = {
-            data
-            for checkbox, _label, data in checkboxes
-            if checkbox.isChecked()
-        }
-        if selected == self._selected_values:
-            return
-        self._selected_values = selected
-        self._update_text()
-        self.selectionChanged.emit()
-
-
 def _set_table_badge_style(item: QTableWidgetItem, tone: str, *, con_fondo: bool = True) -> None:
     palette = {
         "positive": ("#e5f2eb", "#245241"),
@@ -1012,43 +697,6 @@ def _set_table_row_tint(item: QTableWidgetItem, tone: str) -> None:
     background, foreground = palette.get(tone, palette["neutral"])
     item.setBackground(QColor(background))
     item.setForeground(QColor(foreground))
-
-# Listas de los selectores de talla y color: las formas oficiales que decidió
-# Daniel el 2026-11-13 (viven en `catalogo_valores_service`). Antes traían
-# XS/S/M/L/XL/XXL y «Multicolor», que no se usan en la tienda.
-COMMON_COLORS = list(COLORES_SUGERIDOS)
-COMMON_SIZES = list(TALLAS_SUGERIDAS)
-
-DEFAULT_VARIANT_SIZE = "Unitalla"
-DEFAULT_VARIANT_COLOR = "Sin color"
-
-PRODUCT_TEMPLATES = [
-    {"label": "Jeans", "category": "Ropa", "name": "Jeans", "description": "Pantalon de mezclilla casual."},
-    {"label": "Pantalon vestir", "category": "Ropa", "name": "Pantalon vestir", "description": "Pantalon formal para uso diario."},
-    {"label": "Short", "category": "Ropa", "name": "Short", "description": "Short casual para temporada calida."},
-    {"label": "Playera", "category": "Ropa", "name": "Playera", "description": "Playera basica de manga corta."},
-    {"label": "Polo", "category": "Ropa", "name": "Polo", "description": "Playera tipo polo de uso casual."},
-    {"label": "Camisa", "category": "Ropa", "name": "Camisa", "description": "Camisa casual o formal de manga larga."},
-    {"label": "Blusa", "category": "Ropa", "name": "Blusa", "description": "Blusa ligera para uso diario."},
-    {"label": "Sudadera", "category": "Ropa", "name": "Sudadera", "description": "Sudadera comoda para clima fresco."},
-    {"label": "Chamarra", "category": "Ropa", "name": "Chamarra", "description": "Chamarra ligera o abrigadora."},
-    {"label": "Vestido", "category": "Ropa", "name": "Vestido", "description": "Vestido casual o de ocasion especial."},
-    {"label": "Falda", "category": "Ropa", "name": "Falda", "description": "Falda para uso casual o formal."},
-    {"label": "Tenis", "category": "Calzado", "name": "Tenis", "description": "Calzado deportivo o casual."},
-    {"label": "Zapato casual", "category": "Calzado", "name": "Zapato casual", "description": "Zapato comodo para uso diario."},
-    {"label": "Zapato vestir", "category": "Calzado", "name": "Zapato vestir", "description": "Calzado formal para eventos o trabajo."},
-    {"label": "Bota", "category": "Calzado", "name": "Bota", "description": "Bota casual o de trabajo."},
-    {"label": "Botin", "category": "Calzado", "name": "Botin", "description": "Botin corto para temporada fresca."},
-    {"label": "Sandalia", "category": "Calzado", "name": "Sandalia", "description": "Calzado abierto para clima calido."},
-    {"label": "Pantufla", "category": "Calzado", "name": "Pantufla", "description": "Calzado comodo para interior."},
-    {"label": "Cinturon", "category": "Accesorios", "name": "Cinturon", "description": "Accesorio de vestir para pantalones."},
-    {"label": "Bolsa", "category": "Accesorios", "name": "Bolsa", "description": "Bolsa o bolso para uso diario."},
-    {"label": "Mochila", "category": "Accesorios", "name": "Mochila", "description": "Mochila practica para escuela o trabajo."},
-    {"label": "Gorra", "category": "Accesorios", "name": "Gorra", "description": "Gorra casual para uso diario."},
-]
-
-UNIFORM_MACRO_TYPES = ["Deportivo", "Oficial", "Basico", "Escolta", "Accesorio"]
-
 
 def _build_bulk_selection_label(selected_ids: list[int], matched_rows: list[dict[str, object]]) -> str:
     matched = len(matched_rows)
@@ -4077,131 +3725,6 @@ class MainWindow(QMainWindow):
                 dialog.close()
             setattr(self, attr_name, None)
 
-    def _load_db_colors_and_sizes(self) -> tuple[list[str], list[str]]:
-        """Carga colores y tallas distintos de variantes activas en la BD."""
-        db_colors: list[str] = []
-        db_sizes: list[str] = []
-        try:
-            with get_session() as session:
-                rows = session.execute(
-                    select(Variante.color).where(Variante.activo.is_(True)).distinct()
-                ).scalars().all()
-                db_colors = [c.strip() for c in rows if c and c.strip() and c.strip() != DEFAULT_VARIANT_COLOR]
-                rows = session.execute(
-                    select(Variante.talla).where(Variante.activo.is_(True)).distinct()
-                ).scalars().all()
-                db_sizes = [t.strip() for t in rows if t and t.strip() and t.strip() != DEFAULT_VARIANT_SIZE]
-        except Exception:  # noqa: BLE001
-            pass
-        return db_colors, db_sizes
-
-    def _prompt_product_data(self, initial: dict[str, object] | None = None) -> dict[str, object] | None:
-        db_colors, db_sizes = self._load_db_colors_and_sizes()
-        return build_catalog_product_dialog(
-            self,
-            initial=initial,
-            picker_button_class=MultiSelectPickerButton,
-            product_templates=PRODUCT_TEMPLATES,
-            common_sizes=merge_choice_lists(COMMON_SIZES, db_sizes),
-            common_colors=merge_choice_lists(COMMON_COLORS, db_colors),
-            default_variant_size=DEFAULT_VARIANT_SIZE,
-            default_variant_color=DEFAULT_VARIANT_COLOR,
-        )
-
-    def _prompt_batch_variant_data(
-        self,
-        *,
-        sizes: list[str],
-        colors: list[str],
-        initial_price: str = "",
-        pricing_mode: str = "single",
-        prices_by_size: dict[str, str] | None = None,
-        price_summary: str = "",
-        initial_cost: str = "",
-        initial_stock: int = 0,
-    ) -> dict[str, object] | None:
-        return build_catalog_batch_variant_dialog(
-            self,
-            sizes=sizes,
-            colors=colors,
-            initial_price=initial_price,
-            pricing_mode=pricing_mode,
-            prices_by_size=prices_by_size,
-            price_summary=price_summary,
-            initial_cost=initial_cost,
-            initial_stock=initial_stock,
-            default_variant_size=DEFAULT_VARIANT_SIZE,
-            default_variant_color=DEFAULT_VARIANT_COLOR,
-        )
-
-    def _create_variants_batch(
-        self,
-        *,
-        product_id: int,
-        sizes: list[str],
-        colors: list[str],
-        price_text: str,
-        prices_by_size: dict[str, str] | None = None,
-        cost_text: str = "",
-        stock_initial: int = 0,
-    ) -> tuple[int, int | None, list[str], list[str]]:
-        normalized_sizes = [value.strip() for value in sizes if value and value.strip()] or [DEFAULT_VARIANT_SIZE]
-        normalized_colors = [value.strip() for value in colors if value and value.strip()] or [DEFAULT_VARIANT_COLOR]
-        try:
-            default_price = Decimal(price_text) if str(price_text).strip() else None
-            cost = Decimal(cost_text) if cost_text else None
-        except InvalidOperation as exc:
-            raise ValueError("Precio o costo con formato invalido.") from exc
-        normalized_price_map: dict[str, Decimal] = {}
-        for size, raw_price in (prices_by_size or {}).items():
-            size_key = str(size).strip()
-            price_value = str(raw_price).strip()
-            if not size_key or not price_value:
-                continue
-            try:
-                normalized_price_map[size_key] = Decimal(price_value)
-            except InvalidOperation as exc:
-                raise ValueError(f"Precio invalido para talla {size_key}.") from exc
-
-        created_count = 0
-        first_variant_id: int | None = None
-        errors: list[str] = []
-        created_skus: list[str] = []
-        with get_session() as session:
-            user = session.get(Usuario, self.user_id)
-            producto = session.get(Producto, int(product_id))
-            if user is None or producto is None:
-                raise ValueError("Usuario o producto no encontrado.")
-            for size in normalized_sizes:
-                for color in normalized_colors:
-                    try:
-                        price = normalized_price_map.get(size, default_price)
-                        if price is None:
-                            raise ValueError(f"Falta precio para la talla {size}.")
-                        with session.begin_nested():
-                            presentacion = CatalogService.crear_variante(
-                                session=session,
-                                usuario=user,
-                                producto=producto,
-                                sku=None,
-                                talla=size,
-                                color=color,
-                                precio_venta=price,
-                                costo_referencia=cost,
-                                stock_inicial=stock_initial,
-                            )
-                            session.flush()
-                            created_count += 1
-                            created_skus.append(str(presentacion.sku))
-                            if first_variant_id is None:
-                                first_variant_id = int(presentacion.id)
-                    except Exception as exc:  # noqa: BLE001
-                        errors.append(f"{size} / {color}: {exc}")
-            if created_count == 0:
-                raise ValueError("No se pudo crear ninguna presentacion.")
-            session.commit()
-        return created_count, first_variant_id, errors, created_skus
-
     def _prompt_variant_data(
         self,
         initial: dict[str, object] | None = None,
@@ -4209,29 +3732,12 @@ class MainWindow(QMainWindow):
         include_stock: bool = False,
         default_product_id: int | None = None,
     ) -> dict[str, object] | None:
-        db_colors, db_sizes = self._load_db_colors_and_sizes()
         return build_catalog_variant_dialog(
             self,
             initial=initial,
             prefill=prefill,
             include_stock=include_stock,
             default_product_id=default_product_id,
-            common_sizes=merge_choice_lists(COMMON_SIZES, db_sizes),
-            common_colors=merge_choice_lists(COMMON_COLORS, db_colors),
-            default_variant_size=DEFAULT_VARIANT_SIZE,
-            default_variant_color=DEFAULT_VARIANT_COLOR,
-        )
-
-    def _resolve_named_taxonomy(self, session, model, raw_name: str, data: dict | None = None):
-        # Ya no crea en silencio: solo lo que el usuario eligió crear en
-        # «¿Quisiste decir…?» (tanda 1 del alta, 2026-11-13).
-        campo = CAMPO_POR_MODELO.get(model, "")
-        return resolver_o_crear(
-            session,
-            model,
-            raw_name,
-            confirmados=((data or {}).get("valores_nuevos") or {}).get(campo, ()),
-            usuario=session.get(Usuario, self.user_id),
         )
 
     def _prompt_purchase_data(self) -> dict[str, object] | None:
@@ -5327,169 +4833,6 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, title, str(exc))
             return None
 
-    def _handle_create_product(self) -> None:
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede crear productos.")
-            return
-
-        try:
-            data = self._prompt_product_data()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "Datos incompletos", str(exc))
-            return
-        if data is None:
-            return
-
-        validation_feedback = validate_catalog_product_submission(data)
-        if validation_feedback is not None:
-            QMessageBox.warning(self, "Datos incompletos", validation_feedback)
-            return
-
-        categoria_id = data["categoria_id"]
-        categoria_nombre = str(data.get("categoria_nombre") or "")
-        marca_id = data["marca_id"]
-        nombre = str(data["nombre"]).strip()
-        descripcion = str(data["descripcion"]).strip()
-        is_regular_product_mode = str(data.get("modo_catalogo") or "").strip() == "regular"
-
-        created_product_id: int | None = None
-        selected_sizes = [str(value).strip() for value in data.get("tallas", []) if str(value).strip()]
-        selected_colors = [str(value).strip() for value in data.get("colores", []) if str(value).strip()]
-        try:
-            with get_session() as session:
-                user = session.get(Usuario, self.user_id)
-                categoria = (
-                    session.get(Categoria, int(categoria_id))
-                    if categoria_id is not None
-                    else self._resolve_named_taxonomy(session, Categoria, categoria_nombre, data)
-                )
-                marca = session.get(Marca, int(marca_id))
-                if user is None or categoria is None or marca is None:
-                    raise ValueError("Usuario, categoria o marca no encontrada.")
-                escuela = None if is_regular_product_mode else self._resolve_named_taxonomy(session, Escuela, str(data["escuela"]), data)
-                tipo_prenda = self._resolve_named_taxonomy(session, TipoPrenda, str(data["tipo_prenda"]), data)
-                tipo_pieza = self._resolve_named_taxonomy(session, TipoPieza, str(data["tipo_pieza"]), data)
-                atributo = self._resolve_named_taxonomy(session, AtributoProducto, str(data["atributo"]), data)
-                nivel_educativo = (
-                    None
-                    if is_regular_product_mode
-                    else self._resolve_named_taxonomy(session, NivelEducativo, str(data["nivel_educativo"]), data)
-                )
-                producto = CatalogService.crear_producto(
-                    session,
-                    user,
-                    categoria,
-                    marca,
-                    nombre,
-                    descripcion,
-                    escuela=escuela,
-                    tipo_prenda=tipo_prenda,
-                    tipo_pieza=tipo_pieza,
-                    nivel_educativo=nivel_educativo,
-                    atributo=atributo,
-                    genero=str(data["genero"]),
-                    escudo="" if is_regular_product_mode else str(data["escudo"]),
-                    ubicacion=str(data["ubicacion"]),
-                )
-                session.commit()
-                created_product_id = int(producto.id)
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Producto fallido", str(exc))
-            return
-
-        self.refresh_all()
-        if created_product_id is not None and (selected_sizes or selected_colors):
-            total_sizes = max(1, len(selected_sizes))
-            total_colors = max(1, len(selected_colors))
-            total_variants = total_sizes * total_colors
-            try:
-                with get_session() as session:
-                    sku_preview_list = CatalogService.preview_next_skus(session, total_variants)
-            except Exception:
-                sku_preview_list = []
-            if not sku_preview_list:
-                sku_preview = "SKU pendiente."
-            elif len(sku_preview_list) == 1:
-                sku_preview = sku_preview_list[0]
-            else:
-                sku_head = ", ".join(sku_preview_list[:4])
-                if len(sku_preview_list) > 4:
-                    sku_head += f" ... (+{len(sku_preview_list) - 4})"
-                sku_preview = f"{sku_head} | rango {sku_preview_list[0]} -> {sku_preview_list[-1]}"
-            reply = QMessageBox.question(
-                self,
-                "Producto creado",
-                (
-                    f"Producto '{nombre}' creado correctamente.\n\n"
-                    f"Ya dejaste {total_variants} tallas sugeridas con sus colores.\n"
-                    f"SKU previstos: {sku_preview}\n\n"
-                    "¿Quieres crearlas ahora todas juntas?"
-                ),
-            )
-            if reply == QMessageBox.StandardButton.Yes:
-                batch_data = self._prompt_batch_variant_data(
-                    sizes=selected_sizes,
-                    colors=selected_colors,
-                    initial_price=str(data.get("precio_variante") or ""),
-                    pricing_mode=str(data.get("precio_modo") or "single"),
-                    prices_by_size=dict(data.get("precios_por_talla") or {}),
-                    price_summary=str(data.get("resumen_precio") or ""),
-                    initial_cost=str(data.get("costo_variante") or ""),
-                    initial_stock=int(data.get("stock_inicial_variante") or 0),
-                )
-                if batch_data is not None:
-                    try:
-                        created_count, first_variant_id, errors, created_skus = self._create_variants_batch(
-                            product_id=created_product_id,
-                            sizes=list(batch_data["tallas"]),
-                            colors=list(batch_data["colores"]),
-                            price_text=str(batch_data["precio"]),
-                            prices_by_size=dict(batch_data.get("precios_por_talla") or {}),
-                            cost_text=str(batch_data["costo"]),
-                            stock_initial=int(batch_data["stock_inicial"]),
-                        )
-                    except Exception as exc:  # noqa: BLE001
-                        QMessageBox.critical(self, TITULO_ERROR_LOTE, str(exc))
-                        return
-                    self.refresh_all()
-                    if first_variant_id is not None:
-                        self._set_combo_value(self.inventory_variant_combo, first_variant_id)
-                    QMessageBox.information(
-                        self,
-                        "Tallas creadas",
-                        mensaje_tallas_creadas(nombre, created_count, created_skus, errors),
-                    )
-                return
-
-        reply = QMessageBox.question(
-            self,
-            "Producto creado",
-            f"Producto '{nombre}' creado correctamente.\n\n¿Quieres agregar su primera talla ahora?",
-        )
-        if reply == QMessageBox.StandardButton.Yes and created_product_id is not None:
-            result = self._create_or_edit_presentation(
-                default_product_id=created_product_id,
-                include_stock=True,
-            )
-            if result is not None:
-                sku, variant_id = result
-                self.refresh_all()
-                QMessageBox.information(self, "Talla creada", self._mensaje_talla_creada(variant_id, sku))
-
-    def _handle_create_variant(self) -> None:
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede crear presentaciones.")
-            return
-
-        result = self._create_or_edit_presentation(include_stock=True)
-        if result is None:
-            return
-
-        sku, variant_id = result
-        self.refresh_all()
-        self._set_combo_value(self.inventory_variant_combo, variant_id)
-        QMessageBox.information(self, "Talla creada", self._mensaje_talla_creada(variant_id, sku))
-
     def _handle_duplicate_variant(self) -> None:
         if self.current_role != RolUsuario.ADMIN:
             QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede crear presentaciones.")
@@ -5558,84 +4901,6 @@ class MainWindow(QMainWindow):
         )
         if cambio:
             self._refresh_catalog()
-
-    def _handle_update_product(self) -> None:
-        selected = self._selected_catalog_row()
-        feedback = build_catalog_action_guard_feedback(
-            action_key="update_product",
-            has_selection=selected is not None,
-            is_admin=self.current_role == RolUsuario.ADMIN,
-        )
-        if feedback is not None:
-            QMessageBox.warning(self, feedback.title, feedback.message)
-            return
-        assert selected is not None
-
-        try:
-            data = self._prompt_product_data(selected)
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "No se puede editar", str(exc))
-            return
-        if data is None:
-            return
-
-        categoria_id = data["categoria_id"]
-        categoria_nombre = str(data.get("categoria_nombre") or "")
-        marca_id = data["marca_id"]
-        nombre = str(data["nombre"]).strip()
-        descripcion = str(data["descripcion"]).strip()
-        is_regular_product_mode = str(data.get("modo_catalogo") or "").strip() == "regular"
-
-        try:
-            with get_session() as session:
-                usuario = session.get(Usuario, self.user_id)
-                producto = session.get(Producto, int(selected["producto_id"]))
-                categoria = (
-                    session.get(Categoria, int(categoria_id))
-                    if categoria_id is not None
-                    else self._resolve_named_taxonomy(session, Categoria, categoria_nombre, data)
-                )
-                marca = session.get(Marca, int(marca_id))
-                if usuario is None or producto is None or categoria is None or marca is None:
-                    raise ValueError("No se pudo cargar el producto, categoria o marca.")
-                escuela = None if is_regular_product_mode else self._resolve_named_taxonomy(session, Escuela, str(data["escuela"]), data)
-                tipo_prenda = self._resolve_named_taxonomy(session, TipoPrenda, str(data["tipo_prenda"]), data)
-                tipo_pieza = self._resolve_named_taxonomy(session, TipoPieza, str(data["tipo_pieza"]), data)
-                atributo = self._resolve_named_taxonomy(session, AtributoProducto, str(data["atributo"]), data)
-                nivel_educativo = (
-                    None
-                    if is_regular_product_mode
-                    else self._resolve_named_taxonomy(session, NivelEducativo, str(data["nivel_educativo"]), data)
-                )
-                CatalogService.actualizar_producto(
-                    session=session,
-                    usuario=usuario,
-                    producto=producto,
-                    categoria=categoria,
-                    marca=marca,
-                    nombre=nombre,
-                    descripcion=descripcion,
-                    escuela=escuela,
-                    tipo_prenda=tipo_prenda,
-                    tipo_pieza=tipo_pieza,
-                    nivel_educativo=nivel_educativo,
-                    atributo=atributo,
-                    genero=str(data["genero"]),
-                    escudo="" if is_regular_product_mode else str(data["escudo"]),
-                    ubicacion=str(data["ubicacion"]),
-                )
-                session.commit()
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Producto no actualizado", str(exc))
-            return
-
-        self.refresh_all()
-        self._select_catalog_variant(int(selected["variante_id"]))
-        result_view = build_catalog_success_result(
-            action_key="update_product",
-            item_label=nombre,
-        )
-        QMessageBox.information(self, result_view.title, result_view.message)
 
     def _handle_update_variant(self) -> None:
         selected = self._selected_catalog_row()
@@ -5857,17 +5122,6 @@ class MainWindow(QMainWindow):
                 return CatalogService.preview_next_skus(session, normalized_count)
         except Exception:
             return []
-
-    def _format_sku_preview(self, count: int) -> str:
-        preview_list = self._preview_next_skus(count)
-        if not preview_list:
-            return "SKU pendiente."
-        if len(preview_list) == 1:
-            return preview_list[0]
-        preview_head = ", ".join(preview_list[:4])
-        if len(preview_list) <= 4:
-            return f"{preview_head} | rango {preview_list[0]} -> {preview_list[-1]}"
-        return f"{preview_head} ... (+{len(preview_list) - 4}) | rango {preview_list[0]} -> {preview_list[-1]}"
 
     def _handle_inventory_adjustment(self) -> None:
         inventario_acciones.corregir_existencia(self)

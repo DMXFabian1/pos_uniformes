@@ -2,8 +2,7 @@
 
 Aquí solo se cablea: la ventana es `ui/dialogs/nueva_prenda_dialog.py` y el
 alta, `services/alta_prenda_service.py`. Lo que la ventana pide a la
-principal (imprimir etiquetas, ver en Inventario, el formulario anterior,
-refrescar) son manejadores que ya existían.
+principal (imprimir etiquetas, ver en Inventario, refrescar) son manejadores que ya existían.
 """
 
 from __future__ import annotations
@@ -56,7 +55,6 @@ def abrir_nueva_prenda(window: "MainWindow", *, session_factory=get_session):
         usuario_id=int(window.user_id),
         al_imprimir=lambda ids: imprimir_etiquetas(window, ids),
         al_ver=lambda resultado: ver_en_inventario(window, resultado),
-        al_formulario_anterior=lambda: window._handle_create_product(),
         al_terminar=lambda _resultado: window.refresh_all(),
     )
     dialogo.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)

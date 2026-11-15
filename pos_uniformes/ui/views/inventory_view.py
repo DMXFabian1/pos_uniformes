@@ -194,7 +194,7 @@ def _encabezado(window: "MainWindow", pantalla: InventarioPantalla) -> QHBoxLayo
     nueva.setText("＋ Nueva prenda")
     nueva.setToolButtonStyle(Qt.ToolButtonStyle.ToolButtonTextOnly)
     nueva.setCursor(Qt.CursorShape.PointingHandCursor)
-    # Tanda 3 del alta: la ventana nueva; el asistente viejo sigue en «⋯ → Usar el formulario anterior».
+    # Tanda 3 del alta: la ventana nueva (el asistente viejo se retiró en la tanda 5).
     nueva.clicked.connect(lambda: abrir_nueva_prenda(window))
     fila.addWidget(nueva)
 
