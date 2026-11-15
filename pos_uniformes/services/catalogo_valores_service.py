@@ -93,6 +93,15 @@ TALLAS_SUGERIDAS = (
     TALLA_UNITALLA,
 )
 
+#: Juegos de tallas de un toque para la ropa general o de temporada (tanda 4
+#: del alta, 2026-11-15; `alta_datos.md` §9: Unitalla, Adulto/Infantil, CH–EXG).
+JUEGOS_TALLAS = {
+    "Unitalla": (TALLA_UNITALLA,),
+    "Infantil · Adulto": ("Infantil", "Adulto"),
+    "Infantil · Juvenil · Adulto": TALLAS_TEMPORADA,
+    "CH · MD · GD · EXG": TALLAS_LETRA,
+}
+
 COLOR_SURTIDO = "Surtido"
 COLORES_SUGERIDOS = (
     "Negro",

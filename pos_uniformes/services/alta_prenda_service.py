@@ -140,6 +140,9 @@ class PlanPrenda:
     confirmados: tuple[str, ...] = ()
     #: Origen propio para la bitácora (gana sobre el de `aplicar`).
     origen: str | None = None
+    #: Compara cada precio con el que más se repite en la base (ámbar si
+    #: queda abajo). En ropa general no: cada modelo de temporada es distinto.
+    comparar_precios: bool = True
     #: Avisos y errores que pone quien arma el plan (sin modelo, lote) y que
     #: `completar` conserva cada vez que se vuelve a llamar.
     avisos_fijos: list[str] = field(default_factory=list)
@@ -373,7 +376,7 @@ def _revisar_precios(plan: PlanPrenda, usos: _Usos) -> None:
     `plan.avisos`."""
     pieza_id = _id_de(usos.session, TipoPieza, plan.tipo_pieza)
     nivel_id = _id_de(usos.session, NivelEducativo, plan.nivel)
-    conteos = usos.precios(pieza_id, nivel_id, plan.escuela_id)
+    conteos = usos.precios(pieza_id, nivel_id, plan.escuela_id) if plan.comparar_precios else {}
     for t in plan.tallas_posibles:  # desmarcadas: solo su precio y aviso
         t.precio = precios.dinero(t.precio)
         contador = conteos.get(t.talla)
@@ -794,6 +797,217 @@ def planear_varias_escuelas(
     return planes
 
 
+# ── Prenda general o de temporada (tanda 4, 2026-11-15) ────────────────────
+#
+# Caso (c) de la propuesta: 28 % de las altas recientes son ropa general o de
+# temporada («Chaleco Mujer KY18005», color Surtido, 1 a 4 tallas, marca
+# nueva). Casi nunca tienen hermana; si hay una parecida (sin escuela) se
+# ofrece «Igual que esta, otro modelo» con las mismas tallas, precio y marca.
+# La marca y el color siempre se eligen (no se adivinan).
+
+ORIGEN_GENERAL = "Alta desde POS · prenda general"
+
+
+@dataclass(frozen=True)
+class Parecida:
+    """Una prenda general que se parece a lo que se escribe."""
+
+    producto_id: int
+    nombre: str
+    marca: str
+    tipo_prenda: str | None
+    tipo_pieza: str | None
+    categoria: str
+    genero: str | None
+    color: str
+    tallas: tuple[tuple[str, Decimal], ...] = ()
+
+    @property
+    def precios(self) -> dict[str, Decimal]:
+        return dict(self.tallas)
+
+    @property
+    def texto(self) -> str:
+        """«2 tallas · $389 · Ykan»."""
+        n = len(self.tallas)
+        partes = ["1 talla" if n == 1 else f"{n} tallas"]
+        if self.tallas:
+            lo, hi = min(p for _t, p in self.tallas), max(p for _t, p in self.tallas)
+            partes.append(f"${lo:.0f}" if lo == hi else f"${lo:.0f} a ${hi:.0f}")
+        if self.marca:
+            partes.append(self.marca)
+        return " · ".join(partes)
+
+
+def _parecido_de_nombre(escrito: str, nombre: str) -> float:
+    """Puro: qué tanto se parece un nombre a otro. La primera palabra (la
+    pieza: «Chaleco», «Sudadera») tiene que coincidir; luego cuenta el resto."""
+    import difflib
+
+    a, b = valores.normalizar(escrito).split(), valores.normalizar(nombre).split()
+    if not a or not b or a[0] != b[0]:
+        return 0.0
+    return 0.5 + 0.5 * difflib.SequenceMatcher(None, " ".join(a[1:]), " ".join(b[1:])).ratio()
+
+
+def parecidas_generales(session: Session, nombre: str, *, limite: int = 3) -> list[Parecida]:
+    """Las prendas generales activas (sin escuela) que más se parecen a `nombre`,
+    con sus tallas y precios. Dos consultas."""
+    escrito = valores.limpiar(nombre)
+    if len(valores.normalizar(escrito)) < 3:
+        return []
+    filas = session.execute(
+        select(Producto.id, Producto.nombre).where(Producto.activo.is_(True), Producto.escuela_id.is_(None))
+    ).all()
+    puntuadas = sorted(
+        ((_parecido_de_nombre(escrito, n), int(pid)) for pid, n in filas
+         if valores.normalizar(n) != valores.normalizar(escrito)),
+        reverse=True,
+    )
+    ids = [pid for score, pid in puntuadas if score > 0][: max(limite * 3, limite)]
+    if not ids:
+        return []
+    datos = {d.producto_id: d for d in _datos_generales(session, ids) if d.tallas}
+    return [datos[pid] for pid in ids if pid in datos][:limite]
+
+
+def _datos_generales(session: Session, ids: list[int]) -> list[Parecida]:
+    filas = session.execute(
+        select(Producto.id, Producto.nombre, Marca.nombre, TipoPrenda.nombre, TipoPieza.nombre, Categoria.nombre,
+               Producto.genero, Variante.talla, Variante.color, Variante.precio_venta)
+        .join(Marca, Marca.id == Producto.marca_id)
+        .join(Categoria, Categoria.id == Producto.categoria_id)
+        .outerjoin(TipoPrenda, TipoPrenda.id == Producto.tipo_prenda_id)
+        .outerjoin(TipoPieza, TipoPieza.id == Producto.tipo_pieza_id)
+        .join(Variante, (Variante.producto_id == Producto.id) & Variante.activo.is_(True))
+        .where(Producto.id.in_(ids))
+    ).all()
+    por_id: dict[int, dict] = {}
+    for pid, nombre, marca, prenda, pieza, categoria, genero, talla, color, precio in filas:
+        d = por_id.setdefault(int(pid), {"base": (str(nombre), str(marca), prenda, pieza, str(categoria), genero),
+                                          "precios": {}, "colores": []})
+        t = valores.forma_oficial_talla(talla)
+        p = precios.dinero(precio) or Decimal("0")
+        d["precios"][t] = max(p, d["precios"].get(t, p))
+        d["colores"].append(valores.limpiar(color) or SIN_COLOR)
+    salida = []
+    for pid, d in por_id.items():
+        nombre, marca, prenda, pieza, categoria, genero = d["base"]
+        orden = sorted(d["precios"].items(), key=lambda tp: _clave_general(tp[0]))
+        color = max(set(d["colores"]), key=d["colores"].count) if d["colores"] else SIN_COLOR
+        salida.append(Parecida(pid, nombre, marca, prenda, pieza, categoria, genero, color, tuple(orden)))
+    return salida
+
+
+def datos_de_modelo(session: Session, producto_id: int) -> Parecida | None:
+    """Tallas, precios, marca, tipo y categoría de una prenda (para «Igual que esta, otro modelo»)."""
+    datos = _datos_generales(session, [int(producto_id)])
+    return datos[0] if datos else None
+
+
+_ORDEN_TEMPORADA = {"infantil": 0, "juvenil": 1, "adulto": 2}
+
+
+def _clave_general(talla: str) -> tuple:
+    n = valores.normalizar(talla)
+    if n in _ORDEN_TEMPORADA:
+        return (1, 60 + _ORDEN_TEMPORADA[n], n)
+    return clave_talla(talla)
+
+
+def categoria_para(session: Session, tipo_prenda: str | None) -> str | None:
+    """La categoría que más usan las prendas activas de ese tipo (la categoría
+    es casi un espejo del tipo de prenda: se llena sola)."""
+    if not tipo_prenda:
+        return None
+    fila = session.execute(
+        select(Categoria.nombre, func.count(Producto.id))
+        .join(Producto, Producto.categoria_id == Categoria.id)
+        .join(TipoPrenda, TipoPrenda.id == Producto.tipo_prenda_id)
+        .where(Producto.activo.is_(True), TipoPrenda.nombre == tipo_prenda)
+        .group_by(Categoria.nombre)
+        .order_by(func.count(Producto.id).desc(), Categoria.nombre)
+    ).first()
+    if fila is not None:
+        return str(fila[0])
+    clave = valores.normalizar(tipo_prenda)
+    for nombre in session.scalars(select(Categoria.nombre).where(Categoria.activo.is_(True))).all():
+        if valores.normalizar(nombre) == clave:
+            return str(nombre)
+    return None
+
+
+def planear_general(
+    session: Session,
+    nombre: str,
+    *,
+    tallas: Sequence[str],
+    marca: str | None,
+    color: str | None,
+    tipo_prenda: str | None,
+    tipo_pieza: str | None,
+    categoria: str | None = None,
+    precio: object = None,
+    precios_por_talla: Mapping[str, object] | None = None,
+    llegan: Mapping[str, int] | None = None,
+    costo: object = None,
+    genero: str | None = None,
+    modelo_id: int | None = None,
+    modelo_nombre: str | None = None,
+    confirmados: Iterable[str] = (),
+    saltar_skus: int = 0,
+) -> PlanPrenda:
+    """(c) Una prenda general o de temporada (sin escuela ni uniforme).
+
+    `precio` es el mismo para todas las tallas; `precios_por_talla` gana
+    sobre él talla por talla. `llegan` y `costo` son opcionales. Marca, color,
+    tipo de prenda y pieza se eligen siempre: sin ellos no deja guardar."""
+    errores: list[str] = []
+    if not valores.limpiar(color):
+        errores.append("Elige el color.")
+    if not valores.limpiar(tipo_prenda):
+        errores.append("Elige el tipo de prenda.")
+    if not valores.limpiar(tipo_pieza):
+        errores.append("Elige la pieza.")
+    categoria = valores.limpiar(categoria) or categoria_para(session, valores.limpiar(tipo_prenda)) or ""
+    if not categoria and valores.limpiar(tipo_prenda):
+        errores.append("Elige la categoría.")
+    por_talla = {valores.forma_oficial_talla(t): precios.dinero(p) for t, p in (precios_por_talla or {}).items()}
+    unico = precios.dinero(precio)
+    llegan = {valores.forma_oficial_talla(k): int(v or 0) for k, v in (llegan or {}).items()}
+    costo_d = precios.dinero(costo)
+    lista = []
+    for cruda in tallas:
+        talla = valores.forma_oficial_talla(cruda)
+        p = por_talla.get(talla)
+        p = p if p is not None else unico
+        lista.append(TallaPlan(talla=talla, precio=p, origen_precio=precios.ORIGEN_A_MANO if p is not None
+                               else precios.ORIGEN_FALTA, llegan=llegan.get(talla, 0), costo=costo_d))
+    lista.sort(key=lambda t: _clave_general(t.talla))
+    plan = PlanPrenda(
+        nombre_sin_escuela=valores.limpiar(nombre),
+        escuela=None,
+        categoria=categoria,
+        marca=valores.limpiar(marca),
+        tipo_prenda=_texto(tipo_prenda),
+        tipo_pieza=_texto(tipo_pieza),
+        genero=_texto(genero),
+        color=valores.limpiar(color) or SIN_COLOR,
+        tallas=lista,
+        ligar=False,
+        modelo_id=modelo_id,
+        modelo_nombre=_texto(modelo_nombre),
+        confirmados=tuple(confirmados),
+        origen=ORIGEN_GENERAL,
+        comparar_precios=False,
+        errores_fijos=errores,
+    )
+    plan = completar(session, plan, saltar_skus=saltar_skus)
+    # Las tallas de temporada en su orden (Infantil, Juvenil, Adulto).
+    plan.tallas.sort(key=lambda t: _clave_general(t.talla))
+    return plan
+
+
 # ── Ensayar y aplicar ──────────────────────────────────────────────────────
 
 @dataclass(frozen=True)
@@ -1040,6 +1254,12 @@ def ensayar(
 
 __all__ = [
     "ORIGEN_CLAUDE",
+    "ORIGEN_GENERAL",
+    "Parecida",
+    "categoria_para",
+    "datos_de_modelo",
+    "parecidas_generales",
+    "planear_general",
     "ORIGEN_POS",
     "REFERENCIA_ENTRADA",
     "AltaNoValida",
