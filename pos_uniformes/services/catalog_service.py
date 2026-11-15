@@ -609,7 +609,9 @@ class CatalogService:
         genero: str | None = None,
         escudo: str | None = None,
         ubicacion: str | None = None,
+        observacion: str | None = None,
     ) -> Producto:
+        """`observacion` va a la bitácora (p. ej. «Corregir prenda · desde la ficha»)."""
         cls._validar_admin(usuario)
         raw_name = nombre.strip()
         if not raw_name:
@@ -686,6 +688,7 @@ class CatalogService:
                 "escudo": producto.escudo,
                 "ubicacion": producto.ubicacion,
             },
+            observacion=(observacion or "").strip() or None,
         )
         cls._notify_meili(session)
         return producto
@@ -781,7 +784,9 @@ class CatalogService:
         precio_venta: Decimal,
         costo_referencia: Decimal | None = None,
         stock_minimo: int | None = None,
+        observacion: str | None = None,
     ) -> Variante:
+        """`observacion` va a la bitácora (p. ej. «Corregir prenda · desde la ficha»)."""
         cls._validar_admin(usuario)
         talla = talla.strip()
         color = color.strip() or "Sin color"
@@ -848,6 +853,7 @@ class CatalogService:
                 "precio_venta": variante.precio_venta,
                 "costo_referencia": variante.costo_referencia,
             },
+            observacion=(observacion or "").strip() or None,
         )
         cls._notify_meili(session)
         return variante
