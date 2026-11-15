@@ -111,6 +111,57 @@ class CorregirTests(unittest.TestCase):
         self.assertEqual(plan.etiquetas_enviadas, 1)
         self.assertTrue(plan.texto_etiquetas.startswith("Se han mandado a imprimir 1 etiqueta de esta prenda."))
 
+    # ── Revisión 2026-11-15 ────────────────────────────────────────────────
+
+    def test_precio_que_otra_caja_subio_no_se_regresa_al_guardar(self) -> None:
+        vid = self.variantes(self.sueter.id)[0][0]
+        plan = cp.planear_correccion(self.s, self.sueter.id, color="Azul")  # foto con $299
+        self.assertEqual(plan.tallas[0].precio, D(299))
+        v = self.s.get(Variante, vid)
+        v.precio_venta = D(325)  # otra caja lo sube mientras la ventanita sigue abierta
+        self.s.commit()
+        cp.aplicar_correccion(self.s, plan, self.admin, commit=True)
+        _i, _s, _t, color, precio = self.variantes(self.sueter.id)[0]
+        self.assertEqual((color, precio), ("Azul", D(325)))
+
+    def test_precio_tocado_que_cambio_en_la_base_se_detiene(self) -> None:
+        vid = self.variantes(self.sueter.id)[0][0]
+        plan = cp.planear_correccion(self.s, self.sueter.id, precios_nuevos={vid: 310})
+        v = self.s.get(Variante, vid)
+        v.precio_venta = D(330)
+        self.s.commit()
+        with self.assertRaises(cp.CorreccionNoValida) as error:
+            cp.aplicar_correccion(self.s, plan, self.admin, commit=True)
+        self.assertEqual(str(error.exception), cp.PRECIOS_CAMBIARON)
+        self.s.rollback()
+        self.assertEqual(self.variantes(self.sueter.id)[0][4], D(330))
+
+    def test_tallas_desactivadas_tambien_cambian_de_color(self) -> None:
+        antes = self.variantes(self.sueter.id)
+        apagada = self.s.get(Variante, antes[-1][0])
+        apagada.activo = False
+        self.s.commit()
+        plan = cp.planear_correccion(self.s, self.sueter.id, color="Azul")
+        self.assertEqual([t.variante_id for t in plan.desactivadas], [apagada.id])
+        self.assertIn("También su talla desactivada.", plan.resumen)
+        resultado = cp.aplicar_correccion(self.s, plan, self.admin, commit=True)
+        self.assertEqual(resultado.tallas_cambiadas, 7)
+        despues = self.variantes(self.sueter.id)
+        self.assertEqual({c for *_x, c, _p in despues}, {"Azul"})
+        self.assertEqual([p for *_x, p in despues], [p for *_x, p in antes])  # precios iguales
+        # Solo cambiar el nombre no toca las desactivadas.
+        plan = cp.planear_correccion(self.s, self.sueter.id, nombre_sin_escuela="Suéter Botones Mujer Azul")
+        self.assertEqual(plan.desactivadas, [])
+
+    def test_color_que_ya_existe_desactivado_frena(self) -> None:
+        primera = self.variantes(self.sueter.id)[0]
+        self.s.add(Variante(producto_id=self.sueter.id, sku="SKUAZUL01", talla=primera[2], color="Azul",
+                            precio_venta=D(299), stock_actual=0, activo=False))
+        self.s.commit()
+        plan = cp.planear_correccion(self.s, self.sueter.id, color="Azul")
+        self.assertFalse(plan.puede_aplicar)
+        self.assertTrue(plan.errores[0].startswith(f"La talla {primera[2]} ya existe en Azul"), plan.errores)
+
 
 if __name__ == "__main__":
     unittest.main()

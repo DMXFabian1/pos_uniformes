@@ -16,6 +16,14 @@ Se conserva todo lo demás: SKU, códigos, costo, mínimo y existencia. La
 bitácora (`cambio_catalogo`) anota cada campo con «Corregir prenda · desde
 la ficha». Solo ADMIN.
 
+Al guardar se vuelven a leer los precios de la base (2026-11-15, revisión):
+una talla cuyo precio no se tocó guarda el que tiene la base en ese
+momento (si otra caja lo subió mientras la ventanita estaba abierta, no se
+regresa); si se tocó y la base ya no tiene el precio que se vio, se detiene
+con «Los precios cambiaron…». Al cambiar el color también se recolorean las
+tallas desactivadas de ese color (sin tocar su precio), para que al
+reactivarlas no vendan el color viejo con el nombre nuevo.
+
 Las etiquetas impresas no se pueden saber todas (las que imprime la misma
 caja no dejan rastro); se cuentan las que se mandaron al satélite
 (`trabajo` ETIQUETA con el SKU) y siempre se avisa en genérico.
@@ -49,6 +57,9 @@ class HayPreciosQueBajan(ValueError):
     """Algún precio baja y no se confirmó (`permitir_bajar`)."""
 
 
+PRECIOS_CAMBIARON = "Los precios cambiaron mientras corregías: revisa otra vez."
+
+
 @dataclass(frozen=True)
 class TallaACorregir:
     variante_id: int
@@ -71,6 +82,8 @@ class PlanCorreccion:
     colores_antes: tuple[str, ...] = ()
     color: str | None = None
     tallas: list[TallaACorregir] = field(default_factory=list)
+    #: Tallas desactivadas del color de antes: se recolorean junto con las activas.
+    desactivadas: list[TallaACorregir] = field(default_factory=list)
     confirmados: tuple[str, ...] = ()
     bajas: list[BajaDePrecio] = field(default_factory=list)
     etiquetas_enviadas: int = 0
@@ -114,6 +127,9 @@ class PlanCorreccion:
         if self.cambia_color:
             partes.append(f"{tallas[:1].upper()}{tallas[1:]} pasan de {self.color_antes} a {self.color}."
                           if n != 1 else f"Su talla pasa de {self.color_antes} a {self.color}.")
+            d = len(self.desactivadas)
+            if d:
+                partes.append("También su talla desactivada." if d == 1 else f"También sus {d} tallas desactivadas.")
         cambian = len(self.precios_que_cambian)
         if cambian:
             partes.append("Cambia 1 precio." if cambian == 1 else f"Cambian {cambian} precios.")
@@ -168,7 +184,8 @@ def planear_correccion(
     if producto is None:
         raise ValueError("Esa prenda ya no existe.")
     escuela = producto.escuela.nombre if producto.escuela is not None else None
-    variantes = [v for v in _variantes(session, producto.id) if v.activo]
+    todas = _variantes(session, producto.id)
+    variantes = [v for v in todas if v.activo]
     colores = []
     for v in variantes:
         c = valores.limpiar(v.color) or SIN_COLOR
@@ -209,6 +226,19 @@ def planear_correccion(
             elif not (nuevo in usos or valores.normalizar(nuevo) in {valores.normalizar(c) for c in plan.confirmados}):
                 plan.errores.append(rev.texto_pregunta())
     plan.color = nuevo if nuevo is not None else plan.color_antes
+    if plan.cambia_color:
+        for v in todas:
+            if v.activo or (valores.limpiar(v.color) or SIN_COLOR) != plan.color_antes:
+                continue
+            p = precios.dinero(v.precio_venta) or Decimal("0.00")
+            plan.desactivadas.append(TallaACorregir(int(v.id), str(v.sku), str(v.talla), str(v.color), p, p))
+        destino = {valores.normalizar(v.talla) for v in todas
+                   if valores.normalizar(v.color) == valores.normalizar(plan.color)}
+        chocan = [v.talla for v in todas if v.activo or any(d.variante_id == v.id for d in plan.desactivadas)
+                  if valores.normalizar(v.talla) in destino]
+        if chocan:
+            plan.errores.append(f"La talla {chocan[0]} ya existe en {plan.color} (desactivada): "
+                                "actívala o corrige talla por talla.")
 
     nuevos = {int(k): precios.dinero(v) for k, v in (precios_nuevos or {}).items()}
     for v in variantes:
@@ -265,6 +295,22 @@ def aplicar_correccion(
         producto = session.get(Producto, plan.producto_id)
         if producto is None:
             raise ValueError("Esa prenda ya no existe.")
+        variantes = _variantes(session, producto.id)
+        # Los precios se vuelven a leer aquí: el plan es una foto de cuando se
+        # abrió o replaneó la ventanita, y otra caja pudo cambiarlos.
+        precio_final: dict[int, Decimal] = {}
+        por_id = {t.variante_id: t for t in plan.tallas}
+        for v in variantes:
+            t = por_id.get(int(v.id))
+            if t is None:
+                continue
+            actual = precios.dinero(v.precio_venta) or Decimal("0.00")
+            if t.precio_nuevo == t.precio:
+                precio_final[t.variante_id] = actual  # no se tocó: se queda el de la base
+            elif actual != t.precio:
+                raise CorreccionNoValida(PRECIOS_CAMBIARON)
+            else:
+                precio_final[t.variante_id] = t.precio_nuevo
         if plan.cambia_nombre:
             CatalogService.actualizar_producto(
                 session, usuario, producto,
@@ -274,16 +320,18 @@ def aplicar_correccion(
                 atributo=producto.atributo, genero=producto.genero, escudo=producto.escudo,
                 ubicacion=producto.ubicacion, observacion=ORIGEN_CORREGIR,
             )
-        por_id = {t.variante_id: t for t in plan.tallas}
-        for v in _variantes(session, producto.id):
+        apagadas = {d.variante_id for d in plan.desactivadas} if plan.cambia_color else set()
+        for v in variantes:
             t = por_id.get(int(v.id))
-            if t is None:
+            if t is None and int(v.id) not in apagadas:
                 continue
+            antes = precios.dinero(v.precio_venta) or Decimal("0.00")
+            precio = precio_final.get(int(v.id), antes)
             color = plan.color if plan.cambia_color else v.color
-            if color == v.color and t.precio_nuevo == t.precio:
+            if color == v.color and precio == antes:
                 continue
             CatalogService.actualizar_variante(
-                session, usuario, v, producto, v.sku, v.talla, color, t.precio_nuevo,
+                session, usuario, v, producto, v.sku, v.talla, color, precio,
                 costo_referencia=v.costo_referencia, stock_minimo=v.stock_minimo, observacion=ORIGEN_CORREGIR,
             )
             cambiadas += 1
@@ -299,6 +347,7 @@ __all__ = [
     "CorreccionNoValida",
     "HayPreciosQueBajan",
     "ORIGEN_CORREGIR",
+    "PRECIOS_CAMBIARON",
     "PlanCorreccion",
     "ResultadoCorreccion",
     "TallaACorregir",
