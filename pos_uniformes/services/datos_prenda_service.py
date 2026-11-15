@@ -138,7 +138,7 @@ class PlanDatos:
             return "Sin cambios todavía."
         partes = [c.texto for c in self.cambios]
         if self.nombre != self.nombre_antes:
-            partes.append(f"Pasa a llamarse «{self.nombre}».")
+            partes.append(f"Pasa a llamarse «{self.nombre}»")
         partes.append("Los códigos, los precios y la existencia se quedan igual.")
         return " · ".join(partes)
 

@@ -69,7 +69,7 @@ class DatosPrendaDialog(_Ventanita):
         fila = (len(CAMPOS_LISTA) + 1) // 2
         self.ubicacion = QLineEdit(antes["ubicacion"])
         self.costo = QLineEdit()
-        self.costo.setPlaceholderText("Igual para todas las tallas (opcional)")
+        self.costo.setPlaceholderText("Todas las tallas (opcional)")
         self.descripcion = QLineEdit(antes["descripcion"])
         for campo in (self.ubicacion, self.costo, self.descripcion):
             campo.setObjectName("npCampo")
