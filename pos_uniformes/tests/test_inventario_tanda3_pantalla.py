@@ -63,7 +63,8 @@ ACCIONES_VIEJAS = {
     # Tanda 4 del alta: «Agregar talla o color» lleva a la ficha; el asistente viejo
     # queda en «Poco usado» y «Duplicar» en el «⋯» de la ficha (ver test_inventario_ficha_prenda).
     "_handle_create_variant": "Talla con el formulario anterior",
-    "_handle_update_product": "Editar la prenda elegida",
+    # Tanda 4 (revisión): un solo lápiz; el editor viejo de la prenda va en «Poco usado».
+    "_handle_update_product": "Prenda con el formulario anterior",
     "_handle_product_photo": "Foto del modelo",
     "_handle_update_variant": "Editar la talla elegida",
     "_handle_inventory_bulk_price_update": "Precios en lote",
@@ -458,7 +459,7 @@ class InventarioTanda3PantallaTests(unittest.TestCase):
         self.assertEqual(ficha.movimiento.text(), "Venta −1 · 12/11/2026")
         textos = [pantalla.boton_corregir.text(), window.inventory_print_label_button.text(),
                   pantalla.boton_editar.text(), pantalla.boton_movimientos.text()]
-        self.assertEqual(textos, ["🧮  Corregir existencia", "🏷  Imprimir etiqueta", "✏️  Editar", "📜  Ver movimientos"])
+        self.assertEqual(textos, ["🧮  Corregir existencia", "🏷  Imprimir etiqueta", "🔧  Editar talla", "📜  Ver movimientos"])
         # Desactivar va en el «⋯» de la ficha, con el texto (y la confirmación) de siempre.
         pantalla.menu_ficha.aboutToShow.emit()
         self.assertEqual(pantalla.accion_talla.text(), "Desactivar esta talla…")

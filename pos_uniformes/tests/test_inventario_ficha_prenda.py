@@ -159,6 +159,55 @@ class FichaPrendaPantallaTests(unittest.TestCase):
             self.assertLessEqual(chip.geometry().right(), derecha, chip.text())
             self.assertGreaterEqual(chip.width(), chip.fontMetrics().horizontalAdvance(chip.text()), chip.text())
 
+    # ── Revisión 2026-11-15 ────────────────────────────────────────────────
+
+    def test_un_solo_lapiz_por_nivel(self) -> None:
+        window = self._ventana()
+        pantalla = window.inventario_pantalla
+        pantalla.seleccionar(1)
+        arriba = [a.text() for a in window.inventory_more_button.menu().actions() if not a.isSeparator()]
+        ficha = [a.text() for a in pantalla.menu_ficha.actions() if not a.isSeparator()]
+        botones = [b.text() for b in (pantalla.boton_corregir, pantalla.boton_editar,
+                                      pantalla.ficha.prenda.boton_color, pantalla.ficha.prenda.boton_corregir)]
+        self.assertEqual([t for t in arriba if "✏️" in t], ["✏️  Corregir la prenda elegida"])
+        self.assertEqual([t for t in ficha + botones if "✏️" in t], ["✏️ Corregir prenda"])
+        self.assertEqual(pantalla.boton_editar.text(), "🔧  Editar talla")
+
+    def test_corregir_desde_el_menu_de_arriba(self) -> None:
+        window = self._ventana()
+        pantalla = window.inventario_pantalla
+        acciones = {a.text().split("  ")[-1]: a for a in window.inventory_more_button.menu().actions()}
+        with patch.object(ip.QMessageBox, "information") as aviso:
+            acciones["Corregir la prenda elegida"].trigger()  # sin talla elegida
+        aviso.assert_called_once()
+        pantalla.seleccionar(1)
+        dialogo = Mock()
+        dialogo.return_value.exec.return_value = 0
+        with patch.object(fpd, "CorregirPrendaDialog", dialogo):
+            acciones["Corregir la prenda elegida"].trigger()
+        self.assertEqual(dialogo.call_args.kwargs["producto_id"], self.pants.id)
+
+    def test_la_prenda_va_antes_de_los_botones_y_otra_talla_aparte(self) -> None:
+        window = self._ventana()
+        window.resize(1366, 768)
+        tabs = window.findChild(QTabWidget)
+        for i in range(tabs.count()):
+            if tabs.tabText(i).strip() == "Inventario":
+                tabs.setCurrentIndex(i)
+        window.show()
+        pantalla = window.inventario_pantalla
+        pantalla.seleccionar(1)
+        self._procesar()
+        seccion = pantalla.ficha.prenda
+        self.assertLess(seccion.y(), pantalla.boton_corregir.mapTo(seccion.parentWidget(), pantalla.boton_corregir.rect().topLeft()).y())
+        # La escalera (con la talla en gris) se ve sin desplazar la ficha.
+        area = pantalla.ficha.scrolls[TALLA]
+        chip = seccion.chips_faltan["EXG"]
+        abajo = chip.mapTo(area.viewport(), chip.rect().bottomLeft()).y()
+        self.assertLessEqual(abajo, area.viewport().height(), "la talla en gris queda bajo el pliegue")
+        # «＋ Otra talla» no va entre los chips.
+        self.assertNotIn(seccion.boton_otra, [seccion.flujo.itemAt(i).widget() for i in range(seccion.flujo.count())])
+
 
 if __name__ == "__main__":
     unittest.main()

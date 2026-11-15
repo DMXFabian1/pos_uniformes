@@ -152,13 +152,14 @@ class FichaPrenda:
         """La nota bajo la escalera, solo si hay tallas en gris."""
         if not self.faltan:
             return ""
-        pieza = self.tipo_pieza or "esta pieza"
+        # Sin artículo con la pieza («las Pants Suelto» suena raro en la tienda).
+        pieza = f" de {self.tipo_pieza}" if self.tipo_pieza else ""
         if self.escuela_id is None:
-            de = f"las otras {pieza} generales"
+            donde = "en otras prendas generales"
         else:
             nivel = f" de {self.nivel.lower()}" if self.nivel else ""
-            de = f"las {pieza} de otras escuelas{nivel}"
-        return f"En gris: las tallas que tienen {de} y esta no. Toca una para agregarla."
+            donde = f"en otras escuelas{nivel}"
+        return f"En gris: tallas que hay{pieza} {donde} y aquí no. Toca una para agregarla."
 
 
 def _hermanas(session: Session, producto: Producto) -> tuple[int, tuple[hermanos_service.TallaEnHermanas, ...]]:

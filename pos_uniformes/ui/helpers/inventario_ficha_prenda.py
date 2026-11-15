@@ -2,14 +2,17 @@
 
 Bajo la tarjeta vino de la ficha, solo para ADMIN:
 
-    LA PRENDA                         ＋ Otro color   ✏️ Corregir
-    [4] [6] [8] [10] [12] [14] [16] [CH] [MD] [GD]  [EXG ＋ $305]  [＋ Otra talla ▾]
-    En gris: las tallas que tienen las Pants Suelto de otras escuelas…
+    LA PRENDA                         ＋ Otro color   ✏️ Corregir prenda
+    [4] [6] [8] [10] [12] [14] [16] [CH] [MD] [GD]  [EXG ＋ $305]
+    ＋ Otra talla ▾
+    En gris: tallas que hay de Pants Suelto en otras escuelas…
 
 Las tallas que ya tiene van en blanco (la elegida, en vino suave); las que
 tienen sus hermanas y esta no, en gris con su precio sugerido. Un toque abre
-la confirmación corta (`TallaNuevaDialog`). «＋ Otra talla» ofrece la lista
-oficial. «Agregar talla o color» y «Duplicar talla» viven aquí, ya con la
+la confirmación corta (`TallaNuevaDialog`). «＋ Otra talla» (un enlace en su
+renglón, no un chip: no se confunde con las sugeridas) ofrece la lista
+oficial. «✏️ Corregir prenda» es el único lápiz de la ficha: «Editar talla»
+y el formulario anterior de la prenda van sin él. «Agregar talla o color» y «Duplicar talla» viven aquí, ya con la
 prenda elegida (antes, en el «⋯» de arriba, con una lista de 580 prendas).
 
 Aquí solo hay pantalla y cableado: la escalera la arma
@@ -65,11 +68,11 @@ QPushButton#invPrendaFalta {{
 }}
 QPushButton#invPrendaFalta:hover {{ background: {VINO_SUAVE}; color: {VINO}; border-color: #d9b6c4; }}
 QToolButton#invPrendaOtra {{
-    background: transparent; color: {TENUE}; border: 1px dashed #d8c6b0; border-radius: 10px;
-    padding: 3px 9px; font-size: 13px; font-weight: 700;
+    background: transparent; color: {VINO}; border: none; font-size: 13px; font-weight: 700; padding: 2px 4px;
 }}
 QToolButton#invPrendaOtra::menu-indicator {{ image: none; width: 0; }}
-QToolButton#invPrendaOtra:hover {{ color: {VINO}; border-color: #d9b6c4; }}
+QToolButton#invPrendaOtra:hover {{ text-decoration: underline; }}
+QToolButton#invPrendaOtra:disabled {{ color: #b4aba0; }}
 QLabel#invPrendaNota {{ font-size: 12px; color: {TENUE}; }}
 """
 
@@ -181,12 +184,6 @@ class SeccionPrenda(QFrame):
         self.rejilla.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.flujo = Flujo(self.rejilla)
         caja.addWidget(self.rejilla)
-        self.nota = QLabel()
-        self.nota.setObjectName("invPrendaNota")
-        self.nota.setWordWrap(True)
-        caja.addWidget(self.nota)
-        self.chips_tallas: dict[str, QLabel] = {}
-        self.chips_faltan: dict[str, QPushButton] = {}
         self.boton_otra = QToolButton()
         self.boton_otra.setObjectName("invPrendaOtra")
         self.boton_otra.setText("＋ Otra talla")
@@ -196,6 +193,13 @@ class SeccionPrenda(QFrame):
         self.menu_otra = QMenu(self.boton_otra)
         self.menu_otra.setObjectName("invMenu")
         self.boton_otra.setMenu(self.menu_otra)
+        caja.addWidget(self.boton_otra, 0, Qt.AlignmentFlag.AlignLeft)
+        self.nota = QLabel()
+        self.nota.setObjectName("invPrendaNota")
+        self.nota.setWordWrap(True)
+        caja.addWidget(self.nota)
+        self.chips_tallas: dict[str, QLabel] = {}
+        self.chips_faltan: dict[str, QPushButton] = {}
         self.setVisible(False)
 
     def mostrar(self, ficha: FichaPrenda | None, talla_actual: str | None = None) -> None:
@@ -206,7 +210,7 @@ class SeccionPrenda(QFrame):
         while self.flujo.count():
             item = self.flujo.takeAt(0)
             w = item.widget()
-            if w is not None and w is not self.boton_otra:
+            if w is not None:
                 w.hide()
                 w.deleteLater()
         self.chips_tallas, self.chips_faltan = {}, {}
@@ -228,7 +232,6 @@ class SeccionPrenda(QFrame):
         for talla in ficha.otras_tallas:
             accion = self.menu_otra.addAction(talla)
             accion.triggered.connect(lambda _=False, t=talla: self.otra_talla.emit(t))
-        self.flujo.addWidget(self.boton_otra)
         self.boton_otra.setVisible(bool(ficha.otras_tallas))
         self.nota.setText(ficha.texto_hermanas)
         self.nota.setVisible(bool(ficha.texto_hermanas))

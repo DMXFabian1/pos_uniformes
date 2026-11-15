@@ -450,15 +450,18 @@ class FichaInventario(QFrame):
             widget.setVisible(False)
         layout.addLayout(lineas)
 
+        # Tanda 4 del alta: la escalera de la prenda con lo que le falta (solo
+        # ADMIN). Va antes de los botones para que a 1366×768 se vea sin
+        # desplazar la ficha (las tallas en gris son el caso más común).
+        layout.addSpacing(4)
+        self.prenda = SeccionPrenda()
+        layout.addWidget(self.prenda)
+
         self.acciones = QGridLayout()
         self.acciones.setHorizontalSpacing(8)
         self.acciones.setVerticalSpacing(8)
         layout.addSpacing(2)
         layout.addLayout(self.acciones)
-        # Tanda 4 del alta: la escalera de la prenda con lo que le falta (solo ADMIN).
-        layout.addSpacing(6)
-        self.prenda = SeccionPrenda()
-        layout.addWidget(self.prenda)
         layout.addStretch(1)
         return pagina
 
@@ -1183,6 +1186,15 @@ class InventarioPantalla(QObject):
             return None
         return corregir_prenda(self.window, self.session_factory, self._producto_ficha)
 
+    def corregir_desde_menu(self) -> None:
+        """«⋯» de arriba: «Corregir la prenda elegida». Sin talla elegida, dice dónde está."""
+        fila = self.fila_de(self.variante_actual())
+        if fila is None or not fila.get("producto_id"):
+            QMessageBox.information(self.window, "Corregir prenda", TEXTO_ELIGE_PRENDA)
+            return
+        self._producto_ficha = int(fila["producto_id"])
+        self.corregir_prenda()
+
     def tallas_o_color_desde_menu(self) -> None:
         """«⋯» de arriba: lleva a la ficha. Sin talla elegida, dice dónde está ahora."""
         fila = self.fila_de(self.variante_actual())
@@ -1240,7 +1252,8 @@ class InventarioPantalla(QObject):
         self.boton_corregir.clicked.connect(lambda: self._llamar("_handle_inventory_adjustment"))
         w.inventory_print_label_button.setObjectName("invAccion")
         w.inventory_print_label_button.setText("🏷  Imprimir etiqueta")
-        self.boton_editar = boton_accion("✏️  Editar", "Cambiar código, talla, color o precio de esta talla")
+        # Sin lápiz: el único de la ficha es «✏️ Corregir prenda» (tanda 4 del alta).
+        self.boton_editar = boton_accion("🔧  Editar talla", "Cambiar código, talla, color o precio de esta talla")
         self.boton_editar.clicked.connect(lambda: self._llamar("_handle_update_variant"))
         self.boton_movimientos = boton_accion("📜  Ver movimientos", "Abre Historial inventarios con esta talla")
         self.boton_movimientos.clicked.connect(self.ver_movimientos)
@@ -1251,7 +1264,7 @@ class InventarioPantalla(QObject):
 
         menu = QMenu(ficha.mas)
         menu.setObjectName("invMenu")
-        _accion(menu, "✏️  Editar la prenda", lambda: self._llamar("_handle_update_product"))
+        _accion(menu, "📝  Prenda con el formulario anterior", lambda: self._llamar("_handle_update_product"))
         _accion(menu, "📷  Foto del modelo", lambda: self._llamar("_handle_product_photo"))
         _accion(menu, "⧉  Duplicar esta talla", lambda: self._llamar("_handle_duplicate_variant"))
         _accion(menu, "📦  Registrar entrada", lambda: self._llamar("_handle_purchase"))
@@ -1459,10 +1472,12 @@ def armar_menu_mas(window: "MainWindow", pantalla: InventarioPantalla) -> QMenu:
     # con la prenda ya elegida. Aquí queda una entrada que lleva a ella.
     _accion(menu, "➕  Agregar talla o color", pantalla.tallas_o_color_desde_menu,
             "Ahora está en la ficha de la talla elegida, bajo «LA PRENDA»")
-    _accion(menu, "✏️  Editar la talla elegida", llamar("_handle_update_variant"),
+    # Un solo lápiz por menú (tanda 4 del alta): «Corregir prenda» cambia nombre y color
+    # de toda la prenda con vista previa; el editor viejo queda en «Poco usado».
+    _accion(menu, "🔧  Editar la talla elegida", llamar("_handle_update_variant"),
             "Cambiar código, talla, color o precio de la talla elegida")
-    _accion(menu, "✏️  Editar la prenda elegida", llamar("_handle_update_product"),
-            "Cambiar nombre, escuela, marca o tipo de la prenda elegida")
+    _accion(menu, "✏️  Corregir la prenda elegida", pantalla.corregir_desde_menu,
+            "Cambiar el nombre o el color de todas sus tallas a la vez, con vista previa")
     _accion(menu, "📷  Foto del modelo", llamar("_handle_product_photo"),
             "Tomar con la webcam (o elegir archivo) la foto que sale en el kiosko")
     menu.addSeparator()
@@ -1495,6 +1510,8 @@ def armar_menu_mas(window: "MainWindow", pantalla: InventarioPantalla) -> QMenu:
     _accion(poco, "Marca nueva", llamar("_handle_create_brand"), "Crear una marca (p. ej. Fertoni, Ykan)")
     _accion(poco, "Talla con el formulario anterior", llamar("_handle_create_variant"),
             "El asistente de antes para agregar una talla o color a cualquier prenda (por si acaso)")
+    _accion(poco, "Prenda con el formulario anterior", llamar("_handle_update_product"),
+            "El editor de antes: nombre, escuela, marca o tipo de la prenda elegida (por si acaso)")
     poco.addSeparator()
     _accion(poco, "Calendario de conteos", disparar("conteo_calendario_action"), "Qué escuela toca contar cada día")
     _accion(poco, "Mercancía por nombrar", disparar("por_nombrar_action"), "Lo que llegó sin nombre todavía")
