@@ -677,6 +677,19 @@ def resumen_para_revisar(session: Session, jornada: ConteoJornada) -> ResumenRev
     )
 
 
+class JornadaYaRevisada(ValueError):
+    """La jornada ya se aplicó o se descartó: no se vuelve a decidir (2026-11-15).
+
+    Re-aplicar no ajustaba nada pero re-sellaba la fecha; descartar una ya
+    aplicada la marcaba «Descartada» con el stock ya corregido."""
+
+
+def _no_revisada(jornada: ConteoJornada) -> None:
+    if jornada.revisada_at is not None:
+        hecho = "se descartó" if (jornada.notas or "") == DESCARTADA else "ya se aplicó al inventario"
+        raise JornadaYaRevisada(f"Este conteo ya se revisó: {hecho}. No se puede volver a aplicar ni descartar.")
+
+
 def aplicar_jornada(session: Session, jornada: ConteoJornada, *, revisada_por: str) -> tuple[int, int]:
     """Aplica al inventario TODAS las diferencias de la jornada. Solo el dueño.
 
@@ -686,6 +699,7 @@ def aplicar_jornada(session: Session, jornada: ConteoJornada, *, revisada_por: s
 
     if (revisada_por or "").strip().upper() != DUENO_CODE:
         raise PermissionError("Solo el dueño aplica un conteo al inventario.")
+    _no_revisada(jornada)
     ids = list(
         session.scalars(
             select(ConteoInventario.id).where(
@@ -707,6 +721,7 @@ def descartar_jornada(session: Session, jornada: ConteoJornada, *, revisada_por:
     """La marca revisada sin aplicar nada. Los renglones quedan como historia."""
     if (revisada_por or "").strip().upper() != DUENO_CODE:
         raise PermissionError("Solo el dueño descarta un conteo.")
+    _no_revisada(jornada)
     jornada.revisada_at = func.now()
     jornada.revisada_por = revisada_por.strip().upper()
     jornada.notas = DESCARTADA

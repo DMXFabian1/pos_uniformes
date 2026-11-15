@@ -406,6 +406,46 @@ class JornadaTests(unittest.TestCase):
         self.assertNotIn(j, jn.jornadas_por_revisar(self.s))
         self.assertNotIn(j, jn.jornadas_abiertas(self.s))
 
+    def test_una_jornada_aplicada_no_se_vuelve_a_aplicar_ni_a_descartar(self) -> None:
+        j = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4")
+        v = self._variantes()
+        registrar_conteos_lote(self.s, [ConteoInput(v[0].id, 7)], "x", jornada_id=j.id)
+        jn.terminar_jornada(self.s, j, empleada_code="VEND-4")
+        jn.aplicar_jornada(self.s, j, revisada_por="VEND-1")
+        self.s.commit()
+        sello = j.revisada_at
+        with self.assertRaises(jn.JornadaYaRevisada) as err:
+            jn.aplicar_jornada(self.s, j, revisada_por="VEND-1")
+        self.assertIn("ya se aplicó", str(err.exception))
+        with self.assertRaises(ValueError):   # es un ValueError: quien ya lo atrapa, lo sigue atrapando
+            jn.descartar_jornada(self.s, j, revisada_por="VEND-1")
+        self.s.rollback()
+        self.assertEqual(self.s.get(Variante, v[0].id).stock_actual, 7)
+        self.assertEqual(jn.ref(j).estado, "Aplicada")          # descartar no la volteó
+        self.assertEqual(j.revisada_at, sello)                  # ni re-selló la fecha
+
+    def test_una_jornada_descartada_no_se_aplica_despues(self) -> None:
+        j = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4")
+        v = self._variantes()
+        registrar_conteos_lote(self.s, [ConteoInput(v[0].id, 0)], "x", jornada_id=j.id)
+        jn.terminar_jornada(self.s, j, empleada_code="VEND-4")
+        jn.descartar_jornada(self.s, j, revisada_por="VEND-1")
+        self.s.commit()
+        with self.assertRaises(jn.JornadaYaRevisada) as err:
+            jn.aplicar_jornada(self.s, j, revisada_por="VEND-1")
+        self.assertIn("se descartó", str(err.exception))
+        with self.assertRaises(jn.JornadaYaRevisada):
+            jn.descartar_jornada(self.s, j, revisada_por="VEND-1")
+        self.s.rollback()
+        self.assertEqual(self.s.get(Variante, v[0].id).stock_actual, 10)
+
+    def test_la_empleada_sigue_viendo_el_permiso_antes_que_el_candado(self) -> None:
+        j = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4")
+        jn.terminar_jornada(self.s, j, empleada_code="VEND-4")
+        jn.descartar_jornada(self.s, j, revisada_por="VEND-1")
+        with self.assertRaises(PermissionError):
+            jn.aplicar_jornada(self.s, j, revisada_por="VEND-4")
+
     def test_cuando_habla_como_persona(self) -> None:
         from datetime import datetime, timedelta, timezone
 
