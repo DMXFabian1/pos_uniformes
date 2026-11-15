@@ -54,6 +54,8 @@ _ESTILO = """
     QPushButton#primaryButton:hover { background: #a2583a; }
     QPushButton#dangerButton { color: #b3261e; border-color: #e8c7c3; }
     QPushButton#dangerButton:hover { background: #fbeae8; }
+    QPushButton:disabled, QPushButton#primaryButton:disabled, QPushButton#dangerButton:disabled {
+                  background: #f6f1ea; color: #c4b5a5; border: 1px solid #ece3d8; }
 """
 
 
@@ -62,10 +64,16 @@ _ESTILO_TARJETAS = """
     QFrame#tarjetaFiltro[prendida="si"] { background: #87492c; border-color: #87492c; }
     QFrame#tarjetaFiltro[prendida="si"][clave="URGENTE"] { background: #b91c1c; border-color: #b91c1c; }
     QFrame#tarjetaFiltro[prendida="si"][clave="SURTIR"] { background: #1d4ed8; border-color: #1d4ed8; }
-    QFrame#tarjetaFiltro:disabled { background: #faf7f3; }
     QFrame#tarjetaFiltro QLabel { background: transparent; color: #5c3019; }
     QFrame#tarjetaFiltro[prendida="si"] QLabel { color: #ffffff; }
-    QFrame#tarjetaFiltro:disabled QLabel { color: #b9a89b; }
+    /* Apagada (en 0) = gris y sin relleno, aunque esté «prendida»: estas reglas
+       van después y con la misma especificidad que las de color (2026-11-15). */
+    QFrame#tarjetaFiltro:disabled,
+    QFrame#tarjetaFiltro[prendida="si"]:disabled,
+    QFrame#tarjetaFiltro[prendida="si"][clave="URGENTE"]:disabled,
+    QFrame#tarjetaFiltro[prendida="si"][clave="SURTIR"]:disabled { background: #faf7f3; border-color: #ece3d8; }
+    QFrame#tarjetaFiltro:disabled QLabel,
+    QFrame#tarjetaFiltro[prendida="si"]:disabled QLabel { color: #b9a89b; }
     QLabel#tarjetaTitulo { font-size: 11px; font-weight: 700; letter-spacing: 1px; }
     QLabel#tarjetaValor { font-size: 26px; font-weight: 800; }
     QLabel#tarjetaSub { font-size: 11px; }
