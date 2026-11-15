@@ -17,6 +17,7 @@ from pos_uniformes.database.models import RolUsuario
 
 if TYPE_CHECKING:  # pragma: no cover
     from pos_uniformes.services.alta_prenda_service import ResultadoAlta
+    from pos_uniformes.services.copiar_escuela_service import ResultadoCopia
     from pos_uniformes.ui.main_window import MainWindow
 
 
@@ -30,8 +31,16 @@ def imprimir_etiquetas(window: "MainWindow", variante_ids: list[int]) -> None:
         window._handle_inventory_print_label_batch(ids)
 
 
-def ver_en_inventario(window: "MainWindow", resultado: "ResultadoAlta") -> None:
-    """Pone el nombre de la prenda en el buscador de Inventario y elige su primera talla."""
+def ver_en_inventario(window: "MainWindow", resultado: "ResultadoAlta | ResultadoCopia") -> None:
+    """Pone el nombre de la prenda en el buscador de Inventario y elige su primera talla.
+
+    Con el resultado de «Escuela igual a otra» busca la escuela destino: así
+    se ven todas las prendas, también las que solo cambiaron de color o se ligaron."""
+    escuela = str(getattr(resultado, "escuela", "") or "") if hasattr(resultado, "cambiados") else ""
+    if escuela:
+        window.inventory_search_input.setText(escuela)
+        window._handle_inventory_filters_changed_reset_page()
+        return
     if not resultado.productos:
         return
     producto = resultado.productos[0]

@@ -1316,7 +1316,9 @@ class NuevaPrendaDialog(QDialog):
             QTimer.singleShot(0, lambda: self.al_imprimir(ids))
 
     def _ver_en_inventario(self) -> None:
-        resultado = self.resultado
+        # En «Escuela igual a otra» va el resultado de la copia: se busca la
+        # escuela (puede no haber prendas nuevas, solo cambios de color o ligas).
+        resultado = self.resultado_copia if self.modo == MODO_COPIA else self.resultado
         self.accept()
         if self.al_ver is not None and resultado is not None:
             QTimer.singleShot(0, lambda: self.al_ver(resultado))

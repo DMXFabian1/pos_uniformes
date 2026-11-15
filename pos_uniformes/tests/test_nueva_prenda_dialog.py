@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session
 
 from pos_uniformes.database.models import CambioCatalogo, Producto, RolUsuario, UniformePieza, Variante
 from pos_uniformes.services import alta_prenda_service as alta
+from pos_uniformes.services import copiar_escuela_service as ce
 from pos_uniformes.services.catalog_service import CatalogService
 from pos_uniformes.ui.dialogs import nueva_prenda_dialog as npd
 from pos_uniformes.ui.dialogs.quisiste_decir_dialog import ACCION_CORREGIR, ACCION_CREAR, ACCION_USAR, Eleccion
@@ -456,6 +457,12 @@ class PuertaTests(_Base):
         ventana.inventario_pantalla.seleccionar.assert_called_once_with(9)
         d.al_terminar(resultado)
         ventana.refresh_all.assert_called_once_with()
+        # «Escuela igual a otra» que solo cambió un color: busca la escuela destino.
+        ventana.inventory_search_input.setText.reset_mock()
+        ventana.inventario_pantalla.seleccionar.reset_mock()
+        d.al_ver(ce.ResultadoCopia(cambiados=("Playera Gris → Playera Azul",), escuela="Jaral"))
+        ventana.inventory_search_input.setText.assert_called_once_with("Jaral")
+        ventana.inventario_pantalla.seleccionar.assert_not_called()
 
     def test_una_cajera_no_puede_guardar(self) -> None:
         antes = self.contar(Producto)

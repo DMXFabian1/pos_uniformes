@@ -119,6 +119,25 @@ class RecorridoCopiaTests(_BaseCopia):
         self.assertEqual(preguntas, ["Grisz"])
         self.assertEqual(d.copia.plan.color_para_todas("Rojo"), "Gris")
 
+    def test_ver_en_inventario_de_una_copia_que_solo_cambia_color(self) -> None:
+        d = self.dialogo()
+        self.a_lista(d)
+        c = d.copia
+        for nombre in ("Pants Suelto", "Suéter Botones M Rojo", "Chaleco Rojo"):
+            c.fila(nombre).casilla.setChecked(False)
+        c.cambiar_color_de(self.caja.productos[(ORIGEN, "Playera")].id, "Azul")
+        self.assertEqual(d.principal.text(), "Cambiar color de 1 prenda")
+        d.principal.click()
+        d.principal.click()  # «Sí, copiar»
+        self.assertEqual(d.pasos.currentIndex(), npd.LISTO, d.error_confirmar.text())
+        self.assertEqual(d.resultado_copia.productos, ())
+        d._ver_en_inventario()
+        _procesar()
+        self.al_ver.assert_called_once()
+        enviado = self.al_ver.call_args.args[0]
+        self.assertIsInstance(enviado, ce.ResultadoCopia)
+        self.assertEqual(enviado.escuela, JARAL)
+
     def test_cancelar_no_crea_nada(self) -> None:
         antes = self.foto()
         d = self.dialogo()
