@@ -379,6 +379,24 @@ class DosColoresTests(_Base):
         self.assertIn("con 12 piezas en existencia, que también cambian", plan.resumen())
 
 
+class PrendaSinTallasTests(_Base):
+    def test_la_del_destino_sin_tallas_se_llena(self) -> None:
+        c = self.caja
+        vacia = Producto(nombre=f"Pants Suelto {JARAL}", nombre_base=f"Pants Suelto {JARAL}",
+                         categoria_id=c.cat["Deportivo"].id, marca_id=c.marca.id,
+                         escuela_id=c.escuelas[JARAL].id, tipo_pieza_id=c.pieza["Pants Suelto"].id)
+        self.s.add(vacia)
+        self.s.commit()
+        plan = ce.planear_copia(self.s, ORIGEN, JARAL, colores={"Rojo": "Azul"})
+        p = self.pieza(plan, "Pants Suelto")
+        self.assertEqual(p.estado, ce.ESTADO_NUEVA)
+        self.assertEqual(p.plan.reusar_id, vacia.id)
+        self.assertTrue(plan.puede_aplicar, plan.todos_los_errores)
+        ce.aplicar_copia(self.s, plan, self.admin, commit=True)
+        self.s.expire_all()
+        self.assertEqual(len(self.s.get(Producto, vacia.id).variantes), len(p.origen.tallas))
+
+
 class PurasTests(unittest.TestCase):
     def test_nombre_sin_color(self) -> None:
         colores = [["azul", "marino"], ["azul"], ["rojo"], ["blanco"], ["gris"]]

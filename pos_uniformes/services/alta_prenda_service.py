@@ -149,6 +149,10 @@ class PlanPrenda:
     errores_fijos: list[str] = field(default_factory=list)
     # Calculado por `completar`:
     escuela_id: int | None = None
+    #: Ya existe una prenda con este nombre pero SIN ninguna talla (quedó de un
+    #: alta vieja o de borrar su última talla): se le agregan las tallas a ella
+    #: en lugar de frenar con «Ya existe».
+    reusar_id: int | None = None
     nombre: str = ""
     grupo_previsto: str | None = None
     receta_texto: str = ""
@@ -490,6 +494,11 @@ def _conjuntos_de_la_escuela(session: Session, escuela_id: int) -> list[Producto
     )
 
 
+def prenda_sin_tallas(session: Session, producto_id: int) -> bool:
+    """La prenda no tiene ninguna talla, ni activa ni dada de baja."""
+    return session.scalar(select(Variante.id).where(Variante.producto_id == int(producto_id)).limit(1)) is None
+
+
 def completar(
     session: Session, plan: PlanPrenda, *, saltar_skus: int | None = None, usos: _Usos | None = None
 ) -> PlanPrenda:
@@ -513,9 +522,16 @@ def completar(
     plan.nombre = CatalogService.armar_nombre(base, plan.escuela) if base else ""
     plan.nombre_sin_escuela = CatalogService.nombre_sin_escuela(plan.nombre, plan.escuela) if base else ""
     marca_id = _id_de(session, Marca, plan.marca)
+    plan.reusar_id = None
     if plan.nombre and marca_id is not None:
-        if session.scalar(select(Producto.id).where(Producto.nombre == plan.nombre, Producto.marca_id == marca_id)):
-            plan.errores.append(f"Ya existe «{plan.nombre}».")
+        existente = session.scalar(
+            select(Producto.id).where(Producto.nombre == plan.nombre, Producto.marca_id == marca_id))
+        if existente is not None:
+            if prenda_sin_tallas(session, existente):
+                plan.reusar_id = int(existente)
+                plan.avisos.append(f"Ya existía «{plan.nombre}» sin ninguna talla: se le agregan estas.")
+            else:
+                plan.errores.append(f"Ya existe «{plan.nombre}».")
     if plan.escuela_id is not None and plan.tipo_pieza:
         ya = session.scalars(
             select(Producto.nombre)
@@ -1158,8 +1174,7 @@ def _crear(session: Session, plan: PlanPrenda, usuario: Usuario, origen: str | N
     nota = origen_bitacora(plan, origen)
     escuela = _resolver(session, Escuela, plan.escuela, plan, usuario)
     categoria = _resolver(session, Categoria, plan.categoria, plan, usuario)
-    producto = CatalogService.crear_producto(
-        session, usuario, categoria, _marca(session, plan, usuario), plan.nombre_sin_escuela,
+    datos = dict(
         descripcion=plan.descripcion,
         escuela=escuela,
         tipo_prenda=_resolver(session, TipoPrenda, plan.tipo_prenda, plan, usuario),
@@ -1169,6 +1184,18 @@ def _crear(session: Session, plan: PlanPrenda, usuario: Usuario, origen: str | N
         genero=plan.genero, escudo=plan.escudo, ubicacion=plan.ubicacion,
         observacion=nota,
     )
+    if plan.reusar_id is not None:
+        # La prenda vacía que ya existía: toma los datos del plan y sus tallas.
+        producto = session.get(Producto, int(plan.reusar_id))
+        if producto is None or not prenda_sin_tallas(session, producto.id):
+            raise AltaNoValida(f"«{plan.nombre}» cambió mientras se armaba el alta: revisa otra vez.")
+        CatalogService.actualizar_producto(
+            session, usuario, producto, categoria, _marca(session, plan, usuario), plan.nombre_sin_escuela, **datos)
+        if not producto.activo:
+            CatalogService.cambiar_estado_producto(session, usuario, producto, True)
+    else:
+        producto = CatalogService.crear_producto(
+            session, usuario, categoria, _marca(session, plan, usuario), plan.nombre_sin_escuela, **datos)
     variantes = []
     for t in plan.tallas:
         v = CatalogService.crear_variante(
@@ -1296,6 +1323,7 @@ def ensayar(
 
 
 __all__ = [
+    "prenda_sin_tallas",
     "ORIGEN_CLAUDE",
     "ORIGEN_GENERAL",
     "Parecida",

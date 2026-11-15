@@ -226,6 +226,39 @@ class PlanTests(_Base):
         plan = alta.planear_desde_modelo(self.s, "Miguel Hidalgo", "Pants Suelto")
         self.assertIn("Ya existe «Pants Suelto Miguel Hidalgo».", plan.errores)
 
+    def test_prenda_que_ya_existe_sin_tallas_se_reusa(self) -> None:
+        # Como «Short» (id 420) en la caja: quedó sin ninguna talla (alta vieja o
+        # «Eliminar talla» de la última). Antes frenaba con «Ya existe» para siempre.
+        c = self.caja
+        vacia = Producto(nombre=f"Pants Suelto {JARAL}", nombre_base=f"Pants Suelto {JARAL}",
+                         categoria_id=c.cat["Oficial"].id, marca_id=c.marca.id,
+                         escuela_id=c.escuelas[JARAL].id, activo=False)
+        self.s.add(vacia)
+        self.s.commit()
+        plan = self.pants_suelto_jaral(color="Gris")
+        self.assertEqual(plan.errores, [])
+        self.assertEqual(plan.reusar_id, vacia.id)
+        self.assertIn(f"Ya existía «Pants Suelto {JARAL}» sin ninguna talla: se le agregan estas.", plan.avisos)
+        productos_antes = self.contar(Producto)
+        r = alta.aplicar(self.s, plan, self.admin, commit=True)
+        self.assertEqual(r.productos[0].producto_id, vacia.id)
+        self.assertEqual(self.contar(Producto), productos_antes)
+        self.s.expire_all()
+        p = self.s.get(Producto, vacia.id)
+        self.assertTrue(p.activo)
+        self.assertEqual((p.tipo_pieza.nombre, p.categoria.nombre), ("Pants Suelto", "Deportivo"))
+        self.assertEqual(len([v for v in p.variantes if v.activo]), len(plan.tallas))
+        self.assertTrue(self.s.scalar(select(UniformePieza.id).where(UniformePieza.producto_id == p.id)))
+
+    def test_prenda_con_tallas_dadas_de_baja_no_se_reusa(self) -> None:
+        p = self.caja.productos[("Miguel Hidalgo", "Pants Suelto")]
+        for v in p.variantes:
+            v.activo = False
+        self.s.commit()
+        plan = alta.planear_desde_modelo(self.s, "Miguel Hidalgo", "Pants Suelto")
+        self.assertIn("Ya existe «Pants Suelto Miguel Hidalgo».", plan.errores)
+        self.assertIsNone(plan.reusar_id)
+
 
 class EnsayoTests(_Base):
     def test_ensayo_dice_lo_que_se_crearia_y_no_deja_nada(self) -> None:
