@@ -188,11 +188,40 @@ class CasoJornada86Tests(_Base):
             "Conviene recontar antes de corregir.",
         )
 
+    def test_la_confirmacion_nombra_la_36_una_sola_vez(self) -> None:
+        self._ajuste(self.vs["36"], datetime(2026, 10, 20, 18, 0), -2)
+        r = rs.resumen_de_jornada(self.s, self.j)
+        texto = vista.texto_confirmar_aplicar(
+            quien="Stayce", contado=CONTADO, diferencias=[t.diferencia for t in r.a_corregir], hoy=HOY, resumen=r,
+        )
+        self.assertIn("Ojo: la talla 36 tuvo otro ajuste el 20 oct; se le suma la diferencia otra vez.", texto)
+        self.assertIn("⚠ Conteo de hace 41 días: desde entonces se vendieron 13 piezas. Conviene recontar", texto)
+        self.assertEqual(texto.count("36"), 1)
+
     def test_pocas_consultas_sin_importar_cuantas_tallas(self) -> None:
         sentencias = []
         event.listen(self.engine, "before_cursor_execute", lambda *a, **k: sentencias.append(1))
         rs.resumen_de_jornada(self.s, self.j)
         self.assertLessEqual(len(sentencias), 6)
+
+    def test_pocas_consultas_con_muchos_conjuntos_vendidos(self) -> None:
+        # 20 tallas de Pants 3pz (receta: la playera de la jornada) vendidas después del conteo.
+        tallas = tuple(str(n) for n in range(2, 42, 2))
+        pz3 = self._producto("Pants 3pz", tallas)
+        p3 = pz3[tallas[0]].producto_id
+        self.s.add(ConjuntoComponente(conjunto_id=p3, componente_id=self.vs["32"].producto_id, cantidad=1, grupo=0))
+        self.s.flush()
+        for t in tallas:
+            self._venta(CONTADO + timedelta(days=2), pz3[t].sku, 1)
+        sentencias = []
+        event.listen(self.engine, "before_cursor_execute", lambda *a, **k: sentencias.append(1))
+        r = rs.resumen_de_jornada(self.s, self.j)
+        self.assertLessEqual(len(sentencias), 8)
+        # Las 20 tallas del 3pz solo tocan las de la playera que existen (4..42 de la jornada).
+        por = self._por_talla(r)
+        self.assertEqual(por["32"].vendidas_desde, 3)   # 2 sueltas + 1 en el 3pz
+        self.assertEqual(por["16"].vendidas_desde, 6)
+        self.assertEqual(por["4"].vendidas_desde, 1)
 
 
 class VendidasDesdeTests(_Base):

@@ -108,14 +108,14 @@ def cuando_se_conto(momento: datetime | date | None, hoy: date | None = None) ->
     return f"{fecha_corta(dia)} · {hace_texto(dias_desde(dia, hoy))}"
 
 
-def aviso_conteo_viejo(dias: int | None, resumen=None) -> str:
+def aviso_conteo_viejo(dias: int | None, resumen=None, *, con_ajustes: bool = True) -> str:
     """El aviso ámbar; '' si el conteo es de hace menos de `DIAS_AVISO_VIEJO` días.
 
     Con el `resumen` del ajuste (`conteo_resumen_service`) dice además lo vendido
-    desde entonces y las tallas que tuvieron otro ajuste."""
+    desde entonces y (con `con_ajustes`) las tallas que tuvieron otro ajuste."""
     if dias is None or dias < DIAS_AVISO_VIEJO:
         return ""
-    desde = texto_desde_entonces(resumen) if resumen is not None else ""
+    desde = texto_desde_entonces(resumen, con_ajustes=con_ajustes) if resumen is not None else ""
     if desde:
         return f"Conteo de hace {dias} días: {desde}. Conviene recontar antes de corregir."
     return f"Conteo de hace {dias} días: conviene recontar antes de corregir."
@@ -237,7 +237,8 @@ def texto_confirmar_aplicar(
             "Tu pedido se guarda."
         )
     dias = dias_desde(dia, hoy)
-    aviso = aviso_conteo_viejo(dias, resumen)
+    # El «Ojo» de arriba ya nombra las tallas con otro ajuste: aquí solo lo vendido.
+    aviso = aviso_conteo_viejo(dias, resumen, con_ajustes=False)
     return texto + (f"\n\n⚠ {aviso}" if aviso else "")
 
 
@@ -328,13 +329,15 @@ def texto_ojo_ajuste_posterior(resumen) -> str:
     return f"Ojo: {sujeto} tuvieron otro ajuste después del conteo; se les suma la diferencia otra vez."
 
 
-def texto_desde_entonces(resumen) -> str:
-    """«desde entonces se vendieron 13 piezas y la talla 36 tuvo otro ajuste (20 oct)»; '' si nada."""
+def texto_desde_entonces(resumen, *, con_ajustes: bool = True) -> str:
+    """«desde entonces se vendieron 13 piezas y la talla 36 tuvo otro ajuste (20 oct)»; '' si nada.
+
+    Sin `con_ajustes`, solo lo vendido (la confirmación ya lo dice en su «Ojo»)."""
     partes = []
     n = resumen.vendidas_desde
     if n:
         partes.append("desde entonces se vendió 1 pieza" if n == 1 else f"desde entonces se vendieron {n} piezas")
-    tallas = list(resumen.con_ajuste_posterior)
+    tallas = list(resumen.con_ajuste_posterior) if con_ajustes else []
     if tallas:
         varias = _varias_prendas(resumen)
         lista = _tallas_con_fecha(tallas, varias)
