@@ -108,14 +108,17 @@ def cuando_se_conto(momento: datetime | date | None, hoy: date | None = None) ->
     return f"{fecha_corta(dia)} · {hace_texto(dias_desde(dia, hoy))}"
 
 
-def aviso_conteo_viejo(dias: int | None, resumen=None, *, con_ajustes: bool = True) -> str:
+def aviso_conteo_viejo(dias: int | None, resumen=None, *, con_ajustes: bool = True, corto: bool = False) -> str:
     """El aviso ámbar; '' si el conteo es de hace menos de `DIAS_AVISO_VIEJO` días.
 
     Con el `resumen` del ajuste (`conteo_resumen_service`) dice además lo vendido
-    desde entonces y (con `con_ajustes`) las tallas que tuvieron otro ajuste."""
+    desde entonces y (con `con_ajustes`) las tallas que tuvieron otro ajuste.
+    `corto` (la ventana de Revisar): con más de una talla con otro ajuste solo
+    dice cuántas («y 11 tallas tuvieron otro ajuste»), para que quepa en una
+    línea; el detalle va en el tooltip (el aviso largo)."""
     if dias is None or dias < DIAS_AVISO_VIEJO:
         return ""
-    desde = texto_desde_entonces(resumen, con_ajustes=con_ajustes) if resumen is not None else ""
+    desde = texto_desde_entonces(resumen, con_ajustes=con_ajustes, corto=corto) if resumen is not None else ""
     if desde:
         return f"Conteo de hace {dias} días: {desde}. Conviene recontar antes de corregir."
     return f"Conteo de hace {dias} días: conviene recontar antes de corregir."
@@ -329,7 +332,7 @@ def texto_ojo_ajuste_posterior(resumen) -> str:
     return f"Ojo: {sujeto} tuvieron otro ajuste después del conteo; se les suma la diferencia otra vez."
 
 
-def texto_desde_entonces(resumen, *, con_ajustes: bool = True) -> str:
+def texto_desde_entonces(resumen, *, con_ajustes: bool = True, corto: bool = False) -> str:
     """«desde entonces se vendieron 13 piezas y la talla 36 tuvo otro ajuste (20 oct)»; '' si nada.
 
     Sin `con_ajustes`, solo lo vendido (la confirmación ya lo dice en su «Ojo»)."""
@@ -338,7 +341,10 @@ def texto_desde_entonces(resumen, *, con_ajustes: bool = True) -> str:
     if n:
         partes.append("desde entonces se vendió 1 pieza" if n == 1 else f"desde entonces se vendieron {n} piezas")
     tallas = list(resumen.con_ajuste_posterior) if con_ajustes else []
-    if tallas:
+    if tallas and corto and len(tallas) > 1:
+        ajuste = f"{len(tallas)} tallas tuvieron otro ajuste"
+        partes.append(ajuste if partes else f"desde entonces {ajuste}")
+    elif tallas:
         varias = _varias_prendas(resumen)
         lista = _tallas_con_fecha(tallas, varias)
         if len(tallas) == 1:

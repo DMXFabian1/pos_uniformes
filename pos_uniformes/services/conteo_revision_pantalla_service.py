@@ -253,6 +253,7 @@ class Fila:
     tono_que: str = ""
     tono_conto: str = ""              # «0» en rojo
     ayuda_que: str = ""               # tooltip de «qué hacer» (las cajas)
+    ojo: str = ""                     # «otro ajuste el 20 oct»: la marca ⚠ va en DIF (tooltip)
 
 
 def tallas_por_id(ajuste) -> dict:
@@ -273,9 +274,21 @@ def queda_texto(n: int) -> str:
     return f"{_MENOS}{-n} · recontar" if n < 0 else str(n)
 
 
+#: La marca corta del otro ajuste; va pegada a la diferencia, no en «qué hacer».
+MARCA_OJO = "⚠"
+
+
+def texto_ojo(t) -> str:
+    """«otro ajuste el 20 oct» si la talla tuvo otro ajuste que Corregir no toca; '' si no."""
+    if t is None or t.ajuste_posterior is None or t.ajustado:
+        return ""
+    return f"otro ajuste el {dia_mes(fecha_tienda(t.ajuste_posterior))}"
+
+
 def _que_hacer_talla(linea, t) -> tuple[str, str, str]:
-    """(texto, tono, ayuda) de «qué hacer»: el motivo real de la tanda 1, con
-    el ⚠ del otro ajuste y las cajas en gris (sin recontar)."""
+    """(texto, tono, ayuda) de «qué hacer»: el motivo real de la tanda 1 y las
+    cajas en gris (sin recontar). Solo la acción: el ⚠ del otro ajuste va en
+    DIF (con la fecha en el tooltip y en el «por qué») para que no la corte."""
     texto = que_hacer(linea)
     if linea.estado == URGENTE:
         tono = QUE_URGENTE
@@ -293,9 +306,6 @@ def _que_hacer_talla(linea, t) -> tuple[str, str, str]:
             texto = f"{texto} de cajas*"
         elif not linea.surtir:
             texto = f"{texto} · +{linea.en_cajas} en cajas*"
-    if t is not None and t.ajuste_posterior is not None and not t.ajustado:
-        texto = f"⚠ otro ajuste el {dia_mes(fecha_tienda(t.ajuste_posterior))} · {texto}"
-        tono = QUE_OJO
     return texto, tono, ayuda
 
 
@@ -314,28 +324,57 @@ def fila_talla(linea, t, pedido: int | None, *, varios_colores: bool = False, ya
         sistema = dif = vendidas = queda = "—"
         tono_dif = tono_queda = ""
     que, tono_que, ayuda = _que_hacer_talla(linea, t)
+    ojo = texto_ojo(t)
+    if ojo:
+        dif = f"{dif} {MARCA_OJO}"
     celdas = (
         talla_texto(linea, varios_colores=varios_colores), sistema, str(linea.conto), dif, vendidas, queda, que,
         "" if pedido is None else str(pedido),
     )
     return Fila(
         FILA_TALLA, conteo_id=linea.conteo_id, celdas=celdas, tono_dif=tono_dif, tono_queda=tono_queda,
-        tono_que=tono_que, tono_conto="cero" if linea.conto == 0 else "", ayuda_que=ayuda,
+        tono_que=tono_que, tono_conto="cero" if linea.conto == 0 else "", ayuda_que=ayuda, ojo=ojo,
     )
 
 
-def _resumen_prenda(tallas, por_id) -> str:
-    """«2 con diferencia · pedir 6» para la fila de grupo."""
+def _resumen_prenda(tallas, por_id, pedidos: Mapping[int, int | None]) -> str:
+    """«2 con diferencia · pedir 6» para la fila de grupo. «pedir» es lo que
+    está escrito en PEDIR (lo que va a la hoja), no lo sugerido."""
     partes = []
     n_dif = sum(1 for l in tallas if _con_diferencia(por_id.get(l.conteo_id)))
     if n_dif:
         partes.append(f"{n_dif} con diferencia")
-    sug = sum(l.sugerido for l in tallas)
-    if sug:
-        partes.append(f"pedir {sug}")
+    pedido = sum(pedidos.get(l.conteo_id) or 0 for l in tallas)
+    if pedido:
+        partes.append(f"pedir {pedido}")
     if any(l.estado == URGENTE for l in tallas):
         partes.append("¡urgente!")
     return " · ".join(partes)
+
+
+def grupos_tabla(lineas: Iterable, titulo: str = "") -> list[tuple[str, list]]:
+    """[(nombre del grupo, tallas)] en el orden de la hoja: uno por prenda y,
+    si la prenda trae varios colores, uno por prenda y color («Chamarra ·
+    Negro»). Así la talla va sola en su celda y no se corta («10 Azul …»)."""
+    salida: list[tuple[str, list]] = []
+    for producto, tallas in prendas(lineas):
+        colores = _colores(tallas)
+        if len(colores) <= 1:
+            salida.append((nombre_prenda(producto, tallas, titulo), tallas))
+            continue
+        nombre = _limpio(producto, titulo)
+        por_color: dict[str, list] = {}
+        for l in tallas:
+            color = str(getattr(l, "color", "") or "").strip()
+            clave = "" if color.upper() in _SIN_COLOR else color.lower()
+            por_color.setdefault(clave, []).append(l)
+        for clave, del_color in por_color.items():
+            color = _colores(del_color)
+            if color and color[0].lower() not in nombre.lower():
+                salida.append((f"{nombre} · {_bonito(color[0])}", del_color))
+            else:
+                salida.append((nombre, del_color))
+    return salida
 
 
 def filas_tabla(
@@ -344,24 +383,24 @@ def filas_tabla(
 ) -> list[Fila]:
     """Las filas de la tabla, ya ordenadas y agrupadas.
 
-    - Varias prendas: una fila de grupo por prenda (nombre + color una vez).
-    - Dentro de cada prenda, las tallas con diferencia primero y luego el
+    - Varias prendas (o una de varios colores): una fila de grupo por prenda
+      y color (nombre + color una vez); la talla va sola.
+    - Dentro de cada grupo, las tallas con diferencia primero y luego el
       separador «sin diferencia (N)» (solo si hay de las dos). Con
       `en_su_orden`, el orden de la hoja y sin separador.
-    - Con `filtro` (la clave de un chip), solo las tallas de ese grupo."""
+    - Con `filtro` (la clave de un chip), solo las tallas de ese grupo.
+    - La fila de grupo dice «pedir N» con lo escrito en PEDIR (`pedidos`)."""
     pedidos = pedidos or {}
     por_id = tallas_por_id(ajuste)
-    grupos = prendas(lineas)
-    varias = len(grupos) > 1
+    grupos = grupos_tabla(lineas, titulo)
+    varios = len(grupos) > 1
     filas: list[Fila] = []
-    for producto, tallas in grupos:
+    for nombre, tallas in grupos:
         visibles = [l for l in tallas if filtro is None or en_grupo(filtro, l, por_id.get(l.conteo_id))]
         if not visibles:
             continue
-        varios_colores = len(_colores(tallas)) > 1
-        if varias:
-            nombre = nombre_prenda(producto, tallas, titulo)
-            resumen = _resumen_prenda(visibles, por_id)
+        if varios:
+            resumen = _resumen_prenda(visibles, por_id, pedidos)
             filas.append(Fila(FILA_PRENDA, texto=nombre + (f"   —   {resumen}" if resumen else "")))
         if en_su_orden:
             primero, despues = visibles, []
@@ -372,10 +411,7 @@ def filas_tabla(
                 primero, despues = despues, []
 
         def _fila(l):
-            return fila_talla(
-                l, por_id.get(l.conteo_id), pedidos.get(l.conteo_id),
-                varios_colores=varios_colores, ya_revisada=ya_revisada,
-            )
+            return fila_talla(l, por_id.get(l.conteo_id), pedidos.get(l.conteo_id), ya_revisada=ya_revisada)
 
         filas.extend(_fila(l) for l in primero)
         if despues:

@@ -161,10 +161,33 @@ class TablaTests(unittest.TestCase):
         self.assertEqual(filas[4].texto, "Pants · Gris   —   pedir 6")
         self.assertEqual(filas[5].celdas[p.COL_PEDIDO], "6")
 
-    def test_una_prenda_de_varios_colores_si_dice_el_color(self) -> None:
-        lineas = [_l(1, "6", producto="Playera", color="BLANCO"), _l(2, "6", producto="Playera", color="AZUL")]
-        filas = p.filas_tabla(lineas, resumir([_t(1), _t(2)]), {})
-        self.assertEqual([f.celdas[0] for f in filas], ["6 Blanco", "6 Azul"])
+    def test_una_prenda_de_varios_colores_se_parte_por_color(self) -> None:
+        # Reescrita (antes: test_una_prenda_de_varios_colores_si_dice_el_color, «6 Blanco»):
+        # la talla con el color no cabía en TALLA («10 Azul …»); ahora va un grupo por color.
+        lineas = [
+            _l(1, "6", producto="Playera", color="BLANCO"), _l(2, "6", producto="Playera", color="AZUL REY"),
+            _l(3, "Unitalla", producto="Playera", color="BLANCO"),
+        ]
+        filas = p.filas_tabla(lineas, resumir([_t(1), _t(2), _t(3)]), {})
+        self.assertEqual(
+            [(f.tipo, f.texto or f.celdas[0]) for f in filas],
+            [("prenda", "Playera · Blanco"), ("talla", "6"), ("talla", "Unitalla"),
+             ("prenda", "Playera · Azul Rey"), ("talla", "6")],
+        )
+        # «Ver todas las columnas» sí lleva el color en la talla (no hay grupos).
+        self.assertEqual(p.fila_todas(lineas[1], None, None)[1], "6 Azul Rey")
+
+    def test_la_fila_de_grupo_dice_lo_pedido_no_lo_sugerido(self) -> None:
+        lineas = [
+            _l(1, "6", producto="Playera Uno", color="BLANCO", estado=PEDIR, sugerido=5),
+            _l(2, "10", producto="Pants Uno", color="GRIS", estado=PEDIR, sugerido=6),
+        ]
+        ajuste = resumir([_t(1), _t(2)])
+        self.assertEqual(p.filas_tabla(lineas, ajuste, {1: 5, 2: 6}, titulo="Uno")[0].texto, "Playera · Blanco   —   pedir 5")
+        # Lo borraste: el grupo ya no dice «pedir»; lo cambiaste: dice lo tuyo.
+        filas = p.filas_tabla(lineas, ajuste, {1: None, 2: 9}, titulo="Uno")
+        self.assertEqual(filas[0].texto, "Playera · Blanco")
+        self.assertEqual(filas[2].texto, "Pants · Gris   —   pedir 9")
 
     def test_queda_hoy_negativo_dice_recontar(self) -> None:
         linea = _l(1, "10", conto=0)
@@ -174,10 +197,17 @@ class TablaTests(unittest.TestCase):
         self.assertEqual(fila.celdas[p.COL_QUE], "se acabó")
         self.assertEqual(fila.tono_conto, "cero")
 
-    def test_otro_ajuste_despues_lleva_el_ojo(self) -> None:
+    def test_otro_ajuste_despues_lleva_el_ojo_en_la_diferencia(self) -> None:
+        # Reescrita (antes: el ⚠ y la fecha iban al principio de «qué hacer» y se
+        # comían la acción al 125 %). Ahora: marca corta en DIF y la fecha en `ojo`.
         fila = p.fila_talla(_l(1, "36"), _t(1, sistema=19, conto=18, posterior=datetime(2026, 10, 20, 18)), None)
-        self.assertTrue(fila.celdas[p.COL_QUE].startswith("⚠ otro ajuste el 20 oct · "))
-        self.assertEqual(fila.tono_que, p.QUE_OJO)
+        self.assertEqual(fila.celdas[p.COL_DIF], f"{M}1 ⚠")
+        self.assertEqual(fila.ojo, "otro ajuste el 20 oct")
+        self.assertEqual(fila.celdas[p.COL_QUE], "no se mueve")          # solo la acción
+        self.assertEqual(fila.tono_que, p.QUE_GRIS)
+        # Ya corregida (ajustado), el otro ajuste no importa: sin marca.
+        t = _t(1, sistema=19, conto=18, ajustado=True, posterior=datetime(2026, 10, 20, 18))
+        self.assertEqual(p.fila_talla(_l(1, "36"), t, None).celdas[p.COL_DIF], f"{M}1")
 
     def test_ya_revisada_queda_lo_de_hoy(self) -> None:
         t = _t(1, sistema=10, conto=6, vendidas=2)          # sin aplicar: 8 − 4 = 4

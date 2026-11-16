@@ -187,6 +187,20 @@ class CasoJornada86Tests(_Base):
             "Conteo de hace 41 días: desde entonces se vendieron 13 piezas y la talla 36 (20 oct) tuvo otro ajuste. "
             "Conviene recontar antes de corregir.",
         )
+        # Corto (la ventana de Revisar): con una sola talla dice lo mismo.
+        self.assertEqual(vista.aviso_conteo_viejo(41, r, corto=True), vista.aviso_conteo_viejo(41, r))
+
+    def test_el_aviso_corto_solo_cuenta_las_tallas_con_otro_ajuste(self) -> None:
+        # Escuela grande: el aviso enumeraba hasta 5 tallas y se iba a 3 líneas al 125 %.
+        self._ajuste(self.vs["36"], datetime(2026, 10, 20, 18, 0), -2)
+        self._ajuste(self.vs["8"], datetime(2026, 10, 21, 18, 0), -1)
+        r = rs.resumen_de_jornada(self.s, self.j)
+        self.assertEqual(
+            vista.aviso_conteo_viejo(41, r, corto=True),
+            "Conteo de hace 41 días: desde entonces se vendieron 13 piezas y 2 tallas tuvieron otro ajuste. "
+            "Conviene recontar antes de corregir.",
+        )
+        self.assertIn("(20 oct)", vista.aviso_conteo_viejo(41, r))     # el largo (tooltip) trae el detalle
 
     def test_la_confirmacion_nombra_la_36_una_sola_vez(self) -> None:
         self._ajuste(self.vs["36"], datetime(2026, 10, 20, 18, 0), -2)

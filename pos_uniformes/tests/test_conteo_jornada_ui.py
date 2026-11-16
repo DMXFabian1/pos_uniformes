@@ -471,6 +471,57 @@ class RevisionDialogTests(unittest.TestCase):
         self.assertEqual(d.siguiente_jornada.id, otra)
         self.assertFalse(d.isVisible())
 
+    def _no_usar_con_pedido_escrito(self):
+        """Escribe 30 en PEDIR de la talla 6 y elige «No usar»: queda en «✓ Listo»."""
+        d = self._dialogo()
+        d.show(); _APP.processEvents()
+        d._table.item(self._fila(d, "6"), d.COL_PEDIDO).setText("30")
+        with patch(f"{_D}._elegir", return_value="si"):
+            d._descartar()
+        self.assertEqual(d._paginas.currentIndex(), 1)
+        return d
+
+    def _pedido_de_la_6(self):
+        from pos_uniformes.database.models import ConteoInventario
+
+        s = self.factory()
+        try:
+            return s.scalars(select(ConteoInventario).where(ConteoInventario.variante_id == self.v_ids[0])).one().pedido
+        finally:
+            s.close()
+
+    def test_no_usar_y_cerrar_desde_listo_pregunta_por_el_pedido(self) -> None:
+        # «No usar» no guarda el pedido: [Cerrar] del «✓ Listo» pregunta como la ✕.
+        d = self._no_usar_con_pedido_escrito()
+        with patch(f"{_D}._elegir", return_value="volver") as preg:
+            d._cerrar_btn.click()
+        self.assertEqual(preg.call_args.args[2], "Cambiaste el pedido y no lo guardaste.")
+        self.assertTrue(d.isVisible())                       # Volver: sigue en «Listo»
+        with patch(f"{_D}._elegir", return_value="guardar"):
+            d._cerrar_btn.click()
+        self.assertFalse(d.isVisible())
+        self.assertEqual(self._pedido_de_la_6(), 30)
+
+    def test_no_usar_y_siguiente_tambien_pregunta_por_el_pedido(self) -> None:
+        otra = self._otra_por_revisar()
+        d = self._no_usar_con_pedido_escrito()
+        with patch(f"{_D}._elegir", return_value="volver"):
+            d._siguiente_btn.click()
+        self.assertIsNone(d.siguiente_jornada_id)            # Volver: no se va a la siguiente
+        self.assertTrue(d.isVisible())
+        with patch(f"{_D}._elegir", return_value="guardar") as preg:
+            d._siguiente_btn.click()
+        preg.assert_called_once()
+        self.assertEqual(d.siguiente_jornada_id, otra)
+        self.assertEqual(self._pedido_de_la_6(), 30)
+
+    def test_no_usar_y_no_guardar_sale_sin_el_pedido(self) -> None:
+        d = self._no_usar_con_pedido_escrito()
+        with patch(f"{_D}._elegir", return_value="no_guardar"):
+            d._cerrar_btn.click()
+        self.assertFalse(d.isVisible())
+        self.assertIsNone(self._pedido_de_la_6())
+
     def test_desde_el_historial_no_se_ofrece_la_siguiente(self) -> None:
         self._otra_por_revisar()
         d = self._dialogo(ofrecer_siguiente=False)
@@ -500,6 +551,104 @@ class RevisionDialogTests(unittest.TestCase):
         with patch(f"{_D}.ConteoRevisionDialog", _Falsa):
             QuoteSatelliteWindow._conteos_revisar(w, _foto(id=1))
         self.assertEqual(abiertas, [(1, "VEND-1"), (2, "VEND-1")])
+
+    def test_el_kiosko_no_reabre_una_jornada_ya_vista(self) -> None:
+        # Si la 2 ofreciera otra vez la 1 (1 → 2 → 1), el kiosko se detiene: sin ciclo.
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fotos = {1: _foto(id=1), 2: _foto(id=2, titulo="Dos")}
+        abiertas = []
+
+        class _Falsa:
+            def __init__(self, _padre, *, jornada, revisada_por):
+                abiertas.append(jornada.id)
+                self.siguiente_jornada = fotos[2 if jornada.id == 1 else 1]
+
+            def exec(self):
+                if len(abiertas) > 5:
+                    raise AssertionError("ciclo: reabre jornadas ya vistas")
+                return 1
+
+        w = SimpleNamespace(
+            _conteos_code="VEND-1", _set_status=lambda *_: None,
+            _refresh_conteo_banner=lambda: None, _refresh_conteos_vista=lambda: None,
+        )
+        with patch(f"{_D}.ConteoRevisionDialog", _Falsa):
+            QuoteSatelliteWindow._conteos_revisar(w, fotos[1])
+        self.assertEqual(abiertas, [1, 2])
+
+    def _jornada_de_dos_prendas(self):
+        """«Tres»: Prenda 0 (6 y 8) y Prenda 1 (6 y 8). La 8 de Prenda 1 se vende
+        (PEDIR) y la 6 de Prenda 0 tiene diferencia (−2)."""
+        from datetime import timedelta
+
+        from pos_uniformes.database.models import LibretaVenta
+        from pos_uniformes.services.conteo_service import ConteoInput, registrar_conteos_lote
+        from pos_uniformes.tests.test_conteo_jornada_service import _seed
+
+        s = self.factory()
+        e = _seed(s, "Tres")
+        s.flush()
+        v = {x.sku: x for x in s.scalars(select(Variante).where(Variante.sku.like("STres%"))).all()}
+        s.add(LibretaVenta(
+            employee_code="VEND-4", tipo="venta", piezas=14, monto_total=1400,
+            detalle=[{"sku": "STres18", "talla": "8", "nombre": "x", "cantidad": 14, "precio": "100", "subtotal": "1400"}],
+            created_at=datetime.now() - timedelta(days=14),
+        ))
+        j = jn.abrir_jornada(s, escuela_id=e.id, empleada_code="VEND-4", empleada_nombre="Stayce")
+        registrar_conteos_lote(s, [
+            ConteoInput(v["STres06"].id, 8), ConteoInput(v["STres08"].id, 10),
+            ConteoInput(v["STres16"].id, 10), ConteoInput(v["STres18"].id, 10),
+        ], "x", jornada_id=j.id)
+        jn.terminar_jornada(s, j, empleada_code="VEND-4")
+        s.commit()
+        s.refresh(j)
+        foto = jn.ref(j)
+        ids = {sku: x.id for sku, x in v.items()}
+        s.close()
+        return foto, ids
+
+    def test_varias_prendas_pinta_filas_de_grupo_y_pedir_va_al_conteo_correcto(self) -> None:
+        from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import ConteoRevisionDialog
+
+        foto, _ids = self._jornada_de_dos_prendas()
+        d = ConteoRevisionDialog(jornada=foto, revisada_por="VEND-1", session_factory=self.factory)
+        self._dialogos.append(d)
+        grupos = [f for f in range(d._table.rowCount()) if d._table.columnSpan(f, 0) == d._table.columnCount()]
+        textos = [d._table.item(f, 0).text() for f in grupos]
+        self.assertTrue(textos[0].startswith("Prenda 0 · Azul   —   1 con diferencia"), textos)
+        self.assertTrue(any(t.startswith("Prenda 1 · Azul") and "pedir" in t for t in textos), textos)
+        # Las filas de grupo y los separadores no son tallas: no están en _por_fila.
+        self.assertFalse(set(grupos) & set(d._por_fila))
+        self.assertEqual(len(d._por_fila), 4)
+        # Con el chip Pedir prendido queda la Prenda 1 (su grupo y la 8); PEDIR va a su conteo.
+        d._tocar_chip("PEDIR")
+        self.assertEqual(d._table.columnSpan(0, 0), d._table.columnCount())
+        self.assertEqual(list(d._por_fila), [1])
+        cid = d._por_fila[1]
+        linea = next(l for l in d._revision.lineas if l.conteo_id == cid)
+        self.assertEqual((linea.producto.split(" | ")[0], linea.talla), ("Prenda 1 Tres", "8"))
+        d._table.item(1, d.COL_PEDIDO).setText("0")
+        self.assertEqual(d._pedidos[cid], 0)
+        # El grupo deja de decir «pedir N»: dice lo escrito, no lo sugerido.
+        self.assertNotIn("pedir", d._table.item(0, 0).text())
+        d._table.item(1, d.COL_PEDIDO).setText("9")
+        self.assertIn("pedir 9", d._table.item(0, 0).text())
+
+    def test_la_fila_elegida_conserva_el_color_de_su_letra(self) -> None:
+        # La hoja de estilo pintaba lo elegido en negro: se perdía el rojo de la diferencia.
+        from PyQt6.QtGui import QPalette
+        from PyQt6.QtWidgets import QStyleOptionViewItem
+
+        from pos_uniformes.ui.styles import conteo_revision_styles as cr
+
+        d = self._dialogo()
+        fila = self._fila(d, "6")
+        d._table.selectRow(fila)
+        opcion = QStyleOptionViewItem()
+        d._table.itemDelegate().initStyleOption(opcion, d._table.model().index(fila, _P.COL_DIF))
+        self.assertEqual(opcion.palette.color(QPalette.ColorRole.HighlightedText).name(), cr.ROJO)
+        self.assertNotIn("selection-color", cr.build_conteo_revision_stylesheet())
 
     def test_doble_clic_ya_no_abre_la_historia_y_consultar_si(self) -> None:
         # Reescrita (antes: test_doble_clic_en_una_fila_abre_la_historia): el doble
@@ -732,8 +881,12 @@ class RevisionDialogTests(unittest.TestCase):
         ))
         s.commit(); s.close()
         d = self._dialogo()
-        # Tanda 3: la talla lleva el ⚠ en «qué hacer» y en su «por qué».
-        self.assertTrue(self._celda(d, "6", _P.COL_QUE).startswith("⚠ otro ajuste el "))
+        # Tanda 3: la talla lleva el ⚠ en DIF (la fecha en el tooltip) y en su «por qué»;
+        # «qué hacer» queda solo con la acción (antes el ⚠ iba ahí y la cortaba).
+        fila = self._fila(d, "6")
+        self.assertTrue(self._celda(d, "6", _P.COL_DIF).endswith(" ⚠"))
+        self.assertIn("⚠ otro ajuste el ", d._table.item(fila, _P.COL_DIF).toolTip())
+        self.assertFalse(self._celda(d, "6", _P.COL_QUE).startswith("⚠"))
         d._table.selectRow(self._fila(d, "6"))
         self.assertIn("⚠ otro ajuste el ", d._por_que_label.text())
         with patch(f"{_D}._elegir", return_value="no") as preg:

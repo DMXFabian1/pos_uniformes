@@ -118,10 +118,11 @@ QPushButton#crOrden:hover {{ text-decoration: underline; }}
 QTableWidget#crTabla {{
     background: {TARJETA}; color: {TEXTO}; border: 1px solid {BORDE_SUAVE}; border-radius: 14px;
     gridline-color: transparent; font-family: {FUENTE}; font-size: 14px;
-    selection-background-color: {SELECCION}; selection-color: {TEXTO};
+    selection-background-color: {SELECCION};
 }}
 QTableWidget#crTabla::item {{ border-bottom: 1px solid #f1e9de; padding: 0 6px; }}
-QTableWidget#crTabla::item:selected {{ background: {SELECCION}; color: {TEXTO}; }}
+/* Sin `color` en lo elegido: la fila conserva el rojo/verde de su letra (lo pone el delegado). */
+QTableWidget#crTabla::item:selected {{ background: {SELECCION}; }}
 QTableWidget#crTabla QHeaderView::section {{
     background: {TARJETA}; color: {TENUE}; border: none; border-bottom: 1px solid {BORDE};
     padding: 6px 6px; font-family: {FUENTE}; font-size: 11px; font-weight: 800;

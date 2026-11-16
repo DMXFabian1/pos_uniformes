@@ -14,7 +14,7 @@ from collections.abc import Callable
 from datetime import date
 
 from PyQt6.QtCore import QRect, QRectF, Qt, QTimer
-from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPen
+from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPalette, QPen
 from PyQt6.QtWidgets import (
     QAbstractItemDelegate,
     QAbstractItemView,
@@ -600,6 +600,17 @@ class _CajitaPedido(QStyledItemDelegate):
         super().__init__(parent)
         self._columna = columna
 
+    def initStyleOption(self, option, index) -> None:  # noqa: N802 - API de Qt
+        """La fila elegida conserva el color de su letra (rojo de la diferencia,
+        «¡URGENTE!»…): Qt pinta lo seleccionado con HighlightedText, no con el
+        ForegroundRole de la celda."""
+        super().initStyleOption(option, index)
+        letra = index.data(Qt.ItemDataRole.ForegroundRole)
+        if isinstance(letra, QBrush):
+            option.palette.setBrush(QPalette.ColorRole.HighlightedText, letra)
+        else:
+            option.palette.setBrush(QPalette.ColorRole.HighlightedText, option.palette.brush(QPalette.ColorRole.Text))
+
     def paint(self, painter: QPainter, option, index) -> None:  # noqa: D401
         if index.column() != self._columna or index.data(Qt.ItemDataRole.UserRole) is None:
             # La hoja de estilo de la tabla (::item) se come el fondo de la celda:
@@ -921,7 +932,7 @@ class ConteoRevisionDialog(QDialog):
         self._cerrar_btn = QPushButton("Cerrar")
         self._cerrar_btn.setObjectName("crSecundario")
         self._cerrar_btn.setAutoDefault(False)
-        self._cerrar_btn.clicked.connect(self.accept)
+        self._cerrar_btn.clicked.connect(self._cerrar_listo)
         botones.addWidget(self._cerrar_btn)
         self._siguiente_btn = QPushButton("Siguiente por revisar")
         self._siguiente_btn.setObjectName("crPrimario")
@@ -1010,8 +1021,11 @@ class ConteoRevisionDialog(QDialog):
         self._cuando_label.setText(pantalla.subtitulo_encabezado(
             quien=r.quien, contado=self._contado_at, lineas=r.lineas, hoy=self._hoy,
         ))
-        aviso = "" if self._ya_revisada else vista.aviso_conteo_viejo(self._dias, self._ajuste)
+        # En una línea: con varias tallas con otro ajuste solo dice cuántas; el detalle, en el tooltip.
+        aviso = "" if self._ya_revisada else vista.aviso_conteo_viejo(self._dias, self._ajuste, corto=True)
+        largo = "" if self._ya_revisada else vista.aviso_conteo_viejo(self._dias, self._ajuste)
         self._aviso_label.setText(f"⚠ {aviso}" if aviso else "")
+        self._aviso_label.setToolTip(largo if largo != aviso else "")
         self._aviso_label.setVisible(bool(aviso))
         if self._ya_revisada:
             self._revisada_label.setText(f"✓ {revisada_txt}. El pedido se puede seguir escribiendo y guardando.")
@@ -1131,6 +1145,8 @@ class ConteoRevisionDialog(QDialog):
                     color = cr.ROJO
                 elif c == pantalla.COL_DIF:
                     color = cr.COLOR_DIF.get(fila.tono_dif)
+                    if fila.ojo:
+                        item.setToolTip(f"⚠ {fila.ojo}")
                     if fila.tono_dif in ("faltan", "sobran"):
                         fuente = self._fuente_tabla()
                         fuente.setBold(True)
@@ -1145,8 +1161,8 @@ class ConteoRevisionDialog(QDialog):
                         fuente = self._fuente_tabla()
                         fuente.setBold(True)
                         item.setFont(fuente)
-                    if fila.ayuda_que:
-                        item.setToolTip(fila.ayuda_que)
+                    # Si no cabe, el texto entero en el tooltip (con las cajas, si hay).
+                    item.setToolTip("\n".join(x for x in (txt, fila.ayuda_que) if x))
                 if color:
                     item.setForeground(QBrush(QColor(color)))
                 self._table.setItem(f, c, item)
@@ -1217,9 +1233,13 @@ class ConteoRevisionDialog(QDialog):
             from pos_uniformes.services.conteo_revision_vista_service import dia_mes, fecha_tienda
 
             partes.append(f"<span style='color:#a35a00'>⚠ otro ajuste el {dia_mes(fecha_tienda(ajuste.ajuste_posterior))}</span>")
+        from pos_uniformes.services.conteo_revision_pantalla_service import _colores, talla_texto
+
         varios = len({x.producto for x in self._revision.lineas}) > 1
         nombre = f"{nombre_para_hoja(l.producto, self._revision.titulo)} · " if varios else ""
-        self._por_que_label.setText(f"▸ <b>{nombre}Talla {l.talla}</b>: " + " · ".join(partes))
+        de_la_prenda = [x for x in self._revision.lineas if x.producto == l.producto]
+        talla = talla_texto(l, varios_colores=len(_colores(de_la_prenda)) > 1)
+        self._por_que_label.setText(f"▸ <b>{nombre}Talla {talla}</b>: " + " · ".join(partes))
         self._por_que_label.setProperty("vacio", "no")
         self._por_que_label.style().unpolish(self._por_que_label)
         self._por_que_label.style().polish(self._por_que_label)
@@ -1247,6 +1267,27 @@ class ConteoRevisionDialog(QDialog):
                 self._pintando = False
                 return
         self._resumen()
+        self._repintar_grupos()
+
+    def _repintar_grupos(self) -> None:
+        """La fila de grupo dice «pedir N» con lo escrito en PEDIR: al cambiar
+        una cajita se rehace su texto (las filas no se mueven)."""
+        from pos_uniformes.services import conteo_revision_pantalla_service as pantalla
+
+        filas = pantalla.filas_tabla(
+            self._revision.lineas, self._ajuste, self._pedidos, titulo=self._revision.titulo,
+            filtro=self._filtro, en_su_orden=self._en_su_orden, ya_revisada=self._ya_revisada,
+        )
+        if len(filas) != self._table.rowCount():
+            return
+        self._pintando = True
+        try:
+            for f, fila in enumerate(filas):
+                item = self._table.item(f, 0)
+                if fila.tipo == pantalla.FILA_PRENDA and item is not None and item.text() != fila.texto:
+                    item.setText(fila.texto)
+        finally:
+            self._pintando = False
 
     # --- acciones ------------------------------------------------------------------
     def _guardar_pedidos(self, *, avisar: bool = True) -> bool:
@@ -1422,11 +1463,38 @@ class ConteoRevisionDialog(QDialog):
         (self._siguiente_btn if self._siguiente is not None else self._cerrar_btn).setFocus()
 
     def _ir_a_siguiente(self) -> None:
-        if self._siguiente is None:
+        if self._siguiente is None or not self._pedido_resuelto():
             return
         self.siguiente_jornada = self._siguiente
         self.siguiente_jornada_id = int(self._siguiente.id)
         self.accept()
+
+    def _cerrar_listo(self) -> None:
+        """[Cerrar] de «✓ Listo»: como la ✕, pregunta si el pedido quedó sin guardar
+        (pasa al «No usar»: ese camino no lo guarda)."""
+        if self._pedido_resuelto():
+            self.accept()
+
+    def _pedido_resuelto(self) -> bool:
+        """Si cambiaste el pedido a mano y no lo guardaste, pregunta Guardar /
+        No guardar / Volver. False = Volver (o no se pudo guardar): no salir."""
+        self._cerrar_editor_abierto()
+        if not self._pedido_cambiado():
+            return True
+        opcion = _elegir(
+            self, "Pedido sin guardar", "Cambiaste el pedido y no lo guardaste.",
+            [
+                ("guardar", "Guardar", QMessageBox.ButtonRole.AcceptRole),
+                ("no_guardar", "No guardar", QMessageBox.ButtonRole.DestructiveRole),
+                ("volver", "Volver", QMessageBox.ButtonRole.RejectRole),
+            ],
+            default="guardar", escape="volver",
+        )
+        if opcion == "volver":
+            return False
+        if opcion == "guardar":
+            return self._guardar_pedidos(avisar=False)
+        return True
 
     # --- cerrar --------------------------------------------------------------------
     def _cerrar_editor_abierto(self) -> None:
@@ -1450,22 +1518,8 @@ class ConteoRevisionDialog(QDialog):
     def reject(self) -> None:
         """Cerrar (✕ o Esc): si cambiaste el pedido a mano y no lo guardaste,
         pregunta. El prellenado con el sugerido no cuenta."""
-        self._cerrar_editor_abierto()
-        if self._pedido_cambiado():
-            opcion = _elegir(
-                self, "Pedido sin guardar", "Cambiaste el pedido y no lo guardaste.",
-                [
-                    ("guardar", "Guardar", QMessageBox.ButtonRole.AcceptRole),
-                    ("no_guardar", "No guardar", QMessageBox.ButtonRole.DestructiveRole),
-                    ("volver", "Volver", QMessageBox.ButtonRole.RejectRole),
-                ],
-                default="guardar", escape="volver",
-            )
-            if opcion == "volver":
-                return
-            if opcion == "guardar" and not self._guardar_pedidos(avisar=False):
-                return
-        super().reject()
+        if self._pedido_resuelto():
+            super().reject()
 
 
 class PedidoHojaDialog(QDialog):
