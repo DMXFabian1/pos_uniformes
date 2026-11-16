@@ -2,8 +2,10 @@
 
 - `ConteoNuevaJornadaDialog`: qué vas a contar (escuela, o una prenda de los
   básicos). Devuelve el alcance; la ventana abre la jornada.
-- `ConteoRevisionDialog`: lo que ve el dueño antes de aplicar una jornada
-  terminada — cada talla con su diferencia — y los botones Aplicar / Descartar.
+- `ConteoRevisionDialog`: lo que ve el dueño antes de corregir el inventario
+  con una jornada terminada — qué cambia, talla por talla, en piezas y en $ —
+  y la decisión: «Corregir inventario» o «No usar este conteo» (tanda 3,
+  2026-11-15; lo que se decide sale de `conteo_revision_pantalla_service`).
 """
 
 from __future__ import annotations
@@ -11,8 +13,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import date
 
-from PyQt6.QtCore import QRectF, Qt
-from PyQt6.QtGui import QBrush, QColor, QPainter, QPen
+from PyQt6.QtCore import QRect, QRectF, Qt, QTimer
+from PyQt6.QtGui import QBrush, QColor, QFont, QPainter, QPen
 from PyQt6.QtWidgets import (
     QAbstractItemDelegate,
     QAbstractItemView,
@@ -25,16 +27,23 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QMenu,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QStackedWidget,
+    QStyle,
+    QStyledItemDelegate,
     QTableWidget,
     QTableWidgetItem,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
 from sqlalchemy.orm import Session
 
+from pos_uniformes.services.conteo_revision_pantalla_service import COL_PEDIDO as _COL_PEDIDO_REVISION
+from pos_uniformes.services.conteo_revision_pantalla_service import COLUMNAS as _COLUMNAS_REVISION
 from pos_uniformes.services.conteo_service import ESCUELA_ID_BASICOS, NOMBRE_BASICOS
 
 # La misma paleta que el corte y la Libreta (2026-11-06): crema, vino y terracota.
@@ -111,6 +120,13 @@ def _preguntar(parent: QWidget | None, titulo: str, texto: str, *, si: str, no: 
     """«Volver» / «Sí, …»: True solo si tocaron el botón del sí."""
     opciones = [("no", no, QMessageBox.ButtonRole.RejectRole), ("si", si, QMessageBox.ButtonRole.AcceptRole)]
     return _elegir(parent, titulo, texto, opciones, default="no", escape="no") == "si"
+
+
+def _area_disponible(widget: QWidget | None) -> QRect:
+    """El área libre de la pantalla donde se abre (sin la barra de tareas)."""
+    pantalla = widget.screen() if widget is not None else None
+    pantalla = pantalla or QApplication.primaryScreen()
+    return pantalla.availableGeometry() if pantalla is not None else QRect(0, 0, 1366, 728)
 
 
 def _default_session_factory() -> Session:
@@ -575,19 +591,101 @@ class _TarjetaFiltro(QFrame):
             w.style().polish(w)
 
 
-class ConteoRevisionDialog(QDialog):
-    """Revisar = decidir qué pedir. Primero la decisión, después la evidencia.
+class _CajitaPedido(QStyledItemDelegate):
+    """La celda PEDIR se ve como un campo (borde redondo) para que se note que
+    ahí se escribe; vacía enseña un 0 tenue. En las demás celdas solo pinta el
+    fondo de las filas de prenda."""
 
-    Arriba cuatro tarjetas (URGENTE · PEDIR · SURTIR · BIEN) que filtran; la
-    tabla compacta dice por talla cuántas hay, **qué hacer** y el Pedido
-    editable; al tocar una talla, debajo aparece **por qué** en una línea.
-    "Ver todas las columnas" trae la tabla completa. Aplicar al inventario
-    también guarda los pedidos: un solo gesto.
+    def __init__(self, columna: int, parent=None) -> None:
+        super().__init__(parent)
+        self._columna = columna
+
+    def paint(self, painter: QPainter, option, index) -> None:  # noqa: D401
+        if index.column() != self._columna or index.data(Qt.ItemDataRole.UserRole) is None:
+            # La hoja de estilo de la tabla (::item) se come el fondo de la celda:
+            # las filas de prenda lo pintan aquí.
+            fondo = index.data(Qt.ItemDataRole.BackgroundRole)
+            if isinstance(fondo, QBrush) and not option.state & QStyle.StateFlag.State_Selected:
+                painter.fillRect(option.rect, fondo)
+            super().paint(painter, option, index)
+            return
+        from pos_uniformes.ui.styles import conteo_revision_styles as cr
+
+        painter.save()
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        seleccionada = bool(option.state & QStyle.StateFlag.State_Selected)
+        if seleccionada:
+            painter.fillRect(option.rect, QColor(cr.SELECCION))
+        caja = QRectF(option.rect).adjusted(10, 4, -10, -4)
+        painter.setPen(QPen(QColor(cr.CAJITA_BORDE), 1.2))
+        painter.setBrush(QBrush(QColor("#ffffff")))
+        painter.drawRoundedRect(caja, 7, 7)
+        texto = str(index.data(Qt.ItemDataRole.DisplayRole) or "")
+        fuente = QFont(option.font)
+        fuente.setBold(bool(texto))
+        painter.setFont(fuente)
+        painter.setPen(QColor(cr.TEXTO if texto else "#c9bcad"))
+        painter.drawText(caja, int(Qt.AlignmentFlag.AlignCenter), texto or "0")
+        painter.restore()
+
+
+class ConteoColumnasDialog(QDialog):
+    """«Ver todas las columnas»: la tabla completa en un diálogo aparte, con
+    scroll de lado (no cabe en la ventana de Revisar)."""
+
+    def __init__(self, parent: QWidget | None, *, titulo: str, filas: list[tuple[str, ...]]) -> None:
+        super().__init__(parent)
+        from pos_uniformes.services.conteo_revision_pantalla_service import COLUMNAS_TODAS
+
+        self.setWindowTitle(f"Todas las columnas · {titulo}")
+        self.setStyleSheet(_ESTILO)
+        ly = QVBoxLayout(self)
+        self._tabla = QTableWidget(len(filas), len(COLUMNAS_TODAS))
+        self._tabla.setHorizontalHeaderLabels(list(COLUMNAS_TODAS))
+        self._tabla.verticalHeader().setVisible(False)
+        self._tabla.setAlternatingRowColors(True)
+        self._tabla.setShowGrid(False)
+        self._tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._tabla.setHorizontalScrollMode(QAbstractItemView.ScrollMode.ScrollPerPixel)
+        for f, valores in enumerate(filas):
+            for c, txt in enumerate(valores):
+                item = QTableWidgetItem(txt)
+                if c not in (0, len(valores) - 1):
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self._tabla.setItem(f, c, item)
+        self._tabla.resizeColumnsToContents()
+        ly.addWidget(self._tabla, 1)
+        cerrar = QPushButton("Cerrar")
+        cerrar.setAutoDefault(False)
+        cerrar.clicked.connect(self.accept)
+        pie = QHBoxLayout()
+        pie.addStretch()
+        pie.addWidget(cerrar)
+        ly.addLayout(pie)
+        self.resize(1180, 600)
+
+
+class ConteoRevisionDialog(QDialog):
+    """Revisar un conteo: arriba, «¿le creo a este conteo?»; abajo, la decisión.
+
+    - Encabezado: la prenda (o la escuela), quién contó, cuándo y hace cuánto,
+      el aviso ámbar si ya es viejo o el letrero de ya revisada.
+    - Franja de chips: el ajuste («Corrige 4 tallas · faltan 7 …») y Urgente,
+      Pedir y Surtir; tocar uno filtra, tocarlo otra vez quita el filtro.
+    - Tabla: una fila por talla con lo que decía el sistema, lo contado, la
+      diferencia, lo vendido desde, lo que queda hoy, qué hacer y PEDIR
+      (editable). Las de diferencia primero. Tocar una talla abre su «por qué».
+    - Abajo: «Consultar ▾», «No usar este conteo», «Hoja de pedido» (si hay
+      pedido) y «Corregir inventario (N tallas, ±N pz)».
+    - Después de decidir, «✓ Listo» con «Siguiente por revisar»: la ventana
+      deja `siguiente_jornada_id` / `siguiente_jornada` y el kiosko la abre.
+
+    Todo lo que se decide (orden, textos, qué se ve) sale de
+    `conteo_revision_pantalla_service`; aquí solo se pinta.
     """
 
-    COLUMNAS_COMPLETAS = ("Prenda", "Talla", "A la mano", "En cajas", "Vendidas", "Ritmo/sem", "Alcanza", "Pidieron", "Hoja", "Surtir", "Sugerido", "Pedido", "La vez pasada")
-    COLUMNAS_COMPACTAS = ("Prenda", "Talla", "Hay", "Qué hacer", "Pedido")
-    _FILTROS = ("URGENTE", "PEDIR", "SURTIR", "OTRAS")
+    COLUMNAS = _COLUMNAS_REVISION
+    COL_PEDIDO = _COL_PEDIDO_REVISION
 
     def __init__(
         self,
@@ -597,131 +695,267 @@ class ConteoRevisionDialog(QDialog):
         revisada_por: str,
         session_factory: Callable[[], Session] | None = None,
         hoy: date | None = None,
+        ofrecer_siguiente: bool = True,
     ) -> None:
         super().__init__(parent)
+        from pos_uniformes.ui.styles import conteo_revision_styles as cr
+
+        self.setObjectName("crDialogo")
         self.setWindowTitle(f"Revisar conteo · {jornada.titulo}")
-        self.setStyleSheet(_ESTILO + _ESTILO_TARJETAS)
+        self.setStyleSheet(cr.build_conteo_revision_stylesheet())
         self._session_factory = session_factory or _default_session_factory
         self._jornada = jornada
         self._revisada_por = revisada_por
+        self._ofrecer_siguiente = ofrecer_siguiente
         self.resultado: str = ""   # "aplicada" | "descartada" | ""
+        self.siguiente_jornada_id: int | None = None   # «Siguiente por revisar»: la abre quien llamó
+        self.siguiente_jornada = None                  # su JornadaRef
+        self._siguiente = None                         # la que se ofrece en «Listo»
         self._revision = None
-        self._pedidos: dict[int, int | None] = {}   # conteo_id → lo que Daniel escribió
+        self._pedidos: dict[int, int | None] = {}      # conteo_id → lo que Daniel escribió
+        self._pedidos_base: dict[int, int | None] = {}  # lo guardado (o el sugerido): no cuenta como cambio
         self._pintando = False
-        self._por_fila: dict[int, int] = {}          # fila → conteo_id (las de prenda no están)
-        self._hoy = hoy                              # None = hoy en la tienda (las pruebas lo fijan)
-        self._pedidos_base: dict[int, int | None] = {}   # lo guardado (o el sugerido): no cuenta como cambio
-        self._contado_at = None                      # cuándo se terminó el conteo
-        self._dias = None                            # días desde el conteo
-        self._diferencias: list[int] = []            # de las tallas que Aplicar todavía corregiría
-        self._ajuste = None                          # conteo_resumen_service.ResumenAjuste (tanda 2)
+        self._por_fila: dict[int, int] = {}            # fila → conteo_id (las de prenda y separador no están)
+        self._hoy = hoy                                # None = hoy en la tienda (las pruebas lo fijan)
+        self._contado_at = None
+        self._dias = None
+        self._diferencias: list[int] = []              # de las tallas que Corregir todavía mueve
+        self._ajuste = None                            # conteo_resumen_service.ResumenAjuste
         self._ya_revisada = False
+        self._aplicada = True
+        self._filtro: str | None = None                # la clave del chip prendido
+        self._en_su_orden = False
 
-        layout = QVBoxLayout()
-        layout.setSpacing(10)
-        self._resumen_label = QLabel("")
-        self._resumen_label.setWordWrap(True)
-        self._resumen_label.setStyleSheet("font-size: 13px;")
-        layout.addWidget(self._resumen_label)
-        # Cuándo se contó, y los avisos: conteo viejo (ámbar) o ya revisado.
+        raiz = QVBoxLayout(self)
+        raiz.setContentsMargins(0, 0, 0, 0)
+        self._paginas = QStackedWidget()
+        raiz.addWidget(self._paginas)
+        self._paginas.addWidget(self._armar_revisar())
+        self._paginas.addWidget(self._armar_listo())
+
+        area = _area_disponible(parent)
+        ancho, alto, min_ancho, min_alto = cr.medidas_ventana(area.width(), area.height())
+        self.resize(ancho, alto)
+        self.setMinimumSize(min_ancho, min_alto)
+        self._cargar()
+
+    # --- armado --------------------------------------------------------------------
+    def _armar_revisar(self) -> QWidget:
+        from pos_uniformes.services import conteo_revision_pantalla_service as pantalla
+        from pos_uniformes.ui.styles import conteo_revision_styles as cr
+
+        pagina = QWidget()
+        pagina.setObjectName("crPagina")
+        ly = QVBoxLayout(pagina)
+        ly.setContentsMargins(22, 12, 22, 12)
+        ly.setSpacing(6)
+
+        # Una sola línea: la prenda (o escuela) y quién, cuándo, cuántas.
+        cabeza = QHBoxLayout()
+        cabeza.setSpacing(14)
+        self._titulo_label = QLabel("")
+        self._titulo_label.setObjectName("crTitulo")
+        cabeza.addWidget(self._titulo_label, 0, Qt.AlignmentFlag.AlignBaseline)
         self._cuando_label = QLabel("")
-        self._cuando_label.setObjectName("cuandoConteo")
-        layout.addWidget(self._cuando_label)
+        self._cuando_label.setObjectName("crSub")
+        self._cuando_label.setWordWrap(True)
+        cabeza.addWidget(self._cuando_label, 1, Qt.AlignmentFlag.AlignBaseline)
+        ly.addLayout(cabeza)
         self._aviso_label = QLabel("")
-        self._aviso_label.setObjectName("avisoViejo")
+        self._aviso_label.setObjectName("crAviso")
         self._aviso_label.setWordWrap(True)
         self._aviso_label.setVisible(False)
-        layout.addWidget(self._aviso_label)
+        ly.addWidget(self._aviso_label)
         self._revisada_label = QLabel("")
-        self._revisada_label.setObjectName("yaRevisada")
+        self._revisada_label.setObjectName("crRevisada")
         self._revisada_label.setWordWrap(True)
         self._revisada_label.setVisible(False)
-        layout.addWidget(self._revisada_label)
+        ly.addWidget(self._revisada_label)
 
-        # Las cuatro tarjetas: cifra grande, y son el filtro.
-        tarjetas = QHBoxLayout()
-        tarjetas.setSpacing(10)
-        self._tarjetas: dict[str, _TarjetaFiltro] = {}
-        for clave, titulo in (("URGENTE", "URGENTE"), ("PEDIR", "PEDIR"), ("SURTIR", "SURTIR DE CAJAS"), ("OTRAS", "BIEN / SIN DATOS")):
-            b = _TarjetaFiltro(clave, titulo, self._pintar)
-            self._tarjetas[clave] = b
-            tarjetas.addWidget(b, 1)
-        layout.addLayout(tarjetas)
+        # La franja: chips en una línea, la nota de las cajas y el orden.
+        franja = QHBoxLayout()
+        franja.setSpacing(8)
+        self._chips: dict[str, QPushButton] = {}
+        for clave in pantalla.CHIPS:
+            b = QPushButton("")
+            b.setObjectName("crChip")
+            b.setAutoDefault(False)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+            b.clicked.connect(lambda _=False, c=clave: self._tocar_chip(c))
+            self._chips[clave] = b
+            franja.addWidget(b)
+        self._nota_cajas = QLabel(f"* {pantalla.NOTA_CAJAS}")
+        self._nota_cajas.setObjectName("crNotaCajas")
+        franja.addWidget(self._nota_cajas)
+        franja.addStretch()
+        self._orden_btn = QPushButton(pantalla.texto_orden(False))
+        self._orden_btn.setObjectName("crOrden")
+        self._orden_btn.setAutoDefault(False)
+        self._orden_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._orden_btn.clicked.connect(self._cambiar_orden)
+        franja.addWidget(self._orden_btn)
+        ly.addLayout(franja)
 
-        self._table = QTableWidget()
+        # Motivo real si no hay nada que pedir, y lo pedido.
+        self._resumen_label = QLabel("")
+        self._resumen_label.setObjectName("crResumen")
+        self._resumen_label.setWordWrap(True)
+        ly.addWidget(self._resumen_label)
+
+        self._table = QTableWidget(0, len(self.COLUMNAS))
+        self._table.setObjectName("crTabla")
+        self._table.setHorizontalHeaderLabels(list(self.COLUMNAS))
         self._table.verticalHeader().setVisible(False)
-        self._table.setAlternatingRowColors(True)
+        self._table.verticalHeader().setDefaultSectionSize(cr.ALTO_FILA)
         self._table.setShowGrid(False)
+        self._table.setWordWrap(False)
         self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self._table.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self._table.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        # El doble clic ya no abre la historia: deja escribir en PEDIR (y un toque también).
         self._table.setEditTriggers(
             QTableWidget.EditTrigger.DoubleClicked
             | QTableWidget.EditTrigger.SelectedClicked
             | QTableWidget.EditTrigger.AnyKeyPressed
         )
+        self._table.setItemDelegate(_CajitaPedido(self.COL_PEDIDO, self._table))
+        h = self._table.horizontalHeader()
+        h.setHighlightSections(False)
+        h.setDefaultAlignment(Qt.AlignmentFlag.AlignCenter)
+        from pos_uniformes.services.conteo_revision_pantalla_service import COL_QUE
+
+        que = QTableWidgetItem(self.COLUMNAS[COL_QUE])
+        que.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self._table.setHorizontalHeaderItem(COL_QUE, que)
+        anchos = (96, 132, 76, 70, 124, 130, None, 104)
+        for c, ancho in enumerate(anchos):
+            if ancho is None:
+                h.setSectionResizeMode(c, QHeaderView.ResizeMode.Stretch)
+            else:
+                h.setSectionResizeMode(c, QHeaderView.ResizeMode.Fixed)
+                self._table.setColumnWidth(c, ancho)
         self._table.itemChanged.connect(self._pedido_editado)
-        self._table.itemDoubleClicked.connect(self._doble_clic)
         self._table.itemSelectionChanged.connect(self._por_que)
-        layout.addWidget(self._table, 1)
+        self._table.cellClicked.connect(self._celda_tocada)
+        ly.addWidget(self._table, 1)
 
         # Por qué: la evidencia de la talla tocada, en una línea.
-        self._por_que_label = QLabel("Toca una talla para ver por qué se sugiere eso.")
-        self._por_que_label.setObjectName("porQue")
+        self._por_que_label = QLabel("")
+        self._por_que_label.setObjectName("crPorQue")
         self._por_que_label.setWordWrap(True)
-        layout.addWidget(self._por_que_label)
+        ly.addWidget(self._por_que_label)
 
-        acciones = QHBoxLayout()
-        self._completo = QPushButton("Ver todas las columnas")
-        self._completo.setCheckable(True)
-        self._completo.setAutoDefault(False)
-        self._completo.toggled.connect(self._pintar)
-        acciones.addWidget(self._completo)
-        self._historia_btn = QPushButton("Historia de la talla")
-        self._historia_btn.setAutoDefault(False)
-        self._historia_btn.clicked.connect(self._historia)
-        acciones.addWidget(self._historia_btn)
-        self._escuela_btn = QPushButton("Historia de la escuela")
-        self._escuela_btn.setAutoDefault(False)
-        self._escuela_btn.clicked.connect(self._historia_escuela)
-        acciones.addWidget(self._escuela_btn)
-        self._comparar_btn = QPushButton("Comparar con el anterior")
-        self._comparar_btn.setAutoDefault(False)
-        self._comparar_btn.clicked.connect(self._comparar)
-        acciones.addWidget(self._comparar_btn)
-        acciones.addStretch()
-        self._descartar_btn = QPushButton("Descartar")
-        self._descartar_btn.setObjectName("dangerButton")
+        pie = QHBoxLayout()
+        pie.setSpacing(10)
+        self._consultar_btn = QToolButton()
+        self._consultar_btn.setObjectName("crConsultar")
+        self._consultar_btn.setText("Consultar ▾")
+        self._consultar_btn.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        self._consultar_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._menu_consultar = QMenu(self._consultar_btn)
+        self._menu_consultar.setObjectName("crMenu")
+        self._accion_historia = self._menu_consultar.addAction("📈  Historia de la talla")
+        self._accion_historia.triggered.connect(lambda: self._historia())
+        self._accion_escuela = self._menu_consultar.addAction("🏫  Historia de la escuela")
+        self._accion_escuela.triggered.connect(self._historia_escuela)
+        self._accion_comparar = self._menu_consultar.addAction("🔁  Comparar con el anterior")
+        self._accion_comparar.triggered.connect(self._comparar)
+        self._menu_consultar.addSeparator()
+        self._accion_todas = self._menu_consultar.addAction("▦  Ver todas las columnas")
+        self._accion_todas.triggered.connect(self._ver_todas_las_columnas)
+        self._consultar_btn.setMenu(self._menu_consultar)
+        pie.addWidget(self._consultar_btn)
+        pie.addSpacing(12)
+        self._descartar_btn = QPushButton("No usar este conteo")
+        self._descartar_btn.setObjectName("crNoUsar")
         self._descartar_btn.setAutoDefault(False)
         self._descartar_btn.clicked.connect(self._descartar)
-        acciones.addWidget(self._descartar_btn)
-        self._guardar_btn = QPushButton("Guardar pedido")
-        self._guardar_btn.setAutoDefault(False)
-        self._guardar_btn.clicked.connect(self._guardar_pedidos)
-        acciones.addWidget(self._guardar_btn)
-        self._hoja_btn = QPushButton("Hoja de pedido")
+        pie.addWidget(self._descartar_btn)
+        pie.addStretch()
+        self._hoja_btn = QPushButton("🧾 Hoja de pedido")
+        self._hoja_btn.setObjectName("crSecundario")
         self._hoja_btn.setAutoDefault(False)
         self._hoja_btn.clicked.connect(self._hoja_de_pedido)
-        acciones.addWidget(self._hoja_btn)
-        self._aplicar_btn = QPushButton("Aplicar al inventario")
-        self._aplicar_btn.setObjectName("primaryButton")
+        pie.addWidget(self._hoja_btn)
+        self._aplicar_btn = QPushButton("Corregir inventario")
+        self._aplicar_btn.setObjectName("crPrimario")
         self._aplicar_btn.setAutoDefault(False)
         self._aplicar_btn.clicked.connect(self._aplicar)
-        acciones.addWidget(self._aplicar_btn)
-        cerrar = QPushButton("Cerrar")
-        cerrar.setAutoDefault(False)
-        cerrar.clicked.connect(self.reject)
-        acciones.addWidget(cerrar)
-        layout.addLayout(acciones)
-        self.setLayout(layout)
-        self.resize(1040, 680)
-        self._cargar()
+        pie.addWidget(self._aplicar_btn)
+        ly.addLayout(pie)
+        return pagina
 
-    # --- compatibilidad con lo que había ------------------------------------------
-    @property
-    def COL_PEDIDO(self) -> int:  # noqa: N802 — nombre heredado
-        return len(self._columnas()) - 1 if not self._completo.isChecked() else 11
+    def _armar_listo(self) -> QWidget:
+        pagina = QWidget()
+        pagina.setObjectName("crPagina")
+        ly = QVBoxLayout(pagina)
+        ly.setContentsMargins(22, 22, 22, 22)
+        ly.addStretch(1)
+        tarjeta = QFrame()
+        tarjeta.setObjectName("crListo")
+        tarjeta.setMaximumWidth(620)
+        t = QVBoxLayout(tarjeta)
+        t.setContentsMargins(36, 30, 36, 28)
+        t.setSpacing(10)
+        icono = QLabel("✓")
+        icono.setObjectName("crListoIcono")
+        icono.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        t.addWidget(icono)
+        self._listo_titulo = QLabel("Listo")
+        self._listo_titulo.setObjectName("crListoTitulo")
+        self._listo_titulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        t.addWidget(self._listo_titulo)
+        self._listo_texto = QLabel("")
+        self._listo_texto.setObjectName("crListoTexto")
+        self._listo_texto.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._listo_texto.setWordWrap(True)
+        t.addWidget(self._listo_texto)
+        self._listo_quedan = QLabel("")
+        self._listo_quedan.setObjectName("crListoQuedan")
+        self._listo_quedan.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._listo_quedan.setWordWrap(True)
+        t.addWidget(self._listo_quedan)
+        botones = QHBoxLayout()
+        botones.setSpacing(10)
+        botones.addStretch()
+        self._cerrar_btn = QPushButton("Cerrar")
+        self._cerrar_btn.setObjectName("crSecundario")
+        self._cerrar_btn.setAutoDefault(False)
+        self._cerrar_btn.clicked.connect(self.accept)
+        botones.addWidget(self._cerrar_btn)
+        self._siguiente_btn = QPushButton("Siguiente por revisar")
+        self._siguiente_btn.setObjectName("crPrimario")
+        self._siguiente_btn.setAutoDefault(False)
+        self._siguiente_btn.clicked.connect(self._ir_a_siguiente)
+        botones.addWidget(self._siguiente_btn)
+        botones.addStretch()
+        t.addSpacing(8)
+        t.addLayout(botones)
+        fila = QHBoxLayout()
+        fila.addStretch()
+        fila.addWidget(tarjeta, 1)
+        fila.addStretch()
+        ly.addLayout(fila)
+        ly.addStretch(2)
+        return pagina
 
-    def _columnas(self) -> tuple:
-        return self.COLUMNAS_COMPLETAS if self._completo.isChecked() else self.COLUMNAS_COMPACTAS
+    def showEvent(self, evento) -> None:  # noqa: N802 - API de Qt
+        super().showEvent(evento)
+        QTimer.singleShot(0, self._caber_en_pantalla)
+
+    def _caber_en_pantalla(self) -> None:
+        """Con el marco real: si se sale del área libre, se achica y se mueve."""
+        area = _area_disponible(self)
+        marco = self.frameGeometry()
+        extra_alto = max(0, marco.height() - self.height())
+        extra_ancho = max(0, marco.width() - self.width())
+        if marco.height() > area.height() or marco.width() > area.width():
+            self.resize(min(self.width(), area.width() - extra_ancho), min(self.height(), area.height() - extra_alto))
+            marco = self.frameGeometry()
+        x = max(area.left(), min(marco.x(), area.right() + 1 - marco.width()))
+        y = max(area.top(), min(marco.y(), area.bottom() + 1 - marco.height()))
+        if (x, y) != (marco.x(), marco.y()):
+            self.move(x, y)
 
     # --- datos ---------------------------------------------------------------------
     def _cargar(self) -> None:
@@ -730,25 +964,24 @@ class ConteoRevisionDialog(QDialog):
         from pos_uniformes.services.conteo_jornada_service import DESCARTADA, resumen_para_revisar
         from pos_uniformes.services.conteo_resumen_service import resumen_de_jornada
         from pos_uniformes.services.nombres_empleadas_service import mostrar, nombres_por_codigo
-        from pos_uniformes.services.revision_service import PEDIR, SURTIR, URGENTE, revisar
+        from pos_uniformes.services.revision_service import revisar
 
         session = self._session_factory()
         try:
             j = session.get(ConteoJornada, self._jornada.id)
             self._revision = revisar(session, j)
-            # La diferencia de cada talla se guardó al capturar; Aplicar suma
+            # La diferencia de cada talla se guardó al capturar; Corregir suma
             # las que todavía no se ajustan.
             self._diferencias = [l.diferencia for l in resumen_para_revisar(session, j).lineas]
             # El resumen real del ajuste: piezas, $, vendidas desde y otros ajustes.
             self._ajuste = resumen_de_jornada(session, j)
             self._contado_at = j.terminada_at or j.iniciada_at
             self._ya_revisada = vista.ya_revisada(j)
+            self._aplicada = (j.notas or "") != DESCARTADA
             revisada_txt = ""
             if self._ya_revisada:
                 por = mostrar(j.revisada_por, nombres_por_codigo(session)) if j.revisada_por else ""
-                revisada_txt = vista.texto_ya_revisada(
-                    revisada_at=j.revisada_at, aplicada=(j.notas or "") != DESCARTADA, por=por,
-                )
+                revisada_txt = vista.texto_ya_revisada(revisada_at=j.revisada_at, aplicada=self._aplicada, por=por)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Error", f"No se pudo leer la jornada:\n{exc}")
             self._revision = None
@@ -761,85 +994,81 @@ class ConteoRevisionDialog(QDialog):
             for l in self._revision.lineas
         }
         self._pedidos_base = dict(self._pedidos)   # el prellenado no es «un cambio sin guardar»
-        self._encabezado_fecha(revisada_txt)
-        # Filtro inicial: lo que pide acción. Si no hay nada de eso, todas.
-        hay_accion = any(l.estado in (URGENTE, PEDIR, SURTIR) for l in self._revision.lineas)
-        self._pintando = True
-        for clave, b in self._tarjetas.items():
-            b.setChecked(clave != "OTRAS" if hay_accion else True)
-        self._pintando = False
+        self._encabezado(revisada_txt)
         self._resumen()
         self._pintar()
 
-    def _encabezado_fecha(self, revisada_txt: str) -> None:
-        """«Contado el lun 5 oct · hace 41 días», el aviso ámbar si ya es viejo,
-        y si ya se revisó: el letrero y sin Aplicar ni Descartar (el pedido sigue)."""
+    def _encabezado(self, revisada_txt: str) -> None:
+        """Prenda (o escuela), quién/cuándo/cuántas, el aviso ámbar si ya es
+        viejo, y si ya se revisó: el letrero y sin Corregir ni No usar."""
+        from pos_uniformes.services import conteo_revision_pantalla_service as pantalla
         from pos_uniformes.services import conteo_revision_vista_service as vista
 
+        r = self._revision
         self._dias = vista.dias_desde(self._contado_at, self._hoy)
-        cuando = vista.cuando_se_conto(self._contado_at, self._hoy)
-        self._cuando_label.setText(f"Contado el {cuando}" if cuando else "")
-        self._cuando_label.setVisible(bool(cuando))
+        self._titulo_label.setText(pantalla.titulo_encabezado(r.lineas, r.titulo))
+        self._cuando_label.setText(pantalla.subtitulo_encabezado(
+            quien=r.quien, contado=self._contado_at, lineas=r.lineas, hoy=self._hoy,
+        ))
         aviso = "" if self._ya_revisada else vista.aviso_conteo_viejo(self._dias, self._ajuste)
         self._aviso_label.setText(f"⚠ {aviso}" if aviso else "")
         self._aviso_label.setVisible(bool(aviso))
         if self._ya_revisada:
             self._revisada_label.setText(f"✓ {revisada_txt}. El pedido se puede seguir escribiendo y guardando.")
         self._revisada_label.setVisible(self._ya_revisada)
-        self._aplicar_btn.setVisible(not self._ya_revisada)
-        self._descartar_btn.setVisible(not self._ya_revisada)
+        self._aplicar_btn.setText(pantalla.texto_boton_corregir(self._ajuste))
 
     def _pedido_cambiado(self) -> bool:
-        """¿Daniel escribió en Pedido algo distinto de lo guardado (o lo sugerido)?"""
+        """¿Daniel escribió en PEDIR algo distinto de lo guardado (o lo sugerido)?"""
         return self._revision is not None and self._pedidos != self._pedidos_base
 
-    def _conteo(self, clave: str) -> tuple[int, int, int]:
-        """(tallas, piezas sugeridas, piezas a surtir) de un grupo del filtro."""
-        from pos_uniformes.services.revision_service import PEDIR, SURTIR, URGENTE
-
-        grupo = {"URGENTE": (URGENTE,), "PEDIR": (PEDIR,), "SURTIR": (SURTIR,)}.get(clave)
-        lineas = [l for l in self._revision.lineas if (l.estado in grupo if grupo else l.estado not in (URGENTE, PEDIR, SURTIR))]
-        return len(lineas), sum(l.sugerido for l in lineas), sum(l.surtir for l in lineas)
-
     def _resumen(self) -> None:
-        r = self._revision
-        piezas = sum(p for p in self._pedidos.values() if p)
-        tallas = sum(1 for p in self._pedidos.values() if p)
-        texto = f"<b>{r.quien}</b> contó <b>{len(r.lineas)}</b> tallas de <b>{r.titulo}</b>  ·  tu pedido va en <b>{piezas}</b> piezas en {tallas} tallas"
-        if not r.lineas:
-            texto += "<br><span style='color:#8a8a8a'>Esta jornada no tiene tallas capturadas.</span>"
-        else:
-            from pos_uniformes.services.conteo_revision_vista_service import motivo_sin_accion
+        """Los chips, el renglón de motivo/pedido y qué botones se ven."""
+        from pos_uniformes.services import conteo_revision_pantalla_service as pantalla
+        from pos_uniformes.services.conteo_revision_vista_service import motivo_sin_accion
 
+        r = self._revision
+        for chip in pantalla.chips(r.lineas, self._ajuste, ya_revisada=self._ya_revisada, aplicada=self._aplicada):
+            b = self._chips[chip.clave]
+            b.setText(chip.texto + ("*" if chip.nota else ""))
+            b.setToolTip(chip.nota)
+            b.setEnabled(chip.tocable)
+            b.setProperty("tono", chip.tono)
+            b.setProperty("activo", "si" if self._filtro == chip.clave else "no")
+            b.style().unpolish(b)
+            b.style().polish(b)
+        partes = []
+        if not r.lineas:
+            partes.append("Esta jornada no tiene tallas capturadas.")
+        else:
             motivo = motivo_sin_accion(r.lineas)
             if motivo:
-                texto += f"<br><span style='color:#8a8a8a'>{motivo}</span>"
-        self._resumen_label.setText(texto)
-        self._hoja_btn.setEnabled(piezas > 0)
-        # Las tarjetas: cifra grande + una línea chica.
-        for clave, b in self._tarjetas.items():
-            n, sug, sur = self._conteo(clave)
-            if clave == "URGENTE":
-                sub = "no hay y la piden" if n else "ninguna"
-            elif clave == "PEDIR":
-                sub = f"{sug} piezas al maquilador" if n else "nada"
-            elif clave == "SURTIR":
-                sub = f"{sur} piezas de las cajas" if n else "nada"
-            else:
-                sub = "tallas que están bien o sin datos"
-            b.poner(n, sub)
+                partes.append(motivo)
+        pedido = pantalla.texto_pedido(self._pedidos)
+        if pedido:
+            partes.append(pedido)
+        self._resumen_label.setText("  ·  ".join(partes))
+        self._resumen_label.setVisible(bool(partes))
+        acciones = pantalla.acciones(ya_revisada=self._ya_revisada, pedidos=self._pedidos)
+        self._aplicar_btn.setVisible(acciones.corregir)
+        self._descartar_btn.setVisible(acciones.no_usar)
+        self._hoja_btn.setVisible(acciones.hoja)
+        self._hoja_btn.setEnabled(acciones.hoja)
 
-    def _lineas_visibles(self):
-        from pos_uniformes.services.revision_service import PEDIR, SURTIR, URGENTE
+    # --- filtro y orden --------------------------------------------------------------
+    def _tocar_chip(self, clave: str) -> None:
+        from pos_uniformes.services.conteo_revision_pantalla_service import tocar_chip
 
-        activos = {k for k, b in self._tarjetas.items() if b.isChecked() and b.isEnabled()}
-        if not activos:
-            return list(self._revision.lineas)
-        grupo_de = {URGENTE: "URGENTE", PEDIR: "PEDIR", SURTIR: "SURTIR"}
-        return [l for l in self._revision.lineas if grupo_de.get(l.estado, "OTRAS") in activos or self._pedidos.get(l.conteo_id)]
+        self._filtro = tocar_chip(self._filtro, clave)
+        self._resumen()
+        self._pintar()
 
-    def _filtro_sin_efecto(self) -> bool:
-        return bool(self._revision.lineas) and not any(l.estado in ("URGENTE", "PEDIR", "SURTIR") for l in self._revision.lineas)
+    def _cambiar_orden(self) -> None:
+        from pos_uniformes.services.conteo_revision_pantalla_service import texto_orden
+
+        self._en_su_orden = not self._en_su_orden
+        self._orden_btn.setText(texto_orden(self._en_su_orden))
+        self._pintar()
 
     # --- pintura -------------------------------------------------------------------
     def _que_hacer(self, l) -> str:
@@ -850,128 +1079,95 @@ class ConteoRevisionDialog(QDialog):
     def _pintar(self, *_a) -> None:
         if self._revision is None or self._pintando:
             return
-        from pos_uniformes.services.conteo_hoja_carta_service import nombre_para_hoja
-        from pos_uniformes.services.conteo_revision_vista_service import etiqueta_sin_ritmo
-        from pos_uniformes.services.revision_service import NO_SE_MUEVE, SIN_DATOS, SURTIR, URGENTE
+        from pos_uniformes.services import conteo_revision_pantalla_service as pantalla
+        from pos_uniformes.ui.styles import conteo_revision_styles as cr
 
+        elegido = self._por_fila.get(self._table.currentRow())
         self._pintando = True
-        columnas = self._columnas()
-        self._table.clear()
-        self._table.setColumnCount(len(columnas))
-        self._table.setHorizontalHeaderLabels(list(columnas))
-        h = self._table.horizontalHeader()
-        h.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        for c in range(1, len(columnas)):
-            h.setSectionResizeMode(c, QHeaderView.ResizeMode.ResizeToContents)
-        lineas = self._lineas_visibles()
-        compacto = not self._completo.isChecked()
-        col_pedido = self.COL_PEDIDO
-        self._por_fila = {}
-
-        # Compacto: agrupado por prenda con una fila de encabezado por prenda.
-        filas: list = []
-        if compacto:
-            grupos: dict[str, list] = {}
-            for l in lineas:
-                grupos.setdefault(l.producto, []).append(l)
-            for producto, tallas in grupos.items():
-                filas.append(("prenda", producto, tallas))
-                filas.extend(("talla", l, None) for l in tallas)
-        else:
-            filas = [("talla", l, None) for l in lineas]
+        filas = pantalla.filas_tabla(
+            self._revision.lineas, self._ajuste, self._pedidos, titulo=self._revision.titulo,
+            filtro=self._filtro, en_su_orden=self._en_su_orden, ya_revisada=self._ya_revisada,
+        )
+        self._table.clearSpans()
+        self._table.clearContents()
         self._table.setRowCount(len(filas))
-
-        for fila, (tipo, dato, extra) in enumerate(filas):
-            if tipo == "prenda":
-                sug = sum(l.sugerido for l in extra)
-                sur = sum(l.surtir for l in extra)
-                resumen = " · ".join(p for p in (f"pedir {sug}" if sug else "", f"surtir {sur}" if sur else "") if p)
-                item = QTableWidgetItem(nombre_para_hoja(dato, self._revision.titulo) + (f"   —   {resumen}" if resumen else ""))
-                fuente = item.font()
-                fuente.setBold(True)
-                item.setFont(fuente)
-                item.setBackground(QBrush(QColor("#f5ebe0")))
-                item.setForeground(QBrush(QColor("#5c3019")))
-                item.setFlags(Qt.ItemFlag.ItemIsEnabled)
-                self._table.setItem(fila, 0, item)
-                for c in range(1, len(columnas)):
-                    vacio = QTableWidgetItem("")
-                    vacio.setBackground(QBrush(QColor("#f5ebe0")))
-                    vacio.setFlags(Qt.ItemFlag.ItemIsEnabled)
-                    self._table.setItem(fila, c, vacio)
-                self._table.setSpan(fila, 0, 1, len(columnas))
-                continue
-
-            l = dato
-            self._por_fila[fila] = l.conteo_id
-            pedido = self._pedidos.get(l.conteo_id)
-            talla = f"{l.talla} {l.color}".strip() if l.color and l.color.upper() not in ("", "UNICO", "ÚNICO") else l.talla
-            if compacto:
-                hay = f"{l.conto}" + (f"  + {l.en_cajas} en cajas" if l.en_cajas else "")
-                valores = ("", talla, hay, self._que_hacer(l), "" if pedido is None else str(pedido))
-                col_que = 3
-            else:
-                vendidas = f"{l.vendidas} en {l.dias_observados} d" if l.dias_observados else "—"
-                alcanza = "—" if l.semanas_cubiertas is None else (f"{l.semanas_cubiertas:g} sem" if l.semanas_cubiertas < 99 else "+")
-                if l.estado in (SIN_DATOS, NO_SE_MUEVE):
-                    sugerido = etiqueta_sin_ritmo(l)
-                elif l.estado == URGENTE:
-                    sugerido = f"{l.sugerido}  ¡urgente!"
-                else:
-                    sugerido = str(l.sugerido) if l.sugerido else "bien"
-                valores = (
-                    nombre_para_hoja(l.producto, self._revision.titulo), talla, str(l.conto),
-                    str(l.en_cajas) if l.en_cajas else "—", vendidas,
-                    f"{l.ritmo_semana:.1f}" if l.ritmo_semana else "—", alcanza,
-                    str(l.pidieron) if l.pidieron else "—",
-                    str(l.ellas_sugieren) if l.ellas_sugieren is not None else "—",
-                    str(l.surtir) if l.surtir else "—", sugerido,
-                    "" if pedido is None else str(pedido), self._la_vez_pasada(l),
-                )
-                col_que = 10
-            for col, txt in enumerate(valores):
-                item = QTableWidgetItem(txt)
-                item.setData(Qt.ItemDataRole.UserRole, l.conteo_id)
-                if col not in (0, len(valores) - 1) or (compacto and col == len(valores) - 1):
-                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                if col == col_pedido:
-                    item.setBackground(QBrush(QColor("#fff8e6")))
-                    fuente = item.font()
+        self._por_fila = {}
+        n_col = len(self.COLUMNAS)
+        fila_elegida = -1
+        for f, fila in enumerate(filas):
+            if fila.tipo != pantalla.FILA_TALLA:
+                item = QTableWidgetItem(fila.texto)
+                item.setFlags(Qt.ItemFlag.NoItemFlags)
+                fuente = self._fuente_tabla()
+                if fila.tipo == pantalla.FILA_PRENDA:
                     fuente.setBold(True)
+                    item.setForeground(QBrush(QColor(cr.TERRACOTA_OSCURO)))
+                    item.setBackground(QBrush(QColor(cr.GRUPO)))
                     item.setFont(fuente)
                 else:
+                    item.setForeground(QBrush(QColor(cr.TENUE)))
+                    item.setText(f"— {fila.texto} —")
+                self._table.setItem(f, 0, item)
+                self._table.setSpan(f, 0, 1, n_col)
+                continue
+            self._por_fila[f] = fila.conteo_id
+            if fila.conteo_id == elegido:
+                fila_elegida = f
+            for c, txt in enumerate(fila.celdas):
+                item = QTableWidgetItem(txt)
+                item.setData(Qt.ItemDataRole.UserRole, fila.conteo_id)
+                if c == pantalla.COL_QUE:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+                else:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                if c != self.COL_PEDIDO:
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                if col == col_que:
-                    if l.estado == URGENTE:
-                        item.setForeground(QBrush(QColor("#b91c1c")))
-                    elif l.estado == SURTIR:
-                        item.setForeground(QBrush(QColor("#1d4ed8")))
-                    elif l.estado in (NO_SE_MUEVE, SIN_DATOS):
-                        item.setForeground(QBrush(QColor("#8a8a8a")))
-                    elif l.sugerido:
-                        item.setForeground(QBrush(QColor("#5c3019")))
-                    if compacto:
-                        fuente = item.font()
-                        fuente.setBold(bool(l.sugerido or l.surtir))
+                color = None
+                if c == pantalla.COL_TALLA:
+                    fuente = self._fuente_tabla()
+                    fuente.setBold(True)
+                    item.setFont(fuente)
+                elif c == pantalla.COL_CONTO and fila.tono_conto:
+                    color = cr.ROJO
+                elif c == pantalla.COL_DIF:
+                    color = cr.COLOR_DIF.get(fila.tono_dif)
+                    if fila.tono_dif in ("faltan", "sobran"):
+                        fuente = self._fuente_tabla()
+                        fuente.setBold(True)
                         item.setFont(fuente)
-                if not compacto and col == 3 and l.cajas:
-                    item.setToolTip("En cajas: " + " · ".join(f"{codigo} ×{n}" for codigo, n in l.cajas))
-                if compacto and col == 2 and l.cajas:
-                    item.setToolTip("En cajas: " + " · ".join(f"{codigo} ×{n}" for codigo, n in l.cajas))
-                if col == 2 and l.conto == 0:
-                    item.setForeground(QBrush(QColor("#b91c1c")))
-                self._table.setItem(fila, col, item)
+                elif c == pantalla.COL_VENDIDAS and txt == "0":
+                    color = "#b4a898"
+                elif c == pantalla.COL_QUEDA and fila.tono_queda:
+                    color = cr.ROJO
+                elif c == pantalla.COL_QUE:
+                    color = cr.COLOR_QUE.get(fila.tono_que)
+                    if fila.tono_que in ("urgente", "pedir"):
+                        fuente = self._fuente_tabla()
+                        fuente.setBold(True)
+                        item.setFont(fuente)
+                    if fila.ayuda_que:
+                        item.setToolTip(fila.ayuda_que)
+                if color:
+                    item.setForeground(QBrush(QColor(color)))
+                self._table.setItem(f, c, item)
+        if fila_elegida >= 0:
+            self._table.selectRow(fila_elegida)
+        else:
+            self._table.clearSelection()
+            self._table.setCurrentCell(-1, -1)
         self._pintando = False
         self._por_que()
 
+    def _fuente_tabla(self) -> QFont:
+        """La letra de la tabla (la de su hoja de estilo): una celda con letra
+        propia no hereda el tamaño de la hoja."""
+        self._table.ensurePolished()
+        return QFont(self._table.font())
+
     def _la_vez_pasada(self, l) -> str:
-        if l.pedido_anterior is not None:
-            cuando = l.pedido_anterior_at.strftime("%d/%m") if l.pedido_anterior_at else ""
-            vendio = f", vendiste {l.vendidas_desde_pedido}" if l.vendidas_desde_pedido is not None else ""
-            return f"pediste {l.pedido_anterior} el {cuando}{vendio}"
-        if l.anterior is not None:
-            return f"había {l.anterior} el {l.anterior_at.strftime('%d/%m')}"
-        return "primer conteo"
+        from pos_uniformes.services.conteo_revision_pantalla_service import la_vez_pasada
+
+        return la_vez_pasada(l)
 
     def _linea_en_fila(self, fila: int):
         conteo_id = self._por_fila.get(fila)
@@ -979,13 +1175,25 @@ class ConteoRevisionDialog(QDialog):
             return None
         return next((l for l in self._revision.lineas if l.conteo_id == conteo_id), None)
 
+    def _celda_tocada(self, fila: int, columna: int) -> None:
+        """Un toque en PEDIR ya abre la cajita para escribir."""
+        if columna == self.COL_PEDIDO and fila in self._por_fila:
+            item = self._table.item(fila, columna)
+            if item is not None:
+                self._table.editItem(item)
+
     def _por_que(self) -> None:
-        """La evidencia de la talla seleccionada, en una línea."""
+        """La evidencia de la talla tocada, en una línea debajo de la tabla."""
         if self._revision is None or self._pintando:
             return
-        l = self._linea_en_fila(self._table.currentRow())
+        filas = {i.row() for i in self._table.selectedIndexes()}
+        fila = self._table.currentRow() if self._table.currentRow() in filas else (min(filas) if filas else -1)
+        l = self._linea_en_fila(fila)
         if l is None:
             self._por_que_label.setText("Toca una talla para ver por qué se sugiere eso.")
+            self._por_que_label.setProperty("vacio", "si")
+            self._por_que_label.style().unpolish(self._por_que_label)
+            self._por_que_label.style().polish(self._por_que_label)
             return
         from pos_uniformes.services.conteo_hoja_carta_service import nombre_para_hoja
 
@@ -997,19 +1205,24 @@ class ConteoRevisionDialog(QDialog):
         else:
             partes.append("sin ventas registradas todavía")
         if l.pidieron:
-            partes.append(f"<span style='color:#b91c1c'>pidieron <b>{l.pidieron}</b> y no había</span>")
+            partes.append(f"<span style='color:#b3261e'>pidieron <b>{l.pidieron}</b> y no había</span>")
         if l.ellas_sugieren is not None:
             partes.append(f"en la hoja anotaron pedir {l.ellas_sugieren}")
         if l.cajas:
-            partes.append("en cajas: " + " · ".join(f"{c} ×{n}" for c, n in l.cajas))
+            partes.append("en cajas*: " + " · ".join(f"{c} ×{n}" for c, n in l.cajas))
         partes.append(self._la_vez_pasada(l))
         ajuste = self._talla_del_ajuste(l.conteo_id)
-        if ajuste is not None:
-            from pos_uniformes.services.conteo_revision_vista_service import texto_talla_ajuste
+        if ajuste is not None and ajuste.ajuste_posterior is not None:
+            # Lo demás (el sistema decía, vendidas desde, queda hoy) ya está en la fila.
+            from pos_uniformes.services.conteo_revision_vista_service import dia_mes, fecha_tienda
 
-            partes.append(texto_talla_ajuste(ajuste))
-        talla = f"{l.talla} {l.color}".strip() if l.color and l.color.upper() not in ("", "UNICO", "ÚNICO") else l.talla
-        self._por_que_label.setText(f"<b>{nombre_para_hoja(l.producto, self._revision.titulo)} · {talla}</b>  —  " + " · ".join(partes))
+            partes.append(f"<span style='color:#a35a00'>⚠ otro ajuste el {dia_mes(fecha_tienda(ajuste.ajuste_posterior))}</span>")
+        varios = len({x.producto for x in self._revision.lineas}) > 1
+        nombre = f"{nombre_para_hoja(l.producto, self._revision.titulo)} · " if varios else ""
+        self._por_que_label.setText(f"▸ <b>{nombre}Talla {l.talla}</b>: " + " · ".join(partes))
+        self._por_que_label.setProperty("vacio", "no")
+        self._por_que_label.style().unpolish(self._por_que_label)
+        self._por_que_label.style().polish(self._por_que_label)
 
     def _talla_del_ajuste(self, conteo_id: int):
         if self._ajuste is None:
@@ -1037,6 +1250,8 @@ class ConteoRevisionDialog(QDialog):
 
     # --- acciones ------------------------------------------------------------------
     def _guardar_pedidos(self, *, avisar: bool = True) -> bool:
+        """Guarda lo escrito en PEDIR. Ya no hay botón: lo llaman Corregir, la
+        Hoja de pedido y el cierre (con la pregunta)."""
         if self._revision is None:
             return False
         from pos_uniformes.database.models import ConteoJornada
@@ -1059,7 +1274,7 @@ class ConteoRevisionDialog(QDialog):
         return True
 
     def _revision_con_pedidos(self):
-        """La revisión con lo que Daniel tiene escrito ahora (sin guardar)."""
+        """La revisión con lo que Daniel tiene escrito ahora."""
         from dataclasses import replace
 
         r = self._revision
@@ -1067,17 +1282,16 @@ class ConteoRevisionDialog(QDialog):
         return replace(r, lineas=lineas)
 
     def _hoja_de_pedido(self) -> None:
+        """Guarda el pedido (si cambió) y abre la hoja para mandarlo."""
         if self._revision is None:
+            return
+        self._cerrar_editor_abierto()
+        if self._pedido_cambiado() and not self._guardar_pedidos(avisar=False):
             return
         from pos_uniformes.services.revision_service import html_pedido, texto_pedido
 
         r = self._revision_con_pedidos()
         PedidoHojaDialog(self, texto=texto_pedido(r), html=html_pedido(r), titulo=f"Pedido · {r.titulo}").exec()
-
-    def _doble_clic(self, item: QTableWidgetItem) -> None:
-        # En Pedido el doble clic edita; en cualquier otra columna abre la historia.
-        if item.column() != self.COL_PEDIDO:
-            self._historia(item.row())
 
     def _historia(self, fila: int | None = None) -> None:
         if self._revision is None:
@@ -1099,16 +1313,36 @@ class ConteoRevisionDialog(QDialog):
             prenda=getattr(self._jornada, "prenda", "") or "", session_factory=self._session_factory,
         ).exec()
 
+    def _filas_todas(self) -> list[tuple[str, ...]]:
+        from pos_uniformes.services import conteo_revision_pantalla_service as pantalla
+
+        por_id = pantalla.tallas_por_id(self._ajuste)
+        return [
+            pantalla.fila_todas(
+                l, por_id.get(l.conteo_id), self._pedidos.get(l.conteo_id),
+                titulo=self._revision.titulo, ya_revisada=self._ya_revisada,
+            )
+            for l in self._revision.lineas
+        ]
+
+    def _ver_todas_las_columnas(self) -> None:
+        """Todas las columnas no caben aquí: van en un diálogo aparte con scroll de lado."""
+        if self._revision is None:
+            return
+        self._todas_dlg = ConteoColumnasDialog(self, titulo=self._revision.titulo, filas=self._filas_todas())
+        self._todas_dlg.exec()
+
     def _aplicar(self) -> None:
         if self._revision is None or self._ya_revisada:
             return
         from pos_uniformes.services import conteo_revision_vista_service as vista
 
+        self._cerrar_editor_abierto()
         texto = vista.texto_confirmar_aplicar(
             quien=self._revision.quien, contado=self._contado_at, diferencias=self._diferencias, hoy=self._hoy,
             resumen=self._ajuste,
         )
-        if not _preguntar(self, "Aplicar al inventario", texto, si=vista.boton_corregir(self._dias, self._diferencias), no=vista.BOTON_VOLVER):
+        if not _preguntar(self, "Corregir inventario", texto, si=vista.boton_corregir(self._dias, self._diferencias), no=vista.BOTON_VOLVER):
             return
         if not self._guardar_pedidos(avisar=False):
             return
@@ -1118,27 +1352,23 @@ class ConteoRevisionDialog(QDialog):
         session = self._session_factory()
         try:
             j = session.get(ConteoJornada, self._jornada.id)
-            ajustados, omitidos = aplicar_jornada(session, j, revisada_por=self._revisada_por)
+            aplicar_jornada(session, j, revisada_por=self._revisada_por)
             session.commit()
         except Exception as exc:  # noqa: BLE001
             session.rollback()
-            QMessageBox.critical(self, "No se aplicó", str(exc))
+            QMessageBox.critical(self, "No se corrigió", str(exc))
             return
         finally:
             session.close()
         self.resultado = "aplicada"
-        QMessageBox.information(
-            self, "Inventario actualizado",
-            f"Se ajustaron {ajustados} tallas." + (f" {omitidos} sin diferencia." if omitidos else ""),
-        )
-        self.accept()
+        self._mostrar_listo()
 
     def _descartar(self) -> None:
         if self._ya_revisada:
             return
         from pos_uniformes.services import conteo_revision_vista_service as vista
 
-        if not _preguntar(self, "Descartar conteo", vista.TEXTO_CONFIRMAR_DESCARTAR, si=vista.BOTON_DESCARTAR, no=vista.BOTON_VOLVER):
+        if not _preguntar(self, "No usar este conteo", vista.TEXTO_CONFIRMAR_DESCARTAR, si=vista.BOTON_DESCARTAR, no=vista.BOTON_VOLVER):
             return
         from pos_uniformes.database.models import ConteoJornada
         from pos_uniformes.services.conteo_jornada_service import descartar_jornada
@@ -1155,10 +1385,52 @@ class ConteoRevisionDialog(QDialog):
         finally:
             session.close()
         self.resultado = "descartada"
+        self._mostrar_listo()
+
+    # --- ✓ Listo -------------------------------------------------------------------
+    def _por_revisar(self) -> list:
+        """Las jornadas que siguen por revisar (en el orden de la tarjeta del kiosko)."""
+        from pos_uniformes.services.conteo_jornada_service import jornadas_por_revisar, ref
+
+        session = self._session_factory()
+        try:
+            return [ref(j) for j in jornadas_por_revisar(session) if int(j.id) != int(self._jornada.id)]
+        except Exception:  # noqa: BLE001 — sin conexión: solo se ofrece cerrar
+            return []
+        finally:
+            session.close()
+
+    def _mostrar_listo(self) -> None:
+        """«✓ Listo» en la misma ventana, con [Siguiente por revisar] si hay otra."""
+        from pos_uniformes.services import conteo_revision_pantalla_service as pantalla
+
+        pendientes = self._por_revisar() if self._ofrecer_siguiente else []
+        sid = pantalla.siguiente_por_revisar([j.id for j in pendientes], self._jornada.id)
+        self._siguiente = next((j for j in pendientes if j.id == sid), None)
+        self._listo_titulo.setText("Listo")
+        self._listo_texto.setText(pantalla.texto_listo(self.resultado, self._ajuste))
+        quedan = pantalla.texto_quedan(len(pendientes)) if self._ofrecer_siguiente else ""
+        if self._siguiente is not None:
+            quedan += f" Sigue: {self._siguiente.titulo} ({self._siguiente.quien})."
+        self._listo_quedan.setText(quedan)
+        self._listo_quedan.setVisible(bool(quedan))
+        self._siguiente_btn.setVisible(self._siguiente is not None)
+        self._cerrar_btn.setObjectName("crSecundario" if self._siguiente is not None else "crPrimario")
+        self._cerrar_btn.style().unpolish(self._cerrar_btn)
+        self._cerrar_btn.style().polish(self._cerrar_btn)
+        self._paginas.setCurrentIndex(1)
+        (self._siguiente_btn if self._siguiente is not None else self._cerrar_btn).setFocus()
+
+    def _ir_a_siguiente(self) -> None:
+        if self._siguiente is None:
+            return
+        self.siguiente_jornada = self._siguiente
+        self.siguiente_jornada_id = int(self._siguiente.id)
         self.accept()
 
+    # --- cerrar --------------------------------------------------------------------
     def _cerrar_editor_abierto(self) -> None:
-        """Si hay una celda de Pedido a medio escribir, la guarda antes de preguntar.
+        """Si hay una celda de PEDIR a medio escribir, la guarda antes de seguir.
 
         Con la ✕ el editor no pierde el foco: sin esto, lo escrito entraba a
         `_pedidos` hasta que la ventana ya se ocultaba, después de la pregunta."""
@@ -1176,8 +1448,8 @@ class ConteoRevisionDialog(QDialog):
             self._table.closeEditor(editor, QAbstractItemDelegate.EndEditHint.NoHint)
 
     def reject(self) -> None:
-        """Cerrar (botón, ✕ o Esc): si cambiaste el pedido a mano y no lo
-        guardaste, pregunta. El prellenado con el sugerido no cuenta."""
+        """Cerrar (✕ o Esc): si cambiaste el pedido a mano y no lo guardaste,
+        pregunta. El prellenado con el sugerido no cuenta."""
         self._cerrar_editor_abierto()
         if self._pedido_cambiado():
             opcion = _elegir(

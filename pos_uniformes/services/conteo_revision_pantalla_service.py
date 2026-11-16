@@ -291,6 +291,8 @@ def _que_hacer_talla(linea, t) -> tuple[str, str, str]:
         ayuda = f"En cajas: {detalle or linea.en_cajas} ({NOTA_CAJAS})"
         if linea.estado == SURTIR:
             texto = f"{texto} de cajas*"
+        elif not linea.surtir:
+            texto = f"{texto} · +{linea.en_cajas} en cajas*"
     if t is not None and t.ajuste_posterior is not None and not t.ajustado:
         texto = f"⚠ otro ajuste el {dia_mes(fecha_tienda(t.ajuste_posterior))} · {texto}"
         tono = QUE_OJO

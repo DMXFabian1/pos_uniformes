@@ -129,6 +129,7 @@ class TablaTests(unittest.TestCase):
         t32 = filas[1]
         self.assertEqual(t32.celdas[:6], ("32", "10", "6", f"{M}4", "2", "4"))   # 10 − 2 vendidas − 4
         self.assertEqual(t32.tono_dif, p.DIF_FALTAN)
+        self.assertEqual(t32.celdas[p.COL_QUE], "bien · +12 en cajas*")
         self.assertIn("A-12 ×12", t32.ayuda_que)
         self.assertIn("16-jul", t32.ayuda_que)
         sin_dif = next(f for f in filas if f.tipo == "talla" and f.celdas[0] == "16")

@@ -19,6 +19,7 @@ from sqlalchemy.orm import Session  # noqa: E402
 from pos_uniformes.database.connection import Base  # noqa: E402
 from pos_uniformes.database.models import ConteoJornada, Variante  # noqa: E402
 from pos_uniformes.services import conteo_jornada_service as jn  # noqa: E402
+from pos_uniformes.services import conteo_revision_pantalla_service as _P  # noqa: E402
 from pos_uniformes.ui.helpers import conteos_jornadas_helper as tarjetas  # noqa: E402
 
 _APP = QApplication.instance() or QApplication([])
@@ -201,7 +202,7 @@ class TarjetasTests(unittest.TestCase):
 
 
 class RevisionDialogTests(unittest.TestCase):
-    """El dueño ve qué pedir por talla, decide, y aplica o descarta."""
+    """El dueño ve qué cambia, decide qué pedir, y corrige o no usa el conteo."""
 
     def setUp(self) -> None:
         from datetime import timedelta
@@ -225,6 +226,7 @@ class RevisionDialogTests(unittest.TestCase):
             created_at=datetime.now() - timedelta(days=14),
         ))
         j = jn.abrir_jornada(s, escuela_id=e.id, empleada_code="VEND-4", empleada_nombre="Stayce")
+        # Talla 6: el sistema decía 10 y contaron 7 (−3). Talla 8: cuadra (10).
         registrar_conteos_lote(s, [ConteoInput(v[0].id, 7), ConteoInput(v[1].id, 10)], "x", jornada_id=j.id)
         jn.terminar_jornada(s, j, empleada_code="VEND-4")
         s.commit()
@@ -233,10 +235,10 @@ class RevisionDialogTests(unittest.TestCase):
         self.v_ids = [x.id for x in v]
         s.close()
 
-    def _dialogo(self, quien="VEND-1"):
+    def _dialogo(self, quien="VEND-1", **kw):
         from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import ConteoRevisionDialog
 
-        d = ConteoRevisionDialog(jornada=self.foto, revisada_por=quien, session_factory=self.factory)
+        d = ConteoRevisionDialog(jornada=self.foto, revisada_por=quien, session_factory=self.factory, **kw)
         self._dialogos.append(d)
         return d
 
@@ -247,46 +249,98 @@ class RevisionDialogTests(unittest.TestCase):
         self._dialogos = []
         _APP.processEvents()
 
-    def _fila(self, d, talla_col_texto: str) -> int:
-        for i in range(d._table.rowCount()):
-            if d._table.item(i, 1).text().startswith(talla_col_texto):
+    def _fila(self, d, talla: str) -> int:
+        for i in d._por_fila:
+            if d._table.item(i, _P.COL_TALLA).text() == talla:
                 return i
-        raise AssertionError(f"no está la fila {talla_col_texto}")
+        raise AssertionError(f"no está la fila {talla}")
 
-    def test_muestra_solo_lo_que_hay_que_pedir_por_defecto(self) -> None:
-        # Compacto: fila de prenda + la talla que pide acción. Primero la decisión.
+    def _celda(self, d, talla: str, col: int) -> str:
+        return d._table.item(self._fila(d, talla), col).text()
+
+    def _otra_por_revisar(self) -> int:
+        """Otra jornada terminada y sin revisar (de otra escuela)."""
+        from pos_uniformes.services.conteo_service import ConteoInput, registrar_conteos_lote
+        from pos_uniformes.tests.test_conteo_jornada_service import _seed
+
+        s = self.factory()
+        e = _seed(s, "Dos", productos=1, tallas=("10",))
+        s.flush()
+        v = s.scalars(select(Variante).where(Variante.sku == "SDos010")).one()
+        j = jn.abrir_jornada(s, escuela_id=e.id, empleada_code="VEND-5", empleada_nombre="Fanny")
+        registrar_conteos_lote(s, [ConteoInput(v.id, 9)], "x", jornada_id=j.id)
+        jn.terminar_jornada(s, j, empleada_code="VEND-5")
+        s.commit()
+        jid = j.id
+        s.close()
+        return jid
+
+    # --- tanda 3 (2026-11-15): la pantalla nueva --------------------------------------
+    def test_la_tabla_trae_las_tallas_con_diferencia_primero(self) -> None:
+        # Reescrita (antes: test_muestra_solo_lo_que_hay_que_pedir_por_defecto, con tarjetas).
         d = self._dialogo()
-        self.assertEqual(d._table.rowCount(), 2)                        # "Prenda 0" + talla 6
-        self.assertIn("pedir 21", d._table.item(0, 0).text())           # la prenda resume
-        fila = self._fila(d, "6")
-        self.assertEqual(d._table.item(fila, 2).text(), "7")            # hay
-        self.assertEqual(d._table.item(fila, 3).text(), "pedir 21")     # qué hacer: 28 − 7
-        self.assertEqual(d._table.item(fila, 4).text(), "21")           # pedido arranca en lo sugerido
-        self.assertIn("Stayce", d._resumen_label.text())
+        self.assertEqual(d._table.columnCount(), 8)
+        self.assertEqual(d.COL_PEDIDO, 7)
+        self.assertEqual(d._table.rowCount(), 3)                        # 6 · «sin diferencia (1)» · 8
+        self.assertEqual(d._table.item(1, 0).text(), "— sin diferencia (1) —")
+        fila = [self._celda(d, "6", c) for c in range(8)]
+        # talla · el sistema decía · contó · dif · vendidas desde · queda hoy · qué hacer · pedir
+        self.assertEqual(fila, ["6", "10", "7", "−3", "0", "7", "pedir 21", "21"])
+        self.assertEqual(self._celda(d, "8", _P.COL_DIF), "·")
+        self.assertEqual(self._celda(d, "8", _P.COL_QUE), "no se mueve")
         self.assertIn("<b>21</b> piezas", d._resumen_label.text())
-        # Las tarjetas: PEDIR prendida con 1; URGENTE y SURTIR apagadas (no hay); BIEN apagada.
-        self.assertTrue(d._tarjetas["PEDIR"].isChecked())
-        self.assertEqual(d._tarjetas["PEDIR"]._valor.text(), "1")
-        self.assertFalse(d._tarjetas["URGENTE"].isEnabled())
-        self.assertFalse(d._tarjetas["OTRAS"].isChecked())
-        # Prender BIEN trae la talla 8 ("no se mueve").
-        d._tarjetas["OTRAS"].setChecked(True)
+        # Sin columna Prenda ni color repetido: la prenda va arriba, una vez.
+        self.assertEqual(d._titulo_label.text(), "Prenda 0 · Azul · Uno")
+        self.assertIn("Contó Stayce · ", d._cuando_label.text())
+        self.assertTrue(d._cuando_label.text().endswith("· 2 tallas"))
+        self.assertEqual(d._aplicar_btn.text(), "Corregir inventario (1 talla, −3 pz)")
+
+    def test_los_chips_filtran_y_otro_toque_quita_el_filtro(self) -> None:
+        # Reescrita (antes: las tarjetas URGENTE/PEDIR/SURTIR/OTRAS).
+        d = self._dialogo()
+        ajuste, urgente, pedir = d._chips["AJUSTE"], d._chips["URGENTE"], d._chips["PEDIR"]
+        self.assertEqual(ajuste.text(), "Corrige 1 talla · faltan 3 · sobran 0 · −$300")
+        self.assertEqual((pedir.text(), pedir.property("tono")), ("Pedir 1", "advertencia"))
+        self.assertFalse(urgente.isEnabled())
+        self.assertEqual(urgente.property("tono"), "cero")
+        pedir.click()
+        self.assertEqual(d._table.rowCount(), 1)
+        self.assertEqual(pedir.property("activo"), "si")
+        pedir.click()
         self.assertEqual(d._table.rowCount(), 3)
-        self.assertEqual(d._table.item(self._fila(d, "8"), 3).text(), "no se mueve")
-        # Ver todas las columnas: la tabla completa de antes, sin filas de prenda.
-        d._completo.setChecked(True)
-        self.assertEqual(d._table.columnCount(), 13)
-        self.assertEqual(d._table.rowCount(), 2)
-        self.assertEqual(d._table.item(self._fila(d, "6"), 4).text(), "14 en 14 d")   # vendidas
-        self.assertEqual(d._table.item(self._fila(d, "6"), 11).text(), "21")          # pedido
+        ajuste.click()
+        self.assertEqual([d._table.item(i, 0).text() for i in range(d._table.rowCount())], ["6"])
+
+    def test_en_su_orden_quita_el_separador(self) -> None:
+        d = self._dialogo()
+        self.assertEqual(d._orden_btn.text(), "↕ En su orden")
+        d._orden_btn.click()
+        self.assertEqual([d._table.item(i, 0).text() for i in range(d._table.rowCount())], ["6", "8"])
+        self.assertEqual(d._orden_btn.text(), "↕ Diferencias primero")
+
+    def test_ver_todas_las_columnas_es_un_dialogo_aparte(self) -> None:
+        from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import ConteoColumnasDialog
+
+        d = self._dialogo()
+        with patch.object(ConteoColumnasDialog, "exec"):
+            d._accion_todas.trigger()
+        t = d._todas_dlg._tabla
+        self._dialogos.append(d._todas_dlg)
+        self.assertEqual(t.columnCount(), 17)
+        self.assertEqual(t.rowCount(), 2)
+        encabezados = [t.horizontalHeaderItem(c).text() for c in range(17)]
+        fila = {encabezados[c]: t.item(0, c).text() for c in range(17)}
+        self.assertEqual((fila["Talla"], fila["Vendidas"], fila["Pedido"], fila["Dif"]), ("6 Azul", "14 en 14 d", "21", "−3"))
+        self.assertEqual(d._table.columnCount(), 8)      # la de Revisar no cambia
 
     def test_al_tocar_una_talla_dice_por_que(self) -> None:
         d = self._dialogo()
         self.assertIn("Toca una talla", d._por_que_label.text())
         d._table.selectRow(self._fila(d, "6"))
+        self.assertIn("Talla 6", d._por_que_label.text())
         self.assertIn("vendidas <b>14</b> en 14 días", d._por_que_label.text())
         self.assertIn("primer conteo", d._por_que_label.text())
-        d._table.selectRow(0)   # la fila de prenda no es una talla
+        d._table.clearSelection()
         self.assertIn("Toca una talla", d._por_que_label.text())
 
     def test_si_nada_hay_que_pedir_se_muestran_todas_y_lo_dice(self) -> None:
@@ -296,12 +350,14 @@ class RevisionDialogTests(unittest.TestCase):
         s.query(LibretaVenta).delete()   # sin Libreta: todo "sin datos"
         s.commit(); s.close()
         d = self._dialogo()
-        self.assertEqual(d._table.rowCount(), 3)   # prenda + 2 tallas, no una tabla vacía
+        self.assertEqual(d._table.rowCount(), 3)   # 6 · separador · 8, no una tabla vacía
         self.assertIn("Nada que pedir ni surtir", d._resumen_label.text())
-        self.assertEqual(d._table.item(1, 3).text(), "sin datos")
-        self.assertTrue(d._tarjetas["OTRAS"].isChecked())
+        self.assertEqual(self._celda(d, "8", _P.COL_QUE), "sin datos")
+        self.assertIsNone(d._filtro)
+        self.assertFalse(d._chips["PEDIR"].isEnabled())
 
-    def test_lo_de_las_cajas_se_ve_y_dice_surtir(self) -> None:
+    def test_lo_de_las_cajas_se_ve_en_gris_con_su_nota(self) -> None:
+        # Reescrita (antes: test_lo_de_las_cajas_se_ve_y_dice_surtir, con la tarjeta SURTIR).
         from pos_uniformes.database.models import BodegaCaja, BodegaContenido
 
         s = self.factory()
@@ -310,24 +366,27 @@ class RevisionDialogTests(unittest.TestCase):
         s.add(BodegaContenido(caja_id=caja.id, variante_id=self.v_ids[0], cantidad=30))
         s.commit(); s.close()
         d = self._dialogo()
-        fila = self._fila(d, "6")
         # 7/sem; a la mano 7, en cajas 30 → total 37 ≥ 28: no pedir; surtir 14 − 7 = 7.
-        self.assertEqual(d._table.item(fila, 2).text(), "7  + 30 en cajas")
-        self.assertIn("A-12 ×30", d._table.item(fila, 2).toolTip())
-        self.assertEqual(d._table.item(fila, 3).text(), "surtir 7")
-        self.assertEqual(d._table.item(fila, 4).text(), "")
-        self.assertTrue(d._tarjetas["SURTIR"].isChecked())
-        self.assertIn("7 piezas de las cajas", d._tarjetas["SURTIR"]._sub.text())
+        self.assertEqual(self._celda(d, "6", _P.COL_CONTO), "7")
+        self.assertEqual(self._celda(d, "6", _P.COL_QUE), "surtir 7 de cajas*")
+        ayuda = d._table.item(self._fila(d, "6"), _P.COL_QUE).toolTip()
+        self.assertIn("A-12 ×30", ayuda)
+        self.assertIn("sin recontar desde el 16-jul", ayuda)
+        self.assertEqual(self._celda(d, "6", _P.COL_PEDIDO), "")
+        surtir = d._chips["SURTIR"]
+        self.assertEqual((surtir.text(), surtir.property("tono")), ("Surtir 1*", "neutro"))   # gris, no se prende
+        self.assertIn("16-jul", surtir.toolTip())
+        self.assertFalse(d._nota_cajas.isHidden())
 
     def test_editar_pedido_y_guardarlo(self) -> None:
         from pos_uniformes.database.models import ConteoInventario
 
         d = self._dialogo()
         fila = self._fila(d, "6")
-        d._table.item(fila, 4).setText("30")
+        d._table.item(fila, d.COL_PEDIDO).setText("30")
         self.assertIn("<b>30</b> piezas", d._resumen_label.text())
-        d._table.item(fila, 4).setText("abc")   # no es número: vuelve a lo anterior
-        self.assertEqual(d._table.item(fila, 4).text(), "30")
+        d._table.item(fila, d.COL_PEDIDO).setText("abc")   # no es número: vuelve a lo anterior
+        self.assertEqual(d._table.item(fila, d.COL_PEDIDO).text(), "30")
         with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.QMessageBox.information"):
             self.assertTrue(d._guardar_pedidos())
         s = self.factory()
@@ -335,24 +394,50 @@ class RevisionDialogTests(unittest.TestCase):
         self.assertEqual((c.pedido, c.pedido_sugerido), (30, 21))
         # Al reabrir, trae lo decidido.
         d2 = self._dialogo()
-        self.assertEqual(d2._table.item(self._fila(d2, "6"), 4).text(), "30")
+        self.assertEqual(self._celda(d2, "6", d2.COL_PEDIDO), "30")
 
-    def test_la_hoja_de_pedido_lleva_lo_escrito(self) -> None:
+    def test_un_toque_en_pedir_abre_la_cajita(self) -> None:
+        from PyQt6.QtWidgets import QAbstractItemView
+
+        d = self._dialogo()
+        d.show(); _APP.processEvents()
+        d._table.cellClicked.emit(self._fila(d, "6"), d.COL_PEDIDO)
+        self.assertEqual(d._table.state(), QAbstractItemView.State.EditingState)
+        d._cerrar_editor_abierto()
+        d._table.cellClicked.emit(self._fila(d, "6"), _P.COL_QUE)
+        self.assertNotEqual(d._table.state(), QAbstractItemView.State.EditingState)
+        d.hide()
+
+    def test_la_hoja_de_pedido_lleva_lo_escrito_y_lo_guarda(self) -> None:
+        from pos_uniformes.database.models import ConteoInventario
         from pos_uniformes.services.revision_service import texto_pedido
 
         d = self._dialogo()
-        d._table.item(self._fila(d, "6"), 4).setText("12")
+        d._table.item(self._fila(d, "6"), d.COL_PEDIDO).setText("12")
         texto = texto_pedido(d._revision_con_pedidos())
         self.assertIn("Pedido Uno", texto)
         self.assertIn("6: 12", texto)
         self.assertIn("Total: 12 piezas", texto)
+        # Ya no hay «Guardar pedido»: abrir la hoja lo guarda.
+        with patch(f"{_D}.PedidoHojaDialog") as hoja:
+            d._hoja_de_pedido()
+        hoja.assert_called_once()
+        s = self.factory()
+        c = s.scalars(select(ConteoInventario).where(ConteoInventario.variante_id == self.v_ids[0])).one()
+        self.assertEqual(c.pedido, 12)
+        self.assertFalse(d._pedido_cambiado())
+
+    def test_hoja_de_pedido_solo_si_hay_algo_pedido(self) -> None:
+        d = self._dialogo()
+        self.assertFalse(d._hoja_btn.isHidden())
+        d._table.item(self._fila(d, "6"), d.COL_PEDIDO).setText("")
+        self.assertTrue(d._hoja_btn.isHidden())
 
     def test_aplicar_guarda_el_pedido_y_cambia_el_stock(self) -> None:
         from pos_uniformes.database.models import ConteoInventario
 
         d = self._dialogo()
-        with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs._elegir", return_value="si"), \
-             patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.QMessageBox.information"):
+        with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs._elegir", return_value="si"):
             d._aplicar()
         self.assertEqual(d.resultado, "aplicada")
         s = self.factory()
@@ -362,17 +447,55 @@ class RevisionDialogTests(unittest.TestCase):
         self.assertIsNotNone(s.get(ConteoJornada, self.foto.id).revisada_at)
         c = s.scalars(select(ConteoInventario).where(ConteoInventario.variante_id == self.v_ids[0])).one()
         self.assertEqual(c.pedido, 21)
+        # «✓ Listo» en la misma ventana; no hay otra por revisar: solo Cerrar.
+        self.assertEqual(d._paginas.currentIndex(), 1)
+        self.assertEqual(d._listo_texto.text(), "Se corrigió 1 talla: faltaban 3, sobraban 0 (−$300 a precio de venta).")
+        self.assertTrue(d._siguiente_btn.isHidden())
+        self.assertEqual(d._listo_quedan.text(), "No queda ningún conteo por revisar.")
+        d._cerrar_btn.click()
+        self.assertIsNone(d.siguiente_jornada_id)
 
-    def test_doble_clic_en_una_fila_abre_la_historia(self) -> None:
+    def test_listo_ofrece_la_siguiente_por_revisar(self) -> None:
+        otra = self._otra_por_revisar()
+        d = self._dialogo()
+        d.show(); _APP.processEvents()
+        with patch(f"{_D}._elegir", return_value="si"):
+            d._descartar()
+        self.assertEqual(d.resultado, "descartada")
+        self.assertEqual(d._paginas.currentIndex(), 1)
+        self.assertIn("No se usó este conteo", d._listo_texto.text())
+        self.assertFalse(d._siguiente_btn.isHidden())
+        self.assertIn("Queda 1 conteo por revisar. Sigue: Dos (Fanny).", d._listo_quedan.text())
+        d._siguiente_btn.click()
+        self.assertEqual(d.siguiente_jornada_id, otra)
+        self.assertEqual(d.siguiente_jornada.id, otra)
+        self.assertFalse(d.isVisible())
+
+    def test_desde_el_historial_no_se_ofrece_la_siguiente(self) -> None:
+        self._otra_por_revisar()
+        d = self._dialogo(ofrecer_siguiente=False)
+        with patch(f"{_D}._elegir", return_value="si"):
+            d._descartar()
+        self.assertTrue(d._siguiente_btn.isHidden())
+        self.assertTrue(d._listo_quedan.isHidden())
+
+    def test_doble_clic_ya_no_abre_la_historia_y_consultar_si(self) -> None:
+        # Reescrita (antes: test_doble_clic_en_una_fila_abre_la_historia): el doble
+        # clic deja escribir en PEDIR; la historia está en «Consultar ▾».
         d = self._dialogo()
         fila = self._fila(d, "6")
         with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.TallaHistoriaDialog") as hist:
-            d._doble_clic(d._table.item(fila, 2))      # cualquier columna menos Pedido
+            d._table.itemDoubleClicked.emit(d._table.item(fila, _P.COL_CONTO))
+            hist.assert_not_called()
+            d._table.selectRow(fila)
+            d._accion_historia.trigger()
             hist.assert_called_once()
             self.assertEqual(hist.call_args.kwargs["variante_id"], self.v_ids[0])
-            hist.reset_mock()
-            d._doble_clic(d._table.item(fila, 4))      # Pedido: ahí el doble clic edita
-            hist.assert_not_called()
+        textos = [a.text() for a in d._menu_consultar.actions() if not a.isSeparator()]
+        self.assertEqual(
+            [t.split("  ", 1)[-1] for t in textos],
+            ["Historia de la talla", "Historia de la escuela", "Comparar con el anterior", "Ver todas las columnas"],
+        )
 
     def test_la_historia_muestra_conteos_y_semanas(self) -> None:
         from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import TallaHistoriaDialog
@@ -401,10 +524,10 @@ class RevisionDialogTests(unittest.TestCase):
         self.assertEqual(h._tabla.rowCount(), 6)                       # 2 prendas + 4 tallas
         self.assertEqual(h._tabla.item(1, 1).text(), "6 AZUL")         # talla 6 es la vendida
         self.assertEqual(h._tabla.item(1, 2).text(), "14")
-        # Desde Revisar se abre con un botón.
+        # Desde Revisar se abre con «Consultar ▾».
         d = self._dialogo()
         with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.EscuelaHistoriaDialog") as esc:
-            d._historia_escuela()
+            d._accion_escuela.trigger()
             esc.assert_called_once()
             self.assertEqual(esc.call_args.kwargs["escuela_id"], self.foto.escuela_id)
 
@@ -421,8 +544,7 @@ class RevisionDialogTests(unittest.TestCase):
                                diferencia=0, contado_por="x", contado_at=datetime.now() - timedelta(days=20)))
         s.commit()
         d = self._dialogo()
-        with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs._elegir", return_value="si"), \
-             patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.QMessageBox.information"):
+        with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs._elegir", return_value="si"):
             d._aplicar()
         self.assertEqual(d.resultado, "aplicada")
         c = ConteoComparativoDialog(jornada_id=self.foto.id, session_factory=self.factory)
@@ -437,9 +559,9 @@ class RevisionDialogTests(unittest.TestCase):
         c._solo_cambios.setChecked(False)
         self.assertEqual(c._tabla.rowCount(), 2)
         self.assertEqual(c._tabla.item(1, 4).text(), "primer conteo")
-        # Desde Revisar hay botón.
+        # Desde Revisar, en «Consultar ▾».
         with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.ConteoComparativoDialog") as comp:
-            d._comparar()
+            d._accion_comparar.trigger()
             comp.assert_called_once()
 
     def test_descartar_no_toca_el_stock(self) -> None:
@@ -458,6 +580,7 @@ class RevisionDialogTests(unittest.TestCase):
             d._aplicar()
         err.assert_called_once()
         self.assertEqual(d.resultado, "")
+        self.assertEqual(d._paginas.currentIndex(), 0)
 
 
     # --- tanda 1 (2026-11-15): textos honestos, fecha, ya revisado, cerrar ---------
@@ -482,6 +605,7 @@ class RevisionDialogTests(unittest.TestCase):
             d._descartar()
         self.assertEqual(d.resultado, "")
         self.assertEqual([o[1] for o in preg.call_args.args[3]], ["Volver", "Sí, no usar este conteo"])
+        self.assertEqual(d._descartar_btn.text(), "No usar este conteo")
 
     def _envejecer(self, dias: int) -> None:
         from datetime import timedelta
@@ -516,16 +640,19 @@ class RevisionDialogTests(unittest.TestCase):
         from pos_uniformes.database.models import ConteoInventario
 
         d = self._dialogo()
-        with patch(f"{_D}._elegir", return_value="si"), patch(f"{_D}.QMessageBox.information"):
+        with patch(f"{_D}._elegir", return_value="si"):
             d._aplicar()
         self.assertEqual(d.resultado, "aplicada")
         # Desde el Historial («Ver el pedido que decidiste») se abre la misma ventana.
         d2 = self._dialogo()
         self.assertTrue(d2._aplicar_btn.isHidden())
         self.assertTrue(d2._descartar_btn.isHidden())
+        self.assertFalse(d2._hoja_btn.isHidden())                      # el pedido y la hoja siguen
         self.assertFalse(d2._revisada_label.isHidden())
         self.assertIn("Corregido el ", d2._revisada_label.text())
         self.assertTrue(d2._aviso_label.isHidden())
+        self.assertEqual(d2._chips["AJUSTE"].text(), "Corrigió 1 talla · faltaban 3 · sobraban 0")
+        self.assertEqual(self._celda(d2, "6", _P.COL_QUEDA), "7")       # ya corregida: lo de hoy
         with patch(f"{_D}._elegir") as preg:
             d2._aplicar(); d2._descartar()
         preg.assert_not_called()
@@ -534,7 +661,7 @@ class RevisionDialogTests(unittest.TestCase):
         s.close()
         # El pedido sigue editable y se guarda.
         fila = self._fila(d2, "6")
-        d2._table.item(fila, 4).setText("5")
+        d2._table.item(fila, d2.COL_PEDIDO).setText("5")
         with patch(f"{_D}.QMessageBox.information"):
             self.assertTrue(d2._guardar_pedidos())
         s = self.factory()
@@ -566,11 +693,11 @@ class RevisionDialogTests(unittest.TestCase):
         s.commit(); s.close()
         self._envejecer(41)
         d = self._dialogo()
-        d._tarjetas["OTRAS"].setChecked(True)
         self.assertIn("Conteo de hace 41 días: desde entonces se vendieron 2 piezas.", d._aviso_label.text())
-        d._table.selectRow(self._fila(d, "6"))
-        self.assertIn("el sistema decía 10, contó 7", d._por_que_label.text())
-        self.assertIn("vendidas desde el conteo 2", d._por_que_label.text())
+        # Tanda 3: el sistema decía / contó / vendidas desde ya son columnas (antes iban en el «por qué»).
+        self.assertEqual(
+            [self._celda(d, "6", c) for c in (_P.COL_SISTEMA, _P.COL_CONTO, _P.COL_VENDIDAS)], ["10", "7", "2"],
+        )
 
     def test_la_confirmacion_avisa_de_otro_ajuste_despues_del_conteo(self) -> None:
         from pos_uniformes.database.models import MovimientoInventario, TipoMovimientoInventario
@@ -583,6 +710,10 @@ class RevisionDialogTests(unittest.TestCase):
         ))
         s.commit(); s.close()
         d = self._dialogo()
+        # Tanda 3: la talla lleva el ⚠ en «qué hacer» y en su «por qué».
+        self.assertTrue(self._celda(d, "6", _P.COL_QUE).startswith("⚠ otro ajuste el "))
+        d._table.selectRow(self._fila(d, "6"))
+        self.assertIn("⚠ otro ajuste el ", d._por_que_label.text())
         with patch(f"{_D}._elegir", return_value="no") as preg:
             d._aplicar()
         texto = preg.call_args.args[2]
@@ -596,6 +727,7 @@ class RevisionDialogTests(unittest.TestCase):
         d2 = self._dialogo()
         self.assertIn("No se usó (", d2._revisada_label.text())
         self.assertTrue(d2._aplicar_btn.isHidden())
+        self.assertEqual(d2._chips["AJUSTE"].text(), "1 talla con diferencia · no se usó")
 
     def test_contada_en_cero_sin_demanda_dice_se_acabo(self) -> None:
         from pos_uniformes.database.models import ConteoInventario
@@ -607,7 +739,7 @@ class RevisionDialogTests(unittest.TestCase):
         c8.stock_fisico = 0     # la 8 no se vende en 14 días y la contaron en 0
         s.commit(); s.close()
         d = self._dialogo()
-        self.assertEqual(d._table.item(self._fila(d, "8"), 3).text(), "se acabó")
+        self.assertEqual(self._celda(d, "8", _P.COL_QUE), "se acabó")
         texto = d._resumen_label.text()
         self.assertIn("1 se acabó y nadie la pidió", texto)
         self.assertNotIn("faltan", texto)
@@ -622,8 +754,8 @@ class RevisionDialogTests(unittest.TestCase):
         s.query(LibretaVenta).delete()
         s.commit(); s.close()
         d = self._dialogo()
-        self.assertEqual(d._table.item(self._fila(d, "8"), 3).text(), "sin datos")
-        self.assertEqual(d._table.item(self._fila(d, "6"), 3).text(), "sin datos")
+        self.assertEqual(self._celda(d, "8", _P.COL_QUE), "sin datos")
+        self.assertEqual(self._celda(d, "6", _P.COL_QUE), "sin datos")
         texto = d._resumen_label.text()
         self.assertNotIn("se acabó", texto)
         self.assertIn("faltan días para saber el ritmo (2 tallas)", texto)
@@ -641,21 +773,28 @@ class RevisionDialogTests(unittest.TestCase):
         self.assertIn("1 talla sin ventas", texto)
         self.assertNotIn("faltan días", texto)
 
-    def test_tarjeta_en_cero_se_apaga_aunque_este_prendida(self) -> None:
+    def test_chip_en_cero_va_gris_y_sin_relleno(self) -> None:
+        # Reescrita (antes: test_tarjeta_en_cero_se_apaga_aunque_este_prendida).
         from pos_uniformes.database.models import LibretaVenta
 
         s = self.factory()
         s.query(LibretaVenta).delete()
         s.commit(); s.close()
         d = self._dialogo()
-        urgente = d._tarjetas["URGENTE"]
-        self.assertTrue(urgente.isChecked())       # el filtro inicial prende todas
+        urgente = d._chips["URGENTE"]
         self.assertFalse(urgente.isEnabled())
+        self.assertEqual(urgente.property("tono"), "cero")
         d.show(); _APP.processEvents()
-        color = urgente.grab().toImage().pixelColor(6, urgente.height() // 2)
+        from PyQt6.QtCore import QPoint, QRect
+
+        # El chip no tiene fondo propio: se ve lo de atrás (crema), no un rojo sólido.
+        imagen = d.grab(QRect(urgente.mapTo(d, QPoint(0, 0)), urgente.size())).toImage()
+        color = imagen.pixelColor(imagen.width() // 2, 3)
         self.assertGreater(color.red(), 230)       # crema, no rojo sólido
-        self.assertGreater(color.green(), 230)
-        self.assertFalse(d._hoja_btn.isEnabled())
+        self.assertGreater(color.green(), 225)
+        urgente.click()
+        self.assertIsNone(d._filtro)               # apagado: no filtra
+        self.assertTrue(d._hoja_btn.isHidden())    # sin nada pedido no hay hoja
         d.hide()
 
     def test_cerrar_sin_cambios_no_pregunta(self) -> None:
@@ -669,7 +808,7 @@ class RevisionDialogTests(unittest.TestCase):
 
         d = self._dialogo()
         d.show(); _APP.processEvents()
-        d._table.item(self._fila(d, "6"), 4).setText("30")
+        d._table.item(self._fila(d, "6"), d.COL_PEDIDO).setText("30")
         with patch(f"{_D}._elegir", return_value="volver") as preg:
             d.reject()
         self.assertTrue(d.isVisible())                       # Volver: sigue abierta
@@ -683,7 +822,7 @@ class RevisionDialogTests(unittest.TestCase):
         self.assertEqual(c.pedido, 30)
 
     def test_cerrar_con_la_x_mientras_escribes_pregunta(self) -> None:
-        # Editor abierto en Pedido (sin Enter) y se cierra con la ✕: lo escrito cuenta.
+        # Editor abierto en PEDIR (sin Enter) y se cierra con la ✕: lo escrito cuenta.
         from PyQt6.QtTest import QTest
         from PyQt6.QtWidgets import QAbstractItemView
 
@@ -691,7 +830,7 @@ class RevisionDialogTests(unittest.TestCase):
 
         d = self._dialogo()
         d.show(); d.activateWindow(); _APP.processEvents()
-        item = d._table.item(self._fila(d, "6"), 4)
+        item = d._table.item(self._fila(d, "6"), d.COL_PEDIDO)
         d._table.setCurrentItem(item)
         d._table.editItem(item)
         _APP.processEvents()
@@ -717,7 +856,7 @@ class RevisionDialogTests(unittest.TestCase):
 
         d = self._dialogo()
         d.show(); _APP.processEvents()
-        d._table.item(self._fila(d, "6"), 4).setText("30")
+        d._table.item(self._fila(d, "6"), d.COL_PEDIDO).setText("30")
         with patch(f"{_D}._elegir", return_value="no_guardar"):
             d.reject()
         self.assertFalse(d.isVisible())
@@ -727,12 +866,23 @@ class RevisionDialogTests(unittest.TestCase):
 
     def test_despues_de_guardar_ya_no_pregunta(self) -> None:
         d = self._dialogo()
-        d._table.item(self._fila(d, "6"), 4).setText("30")
+        d._table.item(self._fila(d, "6"), d.COL_PEDIDO).setText("30")
         with patch(f"{_D}.QMessageBox.information"):
             d._guardar_pedidos()
         with patch(f"{_D}._elegir") as preg:
             d.reject()
         preg.assert_not_called()
+
+    def test_cabe_en_1366x768_al_100_y_al_125(self) -> None:
+        from PyQt6.QtCore import QRect
+
+        for area, esperado in ((QRect(0, 0, 1920, 1040), (1280, 700)), (QRect(0, 0, 1366, 728), (1280, 688)),
+                               (QRect(0, 0, 1093, 574), (1077, 534))):
+            with patch(f"{_D}._area_disponible", return_value=area):
+                d = self._dialogo()
+            self.assertEqual((d.width(), d.height()), esperado)
+            self.assertLessEqual(d.minimumWidth(), esperado[0])
+            self.assertLessEqual(d.minimumHeight(), esperado[1])
 
 
 _D = "pos_uniformes.ui.dialogs.conteo_jornada_dialogs"
