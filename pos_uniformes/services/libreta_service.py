@@ -427,6 +427,12 @@ def registrar_operacion(
     if acreditar_cashback:
         acreditar_cashback_sin_bloquear(session, entry)
         subir_de_programa_sin_bloquear(session, entry)
+    if calculo:
+        # QR de temporada (2026-11-16): aviso a Daniel en la cola de Telegram,
+        # en la misma transacción; si falla, la venta sigue.
+        from pos_uniformes.services.descuento_qr_aviso_service import avisar_venta_con_qr
+
+        avisar_venta_con_qr(session, entry)
     return entry
 
 
