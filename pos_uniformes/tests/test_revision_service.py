@@ -336,6 +336,19 @@ class HistoriaTests(_Escenario):
         with self.assertRaises(ValueError):
             rv.historia_de_talla(self.s, 99999, hoy=HOY)
 
+    def test_una_talla_saltada_se_ve_como_no_corregida(self) -> None:
+        # Tanda 4: al aplicar se saltó (otro ajuste después): no se ve como corregida.
+        v0 = self.v[0]
+        saltado = self._conteo_previo(v0, 12, HOY - timedelta(days=42))
+        saltado.notas = "Pedido: 3 · No se corrigió: otro ajuste el 20 oct"
+        corregido = self._conteo_previo(v0, 8, HOY - timedelta(days=21))
+        corregido.ajustado = True
+        self._conteo_previo(v0, 5, HOY - timedelta(days=2))        # sin revisar
+        self.s.flush()
+        h = rv.historia_de_talla(self.s, v0.id, hoy=HOY)
+        self.assertEqual([c.inventario for c in h.conteos], ["", "se corrigió", "no se corrigió (otro ajuste)"])
+        self.assertEqual(rv.inventario_del_conteo(ajustado=True, diferencia=0, notas=None), "")
+
 
 class HistoriaEscuelaTests(_Escenario):
     def test_por_prenda_y_talla_de_mayor_a_menor(self) -> None:

@@ -100,6 +100,21 @@ class VentanaTests(_Base):
         self.assertIn("2 conteos", self.d._resumen.text())
         self.assertIn("12 piezas pedidas", self.d._resumen.text())
 
+    def test_una_talla_saltada_al_aplicar_se_dice_en_el_estado(self) -> None:
+        # Tanda 4: la talla con otro ajuste después no se corrigió; no se ve como corregida.
+        from sqlalchemy import select
+
+        with self.factory() as s:
+            c = s.scalars(select(ConteoInventario).where(ConteoInventario.stock_sistema == 10)).one()   # el del viejo
+            c.notas = "No se corrigió: otro ajuste el 20 oct"
+            s.commit()
+            nuevo, viejo = jn.historial_de_alcance(s, self.esc_id)
+        self.assertEqual((viejo.no_corregidas, viejo.estado_texto), (1, "Aplicada · 1 no se corrigió"))
+        self.assertEqual(nuevo.estado_texto, "Por revisar")
+        self._elegir_escuela()
+        self.assertEqual(self.d._tabla.item(1, hist._COL_ESTADO).text(), "Aplicada · 1 no se corrigió")
+        self.assertEqual(self.d._tabla.item(0, hist._COL_ESTADO).text(), "Por revisar")
+
     def test_los_botones_dependen_del_conteo_elegido(self) -> None:
         self._elegir_escuela()
         self.d._tabla.selectRow(0)      # el nuevo: sin pedido todavía

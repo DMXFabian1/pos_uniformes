@@ -953,6 +953,15 @@ class RevisionDialogTests(unittest.TestCase):
         self.assertEqual(d2._chips["AJUSTE"].text(), "Corrigió 1 talla · faltaban 0 · sobraban 2 · 1 no se corrigió")
         d2._table.selectRow(self._fila(d2, "6"))
         self.assertIn(": no se corrigió, recontar", d2._por_que_label.text())
+        # Y en la historia de la talla.
+        from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import TallaHistoriaDialog
+
+        h = TallaHistoriaDialog(variante_id=self.v_ids[0], titulo="Uno", session_factory=self.factory)
+        self._dialogos.append(h)
+        self.assertEqual(h._tabla.item(0, 6).text(), "no se corrigió (otro ajuste)")
+        h3 = TallaHistoriaDialog(variante_id=self.v_ids[3], titulo="Uno", session_factory=self.factory)
+        self._dialogos.append(h3)
+        self.assertEqual(h3._tabla.item(0, 6).text(), "se corrigió")
 
     def test_si_todas_tuvieron_otro_ajuste_solo_se_marca_revisado(self) -> None:
         self._otro_ajuste(0)

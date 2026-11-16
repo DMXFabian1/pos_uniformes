@@ -570,6 +570,7 @@ class ConteoHistorico:
     pedido: int | None
     sugerido: int | None
     vendidas_despues: int | None   # hasta el siguiente conteo (o hasta hoy); None si no hay Libreta
+    inventario: str = ""           # «se corrigió» / «no se corrigió (otro ajuste)» (tanda 4) / ''
 
 
 @dataclass(frozen=True)
@@ -602,6 +603,19 @@ class Historia:
 
 def _lunes(d: date) -> date:
     return d - timedelta(days=d.weekday())
+
+
+def inventario_del_conteo(*, ajustado: bool, diferencia: int, notas: str | None) -> str:
+    """Qué le pasó al inventario con ese conteo, para la historia de la talla:
+    «se corrigió», «no se corrigió (otro ajuste)» si al aplicar se saltó a
+    propósito (tanda 4), o '' (cuadró, no se usó o falta revisarlo)."""
+    from pos_uniformes.services.conteo_resumen_service import TEXTO_NO_CORREGIDA, es_no_corregida
+
+    if es_no_corregida(notas):
+        return TEXTO_NO_CORREGIDA
+    if ajustado and diferencia:
+        return "se corrigió"
+    return ""
 
 
 def historia_de_talla(session: Session, variante_id: int, *, hoy: date | None = None, semanas: int = SEMANAS_HISTORIA) -> Historia:
@@ -646,6 +660,7 @@ def historia_de_talla(session: Session, variante_id: int, *, hoy: date | None = 
         conteos.append(ConteoHistorico(
             fecha=fecha, conto=int(c.stock_fisico), quien=str(c.contado_por or ""),
             pedido=c.pedido, sugerido=c.pedido_sugerido, vendidas_despues=vendidas_despues,
+            inventario=inventario_del_conteo(ajustado=bool(c.ajustado), diferencia=int(c.diferencia or 0), notas=c.notas),
         ))
         siguiente = fecha
     return Historia(

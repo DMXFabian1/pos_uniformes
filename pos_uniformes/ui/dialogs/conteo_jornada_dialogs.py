@@ -1678,15 +1678,15 @@ class TallaHistoriaDialog(QDialog):
 
         layout.addWidget(QLabel("Conteos"))
         self._tabla = QTableWidget()
-        self._tabla.setColumnCount(6)
-        self._tabla.setHorizontalHeaderLabels(["Fecha", "Contó", "Quién", "Sugerido", "Pediste", "Vendidas después"])
+        self._tabla.setColumnCount(7)
+        self._tabla.setHorizontalHeaderLabels(["Fecha", "Contó", "Quién", "Sugerido", "Pediste", "Vendidas después", "Inventario"])
         self._tabla.verticalHeader().setVisible(False)
         self._tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._tabla.setAlternatingRowColors(True)
         self._tabla.setShowGrid(False)
         h = self._tabla.horizontalHeader()
         h.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        for c in (0, 1, 3, 4, 5):
+        for c in (0, 1, 3, 4, 5, 6):
             h.setSectionResizeMode(c, QHeaderView.ResizeMode.ResizeToContents)
         layout.addWidget(self._tabla, 1)
 
@@ -1732,11 +1732,14 @@ class TallaHistoriaDialog(QDialog):
                 "—" if c.sugerido is None else str(c.sugerido),
                 "—" if c.pedido is None else str(c.pedido),
                 "—" if c.vendidas_despues is None else str(c.vendidas_despues),
+                c.inventario or "—",   # tanda 4: «no se corrigió (otro ajuste)» si se saltó
             )
             for col, txt in enumerate(valores):
                 item = QTableWidgetItem(txt)
                 if col != 2:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                if col == 6 and c.inventario.startswith("no se corrigió"):
+                    item.setForeground(QBrush(QColor("#a35a00")))
                 if col == 4 and c.pedido:
                     fuente = item.font()
                     fuente.setBold(True)

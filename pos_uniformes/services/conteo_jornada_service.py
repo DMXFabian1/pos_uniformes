@@ -907,10 +907,19 @@ class ConteoDelHistorial:
     sobraron: int      # piezas que había de más
     pedido_piezas: int  # lo que Daniel decidió pedir a partir de este conteo
     estado: str
+    no_corregidas: int = 0   # tallas que al aplicar se saltaron por otro ajuste (tanda 4)
 
     @property
     def diferencia(self) -> int:
         return self.sobraron - self.faltaron
+
+    @property
+    def estado_texto(self) -> str:
+        """«Aplicada» o, si se saltaron tallas, «Aplicada · 1 no se corrigió»."""
+        n = self.no_corregidas
+        if not n:
+            return self.estado
+        return f"{self.estado} · {n} no se corrigió" if n == 1 else f"{self.estado} · {n} no se corrigieron"
 
 
 def historial_de_alcance(
@@ -933,15 +942,18 @@ def historial_de_alcance(
     ).all()
     if not jornadas:
         return []
+    from pos_uniformes.services.conteo_resumen_service import MARCA_NO_CORREGIDA
+
     cifras = {
-        int(jid): (int(tallas or 0), int(faltaron or 0), int(sobraron or 0), int(pedido or 0))
-        for jid, tallas, faltaron, sobraron, pedido in session.execute(
+        int(jid): (int(tallas or 0), int(faltaron or 0), int(sobraron or 0), int(pedido or 0), int(saltadas or 0))
+        for jid, tallas, faltaron, sobraron, pedido, saltadas in session.execute(
             select(
                 ConteoInventario.jornada_id,
                 func.count(ConteoInventario.id),
                 func.sum(case((ConteoInventario.diferencia < 0, -ConteoInventario.diferencia), else_=0)),
                 func.sum(case((ConteoInventario.diferencia > 0, ConteoInventario.diferencia), else_=0)),
                 func.sum(func.coalesce(ConteoInventario.pedido, 0)),
+                func.sum(case((ConteoInventario.notas.contains(MARCA_NO_CORREGIDA, autoescape=True), 1), else_=0)),
             )
             .where(ConteoInventario.jornada_id.in_([j.id for j in jornadas]))
             .group_by(ConteoInventario.jornada_id)
@@ -949,7 +961,7 @@ def historial_de_alcance(
     }
     salida = []
     for j in jornadas:
-        tallas, faltaron, sobraron, pedido = cifras.get(int(j.id), (0, 0, 0, 0))
+        tallas, faltaron, sobraron, pedido, saltadas = cifras.get(int(j.id), (0, 0, 0, 0, 0))
         salida.append(
             ConteoDelHistorial(
                 jornada_id=int(j.id),
@@ -962,6 +974,7 @@ def historial_de_alcance(
                 sobraron=sobraron,
                 pedido_piezas=pedido,
                 estado=estado_de(j),
+                no_corregidas=saltadas,
             )
         )
     return salida

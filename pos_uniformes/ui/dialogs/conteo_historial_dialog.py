@@ -227,7 +227,7 @@ class ConteoHistorialDialog(QDialog):
                 f"−{c.faltaron}" if c.faltaron else "—",
                 f"+{c.sobraron}" if c.sobraron else "—",
                 str(c.pedido_piezas) if c.pedido_piezas else "—",
-                c.estado,
+                c.estado_texto,   # «Aplicada · 1 no se corrigió» (tanda 4)
             )
             for col, txt in enumerate(valores):
                 item = QTableWidgetItem(txt)
