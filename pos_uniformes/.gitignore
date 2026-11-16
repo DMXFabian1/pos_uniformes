@@ -33,6 +33,7 @@ data/school_links_cache.json
 data/business_info.json
 data/libreta_pendiente.json
 data/demanda_pendiente.json
+data/descuento_qr_intentos.json
 data/print_routing.json
 data/ticket_print_settings.json
 data/anuncios/
