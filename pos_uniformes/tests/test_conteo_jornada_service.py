@@ -866,3 +866,145 @@ class LoQueTocaTests(unittest.TestCase):
         from pos_uniformes.services import conteo_jornada_service as jn
         with patch.object(jn, "ultimos_conteos", return_value={}):
             self.assertEqual(len(jn.lo_que_toca(None, mapa=mapa, limite=2)), 2)
+
+
+class SaltarConAjustePosteriorTests(unittest.TestCase):
+    """Tanda 4 (decisión de Daniel, 2026-11-15): una talla con otro ajuste
+    después del conteo NO se corrige al aplicar (se corregiría dos veces); se
+    marca para recontar y la jornada sí queda revisada."""
+
+    from datetime import datetime as _dt
+
+    CONTADO = _dt(2026, 10, 5, 17, 0)      # UTC sin zona (SQLite)
+    OTRO = _dt(2026, 10, 20, 18, 0)        # 20 oct en la tienda
+
+    def setUp(self) -> None:
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.s = Session(self.engine)
+        self.escuela = _seed(self.s, "Cha", productos=1, tallas=("8", "32", "36"), stock=10)
+        self.v = {v.talla: v for v in self.s.scalars(select(Variante)).all()}
+        self.j = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4", empleada_nombre="Stayce")
+        self.c = {}
+        for talla, conto, notas in (("8", 9, None), ("32", 6, None), ("36", 9, "Pedido: 3")):
+            c = ConteoInventario(
+                variante_id=self.v[talla].id, escuela_id=self.escuela.id, stock_sistema=10, stock_fisico=conto,
+                diferencia=conto - 10, contado_por="VEND-4", contado_at=self.CONTADO, jornada_id=self.j.id, notas=notas,
+            )
+            self.s.add(c)
+            self.c[talla] = c
+        self.s.flush()
+        jn.terminar_jornada(self.s, self.j, empleada_code="VEND-4")
+
+    def tearDown(self) -> None:
+        self.s.close()
+
+    def _ajuste(self, talla: str, cantidad: int, referencia: str | None = None, cuando=None) -> None:
+        from pos_uniformes.database.models import MovimientoInventario, TipoMovimientoInventario
+
+        v = self.v[talla]
+        tipo = TipoMovimientoInventario.AJUSTE_ENTRADA if cantidad > 0 else TipoMovimientoInventario.AJUSTE_SALIDA
+        self.s.add(MovimientoInventario(
+            variante_id=v.id, tipo_movimiento=tipo, cantidad=cantidad, stock_anterior=v.stock_actual,
+            stock_posterior=v.stock_actual + cantidad, referencia=referencia, creado_por="x", created_at=cuando or self.OTRO,
+        ))
+        v.stock_actual += cantidad
+        self.s.flush()
+
+    def _movs_de(self, talla: str) -> list:
+        from pos_uniformes.database.models import MovimientoInventario
+
+        return list(self.s.scalars(select(MovimientoInventario).where(
+            MovimientoInventario.referencia == f"CONTEO-{self.c[talla].id}"
+        )).all())
+
+    def test_la_talla_con_otro_ajuste_no_se_toca_y_las_demas_si(self) -> None:
+        self._ajuste("36", -2)                                  # a mano el 20 oct: 10 → 8
+        hecho = jn.aplicar_jornada(self.s, self.j, revisada_por="VEND-1")
+        self.s.commit()
+        ajustados, omitidos = hecho                              # se sigue desempacando igual
+        self.assertEqual((ajustados, omitidos), (2, 0))
+        self.assertEqual(set(hecho.saltadas), {self.c["36"].id})
+        self.assertEqual((self.v["8"].stock_actual, self.v["32"].stock_actual), (9, 6))
+        self.assertEqual(self.v["36"].stock_actual, 8)           # no se le sumó el −1 de octubre
+        self.assertEqual(self._movs_de("36"), [])
+        self.assertFalse(self.c["36"].ajustado)
+        self.assertTrue(self.c["8"].ajustado and self.c["32"].ajustado)
+        self.assertIsNotNone(self.j.revisada_at)                 # la jornada sí queda revisada
+        self.assertEqual(jn.ref(self.j).estado, "Aplicada")
+
+    def test_la_marca_queda_en_las_notas_sin_perder_el_pedido_de_la_hoja(self) -> None:
+        from pos_uniformes.services import conteo_resumen_service as rs
+        from pos_uniformes.services.revision_service import _ellas_sugieren
+
+        self._ajuste("36", -2)
+        self._ajuste("32", 1)
+        jn.aplicar_jornada(self.s, self.j, revisada_por="VEND-1")
+        self.assertEqual(self.c["36"].notas, "Pedido: 3 · No se corrigió: otro ajuste el 20 oct")
+        self.assertEqual(self.c["32"].notas, "No se corrigió: otro ajuste el 20 oct")
+        self.assertIsNone(self.c["8"].notas)
+        self.assertTrue(rs.es_no_corregida(self.c["36"].notas))
+        self.assertFalse(rs.es_no_corregida("Pedido: 3"))
+        self.assertEqual(_ellas_sugieren(self.c["36"].notas), 3)
+        hoja = jn.hoja_de_jornada(self.s, self.j)
+        pedidos = {t["talla"]: t["pedido"] for p in hoja["prendas"] for t in p["tallas"]}
+        self.assertEqual(pedidos["36"], 3)
+
+    def test_si_todas_tuvieron_otro_ajuste_solo_se_marca_revisada(self) -> None:
+        for talla in ("8", "32", "36"):
+            self._ajuste(talla, 1, "CONTEO-99999")               # otro conteo aplicado
+        hecho = jn.aplicar_jornada(self.s, self.j, revisada_por="VEND-1")
+        self.assertEqual(tuple(hecho), (0, 0))
+        self.assertEqual(len(hecho.saltadas), 3)
+        self.assertEqual(sorted(v.stock_actual for v in self.v.values()), [11, 11, 11])
+        self.assertIsNotNone(self.j.revisada_at)
+
+    def test_los_ajustes_que_no_son_otro_ajuste_no_la_saltan(self) -> None:
+        self._ajuste("8", -1, "libreta:17")                      # lo hizo la venta
+        self._ajuste("32", 1, "derivado:4")                      # stock de un conjunto
+        self._ajuste("36", 5, None, cuando=self.CONTADO.replace(day=1))   # antes del conteo
+        hecho = jn.aplicar_jornada(self.s, self.j, revisada_por="VEND-1")
+        self.assertEqual(tuple(hecho), (3, 0))
+        self.assertEqual(hecho.saltadas, {})
+
+    def test_decide_con_lo_que_hay_al_aplicar_no_con_lo_que_vio_la_pantalla(self) -> None:
+        from pos_uniformes.services import conteo_resumen_service as rs
+
+        pantalla = rs.resumen_de_jornada(self.s, self.j)
+        self.assertEqual(pantalla.tallas_a_corregir, 3)          # cuando se abrió, nada que saltar
+        self._ajuste("32", -1)                                   # alguien ajustó mientras tanto
+        hecho = jn.aplicar_jornada(self.s, self.j, revisada_por="VEND-1")
+        self.assertEqual(set(hecho.saltadas), {self.c["32"].id})
+        self.assertEqual(self.v["32"].stock_actual, 9)
+
+    def test_misma_definicion_que_la_pantalla(self) -> None:
+        from pos_uniformes.services import conteo_resumen_service as rs
+
+        self._ajuste("36", -2)
+        pantalla = rs.resumen_de_jornada(self.s, self.j)
+        self.assertEqual([t.conteo_id for t in pantalla.saltadas], [self.c["36"].id])
+        hecho = jn.aplicar_jornada(self.s, self.j, revisada_por="VEND-1")
+        self.assertEqual(set(hecho.saltadas), {t.conteo_id for t in pantalla.saltadas})
+        self.assertEqual(hecho.ajustados, pantalla.tallas_a_corregir)
+
+    def test_el_recuento_de_una_caja_solo_cuenta_si_subio_el_total(self) -> None:
+        # corregir_caja solo deja movimiento de inventario cuando la caja dice
+        # más de lo que el sistema tenía en total (sube stock_actual). Si no, el
+        # cambio va en BodegaMovimiento y la talla se corrige normal.
+        from pos_uniformes.database.models import BodegaCaja, BodegaContenido
+        from pos_uniformes.services import bodega_movil_service as bm
+
+        caja = BodegaCaja(codigo="A-12")
+        self.s.add(caja)
+        self.s.flush()
+        self.s.add(BodegaContenido(caja_id=caja.id, variante_id=self.v["8"].id, cantidad=2))
+        self.s.flush()
+        bm.corregir_caja(self.s, caja_id=caja.id, items=[
+            {"variante_id": self.v["8"].id, "cantidad": 4},       # 4 ≤ 10 en total: no sube el total
+            {"variante_id": self.v["32"].id, "cantidad": 12},     # 12 > 10: sube el total a 12
+        ], quien_code="VEND-1")
+        self.assertEqual((self.v["8"].stock_actual, self.v["32"].stock_actual), (10, 12))
+        hecho = jn.aplicar_jornada(self.s, self.j, revisada_por="VEND-1")
+        self.assertEqual(set(hecho.saltadas), {self.c["32"].id})
+        self.assertEqual(self.v["8"].stock_actual, 9)
+        self.assertEqual(self.v["32"].stock_actual, 12)

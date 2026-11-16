@@ -10,7 +10,9 @@ La ventana (`ConteoRevisionDialog`) solo pinta; aquí se decide qué decir:
 - **Qué hacer con una talla**: «pedir 6 · surtir 2», «¡URGENTE! …», «se acabó»
   (contaron 0 y nadie la pidió en días suficientes), «no se mueve», «sin datos».
 - **La confirmación de aplicar y de descartar**, con botones en español y lo
-  que de verdad pasa: a cada talla se le SUMA la diferencia de aquel día.
+  que de verdad pasa: a cada talla se le SUMA la diferencia de aquel día; las
+  que tuvieron otro ajuste después del conteo no se tocan (tanda 4) y se dice
+  cuáles hay que recontar.
 - **Ya revisado**: «Corregido el 22 sep por Daniel» / «No se usó (22 sep)».
 
 Las reglas de `revision_service.sugerir` no cambian: esto solo las cuenta.
@@ -191,12 +193,16 @@ def motivo_sin_accion(lineas: Iterable) -> str:
 
 # --- confirmaciones -----------------------------------------------------------------
 
-def boton_corregir(dias: int | None, diferencias: Iterable[int] | None = None) -> str:
+def boton_corregir(dias: int | None, diferencias: Iterable[int] | None = None, *, resumen=None) -> str:
     """El botón que confirma aplicar: dice la edad del conteo si ya es viejo.
 
     Si se pasan las `diferencias` y ninguna es distinta de 0, no se corrige
-    nada: el botón dice «Sí, marcar como revisado» (sin alarmar por la edad)."""
+    nada: el botón dice «Sí, marcar como revisado» (sin alarmar por la edad).
+    Lo mismo si el `resumen` dice que todas las de diferencia se saltan (tuvieron
+    otro ajuste después del conteo)."""
     if diferencias is not None and not any(int(d) != 0 for d in diferencias):
+        return BOTON_MARCAR_REVISADO
+    if resumen is not None and resumen.tallas_a_corregir == 0:
         return BOTON_MARCAR_REVISADO
     if dias is not None and dias >= DIAS_BOTON_VIEJO:
         return f"Sí, corregir con un conteo de hace {dias} días"
@@ -215,7 +221,7 @@ def texto_confirmar_aplicar(
     `diferencias` son las de los renglones que todavía no se ajustan (ya
     guardadas al capturar: contado − lo que decía el sistema). Con el
     `resumen` del ajuste (tanda 2) dice además el dinero y avisa de las tallas
-    que tuvieron otro ajuste después del conteo."""
+    que tuvieron otro ajuste después del conteo: esas no se tocan (tanda 4)."""
     difs = [int(d) for d in diferencias if int(d) != 0]
     dia = fecha_tienda(contado)
     el_dia = f"el {fecha_corta(dia)}" if dia else "en el conteo"
@@ -225,11 +231,16 @@ def texto_confirmar_aplicar(
             f"Ninguna talla tiene diferencia; solo se marca como revisado ({quien} contó {el_dia}).\n\n"
             "Tu pedido se guarda."
         )
-    if resumen is not None:
+    if resumen is not None and resumen.tallas_a_corregir == 0 and resumen.tallas_saltadas:
+        texto = (
+            f"Ninguna talla se corrige ({quien} contó {el_dia}). {texto_no_se_tocan(resumen)}\n\n"
+            "Solo se marca como revisado. Tu pedido se guarda."
+        )
+    elif resumen is not None:
         texto = f"A cada talla se le suma la diferencia que encontró {quien} {el_dia}. {texto_resumen_ajuste(resumen)}"
-        ojo = texto_ojo_ajuste_posterior(resumen)
-        if ojo:
-            texto += f"\n\n{ojo}"
+        no_se_tocan = texto_no_se_tocan(resumen)
+        if no_se_tocan:
+            texto += f"\n\n{no_se_tocan}"
         texto += "\n\nTu pedido se guarda."
     else:
         faltan = -sum(d for d in difs if d < 0)
@@ -240,7 +251,7 @@ def texto_confirmar_aplicar(
             "Tu pedido se guarda."
         )
     dias = dias_desde(dia, hoy)
-    # El «Ojo» de arriba ya nombra las tallas con otro ajuste: aquí solo lo vendido.
+    # Lo de arriba ya nombra las tallas con otro ajuste: aquí solo lo vendido.
     aviso = aviso_conteo_viejo(dias, resumen, con_ajustes=False)
     return texto + (f"\n\n⚠ {aviso}" if aviso else "")
 
@@ -312,24 +323,36 @@ def _tallas_con_fecha(tallas, varias: bool) -> str:
     return _y(nombres)
 
 
-def texto_ojo_ajuste_posterior(resumen) -> str:
-    """«Ojo: la talla 36 tuvo otro ajuste el 20 oct; se le suma la diferencia otra vez.»
+def texto_no_se_tocan(resumen) -> str:
+    """«La talla 36 no se toca: tuvo otro ajuste el 20 oct. Recuéntala.»
 
-    Solo las tallas que Aplicar todavía corrige; '' si ninguna tuvo otro ajuste."""
-    tallas = list(resumen.a_corregir_con_ajuste_posterior)
+    Las tallas con diferencia que tuvieron otro ajuste después del conteo:
+    Corregir no las toca (sumarles la diferencia vieja las corregiría dos
+    veces). '' si no hay."""
+    tallas = list(resumen.saltadas)
     if not tallas:
         return ""
     varias = _varias_prendas(resumen)
     if len(tallas) == 1:
         t = tallas[0]
-        nombre = f"la talla {t.talla}" if not varias else _nombre_talla(t, True)
-        return (
-            f"Ojo: {nombre} tuvo otro ajuste el {dia_mes(fecha_tienda(t.ajuste_posterior))}; "
-            "se le suma la diferencia otra vez."
-        )
+        nombre = f"La talla {t.talla}" if not varias else _nombre_talla(t, True)
+        return f"{nombre} no se toca: tuvo otro ajuste el {dia_mes(fecha_tienda(t.ajuste_posterior))}. Recuéntala."
     lista = _tallas_con_fecha(tallas, varias)
-    sujeto = f"las tallas {lista}" if not varias else lista
-    return f"Ojo: {sujeto} tuvieron otro ajuste después del conteo; se les suma la diferencia otra vez."
+    sujeto = f"Las tallas {lista}" if not varias else lista[:1].upper() + lista[1:]
+    return f"{sujeto} no se tocan: tuvieron otro ajuste después del conteo. Recuéntalas."
+
+
+def texto_no_se_tocaron(resumen) -> str:
+    """Para «✓ Listo»: «La talla 36 no se tocó (tuvo otro ajuste): recuéntala.»
+    / «3 tallas no se tocaron (tuvieron otro ajuste): recuéntalas.»; '' si ninguna."""
+    tallas = list(resumen.saltadas) if resumen is not None else []
+    if not tallas:
+        return ""
+    if len(tallas) == 1:
+        t = tallas[0]
+        nombre = f"La talla {t.talla}" if not _varias_prendas(resumen) else _nombre_talla(t, True)
+        return f"{nombre} no se tocó (tuvo otro ajuste): recuéntala."
+    return f"{len(tallas)} tallas no se tocaron (tuvieron otro ajuste): recuéntalas."
 
 
 def texto_desde_entonces(resumen, *, con_ajustes: bool = True, corto: bool = False) -> str:
@@ -363,13 +386,20 @@ def texto_talla_ajuste(t) -> str:
     dif = "cuadra" if t.diferencia == 0 else (f"{_MENOS}{-t.diferencia}" if t.diferencia < 0 else f"+{t.diferencia}")
     partes = [f"el sistema decía {t.stock_sistema}, contó {t.conto} ({dif})"]
     partes.append(f"vendidas desde el conteo {t.vendidas_desde}")
+    otro = f"otro ajuste el {dia_mes(fecha_tienda(t.ajuste_posterior))}" if t.ajuste_posterior is not None else ""
     if t.ajustado:
         partes.append(f"ya corregida; hoy hay {t.tienda_hoy}")
+    elif getattr(t, "no_se_corrigio", False):
+        partes.append(f"no se corrigió ({otro or 'otro ajuste'}); hoy hay {t.tienda_hoy}")
+        otro = ""
+    elif t.diferencia and t.ajuste_posterior is not None:
+        partes.append(f"no se toca ({otro}): recontar; hoy hay {t.tienda_hoy}")
+        otro = ""
     elif t.diferencia:
         queda = f"queda hoy {t.queda_hoy}"
         partes.append(queda + (" (recontar)" if t.queda_hoy < 0 else ""))
-    if t.ajuste_posterior is not None:
-        partes.append(f"otro ajuste el {dia_mes(fecha_tienda(t.ajuste_posterior))}")
+    if otro:
+        partes.append(otro)
     return " · ".join(partes)
 
 

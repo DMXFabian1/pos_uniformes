@@ -20,15 +20,28 @@ Para cada talla de una jornada dice lo que de verdad pasa al corregir:
   ajustada, es la tienda de hoy.
 - **ajuste posterior**: la fecha del primer `AJUSTE_ENTRADA`/`AJUSTE_SALIDA`
   de esa talla después del conteo que no sea el de este mismo renglón
-  (`CONTEO-<id>`): otro conteo aplicado o un ajuste a mano. Esas tallas
-  recibirían la diferencia otra vez. Los ajustes que hace sola la venta
-  (`libreta:N`, p. ej. el pants suelto que deja una chamarra, o una operación
-  borrada) y el stock calculado de un conjunto (`derivado:`) no cuentan: son
-  movimientos que la diferencia ya respeta.
+  (`CONTEO-<id>`): otro conteo aplicado, un ajuste a mano o el recuento de
+  una caja que subió el total. Todos cambian `stock_actual` (pasan por
+  `registrar_movimiento` o por `confirmar_ajustes_lote`). El recuento de caja
+  (`bodega_movil_service.corregir_caja`) solo deja movimiento de inventario
+  cuando la caja dice más de lo que el sistema tenía en total y sube el
+  total; lo demás de un recuento va en `BodegaMovimiento` y nunca contó aquí.
+  Los ajustes que hace sola la venta (`libreta:N`, p. ej. el pants suelto
+  que deja una chamarra, o una operación borrada) y el stock calculado de un
+  conjunto (`derivado:`) no cuentan: son movimientos que la diferencia ya
+  respeta.
+- **se salta** (tanda 4, decisión de Daniel): una talla con diferencia y con
+  otro ajuste después del conteo **no se corrige** al aplicar, porque
+  sumarle la diferencia vieja la corregiría dos veces. Queda `ajustado =
+  False`, su «queda hoy» es la tienda de hoy, no entra al total y hay que
+  recontarla. `aplicar_jornada` usa esta misma definición
+  (`ajustes_posteriores`) dentro de su transacción, y deja en `notas` del
+  renglón «No se corrigió: otro ajuste el 20 oct» (`con_nota_no_corregida`)
+  para la historia y el Historial.
 
 Y el total: tallas a corregir, piezas que entran y que salen, el valor a
-precio de venta, lo vendido desde el conteo y cuántas tallas tuvieron otro
-ajuste. Solo lee; no cambia la regla de aplicar ni la de sugerir.
+precio de venta, lo vendido desde el conteo, cuántas tallas tuvieron otro
+ajuste y cuántas se saltan. Solo lee; no cambia la regla de sugerir.
 
 Pocas consultas: los renglones de la jornada, las cajas, la Libreta desde el
 conteo más viejo y los ajustes desde ahí (más el reparto de conjuntos de
@@ -38,6 +51,7 @@ conteo más viejo y los ajustes desde ahí (más el reparto de conjuntos de
 from __future__ import annotations
 
 from collections import defaultdict
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -69,6 +83,37 @@ def referencia_de(conteo_id: int) -> str:
     return f"CONTEO-{int(conteo_id)}"
 
 
+# --- la marca en `notas` de una talla que se saltó a propósito -----------------------
+
+#: Lo que `aplicar_jornada` deja en `notas` del renglón que no corrigió.
+#: `notas` ya puede traer «Pedido: N» de la hoja: se agrega con « · ».
+MARCA_NO_CORREGIDA = "No se corrigió: otro ajuste"
+#: Cómo se ve después en la historia, el Historial y la ventana ya revisada.
+TEXTO_NO_CORREGIDA = "no se corrigió (otro ajuste)"
+
+
+def nota_no_corregida(ajuste_posterior: datetime | None) -> str:
+    """«No se corrigió: otro ajuste el 20 oct» (la fecha en la tienda)."""
+    from pos_uniformes.services.conteo_revision_vista_service import dia_mes, fecha_tienda
+
+    dia = fecha_tienda(ajuste_posterior)
+    return f"{MARCA_NO_CORREGIDA} el {dia_mes(dia)}" if dia else MARCA_NO_CORREGIDA
+
+
+def con_nota_no_corregida(notas: str | None, ajuste_posterior: datetime | None) -> str:
+    """Las notas del renglón con la marca agregada (sin repetirla)."""
+    actual = (notas or "").strip()
+    if MARCA_NO_CORREGIDA in actual:
+        return actual
+    nota = nota_no_corregida(ajuste_posterior)
+    return f"{actual} · {nota}" if actual else nota
+
+
+def es_no_corregida(notas: str | None) -> bool:
+    """¿El renglón se saltó a propósito al aplicar (tanda 4)?"""
+    return MARCA_NO_CORREGIDA in (notas or "")
+
+
 @dataclass(frozen=True)
 class TallaResumen:
     conteo_id: int
@@ -84,11 +129,23 @@ class TallaResumen:
     queda_hoy: int                  # lo que dirá el sistema en tienda al corregir
     precio_venta: Decimal | None    # None si la talla no tiene precio
     ajuste_posterior: datetime | None   # el primer ajuste ajeno después del conteo
+    no_se_corrigio: bool = False    # ya aplicada: se saltó a propósito (marca en `notas`)
+
+    @property
+    def pendiente(self) -> bool:
+        """Trae diferencia y todavía no se ajusta."""
+        return not self.ajustado and self.diferencia != 0
+
+    @property
+    def se_salta(self) -> bool:
+        """Trae diferencia, pero tuvo otro ajuste después del conteo: Aplicar
+        no la toca (le sumaría la diferencia dos veces). Hay que recontarla."""
+        return self.pendiente and self.ajuste_posterior is not None
 
     @property
     def por_corregir(self) -> bool:
-        """Aplicar todavía la mueve (mismo criterio que `aplicar_jornada`)."""
-        return not self.ajustado and self.diferencia != 0
+        """Aplicar la mueve (el criterio de `aplicar_jornada`)."""
+        return self.pendiente and self.ajuste_posterior is None
 
     @property
     def valor(self) -> Decimal | None:
@@ -109,6 +166,7 @@ class ResumenAjuste:
     tallas_sin_precio: int          # a corregir y sin precio: no entran al valor
     vendidas_desde: int
     tallas_con_ajuste_posterior: int
+    tallas_saltadas: int = 0        # con diferencia y otro ajuste después: no se tocan
 
     @property
     def a_corregir(self) -> tuple[TallaResumen, ...]:
@@ -119,9 +177,9 @@ class ResumenAjuste:
         return tuple(t for t in self.tallas if t.ajuste_posterior is not None)
 
     @property
-    def a_corregir_con_ajuste_posterior(self) -> tuple[TallaResumen, ...]:
-        """Las que recibirían la diferencia otra vez si se aplica hoy."""
-        return tuple(t for t in self.tallas if t.por_corregir and t.ajuste_posterior is not None)
+    def saltadas(self) -> tuple[TallaResumen, ...]:
+        """Las que Aplicar deja sin tocar porque tuvieron otro ajuste: a recontar."""
+        return tuple(t for t in self.tallas if t.se_salta)
 
     @property
     def piezas_netas(self) -> int:
@@ -140,9 +198,11 @@ def _precio(valor) -> Decimal | None:
     return precio if precio > 0 else None
 
 
-def queda_hoy(*, tienda_hoy: int, diferencia: int, ajustado: bool) -> int:
-    """Lo que dirá el sistema en tienda después de corregir (como hace Aplicar)."""
-    return int(tienda_hoy) if ajustado else int(tienda_hoy) + int(diferencia)
+def queda_hoy(*, tienda_hoy: int, diferencia: int, ajustado: bool, se_salta: bool = False) -> int:
+    """Lo que dirá el sistema en tienda después de corregir (como hace Aplicar).
+
+    Ya ajustada, o saltada por otro ajuste posterior: la tienda de hoy (no se suma)."""
+    return int(tienda_hoy) if (ajustado or se_salta) else int(tienda_hoy) + int(diferencia)
 
 
 def resumir(tallas, *, jornada_id: int = 0) -> ResumenAjuste:
@@ -162,6 +222,7 @@ def resumir(tallas, *, jornada_id: int = 0) -> ResumenAjuste:
         tallas_sin_precio=sum(1 for t in corregir if t.precio_venta is None),
         vendidas_desde=sum(t.vendidas_desde for t in tallas),
         tallas_con_ajuste_posterior=sum(1 for t in tallas if t.ajuste_posterior is not None),
+        tallas_saltadas=sum(1 for t in tallas if t.se_salta),
     )
 
 
@@ -245,6 +306,37 @@ def _ajustes_desde(session: Session, variante_ids: list[int], desde: datetime) -
     return out
 
 
+def primer_ajuste_posterior(
+    ajustes: Iterable[tuple[datetime, str]], *, contado: datetime | None, conteo_id: int,
+) -> datetime | None:
+    """De los ajustes de una talla, el primero después del conteo que no sea el propio."""
+    if contado is None:
+        return None
+    propia = referencia_de(conteo_id)
+    posteriores = [m for m, ref in ajustes if m > contado and ref != propia]
+    return min(posteriores) if posteriores else None
+
+
+def ajustes_posteriores(session: Session, renglones: Iterable[ConteoInventario]) -> dict[int, datetime]:
+    """{conteo_id: primer ajuste ajeno después de su conteo} de esos renglones,
+    en una consulta. Es la única definición de «otro ajuste»: la usan el
+    resumen (la pantalla) y `aplicar_jornada` (para saltar esas tallas)."""
+    renglones = list(renglones)
+    contados = [c.contado_at for c in renglones if c.contado_at is not None]
+    if not contados:
+        return {}
+    desde = min(contados, key=_utc)
+    ajustes = _ajustes_desde(session, sorted({int(c.variante_id) for c in renglones}), desde)
+    out: dict[int, datetime] = {}
+    for c in renglones:
+        primero = primer_ajuste_posterior(
+            ajustes.get(int(c.variante_id), []), contado=_utc(c.contado_at), conteo_id=int(c.id),
+        )
+        if primero is not None:
+            out[int(c.id)] = primero
+    return out
+
+
 def resumen_de_jornada(session: Session, jornada: ConteoJornada) -> ResumenAjuste:
     """Por talla y en total, lo que Aplicar le haría hoy al inventario."""
     filas = session.execute(
@@ -262,21 +354,18 @@ def resumen_de_jornada(session: Session, jornada: ConteoJornada) -> ResumenAjust
     desde_raw = min(contados_raw, key=_utc) if contados_raw else None
     cajas = _en_cajas_por_variante(session, variante_ids)
     salidas = _salidas_libreta(session, desde_raw) if desde_raw is not None else {}
-    ajustes = _ajustes_desde(session, variante_ids, desde_raw) if desde_raw is not None else {}
+    posteriores = ajustes_posteriores(session, [c for c, _v, _p in filas])
 
     tallas: list[TallaResumen] = []
     for conteo, variante, producto in filas:
         contado = _utc(conteo.contado_at)
         sku = str(variante.sku or "")
         vendidas = sum(p for m, p in salidas.get(sku, []) if contado is not None and m > contado)
-        propia = referencia_de(conteo.id)
-        posteriores = sorted(
-            m for m, ref in ajustes.get(int(variante.id), [])
-            if contado is not None and m > contado and ref != propia
-        )
+        posterior = posteriores.get(int(conteo.id))
         tienda = int(variante.stock_actual or 0) - cajas.get(int(variante.id), 0)
         diferencia = int(conteo.diferencia)
         ajustado = bool(conteo.ajustado)
+        se_salta = not ajustado and diferencia != 0 and posterior is not None
         tallas.append(TallaResumen(
             conteo_id=int(conteo.id),
             variante_id=int(variante.id),
@@ -288,8 +377,9 @@ def resumen_de_jornada(session: Session, jornada: ConteoJornada) -> ResumenAjust
             ajustado=ajustado,
             vendidas_desde=max(0, vendidas),
             tienda_hoy=tienda,
-            queda_hoy=queda_hoy(tienda_hoy=tienda, diferencia=diferencia, ajustado=ajustado),
+            queda_hoy=queda_hoy(tienda_hoy=tienda, diferencia=diferencia, ajustado=ajustado, se_salta=se_salta),
             precio_venta=_precio(variante.precio_venta),
-            ajuste_posterior=posteriores[0] if posteriores else None,
+            ajuste_posterior=posterior,
+            no_se_corrigio=es_no_corregida(conteo.notas),
         ))
     return resumir(tallas, jornada_id=jornada.id)

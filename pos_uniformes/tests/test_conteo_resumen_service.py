@@ -43,10 +43,11 @@ VENDIDAS_86 = {"16": 5, "32": 2, "34": 2, "38": 1, "40": 3}
 def _tallita(talla: str, *, sistema: int, conto: int, diferencia: int | None = None, ajustado: bool = False,
              vendidas: int = 0, tienda: int = 0, precio="100", ajuste=None, producto: str = "Playera") -> rs.TallaResumen:
     dif = conto - sistema if diferencia is None else diferencia
+    salta = not ajustado and dif != 0 and ajuste is not None
     return rs.TallaResumen(
         conteo_id=hash(talla) % 1000, variante_id=1, producto=producto, talla=talla, stock_sistema=sistema,
         conto=conto, diferencia=dif, ajustado=ajustado, vendidas_desde=vendidas, tienda_hoy=tienda,
-        queda_hoy=rs.queda_hoy(tienda_hoy=tienda, diferencia=dif, ajustado=ajustado),
+        queda_hoy=rs.queda_hoy(tienda_hoy=tienda, diferencia=dif, ajustado=ajustado, se_salta=salta),
         precio_venta=None if precio is None else Decimal(precio), ajuste_posterior=ajuste,
     )
 
@@ -160,7 +161,8 @@ class CasoJornada86Tests(_Base):
     def test_los_textos(self) -> None:
         r = rs.resumen_de_jornada(self.s, self.j)
         self.assertEqual(vista.texto_resumen_ajuste(r), "Se corrigen 4 tallas: faltan 7, sobran 0 (−$1,385 a precio de venta).")
-        self.assertEqual(vista.texto_ojo_ajuste_posterior(r), "")
+        self.assertEqual(vista.texto_no_se_tocan(r), "")
+        self.assertEqual(r.tallas_saltadas, 0)
         self.assertEqual(
             vista.aviso_conteo_viejo(41, r),
             "Conteo de hace 41 días: desde entonces se vendieron 13 piezas. Conviene recontar antes de corregir.",
@@ -171,17 +173,22 @@ class CasoJornada86Tests(_Base):
         self.assertIn("A cada talla se le suma la diferencia que encontró Stayce el lun 5 oct.", texto)
         self.assertIn("Se corrigen 4 tallas: faltan 7, sobran 0 (−$1,385 a precio de venta).", texto)
         self.assertIn("desde entonces se vendieron 13 piezas", texto)
-        self.assertNotIn("Ojo", texto)
+        self.assertNotIn("no se toca", texto)
 
     def test_con_otro_ajuste_en_la_36(self) -> None:
         self._ajuste(self.vs["36"], datetime(2026, 10, 20, 18, 0), -2)
         r = rs.resumen_de_jornada(self.s, self.j)
         self.assertEqual(self._por_talla(r)["36"].ajuste_posterior.date(), date(2026, 10, 20))
         self.assertEqual(r.tallas_con_ajuste_posterior, 1)
-        self.assertEqual(
-            vista.texto_ojo_ajuste_posterior(r),
-            "Ojo: la talla 36 tuvo otro ajuste el 20 oct; se le suma la diferencia otra vez.",
-        )
+        # Tanda 4: la 36 no se corrige; queda hoy = tienda hoy y sale de los totales.
+        t36 = self._por_talla(r)["36"]
+        self.assertTrue(t36.se_salta)
+        self.assertFalse(t36.por_corregir)
+        self.assertEqual(t36.queda_hoy, t36.tienda_hoy)
+        self.assertEqual((r.tallas_a_corregir, r.tallas_saltadas, r.salen), (3, 1, 6))
+        self.assertEqual(r.valor, Decimal("-1180"))
+        self.assertEqual([t.talla for t in r.saltadas], ["36"])
+        self.assertEqual(vista.texto_no_se_tocan(r), "La talla 36 no se toca: tuvo otro ajuste el 20 oct. Recuéntala.")
         self.assertEqual(
             vista.aviso_conteo_viejo(41, r),
             "Conteo de hace 41 días: desde entonces se vendieron 13 piezas y la talla 36 (20 oct) tuvo otro ajuste. "
@@ -208,7 +215,9 @@ class CasoJornada86Tests(_Base):
         texto = vista.texto_confirmar_aplicar(
             quien="Stayce", contado=CONTADO, diferencias=[t.diferencia for t in r.a_corregir], hoy=HOY, resumen=r,
         )
-        self.assertIn("Ojo: la talla 36 tuvo otro ajuste el 20 oct; se le suma la diferencia otra vez.", texto)
+        self.assertIn("Se corrigen 3 tallas: faltan 6, sobran 0 (−$1,180 a precio de venta).", texto)
+        self.assertIn("La talla 36 no se toca: tuvo otro ajuste el 20 oct. Recuéntala.", texto)
+        self.assertNotIn("se le suma la diferencia otra vez", texto)
         self.assertIn("⚠ Conteo de hace 41 días: desde entonces se vendieron 13 piezas. Conviene recontar", texto)
         self.assertEqual(texto.count("36"), 1)
 
@@ -370,13 +379,33 @@ class ResumirPuroTests(unittest.TestCase):
             _tallita("38", sistema=2, conto=2, ajuste=datetime(2026, 10, 21, 18)),   # sin diferencia: no recibe nada
         ])
         self.assertEqual(
-            vista.texto_ojo_ajuste_posterior(r),
-            "Ojo: las tallas 32 (18 oct) y 36 (20 oct) tuvieron otro ajuste después del conteo; se les suma la diferencia otra vez.",
+            vista.texto_no_se_tocan(r),
+            "Las tallas 32 (18 oct) y 36 (20 oct) no se tocan: tuvieron otro ajuste después del conteo. Recuéntalas.",
         )
+        self.assertEqual((r.tallas_a_corregir, r.tallas_saltadas), (0, 2))
+        self.assertEqual(vista.texto_no_se_tocaron(r), "2 tallas no se tocaron (tuvieron otro ajuste): recuéntalas.")
         self.assertEqual(
             vista.texto_desde_entonces(r),
             "desde entonces las tallas 32 (18 oct), 36 (20 oct) y 38 (21 oct) tuvieron otro ajuste",
         )
+
+    def test_si_todas_las_de_diferencia_se_saltan_solo_se_marca_revisado(self) -> None:
+        r = rs.resumir([
+            _tallita("36", sistema=19, conto=18, tienda=17, ajuste=datetime(2026, 10, 20, 18)),
+            _tallita("38", sistema=2, conto=2, tienda=2),
+        ])
+        self.assertEqual((r.tallas_a_corregir, r.tallas_saltadas, r.valor), (0, 1, Decimal("0")))
+        self.assertEqual(r.tallas[0].queda_hoy, 17)                 # no se suma
+        texto = vista.texto_confirmar_aplicar(
+            quien="Stayce", contado=datetime(2026, 10, 5, 17), diferencias=[-1], hoy=date(2026, 10, 7), resumen=r,
+        )
+        self.assertEqual(
+            texto,
+            "Ninguna talla se corrige (Stayce contó el lun 5 oct). La talla 36 no se toca: tuvo otro ajuste el 20 oct. "
+            "Recuéntala.\n\nSolo se marca como revisado. Tu pedido se guarda.",
+        )
+        self.assertEqual(vista.boton_corregir(41, [-1], resumen=r), vista.BOTON_MARCAR_REVISADO)
+        self.assertEqual(vista.boton_corregir(41, [-1]), "Sí, corregir con un conteo de hace 41 días")
 
     def test_con_varias_prendas_dice_cual(self) -> None:
         r = rs.resumir([
@@ -384,9 +413,10 @@ class ResumirPuroTests(unittest.TestCase):
             _tallita("10", sistema=4, conto=4, producto="Playera"),
         ])
         self.assertEqual(
-            vista.texto_ojo_ajuste_posterior(r),
-            "Ojo: Pants 2pz 10 tuvo otro ajuste el 20 oct; se le suma la diferencia otra vez.",
+            vista.texto_no_se_tocan(r),
+            "Pants 2pz 10 no se toca: tuvo otro ajuste el 20 oct. Recuéntala.",
         )
+        self.assertEqual(vista.texto_no_se_tocaron(r), "Pants 2pz 10 no se tocó (tuvo otro ajuste): recuéntala.")
 
     def test_sin_nada_que_decir(self) -> None:
         r = rs.resumir([_tallita("6", sistema=5, conto=5)])
@@ -405,7 +435,12 @@ class ResumirPuroTests(unittest.TestCase):
         t = _tallita("10", sistema=2, conto=0, vendidas=1, tienda=1, ajuste=datetime(2026, 10, 20, 18))
         self.assertEqual(
             vista.texto_talla_ajuste(t),
-            "el sistema decía 2, contó 0 (−2) · vendidas desde el conteo 1 · queda hoy -1 (recontar) · otro ajuste el 20 oct",
+            "el sistema decía 2, contó 0 (−2) · vendidas desde el conteo 1 · no se toca (otro ajuste el 20 oct): recontar; hoy hay 1",
+        )
+        t = _tallita("8", sistema=2, conto=2, tienda=1, ajuste=datetime(2026, 10, 20, 18))
+        self.assertEqual(
+            vista.texto_talla_ajuste(t),
+            "el sistema decía 2, contó 2 (cuadra) · vendidas desde el conteo 0 · otro ajuste el 20 oct",
         )
         t = _tallita("6", sistema=4, conto=4, tienda=4)
         self.assertEqual(vista.texto_talla_ajuste(t), "el sistema decía 4, contó 4 (cuadra) · vendidas desde el conteo 0")

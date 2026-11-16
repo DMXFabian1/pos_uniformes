@@ -514,12 +514,10 @@ def hoja_de_jornada(session: Session, jornada: ConteoJornada) -> dict:
     capturado = {}
     quien_por_vid = {int(vid): primer_nombre(por) for vid, _f, _n, por in filas}
     for vid, fisico, notas, _por in filas:
-        pedido = None
-        if notas and str(notas).startswith("Pedido:"):
-            try:
-                pedido = int(str(notas).split(":", 1)[1])
-            except ValueError:
-                pedido = None
+        # «Pedido: N», aunque luego se le agregue «· No se corrigió: …» (tanda 4).
+        from pos_uniformes.services.revision_service import _ellas_sugieren
+
+        pedido = _ellas_sugieren(notas) if notas and str(notas).startswith("Pedido:") else None
         capturado[int(vid)] = (int(fisico), pedido)
     grupos = alcance(session, jornada.escuela_id, jornada.tipo_pieza, getattr(jornada, "prenda", ""))
     prendas = []
@@ -710,31 +708,68 @@ def _no_revisada(jornada: ConteoJornada) -> None:
         raise JornadaYaRevisada(f"Este conteo ya se revisó: {hecho}. No se puede volver a aplicar ni descartar.")
 
 
-def aplicar_jornada(session: Session, jornada: ConteoJornada, *, revisada_por: str) -> tuple[int, int]:
-    """Aplica al inventario TODAS las diferencias de la jornada. Solo el dueño.
+class Aplicado(tuple):
+    """Lo que hizo `aplicar_jornada`: se desempaca como (ajustados, omitidos),
+    igual que antes, y trae además las tallas que se saltaron (tanda 4)."""
 
-    Devuelve (ajustados, omitidos) igual que `confirmar_ajustes_lote`.
+    saltadas: dict[int, datetime]
+
+    def __new__(cls, ajustados: int, omitidos: int, saltadas: dict[int, datetime] | None = None):
+        obj = super().__new__(cls, (int(ajustados), int(omitidos)))
+        obj.saltadas = dict(saltadas or {})
+        return obj
+
+    @property
+    def ajustados(self) -> int:
+        return self[0]
+
+    @property
+    def omitidos(self) -> int:
+        return self[1]
+
+
+def aplicar_jornada(session: Session, jornada: ConteoJornada, *, revisada_por: str) -> Aplicado:
+    """Aplica al inventario las diferencias de la jornada. Solo el dueño.
+
+    Tanda 4 (decisión de Daniel, 2026-11-15): una talla con diferencia que
+    tuvo **otro ajuste después del conteo** (otro conteo aplicado, un ajuste a
+    mano o el recuento de una caja que subió el total) NO se corrige: sumarle
+    la diferencia vieja la corregiría dos veces. Se queda `ajustado = False`,
+    con «No se corrigió: otro ajuste el 20 oct» en sus notas, para recontarla.
+    La decisión se toma aquí, con la jornada bloqueada y la misma definición
+    que enseña la pantalla (`conteo_resumen_service.ajustes_posteriores`), no
+    con lo que la pantalla leyó antes. La jornada sí queda revisada.
+
+    Devuelve `Aplicado`: (ajustados, omitidos) como `confirmar_ajustes_lote`,
+    y `.saltadas` = {conteo_id: fecha del otro ajuste}.
     """
+    from pos_uniformes.services.conteo_resumen_service import ajustes_posteriores, con_nota_no_corregida
     from pos_uniformes.services.conteo_service import confirmar_ajustes_lote
 
     if (revisada_por or "").strip().upper() != DUENO_CODE:
         raise PermissionError("Solo el dueño aplica un conteo al inventario.")
     jornada = _bloquear_sin_revisar(session, jornada)
-    ids = list(
+    pendientes = list(
         session.scalars(
-            select(ConteoInventario.id).where(
+            select(ConteoInventario).where(
                 ConteoInventario.jornada_id == jornada.id,
                 ConteoInventario.ajustado.is_(False),
                 ConteoInventario.diferencia != 0,
-            )
+            ).order_by(ConteoInventario.id)
         ).all()
     )
+    saltadas = ajustes_posteriores(session, pendientes)
+    ids = [int(c.id) for c in pendientes if int(c.id) not in saltadas]
     ajustados, omitidos = confirmar_ajustes_lote(session, ids, revisada_por) if ids else (0, 0)
+    for c in pendientes:
+        if int(c.id) in saltadas:
+            c.notas = con_nota_no_corregida(c.notas, saltadas[int(c.id)])
+            session.add(c)
     jornada.revisada_at = func.now()
     jornada.revisada_por = revisada_por.strip().upper()
     session.add(jornada)
     session.flush()
-    return ajustados, omitidos
+    return Aplicado(ajustados, omitidos, saltadas)
 
 
 def descartar_jornada(session: Session, jornada: ConteoJornada, *, revisada_por: str) -> None:

@@ -892,8 +892,10 @@ class RevisionDialogTests(unittest.TestCase):
         with patch(f"{_D}._elegir", return_value="no") as preg:
             d._aplicar()
         texto = preg.call_args.args[2]
-        self.assertIn("Ojo: la talla 6 tuvo otro ajuste el ", texto)
-        self.assertIn("se le suma la diferencia otra vez.", texto)
+        # Tanda 4: esa talla no se toca al corregir; hay que recontarla.
+        self.assertIn("La talla 6 no se toca: tuvo otro ajuste el ", texto)
+        self.assertIn("Recuéntala.", texto)
+        self.assertNotIn("se le suma la diferencia otra vez", texto)
 
     def test_descartada_dice_que_no_se_uso(self) -> None:
         d = self._dialogo()
