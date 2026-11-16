@@ -121,9 +121,12 @@ def aviso_conteo_viejo(dias: int | None, resumen=None, *, con_ajustes: bool = Tr
     if dias is None or dias < DIAS_AVISO_VIEJO:
         return ""
     desde = texto_desde_entonces(resumen, con_ajustes=con_ajustes, corto=corto) if resumen is not None else ""
+    # Si todas las de diferencia se saltan, Aplicar ya no corrige nada: solo recontar.
+    nada_que_corregir = resumen is not None and resumen.tallas_a_corregir == 0 and resumen.tallas_saltadas
+    cierre = "recontar" if nada_que_corregir else "recontar antes de corregir"
     if desde:
-        return f"Conteo de hace {dias} días: {desde}. Conviene recontar antes de corregir."
-    return f"Conteo de hace {dias} días: conviene recontar antes de corregir."
+        return f"Conteo de hace {dias} días: {desde}. Conviene {cierre}."
+    return f"Conteo de hace {dias} días: conviene {cierre}."
 
 
 # --- qué hacer con cada talla -------------------------------------------------------
@@ -237,7 +240,12 @@ def texto_confirmar_aplicar(
             "Solo se marca como revisado. Tu pedido se guarda."
         )
     elif resumen is not None:
-        texto = f"A cada talla se le suma la diferencia que encontró {quien} {el_dia}. {texto_resumen_ajuste(resumen)}"
+        if resumen.tallas_saltadas:
+            n = resumen.tallas_a_corregir
+            a_cuales = "A la talla que se corrige se le suma" if n == 1 else f"A las {n} tallas que se corrigen se les suma"
+        else:
+            a_cuales = "A cada talla se le suma"
+        texto = f"{a_cuales} la diferencia que encontró {quien} {el_dia}. {texto_resumen_ajuste(resumen)}"
         no_se_tocan = texto_no_se_tocan(resumen)
         if no_se_tocan:
             texto += f"\n\n{no_se_tocan}"
@@ -311,10 +319,17 @@ def texto_resumen_ajuste(resumen) -> str:
 _MAX_TALLAS_EN_TEXTO = 5
 
 
-def _tallas_con_fecha(tallas, varias: bool) -> str:
-    """'32 (18 oct) y 36 (20 oct)'; de 5 en adelante, '… y 3 más'."""
+def _fecha_comun(tallas) -> str:
+    """'20 oct' si todas tuvieron el otro ajuste el mismo día; '' si no."""
+    dias = {fecha_tienda(t.ajuste_posterior) for t in tallas}
+    return dia_mes(dias.pop()) if len(dias) == 1 and None not in dias else ""
+
+
+def _tallas_con_fecha(tallas, varias: bool, *, con_fecha: bool = True) -> str:
+    """'32 (18 oct) y 36 (20 oct)'; de 5 en adelante, '… y 3 más'. Sin
+    `con_fecha`, solo los nombres (cuando la fecha es la misma y se dice aparte)."""
     nombres = [
-        f"{_nombre_talla(t, varias)} ({dia_mes(fecha_tienda(t.ajuste_posterior))})"
+        _nombre_talla(t, varias) + (f" ({dia_mes(fecha_tienda(t.ajuste_posterior))})" if con_fecha else "")
         for t in tallas[:_MAX_TALLAS_EN_TEXTO]
     ]
     resto = len(tallas) - len(nombres)
@@ -337,9 +352,11 @@ def texto_no_se_tocan(resumen) -> str:
         t = tallas[0]
         nombre = f"La talla {t.talla}" if not varias else _nombre_talla(t, True)
         return f"{nombre} no se toca: tuvo otro ajuste el {dia_mes(fecha_tienda(t.ajuste_posterior))}. Recuéntala."
-    lista = _tallas_con_fecha(tallas, varias)
+    comun = _fecha_comun(tallas)
+    lista = _tallas_con_fecha(tallas, varias, con_fecha=not comun)
     sujeto = f"Las tallas {lista}" if not varias else lista[:1].upper() + lista[1:]
-    return f"{sujeto} no se tocan: tuvieron otro ajuste después del conteo. Recuéntalas."
+    cuando_fue = f"el {comun}" if comun else "después del conteo"
+    return f"{sujeto} no se tocan: tuvieron otro ajuste {cuando_fue}. Recuéntalas."
 
 
 def texto_no_se_tocaron(resumen) -> str:
@@ -369,13 +386,14 @@ def texto_desde_entonces(resumen, *, con_ajustes: bool = True, corto: bool = Fal
         partes.append(ajuste if partes else f"desde entonces {ajuste}")
     elif tallas:
         varias = _varias_prendas(resumen)
-        lista = _tallas_con_fecha(tallas, varias)
+        comun = _fecha_comun(tallas) if len(tallas) > 1 else ""
+        lista = _tallas_con_fecha(tallas, varias, con_fecha=not comun)
         if len(tallas) == 1:
             sujeto = f"la talla {lista}" if not varias else lista
             ajuste = f"{sujeto} tuvo otro ajuste"
         else:
             sujeto = f"las tallas {lista}" if not varias else lista
-            ajuste = f"{sujeto} tuvieron otro ajuste"
+            ajuste = f"{sujeto} tuvieron otro ajuste" + (f" ({comun})" if comun else "")
         partes.append(ajuste if partes else f"desde entonces {ajuste}")
     return " y ".join(partes)
 
@@ -412,14 +430,27 @@ BOTON_VOLVER = "Volver"
 
 # --- ya revisado --------------------------------------------------------------------
 
-def texto_ya_revisada(*, revisada_at: datetime | date | None, aplicada: bool, por: str = "") -> str:
-    """'Corregido el 22 sep por Daniel' / 'No se usó (22 sep)'; '' si no se ha revisado."""
+def texto_ya_revisada(
+    *, revisada_at: datetime | date | None, aplicada: bool, por: str = "", corregidas: int | None = None,
+) -> str:
+    """'Corregido el 22 sep por Daniel' / 'No se usó (22 sep)'; '' si no se ha revisado.
+
+    Con `corregidas` (tallas que de verdad se corrigieron, ver `tallas_corregidas`)
+    en 0: 'Revisado el 22 sep por Daniel (no se corrigió nada)': todas se saltaron
+    por otro ajuste, o ninguna traía diferencia."""
     dia = fecha_tienda(revisada_at)
     if dia is None:
         return ""
+    if aplicada and corregidas == 0:
+        return f"Revisado el {dia_mes(dia)}" + (f" por {por}" if por else "") + " (no se corrigió nada)"
     if aplicada:
         return f"Corregido el {dia_mes(dia)}" + (f" por {por}" if por else "")
     return f"No se usó ({dia_mes(dia)})"
+
+
+def tallas_corregidas(resumen) -> int:
+    """Del resumen de una jornada ya aplicada: cuántas tallas sí movió Aplicar."""
+    return sum(1 for t in resumen.tallas if t.ajustado and t.diferencia != 0)
 
 
 def ya_revisada(jornada) -> bool:

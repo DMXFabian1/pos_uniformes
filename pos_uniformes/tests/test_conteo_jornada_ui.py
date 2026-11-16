@@ -985,6 +985,10 @@ class RevisionDialogTests(unittest.TestCase):
         self.assertEqual(s.get(Variante, self.v_ids[0]).stock_actual, 9)
         self.assertIsNotNone(s.get(ConteoJornada, self.foto.id).revisada_at)
         s.close()
+        # Ya revisada: no dice «Corregido» si no se corrigió ninguna talla.
+        d2 = self._dialogo()
+        self.assertIn("(no se corrigió nada)", d2._revisada_label.text())
+        self.assertNotIn("Corregido", d2._revisada_label.text())
 
     def test_descartada_dice_que_no_se_uso(self) -> None:
         d = self._dialogo()

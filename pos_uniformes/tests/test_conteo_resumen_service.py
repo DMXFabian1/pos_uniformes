@@ -446,6 +446,81 @@ class ResumirPuroTests(unittest.TestCase):
         self.assertEqual(vista.texto_talla_ajuste(t), "el sistema decía 4, contó 4 (cuadra) · vendidas desde el conteo 0")
 
 
+class TextosConTallasSaltadasTests(unittest.TestCase):
+    """Revisión de la tanda 4 (2026-11-15): los textos cuando hay tallas que no se tocan."""
+
+    OTRO = datetime(2026, 10, 20, 18)
+
+    def _todas_saltadas(self):
+        return rs.resumir([
+            _tallita(t, sistema=10, conto=9, tienda=8, ajuste=self.OTRO) for t in ("8", "32", "34", "36")
+        ])
+
+    def test_misma_fecha_se_dice_una_vez(self) -> None:
+        r = self._todas_saltadas()
+        self.assertEqual(
+            vista.texto_no_se_tocan(r),
+            "Las tallas 8, 32, 34 y 36 no se tocan: tuvieron otro ajuste el 20 oct. Recuéntalas.",
+        )
+        self.assertEqual(vista.texto_desde_entonces(r), "desde entonces las tallas 8, 32, 34 y 36 tuvieron otro ajuste (20 oct)")
+
+    def test_fechas_distintas_van_por_talla(self) -> None:
+        r = rs.resumir([
+            _tallita("32", sistema=10, conto=9, ajuste=datetime(2026, 10, 18, 18)),
+            _tallita("36", sistema=10, conto=9, ajuste=self.OTRO),
+        ])
+        self.assertEqual(
+            vista.texto_no_se_tocan(r),
+            "Las tallas 32 (18 oct) y 36 (20 oct) no se tocan: tuvieron otro ajuste después del conteo. Recuéntalas.",
+        )
+
+    def test_si_todas_se_saltan_el_aviso_ya_no_dice_antes_de_corregir(self) -> None:
+        r = self._todas_saltadas()
+        self.assertEqual(
+            vista.aviso_conteo_viejo(41, r, corto=True),
+            "Conteo de hace 41 días: desde entonces 4 tallas tuvieron otro ajuste. Conviene recontar.",
+        )
+        texto = vista.texto_confirmar_aplicar(
+            quien="Stayce", contado=CONTADO, diferencias=[-1] * 4, hoy=HOY, resumen=r,
+        )
+        self.assertIn("Ninguna talla se corrige", texto)
+        self.assertNotIn("antes de corregir", texto)
+
+    def test_la_confirmacion_parcial_dice_a_cuales_se_les_suma(self) -> None:
+        r = rs.resumir([
+            _tallita("8", sistema=10, conto=9),
+            _tallita("32", sistema=10, conto=8),
+            _tallita("34", sistema=10, conto=9),
+            _tallita("36", sistema=10, conto=9, ajuste=self.OTRO),
+        ])
+        texto = vista.texto_confirmar_aplicar(
+            quien="Stayce", contado=CONTADO, diferencias=[-1, -2, -1, -1], hoy=HOY, resumen=r,
+        )
+        self.assertTrue(texto.startswith("A las 3 tallas que se corrigen se les suma la diferencia que encontró Stayce"))
+        self.assertNotIn("A cada talla", texto)
+        uno = rs.resumir([_tallita("8", sistema=10, conto=9), _tallita("36", sistema=10, conto=9, ajuste=self.OTRO)])
+        texto = vista.texto_confirmar_aplicar(quien="Stayce", contado=CONTADO, diferencias=[-1, -1], hoy=HOY, resumen=uno)
+        self.assertTrue(texto.startswith("A la talla que se corrige se le suma"))
+
+    def test_ya_revisada_sin_corregir_nada(self) -> None:
+        cuando = datetime(2026, 11, 15, 20)
+        self.assertEqual(
+            vista.texto_ya_revisada(revisada_at=cuando, aplicada=True, por="Daniel", corregidas=0),
+            "Revisado el 15 nov por Daniel (no se corrigió nada)",
+        )
+        self.assertEqual(
+            vista.texto_ya_revisada(revisada_at=cuando, aplicada=True, por="Daniel", corregidas=2),
+            "Corregido el 15 nov por Daniel",
+        )
+        self.assertEqual(vista.texto_ya_revisada(revisada_at=cuando, aplicada=False, corregidas=0), "No se usó (15 nov)")
+        r = rs.resumir([
+            _tallita("8", sistema=10, conto=9, ajustado=True, tienda=9),
+            _tallita("36", sistema=10, conto=9, tienda=8),        # se saltó: sigue sin ajustar
+            _tallita("6", sistema=4, conto=4, ajustado=True),       # cuadraba
+        ])
+        self.assertEqual(vista.tallas_corregidas(r), 1)
+
+
 class PesosTests(unittest.TestCase):
     def test_formato(self) -> None:
         self.assertEqual(vista.pesos(Decimal("1385")), "$1,385")

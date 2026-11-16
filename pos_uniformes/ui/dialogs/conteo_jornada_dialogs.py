@@ -992,7 +992,10 @@ class ConteoRevisionDialog(QDialog):
             revisada_txt = ""
             if self._ya_revisada:
                 por = mostrar(j.revisada_por, nombres_por_codigo(session)) if j.revisada_por else ""
-                revisada_txt = vista.texto_ya_revisada(revisada_at=j.revisada_at, aplicada=self._aplicada, por=por)
+                revisada_txt = vista.texto_ya_revisada(
+                    revisada_at=j.revisada_at, aplicada=self._aplicada, por=por,
+                    corregidas=vista.tallas_corregidas(self._ajuste),
+                )
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Error", f"No se pudo leer la jornada:\n{exc}")
             self._revision = None
