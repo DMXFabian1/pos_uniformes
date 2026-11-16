@@ -80,6 +80,10 @@ class Mundo:
     leer_marca: Callable[[str], str]
     escribir_marca: Callable[[str, str], None]
     traer: Callable[[], bool] = lambda: True
+    # ¿El programa de ese commit conoce la revisión que tiene ahora la base?
+    # True/False, o None si no se puede saber. Un kiosko con un programa que
+    # no la conoce NO abre («Programa desactualizado»).
+    version_conoce_base: Callable[[str], bool | None] = lambda _commit: None
     decir: Callable[[str], None] = print
     hechos: list[str] = field(default_factory=list)
 
@@ -93,6 +97,14 @@ def _mismo(a: str | None, b: str | None) -> bool:
     """Dos claves de commit son la misma aunque una sea más corta."""
     a, b = (a or "").strip().lower(), (b or "").strip().lower()
     return bool(a) and bool(b) and (a.startswith(b) or b.startswith(a))
+
+
+def _commit_de_version(texto: str | None) -> str | None:
+    """«2026.11.05+aaa1111» → «aaa1111». Sin «+», no se sabe el commit."""
+    texto = (texto or "").strip()
+    if "+" not in texto:
+        return None
+    return texto.rsplit("+", 1)[-1].strip() or None
 
 
 def actualizar(m: Mundo, *, al_abrir: bool = False, traer: bool = False) -> Resultado:
@@ -207,7 +219,21 @@ def actualizar(m: Mundo, *, al_abrir: bool = False, traer: bool = False) -> Resu
     if falta_publicar:
         m.decir("Publicando a los kioskos (se guarda la versión anterior)...")
         if not m.publicar():
-            m.escribir_marca(MARCA_FALLIDA, "")      # el código nuevo es el bueno: la base ya migró
+            # El código nuevo es el bueno: la base ya migró. Sin la marca de
+            # fallida, el siguiente «abrir POS» vuelve a construir y publicar.
+            m.escribir_marca(MARCA_FALLIDA, "")
+            # ¿Los kioskos abren con lo que tienen? Solo si su programa conoce
+            # la revisión de la base. Si no se puede saber, se supone que no
+            # cuando en esta corrida se migró.
+            conoce = m.version_conoce_base(publicado) if publicado else None
+            if conoce is False or (conoce is None and "migrar" in pasos):
+                return _fin(
+                    FALLO_PUBLICAR,
+                    f"🛑 Actualización a {ahora}: la base ya se migró pero NO se pudo publicar a los "
+                    f"kioskos: con la versión que tienen ({publicado or 'ninguna'}) NO van a abrir. "
+                    "Reintenta ya con scripts\\actualizar_pc_principal.bat (también se reintenta "
+                    "solo al abrir el POS en esta PC).",
+                )
             return _fin(
                 FALLO_PUBLICAR,
                 f"⚠️ Actualización a {ahora}: la base quedó al día pero NO se pudo publicar a los "
@@ -238,12 +264,18 @@ def actualizar(m: Mundo, *, al_abrir: bool = False, traer: bool = False) -> Resu
 def volver_kioskos(
     *, carpeta: Path, commit_actual: str, escribir_marca: Callable[[str, str], None],
     avisar: Callable[[str], None], decir: Callable[[str], None] = print,
+    conoce_base: Callable[[str], bool | None] = lambda _commit: None,
 ) -> tuple[bool, str]:
     """Intercambia lo publicado con la versión anterior. Los kioskos la toman al abrir.
 
-    La base no se regresa: un kiosko más viejo que la base abre igual
-    (`assert_database_ready` lo deja pasar desde el 2026-09-22). Y la
-    publicación queda en pausa para este commit: si no, el siguiente
+    La base no se regresa. Un kiosko más viejo que la base abre igual SOLO si
+    su programa conoce la revisión que tiene la base; si entre esa versión y
+    la base hubo una migración que no conoce, no abre («Programa
+    desactualizado», 13-nov-2026). Por eso, si `conoce_base` dice que no, NO
+    se vuelve: los kioskos se quedan con lo de ahora, que sí abre. Si no se
+    puede saber, se vuelve pero se avisa cómo deshacerlo.
+
+    La publicación queda en pausa para este commit: si no, el siguiente
     «abrir POS» vería que lo publicado no es lo de ahora y lo republicaría."""
     actual = carpeta / "PresupuestosSatelite"
     anterior = carpeta / "PresupuestosSatelite_anterior"
@@ -252,6 +284,18 @@ def volver_kioskos(
         decir(texto)
         return False, texto
     vuelve_a = (anterior / "VERSION.txt").read_text(encoding="utf-8").strip()
+    commit_anterior = _commit_de_version(vuelve_a)
+    conoce = conoce_base(commit_anterior) if commit_anterior else None
+    if conoce is False:
+        texto = (
+            f"🛑 No se vuelve a la versión {vuelve_a}: la base ya tiene migraciones que esa versión "
+            "no conoce, y con ella los kioskos NO abrirían. Se quedan con la versión de ahora. "
+            "Si la de ahora tiene un problema, hay que arreglarlo con un cambio nuevo (la base "
+            "no se regresa)."
+        )
+        decir(texto)
+        avisar(texto)
+        return False, texto
     temporal = carpeta / "PresupuestosSatelite_cambio"
     try:
         if temporal.exists():
@@ -279,6 +323,11 @@ def volver_kioskos(
         f"actualizaciones»). La publicación de {commit_actual} queda en pausa hasta que llegue "
         "un cambio nuevo. Para deshacer esto, corre de nuevo volver_version_anterior.bat."
     )
+    if conoce is None:
+        texto += (
+            "\n⚠️ No se pudo comprobar que esa versión conozca la base. Si un kiosko dice "
+            "«Programa desactualizado», corre de nuevo volver_version_anterior.bat para deshacerlo."
+        )
     decir(texto)
     avisar(texto)
     return True, texto
@@ -331,7 +380,45 @@ def _commit_publicado() -> str | None:
         texto = (carpeta_updates() / "PresupuestosSatelite" / "VERSION.txt").read_text(encoding="utf-8").strip()
     except OSError:
         return None
-    return texto.rsplit("+", 1)[-1].strip() or None if "+" in texto else None
+    return _commit_de_version(texto)
+
+
+_CARPETA_MIGRACIONES = "pos_uniformes/migrations/versions"
+
+
+def conoce_revisiones(
+    commit: str, revisiones: tuple[str, ...],
+    git: Callable[..., tuple[int, str]] | None = None,
+) -> bool | None:
+    """¿Las migraciones de ese commit definen todas esas revisiones?
+
+    Se busca en git, en el código de ESE commit, la línea `revision = "…"` de
+    cada una. True/False, o None si git no contesta (commit desconocido, sin
+    git…): ante la duda no se afirma nada."""
+    git = git or _git
+    if not commit or not revisiones:
+        return None
+    for revision in revisiones:
+        codigo, _salida = git(
+            "grep", "-q", "-E", f"^revision(: *str)? *= *[\"']{revision}[\"']",
+            commit, "--", _CARPETA_MIGRACIONES,
+        )
+        if codigo == 1:          # git grep: 1 = no está
+            return False
+        if codigo != 0:          # otro error: no se sabe
+            return None
+    return True
+
+
+def _version_conoce_base(commit: str) -> bool | None:
+    """¿El programa de ese commit conoce la revisión que tiene ahora la base?"""
+    try:
+        from pos_uniformes.database.preflight import inspect_database_status
+
+        cabezas = inspect_database_status().current_heads
+    except Exception:  # noqa: BLE001 — sin base, no se sabe
+        return None
+    return conoce_revisiones(commit, tuple(cabezas))
 
 
 def _migraciones_pendientes() -> bool:
@@ -419,6 +506,7 @@ def mundo_real() -> Mundo:
         leer_marca=_leer_marca,
         escribir_marca=_escribir_marca,
         traer=lambda: _git("pull", "--ff-only", timeout=300)[0] == 0,
+        version_conoce_base=_version_conoce_base,
     )
 
 
@@ -457,6 +545,7 @@ def main(argv: list[str] | None = None) -> int:
         ok, _texto = volver_kioskos(
             carpeta=carpeta_updates(), commit_actual=m.commit_actual(),
             escribir_marca=m.escribir_marca, avisar=m.avisar,
+            conoce_base=m.version_conoce_base,
         )
         return 0 if ok else 1
     try:

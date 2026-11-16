@@ -18,13 +18,16 @@ class _Falso:
     """Un mundo de mentira que anota lo que se le pide, en orden."""
 
     def __init__(self, *, ahora="bbb2222", publicado="aaa1111", pendientes=True, share=True,
-                 build=True, respaldo=True, migrar=True, publicar=True, volver=True, traer=True):
+                 build=True, respaldo=True, migrar=True, publicar=True, volver=True, traer=True,
+                 conoce=None):
         self.hechos: list[str] = []
         self.avisos: list[str] = []
         self.marcas: dict[str, str] = {}
         self.ahora, self.publicado = ahora, publicado
         self._r = dict(build=build, respaldo=respaldo, migrar=migrar, publicar=publicar, volver=volver, traer=traer)
         self.pendientes, self.share = pendientes, share
+        self.conoce = conoce                    # ¿la versión de los kioskos conoce la base?
+        self.preguntas_conoce: list[str] = []
 
     def _hacer(self, que: str) -> bool:
         self.hechos.append(que)
@@ -47,6 +50,10 @@ class _Falso:
             self.ahora = commit
         return self._r["volver"]
 
+    def _conoce(self, commit: str):
+        self.preguntas_conoce.append(commit)
+        return self.conoce
+
     def mundo(self) -> act.Mundo:
         return act.Mundo(
             commit_actual=lambda: self.ahora,
@@ -65,6 +72,7 @@ class _Falso:
             leer_marca=lambda n: self.marcas.get(n, ""),
             escribir_marca=lambda n, v: self.marcas.__setitem__(n, v) if v else self.marcas.pop(n, None),
             traer=lambda: self._hacer("traer"),
+            version_conoce_base=self._conoce,
             decir=lambda _t: None,
         )
 
@@ -151,6 +159,47 @@ class TropiezosTests(unittest.TestCase):
         self.assertNotIn(act.MARCA_FALLIDA, f.marcas)
         self.assertEqual(f.ahora, "bbb2222")
 
+    def test_si_falla_publicar_tras_migrar_el_aviso_es_urgente(self) -> None:
+        # 13-nov-2026: con una migración de por medio, la versión que tienen los
+        # kioskos NO abre. Decir «abre igual» era mentira.
+        f = _Falso(publicar=False)
+        r = act.actualizar(f.mundo())
+        self.assertEqual(r.que, act.FALLO_PUBLICAR)
+        self.assertTrue(f.avisos[0].startswith("🛑"))
+        self.assertIn("la base ya se migró pero NO se pudo publicar a los kioskos", f.avisos[0])
+        self.assertIn("(aaa1111) NO van a abrir", f.avisos[0])
+        self.assertIn("scripts\\actualizar_pc_principal.bat", f.avisos[0])
+        self.assertNotIn("abre igual", f.avisos[0])
+        self.assertEqual(f.preguntas_conoce, ["aaa1111"])
+
+    def test_si_falla_publicar_sin_migrar_abre_igual_es_verdad(self) -> None:
+        f = _Falso(publicar=False, pendientes=False)
+        r = act.actualizar(f.mundo())
+        self.assertEqual(r.que, act.FALLO_PUBLICAR)
+        self.assertIn("que abre igual", f.avisos[0])
+        self.assertTrue(f.avisos[0].startswith("⚠️"))
+
+    def test_si_la_version_de_los_kioskos_no_conoce_la_base_es_urgente_aunque_no_se_migre_ahora(self) -> None:
+        # Se migró en una corrida anterior que tampoco pudo publicar.
+        f = _Falso(publicar=False, pendientes=False, conoce=False)
+        act.actualizar(f.mundo())
+        self.assertIn("NO van a abrir", f.avisos[0])
+
+    def test_si_la_version_de_los_kioskos_si_conoce_la_base_abre_igual_aunque_se_migre(self) -> None:
+        f = _Falso(publicar=False, conoce=True)
+        act.actualizar(f.mundo())
+        self.assertIn("que abre igual", f.avisos[0])
+
+    def test_tras_fallar_publicar_al_abrir_el_pos_si_se_reintenta(self) -> None:
+        f = _Falso(publicar=False)
+        act.actualizar(f.mundo())                       # migra, pero no publica
+        f.hechos.clear()
+        f.pendientes = False                            # la base ya quedó migrada
+        f._r["publicar"] = True
+        r = act.actualizar(f.mundo(), al_abrir=True)    # abrir_pos.bat
+        self.assertEqual(r.que, act.ACTUALIZADO)
+        self.assertEqual(f.hechos, ["build", "publicar"])
+
     def test_sin_base_no_se_decide_nada(self) -> None:
         f = _Falso(pendientes="sin base")
         r = act.actualizar(f.mundo())
@@ -205,6 +254,44 @@ class VolverTests(unittest.TestCase):
         self.assertEqual(marcas, {act.MARCA_PAUSA: "bbb2222"})
         self.assertIn("2026.11.05+aaa1111", avisos[0])
 
+    def _volver(self, raiz: Path, conoce):
+        marcas, avisos, preguntas = {}, [], []
+
+        def _conoce(commit):
+            preguntas.append(commit)
+            return conoce
+
+        ok, texto = act.volver_kioskos(
+            carpeta=raiz, commit_actual="bbb2222", escribir_marca=marcas.__setitem__,
+            avisar=avisos.append, decir=lambda _t: None, conoce_base=_conoce,
+        )
+        return ok, texto, marcas, avisos, preguntas
+
+    def test_no_vuelve_si_la_version_anterior_no_conoce_la_base(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            raiz = self._carpeta(d)
+            ok, texto, marcas, avisos, preguntas = self._volver(raiz, False)
+            self.assertFalse(ok)
+            self.assertEqual(preguntas, ["aaa1111"])
+            self.assertEqual((raiz / "PresupuestosSatelite" / "app.exe").read_text(), "nuevo")   # sin tocar
+        self.assertEqual(marcas, {})                    # sin pausa
+        self.assertIn("NO abrirían", avisos[0])
+        self.assertIn("Se quedan con la versión de ahora", texto)
+
+    def test_si_conoce_la_base_vuelve_sin_advertencia(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            ok, texto, marcas, _avisos, _p = self._volver(self._carpeta(d), True)
+        self.assertTrue(ok)
+        self.assertEqual(marcas, {act.MARCA_PAUSA: "bbb2222"})
+        self.assertNotIn("No se pudo comprobar", texto)
+
+    def test_si_no_se_sabe_vuelve_pero_avisa_como_deshacer(self) -> None:
+        with tempfile.TemporaryDirectory() as d:
+            ok, texto, _m, _a, _p = self._volver(self._carpeta(d), None)
+        self.assertTrue(ok)
+        self.assertIn("No se pudo comprobar que esa versión conozca la base", texto)
+        self.assertNotIn("abre igual", texto)
+
     def test_sin_version_anterior_no_toca_nada(self) -> None:
         with tempfile.TemporaryDirectory() as d:
             raiz = self._carpeta(d, con_anterior=False)
@@ -232,6 +319,47 @@ class VolverTests(unittest.TestCase):
         r = act.actualizar(f.mundo())
         self.assertEqual(f.hechos, ["respaldo", "migrar"])
         self.assertIn("en pausa", r.texto)
+
+
+class ConoceRevisionesTests(unittest.TestCase):
+    """Saber si un commit conoce una revisión: git grep en SUS migraciones."""
+
+    def _git(self, codigos: dict[str, int]):
+        llamadas = []
+
+        def git(*args, **_kw):
+            llamadas.append(args)
+            rev = next(r for r in codigos if r in args[3])
+            return codigos[rev], ""
+        return git, llamadas
+
+    def test_todas_conocidas(self) -> None:
+        git, llamadas = self._git({"c9a4": 0, "d1e2": 0})
+        self.assertTrue(act.conoce_revisiones("aaa1111", ("c9a4", "d1e2"), git=git))
+        self.assertEqual(llamadas[0][0], "grep")
+        self.assertIn("aaa1111", llamadas[0])
+        self.assertEqual(llamadas[0][-1], "pos_uniformes/migrations/versions")
+
+    def test_una_desconocida(self) -> None:
+        git, _ = self._git({"c9a4": 0, "d1e2": 1})
+        self.assertFalse(act.conoce_revisiones("aaa1111", ("c9a4", "d1e2"), git=git))
+
+    def test_git_no_contesta_no_se_sabe(self) -> None:
+        git, _ = self._git({"d1e2": 128})
+        self.assertIsNone(act.conoce_revisiones("zzz", ("d1e2",), git=git))
+        self.assertIsNone(act.conoce_revisiones("", ("d1e2",), git=git))
+
+    def test_el_patron_encuentra_la_revision_en_el_repo_de_verdad(self) -> None:
+        # Sin base: solo git sobre el propio repo (HEAD conoce la primera migración).
+        import re
+
+        archivo = next((Path(act.__file__).resolve().parents[1] / "migrations" / "versions").glob("*.py"))
+        m = re.search(r"^revision(?:: *str)? *= *[\"']([0-9a-z_]+)[\"']", archivo.read_text(encoding="utf-8"), re.M)
+        self.assertIsNotNone(m)
+        if act._git("rev-parse", "HEAD")[0] != 0:
+            self.skipTest("sin git")
+        self.assertTrue(act.conoce_revisiones("HEAD", (m.group(1),)))
+        self.assertFalse(act.conoce_revisiones("HEAD", ("ffffffffffff",)))
 
 
 class EstadoTests(unittest.TestCase):

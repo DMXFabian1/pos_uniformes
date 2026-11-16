@@ -5,7 +5,8 @@ rem  Para cuando la version nueva salio mala: intercambia
 rem  lo publicado con lo que habia antes. Cada kiosko la
 rem  toma al abrir (o con "Buscar actualizaciones").
 rem  Correrlo otra vez deshace el cambio.
-rem  La base NO se regresa: un kiosko viejo abre igual.
+rem  La base NO se regresa: si la version anterior no
+rem  conoce la base (hubo una migracion), NO se vuelve.
 rem =====================================================
 setlocal
 call "%~dp0actualizar_seguro.bat" --volver
