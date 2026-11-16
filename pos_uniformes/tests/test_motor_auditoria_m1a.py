@@ -433,12 +433,15 @@ class FuenteUnicaReglasTests(unittest.TestCase):
         r = ReglasCtx()
         contenido = {f.name: getattr(r, f.name) for f in dataclasses.fields(r)}
         self.assertEqual(contenido, {
-            "version": "2026-11-12",
+            "version": "2026-11-16",  # 2026-11-16: QR de descuento de temporada
             "pct_base_empleada": D("5"),
             "tope_pct_uniforme": D("10"),
             "categorias_no_uniforme": frozenset({"ropa casual", "temporada", "accesorio", "ropa interior", "deportivo casual"}),
             "pct_comision_tarjeta": D("4.5"),
             "pct_otra_persona": D("5"),
+            "qr_categorias": frozenset({"ropa casual", "temporada", "deportivo casual", "ropa interior"}),
+            "qr_minimo_15": D("600.00"),
+            "qr_vence": "2027-01-06",
         })
 
     def test_la_fotografia_guarda_la_clasificacion_aplicada(self) -> None:

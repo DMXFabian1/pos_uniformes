@@ -8,11 +8,22 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 CERO = Decimal("0.00")
 CIEN = Decimal("100")
+
+# QR de descuento de temporada (Daniel, 2026-11-16: «Sí, con candados»). Aquí
+# viven las reglas que usa el motor; `services/descuento_qr_service.py` las
+# reexporta junto con lo del escaneo (prefijo, código, intentos).
+QR_PORCENTAJES = (Decimal("5"), Decimal("10"), Decimal("15"))
+#: El 15 % pide al menos esto de ropa normal (a precio de lista).
+QR_MINIMO_15 = Decimal("600.00")
+#: Último día del descuento (incluido, hora local).
+QR_VENCE = date(2027, 1, 6)
+#: Ropa normal. «accesorio» no entra: calcetas y corbatas escolares son de uniforme.
+QR_CATEGORIAS_ROPA_NORMAL = frozenset({"ropa casual", "temporada", "deportivo casual", "ropa interior"})
 
 OFERTA = "oferta"
 LIQUIDACION = "liquidacion"
@@ -105,7 +116,8 @@ class Pago:
 
 @dataclass(frozen=True)
 class ReglasCtx:
-    version: str = "2026-11-12"  # regla B: Monedero sin la comisión de tarjeta
+    # 2026-11-16: QR de descuento de temporada (antes "2026-11-12", regla B).
+    version: str = "2026-11-16"
     pct_base_empleada: Decimal = Decimal("5")
     tope_pct_uniforme: Decimal = Decimal("10")
     categorias_no_uniforme: frozenset = frozenset(
@@ -113,6 +125,10 @@ class ReglasCtx:
     )
     pct_comision_tarjeta: Decimal = Decimal("4.5")
     pct_otra_persona: Decimal = Decimal("5")
+    # QR de descuento de temporada (2026-11-16, `descuento_qr_service`).
+    qr_categorias: frozenset = QR_CATEGORIAS_ROPA_NORMAL
+    qr_minimo_15: Decimal = QR_MINIMO_15
+    qr_vence: str = QR_VENCE.isoformat()   # último día, hora local
 
 
 @dataclass(frozen=True)
@@ -130,6 +146,9 @@ class EntradaVenta:
     pagos: tuple[Pago, ...] = ()                  # D6: si viene, manda sobre pago_tarjeta
     vendedora: str | None = None                  # D6
     reglas: ReglasCtx = field(default_factory=ReglasCtx)
+    # QR de temporada (2026-11-16): el % que eligió la empleada (5, 10 o 15)
+    # tras validar el QR. None = sin QR.
+    descuento_qr_pct: Decimal | None = None
 
 
 # ─── Validación ──────────────────────────────────────────────────────────
@@ -222,6 +241,14 @@ def validar(entrada: EntradaVenta) -> None:
     r = entrada.reglas
     for nombre in ("pct_base_empleada", "tope_pct_uniforme", "pct_comision_tarjeta", "pct_otra_persona"):
         _pct(nombre, getattr(r, nombre))
+    if entrada.descuento_qr_pct is not None:
+        if not isinstance(entrada.descuento_qr_pct, Decimal) or entrada.descuento_qr_pct not in QR_PORCENTAJES:
+            raise EntradaInvalida("descuento_qr_pct debe ser 5, 10 o 15")
+    _importe("qr_minimo_15", r.qr_minimo_15)
+    try:
+        datetime.fromisoformat(str(r.qr_vence))
+    except ValueError as exc:
+        raise EntradaInvalida("qr_vence no es una fecha") from exc
     for p in entrada.pagos:
         if not isinstance(p, Pago) or p.medio not in MEDIOS:
             raise EntradaInvalida("pagos: medio desconocido")
@@ -235,7 +262,7 @@ def validar(entrada: EntradaVenta) -> None:
 class Descuento:
     pct: Decimal            # el % de la línea; con piezas al base, el del nivel
     importe: Decimal
-    fuente: str | None      # "mayoreo" | "empleada" | "otra_persona" | None
+    fuente: str | None      # "mayoreo" | "empleada" | "otra_persona" | "qr_temporada" | None
 
 
 @dataclass(frozen=True)
@@ -261,6 +288,17 @@ class LineaCalculo:
     base_leal: Decimal
     comision_linea: Decimal                       # D6
     motivos: tuple[str, ...]
+    descuento_qr: Decimal = CERO                  # la parte del descuento que puso el QR
+
+
+@dataclass(frozen=True)
+class DescuentoQrCalculo:
+    """El QR de temporada en esta venta (2026-11-16)."""
+    pct_pedido: Decimal          # el que eligió la empleada
+    pct: Decimal                 # el que se aplicó (15 → 10 bajo el mínimo; 0 si no aplicó)
+    importe: Decimal             # lo que descontó el QR
+    base_elegible: Decimal       # ropa normal a precio de lista
+    motivo: str | None = None    # por qué no se aplicó como se pidió
 
 
 @dataclass(frozen=True)
@@ -299,3 +337,4 @@ class Calculo:
     base_leal_total: Decimal
     consumo_tope_total: Decimal
     motivos_ticket: tuple[str, ...]
+    descuento_qr: DescuentoQrCalculo | None = None

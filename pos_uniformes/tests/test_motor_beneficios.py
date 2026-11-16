@@ -704,7 +704,7 @@ class FotografiaTests(unittest.TestCase):
         self.assertEqual(a_json(a), a_json(b))
         self.assertEqual(huella(a), huella(b))
         self.assertEqual(a["version_motor"], VERSION_MOTOR)
-        self.assertEqual(a["version_reglas"], "2026-11-12")
+        self.assertEqual(a["version_reglas"], "2026-11-16")
 
     def test_importes_como_texto_y_campos_de_d6(self) -> None:
         e = self._entrada()
