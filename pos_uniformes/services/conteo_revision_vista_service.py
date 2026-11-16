@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from datetime import date, datetime, timezone
+from decimal import Decimal
 
 from pos_uniformes.services.revision_service import (
     BIEN,
@@ -107,10 +108,16 @@ def cuando_se_conto(momento: datetime | date | None, hoy: date | None = None) ->
     return f"{fecha_corta(dia)} · {hace_texto(dias_desde(dia, hoy))}"
 
 
-def aviso_conteo_viejo(dias: int | None) -> str:
-    """El aviso ámbar; '' si el conteo es de hace menos de `DIAS_AVISO_VIEJO` días."""
+def aviso_conteo_viejo(dias: int | None, resumen=None) -> str:
+    """El aviso ámbar; '' si el conteo es de hace menos de `DIAS_AVISO_VIEJO` días.
+
+    Con el `resumen` del ajuste (`conteo_resumen_service`) dice además lo vendido
+    desde entonces y las tallas que tuvieron otro ajuste."""
     if dias is None or dias < DIAS_AVISO_VIEJO:
         return ""
+    desde = texto_desde_entonces(resumen) if resumen is not None else ""
+    if desde:
+        return f"Conteo de hace {dias} días: {desde}. Conviene recontar antes de corregir."
     return f"Conteo de hace {dias} días: conviene recontar antes de corregir."
 
 
@@ -197,12 +204,15 @@ BOTON_MARCAR_REVISADO = "Sí, marcar como revisado"
 
 
 def texto_confirmar_aplicar(
-    *, quien: str, contado: datetime | date | None, diferencias: Iterable[int], hoy: date | None = None
+    *, quien: str, contado: datetime | date | None, diferencias: Iterable[int], hoy: date | None = None,
+    resumen=None,
 ) -> str:
     """Lo que de verdad hace Aplicar: suma la diferencia de aquel día a cada talla.
 
     `diferencias` son las de los renglones que todavía no se ajustan (ya
-    guardadas al capturar: contado − lo que decía el sistema)."""
+    guardadas al capturar: contado − lo que decía el sistema). Con el
+    `resumen` del ajuste (tanda 2) dice además el dinero y avisa de las tallas
+    que tuvieron otro ajuste después del conteo."""
     difs = [int(d) for d in diferencias if int(d) != 0]
     dia = fecha_tienda(contado)
     el_dia = f"el {fecha_corta(dia)}" if dia else "en el conteo"
@@ -212,16 +222,146 @@ def texto_confirmar_aplicar(
             f"Ninguna talla tiene diferencia; solo se marca como revisado ({quien} contó {el_dia}).\n\n"
             "Tu pedido se guarda."
         )
-    faltan = -sum(d for d in difs if d < 0)
-    sobran = sum(d for d in difs if d > 0)
-    texto = (
-        f"A cada talla se le suma la diferencia que encontró {quien} {el_dia}. "
-        f"Se corrigen {_tallas(len(difs))} (faltan {faltan}, sobran {sobran}).\n\n"
-        "Tu pedido se guarda."
-    )
+    if resumen is not None:
+        texto = f"A cada talla se le suma la diferencia que encontró {quien} {el_dia}. {texto_resumen_ajuste(resumen)}"
+        ojo = texto_ojo_ajuste_posterior(resumen)
+        if ojo:
+            texto += f"\n\n{ojo}"
+        texto += "\n\nTu pedido se guarda."
+    else:
+        faltan = -sum(d for d in difs if d < 0)
+        sobran = sum(d for d in difs if d > 0)
+        texto = (
+            f"A cada talla se le suma la diferencia que encontró {quien} {el_dia}. "
+            f"Se corrigen {_tallas(len(difs))} (faltan {faltan}, sobran {sobran}).\n\n"
+            "Tu pedido se guarda."
+        )
     dias = dias_desde(dia, hoy)
-    aviso = aviso_conteo_viejo(dias)
+    aviso = aviso_conteo_viejo(dias, resumen)
     return texto + (f"\n\n⚠ {aviso}" if aviso else "")
+
+
+# --- el resumen del ajuste (tanda 2) ------------------------------------------------
+
+_MENOS = "\u2212"   # «−», el signo de menos de verdad
+
+
+def pesos(valor, *, signo: bool = False) -> str:
+    """'$1,385' (con centavos solo si los hay); con `signo`: '−$1,385' / '+$300' / '$0'.
+
+    Mismo formato que el resto del POS (`telegram_cortes_service._pesos`)."""
+    monto = Decimal(str(valor or 0))
+    absoluto = abs(monto)
+    cifra = f"${absoluto:,.0f}" if absoluto == absoluto.to_integral_value() else f"${absoluto:,.2f}"
+    if monto < 0:
+        return f"{_MENOS}{cifra}" if signo else f"-{cifra}"
+    if signo and monto > 0:
+        return f"+{cifra}"
+    return cifra
+
+
+def _y(partes: list[str]) -> str:
+    """'a', 'a y b', 'a, b y c'."""
+    if len(partes) <= 1:
+        return "".join(partes)
+    return ", ".join(partes[:-1]) + " y " + partes[-1]
+
+
+def _nombre_talla(t, varias_prendas: bool) -> str:
+    """'36' o, si la jornada trae varias prendas, 'Playera Chazarilla 36'."""
+    if not varias_prendas:
+        return str(t.talla)
+    from pos_uniformes.services.conteo_hoja_carta_service import nombre_para_hoja
+
+    return f"{nombre_para_hoja(t.producto, '')} {t.talla}".strip()
+
+
+def _varias_prendas(resumen) -> bool:
+    return len({t.producto for t in resumen.tallas}) > 1
+
+
+def texto_resumen_ajuste(resumen) -> str:
+    """«Se corrigen 4 tallas: faltan 7, sobran 0 (−$1,385 a precio de venta).»"""
+    n = resumen.tallas_a_corregir
+    if n == 0:
+        return "Ninguna talla cambia."
+    verbo = "Se corrige" if n == 1 else "Se corrigen"
+    dinero = f"{pesos(resumen.valor, signo=True)} a precio de venta"
+    if resumen.tallas_sin_precio:
+        sin = resumen.tallas_sin_precio
+        dinero += "; 1 talla sin precio" if sin == 1 else f"; {sin} tallas sin precio"
+    return f"{verbo} {_tallas(n)}: faltan {resumen.salen}, sobran {resumen.entran} ({dinero})."
+
+
+_MAX_TALLAS_EN_TEXTO = 5
+
+
+def _tallas_con_fecha(tallas, varias: bool) -> str:
+    """'32 (18 oct) y 36 (20 oct)'; de 5 en adelante, '… y 3 más'."""
+    nombres = [
+        f"{_nombre_talla(t, varias)} ({dia_mes(fecha_tienda(t.ajuste_posterior))})"
+        for t in tallas[:_MAX_TALLAS_EN_TEXTO]
+    ]
+    resto = len(tallas) - len(nombres)
+    if resto > 0:
+        nombres.append(f"{resto} más")
+    return _y(nombres)
+
+
+def texto_ojo_ajuste_posterior(resumen) -> str:
+    """«Ojo: la talla 36 tuvo otro ajuste el 20 oct; se le suma la diferencia otra vez.»
+
+    Solo las tallas que Aplicar todavía corrige; '' si ninguna tuvo otro ajuste."""
+    tallas = list(resumen.a_corregir_con_ajuste_posterior)
+    if not tallas:
+        return ""
+    varias = _varias_prendas(resumen)
+    if len(tallas) == 1:
+        t = tallas[0]
+        nombre = f"la talla {t.talla}" if not varias else _nombre_talla(t, True)
+        return (
+            f"Ojo: {nombre} tuvo otro ajuste el {dia_mes(fecha_tienda(t.ajuste_posterior))}; "
+            "se le suma la diferencia otra vez."
+        )
+    lista = _tallas_con_fecha(tallas, varias)
+    sujeto = f"las tallas {lista}" if not varias else lista
+    return f"Ojo: {sujeto} tuvieron otro ajuste después del conteo; se les suma la diferencia otra vez."
+
+
+def texto_desde_entonces(resumen) -> str:
+    """«desde entonces se vendieron 13 piezas y la talla 36 tuvo otro ajuste (20 oct)»; '' si nada."""
+    partes = []
+    n = resumen.vendidas_desde
+    if n:
+        partes.append("desde entonces se vendió 1 pieza" if n == 1 else f"desde entonces se vendieron {n} piezas")
+    tallas = list(resumen.con_ajuste_posterior)
+    if tallas:
+        varias = _varias_prendas(resumen)
+        lista = _tallas_con_fecha(tallas, varias)
+        if len(tallas) == 1:
+            sujeto = f"la talla {lista}" if not varias else lista
+            ajuste = f"{sujeto} tuvo otro ajuste"
+        else:
+            sujeto = f"las tallas {lista}" if not varias else lista
+            ajuste = f"{sujeto} tuvieron otro ajuste"
+        partes.append(ajuste if partes else f"desde entonces {ajuste}")
+    return " y ".join(partes)
+
+
+def texto_talla_ajuste(t) -> str:
+    """Una línea para el «por qué» de una talla: «el sistema decía 10, contó 6 (−4) ·
+    vendidas desde el conteo 2 · queda hoy 4»."""
+    dif = "cuadra" if t.diferencia == 0 else (f"{_MENOS}{-t.diferencia}" if t.diferencia < 0 else f"+{t.diferencia}")
+    partes = [f"el sistema decía {t.stock_sistema}, contó {t.conto} ({dif})"]
+    partes.append(f"vendidas desde el conteo {t.vendidas_desde}")
+    if t.ajustado:
+        partes.append(f"ya corregida; hoy hay {t.tienda_hoy}")
+    elif t.diferencia:
+        queda = f"queda hoy {t.queda_hoy}"
+        partes.append(queda + (" (recontar)" if t.queda_hoy < 0 else ""))
+    if t.ajuste_posterior is not None:
+        partes.append(f"otro ajuste el {dia_mes(fecha_tienda(t.ajuste_posterior))}")
+    return " · ".join(partes)
 
 
 TEXTO_CONFIRMAR_DESCARTAR = (
