@@ -118,3 +118,15 @@ class VentanaTests(_Base):
     def test_el_buscador_filtra(self) -> None:
         self.d._buscar.setText("no existe tal escuela")
         self.assertEqual(self.d._lista.count(), 0)
+
+    def test_revisar_abre_la_ventana_nueva_sin_siguiente_por_revisar(self) -> None:
+        # Tanda 3 (2026-11-15): el Historial abre la misma Revisar, pero sin encadenar.
+        from unittest.mock import patch
+
+        self._elegir_escuela()
+        self.d._tabla.selectRow(1)
+        with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.ConteoRevisionDialog") as rev:
+            self.d._abrir_revision()
+        rev.assert_called_once()
+        self.assertIs(rev.call_args.kwargs["ofrecer_siguiente"], False)
+        self.assertEqual(rev.call_args.kwargs["revisada_por"], "VEND-1")

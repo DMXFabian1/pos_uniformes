@@ -306,7 +306,10 @@ class ConteoHistorialDialog(QDialog):
             return
         if foto is None:
             return
-        dlg = ConteoRevisionDialog(self, jornada=foto, revisada_por=DUENO_CODE, session_factory=self._session_factory)
+        # Desde el Historial no se encadena «Siguiente por revisar»: se vuelve aquí.
+        dlg = ConteoRevisionDialog(
+            self, jornada=foto, revisada_por=DUENO_CODE, session_factory=self._session_factory, ofrecer_siguiente=False,
+        )
         dlg.exec()
         self._cargar_conteos()
 

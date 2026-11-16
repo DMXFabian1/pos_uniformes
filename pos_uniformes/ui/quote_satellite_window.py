@@ -5840,7 +5840,10 @@ class QuoteSatelliteWindow(QMainWindow):
         self._refresh_conteos_vista()
 
     def _conteos_revisar(self, foto) -> None:
-        """El dueño revisa y aplica (o descarta) una jornada terminada."""
+        """El dueño revisa y corrige (o no usa) una jornada terminada.
+
+        Con «Siguiente por revisar» (en el «✓ Listo» de la ventana) se abre la
+        que sigue, para revisar en tanda sin volver a la tarjeta."""
         from pos_uniformes.services.conteo_jornada_service import DUENO_CODE
 
         if str(self._conteos_code or "") != DUENO_CODE:
@@ -5848,7 +5851,12 @@ class QuoteSatelliteWindow(QMainWindow):
             return
         from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import ConteoRevisionDialog
 
-        ConteoRevisionDialog(self, jornada=foto, revisada_por=DUENO_CODE).exec()
+        vistas: set[int] = set()
+        while foto is not None and int(foto.id) not in vistas:
+            vistas.add(int(foto.id))
+            dlg = ConteoRevisionDialog(self, jornada=foto, revisada_por=DUENO_CODE)
+            dlg.exec()
+            foto = getattr(dlg, "siguiente_jornada", None)
         self._refresh_conteo_banner()
         self._refresh_conteos_vista()
 

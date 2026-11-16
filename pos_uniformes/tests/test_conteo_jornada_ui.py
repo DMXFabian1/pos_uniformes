@@ -479,6 +479,28 @@ class RevisionDialogTests(unittest.TestCase):
         self.assertTrue(d._siguiente_btn.isHidden())
         self.assertTrue(d._listo_quedan.isHidden())
 
+    def test_el_kiosko_abre_la_siguiente_por_revisar(self) -> None:
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        otra = _foto(id=2, titulo="Dos")
+        abiertas = []
+
+        class _Falsa:
+            def __init__(self, _padre, *, jornada, revisada_por):
+                abiertas.append((jornada.id, revisada_por))
+                self.siguiente_jornada = otra if jornada.id == 1 else None
+
+            def exec(self):
+                return 1
+
+        w = SimpleNamespace(
+            _conteos_code="VEND-1", _set_status=lambda *_: None,
+            _refresh_conteo_banner=lambda: None, _refresh_conteos_vista=lambda: None,
+        )
+        with patch(f"{_D}.ConteoRevisionDialog", _Falsa):
+            QuoteSatelliteWindow._conteos_revisar(w, _foto(id=1))
+        self.assertEqual(abiertas, [(1, "VEND-1"), (2, "VEND-1")])
+
     def test_doble_clic_ya_no_abre_la_historia_y_consultar_si(self) -> None:
         # Reescrita (antes: test_doble_clic_en_una_fila_abre_la_historia): el doble
         # clic deja escribir en PEDIR; la historia está en «Consultar ▾».
