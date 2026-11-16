@@ -57,8 +57,10 @@ class MotorVentaMixin:
         items = self._items if items is None else items
         compradora = getattr(self, "_compradora", None)
         descuento = bool(getattr(self, "_discount_active", False))
-        if descuento and compradora is not None and compradora.tiene_nivel:
-            # Uniforme o no (máximo de 10 % en uniforme): solo importa con nivel.
+        pct_qr = getattr(self, "_descuento_qr_pct", None)
+        if (descuento and compradora is not None and compradora.tiene_nivel) or pct_qr:
+            # Uniforme o no (máximo de 10 % en uniforme): importa con nivel y
+            # con el QR de temporada (solo ropa normal, 2026-11-16).
             self._poner_categorias(items)
         cliente = getattr(self, "_cliente", None)
         usar_saldo = bool(getattr(self, "_usar_saldo", False)) and self._puede_usar_saldo() and bool(items)
@@ -75,6 +77,7 @@ class MotorVentaMixin:
             saldo_disponible=(cliente or {}).get("disponible") or _CERO,
             pago_tarjeta=pago_tarjeta,
             vendedora=getattr(self, "_employee_code", None),
+            descuento_qr_pct=pct_qr,
         )
 
     def _calculo_motor(self, items: list[dict] | None = None, *, pago_tarjeta: bool = False, fecha=None):

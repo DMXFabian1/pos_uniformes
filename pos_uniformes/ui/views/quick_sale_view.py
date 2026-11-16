@@ -56,6 +56,7 @@ from pos_uniformes.ui.helpers.quick_sale_compradora_helper import CompradoraEmpl
 from pos_uniformes.ui.helpers.quick_sale_rebaja_helper import RebajaVentaMixin
 from pos_uniformes.ui.helpers.quick_sale_folio_helper import FolioVentaMixin
 from pos_uniformes.ui.helpers.quick_sale_motor_helper import MotorVentaMixin
+from pos_uniformes.ui.helpers.quick_sale_descuento_qr_helper import DescuentoQrMixin
 from pos_uniformes.ui.helpers.quick_sale_monedero_helper import (
     MonederoVentaMixin,
     lineas_ticket_monedero,
@@ -317,10 +318,14 @@ def _totales_de_fotografia(foto: dict | None):
     from types import SimpleNamespace
 
     try:
+        qr = calc.get("descuento_qr") if isinstance(calc.get("descuento_qr"), dict) else {}
         return SimpleNamespace(
             subtotal=Decimal(str(calc["subtotal"])),
             descuento_total=Decimal(str(calc["descuento_total"])),
             total=Decimal(str(calc["total"])),
+            # QR de temporada (2026-11-16): su renglón al reimprimir.
+            qr_pct=Decimal(str(qr["pct"])) if qr.get("pct") else None,
+            qr_importe=Decimal(str(qr["importe"])) if qr.get("importe") else None,
         )
     except (KeyError, ArithmeticError, TypeError):
         return None
@@ -328,7 +333,7 @@ def _totales_de_fotografia(foto: dict | None):
 
 class QuickSaleWidget(
     ClienteRapidoMixin, ProgramaClienteMixin, MonederoVentaMixin, CompradoraEmpleadaMixin, RebajaVentaMixin,
-    MotorVentaMixin, FolioVentaMixin, QWidget
+    MotorVentaMixin, FolioVentaMixin, DescuentoQrMixin, QWidget
 ):
     #: Lo de hoy para el pie del gafete, leído en un hilo (el kiosko sin red no se congela).
     _pie_gafete_leido = pyqtSignal(object)
@@ -793,6 +798,8 @@ class QuickSaleWidget(
         cabeza_total.addStretch(1)
         cabeza_total.addWidget(self._chip_precio_especial)
         tb_layout.addLayout(cabeza_total)
+        # QR de temporada (2026-11-16): se ve y se quita aquí.
+        tb_layout.addWidget(self._build_chip_descuento_qr())
         self._filas_total: dict[str, tuple[QWidget, QLabel, QLabel]] = {}
 
         def _fila_total(clave: str) -> None:
@@ -898,7 +905,15 @@ class QuickSaleWidget(
         self._scan_hint.setText(self._SCAN_HINT_DEFAULT)
 
     def _on_scan_and_add(self) -> None:
-        sku = self._scan_input.text().strip().upper()
+        crudo = self._scan_input.text()
+        if self._es_qr_descuento(crudo):
+            # QR de temporada (2026-11-16): antes de pasarlo a mayúsculas, el
+            # código distingue. Se borra del campo de inmediato.
+            self._scan_input.clear()
+            self._on_qr_descuento(crudo)
+            self._scan_input.setFocus()
+            return
+        sku = crudo.strip().upper()
         if not sku:
             return
         if self._is_employee_badge_scan(sku):
@@ -1118,6 +1133,7 @@ class QuickSaleWidget(
         self._pintar_cliente_bar()
         self._pintar_programa_bar()
         self._pintar_compradora_card()
+        self._pintar_chip_descuento_qr()
         sin_cliente = getattr(self, "_sin_cliente", None)
         if sin_cliente is not None:
             sin_cliente.setVisible(getattr(self, "_cliente", None) is None)
@@ -1140,7 +1156,7 @@ class QuickSaleWidget(
             # que es descuento de empleada ni de quién.
             nombre = "Precio especial"
         else:
-            nombre = "Descuento"
+            nombre = self._nombre_descuento_qr_pantalla() or "Descuento"
         etiqueta.setText(nombre)
         valor.setText(f"−${descuento:,.2f}")
         w.setVisible(bool(self._items) and descuento > 0)
@@ -1386,6 +1402,7 @@ class QuickSaleWidget(
         if reply == QMessageBox.StandardButton.Yes:
             self._anotar_carrito_cancelado()
             self._items.clear()
+            self._limpiar_descuento_qr()
             self._refresh_items_table()
             self._refresh_totals()
             self._scan_input.setFocus()
@@ -2124,6 +2141,7 @@ class QuickSaleWidget(
 
     def _vaciar_carrito(self) -> None:
         self._items.clear()
+        self._limpiar_descuento_qr()
         self._compradora = None
         self._discount_active = False
         self._discount_check.setChecked(False)
@@ -3561,7 +3579,9 @@ class QuickSaleWidget(
         )
         lines.append(tk_row("Subtotal:", f"${tk_fmt(subtotal)}"))
         if discount > 0:
-            lines.append(tk_row(self._etiqueta_descuento_ticket(), f"-${tk_fmt(discount)}"))
+            # QR de temporada (2026-11-16): «Descuento autorizado N %» aparte.
+            for etiqueta, importe in self._renglones_descuento_ticket(discount):
+                lines.append(tk_row(etiqueta, f"-${tk_fmt(importe)}"))
         # El total entre dos reglas dobles: es lo primero que se busca al
         # mirar el papel, y antes pesaba lo mismo que «Subtotal».
         # El total en su propio recuadro doble: es lo primero que se busca al
@@ -3583,10 +3603,10 @@ class QuickSaleWidget(
         )
 
         secciones: list[list[str]] = []
-        # El descuento de mayoreo también es ahorro del cliente; el de
-        # empleada no se cuenta aquí.
-        mayoreo = discount if (discount > 0 and self._pct_descuento_programa()) else 0
-        ahorrado = texto_ahorro_total(items, mayoreo)
+        # El descuento de mayoreo y el del QR de temporada también son ahorro
+        # del cliente; el de empleada no se cuenta aquí.
+        extra = self._ahorro_extra_ticket(discount) if discount > 0 else 0
+        ahorrado = texto_ahorro_total(items, extra)
         if ahorrado:
             secciones.append([tk_center(ahorrado)])
         if monedero:
@@ -3716,7 +3736,8 @@ class QuickSaleWidget(
         lines.append(tk_mid())
         lines.append(tk_row("Subtotal:", f"${tk_fmt(subtotal)}"))
         if discount > 0:
-            lines.append(tk_row(self._etiqueta_descuento_ticket(), f"-${tk_fmt(discount)}"))
+            for etiqueta, importe in self._renglones_descuento_ticket(discount):
+                lines.append(tk_row(etiqueta, f"-${tk_fmt(importe)}"))
         lines.append(tk_dbl())
         lines.append(tk_row("TOTAL:", f"${tk_fmt(total)}"))
         lines.append(tk_mid())
@@ -3784,6 +3805,7 @@ class QuickSaleWidget(
         self._employee_code = None
         self._employee_name = None
         self._items.clear()
+        self._limpiar_descuento_qr()
         self._compradora = None
         self._discount_active = False
         self._discount_check.setChecked(False)
