@@ -17,7 +17,7 @@ cliente vio en el ticket.
 from __future__ import annotations
 
 from dataclasses import replace
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 
 from pos_uniformes.services.beneficios.contrato import (
@@ -176,6 +176,13 @@ def refrescar(session, entrada: EntradaVenta, *, cliente_id: int | None = None) 
             pct_nivel=estado.porcentaje if estado.tiene_nivel else None,
             restante_tope=estado.restante,
         )
+    if not sin_conexion and entrada.descuento_qr_pct:
+        # El vencimiento del QR con la fecha de la base, no con la del kiosko
+        # (revisión 2026-11-16): un reloj atrasado no alarga la temporada.
+        from pos_uniformes.services.descuento_qr_service import vencido_segun_la_base
+
+        if vencido_segun_la_base(session, vence=date.fromisoformat(str(entrada.reglas.qr_vence))):
+            cambios["descuento_qr_pct"] = None
     return replace(entrada, **cambios)
 
 

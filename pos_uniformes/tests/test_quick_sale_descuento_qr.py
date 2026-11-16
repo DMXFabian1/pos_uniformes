@@ -117,6 +117,13 @@ class EscaneoTests(_Kiosko):
             self._escanear(w).assert_not_called()
         self.assertEqual(self.avisos, ["El descuento de temporada terminó"])
 
+    def test_vencido_segun_la_base_no_cuenta_como_fallo(self) -> None:
+        w = self._kiosko([casual()])
+        self._escanear(w, resultado=dqr.VENCIDO)
+        self.assertEqual(self.avisos, ["El descuento de temporada terminó"])
+        self.assertIsNone(w._descuento_qr_pct)
+        self.assertEqual(self.contador._fallos, 0)
+
     def test_el_codigo_escaneado_no_se_anota_en_el_log(self) -> None:
         w = self._kiosko([casual()])
 

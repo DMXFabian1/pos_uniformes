@@ -138,6 +138,9 @@ def vencido(momento: datetime | date | None = None, *, vence: date = VENCE) -> b
 VALIDO = "valido"
 CODIGO_CONOCIDO = "codigo_conocido"
 NO_VALIDO = "no_valido"
+#: La base dice que la temporada ya terminó (aunque el reloj de la máquina
+#: diga otra cosa). No cuenta como intento equivocado.
+VENCIDO = "vencido"
 
 
 def _codigos_publicos() -> tuple[str, ...]:
@@ -191,8 +194,36 @@ def hash_guardado(session) -> str | None:
     return session.scalar(select(ConfiguracionNegocio.promo_authorization_code_hash).limit(1))
 
 
+def fecha_servidor(session) -> date | None:
+    """La fecha de hoy según la base (revisión 2026-11-16: el reloj de la PC
+    del kiosko se puede atrasar). None si no se pudo leer."""
+    try:
+        from sqlalchemy import func, select
+
+        valor = session.scalar(select(func.current_date()))
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning("QR de descuento: no se pudo leer la fecha de la base (%s)", type(exc).__name__)
+        return None
+    if isinstance(valor, datetime):
+        return valor.date()
+    if isinstance(valor, date):
+        return valor
+    try:
+        return date.fromisoformat(str(valor)[:10])
+    except ValueError:
+        return None
+
+
+def vencido_segun_la_base(session, *, vence: date = VENCE) -> bool:
+    hoy = fecha_servidor(session)
+    return hoy is not None and hoy > vence
+
+
 def validar_codigo(session, raw) -> str:
-    """Valida el QR escaneado contra la Configuración de la caja."""
+    """Valida el QR escaneado contra la Configuración de la caja. Antes, el
+    vencimiento con la fecha de la base."""
+    if vencido_segun_la_base(session):
+        return VENCIDO
     return validar_contra_hash(codigo_de(raw), hash_guardado(session))
 
 

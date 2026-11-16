@@ -76,6 +76,33 @@ class CandadosTests(unittest.TestCase):
         self.assertEqual(qr.validar_codigo(sesion, "DSCT-nada"), qr.NO_VALIDO)
 
 
+class FechaDeLaBaseTests(unittest.TestCase):
+    """Revisión 2026-11-16: el vencimiento se revisa con la fecha de la
+    base, no con el reloj de la máquina (que se puede atrasar)."""
+
+    def test_vencido_segun_la_base_aunque_la_maquina_diga_otra_cosa(self) -> None:
+        respuestas = {"fecha": date(2027, 1, 7)}
+
+        def scalar(consulta):
+            return respuestas["fecha"] if "current_date" in str(consulta).lower() else HASH
+
+        sesion = SimpleNamespace(scalar=scalar)
+        self.assertEqual(qr.validar_codigo(sesion, f"DSCT-{CODIGO}"), qr.VENCIDO)
+        respuestas["fecha"] = date(2027, 1, 6)
+        self.assertEqual(qr.validar_codigo(sesion, f"DSCT-{CODIGO}"), qr.VALIDO)
+
+    def test_fecha_de_la_base(self) -> None:
+        self.assertEqual(qr.fecha_servidor(SimpleNamespace(scalar=lambda _c: "2027-01-07")), date(2027, 1, 7))
+        self.assertEqual(qr.fecha_servidor(SimpleNamespace(scalar=lambda _c: datetime(2027, 1, 7, 3))),
+                         date(2027, 1, 7))
+        self.assertIsNone(qr.fecha_servidor(SimpleNamespace(scalar=lambda _c: "no es fecha")))
+
+        def _falla(_c):
+            raise RuntimeError("sin base")
+
+        self.assertIsNone(qr.fecha_servidor(SimpleNamespace(scalar=_falla)))
+
+
 class IntentosTests(unittest.TestCase):
     def _contador(self):
         self.ahora = 1000.0

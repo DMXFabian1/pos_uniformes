@@ -65,6 +65,9 @@ class DescuentoQrMixin:
             _logger.warning("QR de descuento: no se pudo validar (%s)", type(exc).__name__)
             QMessageBox.warning(self, _TITULO, dqr.TXT_SIN_CONEXION)
             return
+        if resultado == dqr.VENCIDO:
+            QMessageBox.warning(self, _TITULO, dqr.TXT_VENCIDO)
+            return
         if resultado == dqr.CODIGO_CONOCIDO:
             QMessageBox.warning(self, _TITULO, dqr.TXT_CODIGO_CONOCIDO)
             return

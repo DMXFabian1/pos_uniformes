@@ -10,7 +10,7 @@ from __future__ import annotations
 import dataclasses
 import unittest
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from decimal import Decimal
 
 from pos_uniformes.services import beneficios_carrito as bc
@@ -254,6 +254,28 @@ class ServidorTests(unittest.TestCase):
         foto["entrada"]["fecha_venta"] = datetime(2027, 3, 1, 18, tzinfo=timezone.utc).isoformat()
         c = calcular(entrada_desde_plano(foto["entrada"]))
         self.assertEqual(c.descuento_qr.pct, D("0"))
+
+    def test_el_servidor_usa_su_fecha_no_la_del_kiosko(self) -> None:
+        """Revisión 2026-11-16: un kiosko con el reloj atrasado no alarga el
+        descuento; el recálculo usa la fecha de la base."""
+        from types import SimpleNamespace
+
+        from pos_uniformes.services import beneficios_servidor as srv
+
+        e = venta([linea(1, "400"), linea(3, "180", "Oficial")], qr="10")   # el kiosko cree que es 20/nov
+        foto = fotografia(e, calcular(e))
+        pasado = SimpleNamespace(scalar=lambda _c: date(2027, 1, 7))
+        self.assertIsNone(srv.refrescar(pasado, entrada_desde_plano(foto["entrada"])).descuento_qr_pct)
+        nueva, dif = srv.recalcular(pasado, foto)
+        self.assertEqual(dif["total"], ("540.00", "580.00"))
+        # Dentro de la temporada (o sin poder leer la fecha) el QR se queda.
+        vigente = SimpleNamespace(scalar=lambda _c: date(2026, 11, 20))
+        self.assertEqual(srv.recalcular(vigente, foto)[1], {})
+
+        def _falla(_c):
+            raise RuntimeError("sin base")
+
+        self.assertEqual(srv.recalcular(SimpleNamespace(scalar=_falla), foto)[1], {})
 
     def test_desde_el_carrito(self) -> None:
         items = [{"sku": "SC1", "nombre": "Sudadera", "talla": "M", "precio": D("400"), "cantidad": 1,
