@@ -104,6 +104,43 @@ class IntentosTests(unittest.TestCase):
         self.assertFalse(c.fallo())
         self.assertFalse(c.bloqueado())
 
+    def test_el_bloqueo_sobrevive_a_reiniciar_la_app(self) -> None:
+        """Revisión 2026-11-16: cerrar y abrir el kiosko no da 3 intentos más."""
+        import tempfile
+        from pathlib import Path
+
+        d = Path(tempfile.mkdtemp())
+        ruta = d / "intentos.json"
+        self.ahora = 1000.0
+        reloj = lambda: self.ahora  # noqa: E731
+        c = qr.ContadorIntentos(reloj=reloj, archivo=lambda: ruta)
+        c.fallo()
+        c.fallo()
+        # «Reinicio»: un contador nuevo lee lo que dejó el anterior.
+        otro = qr.ContadorIntentos(reloj=reloj, archivo=lambda: ruta)
+        self.assertTrue(otro.fallo())
+        nuevo = qr.ContadorIntentos(reloj=reloj, archivo=lambda: ruta)
+        self.assertEqual(nuevo.segundos_bloqueado(), 300)
+        # En el archivo no va ningún código, solo la cuenta y la hora.
+        self.assertEqual(set(__import__("json").loads(ruta.read_text())), {"fallos", "hasta"})
+        self.ahora += 301
+        self.assertFalse(qr.ContadorIntentos(reloj=reloj, archivo=lambda: ruta).bloqueado())
+        nuevo.exito()
+        self.assertFalse(qr.ContadorIntentos(reloj=reloj, archivo=lambda: ruta).fallo())
+
+    def test_archivo_danado_no_tumba_la_venta(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        ruta = Path(tempfile.mkdtemp()) / "intentos.json"
+        ruta.write_text("{no es json")
+        c = qr.ContadorIntentos(reloj=lambda: 1000.0, archivo=lambda: ruta)
+        self.assertFalse(c.bloqueado())
+        self.assertFalse(c.fallo())
+
+    def test_el_de_la_maquina_guarda_en_su_carpeta_de_datos(self) -> None:
+        self.assertEqual(qr.ruta_intentos().name, "descuento_qr_intentos.json")
+
     def test_rechazo_previo_bloqueado(self) -> None:
         c = self._contador()
         for _ in range(3):

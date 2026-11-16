@@ -557,6 +557,8 @@ _RUTAS_DE_LA_MAQUINA = (
     ("pos_uniformes.services.bot_conexion_service", "ruta_estado"),
     ("pos_uniformes.utils.satellite_excepthook", "_log_path"),
     ("pos_uniformes.services.temporada_service", "ruta_bitacora"),
+    # intentos equivocados del QR de descuento (2026-11-16)
+    ("pos_uniformes.services.descuento_qr_service", "ruta_intentos"),
 )
 
 

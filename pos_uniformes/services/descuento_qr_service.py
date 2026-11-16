@@ -29,12 +29,15 @@ la sesión de quien llama. El aviso por Telegram está en
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import threading
 import time
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal
+from pathlib import Path
 from typing import Callable, Iterable
 
 from pos_uniformes.services.beneficios.contrato import (
@@ -196,28 +199,77 @@ def validar_codigo(session, raw) -> str:
 # ─── Intentos equivocados ────────────────────────────────────────────────
 
 
+def ruta_intentos() -> Path:
+    """Dónde se guarda la cuenta de intentos de esta máquina (solo la cuenta
+    y la hora en que termina el bloqueo; nunca el código)."""
+    from pos_uniformes.utils.config import satellite_data_dir
+
+    return satellite_data_dir() / "data" / "descuento_qr_intentos.json"
+
+
 class ContadorIntentos:
-    """Tres códigos equivocados SEGUIDOS bloquean 5 minutos (en este proceso,
-    o sea en esta máquina). Un código bueno reinicia la cuenta."""
+    """Tres códigos equivocados SEGUIDOS bloquean 5 minutos en esta máquina.
+    Un código bueno reinicia la cuenta.
+
+    Con `archivo`, la cuenta vive en disco: cerrar y abrir el POS o el
+    kiosko no regala intentos (revisión 2026-11-16). Por eso el reloj es el
+    de la pared, no el monotónico (que vuelve a cero al reiniciar). Si el
+    archivo no se puede leer o escribir, se sigue con lo que hay en memoria:
+    el contador nunca detiene la venta."""
 
     def __init__(self, *, max_fallos: int = MAX_FALLOS, minutos: float = MINUTOS_BLOQUEO,
-                 reloj: Callable[[], float] = time.monotonic):
+                 reloj: Callable[[], float] = time.time,
+                 archivo: Callable[[], Path] | None = None):
         self.max_fallos = max_fallos
         self.segundos = minutos * 60
         self._reloj = reloj
+        self._archivo = archivo
         self._fallos = 0
         self._hasta: float | None = None
         self._lock = threading.Lock()
 
+    # ─── Disco ───────────────────────────────────────────────────────────
+
+    def _leer(self) -> None:
+        if self._archivo is None:
+            return
+        try:
+            ruta = Path(self._archivo())
+            if not ruta.exists():
+                self._fallos, self._hasta = 0, None
+                return
+            datos = json.loads(ruta.read_text(encoding="utf-8"))
+            self._fallos = max(0, int(datos.get("fallos") or 0))
+            hasta = datos.get("hasta")
+            self._hasta = float(hasta) if hasta is not None else None
+        except Exception as exc:  # noqa: BLE001 — archivo dañado u ocupado
+            _logger.warning("QR de descuento: no se pudo leer la cuenta de intentos (%s)", type(exc).__name__)
+
+    def _guardar(self) -> None:
+        if self._archivo is None:
+            return
+        try:
+            ruta = Path(self._archivo())
+            ruta.parent.mkdir(parents=True, exist_ok=True)
+            tmp = ruta.with_name(ruta.name + ".tmp")
+            tmp.write_text(json.dumps({"fallos": self._fallos, "hasta": self._hasta}), encoding="utf-8")
+            os.replace(tmp, ruta)
+        except Exception as exc:  # noqa: BLE001
+            _logger.warning("QR de descuento: no se pudo guardar la cuenta de intentos (%s)", type(exc).__name__)
+
+    # ─── Cuenta ──────────────────────────────────────────────────────────
+
     def segundos_bloqueado(self) -> int:
         """0 si se puede intentar; si no, cuántos segundos faltan."""
         with self._lock:
+            self._leer()
             if self._hasta is None:
                 return 0
             falta = self._hasta - self._reloj()
             if falta <= 0:
                 self._hasta = None
                 self._fallos = 0
+                self._guardar()
                 return 0
             return int(falta + 0.999)
 
@@ -227,20 +279,24 @@ class ContadorIntentos:
     def fallo(self) -> bool:
         """Anota un código equivocado. True si con este quedó bloqueado."""
         with self._lock:
+            self._leer()
             self._fallos += 1
-            if self._fallos >= self.max_fallos:
+            bloqueado = self._fallos >= self.max_fallos
+            if bloqueado:
                 self._hasta = self._reloj() + self.segundos
-                return True
-            return False
+            self._guardar()
+            return bloqueado
 
     def exito(self) -> None:
         with self._lock:
             self._fallos = 0
             self._hasta = None
+            self._guardar()
 
 
-#: El de esta máquina (el kiosko y el POS corren un proceso cada uno).
-CONTADOR = ContadorIntentos()
+#: El de esta máquina (el kiosko y el POS corren un proceso cada uno; los
+#: dos leen el mismo archivo si están en la misma PC).
+CONTADOR = ContadorIntentos(archivo=lambda: ruta_intentos())
 
 
 def texto_bloqueado(segundos: int) -> str:
