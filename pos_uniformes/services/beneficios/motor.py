@@ -15,10 +15,12 @@ Orden de las reglas (§2.4 del diseño):
    el máximo de uniforme, «otra persona» al 5 % parejo (R2).
 3. Tope de empleada por pieza (C8, C9, P4): primero el mayor precio de lista.
    La pieza que cabe consume el tope aunque luego gane el mayoreo (A3).
-4. Gana el mayor; un descuento de $0 respeta la modalidad (C4).
+4. Gana el mayor (mayoreo, empleada o QR de temporada); un descuento de $0
+   respeta la modalidad (C4). El QR (2026-11-16) solo toca ropa normal.
 5. Redondeo R1 del ticket, repartido entre las líneas (I8, D2).
 6. Saldo (C2), repartido en proporción (Q2).
-7. Base y abono de Monedero (C2, C4, T9, D1 del código; la playera 3pz no gana).
+7. Base y abono de Monedero (C2, C4, T9, D1 del código; la playera 3pz no
+   gana; una línea con QR de temporada tampoco).
 8. Base de Leal (C1, C2).
 9. Comisión de tarjeta, una sola vez (T4).
 
@@ -30,6 +32,7 @@ No incluye devoluciones (M4/M5) ni H1–H8.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from datetime import date
 from decimal import ROUND_DOWN, ROUND_HALF_EVEN, Decimal
 
 from pos_uniformes.services.beneficios import motivos as M
@@ -43,6 +46,7 @@ from pos_uniformes.services.beneficios.contrato import (
     ORIGEN_KIOSKO_SIN_CONEXION,
     Calculo,
     Descuento,
+    DescuentoQrCalculo,
     EntradaInvalida,
     EntradaVenta,
     LineaCalculo,
@@ -59,11 +63,12 @@ from pos_uniformes.services.beneficios.reparto import (
     repartir_redondeo,
 )
 
-VERSION_MOTOR = "M1a-2026-11-13"  # 2026-11-13: la playera 3pz no genera Monedero
+VERSION_MOTOR = "M1a-2026-11-16"  # 2026-11-16: QR de descuento de temporada
 
 FUENTE_MAYOREO = "mayoreo"
 FUENTE_EMPLEADA = "empleada"
 FUENTE_OTRA_PERSONA = "otra_persona"
+FUENTE_QR = "qr_temporada"
 
 
 def _q(valor: Decimal) -> Decimal:
@@ -156,6 +161,8 @@ class _Desc:
     piezas_nivel: int = 0
     piezas_base: int = 0       # piezas con el % parejo de empleada (no las que ganó el mayoreo)
     consumo_tope: Decimal = CERO
+    importe_qr: Decimal = CERO  # la parte del importe que puso el QR
+    con_qr: bool = False        # alguna pieza se cobró con el QR (sin Monedero)
 
 
 def _es_uniforme(linea: LineaEntrada, entrada: EntradaVenta) -> bool:
@@ -163,16 +170,65 @@ def _es_uniforme(linea: LineaEntrada, entrada: EntradaVenta) -> bool:
     return categoria not in entrada.reglas.categorias_no_uniforme
 
 
-def _pct_y_fuente(pct_empleada: Decimal, pct_mayoreo: Decimal, fuente_empleada: str) -> tuple[Decimal, str | None]:
-    """Gana el mayor. En empate gana el mayoreo (es la modalidad elegida)."""
+def _pct_y_fuente(
+    pct_empleada: Decimal, pct_mayoreo: Decimal, fuente_empleada: str, pct_qr: Decimal = Decimal("0")
+) -> tuple[Decimal, str | None]:
+    """Gana el mayor; no se suman. En empate gana el mayoreo (es la modalidad
+    elegida) y el QR solo gana si es estrictamente mayor (2026-11-16)."""
     if pct_mayoreo > 0 and pct_mayoreo >= pct_empleada:
-        return pct_mayoreo, FUENTE_MAYOREO
-    if pct_empleada > 0:
-        return pct_empleada, fuente_empleada
-    return Decimal("0"), None
+        pct, fuente = pct_mayoreo, FUENTE_MAYOREO
+    elif pct_empleada > 0:
+        pct, fuente = pct_empleada, fuente_empleada
+    else:
+        pct, fuente = Decimal("0"), None
+    if pct_qr > 0 and pct_qr > pct:
+        return pct_qr, FUENTE_QR
+    return pct, fuente
 
 
-def _descuentos(grupos: list[_Grupo], entrada: EntradaVenta, motivos_ticket: list[str]) -> dict[str, _Desc]:
+def _qr_elegible(g: _Grupo, entrada: EntradaVenta) -> bool:
+    """Solo ropa normal: ni uniforme, ni rebaja, ni promo 3pz (2026-11-16)."""
+    if g.rebajada or g.es_3pz or g.base.playera_3pz:
+        return False
+    categoria = " ".join(str(g.base.categoria or "").split()).lower()
+    return categoria in entrada.reglas.qr_categorias
+
+
+def _fecha_local(entrada: EntradaVenta) -> date:
+    f = entrada.fecha_venta
+    return (f.astimezone() if f.tzinfo else f).date()
+
+
+def _descuento_qr(
+    grupos: list[_Grupo], entrada: EntradaVenta, motivos_ticket: list[str]
+) -> tuple[Decimal, DescuentoQrCalculo | None]:
+    """(% que se aplica a las líneas elegibles, resumen). Sin QR: (0, None).
+
+    Vencido o sin conexión no se aplica aunque venga en la entrada. El 15 %
+    bajo el mínimo de ropa normal (a precio de lista) baja a 10 %."""
+    pedido = entrada.descuento_qr_pct
+    if not pedido:
+        return Decimal("0"), None
+    r = entrada.reglas
+    base = sum((g.importe_lista for g in grupos if _qr_elegible(g, entrada)), CERO).quantize(CENT)
+    motivo = None
+    pct = pedido
+    if _fecha_local(entrada) > date.fromisoformat(str(r.qr_vence)):
+        pct, motivo = Decimal("0"), M.QR_VENCIDO
+    elif entrada.origen_calculo == ORIGEN_KIOSKO_SIN_CONEXION:
+        pct, motivo = Decimal("0"), M.QR_SIN_CONEXION
+    elif base <= 0:
+        pct, motivo = Decimal("0"), M.QR_SIN_LINEAS_ELEGIBLES
+    elif pedido > Decimal("10") and base < r.qr_minimo_15:
+        pct, motivo = Decimal("10"), M.QR_15_A_10
+    if motivo:
+        motivos_ticket.append(motivo)
+    return pct, DescuentoQrCalculo(pct_pedido=pedido, pct=pct, importe=CERO, base_elegible=base, motivo=motivo)
+
+
+def _descuentos(
+    grupos: list[_Grupo], entrada: EntradaVenta, motivos_ticket: list[str], pct_qr: Decimal = Decimal("0")
+) -> dict[str, _Desc]:
     r = entrada.reglas
     base = r.pct_base_empleada
     sin_conexion = entrada.origen_calculo == ORIGEN_KIOSKO_SIN_CONEXION
@@ -189,6 +245,11 @@ def _descuentos(grupos: list[_Grupo], entrada: EntradaVenta, motivos_ticket: lis
             pct_may = c.pct_mayoreo
 
     resultado = {g.linea_uid: _Desc() for g in grupos}
+
+    def pct_qr_de(g: _Grupo) -> Decimal:
+        return pct_qr if pct_qr > 0 and _qr_elegible(g, entrada) else Decimal("0")
+
+    hay_qr = any(pct_qr_de(g) > 0 for g in grupos)
 
     def pct_mayoreo_de(g: _Grupo) -> Decimal:
         if g.rebajada or pct_may <= 0:
@@ -253,8 +314,13 @@ def _descuentos(grupos: list[_Grupo], entrada: EntradaVenta, motivos_ticket: lis
                 pct_empleada[g.linea_uid] = (pct_linea, base, caben)
                 if caben:
                     # Gana el mayor; en empate, el mayoreo (`_pct_y_fuente`).
-                    gana_mayoreo = pct_mayoreo_de(g) >= pct_linea
-                    g.motivos.append(M.TOPE_CONSUMIDO_CON_MAYOREO if gana_mayoreo else M.EMPLEADA_NIVEL)
+                    _p, gana = _pct_y_fuente(pct_linea, pct_mayoreo_de(g), fuente_emp, pct_qr_de(g))
+                    if gana == FUENTE_MAYOREO:
+                        g.motivos.append(M.TOPE_CONSUMIDO_CON_MAYOREO)
+                    elif gana == FUENTE_QR:
+                        g.motivos.append(M.TOPE_CONSUMIDO_CON_QR)
+                    else:
+                        g.motivos.append(M.EMPLEADA_NIVEL)
                 else:
                     g.motivos.append(M.TOPE_MES_AGOTADO)
                 if 0 < caben < g.cantidad:
@@ -262,7 +328,7 @@ def _descuentos(grupos: list[_Grupo], entrada: EntradaVenta, motivos_ticket: lis
         else:
             pct_parejo = r.pct_otra_persona if comp is None else base
             hay_rebajadas = any(g.rebajada for g in grupos)
-            if not hay_rebajadas and pct_may <= 0:
+            if not hay_rebajadas and pct_may <= 0 and not hay_qr:
                 modo_ticket = True  # como hoy: el % sobre el subtotal, repartido entre las líneas
             for g in grupos:
                 if not g.rebajada:
@@ -286,20 +352,34 @@ def _descuentos(grupos: list[_Grupo], entrada: EntradaVenta, motivos_ticket: lis
         if g.rebajada:
             continue
         pmay = pct_mayoreo_de(g)
+        pqr = pct_qr_de(g)
         p_nivel, p_resto, caben = pct_empleada.get(g.linea_uid, (Decimal("0"), Decimal("0"), 0))
         resto = g.cantidad - caben
-        pct_a, fuente_a = _pct_y_fuente(p_nivel, pmay, fuente_emp)
-        pct_b, fuente_b = _pct_y_fuente(p_resto, pmay, fuente_emp)
+        pct_a, fuente_a = _pct_y_fuente(p_nivel, pmay, fuente_emp, pqr)
+        pct_b, fuente_b = _pct_y_fuente(p_resto, pmay, fuente_emp, pqr)
         importe = CERO
+        importe_qr = CERO
         if caben and resto and pct_a == pct_b:
             # Mismo % en toda la línea (con A3, el mayoreo gana las piezas dentro y
             # fuera del tope): un solo redondeo, como hoy `dps.descuento` por renglón.
             importe = _q(g.precio_unitario * g.cantidad * pct_a / CIEN)
+            if fuente_a == FUENTE_QR and fuente_b == FUENTE_QR:
+                importe_qr = importe
+            elif FUENTE_QR in (fuente_a, fuente_b):
+                piezas_qr = caben if fuente_a == FUENTE_QR else resto
+                importe_qr = min(_q(g.precio_unitario * piezas_qr * pct_a / CIEN), importe)
         else:
             if caben:
-                importe += _q(g.precio_unitario * caben * pct_a / CIEN)
+                parte = _q(g.precio_unitario * caben * pct_a / CIEN)
+                importe += parte
+                if fuente_a == FUENTE_QR:
+                    importe_qr += parte
             if resto:
-                importe += _q(g.precio_unitario * resto * pct_b / CIEN)
+                parte = _q(g.precio_unitario * resto * pct_b / CIEN)
+                importe += parte
+                if fuente_b == FUENTE_QR:
+                    importe_qr += parte
+        con_qr = (bool(caben) and fuente_a == FUENTE_QR) or (bool(resto) and fuente_b == FUENTE_QR)
         con_nivel_real = caben if fuente_a == fuente_emp and caben else 0
         piezas_base = resto if resto and fuente_b == fuente_emp else 0
         if g.linea_uid in al_base and piezas_base:
@@ -309,10 +389,14 @@ def _descuentos(grupos: list[_Grupo], entrada: EntradaVenta, motivos_ticket: lis
             fuente = fuente_emp if fuente_emp in (fuente_a, fuente_b) else fuente_a
         if fuente == FUENTE_MAYOREO:
             g.motivos.append(M.MAYOREO)
-            if pct_empleada.get(g.linea_uid):
+            if pct_empleada.get(g.linea_uid) or pqr > 0:
                 g.motivos.append(M.GANA_MAYOREO)
-        elif fuente is not None and pmay > 0:
+        elif fuente is not None and fuente != FUENTE_QR and (pmay > 0 or pqr > 0):
             g.motivos.append(M.GANA_EMPLEADA)
+        if con_qr:
+            g.motivos.append(M.DESCUENTO_QR)
+            if pct_empleada.get(g.linea_uid) or pmay > 0:
+                g.motivos.append(M.GANA_QR)
         resultado[g.linea_uid] = _Desc(
             pct=pct_a if caben else pct_b,
             importe=importe,
@@ -321,6 +405,8 @@ def _descuentos(grupos: list[_Grupo], entrada: EntradaVenta, motivos_ticket: lis
             piezas_base=piezas_base,
             # A3: consume el tope toda pieza que cupo, la haya ganado el nivel o el mayoreo.
             consumo_tope=(g.base.precio_lista * caben).quantize(CENT),
+            importe_qr=importe_qr,
+            con_qr=con_qr,
         )
     return resultado
 
@@ -404,7 +490,8 @@ def calcular(entrada: EntradaVenta) -> Calculo:
 
     grupos = _agrupar(entrada.lineas)
     _marcar_3pz_con_pants_rebajado(grupos, motivos_ticket)
-    descuentos = _descuentos(grupos, entrada, motivos_ticket)
+    pct_qr, info_qr = _descuento_qr(grupos, entrada, motivos_ticket)
+    descuentos = _descuentos(grupos, entrada, motivos_ticket, pct_qr)
 
     # C4: la modalidad elegida se respeta aunque el descuento salga en $0.
     modalidad = entrada.modalidad_mayorista
@@ -491,7 +578,12 @@ def calcular(entrada: EntradaVenta) -> Calculo:
         playera_sin_monedero = g.es_playera_3pz and not g.rebajada
         if playera_sin_monedero and not bloqueo:
             g.motivos.append(M.TRES_PZ_PLAYERA_SIN_MONEDERO)
-        sin_monedero = bloqueo or g.rebajada or playera_sin_monedero
+        # 2026-11-16: la línea cobrada con el QR de temporada no abona (como
+        # el mayoreo en modalidad descuento).
+        qr_sin_monedero = descuentos[g.linea_uid].con_qr
+        if qr_sin_monedero and not bloqueo:
+            g.motivos.append(M.QR_SIN_MONEDERO)
+        sin_monedero = bloqueo or g.rebajada or playera_sin_monedero or qr_sin_monedero
         bases_mon.append(CERO if sin_monedero else (cobrado - parte).quantize(CENT))
     monedero = None
     abonos = [CERO] * len(grupos)
@@ -554,9 +646,18 @@ def calcular(entrada: EntradaVenta) -> Calculo:
             base_leal=bases_leal[i],
             comision_linea=comisiones[i],
             motivos=tuple(dict.fromkeys(g.motivos)),
+            descuento_qr=d.importe_qr,
         ))
 
     descuento_total = sum((l.descuento.importe for l in lineas), CERO).quantize(CENT)
+    if info_qr is not None:
+        info_qr = DescuentoQrCalculo(
+            pct_pedido=info_qr.pct_pedido,
+            pct=info_qr.pct,
+            importe=sum((l.descuento_qr for l in lineas), CERO).quantize(CENT),
+            base_elegible=info_qr.base_elegible,
+            motivo=info_qr.motivo,
+        )
     return Calculo(
         version_motor=VERSION_MOTOR,
         version_reglas=r.version,
@@ -585,4 +686,5 @@ def calcular(entrada: EntradaVenta) -> Calculo:
         base_leal_total=sum(bases_leal, CERO).quantize(CENT),
         consumo_tope_total=sum((l.consumo_tope for l in lineas), CERO).quantize(CENT),
         motivos_ticket=tuple(dict.fromkeys(motivos_ticket)),
+        descuento_qr=info_qr,
     )

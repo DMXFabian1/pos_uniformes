@@ -69,3 +69,14 @@ SKU_CATEGORIAS_INCOMPATIBLES = "SKU_CATEGORIAS_INCOMPATIBLES"
 # La pieza cupo en el tope y lo consumió (C8, C9, como hoy), pero el mayoreo
 # le dio un % igual o mayor que el del nivel y es el que se cobró.
 TOPE_CONSUMIDO_CON_MAYOREO = "TOPE_CONSUMIDO_CON_MAYOREO"
+
+# ─── QR de descuento de temporada (2026-11-16, `descuento_qr_service`) ───
+DESCUENTO_QR = "DESCUENTO_QR"
+GANA_QR = "GANA_MAYOR(qr_temporada)"
+QR_SIN_MONEDERO = "QR_SIN_MONEDERO"
+TOPE_CONSUMIDO_CON_QR = "TOPE_CONSUMIDO_CON_QR"
+# Motivos del ticket: por qué el QR no se aplicó como se pidió.
+QR_15_A_10 = "QR_15_A_10"                       # bajo $600 de ropa normal
+QR_VENCIDO = "QR_VENCIDO"
+QR_SIN_CONEXION = "QR_SIN_CONEXION"
+QR_SIN_LINEAS_ELEGIBLES = "QR_SIN_LINEAS_ELEGIBLES"

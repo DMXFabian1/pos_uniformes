@@ -153,6 +153,7 @@ def entrada_desde_carrito(
     pago_tarjeta: bool = False,
     vendedora: str | None = None,
     origen_calculo: str | None = None,
+    descuento_qr_pct=None,
 ) -> EntradaVenta:
     asegurar_uids(items)
     lineas = tuple(linea_desde_item(it) for it in items if int(it.get("cantidad", 0) or 0) > 0)
@@ -171,6 +172,8 @@ def entrada_desde_carrito(
         saldo_disponible=disponible,
         pago_tarjeta=bool(pago_tarjeta),
         vendedora=(str(vendedora) if vendedora else None),
+        # QR de temporada (2026-11-16): el % elegido tras validar el QR.
+        descuento_qr_pct=_pct(descuento_qr_pct),
     )
 
 

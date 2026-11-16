@@ -111,6 +111,12 @@ def entrada_desde_plano(d: dict) -> EntradaVenta:
         categorias_no_uniforme=frozenset(r.get("categorias_no_uniforme") or ReglasCtx().categorias_no_uniforme),
         pct_comision_tarjeta=Decimal(str(r.get("pct_comision_tarjeta", ReglasCtx.pct_comision_tarjeta))),
         pct_otra_persona=Decimal(str(r.get("pct_otra_persona", ReglasCtx.pct_otra_persona))),
+        # QR de temporada (2026-11-16). Fotografías de antes no lo traen. El
+        # vencimiento nunca pasa del de este servidor: un kiosko con otra
+        # fecha no alarga el descuento.
+        qr_categorias=frozenset(r.get("qr_categorias") or ReglasCtx().qr_categorias),
+        qr_minimo_15=Decimal(str(r.get("qr_minimo_15", ReglasCtx.qr_minimo_15))),
+        qr_vence=min(str(r.get("qr_vence") or ReglasCtx.qr_vence), ReglasCtx.qr_vence),
     )
     return EntradaVenta(
         lineas=lineas,
@@ -126,6 +132,7 @@ def entrada_desde_plano(d: dict) -> EntradaVenta:
         pagos=tuple(Pago(p["medio"], Decimal(str(p["importe"]))) for p in d.get("pagos") or ()),
         vendedora=d.get("vendedora"),
         reglas=reglas,
+        descuento_qr_pct=_d(d.get("descuento_qr_pct")),
     )
 
 
