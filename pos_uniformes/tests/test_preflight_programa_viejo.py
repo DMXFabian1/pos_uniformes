@@ -21,11 +21,13 @@ from pos_uniformes.database import preflight
 
 
 class _ScriptFalso:
-    """Un ScriptDirectory de mentira: cadena lineal a → b → c."""
+    """Un ScriptDirectory de mentira: cadena lineal a → b → c, o un grafo con
+    merges si se dan `padres` ({revisión: (padres…)})."""
 
     def __init__(self, cadena: tuple[str, ...] = ("aaa", "bbb", "ccc"), *, con_none: bool = False,
-                 cabeza: str | None = None) -> None:
-        self.cadena = cadena
+                 cabeza: str | None = None, padres: dict[str, tuple[str, ...]] | None = None) -> None:
+        self.padres = padres or {r: ((cadena[i - 1],) if i else ()) for i, r in enumerate(cadena)}
+        self.cadena = tuple(self.padres)
         self.con_none = con_none
         self.cabeza = cabeza or cadena[-1]
 
@@ -37,8 +39,13 @@ class _ScriptFalso:
         return SimpleNamespace(revision=rev)
 
     def iterate_revisions(self, desde: str, _hasta: str):
-        i = self.cadena.index(desde)
-        return [SimpleNamespace(revision=r) for r in reversed(self.cadena[: i + 1])]
+        vistas, pila = [], [desde]
+        while pila:
+            r = pila.pop()
+            if r not in vistas:
+                vistas.append(r)
+                pila.extend(self.padres[r])
+        return [SimpleNamespace(revision=r) for r in vistas]
 
     def get_heads(self):
         return [self.cabeza]
@@ -68,6 +75,23 @@ class RelacionTests(unittest.TestCase):
 
     def test_sin_cabezas_es_atrasada(self) -> None:
         self.assertEqual(preflight._relacion_base(_ScriptFalso(), (), ("ccc",)), preflight.BASE_ATRASADA)
+
+    def test_varias_cabezas_con_una_desconocida_es_programa_viejo_en_cualquier_orden(self) -> None:
+        for cabezas in (("d1e2f3a4b5c6", "aaa"), ("aaa", "d1e2f3a4b5c6")):
+            with self.subTest(cabezas=cabezas):
+                self.assertEqual(
+                    preflight._relacion_base(_ScriptFalso(), cabezas, ("ccc",)), preflight.BASE_DESCONOCIDA,
+                )
+
+    def test_base_en_un_merge_que_junta_lo_que_pide_el_programa_va_adelante(self) -> None:
+        # raiz → xxx, raiz → yyy, merge mmm(xxx, yyy). El programa pide (xxx, yyy).
+        script = _ScriptFalso(
+            cabeza="mmm",
+            padres={"raiz": (), "xxx": ("raiz",), "yyy": ("raiz",), "mmm": ("xxx", "yyy")},
+        )
+        self.assertEqual(preflight._relacion_base(script, ("mmm",), ("xxx", "yyy")), preflight.BASE_ADELANTE)
+        # Y al revés: la base en una sola rama del merge está atrasada.
+        self.assertEqual(preflight._relacion_base(script, ("xxx",), ("mmm",)), preflight.BASE_ATRASADA)
 
 
 class InspeccionTests(unittest.TestCase):

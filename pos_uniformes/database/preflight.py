@@ -71,7 +71,9 @@ def _relacion_base(script, current_heads: tuple[str, ...], expected_heads: tuple
     nuevo. Antes eso caía en «base desactualizada», que es al revés."""
     if not current_heads:
         return BASE_ATRASADA
-    adelante = True
+    # Primero, si hay alguna desconocida: con varias cabezas basta una para
+    # que el viejo sea el programa, sin importar el orden ni lo que digan las otras.
+    revisiones = []
     for actual in current_heads:
         try:
             revision = script.get_revision(actual)
@@ -79,6 +81,9 @@ def _relacion_base(script, current_heads: tuple[str, ...], expected_heads: tuple
             revision = None
         if revision is None:
             return BASE_DESCONOCIDA
+        revisiones.append(revision)
+    adelante = True
+    for revision in revisiones:
         try:
             historia = {r.revision for r in script.iterate_revisions(revision.revision, "base")}
         except Exception:  # noqa: BLE001 — ante la duda, se trata como desactualizada
