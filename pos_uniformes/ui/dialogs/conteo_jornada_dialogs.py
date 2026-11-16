@@ -614,6 +614,7 @@ class ConteoRevisionDialog(QDialog):
         self._contado_at = None                      # cuándo se terminó el conteo
         self._dias = None                            # días desde el conteo
         self._diferencias: list[int] = []            # de las tallas que Aplicar todavía corregiría
+        self._ajuste = None                          # conteo_resumen_service.ResumenAjuste (tanda 2)
         self._ya_revisada = False
 
         layout = QVBoxLayout()
@@ -727,6 +728,7 @@ class ConteoRevisionDialog(QDialog):
         from pos_uniformes.database.models import ConteoJornada
         from pos_uniformes.services import conteo_revision_vista_service as vista
         from pos_uniformes.services.conteo_jornada_service import DESCARTADA, resumen_para_revisar
+        from pos_uniformes.services.conteo_resumen_service import resumen_de_jornada
         from pos_uniformes.services.nombres_empleadas_service import mostrar, nombres_por_codigo
         from pos_uniformes.services.revision_service import PEDIR, SURTIR, URGENTE, revisar
 
@@ -737,6 +739,8 @@ class ConteoRevisionDialog(QDialog):
             # La diferencia de cada talla se guardó al capturar; Aplicar suma
             # las que todavía no se ajustan.
             self._diferencias = [l.diferencia for l in resumen_para_revisar(session, j).lineas]
+            # El resumen real del ajuste: piezas, $, vendidas desde y otros ajustes.
+            self._ajuste = resumen_de_jornada(session, j)
             self._contado_at = j.terminada_at or j.iniciada_at
             self._ya_revisada = vista.ya_revisada(j)
             revisada_txt = ""
@@ -776,7 +780,7 @@ class ConteoRevisionDialog(QDialog):
         cuando = vista.cuando_se_conto(self._contado_at, self._hoy)
         self._cuando_label.setText(f"Contado el {cuando}" if cuando else "")
         self._cuando_label.setVisible(bool(cuando))
-        aviso = "" if self._ya_revisada else vista.aviso_conteo_viejo(self._dias)
+        aviso = "" if self._ya_revisada else vista.aviso_conteo_viejo(self._dias, self._ajuste)
         self._aviso_label.setText(f"⚠ {aviso}" if aviso else "")
         self._aviso_label.setVisible(bool(aviso))
         if self._ya_revisada:
@@ -999,8 +1003,18 @@ class ConteoRevisionDialog(QDialog):
         if l.cajas:
             partes.append("en cajas: " + " · ".join(f"{c} ×{n}" for c, n in l.cajas))
         partes.append(self._la_vez_pasada(l))
+        ajuste = self._talla_del_ajuste(l.conteo_id)
+        if ajuste is not None:
+            from pos_uniformes.services.conteo_revision_vista_service import texto_talla_ajuste
+
+            partes.append(texto_talla_ajuste(ajuste))
         talla = f"{l.talla} {l.color}".strip() if l.color and l.color.upper() not in ("", "UNICO", "ÚNICO") else l.talla
         self._por_que_label.setText(f"<b>{nombre_para_hoja(l.producto, self._revision.titulo)} · {talla}</b>  —  " + " · ".join(partes))
+
+    def _talla_del_ajuste(self, conteo_id: int):
+        if self._ajuste is None:
+            return None
+        return next((t for t in self._ajuste.tallas if t.conteo_id == conteo_id), None)
 
     def _pedido_editado(self, item: QTableWidgetItem) -> None:
         if self._pintando or item.column() != self.COL_PEDIDO:
@@ -1092,6 +1106,7 @@ class ConteoRevisionDialog(QDialog):
 
         texto = vista.texto_confirmar_aplicar(
             quien=self._revision.quien, contado=self._contado_at, diferencias=self._diferencias, hoy=self._hoy,
+            resumen=self._ajuste,
         )
         if not _preguntar(self, "Aplicar al inventario", texto, si=vista.boton_corregir(self._dias, self._diferencias), no=vista.BOTON_VOLVER):
             return

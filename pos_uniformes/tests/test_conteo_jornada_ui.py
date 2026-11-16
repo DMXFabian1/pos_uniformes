@@ -469,7 +469,9 @@ class RevisionDialogTests(unittest.TestCase):
         titulo, texto, opciones = preg.call_args.args[1:4]
         self.assertEqual([o[1] for o in opciones], ["Volver", "Sí, corregir"])
         self.assertIn("A cada talla se le suma la diferencia que encontró Stayce el ", texto)
-        self.assertIn("Se corrigen 1 talla (faltan 3, sobran 0).", texto)   # 7 contra 10; la otra cuadra
+        # Tanda 2: el resumen real, con el dinero a precio de venta (7 contra 10; la otra cuadra).
+        self.assertIn("Se corrige 1 talla: faltan 3, sobran 0 (−$300 a precio de venta).", texto)
+        self.assertNotIn("Ojo", texto)
         self.assertNotIn("quedará como lo contó", texto)
         s = self.factory()
         self.assertIsNone(s.get(ConteoJornada, self.foto.id).revisada_at)   # Volver no aplica
@@ -538,6 +540,54 @@ class RevisionDialogTests(unittest.TestCase):
         s = self.factory()
         c = s.scalars(select(ConteoInventario).where(ConteoInventario.variante_id == self.v_ids[0])).one()
         self.assertEqual(c.pedido, 5)
+
+    # --- tanda 2 (2026-11-15): el resumen real del ajuste ---------------------------
+    def _despues_del_conteo(self, dias: int = 3):
+        from datetime import timedelta
+
+        from pos_uniformes.database.models import ConteoInventario
+
+        s = self.factory()
+        c = s.scalars(select(ConteoInventario).where(ConteoInventario.variante_id == self.v_ids[0])).one()
+        momento = c.contado_at + timedelta(days=dias)
+        s.close()
+        return momento
+
+    def test_el_aviso_viejo_dice_lo_vendido_desde_el_conteo(self) -> None:
+        from pos_uniformes.database.models import LibretaVenta
+
+        s = self.factory()
+        v6 = s.get(Variante, self.v_ids[0])
+        s.add(LibretaVenta(
+            employee_code="VEND-4", tipo="venta", piezas=2, monto_total=200,
+            detalle=[{"sku": v6.sku, "talla": "6", "nombre": "x", "cantidad": 2, "precio": "100", "subtotal": "200"}],
+            created_at=self._despues_del_conteo(),
+        ))
+        s.commit(); s.close()
+        self._envejecer(41)
+        d = self._dialogo()
+        d._tarjetas["OTRAS"].setChecked(True)
+        self.assertIn("Conteo de hace 41 días: desde entonces se vendieron 2 piezas.", d._aviso_label.text())
+        d._table.selectRow(self._fila(d, "6"))
+        self.assertIn("el sistema decía 10, contó 7", d._por_que_label.text())
+        self.assertIn("vendidas desde el conteo 2", d._por_que_label.text())
+
+    def test_la_confirmacion_avisa_de_otro_ajuste_despues_del_conteo(self) -> None:
+        from pos_uniformes.database.models import MovimientoInventario, TipoMovimientoInventario
+
+        s = self.factory()
+        s.add(MovimientoInventario(
+            variante_id=self.v_ids[0], tipo_movimiento=TipoMovimientoInventario.AJUSTE_SALIDA, cantidad=-1,
+            stock_anterior=10, stock_posterior=9, referencia=None, creado_por="dueno",
+            created_at=self._despues_del_conteo(),
+        ))
+        s.commit(); s.close()
+        d = self._dialogo()
+        with patch(f"{_D}._elegir", return_value="no") as preg:
+            d._aplicar()
+        texto = preg.call_args.args[2]
+        self.assertIn("Ojo: la talla 6 tuvo otro ajuste el ", texto)
+        self.assertIn("se le suma la diferencia otra vez.", texto)
 
     def test_descartada_dice_que_no_se_uso(self) -> None:
         d = self._dialogo()
