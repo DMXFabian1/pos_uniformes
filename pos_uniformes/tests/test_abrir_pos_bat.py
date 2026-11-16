@@ -34,6 +34,23 @@ class AbrirPosTests(unittest.TestCase):
         bloque = self.texto.split(":revisar_publicado", 1)[1]
         self.assertIn("goto :build", bloque)
 
+    def _primer_salto_tras(self, marca: str, desde: str = "") -> str:
+        texto = self.texto.split(desde, 1)[1] if desde else self.texto
+        return texto.split(marca, 1)[1].split("goto :", 1)[1].split()[0]
+
+    def test_sin_internet_igual_revisa_lo_publicado(self) -> None:
+        # 16-nov-2026: si la base ya se migró pero no se publicó, los kioskos no
+        # abren. Republicar es local: no debe depender de `git fetch`.
+        for marca in ("git fetch origin", 'if "%ARRIBA%"==""', 'if "%BEHIND%"=="?"'):
+            self.assertEqual(self._primer_salto_tras(marca), "revisar_publicado", marca)
+
+    def test_si_no_hay_nada_publicado_publica(self) -> None:
+        self.assertEqual(
+            self._primer_salto_tras('if not exist "%UPDATES%\\PresupuestosSatelite\\VERSION.txt"',
+                                    desde="\n:revisar_publicado"),
+            "build",
+        )
+
     def test_cada_salto_tiene_su_etiqueta(self) -> None:
         etiquetas = set(re.findall(r"^:(\w+)", self.texto, re.M))
         saltos = set(re.findall(r"goto :(\w+)", self.texto))

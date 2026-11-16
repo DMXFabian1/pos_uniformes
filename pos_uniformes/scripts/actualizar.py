@@ -160,6 +160,14 @@ def actualizar(m: Mundo, *, al_abrir: bool = False, traer: bool = False) -> Resu
         m.escribir_marca(MARCA_FALLIDA, ahora)
         if antes is None:
             return "El código se quedó en lo nuevo (no se sabe cuál era el anterior)."
+        # Si la base ya se migró (por ejemplo, en una corrida que no pudo
+        # publicar), regresar el código a un programa que no conoce la base
+        # dejaría sin abrir también al POS de esta PC.
+        if m.version_conoce_base(antes) is False:
+            return (
+                f"El código se quedó en lo nuevo: {antes} no conoce la base ya migrada y con él "
+                "tampoco abriría el POS."
+            )
         if m.volver_a(antes):
             pasos.append("volver")
             return f"El código regresó a {antes}, lo que corren los kioskos."
@@ -233,6 +241,16 @@ def actualizar(m: Mundo, *, al_abrir: bool = False, traer: bool = False) -> Resu
                     f"kioskos: con la versión que tienen ({publicado or 'ninguna'}) NO van a abrir. "
                     "Reintenta ya con scripts\\actualizar_pc_principal.bat (también se reintenta "
                     "solo al abrir el POS en esta PC).",
+                )
+            if conoce is None:
+                # Sin migrar en esta corrida, pero la base pudo migrarse antes
+                # (otra corrida, a mano): ante la duda no se promete que abren.
+                return _fin(
+                    FALLO_PUBLICAR,
+                    f"⚠️ Actualización a {ahora}: NO se pudo publicar a los kioskos, y no se pudo "
+                    f"comprobar si la versión que tienen ({publicado or 'ninguna'}) conoce la base. "
+                    "Si un kiosko no abre, reintenta ya con scripts\\actualizar_pc_principal.bat "
+                    "(también se reintenta solo al abrir el POS en esta PC).",
                 )
             return _fin(
                 FALLO_PUBLICAR,
@@ -325,8 +343,9 @@ def volver_kioskos(
     )
     if conoce is None:
         texto += (
-            "\n⚠️ No se pudo comprobar que esa versión conozca la base. Si un kiosko dice "
-            "«Programa desactualizado», corre de nuevo volver_version_anterior.bat para deshacerlo."
+            "\n⚠️ No se pudo comprobar que esa versión conozca la base. Si un kiosko no abre "
+            "(dice «Programa desactualizado» o «Base de datos no lista»), corre de nuevo "
+            "volver_version_anterior.bat para deshacerlo."
         )
     decir(texto)
     avisar(texto)
@@ -354,7 +373,8 @@ def _git(*args: str, timeout: float = 120.0) -> tuple[int, str]:
             stdin=subprocess.DEVNULL,
         )
     except Exception as exc:  # noqa: BLE001
-        return 1, str(exc)
+        # 127 y no 1: para `git grep`, 1 quiere decir «no está», y sin git no se sabe.
+        return 127, str(exc)
     return r.returncode, (r.stdout or "").strip() or (r.stderr or "").strip()
 
 

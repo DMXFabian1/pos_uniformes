@@ -173,11 +173,32 @@ class TropiezosTests(unittest.TestCase):
         self.assertEqual(f.preguntas_conoce, ["aaa1111"])
 
     def test_si_falla_publicar_sin_migrar_abre_igual_es_verdad(self) -> None:
-        f = _Falso(publicar=False, pendientes=False)
+        f = _Falso(publicar=False, pendientes=False, conoce=True)
         r = act.actualizar(f.mundo())
         self.assertEqual(r.que, act.FALLO_PUBLICAR)
         self.assertIn("que abre igual", f.avisos[0])
         self.assertTrue(f.avisos[0].startswith("⚠️"))
+
+    def test_si_falla_publicar_sin_migrar_y_no_se_sabe_no_promete_que_abren(self) -> None:
+        # La base pudo migrarse en otra corrida (o a mano) y git no contestó:
+        # ante la duda no se dice «abre igual».
+        f = _Falso(publicar=False, pendientes=False, conoce=None)
+        r = act.actualizar(f.mundo())
+        self.assertEqual(r.que, act.FALLO_PUBLICAR)
+        self.assertTrue(f.avisos[0].startswith("⚠️"))
+        self.assertNotIn("abre igual", f.avisos[0])
+        self.assertIn("no se pudo comprobar si la versión que tienen (aaa1111) conoce la base", f.avisos[0])
+        self.assertIn("scripts\\actualizar_pc_principal.bat", f.avisos[0])
+
+    def test_si_el_build_falla_no_regresa_a_un_codigo_que_no_conoce_la_base(self) -> None:
+        # Tras migrar sin poder publicar, el reintento al abrir el POS falla en
+        # el build: regresar a aaa1111 dejaría sin abrir también a la principal.
+        f = _Falso(build=False, pendientes=False, conoce=False)
+        r = act.actualizar(f.mundo(), al_abrir=True)
+        self.assertEqual(r.que, act.FALLO_BUILD)
+        self.assertEqual(f.hechos, ["build"])                   # sin volver
+        self.assertEqual(f.ahora, "bbb2222")
+        self.assertIn("aaa1111 no conoce la base ya migrada", f.avisos[0])
 
     def test_si_la_version_de_los_kioskos_no_conoce_la_base_es_urgente_aunque_no_se_migre_ahora(self) -> None:
         # Se migró en una corrida anterior que tampoco pudo publicar.
@@ -353,11 +374,17 @@ class ConoceRevisionesTests(unittest.TestCase):
         # Sin base: solo git sobre el propio repo (HEAD conoce la primera migración).
         import re
 
-        archivo = next((Path(act.__file__).resolve().parents[1] / "migrations" / "versions").glob("*.py"))
-        m = re.search(r"^revision(?:: *str)? *= *[\"']([0-9a-z_]+)[\"']", archivo.read_text(encoding="utf-8"), re.M)
-        self.assertIsNotNone(m)
         if act._git("rev-parse", "HEAD")[0] != 0:
             self.skipTest("sin git")
+        # Una migración que SÍ está en HEAD (no una nueva sin commit del árbol de trabajo).
+        codigo, listado = act._git("ls-tree", "--name-only", "HEAD", "pos_uniformes/migrations/versions/")
+        archivos = sorted(n for n in listado.splitlines() if n.endswith(".py") and not n.endswith("__init__.py"))
+        if codigo != 0 or not archivos:
+            self.skipTest("sin migraciones en HEAD")
+        codigo, texto = act._git("show", f"HEAD:{archivos[0]}")
+        self.assertEqual(codigo, 0)
+        m = re.search(r"^revision(?:: *str)? *= *[\"']([0-9a-z_]+)[\"']", texto, re.M)
+        self.assertIsNotNone(m)
         self.assertTrue(act.conoce_revisiones("HEAD", (m.group(1),)))
         self.assertFalse(act.conoce_revisiones("HEAD", ("ffffffffffff",)))
 

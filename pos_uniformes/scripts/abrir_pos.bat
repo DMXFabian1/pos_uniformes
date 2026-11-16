@@ -7,7 +7,10 @@ rem   - con actualizaciones: pull + migraciones + build
 rem     (publica a kioskos) y luego abre
 rem   - si lo que corren los kioskos quedo atras del codigo
 rem     (por ejemplo tras un pull a mano), tambien publica
-rem   - sin internet o con error: abre la version actual
+rem   - sin internet o con error: abre la version actual, pero
+rem     antes revisa lo publicado (republicar es local y no
+rem     necesita internet: si una migracion quedo sin publicar,
+rem     los kioskos no abren hasta que se publique)
 rem =====================================================
 setlocal
 cd /d "%~dp0.."
@@ -15,8 +18,8 @@ cd /d "%~dp0.."
 echo Buscando actualizaciones...
 git fetch origin
 if errorlevel 1 (
-    echo Sin internet o sin acceso al repositorio - abriendo la version actual.
-    goto :launch
+    echo Sin internet o sin acceso al repositorio - se queda la version actual.
+    goto :revisar_publicado
 )
 
 rem En que rama esta esta copia y a cual remota mira. Importa porque lo que
@@ -33,7 +36,7 @@ if "%ARRIBA%"=="" (
     echo     Por eso no baja nada. Corre: scripts\revisar_actualizacion.bat
     echo.
     timeout /t 12 >nul
-    goto :launch
+    goto :revisar_publicado
 )
 
 rem El centinela: si el conteo falla, NO se asume que estamos al dia.
@@ -45,7 +48,7 @@ if "%BEHIND%"=="?" (
     echo     Se abre la version actual. Corre: scripts\revisar_actualizacion.bat
     echo.
     timeout /t 10 >nul
-    goto :launch
+    goto :revisar_publicado
 )
 if "%BEHIND%"=="0" (
     echo Ya estas al dia ^(rama %RAMA%^).
@@ -78,12 +81,18 @@ rem  Ya al dia con el repositorio, pero lo que corren los kioskos
 rem  puede ser mas viejo: pasa cuando se hizo `git pull` a mano o
 rem  cuando una build fallo. Si el commit publicado no es el de
 rem  ahora, se vuelve a publicar. (2026-09-22: por eso salio
-rem  "Base de datos no lista" en la principal.)
+rem  "Base de datos no lista" en la principal.) Se llega aqui
+rem  tambien sin internet: publicar es local, y si la base ya se
+rem  migro sin publicar, los kioskos no abren (16-nov-2026).
 rem ---------------------------------------------------------------
 :revisar_publicado
 set UPDATES=%POS_UNIFORMES_UPDATES_DIR%
 if "%UPDATES%"=="" set UPDATES=C:\pos_updates
-if not exist "%UPDATES%\PresupuestosSatelite\VERSION.txt" goto :launch
+if not exist "%UPDATES%" goto :launch
+if not exist "%UPDATES%\PresupuestosSatelite\VERSION.txt" (
+    echo No hay nada publicado para los kioskos - publicando...
+    goto :build
+)
 set PUBLICADO=
 set /p PUBLICADO=<"%UPDATES%\PresupuestosSatelite\VERSION.txt"
 if "%PUBLICADO%"=="" goto :launch
