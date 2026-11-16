@@ -72,6 +72,7 @@ TXT_SIN_CONEXION = "El QR de descuento necesita conexión"
 TXT_VENCIDO = "El descuento de temporada terminó"
 TXT_NO_VALIDO = "Ese QR de descuento no es válido."
 TXT_SIN_EMPLEADA = "Escanea primero tu QR de empleada."
+TXT_NO_MEJORA = "no mejora el descuento que ya tiene"
 
 
 def normalizar_categoria(categoria) -> str:
@@ -334,6 +335,10 @@ def texto_chip(pct_pedido, calculo=None) -> str:
         pct = info.pct
     texto = f"Descuento QR {texto_pct(pct)}"
     razon = texto_motivo(getattr(info, "motivo", None))
+    if not razon and info is not None and info.pct > 0 and not info.importe:
+        # El mayoreo o la empleada ya dan lo mismo o más en esas piezas: el
+        # QR no descontó nada y la cajera no debe creer que sí.
+        razon = TXT_NO_MEJORA
     if razon:
         texto += f" ({razon})"
     return texto + "  ✕"

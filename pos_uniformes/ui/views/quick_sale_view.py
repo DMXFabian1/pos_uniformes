@@ -472,7 +472,16 @@ class QuickSaleWidget(
         return clean
 
     def _on_gate_scan(self) -> None:
-        code = self._clean_scanned_code(self._gate_input.text())
+        crudo = self._gate_input.text()
+        if self._es_qr_descuento(crudo):
+            # QR de temporada en la pantalla del gafete (revisión 2026-11-16):
+            # el código no se muestra ni va al log; se borra de inmediato.
+            self._gate_input.clear()
+            self._gate_error.setText(self._TXT_QR_SIN_EMPLEADA)
+            self._gate_error.setVisible(True)
+            self._gate_input.setFocus()
+            return
+        code = self._clean_scanned_code(crudo)
         if not code:
             return
 
@@ -1237,6 +1246,7 @@ class QuickSaleWidget(
             message = restore_promo_playera_after_base_removed(self._items, removed)
             if message:
                 QMessageBox.information(self, "Promo 3pz", message)
+            self._limpiar_qr_si_carrito_vacio()
             self._refrescar_carrito_con_promo_3pz()
 
     def _on_remove(self, row: int) -> None:
@@ -1251,6 +1261,7 @@ class QuickSaleWidget(
                 message = restore_promo_playera_after_base_removed(self._items, removed)
                 if message:
                     QMessageBox.information(self, "Promo 3pz", message)
+            self._limpiar_qr_si_carrito_vacio()
             self._refrescar_carrito_con_promo_3pz()
 
     # ─── Descuento ───────────────────────────────────────────────────────
@@ -1393,6 +1404,11 @@ class QuickSaleWidget(
 
     def _on_clear_all(self) -> None:
         if not self._items:
+            # Sin piezas no hay nada que confirmar, pero un QR que quedó
+            # puesto no pasa a la siguiente venta (revisión 2026-11-16).
+            if self._descuento_qr_pct is not None:
+                self._limpiar_descuento_qr()
+                self._refresh_totals()
             return
         reply = QMessageBox.question(
             self, "Limpiar",
@@ -2443,7 +2459,11 @@ class QuickSaleWidget(
         respaldo_programa = getattr(self, "_descuento_programa_fijo", None)
         respaldo_compradora = self._compradora
         respaldo_motor = (self._calculo_fijo, self._reimpresion_legada)
+        respaldo_qr = self._descuento_qr_pct
         try:
+            # El QR es de la venta en curso, no de la que se reimprime
+            # (revisión 2026-11-16): el de esa venta sale de su fotografía.
+            self._descuento_qr_pct = None
             # M2: con fotografía, los importes son los que se cobraron; sin
             # ella (ventas de antes), el cálculo de antes. Nunca las reglas de hoy.
             self._calculo_fijo = _totales_de_fotografia(calculo)
@@ -2478,6 +2498,7 @@ class QuickSaleWidget(
             self._descuento_programa_fijo = respaldo_programa
             self._compradora = respaldo_compradora
             self._calculo_fijo, self._reimpresion_legada = respaldo_motor
+            self._descuento_qr_pct = respaldo_qr
 
     # ─── Gasto de la tienda ──────────────────────────────────────────────
 

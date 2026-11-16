@@ -31,6 +31,8 @@ class DescuentoQrMixin:
 
     #: El % elegido para ESTA venta (None = sin QR).
     _descuento_qr_pct: Decimal | None = None
+    #: En la pantalla del gafete: se dice esto y el código no se repite.
+    _TXT_QR_SIN_EMPLEADA = dqr.TXT_SIN_EMPLEADA
 
     # ─── Escaneo ─────────────────────────────────────────────────────────
 
@@ -155,6 +157,11 @@ class DescuentoQrMixin:
         """Al terminar o cancelar la venta: la siguiente no hereda el QR."""
         self._descuento_qr_pct = None
 
+    def _limpiar_qr_si_carrito_vacio(self) -> None:
+        """Quitaron la última pieza: esa venta se acabó y el QR con ella."""
+        if not getattr(self, "_items", None):
+            self._limpiar_descuento_qr()
+
     def _calculo_qr_actual(self):
         if self._descuento_qr_pct is None or not getattr(self, "_items", None):
             return None
@@ -178,6 +185,8 @@ class DescuentoQrMixin:
     def _qr_del_ticket(self) -> tuple[Decimal, Decimal] | None:
         """(% aplicado, importe) del QR para el ticket, o None."""
         fijo = getattr(self, "_calculo_fijo", None)
+        if getattr(self, "_reimpresion_legada", False):
+            return None  # una venta sin fotografía nunca llevó QR
         if fijo is not None:
             pct, importe = getattr(fijo, "qr_pct", None), getattr(fijo, "qr_importe", None)
         else:

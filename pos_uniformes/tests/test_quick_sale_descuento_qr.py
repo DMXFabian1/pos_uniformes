@@ -224,5 +224,113 @@ class TicketTests(_Kiosko):
         self.assertIsNone(viejo.qr_pct)
 
 
+class GafeteTests(_Kiosko):
+    """Revisión 2026-11-16: el QR escaneado en la pantalla del gafete no se
+    muestra ni se anota (antes salía «Codigo 'DSCT-…' no encontrado»)."""
+
+    def _gate(self, w, *, sesion):
+        import pos_uniformes.ui.views.quick_sale_view as vista
+
+        with self.assertLogs(level=logging.DEBUG) as logs, patch.object(vista, "get_session", sesion):
+            logging.getLogger("prueba").debug("inicio")
+            w._gate_input.setText(QR)
+            w._on_gate_scan()
+        return logs.output
+
+    def test_en_el_gafete_no_se_muestra_el_codigo(self) -> None:
+        from pos_uniformes.ui.views import quick_sale_view as vista
+
+        @contextlib.contextmanager
+        def _sin_empleada():
+            yield SimpleNamespace(scalar=lambda *_a, **_k: None)
+
+        w = self._kiosko([], empleada=None)
+        with patch.object(vista.QuickSaleWidget, "_empleada_de_cache", return_value=None):
+            logs = self._gate(w, sesion=_sin_empleada)
+        self.assertNotIn("CODIGO-DE-PRUEBA", w._gate_error.text().upper())
+        self.assertEqual(w._gate_error.text(), dqr.TXT_SIN_EMPLEADA)
+        self.assertEqual(w._gate_input.text(), "")
+        self.assertFalse(any("CODIGO-DE-PRUEBA" in l.upper() for l in logs), logs)
+
+    def test_en_el_gafete_con_la_base_caida_no_va_al_log(self) -> None:
+        from pos_uniformes.ui.views import quick_sale_view as vista
+
+        def _falla():
+            raise RuntimeError("sin base")
+
+        w = self._kiosko([], empleada=None)
+        with patch.object(vista.QuickSaleWidget, "_empleada_de_cache", return_value=None), \
+                patch.object(vista.QuickSaleWidget, "_avisar_sin_conexion", return_value=None):
+            logs = self._gate(w, sesion=_falla)
+        self.assertFalse(any("CODIGO-DE-PRUEBA" in l.upper() for l in logs), logs)
+        self.assertNotIn("CODIGO-DE-PRUEBA", w._gate_error.text().upper())
+
+
+class CarritoVacioTests(_Kiosko):
+    """Revisión 2026-11-16: si se quitan las piezas una por una, el QR no se
+    queda pegado para la siguiente clienta."""
+
+    def test_quitar_la_ultima_pieza_limpia_el_qr(self) -> None:
+        w = self._kiosko([casual()])
+        self._escanear(w)
+        w._on_remove(0)
+        self.assertIsNone(w._descuento_qr_pct)
+        self.assertTrue(w._chip_descuento_qr.isHidden())
+
+    def test_borrar_la_ultima_linea_limpia_el_qr(self) -> None:
+        w = self._kiosko([casual(cantidad=2)])
+        self._escanear(w)
+        w._on_delete_line(0)
+        self.assertIsNone(w._descuento_qr_pct)
+
+    def test_si_quedan_piezas_el_qr_sigue(self) -> None:
+        w = self._kiosko([casual(), playera()])
+        self._escanear(w)
+        w._on_remove(1)
+        self.assertEqual(w._descuento_qr_pct, D("10"))
+
+    def test_limpiar_con_el_carrito_vacio_quita_el_qr(self) -> None:
+        w = self._kiosko([casual()])
+        self._escanear(w)
+        w._items.clear()
+        w._on_clear_all()
+        self.assertIsNone(w._descuento_qr_pct)
+        self.assertTrue(w._chip_descuento_qr.isHidden())
+
+
+class ChipSinEfectoTests(_Kiosko):
+    def test_si_el_qr_no_mejora_el_descuento_lo_dice(self) -> None:
+        w = self._kiosko([casual()])
+        w._discount_active = True      # «otra persona»: 5 %, empata con el QR 5 %
+        w._compradora = None
+        self._escanear(w, pct=D("5"))
+        texto = w._chip_descuento_qr.text()
+        self.assertIn("no mejora el descuento que ya tiene", texto)
+        self.assertTrue(texto.endswith("✕"))
+
+
+class ReimpresionTests(_Kiosko):
+    def test_reimprimir_una_venta_vieja_no_toma_el_qr_en_curso(self) -> None:
+        w = self._kiosko([casual()])
+        self._escanear(w)
+
+        def _categorias(items):
+            for it in items:
+                it.setdefault("categoria", "Ropa casual")
+
+        detalle = [{"sku": "SC9", "nombre": "Sudadera casual", "talla": "M", "precio": "500", "cantidad": 1,
+                    "desc_empleada_pct": "5"}]
+        from datetime import datetime as _dt
+
+        with patch.object(type(w), "_poner_categorias", side_effect=_categorias):
+            texto = w.build_reprint_ticket(
+                tipo="venta", detalle=detalle, cliente=None, employee_name="Fanny",
+                descuento_empleada=True, created_at=_dt(2026, 10, 3, 12, 0), calculo=None,
+            )
+        self.assertNotIn("Descuento autorizado", texto)
+        # La venta en curso conserva su QR.
+        self.assertEqual(w._descuento_qr_pct, D("10"))
+
+
 if __name__ == "__main__":
     unittest.main()
