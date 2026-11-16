@@ -167,27 +167,44 @@ def _ventas_por_sku(session: Session, desde: date) -> dict[str, list[tuple[date,
 
 def _piezas_de_conjuntos(session: Session, skus: list[str]) -> dict[str, list[str]]:
     """{sku del conjunto: [sku de cada pieza que se lleva, misma talla]} para
-    los SKUs vendidos que son conjuntos con receta."""
+    los SKUs vendidos que son conjuntos con receta.
+
+    Tres consultas sin importar cuántos conjuntos se vendieron: la receta, los
+    conjuntos vendidos y, de una vez, las variantes activas de todos sus
+    componentes, que se reparten en Python por (producto, talla)."""
     from pos_uniformes.database.models import ConjuntoComponente
 
     if not skus:
         return {}
-    vendidas = session.scalars(select(Variante).where(Variante.sku.in_(skus))).all()
     receta_por_conjunto: dict[int, list[int]] = defaultdict(list)
-    for c in session.scalars(select(ConjuntoComponente).where(ConjuntoComponente.cantidad > 0)).all():
-        receta_por_conjunto[int(c.conjunto_id)].append(int(c.componente_id))
+    for conjunto_id, componente_id in session.execute(
+        select(ConjuntoComponente.conjunto_id, ConjuntoComponente.componente_id).where(ConjuntoComponente.cantidad > 0)
+    ).all():
+        receta_por_conjunto[int(conjunto_id)].append(int(componente_id))
     if not receta_por_conjunto:
         return {}
+    vendidas = session.execute(
+        select(Variante.sku, Variante.producto_id, Variante.talla)
+        .where(Variante.sku.in_(skus), Variante.producto_id.in_(list(receta_por_conjunto)))
+    ).all()
+    if not vendidas:
+        return {}
+    componentes_usados = sorted({c for _sku, pid, _t in vendidas for c in receta_por_conjunto[int(pid)]})
+    piezas_por_producto_talla: dict[tuple[int, str], list[str]] = defaultdict(list)
+    for sku, pid, talla in session.execute(
+        select(Variante.sku, Variante.producto_id, Variante.talla)
+        .where(Variante.producto_id.in_(componentes_usados), Variante.activo.is_(True))
+        .order_by(Variante.id)
+    ).all():
+        piezas_por_producto_talla[(int(pid), str(talla or "").strip().upper())].append(sku)
     out: dict[str, list[str]] = {}
-    for v in vendidas:
-        componentes = receta_por_conjunto.get(int(v.producto_id))
-        if not componentes:
-            continue
-        talla = str(v.talla or "").strip().upper()
-        piezas = session.scalars(
-            select(Variante).where(Variante.producto_id.in_(componentes), Variante.activo.is_(True))
-        ).all()
-        out[v.sku] = [p.sku for p in piezas if str(p.talla or "").strip().upper() == talla]
+    for sku, pid, talla in vendidas:
+        clave_talla = str(talla or "").strip().upper()
+        out[sku] = [
+            pieza
+            for componente in dict.fromkeys(receta_por_conjunto[int(pid)])  # sin repetir, como el IN de antes
+            for pieza in piezas_por_producto_talla.get((componente, clave_talla), [])
+        ]
     return out
 
 
