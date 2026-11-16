@@ -986,6 +986,9 @@ class SaltarConAjustePosteriorTests(unittest.TestCase):
         hecho = jn.aplicar_jornada(self.s, self.j, revisada_por="VEND-1")
         self.assertEqual(set(hecho.saltadas), {t.conteo_id for t in pantalla.saltadas})
         self.assertEqual(hecho.ajustados, pantalla.tallas_a_corregir)
+        # El resumen con que se decidió viaja con el resultado (para «✓ Listo»).
+        self.assertEqual((hecho.resumen.tallas_a_corregir, hecho.resumen.tallas_saltadas), (2, 1))
+        self.assertEqual((hecho.resumen.salen, hecho.resumen.entran), (5, 0))
 
     def test_el_recuento_de_una_caja_solo_cuenta_si_subio_el_total(self) -> None:
         # corregir_caja solo deja movimiento de inventario cuando la caja dice

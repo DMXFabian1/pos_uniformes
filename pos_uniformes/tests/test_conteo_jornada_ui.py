@@ -897,6 +897,86 @@ class RevisionDialogTests(unittest.TestCase):
         self.assertIn("Recuéntala.", texto)
         self.assertNotIn("se le suma la diferencia otra vez", texto)
 
+    # --- tanda 4 (2026-11-15): la talla con otro ajuste no se corrige -----------------
+    def _otro_ajuste(self, indice: int = 0) -> None:
+        from pos_uniformes.database.models import MovimientoInventario, TipoMovimientoInventario
+
+        s = self.factory()
+        s.add(MovimientoInventario(
+            variante_id=self.v_ids[indice], tipo_movimiento=TipoMovimientoInventario.AJUSTE_SALIDA, cantidad=-1,
+            stock_anterior=10, stock_posterior=9, referencia=None, creado_por="dueno",
+            created_at=self._despues_del_conteo(),
+        ))
+        s.get(Variante, self.v_ids[indice]).stock_actual = 9
+        s.commit(); s.close()
+
+    def _con_otra_diferencia(self) -> None:
+        """La talla 8 de la Prenda 1 también con diferencia (contó 12 de 10)."""
+        from pos_uniformes.services.conteo_service import ConteoInput, registrar_conteos_lote
+
+        s = self.factory()
+        registrar_conteos_lote(s, [ConteoInput(self.v_ids[3], 12)], "x", jornada_id=self.foto.id)
+        s.commit(); s.close()
+
+    def test_la_talla_con_otro_ajuste_no_se_toca_y_las_demas_si(self) -> None:
+        from pos_uniformes.database.models import ConteoInventario
+
+        self._con_otra_diferencia()
+        self._otro_ajuste(0)
+        d = self._dialogo()
+        self.assertEqual(d._chips["AJUSTE"].text(), "Corrige 1 talla · faltan 0 · sobran 2 · +$200 · 1 a recontar")
+        self.assertEqual(d._aplicar_btn.text(), "Corregir inventario (1 talla, +2 pz)")
+        fila = [self._celda(d, "6", c) for c in (_P.COL_DIF, _P.COL_QUEDA, _P.COL_QUE)]
+        self.assertEqual(fila, ["−3 ⚠", "9", "no se toca · recontar"])        # queda hoy = tienda hoy
+        self.assertIn("no se toca; hay que recontarla", d._resumen_label.text())
+        d._table.selectRow(self._fila(d, "6"))
+        self.assertIn(": no se toca, recontar", d._por_que_label.text())
+        with patch(f"{_D}._elegir", return_value="si") as preg:
+            d._aplicar()
+        self.assertIn("Prenda 0 Uno 6 no se toca: tuvo otro ajuste el ", preg.call_args.args[2])   # dos prendas: dice cuál
+        self.assertEqual(
+            d._listo_texto.text(),
+            "Se corrigió 1 talla: faltaban 0, sobraban 2 (+$200 a precio de venta). "
+            "Prenda 0 Uno 6 no se tocó (tuvo otro ajuste): recuéntala.",
+        )
+        s = self.factory()
+        self.assertEqual(s.get(Variante, self.v_ids[0]).stock_actual, 9)     # sin el −3 de aquel día
+        self.assertEqual(s.get(Variante, self.v_ids[3]).stock_actual, 12)
+        c6 = s.scalars(select(ConteoInventario).where(ConteoInventario.variante_id == self.v_ids[0])).one()
+        self.assertFalse(c6.ajustado)
+        self.assertIn("No se corrigió: otro ajuste el ", c6.notas)
+        s.close()
+        # Ya revisada (desde el Historial): se ve como no corregida, no como corregida.
+        d2 = self._dialogo()
+        self.assertEqual(self._celda(d2, "6", _P.COL_QUE), "no se corrigió (otro ajuste)")
+        self.assertEqual(self._celda(d2, "6", _P.COL_QUEDA), "9")
+        self.assertEqual(d2._chips["AJUSTE"].text(), "Corrigió 1 talla · faltaban 0 · sobraban 2 · 1 no se corrigió")
+        d2._table.selectRow(self._fila(d2, "6"))
+        self.assertIn(": no se corrigió, recontar", d2._por_que_label.text())
+
+    def test_si_todas_tuvieron_otro_ajuste_solo_se_marca_revisado(self) -> None:
+        self._otro_ajuste(0)
+        d = self._dialogo()
+        self.assertEqual(d._aplicar_btn.text(), "Marcar como revisado")
+        self.assertIn("solo se marca como revisado", d._aplicar_btn.toolTip())
+        self.assertIn("La talla con diferencia tuvo otro ajuste", d._resumen_label.text())
+        self.assertEqual(d._chips["AJUSTE"].text(), "Nada que corregir · 1 a recontar")
+        with patch(f"{_D}._elegir", return_value="si") as preg:
+            d._aplicar()
+        texto, opciones = preg.call_args.args[2], preg.call_args.args[3]
+        self.assertTrue(texto.startswith("Ninguna talla se corrige (Stayce contó el "))
+        self.assertIn("Solo se marca como revisado.", texto)
+        self.assertEqual([o[1] for o in opciones], ["Volver", "Sí, marcar como revisado"])
+        self.assertEqual(d.resultado, "aplicada")
+        self.assertEqual(
+            d._listo_texto.text(),
+            "Quedó revisado: ninguna talla se corrigió. La talla 6 no se tocó (tuvo otro ajuste): recuéntala.",
+        )
+        s = self.factory()
+        self.assertEqual(s.get(Variante, self.v_ids[0]).stock_actual, 9)
+        self.assertIsNotNone(s.get(ConteoJornada, self.foto.id).revisada_at)
+        s.close()
+
     def test_descartada_dice_que_no_se_uso(self) -> None:
         d = self._dialogo()
         with patch(f"{_D}._elegir", return_value="si"):

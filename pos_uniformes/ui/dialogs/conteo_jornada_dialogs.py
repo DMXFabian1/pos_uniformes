@@ -1031,6 +1031,7 @@ class ConteoRevisionDialog(QDialog):
             self._revisada_label.setText(f"✓ {revisada_txt}. El pedido se puede seguir escribiendo y guardando.")
         self._revisada_label.setVisible(self._ya_revisada)
         self._aplicar_btn.setText(pantalla.texto_boton_corregir(self._ajuste))
+        self._aplicar_btn.setToolTip(pantalla.ayuda_boton_corregir(self._ajuste))
 
     def _pedido_cambiado(self) -> bool:
         """¿Daniel escribió en PEDIR algo distinto de lo guardado (o lo sugerido)?"""
@@ -1052,6 +1053,10 @@ class ConteoRevisionDialog(QDialog):
             b.style().unpolish(b)
             b.style().polish(b)
         partes = []
+        # Tanda 4: por qué hay tallas que Corregir no toca (y si por eso solo se marca revisado).
+        no_se_tocan = "" if self._ya_revisada else pantalla.ayuda_boton_corregir(self._ajuste)
+        if no_se_tocan:
+            partes.append(f"<span style='color:#a35a00'>⚠ {no_se_tocan}</span>")
         if not r.lineas:
             partes.append("Esta jornada no tiene tallas capturadas.")
         else:
@@ -1227,12 +1232,12 @@ class ConteoRevisionDialog(QDialog):
         if l.cajas:
             partes.append("en cajas*: " + " · ".join(f"{c} ×{n}" for c, n in l.cajas))
         partes.append(self._la_vez_pasada(l))
-        ajuste = self._talla_del_ajuste(l.conteo_id)
-        if ajuste is not None and ajuste.ajuste_posterior is not None:
-            # Lo demás (el sistema decía, vendidas desde, queda hoy) ya está en la fila.
-            from pos_uniformes.services.conteo_revision_vista_service import dia_mes, fecha_tienda
+        # Lo demás (el sistema decía, vendidas desde, queda hoy) ya está en la fila.
+        from pos_uniformes.services.conteo_revision_pantalla_service import texto_por_que_ajuste
 
-            partes.append(f"<span style='color:#a35a00'>⚠ otro ajuste el {dia_mes(fecha_tienda(ajuste.ajuste_posterior))}</span>")
+        otro = texto_por_que_ajuste(self._talla_del_ajuste(l.conteo_id), ya_revisada=self._ya_revisada)
+        if otro:
+            partes.append(f"<span style='color:#a35a00'>⚠ {otro}</span>")
         from pos_uniformes.services.conteo_revision_pantalla_service import _colores, talla_texto
 
         varios = len({x.producto for x in self._revision.lineas}) > 1
@@ -1383,7 +1388,8 @@ class ConteoRevisionDialog(QDialog):
             quien=self._revision.quien, contado=self._contado_at, diferencias=self._diferencias, hoy=self._hoy,
             resumen=self._ajuste,
         )
-        if not _preguntar(self, "Corregir inventario", texto, si=vista.boton_corregir(self._dias, self._diferencias), no=vista.BOTON_VOLVER):
+        si = vista.boton_corregir(self._dias, self._diferencias, resumen=self._ajuste)
+        if not _preguntar(self, "Corregir inventario", texto, si=si, no=vista.BOTON_VOLVER):
             return
         if not self._guardar_pedidos(avisar=False):
             return
@@ -1393,7 +1399,7 @@ class ConteoRevisionDialog(QDialog):
         session = self._session_factory()
         try:
             j = session.get(ConteoJornada, self._jornada.id)
-            aplicar_jornada(session, j, revisada_por=self._revisada_por)
+            hecho = aplicar_jornada(session, j, revisada_por=self._revisada_por)
             session.commit()
         except Exception as exc:  # noqa: BLE001
             session.rollback()
@@ -1401,6 +1407,10 @@ class ConteoRevisionDialog(QDialog):
             return
         finally:
             session.close()
+        # «✓ Listo» dice lo que decidió el servicio al aplicar (tallas que se
+        # saltaron incluidas), no lo que la pantalla leyó al abrir.
+        if getattr(hecho, "resumen", None) is not None:
+            self._ajuste = hecho.resumen
         self.resultado = "aplicada"
         self._mostrar_listo()
 

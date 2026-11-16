@@ -8,7 +8,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 from pos_uniformes.services import conteo_revision_pantalla_service as p
-from pos_uniformes.services.conteo_resumen_service import TallaResumen, resumir
+from pos_uniformes.services.conteo_resumen_service import TallaResumen, queda_hoy, resumir
 from pos_uniformes.services.revision_service import BIEN, NO_SE_MUEVE, PEDIR, SURTIR, URGENTE
 
 M = "−"
@@ -25,19 +25,28 @@ def _l(cid, talla, *, producto="Playera Chazarilla Azul Marino", color="AZUL MAR
     )
 
 
-def _t(cid, *, sistema=5, conto=5, vendidas=0, tienda=None, precio="185", ajustado=False, posterior=None, producto="P"):
+def _t(cid, *, sistema=5, conto=5, vendidas=0, tienda=None, precio="185", ajustado=False, posterior=None, producto="P",
+       talla=None, no_corregida=False):
     dif = conto - sistema
     tienda = sistema - vendidas if tienda is None else tienda
+    salta = not ajustado and dif != 0 and posterior is not None
     return TallaResumen(
-        conteo_id=cid, variante_id=cid, producto=producto, talla=str(cid), stock_sistema=sistema, conto=conto,
-        diferencia=dif, ajustado=ajustado, vendidas_desde=vendidas, tienda_hoy=tienda,
-        queda_hoy=tienda if ajustado else tienda + dif, precio_venta=Decimal(precio) if precio else None,
-        ajuste_posterior=posterior,
+        conteo_id=cid, variante_id=cid, producto=producto, talla=str(cid) if talla is None else talla,
+        stock_sistema=sistema, conto=conto, diferencia=dif, ajustado=ajustado, vendidas_desde=vendidas,
+        tienda_hoy=tienda, queda_hoy=queda_hoy(tienda_hoy=tienda, diferencia=dif, ajustado=ajustado, se_salta=salta),
+        precio_venta=Decimal(precio) if precio else None, ajuste_posterior=posterior, no_se_corrigio=no_corregida,
     )
 
 
-def _caso_86():
-    """La 86: 15 tallas, 4 con diferencia (8 −1, 32 −4, 34 −1, 36 −1)."""
+OTRO_AJUSTE = datetime(2026, 10, 20, 18)    # 20 oct en la tienda
+
+
+def _caso_86(*, con_otro_ajuste=(), ya_aplicada=False):
+    """La 86: 15 tallas, 4 con diferencia (8 −1, 32 −4, 34 −1, 36 −1).
+
+    `con_otro_ajuste`: tallas con otro ajuste después del conteo (tanda 4).
+    `ya_aplicada`: como queda después de corregir (las demás ajustadas, las
+    saltadas con su marca)."""
     tallas = ("4", "6", "8", "10", "12", "14", "16", "18", "20", "32", "34", "36", "38", "40", "42")
     dif = {"8": (7, 6, "185"), "32": (10, 6, "199"), "34": (9, 8, "199"), "36": (19, 18, "205")}
     vend = {"16": 5, "32": 2, "34": 2, "38": 1, "40": 3}
@@ -46,7 +55,10 @@ def _caso_86():
         sistema, conto, precio = dif.get(t, (6, 6, "185"))
         lineas.append(_l(i, t, conto=conto, estado=BIEN if t in ("16", "32", "34") else NO_SE_MUEVE,
                          en_cajas=12 if t == "32" else 0, cajas=(("A-12", 12),) if t == "32" else ()))
-        resumen.append(_t(i, sistema=sistema, conto=conto, vendidas=vend.get(t, 0), precio=precio))
+        otro = OTRO_AJUSTE if t in con_otro_ajuste else None
+        ajustado = ya_aplicada and t in dif and otro is None
+        resumen.append(_t(i, sistema=sistema, conto=conto, vendidas=vend.get(t, 0), precio=precio, talla=t,
+                          posterior=otro, ajustado=ajustado, no_corregida=ya_aplicada and otro is not None and t in dif))
     return lineas, resumir(resumen, jornada_id=86)
 
 
@@ -200,10 +212,16 @@ class TablaTests(unittest.TestCase):
     def test_otro_ajuste_despues_lleva_el_ojo_en_la_diferencia(self) -> None:
         # Reescrita (antes: el ⚠ y la fecha iban al principio de «qué hacer» y se
         # comían la acción al 125 %). Ahora: marca corta en DIF y la fecha en `ojo`.
+        # Tanda 4: esa talla no se corrige, así que QUÉ HACER dice «no se toca · recontar».
         fila = p.fila_talla(_l(1, "36"), _t(1, sistema=19, conto=18, posterior=datetime(2026, 10, 20, 18)), None)
         self.assertEqual(fila.celdas[p.COL_DIF], f"{M}1 ⚠")
         self.assertEqual(fila.ojo, "otro ajuste el 20 oct")
-        self.assertEqual(fila.celdas[p.COL_QUE], "no se mueve")          # solo la acción
+        self.assertEqual(fila.celdas[p.COL_QUE], "no se toca · recontar")
+        self.assertEqual(fila.tono_que, p.QUE_OJO)
+        self.assertIn("20 oct", fila.ayuda_que)
+        # Sin diferencia, el otro ajuste no cambia nada: QUÉ HACER queda con la acción.
+        fila = p.fila_talla(_l(1, "38"), _t(1, sistema=2, conto=2, posterior=datetime(2026, 10, 20, 18)), None)
+        self.assertEqual(fila.celdas[p.COL_QUE], "no se mueve")
         self.assertEqual(fila.tono_que, p.QUE_GRIS)
         # Ya corregida (ajustado), el otro ajuste no importa: sin marca.
         t = _t(1, sistema=19, conto=18, ajustado=True, posterior=datetime(2026, 10, 20, 18))
@@ -256,6 +274,65 @@ class BotonesTests(unittest.TestCase):
         self.assertEqual(p.texto_quedan(0), "No queda ningún conteo por revisar.")
         self.assertEqual(p.texto_quedan(1), "Queda 1 conteo por revisar.")
         self.assertEqual(p.texto_orden(False), "↕ En su orden")
+
+
+
+class SaltadasTests(unittest.TestCase):
+    """Tanda 4: la talla con otro ajuste después del conteo no se corrige."""
+
+    def test_la_86_con_la_36_ajustada_despues(self) -> None:
+        lineas, ajuste = _caso_86(con_otro_ajuste=("36",))
+        chip = p.chips(lineas, ajuste)[0]
+        self.assertEqual(chip.texto, f"Corrige 3 tallas · faltan 6 · sobran 0 · {M}$1,180 · 1 a recontar")
+        self.assertEqual(chip.n, 4)                       # el filtro sí la enseña
+        self.assertEqual(p.texto_boton_corregir(ajuste), f"Corregir inventario (3 tallas, {M}6 pz)")
+        fila = p.fila_talla(lineas[11], p.tallas_por_id(ajuste)[12], None)
+        self.assertEqual(fila.celdas[p.COL_TALLA], "36")
+        self.assertEqual(fila.celdas[p.COL_DIF], f"{M}1 ⚠")
+        self.assertEqual(fila.celdas[p.COL_QUEDA], "19")  # la tienda de hoy, sin sumar el −1
+        self.assertEqual(fila.celdas[p.COL_QUE], "no se toca · recontar")
+        self.assertEqual(
+            p.texto_listo("aplicada", ajuste),
+            f"Se corrigieron 3 tallas: faltaban 6, sobraban 0 ({M}$1,180 a precio de venta). "
+            "La talla 36 no se tocó (tuvo otro ajuste): recuéntala.",
+        )
+        self.assertEqual(p.ayuda_boton_corregir(ajuste),
+                         "1 talla con otro ajuste después del conteo no se toca; hay que recontarla.")
+        self.assertEqual(p.texto_por_que_ajuste(p.tallas_por_id(ajuste)[12]), "otro ajuste el 20 oct: no se toca, recontar")
+
+    def test_si_todas_las_de_diferencia_tuvieron_otro_ajuste(self) -> None:
+        lineas, ajuste = _caso_86(con_otro_ajuste=("8", "32", "34", "36"))
+        self.assertEqual(p.texto_boton_corregir(ajuste), "Marcar como revisado")
+        chip = p.chips(lineas, ajuste)[0]
+        self.assertEqual((chip.texto, chip.tono, chip.tocable), ("Nada que corregir · 4 a recontar", p.TONO_AJUSTE, True))
+        self.assertEqual(
+            p.texto_listo("aplicada", ajuste),
+            "Quedó revisado: ninguna talla se corrigió. 4 tallas no se tocaron (tuvieron otro ajuste): recuéntalas.",
+        )
+        self.assertEqual(
+            p.ayuda_boton_corregir(ajuste),
+            "Las 4 tallas con diferencia tuvieron otro ajuste después del conteo: no se corrige nada, "
+            "solo se marca como revisado. Recuéntalas.",
+        )
+        self.assertEqual(p.ayuda_boton_corregir(_caso_86()[1]), "")
+
+    def test_ya_revisada_se_ve_como_no_corregida(self) -> None:
+        lineas, ajuste = _caso_86(con_otro_ajuste=("36",), ya_aplicada=True)
+        self.assertEqual(p.texto_chip_ajuste(ajuste, ya_revisada=True),
+                         "Corrigió 3 tallas · faltaban 6 · sobraban 0 · 1 no se corrigió")
+        t36 = p.tallas_por_id(ajuste)[12]
+        fila = p.fila_talla(lineas[11], t36, None, ya_revisada=True)
+        self.assertEqual(fila.celdas[p.COL_QUE], "no se corrigió (otro ajuste)")
+        self.assertEqual(fila.tono_que, p.QUE_OJO)
+        self.assertEqual(fila.celdas[p.COL_QUEDA], "19")
+        self.assertEqual(p.texto_por_que_ajuste(t36, ya_revisada=True), "otro ajuste el 20 oct: no se corrigió, recontar")
+        _, todas = _caso_86(con_otro_ajuste=("8", "32", "34", "36"), ya_aplicada=True)
+        self.assertEqual(p.texto_chip_ajuste(todas, ya_revisada=True), "No corrigió ninguna talla · 4 no se corrigieron")
+
+    def test_descartada_no_dice_no_se_corrigio(self) -> None:
+        lineas, ajuste = _caso_86(con_otro_ajuste=("36",))     # sin marca: se descartó
+        fila = p.fila_talla(lineas[11], p.tallas_por_id(ajuste)[12], None, ya_revisada=True)
+        self.assertNotEqual(fila.celdas[p.COL_QUE], "no se corrigió (otro ajuste)")
 
 
 if __name__ == "__main__":

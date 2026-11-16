@@ -19,6 +19,11 @@
   ni No usar.
 - **Listo**: el texto después de corregir o de no usar, y cuál es la
   siguiente jornada por revisar.
+- **Tallas con otro ajuste después del conteo** (tanda 4): no se corrigen.
+  Su QUÉ HACER dice «no se toca · recontar», QUEDA HOY es la tienda de hoy,
+  y no entran al chip, al botón ni al $. Si todas las de diferencia son así,
+  el botón dice «Marcar como revisado». Ya revisada, se ven como «no se
+  corrigió (otro ajuste)».
 
 No cambia ninguna regla: `revision_service.sugerir` decide el estado y
 `conteo_resumen_service` la diferencia; esto solo las acomoda y las cuenta.
@@ -29,6 +34,7 @@ from __future__ import annotations
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 
+from pos_uniformes.services.conteo_resumen_service import TEXTO_NO_CORREGIDA
 from pos_uniformes.services.conteo_revision_vista_service import (
     _MENOS,
     cuando_se_conto,
@@ -37,6 +43,7 @@ from pos_uniformes.services.conteo_revision_vista_service import (
     dia_mes,
     pesos,
     que_hacer,
+    texto_no_se_tocaron,
 )
 from pos_uniformes.services.revision_service import (
     NO_SE_MUEVE,
@@ -96,23 +103,32 @@ def en_grupo(clave: str, linea, talla_ajuste=None) -> bool:
 def texto_chip_ajuste(ajuste, *, ya_revisada: bool = False, aplicada: bool = True) -> str:
     """«Corrige 4 tallas · faltan 7 · sobran 0 · −$1,385» o «Todo cuadra».
 
-    Ya revisada: lo que se corrigió («Corrigió 4 tallas · faltaban 7 · sobraban 0»)
-    o, si no se usó, cuántas traían diferencia."""
+    Las que tuvieron otro ajuste después del conteo no se cuentan ahí: van
+    aparte («· 1 a recontar»). Ya revisada: lo que se corrigió («Corrigió 4
+    tallas · faltaban 7 · sobraban 0 · 1 no se corrigió») o, si no se usó,
+    cuántas traían diferencia."""
     if ajuste is None:
         return "Sin resumen del ajuste"
     con_dif = [t for t in ajuste.tallas if _con_diferencia(t)]
     if not con_dif:
         return "Todo cuadra"
     if ya_revisada:
-        faltan = -sum(t.diferencia for t in con_dif if t.diferencia < 0)
-        sobran = sum(t.diferencia for t in con_dif if t.diferencia > 0)
         if not aplicada:
             return f"{_tallas(len(con_dif))} con diferencia · no se usó"
-        return f"Corrigió {_tallas(len(con_dif))} · faltaban {faltan} · sobraban {sobran}"
+        corregidas = [t for t in con_dif if not t.no_se_corrigio]
+        saltadas = len(con_dif) - len(corregidas)
+        cola = f" · {saltadas} no se corrigió" if saltadas == 1 else (f" · {saltadas} no se corrigieron" if saltadas else "")
+        if not corregidas:
+            return f"No corrigió ninguna talla{cola}"
+        faltan = -sum(t.diferencia for t in corregidas if t.diferencia < 0)
+        sobran = sum(t.diferencia for t in corregidas if t.diferencia > 0)
+        return f"Corrigió {_tallas(len(corregidas))} · faltaban {faltan} · sobraban {sobran}{cola}"
     n = ajuste.tallas_a_corregir
+    k = ajuste.tallas_saltadas
+    cola = f" · {k} a recontar" if k else ""
     if n == 0:
-        return "Todo cuadra"
-    return f"Corrige {_tallas(n)} · faltan {ajuste.salen} · sobran {ajuste.entran} · {pesos(ajuste.valor, signo=True)}"
+        return f"Nada que corregir{cola}" if k else "Todo cuadra"
+    return f"Corrige {_tallas(n)} · faltan {ajuste.salen} · sobran {ajuste.entran} · {pesos(ajuste.valor, signo=True)}{cola}"
 
 
 def chips(lineas: Iterable, ajuste=None, *, ya_revisada: bool = False, aplicada: bool = True) -> list[Chip]:
@@ -285,10 +301,24 @@ def texto_ojo(t) -> str:
     return f"otro ajuste el {dia_mes(fecha_tienda(t.ajuste_posterior))}"
 
 
-def _que_hacer_talla(linea, t) -> tuple[str, str, str]:
+#: QUÉ HACER de una talla con otro ajuste después del conteo (tanda 4).
+TEXTO_NO_SE_TOCA = "no se toca · recontar"
+
+
+def _que_hacer_talla(linea, t, *, ya_revisada: bool = False) -> tuple[str, str, str]:
     """(texto, tono, ayuda) de «qué hacer»: el motivo real de la tanda 1 y las
     cajas en gris (sin recontar). Solo la acción: el ⚠ del otro ajuste va en
-    DIF (con la fecha en el tooltip y en el «por qué») para que no la corte."""
+    DIF (con la fecha en el tooltip y en el «por qué») para que no la corte.
+
+    Tanda 4: la talla que Corregir no toca dice «no se toca · recontar»; ya
+    revisada, la que se saltó dice «no se corrigió (otro ajuste)»."""
+    if t is not None and ya_revisada and t.no_se_corrigio:
+        return TEXTO_NO_CORREGIDA, QUE_OJO, "Tuvo otro ajuste después del conteo: no se corrigió. Recuéntala."
+    if t is not None and not ya_revisada and t.se_salta:
+        cuando = dia_mes(fecha_tienda(t.ajuste_posterior))
+        return TEXTO_NO_SE_TOCA, QUE_OJO, (
+            f"Tuvo otro ajuste el {cuando}: sumarle la diferencia del conteo la corregiría dos veces. Recuéntala."
+        )
     texto = que_hacer(linea)
     if linea.estado == URGENTE:
         tono = QUE_URGENTE
@@ -323,7 +353,7 @@ def fila_talla(linea, t, pedido: int | None, *, varios_colores: bool = False, ya
     else:
         sistema = dif = vendidas = queda = "—"
         tono_dif = tono_queda = ""
-    que, tono_que, ayuda = _que_hacer_talla(linea, t)
+    que, tono_que, ayuda = _que_hacer_talla(linea, t, ya_revisada=ya_revisada)
     ojo = texto_ojo(t)
     if ojo:
         dif = f"{dif} {MARCA_OJO}"
@@ -477,12 +507,27 @@ TEXTO_MARCAR_REVISADO = "Marcar como revisado"
 
 
 def texto_boton_corregir(ajuste) -> str:
-    """«Corregir inventario (4 tallas, −7 pz)» o «Marcar como revisado» sin diferencias."""
+    """«Corregir inventario (4 tallas, −7 pz)» o «Marcar como revisado» si no
+    hay nada que corregir (sin diferencias, o todas con otro ajuste después)."""
     if ajuste is None or ajuste.tallas_a_corregir == 0:
         return TEXTO_MARCAR_REVISADO
     netas = ajuste.piezas_netas
     pz = "0" if netas == 0 else con_signo(netas)
     return f"Corregir inventario ({_tallas(ajuste.tallas_a_corregir)}, {pz} pz)"
+
+
+def ayuda_boton_corregir(ajuste) -> str:
+    """Por qué el botón dice lo que dice cuando hay tallas que no se tocan; '' si nada."""
+    if ajuste is None or not ajuste.tallas_saltadas:
+        return ""
+    k = ajuste.tallas_saltadas
+    if ajuste.tallas_a_corregir == 0:
+        sujeto = "La talla con diferencia tuvo" if k == 1 else f"Las {k} tallas con diferencia tuvieron"
+        return f"{sujeto} otro ajuste después del conteo: no se corrige nada, solo se marca como revisado. Recuéntalas."
+    sujeto = "1 talla con otro ajuste después del conteo no se toca" if k == 1 else (
+        f"{k} tallas con otro ajuste después del conteo no se tocan"
+    )
+    return f"{sujeto}; hay que recontarla{'s' if k > 1 else ''}."
 
 
 @dataclass(frozen=True)
@@ -503,13 +548,30 @@ def texto_listo(resultado: str, ajuste=None) -> str:
     """Lo que dice «✓ Listo» después de corregir o de no usar el conteo."""
     if resultado == "descartada":
         return "No se usó este conteo: el inventario no cambió."
+    no_tocadas = texto_no_se_tocaron(ajuste)
     if ajuste is None or ajuste.tallas_a_corregir == 0:
+        if no_tocadas:
+            return f"Quedó revisado: ninguna talla se corrigió. {no_tocadas}"
         return "Quedó revisado: ninguna talla cambió."
     verbo = "Se corrigió" if ajuste.tallas_a_corregir == 1 else "Se corrigieron"
-    return (
+    texto = (
         f"{verbo} {_tallas(ajuste.tallas_a_corregir)}: faltaban {ajuste.salen}, sobraban {ajuste.entran} "
         f"({pesos(ajuste.valor, signo=True)} a precio de venta)."
     )
+    return f"{texto} {no_tocadas}" if no_tocadas else texto
+
+
+def texto_por_que_ajuste(t, *, ya_revisada: bool = False) -> str:
+    """La parte del «por qué» de una talla sobre el otro ajuste ('' si no tuvo):
+    «otro ajuste el 20 oct: no se toca, recontar» / «… no se corrigió»."""
+    if t is None or t.ajuste_posterior is None:
+        return ""
+    base = f"otro ajuste el {dia_mes(fecha_tienda(t.ajuste_posterior))}"
+    if ya_revisada and t.no_se_corrigio:
+        return f"{base}: no se corrigió, recontar"
+    if not ya_revisada and t.se_salta:
+        return f"{base}: no se toca, recontar"
+    return base
 
 
 def texto_quedan(n: int) -> str:

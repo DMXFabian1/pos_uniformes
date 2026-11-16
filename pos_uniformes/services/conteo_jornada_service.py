@@ -710,13 +710,16 @@ def _no_revisada(jornada: ConteoJornada) -> None:
 
 class Aplicado(tuple):
     """Lo que hizo `aplicar_jornada`: se desempaca como (ajustados, omitidos),
-    igual que antes, y trae además las tallas que se saltaron (tanda 4)."""
+    igual que antes, y trae además las tallas que se saltaron (tanda 4) y el
+    resumen con que se decidió (para que «✓ Listo» diga lo que de verdad pasó)."""
 
     saltadas: dict[int, datetime]
+    resumen: object
 
-    def __new__(cls, ajustados: int, omitidos: int, saltadas: dict[int, datetime] | None = None):
+    def __new__(cls, ajustados: int, omitidos: int, saltadas: dict[int, datetime] | None = None, *, resumen=None):
         obj = super().__new__(cls, (int(ajustados), int(omitidos)))
         obj.saltadas = dict(saltadas or {})
+        obj.resumen = resumen
         return obj
 
     @property
@@ -736,40 +739,35 @@ def aplicar_jornada(session: Session, jornada: ConteoJornada, *, revisada_por: s
     mano o el recuento de una caja que subió el total) NO se corrige: sumarle
     la diferencia vieja la corregiría dos veces. Se queda `ajustado = False`,
     con «No se corrigió: otro ajuste el 20 oct» en sus notas, para recontarla.
-    La decisión se toma aquí, con la jornada bloqueada y la misma definición
-    que enseña la pantalla (`conteo_resumen_service.ajustes_posteriores`), no
-    con lo que la pantalla leyó antes. La jornada sí queda revisada.
+    La decisión se toma aquí, con la jornada bloqueada, con el mismo resumen
+    que enseña la pantalla (`conteo_resumen_service.resumen_de_jornada`, que
+    usa `ajustes_posteriores`), no con lo que la pantalla leyó antes. La
+    jornada sí queda revisada.
 
     Devuelve `Aplicado`: (ajustados, omitidos) como `confirmar_ajustes_lote`,
-    y `.saltadas` = {conteo_id: fecha del otro ajuste}.
+    `.saltadas` = {conteo_id: fecha del otro ajuste} y `.resumen` (el de antes
+    de corregir, leído aquí).
     """
-    from pos_uniformes.services.conteo_resumen_service import ajustes_posteriores, con_nota_no_corregida
+    from pos_uniformes.services.conteo_resumen_service import con_nota_no_corregida, resumen_de_jornada
     from pos_uniformes.services.conteo_service import confirmar_ajustes_lote
 
     if (revisada_por or "").strip().upper() != DUENO_CODE:
         raise PermissionError("Solo el dueño aplica un conteo al inventario.")
     jornada = _bloquear_sin_revisar(session, jornada)
-    pendientes = list(
-        session.scalars(
-            select(ConteoInventario).where(
-                ConteoInventario.jornada_id == jornada.id,
-                ConteoInventario.ajustado.is_(False),
-                ConteoInventario.diferencia != 0,
-            ).order_by(ConteoInventario.id)
-        ).all()
-    )
-    saltadas = ajustes_posteriores(session, pendientes)
-    ids = [int(c.id) for c in pendientes if int(c.id) not in saltadas]
+    # El mismo resumen que enseña la pantalla, leído aquí con la jornada bloqueada.
+    resumen = resumen_de_jornada(session, jornada)
+    ids = [t.conteo_id for t in resumen.a_corregir]
+    saltadas = {t.conteo_id: t.ajuste_posterior for t in resumen.saltadas}
     ajustados, omitidos = confirmar_ajustes_lote(session, ids, revisada_por) if ids else (0, 0)
-    for c in pendientes:
-        if int(c.id) in saltadas:
-            c.notas = con_nota_no_corregida(c.notas, saltadas[int(c.id)])
-            session.add(c)
+    for conteo_id, cuando_otro in saltadas.items():
+        c = session.get(ConteoInventario, conteo_id)
+        c.notas = con_nota_no_corregida(c.notas, cuando_otro)
+        session.add(c)
     jornada.revisada_at = func.now()
     jornada.revisada_por = revisada_por.strip().upper()
     session.add(jornada)
     session.flush()
-    return Aplicado(ajustados, omitidos, saltadas)
+    return Aplicado(ajustados, omitidos, saltadas, resumen=resumen)
 
 
 def descartar_jornada(session: Session, jornada: ConteoJornada, *, revisada_por: str) -> None:
