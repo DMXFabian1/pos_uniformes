@@ -1011,3 +1011,115 @@ class SaltarConAjustePosteriorTests(unittest.TestCase):
         self.assertEqual(set(hecho.saltadas), {self.c["32"].id})
         self.assertEqual(self.v["8"].stock_actual, 9)
         self.assertEqual(self.v["32"].stock_actual, 12)
+
+    # --- revisión de la tanda 4 (2026-11-15) ---------------------------------------
+
+    def test_la_saltada_no_vuelve_como_pendiente_del_panel(self) -> None:
+        # El Panel de Uniformes (getConteosPendientes → confirmarAjuste) la
+        # corregiría dos veces: ya no la ve, y si le llega el id no la toca.
+        from pos_uniformes.services.conteo_service import confirmar_ajustes_lote, obtener_conteos_pendientes
+
+        self._ajuste("36", -2)                                  # a mano el 20 oct: 10 → 8
+        jn.aplicar_jornada(self.s, self.j, revisada_por="VEND-1")
+        self.assertEqual(self.v["36"].stock_actual, 8)
+        self.assertEqual(obtener_conteos_pendientes(self.s, self.escuela.id), [])
+        self.assertEqual(confirmar_ajustes_lote(self.s, [self.c["36"].id], "ADMIN"), (0, 1))
+        self.assertEqual(self.v["36"].stock_actual, 8)
+        self.assertFalse(self.c["36"].ajustado)
+        self.assertEqual(self._movs_de("36"), [])
+
+    def test_la_descartada_tampoco_sale_como_pendiente(self) -> None:
+        from pos_uniformes.services.conteo_service import confirmar_ajustes_lote, obtener_conteos_pendientes
+
+        self.assertEqual(len(obtener_conteos_pendientes(self.s, self.escuela.id)), 3)   # sin revisar: sí
+        jn.descartar_jornada(self.s, self.j, revisada_por="VEND-1")
+        self.assertEqual(obtener_conteos_pendientes(self.s, self.escuela.id), [])
+        self.assertEqual(confirmar_ajustes_lote(self.s, [self.c["8"].id], "ADMIN"), (0, 1))
+        self.assertEqual(self.v["8"].stock_actual, 10)
+
+    def test_recapturar_el_mismo_numero_no_borra_el_otro_ajuste(self) -> None:
+        # Contó 9 el 5 oct (sistema 10, −1); el 20 oct alguien ajusta a mano a 9.
+        # La empleada vuelve a guardar la hoja con el mismo 9: sigue siendo el
+        # conteo del 5 oct, el ajuste sigue siendo «después», y la 36 se salta.
+        self._ajuste("36", -1)
+        jn.guardar_tallas(self.s, self.j, [{"variante_id": self.v["36"].id, "fisico": 9, "pedido": 3}], contado_por="VEND-4")
+        self.s.refresh(self.c["36"])
+        self.assertEqual((self.c["36"].stock_sistema, self.c["36"].diferencia), (10, -1))
+        self.assertEqual(self.c["36"].contado_at, self.CONTADO)
+        hecho = jn.aplicar_jornada(self.s, self.j, revisada_por="VEND-1")
+        self.assertEqual(set(hecho.saltadas), {self.c["36"].id})
+        self.assertEqual(self.v["36"].stock_actual, 9)          # no se corrigió dos veces
+
+    def test_recapturar_otro_numero_es_un_conteo_nuevo_contra_la_tienda_de_hoy(self) -> None:
+        # Después del ajuste a mano (10 → 9) recuenta y ve 8: se mide contra el 9
+        # de hoy (−1), ya no contra el 10 de octubre, y se corrige una vez: 8.
+        self._ajuste("36", -1)
+        jn.guardar_tallas(self.s, self.j, [{"variante_id": self.v["36"].id, "fisico": 8}], contado_por="VEND-4")
+        self.s.refresh(self.c["36"])
+        self.assertEqual((self.c["36"].stock_sistema, self.c["36"].stock_fisico, self.c["36"].diferencia), (9, 8, -1))
+        self.assertNotEqual(self.c["36"].contado_at, self.CONTADO)
+        hecho = jn.aplicar_jornada(self.s, self.j, revisada_por="VEND-1")
+        self.assertEqual(hecho.saltadas, {})
+        self.assertEqual(self.v["36"].stock_actual, 8)
+
+
+from pos_uniformes.tests.test_conjunto_service import _Base as _BaseConjuntos  # noqa: E402
+
+
+class LaVentaDelPosNoEsOtroAjusteTests(_BaseConjuntos):
+    """Vender una Chamarra en el POS suma +1 Pants Suelto con un AJUSTE_ENTRADA
+    firmado con el folio de la venta (`conjunto_service.descomponer`). Eso lo
+    hizo sola la venta: no es «otro ajuste» y la talla se corrige normal."""
+
+    from datetime import datetime as _dt
+
+    CONTADO = _dt(2026, 10, 5, 17, 0)
+
+    def setUp(self) -> None:
+        super().setUp()
+        self._armar()
+        self.v = self._var(self.suelto, "10")                   # stock 1
+        self.j = jn.abrir_jornada(self.s, escuela_id=self.esc.id, empleada_code="VEND-4", empleada_nombre="Stayce")
+        self.c = ConteoInventario(
+            variante_id=self.v.id, escuela_id=self.esc.id, stock_sistema=1, stock_fisico=0, diferencia=-1,
+            contado_por="VEND-4", contado_at=self.CONTADO, jornada_id=self.j.id,
+        )
+        self.s.add(self.c)
+        self.s.flush()
+        jn.terminar_jornada(self.s, self.j, empleada_code="VEND-4")
+
+    def _aplicar_despues_de(self, vender) -> None:
+        from pos_uniformes.services import conteo_resumen_service as rs
+
+        vender()
+        self.assertEqual(self.v.stock_actual, 2)                # la chamarra dejó su pants suelto
+        self.assertEqual(rs.ajustes_posteriores(self.s, [self.c]), {})
+        hecho = jn.aplicar_jornada(self.s, self.j, revisada_por="VEND-1")
+        self.assertEqual((tuple(hecho), hecho.saltadas), ((1, 0), {}))
+        self.assertEqual(self.v.stock_actual, 1)
+
+    def test_venta_del_pos(self) -> None:
+        from pos_uniformes.services.inventario_service import InventarioService
+
+        self._aplicar_despues_de(lambda: InventarioService.registrar_salida_venta(
+            self.s, self._var(self.cham, "10"), 1, referencia="V-000123", creado_por="VEND-4",
+        ))
+
+    def test_apartado_del_pos(self) -> None:
+        from pos_uniformes.database.models import TipoMovimientoInventario
+        from pos_uniformes.services.inventario_service import InventarioService
+
+        self._aplicar_despues_de(lambda: InventarioService.registrar_movimiento(
+            self.s, self._var(self.cham, "10"), TipoMovimientoInventario.APARTADO_RESERVA, -1,
+            referencia="AP-000045", creado_por="VEND-4", allow_negative_stock=True,
+        ))
+
+    def test_un_ajuste_a_mano_con_otra_referencia_si_cuenta(self) -> None:
+        from pos_uniformes.database.models import TipoMovimientoInventario
+        from pos_uniformes.services import conteo_resumen_service as rs
+        from pos_uniformes.services.inventario_service import InventarioService
+
+        InventarioService.registrar_movimiento(
+            self.s, self.v, TipoMovimientoInventario.AJUSTE_SALIDA, -1, referencia="AJUSTE-MANUAL", creado_por="dueno",
+        )
+        self.assertIn(self.c.id, rs.ajustes_posteriores(self.s, [self.c]))

@@ -21,6 +21,7 @@ from pos_uniformes.database.models import (
     ConfigConteoEscuela,
     ConfiguracionNegocio,
     ConteoInventario,
+    ConteoJornada,
     Escuela,
     MovimientoInventario,
     Producto,
@@ -105,27 +106,7 @@ def registrar_conteo(
     `jornada_id` liga el renglón a su jornada (ver conteo_jornada_service);
     los conteos sueltos siguen valiendo con None.
     """
-    variante = session.scalar(
-        select(Variante)
-        .where(Variante.id == variante_id)
-        .with_for_update()
-    )
-    if variante is None:
-        raise ValueError(f"Variante id={variante_id} no encontrada.")
-    # Cargar producto + contenidos de bodega para calcular stock_tienda igual que
-    # lo ve el usuario en el panel. Se hace en un query aparte con populate_existing
-    # porque joinedload + with_for_update no se combinan en PG.
-    session.scalar(
-        select(Variante)
-        .where(Variante.id == variante_id)
-        .options(
-            joinedload(Variante.producto),
-            joinedload(Variante.bodega_contenidos)
-            .joinedload(BodegaContenido.caja)
-            .joinedload(BodegaCaja.ubicacion),
-        )
-        .execution_options(populate_existing=True)
-    )
+    variante = variante_para_contar(session, variante_id)
 
     # El conteo es SOLO de tienda: la diferencia se mide contra stock_tienda,
     # nunca contra el total. Bodega y piso no se ven afectados por esta herramienta.
@@ -150,6 +131,34 @@ def registrar_conteo(
     session.add(variante)
 
     return conteo
+
+
+def variante_para_contar(session: Session, variante_id: int) -> Variante:
+    """La variante bloqueada y con sus cajas cargadas, para medir `stock_tienda`
+    en el momento de contar (lo usan `registrar_conteo` y la recaptura de una
+    hoja, `conteo_jornada_service.guardar_tallas`)."""
+    variante = session.scalar(
+        select(Variante)
+        .where(Variante.id == variante_id)
+        .with_for_update()
+    )
+    if variante is None:
+        raise ValueError(f"Variante id={variante_id} no encontrada.")
+    # Cargar producto + contenidos de bodega para calcular stock_tienda igual que
+    # lo ve el usuario en el panel. Se hace en un query aparte con populate_existing
+    # porque joinedload + with_for_update no se combinan en PG.
+    session.scalar(
+        select(Variante)
+        .where(Variante.id == variante_id)
+        .options(
+            joinedload(Variante.producto),
+            joinedload(Variante.bodega_contenidos)
+            .joinedload(BodegaContenido.caja)
+            .joinedload(BodegaCaja.ubicacion),
+        )
+        .execution_options(populate_existing=True)
+    )
+    return variante
 
 
 def registrar_conteos_lote(
@@ -192,6 +201,26 @@ def registrar_conteos_lote(
 # Confirmar ajustes
 # ---------------------------------------------------------------------------
 
+def _sin_jornada_revisada():
+    """Condición: el renglón no es de una jornada ya revisada (suelto o de una abierta)."""
+    return ConteoInventario.jornada_id.is_(None) | ConteoInventario.jornada_id.in_(
+        select(ConteoJornada.id).where(ConteoJornada.revisada_at.is_(None))
+    )
+
+
+def _de_jornada_revisada(session: Session, conteo_ids: list[int]) -> set[int]:
+    """De esos renglones, los que son de una jornada ya revisada."""
+    if not conteo_ids:
+        return set()
+    return {
+        int(i) for i in session.scalars(
+            select(ConteoInventario.id)
+            .join(ConteoJornada, ConteoJornada.id == ConteoInventario.jornada_id)
+            .where(ConteoInventario.id.in_(conteo_ids), ConteoJornada.revisada_at.is_not(None))
+        ).all()
+    }
+
+
 def confirmar_ajustes_lote(
     session: Session,
     conteo_ids: list[int],
@@ -216,6 +245,14 @@ def confirmar_ajustes_lote(
 
     ajustados = 0
     omitidos = 0
+
+    # Un renglón de una jornada ya revisada (aplicada o descartada) no se toca:
+    # si se saltó por otro ajuste (tanda 4) sumarle la diferencia vieja la
+    # corregiría dos veces, y si se descartó, Daniel dijo que no.
+    revisadas = _de_jornada_revisada(session, [c.id for c in conteos])
+    if revisadas:
+        omitidos += len(revisadas)
+        conteos = [c for c in conteos if int(c.id) not in revisadas]
 
     for conteo in conteos:
         if conteo.diferencia == 0:
@@ -564,13 +601,17 @@ def obtener_conteos_pendientes(
     escuela_id: int | None = None,
     nivel_id: int | None = None,
 ) -> list[ConteoInventario]:
-    """Conteos con diferencia != 0 que aún no se han ajustado."""
+    """Conteos con diferencia != 0 que aún no se han ajustado.
+
+    Fuera los de una jornada ya revisada: los que se saltaron por otro ajuste
+    (tanda 4, hay que recontarlos) y los de una jornada descartada."""
     stmt = (
         select(ConteoInventario)
         .options(joinedload(ConteoInventario.variante).joinedload(Variante.producto))
         .where(
             ConteoInventario.ajustado.is_(False),
             ConteoInventario.diferencia != 0,
+            _sin_jornada_revisada(),
         )
         .order_by(ConteoInventario.contado_at.desc())
     )

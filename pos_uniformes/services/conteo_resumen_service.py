@@ -27,9 +27,11 @@ Para cada talla de una jornada dice lo que de verdad pasa al corregir:
   cuando la caja dice más de lo que el sistema tenía en total y sube el
   total; lo demás de un recuento va en `BodegaMovimiento` y nunca contó aquí.
   Los ajustes que hace sola la venta (`libreta:N`, p. ej. el pants suelto
-  que deja una chamarra, o una operación borrada) y el stock calculado de un
-  conjunto (`derivado:`) no cuentan: son movimientos que la diferencia ya
-  respeta.
+  que deja una chamarra, o una operación borrada; y en el POS, el mismo
+  pants suelto firmado con el folio de la venta o del apartado: se reconoce
+  porque ese folio también firma una salida, reserva o cancelación) y el
+  stock calculado de un conjunto (`derivado:`) no cuentan: son movimientos
+  que la diferencia ya respeta.
 - **se salta** (tanda 4, decisión de Daniel): una talla con diferencia y con
   otro ajuste después del conteo **no se corrige** al aplicar, porque
   sumarle la diferencia vieja la corregiría dos veces. Queda `ajustado =
@@ -76,6 +78,15 @@ TIPOS_AJUSTE = (TipoMovimientoInventario.AJUSTE_ENTRADA, TipoMovimientoInventari
 # Ajustes que no son «otro ajuste»: los hace sola la venta (libreta:N, libreta:N:borrada)
 # o el stock calculado de un conjunto (conjunto_service.PREFIJO_DERIVADO).
 PREFIJOS_AUTOMATICOS = ("libreta:", "derivado:")
+# Lo que mueve una venta o un apartado del POS (y su cancelación). Un AJUSTE con el
+# mismo folio que uno de estos es la pieza que «queda» de un conjunto: automático.
+# (Sin ENTRADA_COMPRA: su referencia es texto libre, p. ej. «maquilador».)
+TIPOS_DE_VENTA = (
+    TipoMovimientoInventario.SALIDA_VENTA,
+    TipoMovimientoInventario.CANCELACION_VENTA,
+    TipoMovimientoInventario.APARTADO_RESERVA,
+    TipoMovimientoInventario.APARTADO_LIBERACION,
+)
 
 
 def referencia_de(conteo_id: int) -> str:
@@ -284,9 +295,29 @@ def _salidas_libreta(session: Session, desde: datetime) -> dict[str, list[tuple[
     return por_sku
 
 
+def _referencias_de_venta(session: Session, referencias: set[str]) -> set[str]:
+    """De esas referencias, las que también firman una venta, un apartado o su
+    cancelación (`TIPOS_DE_VENTA`). Así se reconoce el AJUSTE que hace
+    sola la venta del POS de un conjunto con pieza que queda: vender una Chamarra
+    suma +1 Pants Suelto con el folio de la venta (`conjunto_service.descomponer`
+    firma con la referencia de quien llama)."""
+    if not referencias:
+        return set()
+    return {
+        str(r) for r in session.scalars(
+            select(MovimientoInventario.referencia).distinct().where(
+                MovimientoInventario.referencia.in_(sorted(referencias)),
+                MovimientoInventario.tipo_movimiento.in_(TIPOS_DE_VENTA),
+            )
+        ).all()
+    }
+
+
 def _ajustes_desde(session: Session, variante_ids: list[int], desde: datetime) -> dict[int, list[tuple[datetime, str]]]:
     """(momento, referencia) de cada AJUSTE_ENTRADA/SALIDA de esas tallas desde `desde`,
-    sin los automáticos de la venta y de los conjuntos."""
+    sin los automáticos: los de la Libreta (`libreta:`), el stock calculado de un
+    conjunto (`derivado:`) y los que comparten folio con una venta, apartado o
+    cancelación del POS (`_referencias_de_venta`)."""
     filas = session.execute(
         select(MovimientoInventario.variante_id, MovimientoInventario.created_at, MovimientoInventario.referencia)
         .where(
@@ -295,10 +326,13 @@ def _ajustes_desde(session: Session, variante_ids: list[int], desde: datetime) -
             MovimientoInventario.created_at >= desde,
         )
     ).all()
+    de_una_venta = _referencias_de_venta(
+        session, {str(r) for _v, _c, r in filas if r and not str(r).startswith(PREFIJOS_AUTOMATICOS)},
+    )
     out: dict[int, list[tuple[datetime, str]]] = defaultdict(list)
     for vid, creado, referencia in filas:
         ref = str(referencia or "")
-        if ref.startswith(PREFIJOS_AUTOMATICOS):
+        if ref.startswith(PREFIJOS_AUTOMATICOS) or ref in de_una_venta:
             continue
         momento = _utc(creado)
         if momento is not None:

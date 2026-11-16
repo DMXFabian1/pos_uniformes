@@ -446,14 +446,16 @@ def guardar_tallas(
     `items`: [{"variante_id": int, "fisico": int | None, "pedido": int | None}].
     - fisico None o vacío = "no la conté": si había renglón, se borra; si no, nada.
     - Si la talla ya tenía renglón en ESTA jornada, se actualiza (no se
-      duplica: la revisión de Daniel vería dos veces la misma talla).
+      duplica: la revisión de Daniel vería dos veces la misma talla). Con el
+      mismo número se queda la fecha del conteo; con otro número es un conteo
+      nuevo: «el sistema decía» se vuelve a medir contra la tienda de hoy.
     - `pedido` (cuántas pedir) va en `notas` como "Pedido: N".
     - Si el renglón lo capturó OTRA persona con otro número, no se pisa: va en
       `conflictos` para que la pantalla pregunte. Con `reemplazar_ajenas` gana
       lo que llega.
     """
     from pos_uniformes.database.models import Producto, Variante
-    from pos_uniformes.services.conteo_service import registrar_conteo
+    from pos_uniformes.services.conteo_service import registrar_conteo, variante_para_contar
 
     guardadas = 0
     conflictos: list[Conflicto] = []
@@ -493,10 +495,20 @@ def guardar_tallas(
         if existente is None:
             registrar_conteo(session, vid, fisico, contado_por, notas=nota, jornada_id=jornada.id)
         elif not existente.ajustado:
-            existente.stock_fisico = fisico
-            existente.diferencia = fisico - int(existente.stock_sistema)
+            if fisico != int(existente.stock_fisico):
+                # Un número nuevo es un conteo nuevo: se mide contra la tienda
+                # de HOY. Si se dejara el «sistema decía» de la primera captura
+                # con la fecha de hoy, un ajuste a mano hecho entre las dos
+                # quedaría «antes del conteo» y Aplicar lo corregiría dos veces.
+                variante = variante_para_contar(session, vid)
+                existente.stock_sistema = int(variante.stock_tienda)
+                existente.stock_fisico = fisico
+                existente.diferencia = fisico - int(existente.stock_sistema)
+                existente.contado_at = func.now()
+                variante.ultimo_conteo_at = func.now()
+                session.add(variante)
+            # Mismo número: se queda la fecha (y el «sistema decía») de cuando se contó.
             existente.notas = nota
-            existente.contado_at = func.now()
             existente.contado_por = contado_por
             session.add(existente)
         guardadas += 1
