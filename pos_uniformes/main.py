@@ -112,7 +112,7 @@ def main() -> int:
     except DatabasePreflightError as exc:
         QMessageBox.critical(
             None,
-            "Base de datos no lista",
+            getattr(exc, "titulo", "Base de datos no lista"),
             str(exc),
         )
         return 1

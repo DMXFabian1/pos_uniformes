@@ -215,7 +215,7 @@ def main() -> int:
             # programa no entiende. Abrir en local escondería el problema y
             # alguien vendería contra un catálogo que ya no cuadra.
             splash.close()
-            QMessageBox.critical(None, "Base de datos no lista", str(exc))
+            QMessageBox.critical(None, getattr(exc, "titulo", "Base de datos no lista"), str(exc))
             return 1
         except Exception as exc:
             logging.getLogger(__name__).warning(
