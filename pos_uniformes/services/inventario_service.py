@@ -353,13 +353,15 @@ class InventarioService:
 
             estado = "VALIDO"
             mensaje = "Listo para aplicar."
-            if stock_final < 0:
+            # Igual que registrar_movimiento: solo se frena lo que BAJA. Sumarle a una talla en
+            # negativo (de −20 a −10) la acerca a la verdad y no debe salir como error.
+            if stock_final < 0 and delta_aplicado < 0:
                 estado = "ERROR"
                 mensaje = "El ajuste deja stock negativo."
             elif delta_aplicado == 0:
                 estado = "SIN_CAMBIOS"
                 mensaje = "Sin cambios pendientes."
-            elif stock_final < apartado_comprometido:
+            elif stock_final < apartado_comprometido and delta_aplicado < 0:
                 estado = "ERROR"
                 mensaje = "El stock final queda por debajo de lo comprometido en apartados."
             elif not variante.activo:

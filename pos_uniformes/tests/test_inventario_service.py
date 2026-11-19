@@ -141,5 +141,43 @@ class InventarioServiceTests(unittest.TestCase):
             )
 
 
+
+class AjusteMasivoEnNegativoTests(unittest.TestCase):
+    """Ajuste masivo con la misma regla que registrar_movimiento: solo se frena lo que baja."""
+
+    def _sesion_con_talla(self, stock: int):
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import Session
+
+        from pos_uniformes.database.connection import Base
+        from pos_uniformes.database.models import Categoria, Marca, Producto, Variante
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        s = Session(engine)
+        cat, marca = Categoria(nombre="Accesorios"), Marca(nombre="Genérica")
+        s.add_all([cat, marca]); s.flush()
+        prod = Producto(nombre="Golpe Escolta Blanco", nombre_base="Golpe Escolta Blanco", categoria_id=cat.id, marca_id=marca.id)
+        s.add(prod); s.flush()
+        v = Variante(producto_id=prod.id, sku="GOLPE-U", talla="Unitalla", color="Blanco", precio_venta=65, stock_actual=stock)
+        s.add(v); s.flush()
+        return s, v
+
+    def test_sumar_a_una_talla_en_negativo_es_valido(self) -> None:
+        from pos_uniformes.services.inventario_service import AjusteMasivoFilaInput
+
+        s, v = self._sesion_con_talla(-20)
+        prev = InventarioService.previsualizar_ajuste_masivo(
+            s, [AjusteMasivoFilaInput(variante_id=v.id, valor_capturado=10)], tipo_ajuste="DELTA")
+        self.assertEqual((prev.filas[0].estado, prev.filas[0].stock_final), ("VALIDO", -10))
+
+    def test_restar_hasta_negativo_sigue_siendo_error(self) -> None:
+        from pos_uniformes.services.inventario_service import AjusteMasivoFilaInput
+
+        s, v = self._sesion_con_talla(-20)
+        prev = InventarioService.previsualizar_ajuste_masivo(
+            s, [AjusteMasivoFilaInput(variante_id=v.id, valor_capturado=-1)], tipo_ajuste="DELTA")
+        self.assertEqual(prev.filas[0].estado, "ERROR")
+
 if __name__ == "__main__":
     unittest.main()
