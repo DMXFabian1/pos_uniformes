@@ -9,7 +9,10 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from pos_uniformes.services.inventario_prenda_service import (
+    PIEZAS_GENERICAS,
+    TEXTO_CONJUNTO_SIN_TALLAS,
     agrupar_por_prenda,
+    aviso_conjunto_sin_tallas,
     filas_en_orden,
     indice_de_variante,
     ordenar_grupos,
@@ -220,6 +223,34 @@ class ProductoDeLaSeleccionTests(unittest.TestCase):
     def test_producto_como_texto_cuenta_igual(self) -> None:
         filas = [_fila("8", 2, producto_id="7"), _fila("10", 2, producto_id=7)]
         self.assertEqual(producto_de_la_seleccion(filas, 2), 7)
+
+
+class AvisoConjuntoSinTallasTests(unittest.TestCase):
+    """«Agregar talla o color» con un conjunto elegido (2026-11-19)."""
+
+    def test_pants_3pz_nombra_sus_dos_piezas(self) -> None:
+        filas = [_fila("8", 0, producto_id=7, es_conjunto=True, tipo_pieza_nombre="Pants 3pz")]
+        self.assertEqual(
+            aviso_conjunto_sin_tallas(filas),
+            "Los conjuntos salen de sus piezas: agrega la talla o el color en el pants 2pz y la playera.",
+        )
+
+    def test_chamarra_sale_del_pants_2pz(self) -> None:
+        filas = [_fila("8", 0, producto_id=7, es_conjunto=True, tipo_pieza_nombre="Chamarra"),
+                 _fila("10", 0, producto_id=7, es_conjunto=True, tipo_pieza_nombre="Chamarra")]
+        self.assertEqual(aviso_conjunto_sin_tallas(filas),
+                         TEXTO_CONJUNTO_SIN_TALLAS.format(piezas="el pants 2pz"))
+
+    def test_sin_saber_las_piezas_habla_de_las_piezas(self) -> None:
+        # Virtual viejo (stock_minimo < 0) o tipo de pieza que no es conjunto conocido.
+        viejo = [_fila("8", 0, producto_id=7, stock_minimo=-1, tipo_pieza_nombre="-")]
+        self.assertEqual(aviso_conjunto_sin_tallas(viejo), TEXTO_CONJUNTO_SIN_TALLAS.format(piezas=PIEZAS_GENERICAS))
+        sin_tipo = [_fila("8", 0, producto_id=7, es_conjunto=True)]
+        self.assertIn(PIEZAS_GENERICAS, aviso_conjunto_sin_tallas(sin_tipo))
+
+    def test_una_prenda_normal_no_lleva_aviso(self) -> None:
+        self.assertIsNone(aviso_conjunto_sin_tallas([_fila("8", 2, producto_id=7, tipo_pieza_nombre="Pants 2pz")]))
+        self.assertIsNone(aviso_conjunto_sin_tallas([]))
 
 
 class RendimientoTests(unittest.TestCase):

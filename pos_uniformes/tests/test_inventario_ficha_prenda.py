@@ -20,6 +20,7 @@ from sqlalchemy import create_engine
 from pos_uniformes.database.models import RolUsuario
 from pos_uniformes.services import alta_ficha_service as af
 from pos_uniformes.ui.dialogs import ficha_prenda_dialogs as fpd
+from pos_uniformes.services import inventario_prenda_service as ips
 from pos_uniformes.ui.helpers import inventario_pantalla as ip
 from pos_uniformes.ui.helpers.inventario_pantalla import LOTE, TALLA
 from pos_uniformes.ui.main_window import MainWindow
@@ -292,6 +293,48 @@ class FichaPrendaPantallaTests(unittest.TestCase):
             acciones["Corregir la prenda elegida"].trigger()
         aviso.assert_not_called()
         corregir.assert_called_once()
+
+    def test_agregar_talla_o_color_con_un_conjunto_avisa_que_va_en_sus_piezas(self) -> None:
+        # 2026-11-19: el «⋯» ponía el foco en «LA PRENDA», que está oculta para un conjunto.
+        window = self._ventana()
+        for fila in self.filas:
+            fila["es_conjunto"] = True
+            fila["tipo_pieza_nombre"] = "Pants 3pz"
+        window._refresh_inventory_table()
+        pantalla = window.inventario_pantalla
+        pantalla.seleccionar(1)
+        acciones = {a.text().split("  ")[-1]: a for a in window.inventory_more_button.menu().actions()}
+        with patch.object(ip.QMessageBox, "information") as aviso:
+            acciones["Agregar talla o color"].trigger()
+        aviso.assert_called_once()
+        self.assertEqual(aviso.call_args.args[1], "Agregar talla o color")
+        self.assertEqual(aviso.call_args.args[2], ips.aviso_conjunto_sin_tallas(self.filas[:1]))
+        self.assertIn("el pants 2pz y la playera", aviso.call_args.args[2])
+        # Con dos tallas del mismo conjunto, igual; y corregir sigue abriendo la ventana.
+        pantalla._espejar_a_tabla([1, 2], 1)
+        with patch.object(ip.QMessageBox, "information") as aviso, patch.object(ip, "corregir_prenda") as corregir:
+            acciones["Agregar talla o color"].trigger()
+            acciones["Corregir la prenda elegida"].trigger()
+        aviso.assert_called_once()
+        corregir.assert_called_once()
+
+    def test_agregar_talla_o_color_de_una_prenda_no_avisa(self) -> None:
+        window = self._ventana()
+        pantalla = window.inventario_pantalla
+        pantalla.seleccionar(1)
+        acciones = {a.text().split("  ")[-1]: a for a in window.inventory_more_button.menu().actions()}
+        with patch.object(ip.QMessageBox, "information") as aviso:
+            acciones["Agregar talla o color"].trigger()
+        aviso.assert_not_called()
+
+    def test_las_piezas_del_aviso_son_las_de_la_receta(self) -> None:
+        # La copia pura de las piezas no se desfasa de `conjunto_service.RECETAS_POR_TIPO`.
+        from pos_uniformes.services.conjunto_service import RECETAS_POR_TIPO
+
+        for tipo, receta in RECETAS_POR_TIPO.items():
+            piezas = tuple(p.casefold() for p, cantidad in receta if cantidad > 0)
+            copia = tuple(p.split(" ", 1)[1] for p in ips.PIEZAS_DE_CONJUNTO[tipo.casefold()])
+            self.assertEqual(copia, piezas, tipo)
 
     def test_con_varias_tallas_tampoco_la_ve_quien_no_es_admin(self) -> None:
         window = self._ventana(rol=RolUsuario.CAJERO)

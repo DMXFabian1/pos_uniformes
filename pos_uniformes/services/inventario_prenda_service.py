@@ -220,6 +220,42 @@ def producto_de_la_seleccion(
     return productos.pop() if len(productos) == 1 else None
 
 
+#: «Agregar talla o color» del «⋯» con un conjunto elegido: el conjunto no
+#: tiene tallas ni colores propios, salen de sus piezas (2026-11-19).
+TEXTO_CONJUNTO_SIN_TALLAS = "Los conjuntos salen de sus piezas: agrega la talla o el color en {piezas}."
+#: Cuando no se sabe qué piezas lo arman (un virtual viejo, o un tipo nuevo).
+PIEZAS_GENERICAS = "las piezas que lo arman"
+
+#: Qué piezas ARMAN cada conjunto (las que se consumen al venderlo), con su
+#: artículo. Es la misma receta que `conjunto_service.RECETAS_POR_TIPO`
+#: (sin el Pants Suelto que le queda a la Chamarra); se copia aquí para que
+#: este servicio siga sin base. Una prueba cuida que no se desfasen.
+PIEZAS_DE_CONJUNTO: dict[str, tuple[str, ...]] = {
+    "pants 3pz": ("el pants 2pz", "la playera"),
+    "chamarra": ("el pants 2pz",),
+}
+
+
+def aviso_conjunto_sin_tallas(filas: Iterable[Mapping[str, object]]) -> str | None:
+    """Si lo elegido es un conjunto, el aviso de dónde agregar tallas o colores; si no, None.
+
+    Nombra las piezas cuando el tipo de pieza de las filas lo dice («Pants
+    3pz» → «el pants 2pz y la playera»); si no, habla de «las piezas».
+    """
+    virtuales = [fila for fila in filas if es_fila_virtual(fila)]
+    if not virtuales:
+        return None
+    tipos = {_normal(fila.get("tipo_pieza_nombre")) for fila in virtuales}
+    piezas = PIEZAS_DE_CONJUNTO.get(tipos.pop()) if len(tipos) == 1 else None
+    if not piezas:
+        texto = PIEZAS_GENERICAS
+    elif len(piezas) == 1:
+        texto = piezas[0]
+    else:
+        texto = f"{', '.join(piezas[:-1])} y {piezas[-1]}"
+    return TEXTO_CONJUNTO_SIN_TALLAS.format(piezas=texto)
+
+
 def agrupar_por_prenda(filas: Iterable[Mapping[str, object]]) -> list[GrupoPrenda]:
     """Junta las tallas por prenda + color, en el orden en que aparece cada prenda.
 

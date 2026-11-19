@@ -61,6 +61,7 @@ from pos_uniformes.services.inventario_prenda_service import (
     GrupoPrenda,
     PaginaPrendas,
     agrupar_por_prenda,
+    aviso_conjunto_sin_tallas,
     filas_en_orden,
     indice_de_variante,
     ordenar_grupos,
@@ -1250,13 +1251,16 @@ class InventarioPantalla(QObject):
         A diferencia de «LA PRENDA», aquí los conjuntos sí cuentan: su nombre,
         color y datos se corrigen igual que los de cualquier prenda.
         """
+        filas, elegidas = self._filas_del_menu()
+        return producto_de_la_seleccion(filas, elegidas, con_conjuntos=True) if elegidas else None
+
+    def _filas_del_menu(self) -> tuple[list, int]:
+        """Las filas a las que aplica el «⋯» y cuántas tallas hay elegidas."""
         elegidas = self.window._selected_inventory_variant_ids()
         if len(elegidas) > 1:
-            return producto_de_la_seleccion(
-                self._filas_elegidas(elegidas), len(set(elegidas)), con_conjuntos=True
-            )
+            return self._filas_elegidas(elegidas), len(set(elegidas))
         fila = self.fila_de(self.variante_actual())
-        return producto_de_la_seleccion([fila], 1, con_conjuntos=True) if fila is not None else None
+        return ([fila], 1) if fila is not None else ([], 0)
 
     def _nota_hermanas(self) -> str:
         ficha = self._seccion_prenda.ficha
@@ -1301,9 +1305,15 @@ class InventarioPantalla(QObject):
         self.editar_datos()
 
     def tallas_o_color_desde_menu(self) -> None:
-        """«⋯» de arriba: lleva a la ficha. Sin talla elegida, dice dónde está ahora."""
+        """«⋯» de arriba: lleva a la ficha. Sin talla elegida, dice dónde está ahora;
+        con un conjunto, que se agrega en sus piezas."""
         if self._producto_elegido() is None:
             QMessageBox.information(self.window, "Agregar talla o color", TEXTO_ELIGE_PRENDA)
+            return
+        # Un conjunto no enseña «LA PRENDA»: sus tallas y colores salen de sus piezas.
+        aviso = aviso_conjunto_sin_tallas(self._filas_del_menu()[0])
+        if aviso:
+            QMessageBox.information(self.window, "Agregar talla o color", aviso)
             return
         seccion = self._seccion_prenda
         seccion.setFocus()
