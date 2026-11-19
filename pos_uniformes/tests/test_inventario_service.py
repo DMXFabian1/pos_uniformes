@@ -68,6 +68,43 @@ class InventarioServiceTests(unittest.TestCase):
         self.assertEqual(movimiento.stock_posterior, -1)
         self.assertEqual(movimiento.cantidad, -2)
 
+    def test_entrada_en_talla_negativa_se_registra_aunque_no_alcance_a_cero(self) -> None:
+        """Golpe Escolta Blanco en −20 y llegan 10: la entrada se registra y
+        queda en −10. Antes se rechazaba («deje stock negativo») y la llegada
+        no se podía capturar ni en la PC ni en el celular."""
+        variante = _make_variante(stock_actual=-20)
+        session = _SessionStub(variante_to_lock=variante)
+
+        with patch(
+            "pos_uniformes.services.inventario_service.MovimientoInventario",
+            side_effect=lambda **kwargs: SimpleNamespace(**kwargs),
+        ):
+            movimiento = InventarioService.registrar_ingreso_compra(
+                session=session, variante=variante, cantidad=10, referencia="maquilador",
+            )
+
+        self.assertEqual(variante.stock_actual, -10)
+        self.assertEqual((movimiento.stock_anterior, movimiento.stock_posterior), (-20, -10))
+
+    def test_ajuste_hacia_arriba_en_negativo_se_permite_y_hacia_abajo_no(self) -> None:
+        variante = _make_variante(stock_actual=-5)
+        session = _SessionStub(variante_to_lock=variante)
+        with patch(
+            "pos_uniformes.services.inventario_service.MovimientoInventario",
+            side_effect=lambda **kwargs: SimpleNamespace(**kwargs),
+        ):
+            InventarioService.registrar_movimiento(
+                session=session, variante=variante,
+                tipo_movimiento=TipoMovimientoInventario.AJUSTE_ENTRADA, cantidad=2,
+            )
+            self.assertEqual(variante.stock_actual, -3)
+            with self.assertRaisesRegex(ValueError, "stock negativo"):
+                InventarioService.registrar_movimiento(
+                    session=session, variante=variante,
+                    tipo_movimiento=TipoMovimientoInventario.AJUSTE_SALIDA, cantidad=-1,
+                )
+        self.assertEqual(variante.stock_actual, -3)
+
     def test_registrar_movimiento_adquiere_lock_antes_de_modificar_stock(self) -> None:
         """registrar_movimiento debe emitir SELECT FOR UPDATE antes de leer stock_actual."""
         variante = _make_variante(stock_actual=5)

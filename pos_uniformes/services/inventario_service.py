@@ -114,7 +114,11 @@ class InventarioService:
         stock_anterior = variante.stock_actual
         stock_posterior = stock_anterior + cantidad
 
-        if stock_posterior < 0 and not allow_negative_stock:
+        # Solo se frena lo que BAJA el stock. Lo que lo sube (llegó mercancía,
+        # una cancelación, un ajuste hacia arriba) nunca empeora un negativo:
+        # si la talla está en −20 y llegan 10, queda en −10, que es más cierto.
+        # Antes esto se rechazaba y la entrada no había forma de registrarla.
+        if stock_posterior < 0 and cantidad < 0 and not allow_negative_stock:
             raise ValueError("No se puede registrar un movimiento que deje stock negativo.")
 
         variante.stock_actual = stock_posterior
