@@ -51,6 +51,7 @@ from pos_uniformes.ui.helpers.history_filter_state_helper import build_history_c
 from pos_uniformes.ui.dialogs.inventory_context_menu_dialog import prompt_inventory_context_action
 from pos_uniformes.ui.helpers.inventory_context_menu_helper import (
     ACCION_CORREGIR_LOTE,
+    accion_contextual_permitida,
     build_inventory_context_menu_actions,
 )
 from pos_uniformes.services.inventario_existencia_service import es_fila_virtual
@@ -1070,16 +1071,18 @@ class InventarioPantalla(QObject):
         elegida = w._selected_catalog_row()
         if elegida is None:
             return
+        especificaciones = build_inventory_context_menu_actions(
+            is_admin=w.current_role == RolUsuario.ADMIN,
+            variante_activa=bool(elegida.get("variante_activo")),
+            tallas_elegidas=cantidad,
+        )
         llave = prompt_inventory_context_action(
             w,
             global_pos=arbol.viewport().mapToGlobal(pos),
-            action_specs=build_inventory_context_menu_actions(
-                is_admin=w.current_role == RolUsuario.ADMIN,
-                variante_activa=bool(elegida.get("variante_activo")),
-                tallas_elegidas=cantidad,
-            ),
+            action_specs=especificaciones,
         )
-        self._hacer_accion_contextual(llave, cantidad)
+        # Una acción apagada en el menú no corre aunque llegue su llave.
+        self._hacer_accion_contextual(accion_contextual_permitida(especificaciones, llave), cantidad)
 
     def _hacer_accion_contextual(self, llave: str | None, cantidad: int) -> None:
         """Con una talla, los manejadores de siempre de «Por talla»; con varias,

@@ -143,7 +143,7 @@ class MenuContextualPorPrendaTests(unittest.TestCase):
         window._handle_toggle_variant.assert_called_once_with()
 
     def test_talla_desplegada_editar_usa_el_manejador_de_siempre(self) -> None:
-        window = self._ventana(rol=RolUsuario.CAJERO)
+        window = self._ventana()
         arbol = window.inventario_pantalla.prendas
         prenda = arbol.modelo.index(0, 0)
         arbol.setExpanded(prenda, True)
@@ -153,9 +153,65 @@ class MenuContextualPorPrendaTests(unittest.TestCase):
             self._clic_derecho(arbol, arbol.modelo.index(3, 0, prenda))  # talla 10
         self.assertEqual(
             menu.call_args.kwargs["action_specs"],
-            build_inventory_context_menu_actions(is_admin=False, variante_activa=True),
+            build_inventory_context_menu_actions(is_admin=True, variante_activa=True),
         )
         window._handle_update_variant.assert_called_once_with()
+
+    def test_cajero_en_talla_desplegada_no_corre_lo_apagado_y_si_imprime(self) -> None:
+        window = self._ventana(rol=RolUsuario.CAJERO)
+        arbol = window.inventario_pantalla.prendas
+        prenda = arbol.modelo.index(0, 0)
+        arbol.setExpanded(prenda, True)
+        QApplication.processEvents()
+        window._handle_update_variant = Mock()
+        window._handle_inventory_print_label = Mock()
+        with patch(MENU, return_value="edit") as menu:
+            self._clic_derecho(arbol, arbol.modelo.index(3, 0, prenda))  # talla 10
+        self.assertEqual(
+            menu.call_args.kwargs["action_specs"],
+            build_inventory_context_menu_actions(is_admin=False, variante_activa=True),
+        )
+        window._handle_update_variant.assert_not_called()
+        with patch(MENU, return_value="print"):
+            self._clic_derecho(arbol, arbol.modelo.index(3, 0, prenda))
+        window._handle_inventory_print_label.assert_called_once_with()
+
+    def test_cajero_no_imprime_etiquetas_de_una_prenda_completa(self) -> None:
+        # Como la barra de lote: imprimir varias etiquetas es solo de ADMIN.
+        window = self._ventana(rol=RolUsuario.CAJERO)
+        window._refresh_permissions()
+        arbol = window.inventario_pantalla.prendas
+        window._handle_inventory_print_label = Mock()
+        with patch(MENU, return_value="print") as menu:
+            self._clic_derecho(arbol, arbol.modelo.index(0, 0))  # Pants · 4 tallas
+        especificaciones = menu.call_args.kwargs["action_specs"]
+        self.assertEqual([a.key for a in especificaciones if a.enabled], [])
+        self.assertFalse(window.inventario_pantalla.barra_lote.etiquetas.isEnabled())
+        window._handle_inventory_print_label.assert_not_called()
+
+    def test_clic_derecho_real_en_talla_desplegada_abre_el_menu_una_vez(self) -> None:
+        from PyQt6.QtCore import Qt
+        from PyQt6.QtGui import QContextMenuEvent
+        from PyQt6.QtTest import QTest
+
+        window = self._ventana()
+        arbol = window.inventario_pantalla.prendas
+        prenda = arbol.modelo.index(0, 0)
+        arbol.setExpanded(prenda, True)
+        QApplication.processEvents()
+        punto = arbol.visualRect(arbol.modelo.index(3, 2, prenda)).center()  # talla 10, columna 2
+        sku = arbol.modelo.data(arbol.modelo.index(3, 0, prenda))
+        esperado = next(f["variante_id"] for f in FILAS if f["sku"] == sku)
+        with patch(MENU, return_value=None) as menu:
+            QTest.mousePress(arbol.viewport(), Qt.MouseButton.RightButton, Qt.KeyboardModifier.NoModifier, punto)
+            evento = QContextMenuEvent(
+                QContextMenuEvent.Reason.Mouse, punto, arbol.viewport().mapToGlobal(punto)
+            )
+            QApplication.sendEvent(arbol.viewport(), evento)
+            QTest.mouseRelease(arbol.viewport(), Qt.MouseButton.RightButton, Qt.KeyboardModifier.NoModifier, punto)
+            QApplication.processEvents()
+        menu.assert_called_once()
+        self.assertEqual(window._selected_inventory_variant_ids(), [esperado])
 
     def test_clic_derecho_fuera_de_las_filas_no_abre_nada(self) -> None:
         window = self._ventana()

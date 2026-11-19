@@ -5,6 +5,7 @@ El mismo menú sirve en «Por talla» (siempre una talla) y en «Por prenda»
 acciones de UNA talla se apagan, igual que la ficha de «Por talla» cuando
 eliges varias (ahí solo quedan las acciones de lote de la barra): imprimir
 pasa a imprimir todas y corregir existencia pasa a corregirlas en lote.
+Las dos de lote siguen los permisos de la barra de lote: solo ADMIN.
 """
 
 from __future__ import annotations
@@ -74,10 +75,22 @@ def _acciones_varias_tallas(*, is_admin: bool, cantidad: int) -> tuple[Inventory
         InventoryContextMenuAction(
             key="print",
             label=f"Imprimir {cantidad:,} etiquetas",
-            enabled=True,
+            # Igual que la barra de lote (inventory_print_label_button solo ADMIN).
+            enabled=is_admin,
         ),
         InventoryContextMenuAction(key="toggle", label="Activar o desactivar talla" + TEXTO_ELIGE_UNA, enabled=False),
     )
+
+
+def accion_contextual_permitida(
+    action_specs: tuple[InventoryContextMenuAction, ...],
+    llave: str | None,
+) -> str | None:
+    """La llave elegida solo si existe y está encendida en el menú; si no, None."""
+    for spec in action_specs:
+        if spec.key == llave:
+            return llave if spec.enabled else None
+    return None
 
 
 def resolve_inventory_context_action_key(
