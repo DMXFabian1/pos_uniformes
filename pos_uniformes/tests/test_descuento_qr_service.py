@@ -245,6 +245,16 @@ class OpcionesTests(unittest.TestCase):
         self.assertIn("Descuento QR 10 %", texto)
         self.assertIn("15 % pide $600 de ropa normal; se aplicó 10 %", texto)
 
+    def test_chip_sin_motor_dice_que_no_se_aplico(self) -> None:
+        # 2026-11-19: con el cálculo de respaldo el QR no se cobra.
+        texto = qr.texto_chip(D("10"), None, sin_motor=True)
+        self.assertEqual(texto, f"Descuento QR 10 % ({qr.TXT_SIN_MOTOR})  ✕")
+        self.assertIn("NO se aplicó", texto)
+
+    def test_aviso_sin_motor_con_el_porcentaje(self) -> None:
+        texto = qr.texto_aviso_sin_motor(D("15"))
+        self.assertIn("QR (15 %) NO está en este total", texto)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -602,6 +602,20 @@ class ElMotorQueNoRespondeSeAvisaTests(unittest.TestCase):
 
         self.assertIn("avísale a Daniel", texto_si_el_motor_no_responde(truena))
 
+    def test_con_qr_dice_que_el_qr_no_esta_en_el_total(self):
+        # 2026-11-19: el cálculo de respaldo no aplica el QR de temporada.
+        from decimal import Decimal
+
+        from pos_uniformes.ui.helpers.quick_sale_motor_helper import texto_si_el_motor_no_responde
+
+        def truena():
+            raise RuntimeError("x")
+
+        texto = texto_si_el_motor_no_responde(truena, pct_qr=Decimal("10"))
+        self.assertIn("avísale a Daniel", texto)
+        self.assertIn("QR (10 %) NO está en este total", texto)
+        self.assertIsNone(texto_si_el_motor_no_responde(lambda: object(), pct_qr=Decimal("10")))
+
 
 class MayoristaQueEligioMayoreoSinLineasTest(_Base):
     """2026-11-12, Daniel, a «Mayorista que eligió mayoreo y ninguna prenda

@@ -76,6 +76,9 @@ TXT_VENCIDO = "El descuento de temporada terminó"
 TXT_NO_VALIDO = "Ese QR de descuento no es válido."
 TXT_SIN_EMPLEADA = "Escanea primero tu QR de empleada."
 TXT_NO_MEJORA = "no mejora el descuento que ya tiene"
+#: Sin el motor de beneficios (cálculo de respaldo) el QR no se cobra: es
+#: una regla del motor, igual que sin conexión (QR_SIN_CONEXION).
+TXT_SIN_MOTOR = "NO se aplicó: las reglas de descuento no respondieron"
 
 
 def normalizar_categoria(categoria) -> str:
@@ -414,8 +417,14 @@ def texto_bajo_a_10(minimo_15: Decimal = MINIMO_15) -> str:
     return f"15 % pide ${minimo_15:,.0f} de ropa normal; se aplicó 10 %"
 
 
-def texto_chip(pct_pedido, calculo=None) -> str:
-    """El chip de la venta para quitar el QR: «Descuento QR 10 % ✕»."""
+def texto_chip(pct_pedido, calculo=None, *, sin_motor: bool = False) -> str:
+    """El chip de la venta para quitar el QR: «Descuento QR 10 % ✕».
+
+    `sin_motor`: el motor no pudo calcular y la venta va con el cálculo de
+    respaldo, que no conoce el QR. El chip lo dice para que la empleada no
+    crea que el descuento está en el total (2026-11-19)."""
+    if sin_motor:
+        return f"Descuento QR {texto_pct(pct_pedido)} ({TXT_SIN_MOTOR})  ✕"
     pct = pct_pedido
     info = getattr(calculo, "descuento_qr", None) if calculo is not None else None
     if info is not None and info.pct > 0:
@@ -429,6 +438,17 @@ def texto_chip(pct_pedido, calculo=None) -> str:
     if razon:
         texto += f" ({razon})"
     return texto + "  ✕"
+
+
+def texto_aviso_sin_motor(pct_pedido) -> str:
+    """Lo que se suma al aviso «las reglas de descuento no pudieron
+    calcular» cuando la venta lleva QR. El cálculo de respaldo no aplica el
+    QR (es regla del motor, como sin conexión; 2026-11-19): se dice para
+    que nadie le prometa a la clienta un descuento que no se cobró."""
+    return (
+        f"El descuento del QR ({texto_pct(pct_pedido)}) NO está en este total: sin las reglas de "
+        "descuento el QR no se aplica. Cobra sin él o espera a que vuelvan."
+    )
 
 
 #: Los motivos del motor (`motivos.py`, 2026-11-16) en palabras de mostrador.

@@ -316,6 +316,90 @@ class ChipSinEfectoTests(_Kiosko):
         self.assertTrue(texto.endswith("✕"))
 
 
+class RespaldoSinMotorTests(_Kiosko):
+    """2026-11-19: si el motor de beneficios falla, la venta se cobra con el
+    cálculo de respaldo (`incentivo_empleada_service.repartir`), que no
+    conoce el QR. El QR es regla del motor (como sin conexión: QR_SIN_CONEXION),
+    así que sin motor NO se aplica, y la empleada lo ve en el chip y en el
+    aviso antes de cobrar. Antes el chip seguía diciendo «Descuento QR 10 %»
+    y el total no lo traía."""
+
+    def _sin_motor(self, w):
+        from contextlib import ExitStack
+
+        pila = ExitStack()
+        pila.enter_context(patch.object(type(w), "_calculo_motor", side_effect=RuntimeError("motor caído")))
+        pila.enter_context(patch.object(type(w), "_calculo_y_entrada", side_effect=RuntimeError("motor caído")))
+        pila.enter_context(patch.object(type(w), "_tomar_folio_venta", return_value=None))
+        self.addCleanup(pila.close)
+
+    def _empleada(self, w, *, nivel="20", tope="3000", usado="3000"):
+        from pos_uniformes.services import incentivo_empleada_service as inc
+
+        w._discount_active = True
+        w._compradora = inc.EstadoCompradora("VEND-3", "Ana", D(nivel), D(tope), D(usado))
+
+    def _anotar(self, w):
+        return w._armar_anotacion("venta", cliente=None, pago_tarjeta=False, anticipo=None,
+                                  anticipo_tarjeta=False)[0]
+
+    def test_sin_motor_el_qr_no_se_cobra_y_el_chip_lo_dice(self) -> None:
+        w = self._kiosko([casual(), playera()])
+        self._escanear(w)
+        self._empleada(w)                       # tope gastado: con motor gana el QR en la sudadera
+        with patch.object(type(w), "_tomar_folio_venta", return_value=None):
+            con_motor = self._anotar(w)
+        self.assertEqual(con_motor["monto_total"], "531.00")
+        self._sin_motor(w)
+        w._refresh_totals()
+        self.assertEqual(w._compute_totals()[2], D("551"))      # 5 % parejo, sin QR
+        self.assertIn(dqr.TXT_SIN_MOTOR, w._chip_descuento_qr.text())
+        self.assertFalse(w._chip_descuento_qr.isHidden())       # se puede quitar
+        texto = w._build_venta_text(fecha_str="19/11/2026 12:00")
+        self.assertNotIn("Descuento autorizado", texto)
+        entrada = self._anotar(w)
+        self.assertEqual(entrada["monto_total"], "551.00")
+        self.assertNotIn("calculo", entrada)
+        self.assertEqual([it["desc_empleada_pct"] for it in entrada["items"]], ["5", "5"])
+        self.assertFalse(any("qr_sin_tope" in it for it in entrada["items"]))
+
+    def test_sin_motor_la_pieza_que_iba_con_qr_va_con_el_nivel_y_gasta_tope(self) -> None:
+        # Con motor: QR 15 >= nivel 10 en ropa normal → QR, sin gastar tope.
+        # Sin motor el QR no se cobra: la pieza va con el nivel y gasta tope,
+        # que es lo que de verdad se cobró.
+        w = self._kiosko([casual("600")])
+        self._escanear(w, pct=D("15"))
+        self._empleada(w, nivel="10", usado="0")
+        with patch.object(type(w), "_tomar_folio_venta", return_value=None):
+            con_motor = self._anotar(w)
+        self.assertEqual(con_motor["items"][0]["desc_empleada_pct"], "15")
+        self.assertTrue(con_motor["items"][0]["qr_sin_tope"])
+        self._sin_motor(w)
+        entrada = self._anotar(w)
+        self.assertEqual(entrada["monto_total"], "540.00")
+        self.assertEqual(entrada["items"][0]["desc_empleada_pct"], "10")
+        self.assertNotIn("qr_sin_tope", entrada["items"][0])
+
+    def test_el_aviso_antes_de_cobrar_menciona_el_qr(self) -> None:
+        w = self._kiosko([casual()])
+        self._escanear(w)
+        self._sin_motor(w)
+        avisos = []
+        with patch("PyQt6.QtWidgets.QMessageBox.warning", side_effect=lambda _w, _t, texto: avisos.append(texto)):
+            w._avisar_si_el_motor_no_responde()
+        self.assertEqual(len(avisos), 1)
+        self.assertIn("QR (10 %) NO está en este total", avisos[0])
+
+    def test_sin_qr_el_aviso_no_habla_del_qr(self) -> None:
+        w = self._kiosko([casual()])
+        self._sin_motor(w)
+        avisos = []
+        with patch("PyQt6.QtWidgets.QMessageBox.warning", side_effect=lambda _w, _t, texto: avisos.append(texto)):
+            w._avisar_si_el_motor_no_responde()
+        self.assertEqual(len(avisos), 1)
+        self.assertNotIn("QR", avisos[0])
+
+
 class ReimpresionTests(_Kiosko):
     def test_reimprimir_una_venta_vieja_no_toma_el_qr_en_curso(self) -> None:
         w = self._kiosko([casual()])

@@ -20,8 +20,11 @@ _logger = logging.getLogger(__name__)
 _CERO = Decimal("0.00")
 
 
-def texto_si_el_motor_no_responde(calcular) -> str | None:
-    """None si `calcular()` funciona; si no, qué decirle a la empleada."""
+def texto_si_el_motor_no_responde(calcular, *, pct_qr=None) -> str | None:
+    """None si `calcular()` funciona; si no, qué decirle a la empleada.
+
+    Con QR de temporada (`pct_qr`) se dice además que el QR no está en el
+    total: el cálculo de respaldo no lo aplica (2026-11-19)."""
     from pos_uniformes.services.beneficios.contrato import EntradaInvalida
 
     try:
@@ -34,10 +37,15 @@ def texto_si_el_motor_no_responde(calcular) -> str | None:
         motivo = ""
     else:
         return None
-    return (
+    texto = (
         "Las reglas de descuento no pudieron calcular esta venta. Se cobra con el cálculo de antes: "
         "revisa que el total sea correcto y avísale a Daniel." + motivo
     )
+    if pct_qr:
+        from pos_uniformes.services.descuento_qr_service import texto_aviso_sin_motor
+
+        texto += "\n\n" + texto_aviso_sin_motor(pct_qr)
+    return texto
 
 
 class MotorVentaMixin:
@@ -98,7 +106,7 @@ class MotorVentaMixin:
         deuda, 2026-11-12). No detiene la venta: el mostrador no se para."""
         if self._calculo_fijo is not None or self._reimpresion_legada:
             return
-        texto = texto_si_el_motor_no_responde(self._calculo_motor)
+        texto = texto_si_el_motor_no_responde(self._calculo_motor, pct_qr=getattr(self, "_descuento_qr_pct", None))
         if texto:
             from PyQt6.QtWidgets import QMessageBox
 

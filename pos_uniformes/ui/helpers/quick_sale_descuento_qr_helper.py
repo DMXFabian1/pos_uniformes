@@ -166,12 +166,17 @@ class DescuentoQrMixin:
             self._limpiar_descuento_qr()
 
     def _calculo_qr_actual(self):
+        return self._calculo_qr_y_si_falla()[0]
+
+    def _calculo_qr_y_si_falla(self):
+        """(cálculo del motor o None, ¿el motor falló?). Si falla, la venta va
+        con el cálculo de respaldo, que no aplica el QR."""
         if self._descuento_qr_pct is None or not getattr(self, "_items", None):
-            return None
+            return None, False
         try:
-            return self._calculo_motor()
+            return self._calculo_motor(), False
         except Exception:  # noqa: BLE001 — el chip no detiene la venta
-            return None
+            return None, True
 
     def _pintar_chip_descuento_qr(self) -> None:
         chip = getattr(self, "_chip_descuento_qr", None)
@@ -180,7 +185,8 @@ class DescuentoQrMixin:
         if self._descuento_qr_pct is None:
             chip.setVisible(False)
             return
-        chip.setText(dqr.texto_chip(self._descuento_qr_pct, self._calculo_qr_actual()))
+        calculo, sin_motor = self._calculo_qr_y_si_falla()
+        chip.setText(dqr.texto_chip(self._descuento_qr_pct, calculo, sin_motor=sin_motor))
         chip.setVisible(True)
 
     # ─── Ticket y pantalla ───────────────────────────────────────────────
