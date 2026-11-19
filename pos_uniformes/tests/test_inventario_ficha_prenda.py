@@ -268,6 +268,31 @@ class FichaPrendaPantallaTests(unittest.TestCase):
             acciones["Corregir la prenda elegida"].trigger()
         aviso.assert_called_once()
 
+    def test_el_menu_corrige_y_edita_un_conjunto_aunque_no_ensene_la_prenda(self) -> None:
+        # Regresión del 2026-11-19: el «⋯» decía «Elige una talla…» con una talla de conjunto elegida.
+        window = self._ventana()
+        for fila in self.filas:
+            fila["es_conjunto"] = True
+        window._refresh_inventory_table()
+        pantalla = window.inventario_pantalla
+        pantalla.seleccionar(1)
+        self.assertTrue(pantalla.ficha.prenda.isHidden())  # sin escalera propia
+        acciones = {a.text().split("  ")[-1]: a for a in window.inventory_more_button.menu().actions()}
+        with patch.object(ip.QMessageBox, "information") as aviso, \
+                patch.object(ip, "editar_datos") as datos, patch.object(ip, "corregir_prenda") as corregir:
+            acciones["Más datos de la prenda elegida"].trigger()
+            acciones["Corregir la prenda elegida"].trigger()
+        aviso.assert_not_called()
+        self.assertEqual(datos.call_args.args[2], self.pants.id)
+        self.assertEqual(corregir.call_args.args[2], self.pants.id)
+        # Con dos tallas del mismo conjunto, igual.
+        pantalla._espejar_a_tabla([1, 2], 1)
+        self.assertTrue(pantalla.ficha.prenda_lote.isHidden())
+        with patch.object(ip.QMessageBox, "information") as aviso, patch.object(ip, "corregir_prenda") as corregir:
+            acciones["Corregir la prenda elegida"].trigger()
+        aviso.assert_not_called()
+        corregir.assert_called_once()
+
     def test_con_varias_tallas_tampoco_la_ve_quien_no_es_admin(self) -> None:
         window = self._ventana(rol=RolUsuario.CAJERO)
         pantalla = window.inventario_pantalla

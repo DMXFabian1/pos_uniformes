@@ -206,6 +206,17 @@ class ProductoDeLaSeleccionTests(unittest.TestCase):
         conjunto = [_fila("8", 0, producto_id=7), _fila("10", 0, producto_id=7, es_conjunto=True)]
         self.assertIsNone(producto_de_la_seleccion(conjunto, 2))
 
+    def test_para_el_menu_el_conjunto_si_es_su_prenda(self) -> None:
+        # El «⋯» (corregir, más datos) sí aplica a un conjunto; «LA PRENDA» no (2026-11-19).
+        conjunto = [_fila("8", 0, producto_id=7, es_conjunto=True), _fila("10", 0, producto_id=7, es_conjunto=True)]
+        self.assertIsNone(producto_de_la_seleccion(conjunto, 2))
+        self.assertEqual(producto_de_la_seleccion(conjunto, 2, con_conjuntos=True), 7)
+        self.assertEqual(producto_de_la_seleccion(conjunto[:1], 1, con_conjuntos=True), 7)
+        mezcla = [_fila("8", 0, producto_id=7, es_conjunto=True), _fila("8", 0, producto_id=8)]
+        self.assertIsNone(producto_de_la_seleccion(mezcla, 2, con_conjuntos=True))
+        self.assertIsNone(producto_de_la_seleccion([_fila("8", 0, producto_id=None, es_conjunto=True)], 1,
+                                                   con_conjuntos=True))
+
     def test_producto_como_texto_cuenta_igual(self) -> None:
         filas = [_fila("8", 2, producto_id="7"), _fila("10", 2, producto_id=7)]
         self.assertEqual(producto_de_la_seleccion(filas, 2), 7)

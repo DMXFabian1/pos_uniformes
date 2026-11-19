@@ -186,7 +186,9 @@ def llave_prenda(fila: Mapping[str, object]) -> tuple:
     return (producto, _normal(fila.get("color")))
 
 
-def producto_de_la_seleccion(filas: Sequence[Mapping[str, object]], elegidas: int) -> int | None:
+def producto_de_la_seleccion(
+    filas: Sequence[Mapping[str, object]], elegidas: int, *, con_conjuntos: bool = False
+) -> int | None:
     """¿Lo elegido es UNA sola prenda? Devuelve su `producto_id`; si no, None.
 
     Sirve para enseñar «LA PRENDA» en la ficha con una talla, con varias
@@ -199,13 +201,17 @@ def producto_de_la_seleccion(filas: Sequence[Mapping[str, object]], elegidas: in
     - alguna fila no trae `producto_id`,
     - alguna es un conjunto o virtual (no tiene escalera propia),
     - se mezclan prendas distintas.
+
+    `con_conjuntos=True` es la regla del menú «⋯» (corregir la prenda, más
+    datos): ahí un conjunto sí es una prenda que se edita, aunque no tenga
+    escalera. Sin eso, la regla es la de enseñar «LA PRENDA».
     """
     if elegidas <= 0 or len(filas) != elegidas:
         return None
     productos: set[int] = set()
     for fila in filas:
         producto = fila.get("producto_id")
-        if not producto or es_fila_virtual(fila):
+        if not producto or (not con_conjuntos and es_fila_virtual(fila)):
             return None
         try:
             productos.add(int(producto))

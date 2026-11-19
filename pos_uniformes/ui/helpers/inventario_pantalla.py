@@ -1186,12 +1186,18 @@ class InventarioPantalla(QObject):
         return [f for f in self.window.inventory_filtered_rows if f.get("variante_id") in ids]
 
     def _producto_elegido(self) -> int | None:
-        """La prenda de lo elegido (una talla o varias de la misma prenda), o None."""
+        """La prenda a la que aplica el menú «⋯» (una talla o varias de la misma prenda), o None.
+
+        A diferencia de «LA PRENDA», aquí los conjuntos sí cuentan: su nombre,
+        color y datos se corrigen igual que los de cualquier prenda.
+        """
         elegidas = self.window._selected_inventory_variant_ids()
         if len(elegidas) > 1:
-            return producto_de_la_seleccion(self._filas_elegidas(elegidas), len(set(elegidas)))
+            return producto_de_la_seleccion(
+                self._filas_elegidas(elegidas), len(set(elegidas)), con_conjuntos=True
+            )
         fila = self.fila_de(self.variante_actual())
-        return producto_de_la_seleccion([fila], 1) if fila is not None else None
+        return producto_de_la_seleccion([fila], 1, con_conjuntos=True) if fila is not None else None
 
     def _nota_hermanas(self) -> str:
         ficha = self._seccion_prenda.ficha
