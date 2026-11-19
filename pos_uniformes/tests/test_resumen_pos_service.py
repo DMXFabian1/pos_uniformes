@@ -148,6 +148,28 @@ class CargarTests(unittest.TestCase):
         self.assertEqual(r.hoy.cobrado, Decimal("300.00"))
         self.assertEqual(r.mes.cobrado, Decimal("300.00"))
 
+    def test_una_base_sin_la_liga_de_compras_a_cuenta_no_tumba_el_resumen(self) -> None:
+        # 2026-11-19: base local atrasada sin prestamo_empleada.libreta_venta_id
+        # (sin_compras_a_cuenta lanza ProgrammingError). El Resumen sigue con la
+        # misma guarda que Analítica: ninguna venta puede estar ligada, así que
+        # las filas tal cual son lo cobrable. Otro error sí sube.
+        from unittest.mock import patch
+
+        from sqlalchemy.exc import OperationalError, ProgrammingError
+
+        from pos_uniformes.services import corte_caja_service as cc
+
+        self._anotar(HOY, "venta", "300")
+        self._anotar(HOY - timedelta(days=2), "venta", "500")
+        falla = ProgrammingError("SELECT …", {}, Exception("column libreta_venta_id does not exist"))
+        with patch.object(cc, "sin_compras_a_cuenta", side_effect=falla):
+            r = rp.cargar(self.s, HOY)
+        self.assertEqual((r.hoy.ventas, r.hoy.cobrado), (1, Decimal("300.00")))
+        self.assertEqual((r.mes.ventas, r.mes.cobrado), (2, Decimal("800.00")))
+        with patch.object(cc, "sin_compras_a_cuenta", side_effect=OperationalError("x", {}, Exception("caída"))):
+            with self.assertRaises(OperationalError):
+                rp.cargar(self.s, HOY)
+
     def test_sin_privadas_para_quien_no_es_dueno(self) -> None:
         self._anotar(HOY, "venta", "300")
         self._anotar(HOY, "venta", "500", pago_tarjeta=True, privado=True)

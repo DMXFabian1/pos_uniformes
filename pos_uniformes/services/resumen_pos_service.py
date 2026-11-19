@@ -19,7 +19,10 @@ resto del sistema:
   suma con `corte_caja_service.resumir_periodo`, la misma regla del corte y
   del bot, y sin las compras a cuenta de las empleadas
   (`corte_caja_service.sin_compras_a_cuenta`): ese dinero no entró al cajón
-  (revisión, 2026-11-12).
+  (revisión, 2026-11-12). En una base atrasada sin
+  `prestamo_empleada.libreta_venta_id` el Resumen no truena: usa la misma
+  guarda que Analítica (`analitica_tablero_service._sin_compras_a_cuenta`)
+  y sigue sin esa parte (2026-11-19).
 - **Anuladas**: una operación anulada o borrada se elimina de la Libreta
   (`libreta_service.anular_operacion_con_monedero` / `eliminar_operacion`),
   así que ya no está en las filas y no cuenta.
@@ -75,15 +78,18 @@ def cifras_periodo(rows: list, *, ajuste: Decimal = Decimal("0.00"), incluir_pri
 
 def cargar(session, hoy: date | None = None, *, incluir_privados: bool = True) -> ResumenPos:
     """Hoy y el mes en curso (del día 1 a hoy), leídos de la Libreta."""
+    from pos_uniformes.services.analitica_tablero_service import _sin_compras_a_cuenta as sin_compras_a_cuenta
     from pos_uniformes.services.analitica_tablero_service import limites
-    from pos_uniformes.services.corte_caja_service import ajustes_en_rango, sin_compras_a_cuenta
+    from pos_uniformes.services.corte_caja_service import ajustes_en_rango
     from pos_uniformes.services.libreta_service import listar_operaciones
 
     hoy = hoy or date.today()
     ini_mes, fin = limites(hoy.replace(day=1), hoy)
     ini_hoy, _ = limites(hoy, hoy)
     # La compra a cuenta de una empleada no es dinero que entró al cajón: el
-    # corte y el bot la quitan igual (revisión, 2026-11-12).
+    # corte y el bot la quitan igual (revisión, 2026-11-12). Con la guarda de
+    # Analítica: una base sin `prestamo_empleada.libreta_venta_id` no tumba
+    # el Resumen; las filas tal cual son lo cobrable (2026-11-19).
     rows_mes = sin_compras_a_cuenta(session, listar_operaciones(session, desde=ini_mes, hasta=fin, employee_code=None))
     rows_hoy = sin_compras_a_cuenta(session, listar_operaciones(session, desde=ini_hoy, hasta=fin, employee_code=None))
     return ResumenPos(
