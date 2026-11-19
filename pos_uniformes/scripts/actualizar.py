@@ -145,8 +145,13 @@ def actualizar(m: Mundo, *, al_abrir: bool = False, traer: bool = False) -> Resu
                 f"🛑 Actualización: este código ({ahora}) es más viejo que la base de datos: la "
                 "base ya tiene cambios que esta versión no conoce (alguien migró con un código más "
                 "nuevo). NO se migró ni se publicó nada.\n"
-                "Qué hacer: traer el código más nuevo (git pull) y volver a correr "
-                f"scripts\\actualizar_pc_principal.bat.\n{exc}",
+                "Repetir el git pull no lo arregla (actualizar_pc_principal.bat, abrir_pos.bat y "
+                "el bot ya lo hacen). Lo más probable es una de dos:\n"
+                "• quien migró no ha subido ese código: que haga git push desde la computadora "
+                "donde migró;\n"
+                "• esta PC está en otra rama (por ejemplo main): revisar con git branch y pasarla "
+                "a la rama de trabajo.\n"
+                f"Ya con el código nuevo aquí, volver a correr scripts\\actualizar_pc_principal.bat.\n{exc}",
             )
         return _fin(
             SIN_BASE,

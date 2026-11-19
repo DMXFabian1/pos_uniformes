@@ -360,7 +360,6 @@ class ProgramaViejoTests(unittest.TestCase):
         self.assertEqual(f.avisos, [r.texto])
         self.assertIn("más viejo que la base", r.texto)
         self.assertIn("NO se migró", r.texto)
-        self.assertIn("traer el código más nuevo", r.texto)
         self.assertIn("actualizar_pc_principal.bat", r.texto)
         self.assertIn("zzz9", r.texto)
         self.assertNotIn(act.MARCA_FALLIDA, f.marcas)
@@ -369,6 +368,18 @@ class ProgramaViejoTests(unittest.TestCase):
         f = _Falso(pendientes="programa viejo")
         r = act.actualizar(f.mundo(), traer=True)
         self.assertEqual((r.que, f.hechos), (act.PROGRAMA_VIEJO, ["traer"]))
+
+    def test_programa_viejo_no_manda_a_repetir_el_pull_sino_a_la_causa(self) -> None:
+        # Quien llama ya hizo git pull: pedir otro manda a la persona en círculo.
+        # La causa real: el código con la migración no se subió, o esta PC está
+        # en otra rama (2026-11-19).
+        f = _Falso(pendientes="programa viejo")
+        r = act.actualizar(f.mundo(), traer=True)
+        self.assertNotIn("traer el código más nuevo (git pull)", r.texto)
+        self.assertIn("Repetir el git pull no lo arregla", r.texto)
+        self.assertIn("git push", r.texto)
+        self.assertIn("otra rama", r.texto)
+        self.assertIn("main", r.texto)
 
     def test_sin_base_sigue_siendo_sin_base(self) -> None:
         f = _Falso(pendientes="sin base")
