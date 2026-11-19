@@ -241,6 +241,29 @@ def sin_compras_a_cuenta(session, rows: list) -> list:
     return [r for r in rows if getattr(r, "id", None) not in a_cuenta] if a_cuenta else rows
 
 
+def sin_compras_a_cuenta_tolerante(session, rows: list, *, quien: str) -> list:
+    """`sin_compras_a_cuenta`, sin tumbar una pantalla que no es el corte.
+
+    El corte falla a propósito si no puede leer las compras a cuenta (quitar
+    el retiro sin su venta daría un esperado falso). Analítica y el Resumen
+    no tienen esperado y pintan mucho más que dinero: una base atrasada sin
+    `prestamo_empleada.libreta_venta_id` no debe dejarlos en blanco
+    (revisión, 2026-11-12; el Resumen, 2026-11-19). Solo `ProgrammingError`
+    (la columna o la tabla no existe): en esa base ninguna venta puede estar
+    ligada a una compra a cuenta, así que las filas tal cual SON lo cobrable.
+    Cualquier otro error sigue subiendo, igual que en el corte.
+
+    `quien` es el nombre de la pantalla que llama («Analítica», «Resumen»)
+    y encabeza el aviso del log."""
+    try:
+        return sin_compras_a_cuenta(session, rows)
+    except ProgrammingError:
+        session.rollback()
+        logger.warning("%s: sin prestamo_empleada.libreta_venta_id (¿migración pendiente?); "
+                       "no hay compras a cuenta que quitar", quien)
+        return rows
+
+
 def pagos_del_periodo(session, desde: datetime | None, hasta: datetime) -> Decimal:
     from pos_uniformes.database.models import EmpleadaPago
 

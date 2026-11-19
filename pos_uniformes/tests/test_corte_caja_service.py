@@ -42,6 +42,57 @@ class ResumirPeriodoTests(unittest.TestCase):
         self.assertEqual(r.operaciones, 0)
 
 
+class SinComprasACuentaToleranteTests(unittest.TestCase):
+    """La guarda común de Analítica y el Resumen (2026-11-19): una base sin
+    `prestamo_empleada.libreta_venta_id` no los tumba; el aviso del log dice
+    quién llamó. El corte sigue usando `sin_compras_a_cuenta`, que sí falla."""
+
+    def _base_sin_la_columna(self):
+        # En PostgreSQL, una columna que no existe es ProgrammingError
+        # (SQLite daría OperationalError), así que se simula la base.
+        from sqlalchemy.exc import ProgrammingError
+
+        sesion = MagicMock()
+        sesion.execute.side_effect = ProgrammingError(
+            "SELECT prestamo_empleada.libreta_venta_id …", {},
+            Exception("column prestamo_empleada.libreta_venta_id does not exist"))
+        sesion.scalars.side_effect = sesion.execute.side_effect
+        return sesion
+
+    def test_sin_la_columna_devuelve_las_filas_y_avisa_con_el_nombre(self) -> None:
+        for quien in ("Resumen", "Analítica"):
+            with self.subTest(quien=quien):
+                sesion = self._base_sin_la_columna()
+                filas = [SimpleNamespace(id=1), SimpleNamespace(id=2)]
+                with self.assertLogs(caja.logger, level="WARNING") as log:
+                    salida = caja.sin_compras_a_cuenta_tolerante(sesion, filas, quien=quien)
+                self.assertIs(salida, filas)
+                sesion.rollback.assert_called_once()
+                self.assertEqual(len(log.records), 1)
+                self.assertTrue(log.records[0].getMessage().startswith(f"{quien}: sin prestamo_empleada.libreta_venta_id"))
+
+    def test_el_corte_si_falla_sin_la_columna(self) -> None:
+        from sqlalchemy.exc import ProgrammingError
+
+        with self.assertRaises(ProgrammingError):
+            caja.sin_compras_a_cuenta(self._base_sin_la_columna(), [SimpleNamespace(id=1)])
+
+    def test_otro_error_sube(self) -> None:
+        from sqlalchemy.exc import OperationalError
+
+        sesion = MagicMock()
+        with patch.object(caja, "sin_compras_a_cuenta", side_effect=OperationalError("x", {}, Exception("caída"))):
+            with self.assertRaises(OperationalError):
+                caja.sin_compras_a_cuenta_tolerante(sesion, [SimpleNamespace(id=1)], quien="Resumen")
+        sesion.rollback.assert_not_called()
+
+    def test_con_la_columna_quita_las_compras_a_cuenta(self) -> None:
+        filas = [SimpleNamespace(id=1), SimpleNamespace(id=2)]
+        with patch("pos_uniformes.services.compra_a_cuenta_service.estados_en_libreta", return_value={2: "pendiente"}):
+            salida = caja.sin_compras_a_cuenta_tolerante(MagicMock(), filas, quien="Resumen")
+        self.assertEqual([f.id for f in salida], [1])
+
+
 class EstadoCajaTests(unittest.TestCase):
     def test_esperado_suma_reactivo_y_resta_pagos(self) -> None:
         estado = EstadoCaja(
