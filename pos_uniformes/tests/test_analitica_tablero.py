@@ -24,6 +24,7 @@ from pos_uniformes.database.models import (  # noqa: E402
     Categoria, Escuela, LibretaCorte, LibretaVenta, Marca, Producto, Variante,
 )
 from pos_uniformes.services import analitica_tablero_service as tb  # noqa: E402
+from tests.test_conjunto_service import _Base as _BaseConjuntos  # noqa: E402
 
 _APP = QApplication.instance() or QApplication([])
 HOY = date(2026, 11, 7)   # sábado
@@ -431,6 +432,78 @@ class ElPosUsaLaNuevaTests(unittest.TestCase):
         fuente = inspect.getsource(main_window.MainWindow._refresh_analytics)
         self.assertIn("analytics_tablero import refrescar", fuente)
         self.assertNotIn("load_confirmed_sales_for_analytics", fuente)
+
+
+class PorAcabarseConConjuntosTests(_BaseConjuntos):
+    """«Se va a acabar» reparte el conjunto vendido en sus piezas (2026-11-19).
+
+    Lo vendido como Pants 3pz se suma al pants 2pz (5 en talla 10) y a la
+    playera (3 en talla 10); el SKU del conjunto es virtual y no sale."""
+
+    HOY = date(2026, 11, 19)
+
+    def _vender(self, sku: str, cantidad: int) -> None:
+        self.s.add(LibretaVenta(
+            employee_code="VEND-4", employee_name="Fanny", tipo="venta", piezas=cantidad,
+            monto_total=Decimal("100"), monto_neto=Decimal("100"), pago_tarjeta=False,
+            detalle=[{"sku": sku, "nombre": "Pants 3pz", "talla": "10", "precio": "100",
+                      "cantidad": cantidad, "subtotal": "100"}],
+            created_at=datetime.combine(self.HOY, time(12, 0)).astimezone(),
+        ))
+        self.s.commit()
+
+    def _piezas_10(self) -> tuple[str, str]:
+        return self._var(self.p2, "10").sku, self._var(self.play, "10").sku
+
+    def _revisar_reparto(self, sku_conjunto: str) -> None:
+        p2, play = self._piezas_10()
+        r = {p.sku: p for p in tb.cargar_por_acabarse(self.s, hoy=self.HOY)}
+        self.assertNotIn(sku_conjunto, r)
+        self.assertEqual(set(r), {p2, play})
+        self.assertEqual((r[p2].vendidas, r[p2].existencia), (12, 5))
+        self.assertEqual((r[play].vendidas, r[play].existencia), (12, 3))
+
+    def test_el_conjunto_vendido_se_reparte_y_su_sku_virtual_no_aparece(self) -> None:
+        self._armar()
+        p3 = self._var(self.p3, "10").sku
+        self._vender(p3, 12)
+        self._revisar_reparto(p3)
+
+    def test_otra_variante_de_la_misma_talla_tambien_se_reparte(self) -> None:
+        self._armar()
+        self.s.add(Variante(producto_id=self.p3.id, sku="P3-10-AZUL", talla="10", color="Azul",
+                            precio_venta=100, stock_actual=0))
+        self.s.commit()
+        self._vender("P3-10-AZUL", 12)
+        self._revisar_reparto("P3-10-AZUL")
+
+    def test_la_variante_desactivada_despues_de_vender_tambien_se_reparte(self) -> None:
+        self._armar()
+        principal = self._var(self.p3, "10")
+        self._vender(principal.sku, 12)
+        principal.activo = False
+        self.s.commit()
+        self._revisar_reparto(principal.sku)
+
+    def test_sin_recetas_el_producto_cuenta_tal_cual(self) -> None:
+        # Un Pants 3pz SIN receta guarda stock propio: sí se mide.
+        p3 = self._var(self.p3, "10").sku
+        self._vender(p3, 4)
+        self.assertEqual([p.sku for p in tb.cargar_por_acabarse(self.s, hoy=self.HOY)], [p3])
+
+    def test_si_las_recetas_fallan_deshace_avisa_y_sigue_sin_repartir(self) -> None:
+        self._armar()
+        p3 = self._var(self.p3, "10").sku
+        self._vender(p3, 12)
+        with patch("pos_uniformes.services.inventario_ritmo_service.cargar_recetas_por_sku",
+                   side_effect=RuntimeError("se cayó la consulta")), \
+                patch.object(self.s, "rollback", wraps=self.s.rollback) as rollback, \
+                self.assertLogs(tb.logger, "WARNING") as avisos:
+            r = tb.cargar_por_acabarse(self.s, hoy=self.HOY)
+        rollback.assert_called_once()
+        self.assertIn("recetas de conjuntos", avisos.output[0])
+        # Lo vendido sale tal cual: el SKU del conjunto (con su stock derivado, 3), sin repartir en las piezas.
+        self.assertEqual([(p.sku, p.vendidas, p.existencia) for p in r], [(p3, 12, 3)])
 
 
 if __name__ == "__main__":
