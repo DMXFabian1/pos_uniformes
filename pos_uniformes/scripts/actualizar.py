@@ -94,6 +94,7 @@ class Mundo:
 # Las marcas viven en data/ de la PC principal.
 MARCA_FALLIDA = "actualizacion_fallida.txt"     # commit que no se pudo aplicar
 MARCA_PAUSA = "kioskos_en_pausa.txt"            # commit que NO se publica (se volvió atrás)
+MARCA_PROGRAMA_VIEJO = "programa_viejo_avisado.txt"  # commit del que ya se avisó que es más viejo que la base
 
 
 def _mismo(a: str | None, b: str | None) -> bool:
@@ -140,6 +141,10 @@ def actualizar(m: Mundo, *, al_abrir: bool = False, traer: bool = False) -> Resu
         if getattr(exc, "programa_viejo", False):
             # Migrar no lo arregla (alembic no sabe ir a una revisión que no
             # conoce) y publicar mandaría a los kioskos un programa que no abre.
+            # Al abrir el POS se avisa una sola vez por commit: si no, cada
+            # apertura manda otro Telegram igual (como YA_HABIA_FALLADO).
+            ya_avisado = al_abrir and _mismo(m.leer_marca(MARCA_PROGRAMA_VIEJO), ahora)
+            m.escribir_marca(MARCA_PROGRAMA_VIEJO, ahora)
             return _fin(
                 PROGRAMA_VIEJO,
                 f"🛑 Actualización: este código ({ahora}) es más viejo que la base de datos: la "
@@ -152,11 +157,15 @@ def actualizar(m: Mundo, *, al_abrir: bool = False, traer: bool = False) -> Resu
                 "• esta PC está en otra rama (por ejemplo main): revisar con git branch y pasarla "
                 "a la rama de trabajo.\n"
                 f"Ya con el código nuevo aquí, volver a correr scripts\\actualizar_pc_principal.bat.\n{exc}",
+                avisar=not ya_avisado,
             )
         return _fin(
             SIN_BASE,
             f"🛑 Actualización: no se pudo hablar con la base ({exc}). No se tocó nada.",
         )
+
+    if m.leer_marca(MARCA_PROGRAMA_VIEJO):
+        m.escribir_marca(MARCA_PROGRAMA_VIEJO, "")   # ya se resolvió: el próximo caso se avisa
 
     pausa = m.leer_marca(MARCA_PAUSA)
     if pausa and not _mismo(pausa, ahora):

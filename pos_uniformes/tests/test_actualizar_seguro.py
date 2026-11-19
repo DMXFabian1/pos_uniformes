@@ -381,6 +381,41 @@ class ProgramaViejoTests(unittest.TestCase):
         self.assertIn("otra rama", r.texto)
         self.assertIn("main", r.texto)
 
+    def test_al_abrir_avisa_por_telegram_una_sola_vez_por_commit(self) -> None:
+        # Antes la migración fallaba, quedaba MARCA_FALLIDA y las aperturas
+        # siguientes callaban; sin marca, cada apertura mandaba otro Telegram.
+        f = _Falso(pendientes="programa viejo")
+        resultados = [act.actualizar(f.mundo(), al_abrir=True) for _ in range(3)]
+        self.assertEqual({r.que for r in resultados}, {act.PROGRAMA_VIEJO})
+        self.assertEqual(len(f.avisos), 1)
+        self.assertEqual(f.marcas.get(act.MARCA_PROGRAMA_VIEJO), "bbb2222")
+        self.assertNotIn(act.MARCA_FALLIDA, f.marcas)
+        self.assertEqual(f.hechos, [])
+
+    def test_a_mano_avisa_siempre(self) -> None:
+        f = _Falso(pendientes="programa viejo")
+        act.actualizar(f.mundo(), al_abrir=True)
+        act.actualizar(f.mundo())
+        act.actualizar(f.mundo())
+        self.assertEqual(len(f.avisos), 3)
+
+    def test_al_abrir_con_otro_commit_vuelve_a_avisar(self) -> None:
+        f = _Falso(pendientes="programa viejo")
+        act.actualizar(f.mundo(), al_abrir=True)
+        f.ahora = "ccc3333"
+        act.actualizar(f.mundo(), al_abrir=True)
+        self.assertEqual(len(f.avisos), 2)
+
+    def test_ya_resuelto_se_borra_la_marca_y_el_siguiente_caso_avisa(self) -> None:
+        f = _Falso(pendientes="programa viejo")
+        act.actualizar(f.mundo(), al_abrir=True)
+        f.pendientes, f.share = False, False
+        self.assertEqual(act.actualizar(f.mundo(), al_abrir=True).que, act.AL_DIA)
+        self.assertNotIn(act.MARCA_PROGRAMA_VIEJO, f.marcas)
+        f.pendientes = "programa viejo"
+        act.actualizar(f.mundo(), al_abrir=True)
+        self.assertEqual(len(f.avisos), 2)
+
     def test_sin_base_sigue_siendo_sin_base(self) -> None:
         f = _Falso(pendientes="sin base")
         self.assertEqual(act.actualizar(f.mundo()).que, act.SIN_BASE)
