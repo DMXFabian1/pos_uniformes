@@ -240,5 +240,48 @@ class CorregirExistenciaTests(_ConQt):
         )
 
 
+class EntradaDeMercanciaTests(_ConQt):
+    def test_sin_proveedor_activo_avisa_igual_que_antes(self) -> None:
+        from pos_uniformes.ui.dialogs import inventory_purchase_dialog as modulo
+
+        with patch.object(modulo, "get_session", _SesionFalsa([], [_variante(1, 3)])):
+            with self.assertRaisesRegex(ValueError, "al menos un proveedor activo"):
+                modulo.prompt_purchase_data(
+                    create_modal_dialog=_crear_dialogo,
+                    set_combo_value=MainWindow._set_combo_value,
+                    prefill_variant_id=lambda: None,
+                )
+
+    def test_aceptar_devuelve_proveedor_y_presentacion_elegidos(self) -> None:
+        from pos_uniformes.ui.dialogs import inventory_purchase_dialog as modulo
+
+        proveedores = [SimpleNamespace(id=10, nombre="Proveedor Muestra")]
+        with patch.object(modulo, "get_session", _SesionFalsa(proveedores, [_variante(1, 3), _variante(2, 0)])):
+            resultado = modulo.prompt_purchase_data(
+                create_modal_dialog=_crear_dialogo,
+                set_combo_value=MainWindow._set_combo_value,
+                prefill_variant_id=lambda: 2,
+            )
+
+        self.assertEqual(
+            resultado,
+            {"proveedor_id": 10, "variante_id": 2, "cantidad": 1, "costo": "", "documento": ""},
+        )
+
+    def test_main_window_solo_delega(self) -> None:
+        ventana = SimpleNamespace(
+            _create_modal_dialog=object(),
+            _set_combo_value=object(),
+            _dialog_prefill_variant_id=object(),
+        )
+        with patch.object(main_window_module, "prompt_purchase_data", return_value=None) as falso:
+            self.assertIsNone(MainWindow._prompt_purchase_data(ventana))
+        falso.assert_called_once_with(
+            create_modal_dialog=ventana._create_modal_dialog,
+            set_combo_value=ventana._set_combo_value,
+            prefill_variant_id=ventana._dialog_prefill_variant_id,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

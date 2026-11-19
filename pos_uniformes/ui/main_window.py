@@ -241,6 +241,7 @@ from pos_uniformes.ui.dialogs.catalog_variant_dialog import (
 )
 from pos_uniformes.ui.dialogs.inventory_context_menu_dialog import prompt_inventory_context_action
 from pos_uniformes.ui.dialogs.inventory_count_dialog import prompt_inventory_count_data
+from pos_uniformes.ui.dialogs.inventory_purchase_dialog import prompt_purchase_data
 from pos_uniformes.ui.dialogs.inventory_adjustment_dialog import prompt_inventory_adjustment_data
 from pos_uniformes.ui.dialogs.inventory_bulk_adjustment_dialog import prompt_inventory_bulk_adjustment_data
 from pos_uniformes.ui.dialogs.inventory_bulk_price_dialog import prompt_inventory_bulk_price_data
@@ -3640,70 +3641,11 @@ class MainWindow(QMainWindow):
         )
 
     def _prompt_purchase_data(self) -> dict[str, object] | None:
-        with get_session() as session:
-            proveedores = [
-                (proveedor.id, proveedor.nombre)
-                for proveedor in session.scalars(
-                    select(Proveedor).where(Proveedor.activo.is_(True)).order_by(Proveedor.nombre)
-                ).all()
-            ]
-            variantes = [
-                (
-                    variante.id,
-                    variante.sku,
-                    sanitize_product_display_name(variante.producto.nombre),
-                    variante.stock_actual,
-                )
-                for variante in session.scalars(
-                    select(Variante).where(Variante.activo.is_(True)).order_by(Variante.sku)
-                ).all()
-            ]
-
-        if not proveedores or not variantes:
-            raise ValueError("Necesitas al menos un proveedor activo y una presentacion activa.")
-
-        dialog, layout = self._create_modal_dialog(
-            "Registrar entrada",
-            "Usa esta ventana para ingresar nueva mercancia de una presentacion existente.",
+        return prompt_purchase_data(
+            create_modal_dialog=self._create_modal_dialog,
+            set_combo_value=self._set_combo_value,
+            prefill_variant_id=self._dialog_prefill_variant_id,
         )
-        form = QFormLayout()
-        proveedor_combo = QComboBox()
-        for proveedor_id, proveedor_nombre in proveedores:
-            proveedor_combo.addItem(proveedor_nombre, proveedor_id)
-        presentacion_combo = QComboBox()
-        for variante_id, sku, producto_nombre, stock_actual in variantes:
-            presentacion_combo.addItem(
-                f"{sku} | {producto_nombre} | stock {stock_actual}",
-                variante_id,
-            )
-        self._set_combo_value(presentacion_combo, self._dialog_prefill_variant_id())
-        cantidad_spin = QSpinBox()
-        cantidad_spin.setRange(1, 1000)
-        costo_input = QLineEdit()
-        costo_input.setPlaceholderText("550.00")
-        documento_input = QLineEdit()
-        documento_input.setPlaceholderText("COMP-0001")
-        form.addRow("Proveedor", proveedor_combo)
-        form.addRow("Presentacion", presentacion_combo)
-        form.addRow("Cantidad", cantidad_spin)
-        form.addRow("Costo unitario", costo_input)
-        form.addRow("Documento", documento_input)
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return None
-        return {
-            "proveedor_id": proveedor_combo.currentData(),
-            "variante_id": presentacion_combo.currentData(),
-            "cantidad": cantidad_spin.value(),
-            "costo": costo_input.text().strip(),
-            "documento": documento_input.text().strip(),
-        }
 
     def _prompt_inventory_adjustment_data(self) -> dict[str, object] | None:
         return prompt_inventory_adjustment_data(
