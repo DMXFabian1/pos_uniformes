@@ -39,6 +39,7 @@ AL_DIA = "al_dia"
 ACTUALIZADO = "actualizado"
 EN_PAUSA = "en_pausa"
 SIN_BASE = "sin_base"
+PROGRAMA_VIEJO = "programa_viejo"     # la base trae una revisión que este código no conoce
 FALLO_TRAER = "fallo_traer"
 FALLO_BUILD = "fallo_build"
 FALLO_RESPALDO = "fallo_respaldo"
@@ -67,7 +68,9 @@ class Mundo:
     commit_actual: Callable[[], str]
     hay_share: Callable[[], bool]
     commit_publicado: Callable[[], str | None]
-    migraciones_pendientes: Callable[[], bool]      # truena si no hay base
+    # Truena si no hay base, y también (con `programa_viejo=True`) si el viejo
+    # es el código: la base trae una revisión que este programa no conoce.
+    migraciones_pendientes: Callable[[], bool]
     construir: Callable[[], bool]
     respaldar: Callable[[], Path]                   # truena si no salió
     migrar: Callable[[], bool]
@@ -134,6 +137,17 @@ def actualizar(m: Mundo, *, al_abrir: bool = False, traer: bool = False) -> Resu
     try:
         pendientes = m.migraciones_pendientes()
     except Exception as exc:  # noqa: BLE001 — sin base no se decide nada
+        if getattr(exc, "programa_viejo", False):
+            # Migrar no lo arregla (alembic no sabe ir a una revisión que no
+            # conoce) y publicar mandaría a los kioskos un programa que no abre.
+            return _fin(
+                PROGRAMA_VIEJO,
+                f"🛑 Actualización: este código ({ahora}) es más viejo que la base de datos: la "
+                "base ya tiene cambios que esta versión no conoce (alguien migró con un código más "
+                "nuevo). NO se migró ni se publicó nada.\n"
+                "Qué hacer: traer el código más nuevo (git pull) y volver a correr "
+                f"scripts\\actualizar_pc_principal.bat.\n{exc}",
+            )
         return _fin(
             SIN_BASE,
             f"🛑 Actualización: no se pudo hablar con la base ({exc}). No se tocó nada.",
@@ -442,9 +456,25 @@ def _version_conoce_base(commit: str) -> bool | None:
 
 
 def _migraciones_pendientes() -> bool:
-    from pos_uniformes.database.preflight import inspect_database_status
+    """¿Hay que correr `alembic upgrade head`? Solo si la base va ATRASADA.
+
+    Con la misma clasificación del preflight: base al día o adelante → no;
+    base con una revisión que este programa no conoce → truena con
+    `programa_viejo=True` (migrar no lo arregla: hay que traer código nuevo)."""
+    from pos_uniformes.database.preflight import (
+        TITULO_PROGRAMA_VIEJO,
+        DatabasePreflightError,
+        inspect_database_status,
+    )
 
     estado = inspect_database_status()
+    if estado.programa_viejo:
+        raise DatabasePreflightError(
+            f"Versión de la base: {', '.join(estado.current_heads)} · este código la conoce hasta "
+            f"{', '.join(estado.expected_heads)}",
+            titulo=TITULO_PROGRAMA_VIEJO,
+            programa_viejo=True,
+        )
     return not estado.is_up_to_date and not estado.base_adelante
 
 

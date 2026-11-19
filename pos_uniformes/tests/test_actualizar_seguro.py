@@ -10,6 +10,7 @@ from __future__ import annotations
 import tempfile
 import unittest
 from pathlib import Path
+from unittest import mock
 
 from pos_uniformes.scripts import actualizar as act
 
@@ -42,6 +43,10 @@ class _Falso:
     def _pendientes(self) -> bool:
         if self.pendientes == "sin base":
             raise RuntimeError("no contesta")
+        if self.pendientes == "programa viejo":
+            from pos_uniformes.database.preflight import DatabasePreflightError
+
+            raise DatabasePreflightError("Versión de la base: zzz9", programa_viejo=True)
         return bool(self.pendientes)
 
     def _volver(self, commit: str) -> bool:
@@ -340,6 +345,77 @@ class VolverTests(unittest.TestCase):
         r = act.actualizar(f.mundo())
         self.assertEqual(f.hechos, ["respaldo", "migrar"])
         self.assertIn("en pausa", r.texto)
+
+
+class ProgramaViejoTests(unittest.TestCase):
+    """Si la base trae una revisión que este código no conoce, el viejo es el
+    programa: migrar no lo arregla (alembic tronaba con un error genérico) y
+    publicar mandaría a los kioskos algo que no abre (2026-11-19)."""
+
+    def test_programa_viejo_no_migra_ni_construye_ni_publica_y_dice_que_hacer(self) -> None:
+        f = _Falso(pendientes="programa viejo")
+        r = act.actualizar(f.mundo())
+        self.assertEqual((r.que, f.hechos), (act.PROGRAMA_VIEJO, []))
+        self.assertFalse(r.ok)
+        self.assertEqual(f.avisos, [r.texto])
+        self.assertIn("más viejo que la base", r.texto)
+        self.assertIn("NO se migró", r.texto)
+        self.assertIn("traer el código más nuevo", r.texto)
+        self.assertIn("actualizar_pc_principal.bat", r.texto)
+        self.assertIn("zzz9", r.texto)
+        self.assertNotIn(act.MARCA_FALLIDA, f.marcas)
+
+    def test_programa_viejo_tras_traer_tampoco_migra(self) -> None:
+        f = _Falso(pendientes="programa viejo")
+        r = act.actualizar(f.mundo(), traer=True)
+        self.assertEqual((r.que, f.hechos), (act.PROGRAMA_VIEJO, ["traer"]))
+
+    def test_sin_base_sigue_siendo_sin_base(self) -> None:
+        f = _Falso(pendientes="sin base")
+        self.assertEqual(act.actualizar(f.mundo()).que, act.SIN_BASE)
+
+
+class MigracionesPendientesTests(unittest.TestCase):
+    """`_migraciones_pendientes` usa la clasificación del preflight, no la repite."""
+
+    def _con(self, **campos):
+        from pos_uniformes.database.preflight import DatabasePreflightStatus
+
+        estado = DatabasePreflightStatus(**campos)
+        return mock.patch(
+            "pos_uniformes.database.preflight.inspect_database_status", return_value=estado
+        )
+
+    def test_base_atrasada_migra(self) -> None:
+        with self._con(current_heads=("a1",), expected_heads=("b2",)):
+            self.assertTrue(act._migraciones_pendientes())
+
+    def test_base_al_dia_no_migra(self) -> None:
+        with self._con(current_heads=("b2",), expected_heads=("b2",)):
+            self.assertFalse(act._migraciones_pendientes())
+
+    def test_base_adelante_no_migra(self) -> None:
+        with self._con(current_heads=("c3",), expected_heads=("b2",), base_adelante=True):
+            self.assertFalse(act._migraciones_pendientes())
+
+    def test_programa_viejo_no_migra_y_truena_con_la_marca(self) -> None:
+        from pos_uniformes.database.preflight import TITULO_PROGRAMA_VIEJO, DatabasePreflightError
+
+        with self._con(current_heads=("x9",), expected_heads=("b2",), programa_viejo=True):
+            with self.assertRaises(DatabasePreflightError) as ctx:
+                act._migraciones_pendientes()
+        self.assertTrue(ctx.exception.programa_viejo)
+        self.assertEqual(ctx.exception.titulo, TITULO_PROGRAMA_VIEJO)
+        self.assertIn("x9", str(ctx.exception))
+        self.assertIn("b2", str(ctx.exception))
+
+    def test_de_punta_a_punta_programa_viejo_no_llama_a_migrar(self) -> None:
+        f = _Falso()
+        mundo = f.mundo()
+        mundo.migraciones_pendientes = act._migraciones_pendientes
+        with self._con(current_heads=("x9",), expected_heads=("b2",), programa_viejo=True):
+            r = act.actualizar(mundo)
+        self.assertEqual((r.que, f.hechos), (act.PROGRAMA_VIEJO, []))
 
 
 class ConoceRevisionesTests(unittest.TestCase):
