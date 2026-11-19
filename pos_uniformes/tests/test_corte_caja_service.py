@@ -87,10 +87,42 @@ class SinComprasACuentaToleranteTests(unittest.TestCase):
         sesion.rollback.assert_not_called()
 
     def test_con_la_columna_quita_las_compras_a_cuenta(self) -> None:
-        filas = [SimpleNamespace(id=1), SimpleNamespace(id=2)]
-        with patch("pos_uniformes.services.compra_a_cuenta_service.estados_en_libreta", return_value={2: "pendiente"}):
-            salida = caja.sin_compras_a_cuenta_tolerante(MagicMock(), filas, quien="Resumen")
-        self.assertEqual([f.id for f in salida], [1])
+        # Base real (SQLite en memoria) con prestamo_empleada.libreta_venta_id:
+        # la venta ligada a una compra a cuenta sale; la otra se queda, y no
+        # hay rollback ni aviso.
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import Session
+        from sqlalchemy.pool import StaticPool
+
+        from pos_uniformes.database.connection import Base
+        from pos_uniformes.database.models import LibretaVenta, PrestamoEmpleada
+        from pos_uniformes.services import prestamos_service as pr
+
+        engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+        Base.metadata.create_all(engine)
+        sesion = Session(engine)
+        self.addCleanup(sesion.close)
+
+        def venta(monto: str, **extra) -> LibretaVenta:
+            fila = LibretaVenta(
+                employee_code="VEND-4", employee_name="Fanny", tipo="venta", piezas=1,
+                monto_total=Decimal(monto), monto_neto=Decimal(monto), detalle=[],
+                created_at=datetime(2026, 11, 19, 12, 0, tzinfo=timezone.utc), **extra,
+            )
+            sesion.add(fila)
+            sesion.commit()
+            return fila
+
+        normal = venta("300")
+        a_cuenta = venta("500", descuento_empleada=True)
+        sesion.add(PrestamoEmpleada(
+            employee_code="VEND-4", employee_name="Fanny", monto=Decimal("500"), motivo="Compra a cuenta",
+            estado=pr.APROBADO, tipo=pr.TIPO_COMPRA, libreta_venta_id=a_cuenta.id,
+        ))
+        sesion.commit()
+        with self.assertNoLogs(caja.logger, level="WARNING"):
+            salida = caja.sin_compras_a_cuenta_tolerante(sesion, [normal, a_cuenta], quien="Resumen")
+        self.assertEqual([f.id for f in salida], [normal.id])
 
 
 class EstadoCajaTests(unittest.TestCase):

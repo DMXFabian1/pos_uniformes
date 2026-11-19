@@ -309,7 +309,12 @@ class CobradoComoElResumenTests(_ConBase):
         self._anotar(HOY, "venta", "300")
         falla = ProgrammingError("SELECT …", {}, Exception("column libreta_venta_id does not exist"))
         with patch.object(cc, "sin_compras_a_cuenta", side_effect=falla):
-            t = tb.cargar(self.s, tb.HOY, HOY, real=True, hoy=HOY)
+            with self.assertLogs(cc.logger, level="WARNING") as log:
+                t = tb.cargar(self.s, tb.HOY, HOY, real=True, hoy=HOY)
+        # El aviso dice que fue Analítica, no el Resumen (2026-11-19).
+        self.assertTrue(log.records)
+        for registro in log.records:
+            self.assertTrue(registro.getMessage().startswith("Analítica: "), registro.getMessage())
         self.assertEqual((t.ahora.cobrado, t.ahora.ventas), (Decimal("300.00"), 1))
         with patch.object(cc, "sin_compras_a_cuenta", side_effect=OperationalError("x", {}, Exception("caída"))):
             with self.assertRaises(OperationalError):

@@ -163,7 +163,12 @@ class CargarTests(unittest.TestCase):
         self._anotar(HOY - timedelta(days=2), "venta", "500")
         falla = ProgrammingError("SELECT …", {}, Exception("column libreta_venta_id does not exist"))
         with patch.object(cc, "sin_compras_a_cuenta", side_effect=falla):
-            r = rp.cargar(self.s, HOY)
+            with self.assertLogs(cc.logger, level="WARNING") as log:
+                r = rp.cargar(self.s, HOY)
+        # El aviso dice que fue el Resumen, no Analítica (2026-11-19).
+        self.assertTrue(log.records)
+        for registro in log.records:
+            self.assertTrue(registro.getMessage().startswith("Resumen: "), registro.getMessage())
         self.assertEqual((r.hoy.ventas, r.hoy.cobrado), (1, Decimal("300.00")))
         self.assertEqual((r.mes.ventas, r.mes.cobrado), (2, Decimal("800.00")))
         with patch.object(cc, "sin_compras_a_cuenta", side_effect=OperationalError("x", {}, Exception("caída"))):
