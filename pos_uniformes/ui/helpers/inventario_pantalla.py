@@ -48,6 +48,11 @@ from pos_uniformes.ui.helpers.inventario_ficha_prenda import (
     editar_datos,
 )
 from pos_uniformes.ui.helpers.history_filter_state_helper import build_history_clear_filter_state
+from pos_uniformes.ui.dialogs.inventory_context_menu_dialog import prompt_inventory_context_action
+from pos_uniformes.ui.helpers.inventory_context_menu_helper import (
+    ACCION_CORREGIR_LOTE,
+    build_inventory_context_menu_actions,
+)
 from pos_uniformes.services.inventario_existencia_service import es_fila_virtual
 from pos_uniformes.services.inventario_precio_service import LLAVE_PRECIO, LLAVE_TIPO, precio_efectivo
 from pos_uniformes.services.inventario_prenda_service import (
@@ -610,6 +615,9 @@ class InventarioPantalla(QObject):
         self.prendas.selectionModel().selectionChanged.connect(lambda *_: self._al_elegir_en_arbol())
         self.prendas.header().sectionClicked.connect(self.tocar_encabezado_prenda)
         self.prendas.talla_doble_clic.connect(lambda _: self._llamar("_handle_inventory_table_double_click"))
+        # Clic derecho: el mismo menú que «Por talla» (ver `menu_contextual_prenda`).
+        self.prendas.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.prendas.customContextMenuRequested.connect(self.menu_contextual_prenda)
         soltar = QShortcut(QKeySequence(Qt.Key.Key_Escape), self.prendas)
         soltar.setContext(Qt.ShortcutContext.WidgetShortcut)
         soltar.activated.connect(self.quitar_seleccion)
@@ -1035,6 +1043,54 @@ class InventarioPantalla(QObject):
             finally:
                 combo.blockSignals(False)
         self.actualizar_ficha()
+
+    def menu_contextual_prenda(self, pos) -> None:
+        """Clic derecho en «Por prenda»: elige la fila (una prenda son todas sus
+        tallas; una talla desplegada, solo esa), la copia a la tabla escondida y
+        abre el MISMO menú de «Por talla», con las mismas acciones."""
+        arbol = self.prendas
+        indice = arbol.indexAt(pos)
+        if not indice.isValid():
+            return
+        indice = indice.sibling(indice.row(), 0)
+        modelo_sel = arbol.selectionModel()
+        self._espejando = True
+        try:
+            modelo_sel.setCurrentIndex(indice, QItemSelectionModel.SelectionFlag.NoUpdate)
+            modelo_sel.select(
+                indice,
+                QItemSelectionModel.SelectionFlag.ClearAndSelect | QItemSelectionModel.SelectionFlag.Rows,
+            )
+        finally:
+            self._espejando = False
+        self._al_elegir_en_arbol()
+
+        w = self.window
+        cantidad = len(w._selected_inventory_variant_ids())
+        elegida = w._selected_catalog_row()
+        if elegida is None:
+            return
+        llave = prompt_inventory_context_action(
+            w,
+            global_pos=arbol.viewport().mapToGlobal(pos),
+            action_specs=build_inventory_context_menu_actions(
+                is_admin=w.current_role == RolUsuario.ADMIN,
+                variante_activa=bool(elegida.get("variante_activo")),
+                tallas_elegidas=cantidad,
+            ),
+        )
+        self._hacer_accion_contextual(llave, cantidad)
+
+    def _hacer_accion_contextual(self, llave: str | None, cantidad: int) -> None:
+        """Con una talla, los manejadores de siempre de «Por talla»; con varias,
+        los de la barra de lote (igual que «Por talla» con varias elegidas)."""
+        if cantidad > 1:
+            if llave == ACCION_CORREGIR_LOTE:
+                self._llamar("_handle_inventory_bulk_adjustment")
+            elif llave == "print":
+                self.imprimir_elegidas()
+            return
+        self.window._handle_inventory_context_action(llave)
 
     def quitar_seleccion(self) -> None:
         """«Quitar selección» (barra, ficha o Esc) en cualquiera de las dos vistas."""

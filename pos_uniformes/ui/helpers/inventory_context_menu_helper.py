@@ -1,8 +1,20 @@
-"""Helpers visibles para las acciones contextuales de inventario."""
+"""Helpers visibles para las acciones contextuales de inventario.
+
+El mismo menú sirve en «Por talla» (siempre una talla) y en «Por prenda»
+(una prenda elegida son todas sus tallas). Con varias tallas elegidas, las
+acciones de UNA talla se apagan, igual que la ficha de «Por talla» cuando
+eliges varias (ahí solo quedan las acciones de lote de la barra): imprimir
+pasa a imprimir todas y corregir existencia pasa a corregirlas en lote.
+"""
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+
+#: Llave de «Corregir existencias» en lote (solo con varias tallas elegidas).
+ACCION_CORREGIR_LOTE = "adjust_bulk"
+#: Lo que se le agrega a una acción de una sola talla cuando hay varias.
+TEXTO_ELIGE_UNA = " (elige una sola talla)"
 
 
 @dataclass(frozen=True)
@@ -16,7 +28,10 @@ def build_inventory_context_menu_actions(
     *,
     is_admin: bool,
     variante_activa: bool,
+    tallas_elegidas: int = 1,
 ) -> tuple[InventoryContextMenuAction, ...]:
+    if tallas_elegidas > 1:
+        return _acciones_varias_tallas(is_admin=is_admin, cantidad=tallas_elegidas)
     return (
         InventoryContextMenuAction(
             key="edit",
@@ -43,6 +58,25 @@ def build_inventory_context_menu_actions(
             label="Activar esta talla" if not variante_activa else "Desactivar esta talla…",
             enabled=is_admin,
         ),
+    )
+
+
+def _acciones_varias_tallas(*, is_admin: bool, cantidad: int) -> tuple[InventoryContextMenuAction, ...]:
+    """Mismo orden que con una talla; lo que es de una sola talla queda apagado."""
+    return (
+        InventoryContextMenuAction(key="edit", label="Editar talla" + TEXTO_ELIGE_UNA, enabled=False),
+        InventoryContextMenuAction(key="entry", label="Registrar entrada" + TEXTO_ELIGE_UNA, enabled=False),
+        InventoryContextMenuAction(
+            key=ACCION_CORREGIR_LOTE,
+            label=f"Corregir existencias ({cantidad:,} tallas)",
+            enabled=is_admin,
+        ),
+        InventoryContextMenuAction(
+            key="print",
+            label=f"Imprimir {cantidad:,} etiquetas",
+            enabled=True,
+        ),
+        InventoryContextMenuAction(key="toggle", label="Activar o desactivar talla" + TEXTO_ELIGE_UNA, enabled=False),
     )
 
 
