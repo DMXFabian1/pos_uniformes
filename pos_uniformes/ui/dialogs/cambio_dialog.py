@@ -427,7 +427,7 @@ class CambioDialog(QDialog):
                 partes.append(f"Esta venta tiene {self._dias} días y el plazo de cambio es de {cs.PLAZO_DIAS}.")
             if self._hay_liquidacion and not self.dueno:
                 partes.append("Las prendas en Liquidación no tienen cambio ni devolución.")
-            partes.append("Solo el dueño lo puede autorizar: escanea su gafete.")
+            partes.append("Solo el dueño lo puede autorizar: escanea su gafete y escribe su PIN.")
             self.texto_plazo.setText(" ".join(partes))
             self.texto_plazo.setStyleSheet("background: transparent; color: #8a5a00; font-size: 14px; font-weight: 700;")
 
@@ -440,7 +440,10 @@ class CambioDialog(QDialog):
             self._pintar()
             self.escaner.setFocus()
         else:
-            QMessageBox.warning(self, "Autorización del dueño", "Ese gafete no es del dueño.")
+            QMessageBox.warning(
+                self, "Autorización del dueño",
+                "No se autorizó: hace falta el gafete del dueño y su PIN.",
+            )
 
     def _pago(self, tarjeta: bool) -> None:
         self.tarjeta = tarjeta

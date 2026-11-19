@@ -40,6 +40,10 @@ data/anuncios/
 data/label_printer_settings.json
 data/dvr_settings.json
 data/empleadas_nombres.json
+# Copia local del hash del PIN del dueño (kiosko sin conexión), y el temporal
+# de su escritura atómica, que se quedaría si el proceso muere a medias
+data/pin_dueno.json
+data/.pin_dueno_*
 data/satellite_errors.log
 data/pos_errors.log
 # Afluencia (contador con YOLO): entorno, modelo, config por máquina y salidas

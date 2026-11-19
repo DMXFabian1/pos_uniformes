@@ -5,6 +5,7 @@ caen ese día.
 Abajo: "¿Cuánto llevas?" — se escanea el gafete. La empleada ve SOLO su
 pago pendiente con desglose; el dueño (VEND-1) o el encargado (ENC-1) ven el de
 todas. Lo mostrado se borra solo a los 45 s (es una pantalla compartida).
+El dueño, además de su gafete, escribe su PIN (2026-11-19).
 """
 
 from __future__ import annotations
@@ -143,11 +144,14 @@ class DiaCalendarioDialog(QDialog):
         *,
         session_factory: Callable[[], object] | None = None,
         hoy: date | None = None,
+        pedir_pin_dueno: Callable[[str], bool] | None = None,
     ) -> None:
         super().__init__(parent)
         self._fecha = fecha
         self._hoy = hoy or date.today()
         self._session_factory = session_factory
+        # Para las pruebas: (motivo) -> bool. Sin él, el diálogo del kiosko.
+        self._pedir_pin = pedir_pin_dueno
         self.setWindowTitle(fecha_en_palabras(fecha))
         self.setMinimumWidth(720)
         self.setStyleSheet(_STYLES)
@@ -281,6 +285,13 @@ class DiaCalendarioDialog(QDialog):
         self.scan_input.clear()
         if not raw.strip():
             return
+        if self._es_gafete_del_dueno(raw) and not self._pedir_pin_dueno(
+            "Para ver los pagos pendientes de todas."
+        ):
+            # Sin PIN no se muestra nada de las demás.
+            self._limpiar_pago_box()
+            self._error("No se confirmó el PIN del dueño.")
+            return
         try:
             vista = self._consultar_pagos(raw)
         except Exception:  # noqa: BLE001
@@ -291,6 +302,25 @@ class DiaCalendarioDialog(QDialog):
             self._error("Ese código no es un gafete activo.")
             return
         self.mostrar_pagos(vista)
+
+    @staticmethod
+    def _es_gafete_del_dueno(raw: str) -> bool:
+        from pos_uniformes.services.employee_identity_service import EmployeeIdentityService
+        from pos_uniformes.services.nomina_service import OWNER_CODE
+
+        try:
+            return EmployeeIdentityService.normalize_employee_code(raw) == OWNER_CODE
+        except ValueError:
+            return False
+
+    def _pedir_pin_dueno(self, motivo: str) -> bool:
+        if self._pedir_pin is not None:
+            return bool(self._pedir_pin(motivo))
+        from pos_uniformes.ui.helpers import pin_dueno_dialog
+
+        return pin_dueno_dialog.pedir_pin_dueno(
+            self, en_linea=pin_dueno_dialog.en_linea_de(self), motivo=motivo,
+        )
 
     def _error(self, texto: str) -> None:
         self.error_label.setText(texto)

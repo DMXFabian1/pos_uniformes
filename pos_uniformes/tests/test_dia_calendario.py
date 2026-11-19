@@ -237,7 +237,8 @@ class DialogTests(unittest.TestCase):
             svc.PagoVista("VEND-2", "Fanny López", _detalle("VEND-2"), date(2026, 9, 11), True),
             svc.PagoVista("VEND-6", "Nayeli Ruiz", _detalle("VEND-6", "433.34", por_dia=True), HOY, True),
         ])
-        with patch.object(dlg, "_consultar_pagos", return_value=vista):
+        with patch.object(dlg, "_consultar_pagos", return_value=vista), \
+                patch.object(dlg, "_pedir_pin_dueno", return_value=True):
             dlg.scan_input.setText("EMP:VEND-1")
             dlg.scan_input.returnPressed.emit()
         tabla = dlg.pago_box.findChildren(QTableWidget)[0]

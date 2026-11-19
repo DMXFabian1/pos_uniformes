@@ -405,7 +405,7 @@ class QuickSaleWidget(
             emoji="📋",
             titulo="Venta rápida",
             ayuda="Escanea tu QR de empleada para comenzar",
-            marcador="VEND-1",
+            marcador="Gafete...",
             hoja=_GATE_STYLE,
             al_escanear=self._on_gate_scan,
             con_pie=True,
@@ -490,7 +490,7 @@ class QuickSaleWidget(
 
         if self.satellite.offline_mode:
             if not code.startswith("VEND-"):
-                self._gate_error.setText("Formato esperado: VEND-1, VEND-2, etc.")
+                self._gate_error.setText("Sin conexión: escanea tu gafete (VEND-…).")
                 self._gate_error.setVisible(True)
                 self._gate_input.clear()
                 self._gate_input.setFocus()
@@ -1268,7 +1268,6 @@ class QuickSaleWidget(
 
     _DISCOUNT_PERCENT = Decimal("5")
     _MIN_LAYAWAY_PERCENT = Decimal("25")
-    _OWNER_NAME = "daniel fabian"
     _OWNER_CODE = "VEND-1"
 
     def _on_discount_toggle(self) -> None:
@@ -1285,61 +1284,16 @@ class QuickSaleWidget(
         self._refresh_totals()
 
     def _authorize_owner(self) -> bool:
-        dlg = QDialog(self)
-        dlg.setWindowTitle("Autorizar precio especial")
-        dlg.setFixedWidth(380)
-        dlg.setStyleSheet(f"""
-            QDialog {{ background: {_WARM_BG}; }}
-            QLabel {{ font-size: 13px; color: {_TEXT}; }}
-            QLineEdit {{
-                font-size: 16px; padding: 12px 16px;
-                border: 1.5px solid {_BORDER}; border-radius: 10px;
-                background: white; color: {_TEXT};
-            }}
-            QLineEdit:focus {{ border-color: {_BRAND}; }}
-        """)
-        ly = QVBoxLayout()
-        ly.setContentsMargins(24, 20, 24, 20)
-        ly.setSpacing(10)
-        ly.addWidget(QLabel("Escanea QR de administrador"))
-        code_input = QLineEdit()
-        code_input.setPlaceholderText("QR de administrador...")
-        code_input.returnPressed.connect(dlg.accept)
-        ly.addWidget(code_input)
-        dlg.setLayout(ly)
-        QTimer.singleShot(0, code_input.setFocus)
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return False
-        scanned = self._clean_scanned_code(code_input.text())
-        if not scanned:
-            return False
-        if self.satellite.offline_mode:
-            if scanned != self._OWNER_CODE:
-                QMessageBox.warning(
-                    self, "No autorizado", "Solo el administrador puede autorizar descuentos."
-                )
-                return False
-            return True
-        try:
-            with get_session() as session:
-                emp = session.scalar(
-                    select(Empleada).where(
-                        Empleada.codigo == scanned,
-                        Empleada.activo.is_(True),
-                    )
-                )
-        except Exception:
-            # Sin log, un error real de DB se veia como "QR no reconocido".
-            _logger.exception("Error de DB al autorizar descuento con QR '%s'", scanned)
-            emp = None
-        if emp is None:
-            QMessageBox.warning(self, "No autorizado", "QR no reconocido.")
-            return False
-        full_name = (emp.nombre_completo or "").casefold()
-        if self._OWNER_NAME not in full_name:
-            QMessageBox.warning(self, "No autorizado", "Solo el administrador puede autorizar descuentos.")
-            return False
-        return True
+        """Precio especial (y de ahí la compra a cuenta): lo autoriza el dueño
+        con su PIN. Antes bastaba su gafete, o teclear su código sin red."""
+        return self._pedir_pin_dueno("Para autorizar el precio especial.")
+
+    def _pedir_pin_dueno(self, motivo: str, parent=None) -> bool:
+        """El PIN del dueño (diálogo del kiosko). Las pruebas lo parchean aquí."""
+        from pos_uniformes.ui.helpers import pin_dueno_dialog
+
+        en_linea = not getattr(self.satellite, "offline_mode", False)
+        return pin_dueno_dialog.pedir_pin_dueno(parent or self, en_linea=en_linea, motivo=motivo)
 
     # Comisión que cobra la terminal bancaria; se descuenta por producto en la
     # copia interna y en el neto de la Libreta cuando la venta fue con tarjeta.
@@ -2690,10 +2644,10 @@ class QuickSaleWidget(
     )
 
     @staticmethod
-    def _teclado_numerico(destino: QLineEdit):
+    def _teclado_numerico(destino: QLineEdit, *, con_punto: bool = True):
         """Teclado numérico en pantalla (táctil): 7 8 9 / 4 5 6 / 1 2 3 / . 0 ⌫.
-        Escribe en `destino`; lo comparten 'producto sin código' y el
-        anticipo del apartado."""
+        Escribe en `destino`; lo comparten 'producto sin código', el
+        anticipo del apartado y el PIN del dueño (este sin punto)."""
         from PyQt6.QtWidgets import QGridLayout
 
         teclado = QGridLayout()
@@ -2710,6 +2664,8 @@ class QuickSaleWidget(
                 destino.setText(actual + txt)
 
         for i, txt in enumerate(("7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0", "⌫")):
+            if txt == "." and not con_punto:
+                continue  # el hueco se queda vacío: 0 y ⌫ no se mueven
             b = QPushButton(txt)
             b.setAutoDefault(False)
             b.setStyleSheet(_TECLA)

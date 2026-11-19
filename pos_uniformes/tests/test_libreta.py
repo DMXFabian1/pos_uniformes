@@ -1402,10 +1402,12 @@ class LibretaPagePrivacyTests(unittest.TestCase):
 
         cls.app = QApplication.instance() or QApplication([])
 
-    def _gate_scan(self, code: str):
+    def _gate_scan(self, code: str, pin_ok: bool = True):
         from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
 
+        self.pines = []
         fake = SimpleNamespace(
+            _pedir_pin_dueno=lambda *a, **k: self.pines.append(a) or pin_ok,
             libreta_gate_input=MagicMock(),
             libreta_gate_error=MagicMock(),
             libreta_gate=MagicMock(),
@@ -1442,10 +1444,26 @@ class LibretaPagePrivacyTests(unittest.TestCase):
     def test_dueno_ve_todo(self) -> None:
         fake = self._gate_scan("EMP:VEND-1")  # gafete del dueño
         self.assertTrue(fake._libreta_is_owner)
+        self.assertEqual(len(self.pines), 1)  # pidió el PIN
         fake.libreta_table.setColumnHidden.assert_called_once_with(6, False)
         fake.libreta_owner_panel.setVisible.assert_called_once_with(True)
         fake.libreta_owner_bar.setVisible.assert_called_once_with(True)
         fake.libreta_emp_list.setVisible.assert_called_once_with(False)
+
+    def test_dueno_con_pin_malo_no_entra(self) -> None:
+        fake = self._gate_scan("EMP:VEND-1", pin_ok=False)
+        self.assertFalse(getattr(fake, "_libreta_is_owner", False))
+        self.assertIsNone(getattr(fake, "_libreta_code", None))
+        fake.libreta_owner_panel.setVisible.assert_not_called()
+        fake.libreta_view.setVisible.assert_not_called()
+        fake._refresh_libreta_view.assert_not_called()
+        fake.libreta_gate_input.clear.assert_called()
+        fake.libreta_gate_error.setText.assert_called_once_with("No se confirmó el PIN del dueño.")
+        fake.libreta_gate_error.setVisible.assert_called_once_with(True)
+
+    def test_la_empleada_no_pide_pin(self) -> None:
+        self._gate_scan("EMP:VEND-2", pin_ok=False)
+        self.assertEqual(self.pines, [])
 
 
 if __name__ == "__main__":

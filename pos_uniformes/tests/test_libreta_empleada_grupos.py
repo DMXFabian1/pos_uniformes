@@ -21,6 +21,7 @@ class LibretaAgrupadaTests(unittest.TestCase):
 
         win = QuoteSatelliteWindow(user_id=1, offline_mode=True)
         win._gafete_libreta_valido = lambda c: True
+        win._pedir_pin_dueno = lambda motivo: True  # el dueño escribió bien su PIN
         win._refresh_libreta_view = lambda: None
         win.libreta_gate_input.setText(code)
         win._on_libreta_gate_scan()

@@ -25,7 +25,8 @@ _CAMPOS = (
 class FolioVentaMixin:
     """Se mezcla en QuickSaleWidget. Usa de él: _en_linea, build_reprint_ticket,
     _lookup_sku, _aplicar_rebaja, _buscar/_registrar_cliente_identidad,
-    _load_business_info, _build_items_block y _OWNER_CODE."""
+    _load_business_info, _build_items_block, _OWNER_CODE, _clean_scanned_code
+    y _pedir_pin_dueno."""
 
     def _es_folio_venta(self, raw: str) -> bool:
         from pos_uniformes.services.folio_venta_service import es_folio
@@ -201,7 +202,7 @@ class FolioVentaMixin:
             cliente=cliente,
             buscar_producto=self._producto_para_cambio,
             elegir_cliente=lambda: self._elegir_cliente_para_cambio(dialogo),
-            es_dueno=lambda codigo: str(codigo or "").strip().upper() == self._OWNER_CODE,
+            es_dueno=lambda codigo: self._dueno_autoriza_cambio(dialogo, codigo),
             registrar=registrar,
         )
         dialogo.exec()
@@ -209,6 +210,15 @@ class FolioVentaMixin:
             from pos_uniformes.ui.helpers.ticket_routing_helper import route_tickets
 
             route_tickets(self, "Ticket de cambio", [hecho["texto"]])
+
+    def _dueno_autoriza_cambio(self, dialogo, codigo) -> bool:
+        """Cambio fuera de plazo o de Liquidación: el gafete del dueño Y su PIN.
+        El gafete se limpia igual que en la pantalla de gafete (EMP:, Ñ → :)."""
+        if self._clean_scanned_code(str(codigo or "")) != self._OWNER_CODE:
+            return False
+        return self._pedir_pin_dueno(
+            "Para autorizar el cambio fuera de plazo o de Liquidación.", parent=dialogo,
+        )
 
     def _build_cambio_text(self, r, saldo=None) -> str:
         """El ticket del cambio: qué regresó, qué se llevó y cómo quedó."""

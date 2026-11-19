@@ -43,6 +43,7 @@ class LibretaDelDuenoTests(unittest.TestCase):
 
         win = QuoteSatelliteWindow(user_id=1, offline_mode=True)
         win._gafete_libreta_valido = lambda c: True
+        win._pedir_pin_dueno = lambda motivo: True  # el dueño escribió bien su PIN
         self.refrescos = []
         win._refresh_libreta_view = lambda: self.refrescos.append(win._libreta_periodo)
         win.libreta_gate_input.setText(code or QuickSaleWidget._OWNER_CODE)

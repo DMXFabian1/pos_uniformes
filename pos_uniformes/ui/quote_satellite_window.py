@@ -72,6 +72,7 @@ from pos_uniformes.services.satellite_favorites_service import load_favorites, s
 from pos_uniformes.services.catalog_snapshot_service import load_catalog_snapshot_rows
 from pos_uniformes.services.nombres_empleadas_service import mostrar as _nombre_de
 from pos_uniformes.services.nombres_empleadas_service import nombres_por_codigo
+from pos_uniformes.services.pin_dueno_service import refrescar_copia_local as refrescar_copia_pin_dueno
 from pos_uniformes.services.client_service import ClientService
 from pos_uniformes.services.presupuesto_service import PresupuestoService
 from pos_uniformes.services.offline_quote_storage_service import (
@@ -747,6 +748,8 @@ class QuoteSatelliteWindow(QMainWindow):
                             nombres_por_codigo(session)   # y su copia local, para sin red
                         except Exception:  # noqa: BLE001
                             pass
+                        # La copia local del PIN del dueño, para validarlo sin red.
+                        refrescar_copia_pin_dueno(session)
                         try:
                             links = list_all_active_links(session)
                         except Exception:  # noqa: BLE001
@@ -2243,8 +2246,15 @@ class QuoteSatelliteWindow(QMainWindow):
             self.libreta_gate_error.setVisible(True)
             QTimer.singleShot(0, self.libreta_gate_input.setFocus)
             return
+        es_dueno = code == QuickSaleWidget._OWNER_CODE
+        # El gafete del dueño ya no basta: además, su PIN (2026-11-19).
+        if es_dueno and not self._pedir_pin_dueno("Para abrir la Libreta como dueño."):
+            self.libreta_gate_error.setText("No se confirmó el PIN del dueño.")
+            self.libreta_gate_error.setVisible(True)
+            QTimer.singleShot(0, self.libreta_gate_input.setFocus)
+            return
         self._libreta_code = code
-        self._libreta_is_owner = code == QuickSaleWidget._OWNER_CODE
+        self._libreta_is_owner = es_dueno
         self._libreta_periodo = "hoy"
         self._libreta_tipo_filtro = "todo"
         self._libreta_emp_filtro = None
@@ -2275,6 +2285,12 @@ class QuoteSatelliteWindow(QMainWindow):
             "Su ciclo" if self._libreta_is_owner else "Mi ciclo"
         )
         self._refresh_libreta_view()
+
+    def _pedir_pin_dueno(self, motivo: str) -> bool:
+        """El PIN del dueño (diálogo del kiosko). Las pruebas lo parchean aquí."""
+        from pos_uniformes.ui.helpers import pin_dueno_dialog
+
+        return pin_dueno_dialog.pedir_pin_dueno(self, en_linea=not self.offline_mode, motivo=motivo)
 
     def _gafete_libreta_valido(self, code: str) -> bool:
         if getattr(self, "offline_mode", False):
@@ -2766,6 +2782,8 @@ class QuoteSatelliteWindow(QMainWindow):
 
     def _libreta_descuento_empleadas(self) -> None:
         """E6: el dueño ajusta niveles y tope (menú Caja)."""
+        if not self._libreta_is_owner:
+            return
         from pos_uniformes.ui.dialogs.descuento_empleadas_dialog import abrir_descuento_empleadas
 
         if abrir_descuento_empleadas(self):
@@ -2773,6 +2791,8 @@ class QuoteSatelliteWindow(QMainWindow):
 
     def _libreta_pedir_meta(self) -> None:
         """La meta semanal, desde el menú Caja (antes vivía en «Más opciones»)."""
+        if not self._libreta_is_owner:
+            return
         from PyQt6.QtWidgets import QInputDialog
 
         valor, ok = QInputDialog.getInt(
@@ -3079,9 +3099,11 @@ class QuoteSatelliteWindow(QMainWindow):
             self.libreta_pendientes_ly.addWidget(fila)
 
     def _pagar_pendiente(self, code: str, nombre: str) -> None:
+        if not self._libreta_is_owner:
+            return
         from pos_uniformes.ui.dialogs.corte_caja_dialog import confirmar_pago
 
-        pago = confirmar_pago(self, employee_code=code, employee_name=nombre, creado_por=str(self._libreta_code or "VEND-1"))
+        pago = confirmar_pago(self, employee_code=code, employee_name=nombre, creado_por=str(self._libreta_code or ""))
         if pago is not None:
             self._set_status(f"Pago registrado a {nombre.split()[0]}: ${Decimal(pago.total):,.2f}")
             self._refresh_libreta_view()
@@ -3095,8 +3117,8 @@ class QuoteSatelliteWindow(QMainWindow):
             with get_session() as session:
                 marcar_dia(
                     session, code, _date.today(), tipo,
-                    nota=f"apuntado por {self._libreta_code or 'VEND-1'} desde Pendientes",
-                    actor=self._libreta_code or "VEND-1", origen="kiosko",
+                    nota=f"apuntado por {self._libreta_code or ''} desde Pendientes",
+                    actor=self._libreta_code or "", origen="kiosko",
                 )
         except Exception:  # noqa: BLE001
             logger.exception("Pendientes: no se pudo marcar %s", tipo)
@@ -3920,6 +3942,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_meta_bar.setVisible(True)
 
     def _guardar_meta_libreta(self) -> None:
+        if not self._libreta_is_owner:
+            return
         from pos_uniformes.services.libreta_meta_service import save_meta_semanal
 
         save_meta_semanal(int(self.libreta_meta_spin.value()))
@@ -4400,7 +4424,7 @@ class QuoteSatelliteWindow(QMainWindow):
             with get_session() as session:
                 # Si movió el Monedero, se anula aquí mismo (Daniel, 2026-11-12).
                 existia, anulacion = borrar_desde_libreta(
-                    session, int(entry_id), actor=str(getattr(self, "_libreta_code", None) or "VEND-1")
+                    session, int(entry_id), actor=str(getattr(self, "_libreta_code", None) or "")
                 )
                 session.commit()
         except Exception as exc:  # noqa: BLE001
@@ -4424,7 +4448,7 @@ class QuoteSatelliteWindow(QMainWindow):
             return
         from pos_uniformes.ui.dialogs.corte_caja_dialog import hacer_corte_caja
 
-        corte = hacer_corte_caja(self, creado_por=str(self._libreta_code or "VEND-1"))
+        corte = hacer_corte_caja(self, creado_por=str(self._libreta_code or ""))
         if corte is not None:
             self._set_status(f"Corte guardado: ${Decimal(corte.monto_final):,.2f} en caja.")
             self._refresh_libreta_view()
@@ -4435,7 +4459,7 @@ class QuoteSatelliteWindow(QMainWindow):
             return
         from pos_uniformes.ui.dialogs.corte_caja_dialog import apuntar_retiro
 
-        retiro = apuntar_retiro(self, creado_por=str(self._libreta_code or "VEND-1"))
+        retiro = apuntar_retiro(self, creado_por=str(self._libreta_code or ""))
         if retiro is not None:
             self._set_status(f"Retiro apuntado: ${Decimal(retiro.monto):,.2f} para {retiro.motivo}.")
 
@@ -5344,6 +5368,8 @@ class QuoteSatelliteWindow(QMainWindow):
     def _open_conteo_historial(self) -> None:
         from pos_uniformes.ui.dialogs.conteo_historial_dialog import abrir_historial_conteos
 
+        if not self._conteos_es_dueno():
+            return  # el historial es del dueño (el botón ya está oculto para las demás)
         if self.offline_mode:
             QMessageBox.information(
                 self, "Sin conexión",
@@ -5913,10 +5939,17 @@ class QuoteSatelliteWindow(QMainWindow):
             self.conteos_gate_error.setVisible(True)
             QTimer.singleShot(0, self.conteos_gate_input.setFocus)
             return
+        from pos_uniformes.services.conteo_jornada_service import DUENO_CODE
+
+        # El gafete del dueño ya no basta: además, su PIN (2026-11-19).
+        if code == DUENO_CODE and not self._pedir_pin_dueno("Para abrir Conteos como dueño."):
+            self.conteos_gate_error.setText("No se confirmó el PIN del dueño.")
+            self.conteos_gate_error.setVisible(True)
+            QTimer.singleShot(0, self.conteos_gate_input.setFocus)
+            return
         self.conteos_gate_error.setVisible(False)
         self._conteos_code = code
         self._conteos_nombre = self._nombre_de_gafete(code)
-        from pos_uniformes.services.conteo_jornada_service import DUENO_CODE
 
         if code == DUENO_CODE:
             self.conteos_titulo_label.setText("📋 Conteos de la tienda")
@@ -7156,6 +7189,13 @@ class QuoteSatelliteWindow(QMainWindow):
                             cartelera.notar_actividad()
                     except Exception:  # noqa: BLE001
                         pass
+                    # Y la del dueño: 5 min sin tocar cierran su sesión.
+                    try:
+                        cierre = getattr(self._owner, "_cierre_dueno", None)
+                        if cierre is not None:
+                            cierre.notar_actividad()
+                    except Exception:  # noqa: BLE001
+                        pass
                 if tipo == QEvent.Type.KeyPress:
                     mods = event.modifiers()
                     key = event.key()
@@ -7165,6 +7205,9 @@ class QuoteSatelliteWindow(QMainWindow):
                         return True
                 return False
 
+        from pos_uniformes.ui.helpers.cierre_inactividad_dueno import CierreInactividadDueno
+
+        self._cierre_dueno = CierreInactividadDueno(self)
         self._kiosk_filter = _KioskKeyFilter(self)
         QApplication.instance().installEventFilter(self._kiosk_filter)
         self.catalog_previous_page_button.clicked.connect(self._handle_catalog_browser_previous_page)
@@ -7201,6 +7244,7 @@ class QuoteSatelliteWindow(QMainWindow):
         try:
             with get_session() as session:
                 nombres_por_codigo(session)
+                refrescar_copia_pin_dueno(session)
                 usuario = session.get(Usuario, self.user_id)
                 if usuario is None:
                     raise ValueError("Usuario no encontrado.")

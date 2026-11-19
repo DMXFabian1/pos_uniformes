@@ -336,6 +336,18 @@ def _sin_hilos_ni_dialogos_modales(monkeypatch: pytest.MonkeyPatch) -> None:
 
         monkeypatch.setattr(_qsw.QuoteSatelliteWindow, "__init__", _init_sin_watchdog)
 
+    # El PIN del dueño abre un diálogo modal que esperaría un PIN para
+    # siempre. Por omisión NO se autoriza (lo seguro): la prueba que necesita
+    # entrar como dueño parchea el PIN ella misma, y la que se olvida falla
+    # en vez de colgarse. Los intentos fallidos no pasan de una prueba a otra.
+    try:
+        from pos_uniformes.ui.helpers import pin_dueno_dialog as _pin
+    except Exception:  # noqa: BLE001
+        _pin = None
+    if _pin is not None:
+        monkeypatch.setattr(_pin, "pedir_pin_dueno", lambda *a, **k: False)
+        _pin.CONTROL_INTENTOS.registrar_exito()
+
     from PyQt6.QtWidgets import QMessageBox
 
     for nombre in _DIALOGOS_BLOQUEANTES:
@@ -477,6 +489,23 @@ def _desviar_copia_local_de_nombres() -> None:
 
 
 _desviar_copia_local_de_nombres()
+
+
+# La copia local del PIN del dueño (data/pin_dueno.json) también: el watchdog
+# del satélite la refresca desde un hilo de fondo.
+def _desviar_copia_local_del_pin() -> None:
+    import atexit
+    import tempfile
+    from pathlib import Path
+
+    from pos_uniformes.services import pin_dueno_service as pd
+
+    d = tempfile.mkdtemp(prefix="pin_dueno_")
+    pd._ruta_local = lambda: Path(d) / "pin_dueno.json"
+    atexit.register(lambda: __import__("shutil").rmtree(d, ignore_errors=True))
+
+
+_desviar_copia_local_del_pin()
 
 
 # La identidad de la PC (nombre e id) y lo leído del buzón también van a un
