@@ -14,6 +14,7 @@ from pos_uniformes.services.inventario_prenda_service import (
     indice_de_variante,
     ordenar_grupos,
     paginar_prendas,
+    producto_de_la_seleccion,
     resumen_prendas,
     siguiente_orden_prenda,
     texto_contada_grupo,
@@ -173,6 +174,41 @@ class OrdenYPaginasTests(unittest.TestCase):
         self.assertEqual(paginar_prendas(self.grupos, 9, 2).pagina, 1)  # se acomoda a la última
         self.assertEqual(texto_paginacion_prendas(paginar_prendas(self.grupos, 0, 10)), "Mostrando 3 prendas")
         self.assertEqual(texto_paginacion_prendas(paginar_prendas([], 0, 10)), "Sin prendas con estos filtros")
+
+
+class ProductoDeLaSeleccionTests(unittest.TestCase):
+    """«LA PRENDA» en la ficha: solo si lo elegido es una sola prenda (2026-11-19)."""
+
+    def test_una_talla_es_su_prenda(self) -> None:
+        self.assertEqual(producto_de_la_seleccion([_fila("8", 3, producto_id=7)], 1), 7)
+
+    def test_varias_tallas_de_la_misma_prenda(self) -> None:
+        filas = [_fila(t, 2, producto_id=7) for t in ("6", "8", "10")]
+        self.assertEqual(producto_de_la_seleccion(filas, 3), 7)
+
+    def test_misma_prenda_en_dos_colores_sigue_siendo_una(self) -> None:
+        filas = [_fila("8", 2, producto_id=7, color="Azul"), _fila("8", 1, producto_id=7, color="Rojo")]
+        self.assertEqual(producto_de_la_seleccion(filas, 2), 7)
+
+    def test_prendas_distintas_no(self) -> None:
+        filas = [_fila("8", 2, producto_id=7), _fila("8", 2, producto_id=8)]
+        self.assertIsNone(producto_de_la_seleccion(filas, 2))
+
+    def test_nada_elegido_no(self) -> None:
+        self.assertIsNone(producto_de_la_seleccion([], 0))
+
+    def test_si_falta_una_fila_no_se_adivina(self) -> None:
+        # Una talla elegida que ya no está entre las filas: no se sabe de qué prenda es.
+        self.assertIsNone(producto_de_la_seleccion([_fila("8", 2, producto_id=7)], 2))
+
+    def test_sin_producto_o_conjunto_no(self) -> None:
+        self.assertIsNone(producto_de_la_seleccion([_fila("8", 2, producto_id=None)], 1))
+        conjunto = [_fila("8", 0, producto_id=7), _fila("10", 0, producto_id=7, es_conjunto=True)]
+        self.assertIsNone(producto_de_la_seleccion(conjunto, 2))
+
+    def test_producto_como_texto_cuenta_igual(self) -> None:
+        filas = [_fila("8", 2, producto_id="7"), _fila("10", 2, producto_id=7)]
+        self.assertEqual(producto_de_la_seleccion(filas, 2), 7)
 
 
 class RendimientoTests(unittest.TestCase):

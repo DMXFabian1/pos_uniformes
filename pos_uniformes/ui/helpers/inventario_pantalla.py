@@ -59,6 +59,7 @@ from pos_uniformes.services.inventario_prenda_service import (
     indice_de_variante,
     ordenar_grupos,
     paginar_prendas,
+    producto_de_la_seleccion,
     resumen_prendas,
     siguiente_orden_prenda,
     texto_paginacion_prendas,
@@ -506,6 +507,11 @@ class FichaInventario(QFrame):
         self.lote_nota = _etiqueta("Con Ctrl/Cmd + clic sumas o quitas tallas; con Shift, un rango.", "invFichaSub", envolver=True)
         caja.addWidget(self.lote_nota)
         layout.addWidget(total)
+        # «LA PRENDA» también con varias tallas de UNA prenda (o la prenda
+        # entera elegida en «Por prenda»); se esconde si se mezclan prendas.
+        layout.addSpacing(4)
+        self.prenda_lote = SeccionPrenda()
+        layout.addWidget(self.prenda_lote)
         # Las acciones de lote viven SOLO en la barra de arriba de la lista (sin repetirlas aquí).
         self.lote_donde = _etiqueta(AVISO_ACCIONES_EN_BARRA, "invSub", envolver=True)
         layout.addWidget(self.lote_donde)
@@ -641,12 +647,14 @@ class InventarioPantalla(QObject):
         self.cargar_prenda: Callable[[int], object] = self._leer_prenda
         self._prendas: dict[int, object] = {}
         self._producto_ficha: int | None = None
-        seccion = self.ficha.prenda
-        seccion.talla_tocada.connect(self.agregar_talla)
-        seccion.otra_talla.connect(self.agregar_talla)
-        seccion.otro_color.connect(self.agregar_color)
-        seccion.corregir.connect(self.corregir_prenda)
-        seccion.datos.connect(self.editar_datos)
+        # La sección de la cara que se ve: la de una talla o la de varias.
+        self._seccion_prenda = self.ficha.prenda
+        for seccion in (self.ficha.prenda, self.ficha.prenda_lote):
+            seccion.talla_tocada.connect(self.agregar_talla)
+            seccion.otra_talla.connect(self.agregar_talla)
+            seccion.otro_color.connect(self.agregar_color)
+            seccion.corregir.connect(self.corregir_prenda)
+            seccion.datos.connect(self.editar_datos)
 
     # ── Avisos de la ventana ─────────────────────────────────────────────
 
@@ -1156,21 +1164,37 @@ class InventarioPantalla(QObject):
             return leer_ficha(session, producto_id)
 
     def _mostrar_prenda(self, fila: Mapping[str, object], *, virtual: bool = False) -> None:
-        seccion = self.ficha.prenda
-        producto_id = fila.get("producto_id")
-        self._producto_ficha = int(producto_id) if producto_id else None
-        if virtual or not self._producto_ficha or not self.es_admin():
+        producto_id = None if virtual else producto_de_la_seleccion([fila], 1)
+        self._poner_prenda(self.ficha.prenda, producto_id, [str(fila.get("talla") or "")])
+
+    def _poner_prenda(self, seccion, producto_id: int | None, tallas: list[str]) -> None:
+        """Llena «LA PRENDA» de esa cara con la escalera del producto (o la esconde)."""
+        self._seccion_prenda = seccion
+        self._producto_ficha = producto_id
+        if not producto_id or not self.es_admin():
             seccion.mostrar(None)
             return
-        if self._producto_ficha not in self._prendas:
+        if producto_id not in self._prendas:
             try:
-                self._prendas[self._producto_ficha] = self.cargar_prenda(self._producto_ficha)
+                self._prendas[producto_id] = self.cargar_prenda(producto_id)
             except Exception:  # noqa: BLE001 - sin la escalera, la ficha sigue
-                self._prendas[self._producto_ficha] = None
-        seccion.mostrar(self._prendas[self._producto_ficha], str(fila.get("talla") or ""))
+                self._prendas[producto_id] = None
+        seccion.mostrar(self._prendas[producto_id], tallas)
+
+    def _filas_elegidas(self, elegidas: list) -> list:
+        ids = set(elegidas)
+        return [f for f in self.window.inventory_filtered_rows if f.get("variante_id") in ids]
+
+    def _producto_elegido(self) -> int | None:
+        """La prenda de lo elegido (una talla o varias de la misma prenda), o None."""
+        elegidas = self.window._selected_inventory_variant_ids()
+        if len(elegidas) > 1:
+            return producto_de_la_seleccion(self._filas_elegidas(elegidas), len(set(elegidas)))
+        fila = self.fila_de(self.variante_actual())
+        return producto_de_la_seleccion([fila], 1) if fila is not None else None
 
     def _nota_hermanas(self) -> str:
-        ficha = self.ficha.prenda.ficha
+        ficha = self._seccion_prenda.ficha
         return ficha.texto_hermanas if ficha is not None else ""
 
     def agregar_talla(self, talla: str) -> object | None:
@@ -1190,11 +1214,11 @@ class InventarioPantalla(QObject):
 
     def corregir_desde_menu(self) -> None:
         """«⋯» de arriba: «Corregir la prenda elegida». Sin talla elegida, dice dónde está."""
-        fila = self.fila_de(self.variante_actual())
-        if fila is None or not fila.get("producto_id"):
+        producto_id = self._producto_elegido()
+        if producto_id is None:
             QMessageBox.information(self.window, "Corregir prenda", TEXTO_ELIGE_PRENDA)
             return
-        self._producto_ficha = int(fila["producto_id"])
+        self._producto_ficha = producto_id
         self.corregir_prenda()
 
     def editar_datos(self) -> object | None:
@@ -1204,23 +1228,23 @@ class InventarioPantalla(QObject):
 
     def datos_desde_menu(self) -> None:
         """«⋯»: «Más datos de la prenda elegida» (reemplaza al editor viejo, tanda 5)."""
-        fila = self.fila_de(self.variante_actual())
-        if fila is None or not fila.get("producto_id"):
+        producto_id = self._producto_elegido()
+        if producto_id is None:
             QMessageBox.information(self.window, "Más datos de la prenda", TEXTO_ELIGE_PRENDA)
             return
-        self._producto_ficha = int(fila["producto_id"])
+        self._producto_ficha = producto_id
         self.editar_datos()
 
     def tallas_o_color_desde_menu(self) -> None:
         """«⋯» de arriba: lleva a la ficha. Sin talla elegida, dice dónde está ahora."""
-        fila = self.fila_de(self.variante_actual())
-        if fila is None or not fila.get("producto_id"):
+        if self._producto_elegido() is None:
             QMessageBox.information(self.window, "Agregar talla o color", TEXTO_ELIGE_PRENDA)
             return
-        self.ficha.prenda.setFocus()
+        seccion = self._seccion_prenda
+        seccion.setFocus()
         for area in self.ficha.scrolls:
-            if area.widget() is self.ficha.prenda.parentWidget():
-                area.ensureWidgetVisible(self.ficha.prenda)
+            if area.widget() is seccion.parentWidget():
+                area.ensureWidgetVisible(seccion)
 
     def _mostrar_venta(self, fila: Mapping[str, object]) -> None:
         """«Se vende ~3 por semana · alcanza para 5 días» y «La pidieron 4 veces en 30 días»."""
@@ -1241,10 +1265,11 @@ class InventarioPantalla(QObject):
             widget.setVisible(bool(pedidas))
 
     def _mostrar_lote(self, elegidas: list) -> None:
-        ids = set(elegidas)
-        filas = [f for f in self.window.inventory_filtered_rows if f.get("variante_id") in ids]
+        filas = self._filas_elegidas(elegidas)
         resumen = resumir_lote(filas) if filas else resumir_lote({"stock_actual": 0} for _ in elegidas)
         self.ficha.lote_total.setText(resumen.texto)
+        producto_id = producto_de_la_seleccion(filas, len(set(elegidas)))
+        self._poner_prenda(self.ficha.prenda_lote, producto_id, [str(f.get("talla") or "") for f in filas])
         self._habilitar_acciones()
         self.ficha.paginas.setCurrentIndex(LOTE)
 

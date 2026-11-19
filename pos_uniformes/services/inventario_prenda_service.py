@@ -186,6 +186,34 @@ def llave_prenda(fila: Mapping[str, object]) -> tuple:
     return (producto, _normal(fila.get("color")))
 
 
+def producto_de_la_seleccion(filas: Sequence[Mapping[str, object]], elegidas: int) -> int | None:
+    """¿Lo elegido es UNA sola prenda? Devuelve su `producto_id`; si no, None.
+
+    Sirve para enseñar «LA PRENDA» en la ficha con una talla, con varias
+    tallas de la misma prenda o con la prenda entera elegida en «Por prenda».
+    Es una sola prenda cuando todas las filas traen el mismo `producto_id`
+    (aunque sean de distinto color: la escalera es del producto). No lo es si:
+
+    - no hay nada elegido, o alguna talla elegida no está entre las filas
+      (no se sabe de qué prenda es),
+    - alguna fila no trae `producto_id`,
+    - alguna es un conjunto o virtual (no tiene escalera propia),
+    - se mezclan prendas distintas.
+    """
+    if elegidas <= 0 or len(filas) != elegidas:
+        return None
+    productos: set[int] = set()
+    for fila in filas:
+        producto = fila.get("producto_id")
+        if not producto or es_fila_virtual(fila):
+            return None
+        try:
+            productos.add(int(producto))
+        except (TypeError, ValueError):
+            return None
+    return productos.pop() if len(productos) == 1 else None
+
+
 def agrupar_por_prenda(filas: Iterable[Mapping[str, object]]) -> list[GrupoPrenda]:
     """Junta las tallas por prenda + color, en el orden en que aparece cada prenda.
 

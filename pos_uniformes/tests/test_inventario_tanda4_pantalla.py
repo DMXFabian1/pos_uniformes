@@ -221,7 +221,9 @@ class InventarioTanda4PantallaTests(unittest.TestCase):
         self._elegir(pantalla.prendas, pantalla.prendas.modelo.index(0, 0))
         self.assertEqual(pantalla.ficha.estado(), LOTE)
         pagina_lote = pantalla.ficha.paginas.widget(LOTE)
-        self.assertEqual(pagina_lote.findChildren(QPushButton), [])
+        # Los únicos botones de la cara son los de «LA PRENDA» (2026-11-19), no acciones de lote.
+        propios = set(pantalla.ficha.prenda_lote.findChildren(QPushButton))
+        self.assertEqual([b for b in pagina_lote.findChildren(QPushButton) if b not in propios], [])
         self.assertIn("barra de arriba", pantalla.ficha.lote_donde.text())
         barra = pantalla.barra_lote
         self.assertEqual([barra.existencias.text(), barra.precio.text(), barra.quitar.text()],

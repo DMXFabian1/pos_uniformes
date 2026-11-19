@@ -21,7 +21,7 @@ Aquí solo hay pantalla y cableado: la escalera la arma
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Callable
+from typing import TYPE_CHECKING, Callable, Iterable
 
 from PyQt6.QtCore import QPoint, QRect, QSize, Qt, pyqtSignal
 from PyQt6.QtWidgets import (
@@ -213,8 +213,15 @@ class SeccionPrenda(QFrame):
         self.chips_faltan: dict[str, QPushButton] = {}
         self.setVisible(False)
 
-    def mostrar(self, ficha: FichaPrenda | None, talla_actual: str | None = None) -> None:
+    def mostrar(self, ficha: FichaPrenda | None, talla_actual: str | Iterable[str] | None = None) -> None:
+        """`talla_actual`: la talla elegida o, con varias de la prenda, todas ellas."""
         self.ficha = ficha
+        if talla_actual is None:
+            actuales: set[str] = set()
+        elif isinstance(talla_actual, str):
+            actuales = {talla_actual}
+        else:
+            actuales = set(talla_actual)
         if ficha is None:
             self.setVisible(False)
             return
@@ -228,7 +235,7 @@ class SeccionPrenda(QFrame):
         for t in ficha.tallas:
             chip = QLabel(t.talla)
             chip.setObjectName("invPrendaTalla")
-            chip.setProperty("actual", "si" if t.talla == talla_actual else "no")
+            chip.setProperty("actual", "si" if t.talla in actuales else "no")
             chip.setToolTip(f"Talla {t.talla} · ${t.precio:,.0f}" + (
                 f" · {', '.join(t.colores)}" if len(ficha.colores) > 1 else ""))
             self.flujo.addWidget(chip)
