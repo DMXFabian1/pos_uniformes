@@ -194,7 +194,8 @@ class TopeDeEmpleadaConQrTests(unittest.TestCase):
         self.assertIn(M.EMPLEADA_NIVEL, uni.motivos)
         self.assertNotIn(M.TOPE_MES_AGOTADO, uni.motivos)
         self.assertEqual(c.consumo_tope_total, D("1000.00"))
-        # La Libreta no anota la sudadera arriba del base: no suma al tope usado.
+        # La Libreta anota la sudadera con el 15 % que se cobró, marcada con
+        # `qr_sin_tope`: no suma al tope usado.
         from pos_uniformes.services import incentivo_empleada_service as inc
 
         items = [{"sku": "S1", "nombre": "Sudadera", "talla": "M", "precio": "1000", "cantidad": 1,
@@ -202,8 +203,9 @@ class TopeDeEmpleadaConQrTests(unittest.TestCase):
                  {"sku": "S2", "nombre": "Pants", "talla": "10", "precio": "500", "cantidad": 2,
                   bc.LLAVE_UID: uid(2)}]
         renglones = bc.detalle_por_renglon(items, c)
-        self.assertEqual([(r["sku"], r["cantidad"], D(str(r["desc_empleada_pct"]))) for r in renglones],
-                         [("S1", 1, D("5")), ("S2", 2, D("10"))])
+        self.assertEqual([(r["sku"], r["cantidad"], D(str(r["desc_empleada_pct"])), bool(r.get(inc.LLAVE_QR_SIN_TOPE)))
+                          for r in renglones],
+                         [("S1", 1, D("15"), True), ("S2", 2, D("10"), False)])
         self.assertEqual(inc.importe_con_nivel(renglones), c.consumo_tope_total)
 
     def test_el_tope_que_deja_el_qr_respeta_el_orden_por_precio(self) -> None:
@@ -217,17 +219,45 @@ class TopeDeEmpleadaConQrTests(unittest.TestCase):
         self.assertEqual((lineas["S2"].piezas_al_base, lineas["S2"].consumo_tope), (1, D("0.00")))
         self.assertIn(M.TOPE_MES_AGOTADO, lineas["S2"].motivos)
 
-    def test_qr_igual_al_nivel_empate_se_comporta_como_antes(self) -> None:
-        # 10 contra 10: el QR solo gana si es mayor; gana el nivel y gasta tope.
+    def test_qr_igual_al_nivel_cobra_lo_mismo_y_no_gasta_tope(self) -> None:
+        # 10 contra 10: con el nivel o con el QR la pieza paga lo mismo, así que
+        # no gasta el tope (revisión 19/11): sin tope la gana el QR, al mismo %.
         c = calcular(venta([linea(1, "1000")], qr="10", **self._empleada("10")))
         l = c.lineas[0]
-        self.assertEqual((l.descuento.pct, l.descuento.fuente), (D("10"), "empleada"))
-        self.assertEqual((l.consumo_tope, l.piezas_con_nivel), (D("1000.00"), 1))
-        self.assertIn(M.EMPLEADA_NIVEL, l.motivos)
-        self.assertNotIn(M.QR_NO_GASTA_TOPE, l.motivos)
-        self.assertEqual(c.descuento_qr.importe, D("0.00"))
+        self.assertEqual((l.descuento.pct, l.descuento.fuente, l.descuento.importe), (D("10"), FUENTE_QR, D("100.00")))
+        self.assertEqual((l.consumo_tope, l.piezas_con_nivel), (D("0.00"), 0))
+        self.assertIn(M.QR_NO_GASTA_TOPE, l.motivos)
+        self.assertNotIn(M.EMPLEADA_NIVEL, l.motivos)
+        self.assertNotIn(M.TOPE_MES_AGOTADO, l.motivos)
         sin_qr = calcular(venta([linea(1, "1000")], **self._empleada("10")))
-        self.assertEqual((c.total, c.consumo_tope_total), (sin_qr.total, sin_qr.consumo_tope_total))
+        self.assertEqual(c.total, sin_qr.total)                  # cobra lo mismo
+        self.assertEqual(sin_qr.consumo_tope_total, D("1000.00"))  # sin QR sí gasta
+        self.assertEqual(c.consumo_tope_total, D("0.00"))
+
+    def test_empate_qr_nivel_no_hace_pagar_mas_a_la_de_nivel_mayor(self) -> None:
+        # Hallazgo de la revisión (19/11): tope de $600, QR 15 %, sudadera $600
+        # y pants oficial $500. Con nivel 15 (empate) la sudadera se comía el
+        # tope y el pants quedaba al 5 % ($985); con nivel 10 pagaba $960.
+        carrito = [linea(1, "600"), linea(2, "500", "Oficial")]
+        n15 = calcular(venta(carrito, qr="15", **self._empleada("15", "600")))
+        n10 = calcular(venta(carrito, qr="15", **self._empleada("10", "600")))
+        for c in (n15, n10):
+            lineas = por_sku(c)
+            self.assertEqual((lineas["S1"].descuento.fuente, lineas["S1"].consumo_tope), (FUENTE_QR, D("0.00")))
+            self.assertEqual((lineas["S2"].piezas_con_nivel, lineas["S2"].descuento.pct), (1, D("10")))
+            self.assertEqual((c.total, c.consumo_tope_total), (D("960.00"), D("500.00")))
+        self.assertLessEqual(n15.total, n10.total)
+
+    def test_triple_empate_con_mayoreo_sigue_a3(self) -> None:
+        # Mayoreo 10, nivel 10, QR 10: gana el mayoreo (empate) y, con A3, la
+        # pieza que cabe sí gasta el tope.
+        mayorista = ClienteCtx(id=9, programa_clave="mayorista", tasa_monedero=None, pct_mayoreo=D("10"), activo=True)
+        c = calcular(venta([linea(1, "1000")], qr="10", cliente=mayorista, modalidad_mayorista="descuento",
+                           **self._empleada("10", "5000")))
+        l = c.lineas[0]
+        self.assertEqual((l.descuento.fuente, l.consumo_tope), ("mayoreo", D("1000.00")))
+        self.assertIn(M.TOPE_CONSUMIDO_CON_MAYOREO, l.motivos)
+        self.assertNotIn(M.QR_NO_GASTA_TOPE, l.motivos)
 
     def test_sin_tope_que_alcance_el_qr_sigue_ganando_y_no_dice_agotado(self) -> None:
         c = calcular(venta([linea(1, "1000")], qr="15", **self._empleada("10", "0")))
@@ -274,6 +304,93 @@ class TopeDeEmpleadaConQrTests(unittest.TestCase):
         self.assertEqual(nueva["servidor"]["diferencias"], {})
         self.assertEqual(nueva["servidor"]["calculo"]["consumo_tope_total"], str(kiosko.consumo_tope_total))
         self.assertEqual(kiosko.consumo_tope_total, D("1000.00"))
+
+
+class LibretaConQrDeEmpleadaTests(unittest.TestCase):
+    """Revisión del 19/11: el renglón con QR de una venta de empleada se anota
+    con el % que se cobró (no con el base) y con `qr_sin_tope`, para que el
+    cambio de prenda y lo ahorrado cuadren sin que gaste el tope."""
+
+    @staticmethod
+    def _empleada(nivel="10", restante="5000"):
+        return {"descuento_empleada": True,
+                "compradora": CompradoraCtx(codigo="VEND-2", pct_nivel=D(nivel), restante_tope=D(restante))}
+
+    @staticmethod
+    def _items(*filas):
+        return [{"sku": f"S{n}", "nombre": f"Pieza {n}", "talla": "M", "precio": precio, "cantidad": cantidad,
+                 bc.LLAVE_UID: uid(n)} for n, precio, cantidad in filas]
+
+    def test_cambio_y_ahorro_cuadran_con_lo_cobrado(self) -> None:
+        from types import SimpleNamespace
+
+        from pos_uniformes.services import cambio_service as cs
+        from pos_uniformes.services import incentivo_empleada_service as inc
+
+        c = calcular(venta([linea(1, "1000"), linea(2, "1000", "Oficial")], qr="15", **self._empleada("10")))
+        self.assertEqual(c.total, D("1750.00"))
+        renglones = bc.detalle_por_renglon(self._items((1, "1000", 1), (2, "1000", 1)), c)
+        self.assertEqual([(r["sku"], D(str(r["desc_empleada_pct"])), bool(r.get(inc.LLAVE_QR_SIN_TOPE)))
+                          for r in renglones], [("S1", D("15"), True), ("S2", D("10"), False)])
+        # El tope usado: solo el uniforme.
+        self.assertEqual(inc.importe_con_nivel(renglones), D("1000.00"))
+        self.assertEqual(inc.importe_con_nivel(renglones), c.consumo_tope_total)
+        # Lo ahorrado: $150 del QR + $100 del nivel.
+        self.assertEqual(inc.ahorro_de(renglones), D("250.00"))
+        # El cambio: cada pieza vale lo que se pagó por ella.
+        venta_guardada = SimpleNamespace(detalle=[{**r, "precio": str(r["precio"])} for r in renglones],
+                                         monto_total=c.total, descuento_programa=None)
+        valores = [v.quantize(D("0.01")) for v in cs.valores_por_pieza(venta_guardada)]
+        self.assertEqual(valores, [D("850.00"), D("900.00")])
+
+    def test_qr_y_tope_parcial_parte_el_renglon(self) -> None:
+        # Nivel 15 y QR 10 (gana el nivel), tope para una pieza de dos: la que
+        # cabe va al 15 % y gasta tope; la otra se cobra con el QR (10 %, le
+        # gana al base) y no gasta.
+        from pos_uniformes.services import incentivo_empleada_service as inc
+
+        c = calcular(venta([linea(1, "500", cantidad=2)], qr="10", **self._empleada("15", "500")))
+        l = c.lineas[0]
+        self.assertEqual((l.piezas_con_nivel, l.consumo_tope), (1, D("500.00")))
+        self.assertEqual(l.descuento.importe, D("125.00"))   # 75 + 50
+        renglones = bc.detalle_por_renglon(self._items((1, "500", 2)), c)
+        self.assertEqual([(r["cantidad"], D(str(r["desc_empleada_pct"])), bool(r.get(inc.LLAVE_QR_SIN_TOPE)))
+                          for r in renglones], [(1, D("15"), False), (1, D("10"), True)])
+        self.assertEqual(inc.importe_con_nivel(renglones), c.consumo_tope_total)
+        self.assertEqual(inc.ahorro_de(renglones), D("125.00"))
+
+    def test_sin_qr_las_piezas_fuera_del_tope_siguen_con_el_base(self) -> None:
+        from pos_uniformes.services import incentivo_empleada_service as inc
+
+        c = calcular(venta([linea(1, "500", cantidad=2)], **self._empleada("15", "500")))
+        renglones = bc.detalle_por_renglon(self._items((1, "500", 2)), c)
+        self.assertEqual([(r["cantidad"], D(str(r["desc_empleada_pct"]))) for r in renglones],
+                         [(1, D("15")), (1, D("5"))])
+        self.assertTrue(all(inc.LLAVE_QR_SIN_TOPE not in r for r in renglones))
+
+    def test_la_marca_vieja_del_carrito_no_se_arrastra(self) -> None:
+        from pos_uniformes.services import incentivo_empleada_service as inc
+
+        c = calcular(venta([linea(1, "1000", "Oficial")], **self._empleada("10")))
+        items = [{**self._items((1, "1000", 1))[0], inc.LLAVE_QR_SIN_TOPE: True}]
+        renglon = bc.detalle_por_renglon(items, c)[0]
+        self.assertNotIn(inc.LLAVE_QR_SIN_TOPE, renglon)
+        self.assertEqual(inc.importe_con_nivel([renglon]), D("1000.00"))
+
+    def test_la_llave_es_la_misma_en_carrito_e_incentivo(self) -> None:
+        from pos_uniformes.services import incentivo_empleada_service as inc
+
+        self.assertEqual(bc.LLAVE_QR_SIN_TOPE, inc.LLAVE_QR_SIN_TOPE)
+
+    def test_el_kiosko_pasa_la_marca_a_la_libreta(self) -> None:
+        from pos_uniformes.services import incentivo_empleada_service as inc
+        from pos_uniformes.ui.helpers.quick_sale_compradora_helper import CompradoraEmpleadaMixin
+
+        w = CompradoraEmpleadaMixin()
+        w._discount_active = True
+        self.assertEqual(w._marca_pct_empleada({inc.LLAVE_PCT: D("15"), inc.LLAVE_QR_SIN_TOPE: True}),
+                         {inc.LLAVE_PCT: "15", inc.LLAVE_QR_SIN_TOPE: True})
+        self.assertEqual(w._marca_pct_empleada({inc.LLAVE_PCT: D("10")}), {inc.LLAVE_PCT: "10"})
 
 
 class MonederoTests(unittest.TestCase):

@@ -16,7 +16,8 @@ Orden de las reglas (§2.4 del diseño):
 3. Tope de empleada por pieza (C8, C9, P4): primero el mayor precio de lista.
    La pieza que cabe consume el tope aunque luego gane el mayoreo (A3). La
    que gana el QR de temporada no lo consume (Daniel, 2026-11-19): ese tope
-   queda para las piezas que siguen.
+   queda para las piezas que siguen. Si el QR empata con el nivel tampoco lo
+   consume: se cobra al mismo % con el QR.
 4. Gana el mayor (mayoreo, empleada o QR de temporada); un descuento de $0
    respeta la modalidad (C4). El QR (2026-11-16) solo toca ropa normal.
 5. Redondeo R1 del ticket, repartido entre las líneas (I8, D2).
@@ -300,8 +301,8 @@ def _descuentos(
                     g.motivos.append(M.TOPE_UNIFORME_10)
                 # A3 (Daniel, 11/11): la pieza que cabe consume el tope aunque luego
                 # gane el mayoreo, como hoy (`incentivo_empleada_service.repartir`).
-                # El QR de temporada ya no (Daniel, 19/11: «No, que no cuente»):
-                # ver QR_NO_GASTA_TOPE abajo.
+                # El QR de temporada ya no (Daniel, 19/11: «No, que no cuente»),
+                # tampoco cuando empata con el nivel: ver QR_NO_GASTA_TOPE abajo.
                 if pct_linea <= base:
                     al_base.add(g.linea_uid)
                     pct_empleada[g.linea_uid] = (base, base, 0)
@@ -309,12 +310,19 @@ def _descuentos(
                 candidatas.append((g, pct_linea))
             queda = comp.restante_tope
             for g, pct_linea in sorted(candidatas, key=lambda t: (-t[0].base.precio_lista, t[0].clave)):
-                _p, gana_con_nivel = _pct_y_fuente(pct_linea, pct_mayoreo_de(g), fuente_emp, pct_qr_de(g))
-                if gana_con_nivel == FUENTE_QR:
-                    # 2026-11-19: el QR le gana al nivel (es estrictamente mayor),
-                    # así que también le gana al base: toda la línea va con el QR
-                    # y ninguna pieza gasta el tope. Lo que queda pasa a las
-                    # piezas que siguen, en el mismo orden por precio de lista.
+                pqr_g = pct_qr_de(g)
+                _p, gana_con_nivel = _pct_y_fuente(pct_linea, pct_mayoreo_de(g), fuente_emp, pqr_g)
+                # El QR empata con el nivel y el mayoreo no gana: con el nivel o
+                # con el QR la pieza se cobra al mismo %, así que no tiene por qué
+                # gastar el tope (si no, una empleada de nivel más alto pagaba más
+                # que una de nivel menor por el mismo carrito). Sin tope la gana
+                # el QR (es mayor que el base), al mismo %.
+                qr_empata = gana_con_nivel != FUENTE_MAYOREO and pqr_g > 0 and pqr_g >= pct_linea
+                if gana_con_nivel == FUENTE_QR or qr_empata:
+                    # 2026-11-19: el QR le gana (o empata) al nivel, así que le
+                    # gana al base: toda la línea va con el QR y ninguna pieza
+                    # gasta el tope. Lo que queda pasa a las piezas que siguen,
+                    # en el mismo orden por precio de lista.
                     pct_empleada[g.linea_uid] = (pct_linea, base, 0)
                     g.motivos.append(M.QR_NO_GASTA_TOPE)
                     continue

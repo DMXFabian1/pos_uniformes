@@ -215,6 +215,21 @@ class LibretaTests(_Db):
         self.assertEqual(v.compradora_code, "VEND-3")
         self.assertEqual([l["desc_empleada_pct"] for l in v.detalle], ["15", "5"])
 
+    def test_el_renglon_con_qr_se_guarda_con_su_marca_y_no_gasta_tope(self) -> None:
+        # 2026-11-19: la pieza cobrada con el QR va con el 15 % que se cobró,
+        # pero no suma al tope usado del mes; sí a lo ahorrado.
+        items = [{"sku": "S1", "nombre": "Sudadera", "talla": "M", "cantidad": 1, "precio": "1000",
+                  "desc_empleada_pct": "15", inc.LLAVE_QR_SIN_TOPE: True},
+                 {"sku": "P1", "nombre": "Pants", "talla": "10", "cantidad": 1, "precio": "400", "desc_empleada_pct": "10"}]
+        cuando = _local(2026, 11, 5)
+        v = lib.registrar_operacion(self.s, employee_code="VEND-1", employee_name="Daniel", tipo="venta",
+                                    items=items, monto_total=D("1210"), descuento_empleada=True,
+                                    compradora_code="VEND-3", created_at=cuando)
+        self.assertEqual([(l["desc_empleada_pct"], bool(l.get(inc.LLAVE_QR_SIN_TOPE))) for l in v.detalle],
+                         [("15", True), ("10", False)])
+        self.assertEqual(inc.usado_del_mes(self.s, "VEND-3", date(2026, 11, 1)), D("400.00"))
+        self.assertEqual(inc.ahorrado_del_mes(self.s, "VEND-3", date(2026, 11, 1)), D("190.00"))
+
     def test_sin_descuento_de_empleada_no_hay_compradora(self) -> None:
         v = lib.registrar_operacion(self.s, employee_code="VEND-1", employee_name="Daniel", tipo="venta",
                                     items=[{"sku": "P1", "nombre": "Pants", "talla": "10", "cantidad": 1, "precio": "400"}],

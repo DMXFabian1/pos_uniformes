@@ -79,7 +79,9 @@ QR_SIN_MONEDERO = "QR_SIN_MONEDERO"
 # mensual?» → «No, que no cuente»). Para la empleada: «Esta pieza se cobró con
 # el QR de temporada y no gasta tu tope del mes; lo que te queda sigue para tus
 # otras piezas». Reemplaza a TOPE_CONSUMIDO_CON_QR (16/11), que la cobraba
-# contra el tope. El mayoreo sigue con A3: ese sí gasta el tope.
+# contra el tope. El mayoreo sigue con A3: ese sí gasta el tope. Si el QR
+# empata con el nivel (y el mayoreo no gana) tampoco gasta: se cobra al mismo %
+# con el QR (revisión del 19/11).
 QR_NO_GASTA_TOPE = "QR_NO_GASTA_TOPE"
 # Motivos del ticket: por qué el QR no se aplicó como se pidió.
 QR_15_A_10 = "QR_15_A_10"                       # bajo $600 de ropa normal

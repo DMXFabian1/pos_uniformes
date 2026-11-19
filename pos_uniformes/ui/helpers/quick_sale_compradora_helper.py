@@ -478,7 +478,8 @@ class CompradoraEmpleadaMixin:
         valor = it.get(inc.LLAVE_PCT)
         if not getattr(self, "_discount_active", False) or valor in (None, ""):
             return {}
-        return {inc.LLAVE_PCT: str(valor)}
+        # 2026-11-19: la pieza cobrada con el QR no gasta el tope del mes.
+        return {inc.LLAVE_PCT: str(valor), **({inc.LLAVE_QR_SIN_TOPE: True} if it.get(inc.LLAVE_QR_SIN_TOPE) else {})}
 
     def _datos_compradora_para_cola(self) -> dict:
         c = self._compradora

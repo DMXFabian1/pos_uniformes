@@ -41,6 +41,12 @@ PCT_BASE = Decimal("5")
 #: Llave del renglón (carrito y detalle de la Libreta) con su % de empleada.
 LLAVE_PCT = LLAVE_PCT_EMPLEADA
 
+#: Marca del renglón (detalle de la Libreta) cobrado con el QR de temporada en
+#: una venta de empleada (2026-11-19, Daniel: «No, que no cuente»). Su
+#: `LLAVE_PCT` es el % que se cobró (el del QR), para que el cambio de prenda,
+#: lo ahorrado y la reimpresión cuadren, pero NO gasta el tope del mes.
+LLAVE_QR_SIN_TOPE = "qr_sin_tope"
+
 #: Tope por omisión: importe a precio de lista por mes con su nivel.
 TOPE_POR_OMISION = Decimal("3000")
 
@@ -195,10 +201,14 @@ def pct_de_renglon(item: Mapping, por_omision=PCT_BASE) -> Decimal:
 
 
 def importe_con_nivel(detalle: Iterable[Mapping], pct_base=PCT_BASE) -> Decimal:
-    """Lo que se compró con un % arriba del base (cuenta para el tope)."""
+    """Lo que se compró con un % arriba del base (cuenta para el tope).
+
+    El renglón cobrado con el QR de temporada (`LLAVE_QR_SIN_TOPE`) no cuenta
+    aunque su % sea mayor que el base (2026-11-19)."""
     base = Decimal(str(pct_base))
     return sum(
-        (importe_de(line) for line in detalle if pct_de_renglon(line, base) > base),
+        (importe_de(line) for line in detalle
+         if pct_de_renglon(line, base) > base and not line.get(LLAVE_QR_SIN_TOPE)),
         _CERO,
     ).quantize(_CENT)
 

@@ -390,6 +390,8 @@ def registrar_operacion(
             **({"rebaja": str(it["rebaja"]), "precio_normal": str(it.get("precio_normal") or "")} if it.get("rebaja") else {}),
             # E6: el % de empleada de este renglón (su nivel o el 5 % base).
             **({"desc_empleada_pct": str(it["desc_empleada_pct"])} if it.get("desc_empleada_pct") not in (None, "") else {}),
+            # 2026-11-19: cobrado con el QR de temporada, no gasta el tope del mes.
+            **({"qr_sin_tope": True} if it.get("qr_sin_tope") else {}),
         }
         for it in items
     ]

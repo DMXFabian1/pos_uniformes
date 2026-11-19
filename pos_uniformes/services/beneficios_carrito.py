@@ -180,6 +180,21 @@ def entrada_desde_carrito(
 # ─── De vuelta: lo que la Libreta guarda por renglón ─────────────────────
 
 
+#: Marca del renglón cobrado con el QR en venta de empleada (no gasta tope).
+LLAVE_QR_SIN_TOPE = "qr_sin_tope"  # = incentivo_empleada_service.LLAVE_QR_SIN_TOPE
+
+
+def _pct_qr_cobrado(linea, calculo) -> Decimal | None:
+    """El % del QR si esta línea se cobró (en parte) con él, o None.
+
+    Las piezas que gastan tope nunca van con el QR (2026-11-19): si la línea
+    lleva QR, son las que no llevan nivel."""
+    info = getattr(calculo, "descuento_qr", None)
+    if info is None or not getattr(linea, "descuento_qr", 0) or linea.descuento_qr <= 0:
+        return None
+    return info.pct if info.pct and info.pct > 0 else None
+
+
 def detalle_por_renglon(items: Sequence[Mapping], calculo, *, pct_base=Decimal("5")) -> list[dict]:
     """Los renglones para la Libreta con lo que decidió el motor.
 
@@ -188,9 +203,10 @@ def detalle_por_renglon(items: Sequence[Mapping], calculo, *, pct_base=Decimal("
     `desc_empleada_pct` (el nivel o el base). Así lo que hoy se lee de
     `detalle` (el tope usado del mes) sigue cuadrando. Como antes (A3), una
     pieza que consume tope lleva el nivel aunque haya cobrado el mayoreo.
-    La pieza que gana el QR de temporada no gasta tope (Daniel, 2026-11-19):
-    va marcada con el base, para que `incentivo_empleada_service.usado_del_mes`
-    no la sume al tope usado.
+    La pieza que se cobró con el QR de temporada no gasta tope (Daniel,
+    2026-11-19): va con el % del QR (el que se cobró, para que el cambio de
+    prenda y lo ahorrado cuadren) y con la marca `qr_sin_tope`, para que
+    `incentivo_empleada_service.usado_del_mes` no la sume al tope usado.
     Sin descuento de empleada los renglones van sin esa marca."""
     por_uid = {}
     for linea in calculo.lineas:
@@ -201,6 +217,7 @@ def detalle_por_renglon(items: Sequence[Mapping], calculo, *, pct_base=Decimal("
     for it in items:
         base = dict(it)
         base.pop("desc_empleada_pct", None)
+        base.pop(LLAVE_QR_SIN_TOPE, None)
         linea = por_uid.get(str(it.get(LLAVE_UID)))
         if linea is None or not calculo.descuento_empleada:
             salida.append(base)
@@ -222,7 +239,14 @@ def detalle_por_renglon(items: Sequence[Mapping], calculo, *, pct_base=Decimal("
             # El % que se cobró (el nivel, o el mayoreo si ganó: A3).
             salida.append({**base, "cantidad": nivel_aqui, "desc_empleada_pct": linea.descuento.pct})
         if cantidad - nivel_aqui:
-            salida.append({**base, "cantidad": cantidad - nivel_aqui, "desc_empleada_pct": pct_base})
+            pct_qr = _pct_qr_cobrado(linea, calculo)
+            if pct_qr is not None:
+                # Las piezas sin nivel de una línea con QR se cobraron con el
+                # QR (le gana al base): ese %, sin gastar tope.
+                salida.append({**base, "cantidad": cantidad - nivel_aqui, "desc_empleada_pct": pct_qr,
+                               LLAVE_QR_SIN_TOPE: True})
+            else:
+                salida.append({**base, "cantidad": cantidad - nivel_aqui, "desc_empleada_pct": pct_base})
     return salida
 
 
