@@ -29,9 +29,11 @@ from pos_uniformes.ui.main_window import (
     INVENTORY_PAGE_SIZE,
     PESTANAS_MUDADAS_AL_KIOSKO,
     MainWindow,
-    _TableSpinTabNavigator,
-    _build_bulk_selection_label,
     _catalog_toggle_feedback_action,
+)
+from pos_uniformes.ui.helpers.tabla_lote_helper import (
+    TableSpinTabNavigator as _TableSpinTabNavigator,
+    build_bulk_selection_label as _build_bulk_selection_label,
 )
 
 

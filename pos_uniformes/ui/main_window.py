@@ -37,7 +37,6 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QFrame,
     QFormLayout,
-    QGridLayout,
     QHBoxLayout,
     QInputDialog,
     QLabel,
@@ -439,8 +438,6 @@ from pos_uniformes.ui.views.history_view import build_history_tab
 from pos_uniformes.ui.helpers import inventario_acciones
 from pos_uniformes.ui.helpers.inventario_tabla_helper import pintar_filas_inventario
 from pos_uniformes.ui.helpers.tabla_lote_helper import (
-    TableSpinTabNavigator as _TableSpinTabNavigator,
-    build_bulk_selection_label as _build_bulk_selection_label,
     set_table_badge_style as _set_table_badge_style,
     table_item as _table_item,
 )
