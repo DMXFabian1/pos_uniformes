@@ -3,8 +3,12 @@
 from __future__ import annotations
 
 import unittest
+from datetime import date, datetime, time
+from decimal import Decimal
 
-from pos_uniformes.services.analitica_tablero_service import SEMANAS_DE_ALERTA, por_acabarse
+from pos_uniformes.database.models import LibretaVenta
+
+from pos_uniformes.services.analitica_tablero_service import SEMANAS_DE_ALERTA, cargar_por_acabarse, por_acabarse
 from pos_uniformes.services.inventario_ritmo_service import (
     DIAS_PARA_ACABARSE,
     LLAVE_PEDIDAS,
@@ -170,6 +174,39 @@ class RecetasPorSkuTests(_BaseConjuntos):
 
     def test_sin_recetas_nada(self) -> None:
         self.assertEqual(cargar_recetas_por_sku(self.s), {})
+
+
+class AnaliticaPorAcabarseConConjuntosTests(_BaseConjuntos):
+    """Analítica «Se va a acabar» reparte el conjunto vendido en sus piezas (2026-11-19)."""
+
+    HOY = date(2026, 11, 19)
+
+    def _vender(self, sku: str, cantidad: int) -> None:
+        self.s.add(LibretaVenta(
+            employee_code="VEND-4", employee_name="Fanny", tipo="venta", piezas=cantidad,
+            monto_total=Decimal("100"), monto_neto=Decimal("100"), pago_tarjeta=False,
+            detalle=[{"sku": sku, "nombre": "Pants 3pz", "talla": "10", "precio": "100",
+                      "cantidad": cantidad, "subtotal": "100"}],
+            created_at=datetime.combine(self.HOY, time(12, 0)).astimezone(),
+        ))
+        self.s.commit()
+
+    def test_el_conjunto_vendido_se_reparte_y_su_sku_virtual_no_aparece(self) -> None:
+        self._armar()
+        p3, p2, play = (self._var(p, "10").sku for p in (self.p3, self.p2, self.play))
+        # 12 Pants 3pz talla 10 en 30 días: salieron 12 pants 2pz (hay 5) y 12 playeras (hay 3).
+        self._vender(p3, 12)
+        r = {p.sku: p for p in cargar_por_acabarse(self.s, hoy=self.HOY)}
+        self.assertNotIn(p3, r)
+        self.assertEqual(set(r), {p2, play})
+        self.assertEqual((r[p2].vendidas, r[p2].existencia), (12, 5))
+        self.assertEqual((r[play].vendidas, r[play].existencia), (12, 3))
+
+    def test_sin_recetas_el_producto_cuenta_tal_cual(self) -> None:
+        # Un Pants 3pz SIN receta guarda stock propio: sí se mide.
+        p3 = self._var(self.p3, "10").sku
+        self._vender(p3, 4)
+        self.assertEqual([p.sku for p in cargar_por_acabarse(self.s, hoy=self.HOY)], [p3])
 
 
 if __name__ == "__main__":

@@ -332,19 +332,37 @@ def vendidas_por_sku(session, *, hoy: date | None = None, dias: int = DIAS_DE_RI
 
 
 def cargar_por_acabarse(session, *, hoy: date | None = None) -> list[PorAcabarse]:
+    """«Se va a acabar» con los conjuntos repartidos en sus piezas (2026-11-19).
+
+    La Libreta anota la venta de un Pants 3pz con el SKU del conjunto, pero lo
+    que se acaba es el pants 2pz y la playera. Igual que Inventario
+    (`inventario_ritmo_service.cargar_vendidas`): a cada pieza se le suma lo
+    vendido como conjunto (`repartir_conjuntos`), y el SKU del conjunto, que
+    es virtual (su existencia sale de las piezas), no se mide. Si las recetas
+    no se pueden leer, se sigue con lo vendido tal cual.
+    """
     from sqlalchemy import select
 
     from pos_uniformes.database.models import Escuela, Producto, Variante
+    from pos_uniformes.services.conjunto_service import filtro_sin_conjuntos
+    from pos_uniformes.services.inventario_ritmo_service import cargar_recetas_por_sku, repartir_conjuntos
 
     vendidas = vendidas_por_sku(session, hoy=hoy)
     if not vendidas:
         return []
+    filtros = [Variante.activo.is_(True)]
+    try:
+        vendidas = repartir_conjuntos(vendidas, cargar_recetas_por_sku(session))
+        filtros.append(filtro_sin_conjuntos())
+    except Exception:  # noqa: BLE001 — sin recetas, sale sin repartir los conjuntos
+        session.rollback()
+        logger.warning("Analítica: no se pudieron leer las recetas de conjuntos.", exc_info=True)
     existencias = {}
     consulta = (
         select(Variante.sku, Variante.stock_actual, Variante.talla, Producto.nombre, Escuela.nombre)
         .join(Producto, Producto.id == Variante.producto_id)
         .outerjoin(Escuela, Escuela.id == Producto.escuela_id)
-        .where(Variante.sku.in_(list(vendidas)), Variante.activo.is_(True))
+        .where(Variante.sku.in_(list(vendidas)), *filtros)
     )
     for sku, stock, talla, nombre, escuela in session.execute(consulta):
         existencias[sku] = {"stock": stock, "talla": talla, "nombre": nombre, "escuela": escuela or ""}
