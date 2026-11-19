@@ -440,15 +440,21 @@ def texto_chip(pct_pedido, calculo=None, *, sin_motor: bool = False) -> str:
     return texto + "  ✕"
 
 
-def texto_aviso_sin_motor(pct_pedido) -> str:
+def texto_aviso_sin_motor(pct_pedido, *, rechazado: bool = False) -> str:
     """Lo que se suma al aviso «las reglas de descuento no pudieron
     calcular» cuando la venta lleva QR. El cálculo de respaldo no aplica el
     QR (es regla del motor, como sin conexión; 2026-11-19): se dice para
-    que nadie le prometa a la clienta un descuento que no se cobró."""
-    return (
+    que nadie le prometa a la clienta un descuento que no se cobró.
+
+    `rechazado`: las reglas rechazaron este carrito (EntradaInvalida). Ese
+    rechazo no se quita esperando, así que no se sugiere esperar."""
+    texto = (
         f"El descuento del QR ({texto_pct(pct_pedido)}) NO está en este total: sin las reglas de "
-        "descuento el QR no se aplica. Cobra sin él o espera a que vuelvan."
+        "descuento el QR no se aplica. "
     )
+    if rechazado:
+        return texto + "Las reglas rechazaron este carrito, esperar no lo arregla: cobra sin él."
+    return texto + "Cobra sin él o espera a que vuelvan."
 
 
 #: Los motivos del motor (`motivos.py`, 2026-11-16) en palabras de mostrador.

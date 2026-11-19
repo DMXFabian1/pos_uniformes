@@ -32,9 +32,11 @@ def texto_si_el_motor_no_responde(calcular, *, pct_qr=None) -> str | None:
     except EntradaInvalida as exc:
         _logger.warning("Motor de beneficios: carrito rechazado (%s); se cobra con el cálculo anterior", exc)
         motivo = f"\n\nMotivo: {exc}"
+        rechazado = True
     except Exception:  # noqa: BLE001 — se avisa; el mostrador no se detiene
         _logger.exception("Motor de beneficios: no se pudo calcular; se cobra con el cálculo anterior")
         motivo = ""
+        rechazado = False
     else:
         return None
     texto = (
@@ -44,7 +46,7 @@ def texto_si_el_motor_no_responde(calcular, *, pct_qr=None) -> str | None:
     if pct_qr:
         from pos_uniformes.services.descuento_qr_service import texto_aviso_sin_motor
 
-        texto += "\n\n" + texto_aviso_sin_motor(pct_qr)
+        texto += "\n\n" + texto_aviso_sin_motor(pct_qr, rechazado=rechazado)
     return texto
 
 

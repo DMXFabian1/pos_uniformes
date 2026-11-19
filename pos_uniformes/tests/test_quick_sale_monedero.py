@@ -616,6 +616,26 @@ class ElMotorQueNoRespondeSeAvisaTests(unittest.TestCase):
         self.assertIn("QR (10 %) NO está en este total", texto)
         self.assertIsNone(texto_si_el_motor_no_responde(lambda: object(), pct_qr=Decimal("10")))
 
+    def test_con_qr_y_carrito_rechazado_no_sugiere_esperar(self):
+        # Revisión 2026-11-19: EntradaInvalida es determinista; esperar no lo arregla.
+        from decimal import Decimal
+
+        from pos_uniformes.services.beneficios.contrato import EntradaInvalida
+        from pos_uniformes.ui.helpers.quick_sale_motor_helper import texto_si_el_motor_no_responde
+
+        def rechaza():
+            raise EntradaInvalida("linea_uid repetido")
+
+        texto = texto_si_el_motor_no_responde(rechaza, pct_qr=Decimal("10"))
+        self.assertIn("Motivo: linea_uid repetido", texto)
+        self.assertIn("QR (10 %) NO está en este total", texto)
+        self.assertNotIn("espera a que vuelvan", texto)
+
+        def truena():
+            raise RuntimeError("x")
+
+        self.assertIn("espera a que vuelvan", texto_si_el_motor_no_responde(truena, pct_qr=Decimal("10")))
+
 
 class MayoristaQueEligioMayoreoSinLineasTest(_Base):
     """2026-11-12, Daniel, a «Mayorista que eligió mayoreo y ninguna prenda

@@ -254,6 +254,14 @@ class OpcionesTests(unittest.TestCase):
     def test_aviso_sin_motor_con_el_porcentaje(self) -> None:
         texto = qr.texto_aviso_sin_motor(D("15"))
         self.assertIn("QR (15 %) NO está en este total", texto)
+        self.assertIn("espera a que vuelvan", texto)
+
+    def test_aviso_sin_motor_con_carrito_rechazado_no_dice_esperar(self) -> None:
+        # Revisión 2026-11-19: un rechazo (EntradaInvalida) no se quita esperando.
+        texto = qr.texto_aviso_sin_motor(D("10"), rechazado=True)
+        self.assertIn("QR (10 %) NO está en este total", texto)
+        self.assertNotIn("espera a que vuelvan", texto)
+        self.assertIn("cobra sin él", texto)
 
 
 if __name__ == "__main__":
