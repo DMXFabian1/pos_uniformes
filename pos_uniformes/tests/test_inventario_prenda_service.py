@@ -11,6 +11,7 @@ from decimal import Decimal
 from pos_uniformes.services.inventario_prenda_service import (
     PIEZAS_GENERICAS,
     TEXTO_CONJUNTO_SIN_TALLAS,
+    TEXTO_VIRTUAL_SIN_TALLAS,
     agrupar_por_prenda,
     aviso_conjunto_sin_tallas,
     filas_en_orden,
@@ -232,8 +233,21 @@ class AvisoConjuntoSinTallasTests(unittest.TestCase):
         filas = [_fila("8", 0, producto_id=7, es_conjunto=True, tipo_pieza_nombre="Pants 3pz")]
         self.assertEqual(
             aviso_conjunto_sin_tallas(filas),
-            "Los conjuntos salen de sus piezas: agrega la talla o el color en el pants 2pz y la playera.",
+            "A un conjunto no se le agregan tallas ni colores desde aquí. "
+            "Cada talla del conjunto se arma con esa misma talla en el pants 2pz y la playera; "
+            "agregarla solo en las piezas no se la agrega al conjunto.",
         )
+
+    def test_el_aviso_no_manda_a_agregar_la_talla_en_las_piezas(self) -> None:
+        # Agregar una talla a las piezas NO se la crea al conjunto
+        # (`sincronizar_conjunto` solo recalcula las que ya tiene; ver
+        # test_alta_ficha_service.test_la_receta_que_usa_la_pieza_avisa_si_no_arma_la_talla).
+        aviso = aviso_conjunto_sin_tallas(
+            [_fila("8", 0, producto_id=7, es_conjunto=True, tipo_pieza_nombre="Pants 3pz")]
+        )
+        self.assertNotIn("agrega la talla", aviso)
+        self.assertNotIn("salen de sus piezas", aviso)
+        self.assertIn("no se la agrega al conjunto", aviso)
 
     def test_chamarra_sale_del_pants_2pz(self) -> None:
         filas = [_fila("8", 0, producto_id=7, es_conjunto=True, tipo_pieza_nombre="Chamarra"),
@@ -241,12 +255,19 @@ class AvisoConjuntoSinTallasTests(unittest.TestCase):
         self.assertEqual(aviso_conjunto_sin_tallas(filas),
                          TEXTO_CONJUNTO_SIN_TALLAS.format(piezas="el pants 2pz"))
 
-    def test_sin_saber_las_piezas_habla_de_las_piezas(self) -> None:
-        # Virtual viejo (stock_minimo < 0) o tipo de pieza que no es conjunto conocido.
-        viejo = [_fila("8", 0, producto_id=7, stock_minimo=-1, tipo_pieza_nombre="-")]
-        self.assertEqual(aviso_conjunto_sin_tallas(viejo), TEXTO_CONJUNTO_SIN_TALLAS.format(piezas=PIEZAS_GENERICAS))
+    def test_conjunto_de_tipo_desconocido_habla_de_las_piezas(self) -> None:
         sin_tipo = [_fila("8", 0, producto_id=7, es_conjunto=True)]
-        self.assertIn(PIEZAS_GENERICAS, aviso_conjunto_sin_tallas(sin_tipo))
+        self.assertEqual(aviso_conjunto_sin_tallas(sin_tipo), TEXTO_CONJUNTO_SIN_TALLAS.format(piezas=PIEZAS_GENERICAS))
+
+    def test_virtual_viejo_sin_receta_no_habla_de_piezas(self) -> None:
+        # stock_minimo < 0 sin receta: no sale de ninguna pieza, aunque su tipo
+        # se llame como un conjunto conocido.
+        for tipo in ("-", "Pants 3pz", "Chamarra"):
+            viejo = [_fila("8", 0, producto_id=7, stock_minimo=-1, es_conjunto=False, tipo_pieza_nombre=tipo)]
+            aviso = aviso_conjunto_sin_tallas(viejo)
+            self.assertEqual(aviso, TEXTO_VIRTUAL_SIN_TALLAS, tipo)
+            self.assertNotIn("pieza", aviso.replace("existencia propia", ""))
+            self.assertNotIn("conjunto", aviso)
 
     def test_una_prenda_normal_no_lleva_aviso(self) -> None:
         self.assertIsNone(aviso_conjunto_sin_tallas([_fila("8", 2, producto_id=7, tipo_pieza_nombre="Pants 2pz")]))

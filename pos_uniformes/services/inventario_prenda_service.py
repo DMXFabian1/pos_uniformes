@@ -220,11 +220,24 @@ def producto_de_la_seleccion(
     return productos.pop() if len(productos) == 1 else None
 
 
-#: «Agregar talla o color» del «⋯» con un conjunto elegido: el conjunto no
-#: tiene tallas ni colores propios, salen de sus piezas (2026-11-19).
-TEXTO_CONJUNTO_SIN_TALLAS = "Los conjuntos salen de sus piezas: agrega la talla o el color en {piezas}."
-#: Cuando no se sabe qué piezas lo arman (un virtual viejo, o un tipo nuevo).
+#: «Agregar talla o color» del «⋯» con un conjunto elegido: «LA PRENDA» está
+#: oculta para los conjuntos (2026-11-19). OJO: agregar una talla o un color a
+#: las piezas NO se lo crea al conjunto (`sincronizar_conjunto` solo recalcula
+#: las tallas que el conjunto ya tiene), así que el aviso no manda a hacerlo:
+#: dice que desde aquí no se puede y de qué piezas sale cada talla. Por qué
+#: camino se le agrega la talla al conjunto lo decide Daniel.
+TEXTO_CONJUNTO_SIN_TALLAS = (
+    "A un conjunto no se le agregan tallas ni colores desde aquí. "
+    "Cada talla del conjunto se arma con esa misma talla en {piezas}; "
+    "agregarla solo en las piezas no se la agrega al conjunto."
+)
+#: Cuando no se sabe qué piezas lo arman (un tipo de conjunto nuevo).
 PIEZAS_GENERICAS = "las piezas que lo arman"
+#: Un «virtual viejo» (stock_minimo < 0) sin receta: no sale de ninguna pieza.
+TEXTO_VIRTUAL_SIN_TALLAS = (
+    "Esta prenda es virtual (no lleva existencia propia): "
+    "no se le agregan tallas ni colores desde aquí."
+)
 
 #: Qué piezas ARMAN cada conjunto (las que se consumen al venderlo), con su
 #: artículo. Es la misma receta que `conjunto_service.RECETAS_POR_TIPO`
@@ -237,15 +250,20 @@ PIEZAS_DE_CONJUNTO: dict[str, tuple[str, ...]] = {
 
 
 def aviso_conjunto_sin_tallas(filas: Iterable[Mapping[str, object]]) -> str | None:
-    """Si lo elegido es un conjunto, el aviso de dónde agregar tallas o colores; si no, None.
+    """Si lo elegido es un conjunto o un virtual, por qué no se le agregan tallas aquí; si no, None.
 
-    Nombra las piezas cuando el tipo de pieza de las filas lo dice («Pants
-    3pz» → «el pants 2pz y la playera»); si no, habla de «las piezas».
+    Un conjunto (con receta, `es_conjunto`) nombra sus piezas cuando su tipo
+    lo dice («Pants 3pz» → «el pants 2pz y la playera»); si no, «las piezas
+    que lo arman». Un virtual viejo (`stock_minimo` < 0, sin receta) no sale
+    de ninguna pieza: su aviso no las menciona.
     """
     virtuales = [fila for fila in filas if es_fila_virtual(fila)]
     if not virtuales:
         return None
-    tipos = {_normal(fila.get("tipo_pieza_nombre")) for fila in virtuales}
+    conjuntos = [fila for fila in virtuales if fila.get("es_conjunto")]
+    if not conjuntos:
+        return TEXTO_VIRTUAL_SIN_TALLAS
+    tipos = {_normal(fila.get("tipo_pieza_nombre")) for fila in conjuntos}
     piezas = PIEZAS_DE_CONJUNTO.get(tipos.pop()) if len(tipos) == 1 else None
     if not piezas:
         texto = PIEZAS_GENERICAS
