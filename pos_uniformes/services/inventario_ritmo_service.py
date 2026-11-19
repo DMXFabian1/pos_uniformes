@@ -231,7 +231,7 @@ def repartir_conjuntos(
 
 
 def cargar_recetas_por_sku(session) -> dict[str, list[tuple[str, int]]]:
-    """{SKU de cada talla de conjunto: [(SKU de la pieza en esa talla, cantidad)]} en dos consultas."""
+    """{SKU de cada variante de conjunto: [(SKU de la pieza en esa talla, cantidad)]} en tres consultas."""
     from sqlalchemy import select
 
     from pos_uniformes.database.models import ConjuntoComponente, Variante
@@ -250,12 +250,22 @@ def cargar_recetas_por_sku(session) -> dict[str, list[tuple[str, int]]]:
     ).all()
     for producto_id, talla, sku, stock in filas:
         por_talla.setdefault(int(producto_id), {}).setdefault(_norm_talla(talla), (str(sku), _entero(stock)))
+    # Del conjunto, en cambio, TODAS sus variantes (2026-11-19): `descomponer` mueve
+    # las piezas por la talla, sea cual sea el SKU que se vendió (otro color de la
+    # misma talla, o uno que se desactivó después de vender).
+    skus_conjunto: dict[int, list[tuple[str, str]]] = {}
+    for producto_id, talla, sku in session.execute(
+        select(Variante.producto_id, Variante.talla, Variante.sku)
+        .where(Variante.producto_id.in_(sorted({int(c.conjunto_id) for c in componentes})))
+        .order_by(Variante.id)
+    ).all():
+        skus_conjunto.setdefault(int(producto_id), []).append((str(sku), _norm_talla(talla)))
     recetas: dict[int, list] = {}
     for c in componentes:
         recetas.setdefault(int(c.conjunto_id), []).append(c)
     salida: dict[str, list[tuple[str, int]]] = {}
     for conjunto_id, receta in recetas.items():
-        for talla, (sku_conjunto, _stock) in por_talla.get(conjunto_id, {}).items():
+        for sku_conjunto, talla in skus_conjunto.get(conjunto_id, []):
             piezas: list[tuple[str, int]] = []
             for grupo in por_grupos(receta):
                 if grupo[0].cantidad <= 0:
@@ -276,7 +286,7 @@ def cargar_recetas_por_sku(session) -> dict[str, list[tuple[str, int]]]:
 def cargar_vendidas() -> dict[str, int]:
     """Lo vendido por SKU en la Libreta en los últimos `DIAS_DE_RITMO` días, con los conjuntos repartidos.
 
-    Una consulta a la Libreta y dos a las recetas, cada `MINUTOS_CACHE` minutos
+    Una consulta a la Libreta y tres a las recetas, cada `MINUTOS_CACHE` minutos
     como máximo (la llama `CacheVentas`). Si las recetas fallan, se usa lo
     vendido tal cual.
     """

@@ -6,7 +6,7 @@ import unittest
 from datetime import date, datetime, time
 from decimal import Decimal
 
-from pos_uniformes.database.models import LibretaVenta
+from pos_uniformes.database.models import LibretaVenta, Variante
 
 from pos_uniformes.services.analitica_tablero_service import SEMANAS_DE_ALERTA, cargar_por_acabarse, por_acabarse
 from pos_uniformes.services.inventario_ritmo_service import (
@@ -174,6 +174,24 @@ class RecetasPorSkuTests(_BaseConjuntos):
 
     def test_sin_recetas_nada(self) -> None:
         self.assertEqual(cargar_recetas_por_sku(self.s), {})
+
+    def test_otra_variante_de_la_talla_y_la_desactivada_tambien_reparten(self) -> None:
+        """`descomponer` mueve las piezas por talla, sea cual sea el SKU vendido (2026-11-19)."""
+        self._armar()
+        p2, play = (self._var(p, "10").sku for p in (self.p2, self.play))
+        piezas = sorted([(p2, 1), (play, 1)])
+        principal = self._var(self.p3, "10")
+        # Segunda variante de la talla 10 (otro color), con la principal activa.
+        self.s.add(Variante(producto_id=self.p3.id, sku="P3-10-AZUL", talla="10", color="Azul",
+                            precio_venta=100, stock_actual=0))
+        self.s.commit()
+        self.assertEqual(sorted(cargar_recetas_por_sku(self.s)["P3-10-AZUL"]), piezas)
+        # La principal se desactiva después de vender: lo vendido con ella sigue repartiéndose.
+        principal.activo = False
+        self.s.commit()
+        recetas = cargar_recetas_por_sku(self.s)
+        self.assertEqual(sorted(recetas[principal.sku]), piezas)
+        self.assertEqual(sorted(recetas["P3-10-AZUL"]), piezas)
 
 
 class AnaliticaPorAcabarseConConjuntosTests(_BaseConjuntos):
