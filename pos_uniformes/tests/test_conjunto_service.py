@@ -139,6 +139,25 @@ class VentaTests(_Base):
         self.s.commit()
         self.assertEqual((self._stock(self.p3, "12"), self._stock(self.cham, "12")), (8, 8))   # min(8, 17), 8
 
+    def test_contar_la_pieza_recalcula_el_conjunto(self) -> None:
+        """El conteo ajusta sin pasar por registrar_movimiento: antes el 3pz y
+        la chamarra se quedaban con el número viejo (81 tallas en la tienda,
+        2026-11-19). Hoy: 2pz 12 = 2, playera 12 = 7 → 3pz y chamarra en 2."""
+        from pos_uniformes.services.conteo_service import confirmar_ajustes_lote, registrar_conteo
+
+        self.assertEqual((self._stock(self.p3, "12"), self._stock(self.cham, "12")), (2, 2))
+        conteo = registrar_conteo(self.s, self._var(self.p2, "12").id, stock_fisico=6, contado_por="Daniel")
+        self.s.flush()
+        self.assertEqual(confirmar_ajustes_lote(self.s, [conteo.id], "VEND-1"), (1, 0))
+        self.s.commit()
+        self.assertEqual(self._stock(self.p2, "12"), 6)
+        self.assertEqual(self._stock(self.p3, "12"), 6)        # min(6, 7)
+        self.assertEqual(self._stock(self.cham, "12"), 6)
+        derivados = self.s.scalars(select(MovimientoInventario).where(
+            MovimientoInventario.referencia == f"{cs.PREFIJO_DERIVADO}{self.p3.id}",
+            MovimientoInventario.creado_por == "VEND-1")).all()
+        self.assertEqual([m.cantidad for m in derivados], [4])
+
     def test_talla_sin_pieza_no_se_toca_y_se_reporta(self) -> None:
         # el 2pz tiene talla 14 pero el 3pz no la tiene: nada que calcular; y una
         # talla del conjunto sin pieza (16) se reporta

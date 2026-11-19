@@ -245,6 +245,7 @@ def confirmar_ajustes_lote(
 
     ajustados = 0
     omitidos = 0
+    movidas: list[Variante] = []
 
     # Un renglón de una jornada ya revisada (aplicada o descartada) no se toca:
     # si se saltó por otro ajuste (tanda 4) sumarle la diferencia vieja la
@@ -297,6 +298,19 @@ def confirmar_ajustes_lote(
 
         conteo.ajustado = True
         ajustados += 1
+        movidas.append(variante)
+
+    # Este ajuste no pasa por `InventarioService.registrar_movimiento`, así que
+    # los conjuntos que usan la pieza (Pants 3pz, Chamarra) no se enteraban:
+    # contar el Pants 2pz dejaba al 3pz con el número viejo (81 tallas
+    # desfasadas en la tienda el 2026-11-19, p. ej. una Chamarra en 0 con
+    # piezas para 4). Se recalculan aquí, con sus movimientos `derivado:`.
+    if movidas:
+        from pos_uniformes.services import conjunto_service
+
+        session.flush()
+        for variante in movidas:
+            conjunto_service.sincronizar_por_componente(session, variante, creado_por=usuario_nombre)
 
     return ajustados, omitidos
 
