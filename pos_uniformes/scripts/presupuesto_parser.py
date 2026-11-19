@@ -16,6 +16,7 @@ Uso como módulo:
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 from collections import defaultdict
@@ -44,7 +45,7 @@ def _get_connection():
         port=int(env.get("POS_UNIFORMES_DB_PORT", "5432")),
         dbname=env.get("POS_UNIFORMES_DB_NAME", "pos_uniformes"),
         user=env.get("POS_UNIFORMES_DB_USER", "postgres"),
-        password=env.get("POS_UNIFORMES_DB_PASSWORD", "1234"),
+        password=env.get("POS_UNIFORMES_DB_PASSWORD", os.environ.get("POS_UNIFORMES_DB_PASSWORD", "")),
     )
 
 

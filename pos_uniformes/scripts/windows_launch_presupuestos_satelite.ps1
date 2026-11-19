@@ -4,10 +4,14 @@ param(
     [string]$DbPort = "5432",
     [string]$DbName = "pos_uniformes",
     [string]$DbUser = "postgres",
-    [string]$DbPassword = "1234"
+    [string]$DbPassword = ""
 )
 
 $ErrorActionPreference = "Stop"
+
+if (-not $DbPassword) {
+    throw "Falta -DbPassword (la clave de Postgres ya no viene escrita en el script)."
+}
 
 function Write-Step([string]$message) {
     Write-Host ""

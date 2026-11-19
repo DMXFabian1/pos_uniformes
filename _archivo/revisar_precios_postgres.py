@@ -10,7 +10,9 @@ from decimal import Decimal
 from dataclasses import dataclass
 import sqlalchemy as sa
 
-DB_URL = "postgresql+psycopg://postgres:1234@localhost:5432/pos_uniformes"
+import os
+
+DB_URL = os.environ.get("POS_UNIFORMES_DB_URL", "postgresql+psycopg://postgres@localhost:5432/pos_uniformes")
 
 # ---------------------------------------------------------------------------
 # Reglas: (filtro_fn, precio_objetivo)
