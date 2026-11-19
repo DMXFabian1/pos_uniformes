@@ -162,5 +162,83 @@ class AjusteEnLoteTests(_ConQt):
         )
 
 
+class _SesionFalsa:
+    """Doble de `get_session()`: cada `scalars(...).all()` saca la siguiente lista."""
+
+    def __init__(self, *listas: list[object]) -> None:
+        self._listas = list(listas)
+
+    def __call__(self) -> "_SesionFalsa":
+        return self
+
+    def __enter__(self) -> "_SesionFalsa":
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        return None
+
+    def scalars(self, _consulta: object) -> SimpleNamespace:
+        lista = self._listas.pop(0)
+        return SimpleNamespace(all=lambda: lista)
+
+
+def _variante(vid: int, stock: int) -> SimpleNamespace:
+    return SimpleNamespace(
+        id=vid,
+        sku=f"SKU-{vid}",
+        stock_actual=stock,
+        producto=SimpleNamespace(nombre="Pants Muestra"),
+    )
+
+
+class CorregirExistenciaTests(_ConQt):
+    def test_sin_presentaciones_avisa_igual_que_antes(self) -> None:
+        from pos_uniformes.ui.dialogs import inventory_adjustment_dialog as modulo
+
+        with patch.object(modulo, "get_session", _SesionFalsa([])):
+            with self.assertRaisesRegex(ValueError, "No hay presentaciones activas"):
+                modulo.prompt_inventory_adjustment_data(
+                    create_modal_dialog=_crear_dialogo,
+                    set_combo_value=MainWindow._set_combo_value,
+                    prefill_variant_id=lambda: None,
+                )
+
+    def test_aceptar_sin_tocar_no_cambia_la_existencia(self) -> None:
+        from pos_uniformes.ui.dialogs import inventory_adjustment_dialog as modulo
+
+        with patch.object(modulo, "get_session", _SesionFalsa([_variante(1, 3), _variante(2, 9)])):
+            resultado = modulo.prompt_inventory_adjustment_data(
+                create_modal_dialog=_crear_dialogo,
+                set_combo_value=MainWindow._set_combo_value,
+                prefill_variant_id=lambda: 2,
+            )
+
+        self.assertEqual(
+            resultado,
+            {
+                "variante_id": 2,
+                "cantidad": 0,
+                "stock_actual": 9,
+                "stock_final": 9,
+                "referencia": "",
+                "observacion": "",
+            },
+        )
+
+    def test_main_window_solo_delega(self) -> None:
+        ventana = SimpleNamespace(
+            _create_modal_dialog=object(),
+            _set_combo_value=object(),
+            _dialog_prefill_variant_id=object(),
+        )
+        with patch.object(main_window_module, "prompt_inventory_adjustment_data", return_value=None) as falso:
+            self.assertIsNone(MainWindow._prompt_inventory_adjustment_data(ventana))
+        falso.assert_called_once_with(
+            create_modal_dialog=ventana._create_modal_dialog,
+            set_combo_value=ventana._set_combo_value,
+            prefill_variant_id=ventana._dialog_prefill_variant_id,
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

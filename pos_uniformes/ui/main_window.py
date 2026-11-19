@@ -241,6 +241,7 @@ from pos_uniformes.ui.dialogs.catalog_variant_dialog import (
 )
 from pos_uniformes.ui.dialogs.inventory_context_menu_dialog import prompt_inventory_context_action
 from pos_uniformes.ui.dialogs.inventory_count_dialog import prompt_inventory_count_data
+from pos_uniformes.ui.dialogs.inventory_adjustment_dialog import prompt_inventory_adjustment_data
 from pos_uniformes.ui.dialogs.inventory_bulk_adjustment_dialog import prompt_inventory_bulk_adjustment_data
 from pos_uniformes.ui.dialogs.inventory_bulk_price_dialog import prompt_inventory_bulk_price_data
 from pos_uniformes.ui.dialogs.inventory_label_batch_dialog import build_inventory_label_batch_dialog
@@ -3705,100 +3706,11 @@ class MainWindow(QMainWindow):
         }
 
     def _prompt_inventory_adjustment_data(self) -> dict[str, object] | None:
-        with get_session() as session:
-            variantes = [
-                (
-                    variante.id,
-                    variante.sku,
-                    sanitize_product_display_name(variante.producto.nombre),
-                    variante.stock_actual,
-                )
-                for variante in session.scalars(
-                    select(Variante).where(Variante.activo.is_(True)).order_by(Variante.sku)
-                ).all()
-            ]
-
-        if not variantes:
-            raise ValueError("No hay presentaciones activas disponibles para ajustar.")
-
-        dialog, layout = self._create_modal_dialog(
-            "Ajuste manual de inventario",
-            "Captura el stock final deseado. El sistema calcula automaticamente la diferencia contra el stock actual.",
+        return prompt_inventory_adjustment_data(
+            create_modal_dialog=self._create_modal_dialog,
+            set_combo_value=self._set_combo_value,
+            prefill_variant_id=self._dialog_prefill_variant_id,
         )
-        form = QFormLayout()
-        presentacion_combo = QComboBox()
-        stock_map: dict[int, int] = {}
-        for variante_id, sku, producto_nombre, stock_actual in variantes:
-            stock_map[int(variante_id)] = int(stock_actual)
-            presentacion_combo.addItem(
-                f"{sku} | {producto_nombre} | stock {stock_actual}",
-                variante_id,
-            )
-        self._set_combo_value(presentacion_combo, self._dialog_prefill_variant_id())
-        stock_actual_label = QLabel()
-        stock_actual_label.setObjectName("analyticsLine")
-        stock_final_spin = QSpinBox()
-        stock_final_spin.setRange(0, 100000)
-        stock_final_spin.setAccelerated(True)
-        diferencia_label = QLabel()
-        diferencia_label.setObjectName("subtleLine")
-        referencia_input = QLineEdit()
-        referencia_input.setPlaceholderText("AJUSTE-0001")
-        observacion_input = QTextEdit()
-        observacion_input.setFixedHeight(90)
-        observacion_input.setPlaceholderText("Motivo del ajuste")
-
-        def refresh_adjustment_labels() -> None:
-            variante_id = presentacion_combo.currentData()
-            current_stock = stock_map.get(int(variante_id), 0) if variante_id is not None else 0
-            stock_actual_label.setText(f"Stock actual: {current_stock}")
-            stock_final_spin.blockSignals(True)
-            stock_final_spin.setValue(current_stock)
-            stock_final_spin.blockSignals(False)
-            diferencia_label.setText("Sin cambios pendientes.")
-
-        def refresh_difference_label() -> None:
-            variante_id = presentacion_combo.currentData()
-            current_stock = stock_map.get(int(variante_id), 0) if variante_id is not None else 0
-            target_stock = stock_final_spin.value()
-            delta = target_stock - current_stock
-            if delta == 0:
-                diferencia_label.setText("Sin cambios pendientes.")
-            elif delta > 0:
-                diferencia_label.setText(f"Se agregaran {delta} unidades para dejar stock en {target_stock}.")
-            else:
-                diferencia_label.setText(f"Se descontaran {abs(delta)} unidades para dejar stock en {target_stock}.")
-
-        presentacion_combo.currentIndexChanged.connect(lambda _: refresh_adjustment_labels())
-        stock_final_spin.valueChanged.connect(lambda _: refresh_difference_label())
-        refresh_adjustment_labels()
-
-        form.addRow("Presentacion", presentacion_combo)
-        form.addRow("Stock actual", stock_actual_label)
-        form.addRow("Stock final", stock_final_spin)
-        form.addRow("Impacto", diferencia_label)
-        form.addRow("Referencia", referencia_input)
-        form.addRow("Observacion", observacion_input)
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return None
-        variante_id = presentacion_combo.currentData()
-        current_stock = stock_map.get(int(variante_id), 0) if variante_id is not None else 0
-        target_stock = stock_final_spin.value()
-        return {
-            "variante_id": variante_id,
-            "cantidad": target_stock - current_stock,
-            "stock_actual": current_stock,
-            "stock_final": target_stock,
-            "referencia": referencia_input.text().strip(),
-            "observacion": observacion_input.toPlainText().strip(),
-        }
 
     def _prompt_inventory_count_data(self) -> dict[str, object] | None:
         payload = prompt_inventory_count_data(
