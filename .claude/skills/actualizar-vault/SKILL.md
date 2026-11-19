@@ -5,7 +5,7 @@ description: Mantener al día el vault de Obsidian del POS (~/Documents/Obsidian
 
 # Actualizar el vault de Obsidian
 
-Vault: `/Users/danielfabian/Documents/Obsidian Vault/`. Si la sesión no tiene acceso, pedir acceso a esa carpeta. El vault es la documentación viva; `pos_uniformes/docs/obsidian/` del repo es una copia vieja que no se toca.
+Vault: `/Users/danielfabian/Documents/Obsidian Vault/`. Si la sesión no tiene acceso, pedir acceso a esa carpeta. El vault es la documentación viva y vive fuera del repo; la copia vieja `pos_uniformes/docs/obsidian/` se quitó del repo el 2026-11-19.
 
 ## Qué nota tocar
 

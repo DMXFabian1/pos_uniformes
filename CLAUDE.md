@@ -56,7 +56,7 @@ Migraciones: Alembic en `pos_uniformes/migrations/versions/`. Se corren con `pyt
 ## Documentación: el vault de Obsidian manda
 
 - La documentación viva está en el vault `~/Documents/Obsidian Vault/` (carpetas `POS Uniformes/`, `Gestor de Precios/`, `PWA Móvil/`, `Mapa Tienda/`). La entrada es `POS Uniformes/00 - Índice General.md`, y la nota de la sesión actual es `21 - Sesión de Trabajo.md`.
-- `pos_uniformes/docs/obsidian/` es una copia vieja (4-oct-2026): **no editarla ni usarla como fuente**.
+- `pos_uniformes/docs/obsidian/` (una copia vieja con secretos) salió del repo el 2026-11-19 y está en `.gitignore`: **no volver a copiar notas del vault al repo**.
 - Varios archivos de `pos_uniformes/docs/*.md` (arquitectura, diagrama de base de datos, mapa de módulos, planes y checklists de marzo a julio) están desactualizados. Ante una contradicción, ganan el código y el vault.
 - Las notas del vault usan wikilinks `[[Nota]]` y tienen nombres únicos. Para revisarlo, usar la skill `obsidian-notes`.
 

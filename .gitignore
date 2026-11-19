@@ -30,3 +30,5 @@ pos_uniformes/pos.db
 mapas_escuelas/cache_fichas/
 # el estado de cada escuela lo escribe el Panel al regenerarse (2026-11-07)
 mapas_escuelas/estados_pos.js
+# la documentación vive en el vault de Obsidian, fuera del repo público (2026-11-19)
+pos_uniformes/docs/obsidian/

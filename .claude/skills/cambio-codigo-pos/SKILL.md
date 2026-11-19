@@ -42,4 +42,4 @@ Mostrar solo el resumen y los nombres de las pruebas que fallan. Las pruebas mar
 - Dar la verificación manual por dominio, según `pos_uniformes/docs/protocolo_cambios.md`.
 - Si cambia lo que se ve en el `.exe`, preguntar si hay que subir `pos_uniformes/VERSION`.
 - Commit: `feat(<dominio>): …` o `fix(<dominio>): …`, en español, explicando el porqué.
-- Documentar con la skill `actualizar-vault`: nota del dominio y `21 - Sesión de Trabajo`. **No** escribir en `pos_uniformes/docs/obsidian/`.
+- Documentar con la skill `actualizar-vault`: nota del dominio y `21 - Sesión de Trabajo`. **No** copiar notas del vault al repo (es público).
