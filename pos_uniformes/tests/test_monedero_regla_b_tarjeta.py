@@ -100,7 +100,7 @@ class MotorReglaBTests(unittest.TestCase):
         self.assertIsNone(c.monedero)
 
     def test_version_de_reglas(self):
-        self.assertEqual(_venta([_linea("100")]).version_reglas, "2026-11-16")
+        self.assertEqual(_venta([_linea("100")]).version_reglas, "2026-11-19")
 
 
 class BaseConComisionTests(unittest.TestCase):

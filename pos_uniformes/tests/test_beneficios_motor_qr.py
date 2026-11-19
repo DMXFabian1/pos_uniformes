@@ -3,6 +3,7 @@
 Solo ropa normal; ni rebajas ni promo 3pz; por línea gana el mayor entre
 mayoreo, empleada y QR; las líneas con QR no abonan Monedero; el 15 % baja a
 10 % bajo $600; vencido o sin conexión no aplica; el servidor recalcula igual.
+La pieza que gana el QR no gasta el tope de empleada (Daniel, 2026-11-19).
 """
 
 from __future__ import annotations
@@ -155,13 +156,124 @@ class GanaElMayorTests(unittest.TestCase):
         self.assertIn(M.GANA_EMPLEADA, l.motivos)
         self.assertEqual(c.descuento_qr.importe, D("0.00"))
 
-    def test_qr_mayor_que_el_nivel_consume_el_tope_como_el_mayoreo(self) -> None:
-        compradora = CompradoraCtx(codigo="VEND-2", pct_nivel=D("10"), restante_tope=D("5000"))
-        c = calcular(venta([linea(1, "1000")], qr="15", descuento_empleada=True, compradora=compradora))
+
+
+class TopeDeEmpleadaConQrTests(unittest.TestCase):
+    """Daniel, 2026-11-19: «¿La pieza de empleada con QR debe gastar su tope
+    mensual?» → «No, que no cuente». El mayoreo sigue con A3."""
+
+    @staticmethod
+    def _empleada(nivel="10", restante="5000"):
+        return {"descuento_empleada": True,
+                "compradora": CompradoraCtx(codigo="VEND-2", pct_nivel=D(nivel), restante_tope=D(restante))}
+
+    def test_pieza_de_ropa_normal_con_qr_mayor_que_el_nivel_no_gasta_tope(self) -> None:
+        c = calcular(venta([linea(1, "1000")], qr="15", **self._empleada("10")))
         l = c.lineas[0]
-        self.assertEqual((l.descuento.pct, l.descuento.fuente), (D("15"), FUENTE_QR))
-        self.assertIn(M.TOPE_CONSUMIDO_CON_QR, l.motivos)
-        self.assertEqual(l.consumo_tope, D("1000.00"))
+        self.assertEqual((l.descuento.pct, l.descuento.fuente, l.descuento.importe), (D("15"), FUENTE_QR, D("150.00")))
+        self.assertIn(M.QR_NO_GASTA_TOPE, l.motivos)
+        self.assertNotIn(M.TOPE_MES_AGOTADO, l.motivos)
+        self.assertNotIn(M.EMPLEADA_NIVEL, l.motivos)
+        self.assertEqual((l.consumo_tope, l.piezas_con_nivel), (D("0.00"), 0))
+        self.assertEqual(c.consumo_tope_total, D("0.00"))
+        self.assertFalse(hasattr(M, "TOPE_CONSUMIDO_CON_QR"))
+
+    def test_pieza_qr_cara_y_uniforme_el_tope_entero_queda_para_el_uniforme(self) -> None:
+        # Tope de $1,000. Hasta el 16/11 la sudadera de $1,000 (gana el QR) iba
+        # primero por precio y se comía el tope entero: el uniforme quedaba al
+        # 5 %. Ahora la sudadera no gasta y los $1,000 quedan para el uniforme.
+        c = calcular(venta([linea(1, "1000"), linea(2, "500", "Oficial", cantidad=2)], qr="15",
+                           **self._empleada("10", "1000")))
+        lineas = por_sku(c)
+        sud, uni = lineas["S1"], lineas["S2"]
+        self.assertEqual((sud.descuento.fuente, sud.consumo_tope), (FUENTE_QR, D("0.00")))
+        self.assertIn(M.QR_NO_GASTA_TOPE, sud.motivos)
+        # Las dos piezas del uniforme caben con el 10 % (tope de uniforme).
+        self.assertEqual((uni.piezas_con_nivel, uni.piezas_al_base, uni.consumo_tope), (2, 0, D("1000.00")))
+        self.assertEqual(uni.descuento.importe, D("100.00"))
+        self.assertIn(M.EMPLEADA_NIVEL, uni.motivos)
+        self.assertNotIn(M.TOPE_MES_AGOTADO, uni.motivos)
+        self.assertEqual(c.consumo_tope_total, D("1000.00"))
+        # La Libreta no anota la sudadera arriba del base: no suma al tope usado.
+        from pos_uniformes.services import incentivo_empleada_service as inc
+
+        items = [{"sku": "S1", "nombre": "Sudadera", "talla": "M", "precio": "1000", "cantidad": 1,
+                  bc.LLAVE_UID: uid(1)},
+                 {"sku": "S2", "nombre": "Pants", "talla": "10", "precio": "500", "cantidad": 2,
+                  bc.LLAVE_UID: uid(2)}]
+        renglones = bc.detalle_por_renglon(items, c)
+        self.assertEqual([(r["sku"], r["cantidad"], D(str(r["desc_empleada_pct"]))) for r in renglones],
+                         [("S1", 1, D("5")), ("S2", 2, D("10"))])
+        self.assertEqual(inc.importe_con_nivel(renglones), c.consumo_tope_total)
+
+    def test_el_tope_que_deja_el_qr_respeta_el_orden_por_precio(self) -> None:
+        # $700 de tope: QR $1,000 (no gasta), luego pants $600 (cabe), luego
+        # playera $200 (ya no cabe: quedan $100).
+        c = calcular(venta([linea(1, "1000"), linea(2, "200", "Oficial"), linea(3, "600", "Oficial")], qr="15",
+                           **self._empleada("10", "700")))
+        lineas = por_sku(c)
+        self.assertEqual(lineas["S1"].consumo_tope, D("0.00"))
+        self.assertEqual((lineas["S3"].piezas_con_nivel, lineas["S3"].consumo_tope), (1, D("600.00")))
+        self.assertEqual((lineas["S2"].piezas_al_base, lineas["S2"].consumo_tope), (1, D("0.00")))
+        self.assertIn(M.TOPE_MES_AGOTADO, lineas["S2"].motivos)
+
+    def test_qr_igual_al_nivel_empate_se_comporta_como_antes(self) -> None:
+        # 10 contra 10: el QR solo gana si es mayor; gana el nivel y gasta tope.
+        c = calcular(venta([linea(1, "1000")], qr="10", **self._empleada("10")))
+        l = c.lineas[0]
+        self.assertEqual((l.descuento.pct, l.descuento.fuente), (D("10"), "empleada"))
+        self.assertEqual((l.consumo_tope, l.piezas_con_nivel), (D("1000.00"), 1))
+        self.assertIn(M.EMPLEADA_NIVEL, l.motivos)
+        self.assertNotIn(M.QR_NO_GASTA_TOPE, l.motivos)
+        self.assertEqual(c.descuento_qr.importe, D("0.00"))
+        sin_qr = calcular(venta([linea(1, "1000")], **self._empleada("10")))
+        self.assertEqual((c.total, c.consumo_tope_total), (sin_qr.total, sin_qr.consumo_tope_total))
+
+    def test_sin_tope_que_alcance_el_qr_sigue_ganando_y_no_dice_agotado(self) -> None:
+        c = calcular(venta([linea(1, "1000")], qr="15", **self._empleada("10", "0")))
+        l = c.lineas[0]
+        self.assertEqual((l.descuento.fuente, l.descuento.importe, l.consumo_tope), (FUENTE_QR, D("150.00"), D("0.00")))
+        self.assertNotIn(M.TOPE_MES_AGOTADO, l.motivos)
+
+    def test_el_mayoreo_sigue_gastando_tope_a3(self) -> None:
+        mayorista = ClienteCtx(id=9, programa_clave="mayorista", tasa_monedero=None, pct_mayoreo=D("15"), activo=True)
+        c = calcular(venta([linea(1, "200")], qr="10", cliente=mayorista, modalidad_mayorista="descuento",
+                           **self._empleada("10", "300")))
+        l = c.lineas[0]
+        self.assertEqual((l.descuento.fuente, l.descuento.importe), ("mayoreo", D("30.00")))
+        self.assertEqual(l.consumo_tope, D("200.00"))
+        self.assertIn(M.TOPE_CONSUMIDO_CON_MAYOREO, l.motivos)
+        self.assertNotIn(M.QR_NO_GASTA_TOPE, l.motivos)
+
+    def test_qr_que_le_gana_al_mayoreo_y_al_nivel_no_gasta_tope(self) -> None:
+        mayorista = ClienteCtx(id=9, programa_clave="mayorista", tasa_monedero=None, pct_mayoreo=D("10"), activo=True)
+        c = calcular(venta([linea(1, "1000")], qr="15", cliente=mayorista, modalidad_mayorista="descuento",
+                           **self._empleada("10", "5000")))
+        l = c.lineas[0]
+        self.assertEqual((l.descuento.fuente, l.consumo_tope), (FUENTE_QR, D("0.00")))
+        self.assertIn(M.QR_NO_GASTA_TOPE, l.motivos)
+        self.assertNotIn(M.TOPE_CONSUMIDO_CON_MAYOREO, l.motivos)
+
+    def test_el_servidor_acepta_y_su_consumo_coincide_con_el_del_kiosko(self) -> None:
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        from pos_uniformes.services import beneficios_servidor as srv
+        from pos_uniformes.services import incentivo_empleada_service as inc
+
+        e = venta([linea(1, "1000"), linea(2, "500", "Oficial", cantidad=2)], qr="15",
+                  **self._empleada("10", "1000"))
+        kiosko = calcular(e)
+        foto = fotografia(e, kiosko)
+        self.assertEqual(foto["version_reglas"], "2026-11-19")
+        estado = inc.EstadoCompradora(codigo="VEND-2", nombre="", porcentaje=D("10"), tope=D("1000"), usado=D("0"))
+        sesion = SimpleNamespace(scalar=lambda _c: date(2026, 11, 20))
+        with patch.object(inc, "estado_compradora", return_value=estado):
+            nueva, dif = srv.recalcular(sesion, foto)
+        self.assertEqual(dif, {})
+        self.assertEqual(nueva["servidor"]["diferencias"], {})
+        self.assertEqual(nueva["servidor"]["calculo"]["consumo_tope_total"], str(kiosko.consumo_tope_total))
+        self.assertEqual(kiosko.consumo_tope_total, D("1000.00"))
 
 
 class MonederoTests(unittest.TestCase):

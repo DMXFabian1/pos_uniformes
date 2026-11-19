@@ -188,6 +188,9 @@ def detalle_por_renglon(items: Sequence[Mapping], calculo, *, pct_base=Decimal("
     `desc_empleada_pct` (el nivel o el base). Así lo que hoy se lee de
     `detalle` (el tope usado del mes) sigue cuadrando. Como antes (A3), una
     pieza que consume tope lleva el nivel aunque haya cobrado el mayoreo.
+    La pieza que gana el QR de temporada no gasta tope (Daniel, 2026-11-19):
+    va marcada con el base, para que `incentivo_empleada_service.usado_del_mes`
+    no la sume al tope usado.
     Sin descuento de empleada los renglones van sin esa marca."""
     por_uid = {}
     for linea in calculo.lineas:

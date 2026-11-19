@@ -67,14 +67,20 @@ SKU_CATEGORIAS_INCOMPATIBLES = "SKU_CATEGORIAS_INCOMPATIBLES"
 
 # ─── A3 (Daniel, 11/11): mayoreo y empleada a la vez ───
 # La pieza cupo en el tope y lo consumió (C8, C9, como hoy), pero el mayoreo
-# le dio un % igual o mayor que el del nivel y es el que se cobró.
+# le dio un % igual o mayor que el del nivel y es el que se cobró. Solo el
+# mayoreo: desde 2026-11-19 la pieza que gana el QR no gasta tope.
 TOPE_CONSUMIDO_CON_MAYOREO = "TOPE_CONSUMIDO_CON_MAYOREO"
 
 # ─── QR de descuento de temporada (2026-11-16, `descuento_qr_service`) ───
 DESCUENTO_QR = "DESCUENTO_QR"
 GANA_QR = "GANA_MAYOR(qr_temporada)"
 QR_SIN_MONEDERO = "QR_SIN_MONEDERO"
-TOPE_CONSUMIDO_CON_QR = "TOPE_CONSUMIDO_CON_QR"
+# Daniel, 2026-11-19 («¿La pieza de empleada con QR debe gastar su tope
+# mensual?» → «No, que no cuente»). Para la empleada: «Esta pieza se cobró con
+# el QR de temporada y no gasta tu tope del mes; lo que te queda sigue para tus
+# otras piezas». Reemplaza a TOPE_CONSUMIDO_CON_QR (16/11), que la cobraba
+# contra el tope. El mayoreo sigue con A3: ese sí gasta el tope.
+QR_NO_GASTA_TOPE = "QR_NO_GASTA_TOPE"
 # Motivos del ticket: por qué el QR no se aplicó como se pidió.
 QR_15_A_10 = "QR_15_A_10"                       # bajo $600 de ropa normal
 QR_VENCIDO = "QR_VENCIDO"

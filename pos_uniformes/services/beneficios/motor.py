@@ -14,7 +14,9 @@ Orden de las reglas (§2.4 del diseño):
 2. Candidatos de descuento: mayoreo (C4, sin 3pz), empleada con su nivel y
    el máximo de uniforme, «otra persona» al 5 % parejo (R2).
 3. Tope de empleada por pieza (C8, C9, P4): primero el mayor precio de lista.
-   La pieza que cabe consume el tope aunque luego gane el mayoreo (A3).
+   La pieza que cabe consume el tope aunque luego gane el mayoreo (A3). La
+   que gana el QR de temporada no lo consume (Daniel, 2026-11-19): ese tope
+   queda para las piezas que siguen.
 4. Gana el mayor (mayoreo, empleada o QR de temporada); un descuento de $0
    respeta la modalidad (C4). El QR (2026-11-16) solo toca ropa normal.
 5. Redondeo R1 del ticket, repartido entre las líneas (I8, D2).
@@ -63,7 +65,7 @@ from pos_uniformes.services.beneficios.reparto import (
     repartir_redondeo,
 )
 
-VERSION_MOTOR = "M1a-2026-11-16"  # 2026-11-16: QR de descuento de temporada
+VERSION_MOTOR = "M1a-2026-11-19"  # 2026-11-19: la pieza con QR no gasta el tope (antes 2026-11-16: QR)
 
 FUENTE_MAYOREO = "mayoreo"
 FUENTE_EMPLEADA = "empleada"
@@ -298,6 +300,8 @@ def _descuentos(
                     g.motivos.append(M.TOPE_UNIFORME_10)
                 # A3 (Daniel, 11/11): la pieza que cabe consume el tope aunque luego
                 # gane el mayoreo, como hoy (`incentivo_empleada_service.repartir`).
+                # El QR de temporada ya no (Daniel, 19/11: «No, que no cuente»):
+                # ver QR_NO_GASTA_TOPE abajo.
                 if pct_linea <= base:
                     al_base.add(g.linea_uid)
                     pct_empleada[g.linea_uid] = (base, base, 0)
@@ -305,6 +309,15 @@ def _descuentos(
                 candidatas.append((g, pct_linea))
             queda = comp.restante_tope
             for g, pct_linea in sorted(candidatas, key=lambda t: (-t[0].base.precio_lista, t[0].clave)):
+                _p, gana_con_nivel = _pct_y_fuente(pct_linea, pct_mayoreo_de(g), fuente_emp, pct_qr_de(g))
+                if gana_con_nivel == FUENTE_QR:
+                    # 2026-11-19: el QR le gana al nivel (es estrictamente mayor),
+                    # así que también le gana al base: toda la línea va con el QR
+                    # y ninguna pieza gasta el tope. Lo que queda pasa a las
+                    # piezas que siguen, en el mismo orden por precio de lista.
+                    pct_empleada[g.linea_uid] = (pct_linea, base, 0)
+                    g.motivos.append(M.QR_NO_GASTA_TOPE)
+                    continue
                 precio = g.base.precio_lista
                 if queda is None or precio <= 0:
                     caben = g.cantidad
@@ -314,11 +327,8 @@ def _descuentos(
                 pct_empleada[g.linea_uid] = (pct_linea, base, caben)
                 if caben:
                     # Gana el mayor; en empate, el mayoreo (`_pct_y_fuente`).
-                    _p, gana = _pct_y_fuente(pct_linea, pct_mayoreo_de(g), fuente_emp, pct_qr_de(g))
-                    if gana == FUENTE_MAYOREO:
+                    if gana_con_nivel == FUENTE_MAYOREO:
                         g.motivos.append(M.TOPE_CONSUMIDO_CON_MAYOREO)
-                    elif gana == FUENTE_QR:
-                        g.motivos.append(M.TOPE_CONSUMIDO_CON_QR)
                     else:
                         g.motivos.append(M.EMPLEADA_NIVEL)
                 else:
@@ -403,7 +413,8 @@ def _descuentos(
             fuente=fuente,
             piezas_nivel=con_nivel_real,
             piezas_base=piezas_base,
-            # A3: consume el tope toda pieza que cupo, la haya ganado el nivel o el mayoreo.
+            # A3: consume el tope toda pieza que cupo, la haya ganado el nivel o el
+            # mayoreo. Las que gana el QR no cupieron (caben = 0, 2026-11-19).
             consumo_tope=(g.base.precio_lista * caben).quantize(CENT),
             importe_qr=importe_qr,
             con_qr=con_qr,

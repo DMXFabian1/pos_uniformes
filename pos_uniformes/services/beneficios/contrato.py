@@ -116,8 +116,9 @@ class Pago:
 
 @dataclass(frozen=True)
 class ReglasCtx:
-    # 2026-11-16: QR de descuento de temporada (antes "2026-11-12", regla B).
-    version: str = "2026-11-16"
+    # 2026-11-19: la pieza que gana el QR no gasta el tope de empleada.
+    # (2026-11-16: QR de descuento de temporada; antes "2026-11-12", regla B.)
+    version: str = "2026-11-19"
     pct_base_empleada: Decimal = Decimal("5")
     tope_pct_uniforme: Decimal = Decimal("10")
     categorias_no_uniforme: frozenset = frozenset(
