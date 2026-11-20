@@ -18,6 +18,8 @@ from decimal import Decimal
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from pos_uniformes.services import telegram_formato as fmt
+
 #: Prefijo de los botones de esta pantalla.
 PREFIJO = "mb:"
 
@@ -154,6 +156,15 @@ def _resumen_cliente(session: Session, membresia, ahora: datetime) -> list[str]:
     return lineas
 
 
+def _local(momento: datetime | None) -> datetime | None:
+    """En hora local, para el encabezado (2026-11-20)."""
+    if momento is None:
+        return None
+    if momento.tzinfo is None:
+        momento = momento.replace(tzinfo=timezone.utc)
+    return momento.astimezone()
+
+
 def _que_pasa_al_aprobar(membresia) -> str:
     programa = membresia.programa
     nombres = {"DOCENTE": "Docente", "MAYORISTA": "Mayorista"}
@@ -170,8 +181,12 @@ def aviso_de_propuesta(session: Session, membresia, *, ahora: datetime | None = 
     """El mensaje que le llega al dueño cuando una empleada propone a alguien."""
     ahora = ahora or _ahora()
     quien = _empleada(session, membresia.propuesta_por_employee_code)
+    # Formato común (2026-11-20): encabezado con el día y la hora en que se
+    # propuso; la frase de siempre debajo.
     lineas = [
-        f"⭐ {quien} propone a un cliente para {membresia.programa.nombre} ({_hace(membresia.created_at, ahora)})",
+        fmt.encabezado("⭐", "Propuesta de programa", _local(membresia.created_at) or _local(ahora), hora=True),
+        f"{quien} propone a un cliente para {membresia.programa.nombre} ({_hace(membresia.created_at, ahora)})",
+        "",
         f"Por qué: {membresia.motivo_propuesta or '—'}",
         "",
     ]
@@ -194,10 +209,11 @@ def aviso_de_caducadas(session: Session, vencidas) -> str:
     for m in vencidas:
         cliente = _cliente(session, m.cliente_id)
         quienes.append(f"{cliente.nombre if cliente is not None else '?'} → {m.programa.nombre}")
-    return (
-        f"⌛ Caducaron {len(vencidas)} propuestas de programa sin respuesta en 7 días:\n· "
-        + "\n· ".join(quienes)
-        + "\nNo cambió nada; a quien las propuso se le avisa en la Libreta."
+    return fmt.mensaje(
+        "⌛", "Propuestas caducadas", cuando=_local(_ahora()),
+        principal=f"Caducaron {len(vencidas)} propuestas de programa sin respuesta en 7 días:",
+        detalle=[f"· {q}" for q in quienes],
+        pie="No cambió nada; a quien las propuso se le avisa en la Libreta.",
     )
 
 
@@ -209,9 +225,12 @@ def texto_y_botones(session: Session, *, ahora: datetime | None = None) -> tuple
 
     ahora = ahora or _ahora()
     pendientes = ms.pendientes(session)
+    dia = _local(ahora)
     if not pendientes:
-        return "No hay propuestas de programa esperando respuesta. ✅", _teclado([[("‹ Menú", "m:raiz")]])
-    lineas = ["⭐ Propuestas por responder:", ""]
+        texto = fmt.mensaje("⭐", "Programas", cuando=dia,
+                            principal="No hay propuestas de programa esperando respuesta. ✅")
+        return texto, _teclado([[("‹ Menú", "m:raiz")]])
+    lineas = []
     filas = []
     for m in pendientes:
         cliente = _cliente(session, m.cliente_id)
@@ -219,10 +238,12 @@ def texto_y_botones(session: Session, *, ahora: datetime | None = None) -> tuple
         lineas.append(f"· {nombre} → {m.programa.nombre} ({_hace(m.created_at, ahora)}, "
                       f"la propuso {_empleada(session, m.propuesta_por_employee_code)})")
         filas.append([(f"👀 {_pila(nombre)} · {m.programa.nombre.replace('Maximoda ', '')}", f"{PREFIJO}ver:{m.id}")])
-    lineas.append("")
-    lineas.append("Las que nadie conteste en 7 días caducan solas.")
     filas.append([("‹ Menú", "m:raiz")])
-    return "\n".join(lineas), _teclado(filas)
+    texto = fmt.mensaje("⭐", "Programas", cuando=dia,
+                        principal=f"{len(pendientes)} propuestas por responder" if len(pendientes) != 1
+                        else "1 propuesta por responder",
+                        detalle=lineas, pie="Las que nadie conteste en 7 días caducan solas.")
+    return texto, _teclado(filas)
 
 
 def detalle(session: Session, membresia_id: int, *, ahora: datetime | None = None) -> tuple[str, list]:
@@ -287,12 +308,18 @@ def atender(dato: str, *, session_factory, quien: str = "") -> tuple[str, str, s
             session.rollback()
             texto, botones = texto_y_botones(session)
             return str(exc), texto, botones
+        # Formato común (2026-11-20).
         if que == "ok":
-            hecho = f"✅ {nombre} ya está en {programa}.\nA quien lo propuso se le avisa en la Libreta."
+            hecho = fmt.mensaje("✅", "Programa aprobado", cuando=_local(_ahora()), hora=True,
+                                principal=f"{nombre} ya está en {programa}.",
+                                detalle="A quien lo propuso se le avisa en la Libreta.")
         else:
-            hecho = f"✖️ {nombre} no entra a {programa}.\nA quien lo propuso se le avisa en la Libreta."
+            hecho = fmt.mensaje("✖️", "Programa no aprobado", cuando=_local(_ahora()), hora=True,
+                                principal=f"{nombre} no entra a {programa}.",
+                                detalle="A quien lo propuso se le avisa en la Libreta.")
         texto, botones = texto_y_botones(session)
-    return aviso, hecho + "\n\n" + texto, botones
+    # Un solo encabezado: el de lo decidido; la lista va sin el suyo (2026-11-20).
+    return aviso, hecho + "\n\n" + fmt.quitar_encabezado(texto), botones
 
 
 def avisar_a_daniel(session: Session, membresia) -> None:

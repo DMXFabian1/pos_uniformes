@@ -21,7 +21,7 @@ porque la propuesta solo importa el día que se hace.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import date, datetime
 from pathlib import Path
 
@@ -41,6 +41,9 @@ class Propuesta:
     #: El mensaje de Telegram de la propuesta (o del recordatorio, que la
     #: reemplaza): el corte de la tarde vive en UN mensaje (2026-11-20).
     message_id: int = 0
+    #: Mensajes viejos de la propuesta que no se pudieron borrar (sin red) y
+    #: que el recordatorio ya reemplazó: se siguen intentando (2026-11-20).
+    viejos: tuple[int, ...] = ()
 
     @property
     def hay(self) -> bool:
@@ -59,6 +62,7 @@ def leer() -> Propuesta:
             recordado=bool(datos.get("recordado")),
             cancelado=bool(datos.get("cancelado")),
             message_id=int(datos.get("message_id") or 0),
+            viejos=tuple(int(v) for v in (datos.get("viejos") or []) if int(v)),
         )
     except Exception:  # noqa: BLE001
         return Propuesta()
@@ -74,6 +78,7 @@ def _guardar(p: Propuesta) -> None:
             "recordado": p.recordado,
             "cancelado": p.cancelado,
             "message_id": int(p.message_id or 0),
+            "viejos": [int(v) for v in p.viejos],
         }),
         encoding="utf-8",
     )
@@ -98,8 +103,26 @@ def anotar_recordatorio(message_id: int = 0) -> None:
     """Ya se recordó. `message_id`: el recordatorio reemplaza a la propuesta."""
     p = leer()
     if p.hay:
-        _guardar(Propuesta(p.fecha, p.momento, True, p.cancelado,
-                           int(message_id or 0) or p.message_id))
+        nuevo = int(message_id or 0)
+        viejos = p.viejos
+        if nuevo and p.message_id and p.message_id != nuevo:
+            # La propuesta no se pudo borrar (sin red): no se pierde su id
+            # al pisarlo, se sigue intentando (2026-11-20).
+            viejos = viejos + (p.message_id,)
+        _guardar(replace(p, recordado=True, message_id=nuevo or p.message_id, viejos=viejos))
+
+
+def adoptar_mensaje(message_id: int, hoy: date | None = None) -> bool:
+    """La propuesta (o el recordatorio) salió por la cola del bot: ese mensaje
+    pasa a ser el de la propuesta de hoy; el anterior, si había, se queda en
+    `viejos` para quitarlo después (revisión 2026-11-20)."""
+    nuevo = int(message_id or 0)
+    p = leer()
+    if not nuevo or not p.hay or p.fecha != (hoy or date.today()) or p.message_id == nuevo:
+        return False
+    viejos = p.viejos + ((p.message_id,) if p.message_id else ())
+    _guardar(replace(p, message_id=nuevo, viejos=viejos))
+    return True
 
 
 def mensaje_de_hoy(hoy: date | None = None) -> int:
@@ -111,20 +134,58 @@ def mensaje_de_hoy(hoy: date | None = None) -> int:
 def retirar_mensaje(hoy: date | None = None, *, salvo: int = 0) -> bool:
     """El corte ya se hizo por otro lado: la propuesta (con sus botones) se
     quita del chat para que quede un solo mensaje del corte. `salvo`: el
-    mensaje que se está reescribiendo con el resultado no se borra."""
-    mid = mensaje_de_hoy(hoy)
-    if not mid or mid == int(salvo or 0):
+    mensaje que se está reescribiendo con el resultado no se borra; como ya
+    es el registro del corte, deja de ser la propuesta (si no, un segundo
+    corte lo borraba; 2026-11-20). También se intentan los `viejos`."""
+    p = leer()
+    if not p.hay or p.fecha != (hoy or date.today()):
         return False
-    try:
-        from pos_uniformes.services import telegram_service
+    salvo = int(salvo or 0)
 
-        motivo = telegram_service.borrar_con_motivo(mid)
-    except Exception:  # noqa: BLE001 — sin credenciales o sin red: se queda para el barrido
-        return False
-    if motivo != "red":
-        p = leer()
-        _guardar(Propuesta(p.fecha, p.momento, p.recordado, p.cancelado, 0))
+    def _borrar(mid: int) -> str:
+        try:
+            from pos_uniformes.services import telegram_service
+
+            motivo = telegram_service.borrar_con_motivo(mid)
+        except Exception:  # noqa: BLE001 — sin credenciales o sin red: se queda para otra vez
+            return "red"
+        if motivo != "red":
+            # Fuera de la lista del barrido: si no, se reintentaba cada hora
+            # hasta las 48 h (2026-11-20).
+            try:
+                from pos_uniformes.services import telegram_limpieza_service as limpieza
+
+                limpieza.olvidar(mid)
+            except Exception:  # noqa: BLE001
+                pass
+        return motivo
+
+    viejos = tuple(v for v in p.viejos if v != salvo and _borrar(v) == "red")
+    mid = p.message_id
+    motivo = _borrar(mid) if mid and mid != salvo else ""
+    queda = mid if motivo == "red" else 0
+    if queda != p.message_id or viejos != p.viejos:
+        _guardar(replace(p, message_id=queda, viejos=viejos))
     return motivo == "ok"
+
+
+def retirar_si_corte_despues(momento: datetime) -> bool:
+    """Hubo un corte en `momento` (kiosko, PWA, encargado…): si es de después
+    de la propuesta de ese día, la propuesta se quita del chat. Lo llama el
+    bot al mandar de la cola el aviso del corte (2026-11-20)."""
+    p = leer()
+    if not p.hay or (not p.message_id and not p.viejos) or momento is None:
+        return False
+    local = _sin_zona(momento)
+    if local.date() != p.fecha:
+        return False
+    if p.momento is not None and local < _sin_zona(p.momento):
+        return False          # un corte de antes de la propuesta no la contesta
+    return retirar_mensaje(p.fecha)
+
+
+def _sin_zona(momento: datetime) -> datetime:
+    return momento.astimezone().replace(tzinfo=None) if momento.tzinfo else momento
 
 
 def cancelar(hoy: date | None = None) -> bool:
@@ -135,7 +196,7 @@ def cancelar(hoy: date | None = None) -> bool:
     hoy = hoy or date.today()
     p = leer()
     if p.hay and p.fecha == hoy:
-        _guardar(Propuesta(p.fecha, p.momento, p.recordado, True, p.message_id))
+        _guardar(replace(p, cancelado=True))
         return True
     _guardar(Propuesta(fecha=hoy, momento=None, recordado=False, cancelado=True))
     return False

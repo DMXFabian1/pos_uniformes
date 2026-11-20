@@ -94,7 +94,7 @@ class AyudaYAutocompletarTests(unittest.TestCase):
     def test_la_ayuda_trae_lo_que_faltaba(self):
         for pedazo in ("/faltas 30", "/actualizar noche", "/corte fondo", "/corte otros",
                        "/corte contarjeta", "/corte segundo", "/deshacer", "/resumen ayer"):
-            self.assertIn(pedazo, bot.AYUDA)
+            self.assertIn(pedazo, bot.AYUDA_COMPLETA)
 
     def test_los_comandos_del_menu_existen_y_telegram_los_acepta(self):
         import inspect

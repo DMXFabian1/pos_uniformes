@@ -57,7 +57,8 @@ class FueraDeHorarioTests(unittest.TestCase):
             textos = v.revisar(s, datetime(2026, 9, 7, 21, 10))
         fuera = [t for t in textos if "fuera de horario" in t]
         self.assertEqual(len(fuera), 1)
-        self.assertIn("🚨 3 movimientos fuera de horario", fuera[0])
+        self.assertTrue(fuera[0].startswith("🚨 FUERA DE HORARIO · "))   # formato común (2026-11-20)
+        self.assertIn("3 movimientos fuera de horario", fuera[0])
         self.assertIn("21:05 venta $100.00 por Ana", fuera[0])
 
 
@@ -90,7 +91,9 @@ class CorteQueNoSeHizoTests(unittest.TestCase):
         a10, a60, a90, despues = self._correr()
         self.assertEqual((a10, a60), ([], []))      # la conversación sigue en marcha
         self.assertEqual(len(a90), 1)
-        self.assertIn("El corte de hoy no se hizo", a90[0])
+        texto, botones = a90[0]                       # con botón (2026-11-20)
+        self.assertIn("El corte de hoy no se hizo", texto)
+        self.assertIn('"cc:volver"', botones)
         self.assertEqual(despues, [])
 
     def test_hoy_no_es_una_decision(self) -> None:

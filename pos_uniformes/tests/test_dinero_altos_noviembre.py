@@ -60,7 +60,7 @@ class LaVentaDeCadaCorteTests(unittest.TestCase):
         from pos_uniformes.services import telegram_cortes_service as tc
 
         texto, _ = tc.detalle(self.s, self.c.id)
-        self.assertIn("Lo que dice el ticket: $1,500.00", texto)
+        self.assertIn("$1,500.00 dice el ticket", texto)   # cifra principal (2026-11-20)
         self.assertNotIn("Ajuste tuyo", texto)
         self.assertIn("Entró sin ser venta (fondo de papá…): $1,750.00", texto)
 

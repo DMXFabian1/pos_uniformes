@@ -7,6 +7,9 @@ hay?" (Daniel, 2026-09-25).
 Aquí no se calcula nada: se le pregunta a los mismos servicios que usan el
 kiosko, el panel y el mapa, y se acomoda para una pantalla de celular. Si una
 cifra no cuadra con su pantalla, el error está en el servicio de origen.
+
+Formato común del bot (2026-11-20): cada respuesta empieza con su encabezado
+(`telegram_formato`), la cifra que importa debajo y el detalle después.
 """
 
 from __future__ import annotations
@@ -17,6 +20,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from pos_uniformes.database.models import Escuela
+from pos_uniformes.services import telegram_formato as fmt
 from pos_uniformes.utils.text_normalization import normalize_text_unicode
 
 #: Cuántos renglones caben sin que el mensaje se vuelva un muro.
@@ -53,13 +57,18 @@ def prenda(session: Session, texto: str) -> str:
     if len(encontradas) > 1:
         nombres = "\n".join(f"· {p.nombre_base or p.nombre}" for p in encontradas[:TOPE])
         mas = f"\n… y {len(encontradas) - TOPE} más" if len(encontradas) > TOPE else ""
-        return f"«{texto}» empata con {len(encontradas)}:\n{nombres}{mas}\n\nDime cuál con más palabras."
+        return fmt.mensaje(
+            "🔎", "¿Cuál prenda?",
+            principal=f"«{texto}» empata con {len(encontradas)}:",
+            detalle=nombres + mas, pie="Dime cuál con más palabras.",
+        )
 
     p = encontradas[0]
     escuela = session.get(Escuela, p.escuela_id).nombre if p.escuela_id else "general"
     variantes = tallas_de(session, p, None)
     if not variantes:
-        return f"{p.nombre_base}\n{escuela}\n\nNo tiene tallas activas."
+        return fmt.mensaje("🏷️", str(p.nombre_base), principal=escuela,
+                           detalle="No tiene tallas activas.")
 
     precios = sorted({float(v.precio_venta) for v in variantes})
     precio = (
@@ -76,7 +85,8 @@ def prenda(session: Session, texto: str) -> str:
         c = "" if c.lower() in ("sin color", "unico", "único") else c
         por_color.setdefault(c, []).append(v)
 
-    lineas = [f"{p.nombre_base}", f"{escuela} · {precio}", ""]
+    # Arriba el precio (la cifra que importa) y la escuela; abajo, las tallas.
+    lineas = []
     for color in sorted(por_color, key=lambda c: (c == "", normalize_text_unicode(c))):
         if len(por_color) > 1:
             lineas.append(f"— {color or 'sin color'} —")
@@ -85,9 +95,10 @@ def prenda(session: Session, texto: str) -> str:
             marca = "⚠️" if stock < 0 else ("—" if stock == 0 else f"{stock}")
             lineas.append(f"{str(v.talla)}: {marca}")
     hay = sum(max(0, int(v.stock_actual)) for v in variantes)
-    lineas.append("")
-    lineas.append(f"En total: {hay} piezas")
-    return "\n".join(lineas)
+    return fmt.mensaje(
+        "🏷️", str(p.nombre_base), principal=f"💰 {precio} · {escuela}",
+        detalle=lineas, pie=f"En total: {hay} piezas",
+    )
 
 
 # ------------------------------------------------------------------ /contar
@@ -98,12 +109,12 @@ def contar(session: Session) -> str:
 
     filas = jn.lo_que_toca(session, limite=TOPE)
     if not filas:
-        return "No hay nada pendiente de contar. ✅"
-    lineas = ["Lo que toca contar:", ""]
+        return fmt.mensaje("🏪", "Qué contar", principal="✅ No hay nada pendiente de contar.")
+    lineas = []
     for f in filas:
         punto = {"rojo": "🔴", "ambar": "🟠"}.get(f.salud, "·")
         lineas.append(f"{punto} {f.titulo}\n   {f.motivo}")
-    return "\n".join(lineas)
+    return fmt.mensaje("🏪", "Qué contar", principal="Lo más urgente primero:", detalle=lineas)
 
 
 # ----------------------------------------------------------------- /escuela
@@ -122,14 +133,15 @@ def escuela(session: Session, texto: str) -> str:
         return f"No encontré ninguna escuela que diga «{texto}»."
     if len(encontradas) > 1:
         nombres = "\n".join(f"· {e.nombre}" for e in encontradas[:TOPE])
-        return f"«{texto}» empata con {len(encontradas)}:\n{nombres}\n\nDime cuál con más palabras."
+        return fmt.mensaje(
+            "🔎", "¿Cuál escuela?",
+            principal=f"«{texto}» empata con {len(encontradas)}:",
+            detalle=nombres, pie="Dime cuál con más palabras.",
+        )
 
     est = ee.estado_de(session, int(encontradas[0].id))
     punto = {"rojo": "🔴", "ambar": "🟠", "verde": "🟢"}.get(est.salud, "·")
     lineas = [
-        f"{punto} {est.nombre}",
-        est.titular,
-        "",
         f"Contada: {est.pct_al_dia}% ({est.al_dia} de {est.tallas} tallas)",
         f"En tienda: {est.piezas_en_tienda} piezas · {est.agotadas} tallas agotadas",
         f"Vendido (30 d): {est.vendido_piezas} piezas",
@@ -141,9 +153,11 @@ def escuela(session: Session, texto: str) -> str:
         lineas.append(f"Pidieron y no había: {len(est.faltas_sentidas)} (la más, {top.prenda} {top.talla})")
     if est.quien_en_proceso:
         lineas.append(f"Contando ahora: {est.quien_en_proceso}")
-    lineas.append("")
-    lineas.append(f"Se contó {est.ultimo_conteo.texto()}")
-    return "\n".join(lineas)
+    # La salud (🔴🟠🟢) va con el titular, justo debajo del encabezado.
+    return fmt.mensaje(
+        "🏫", str(est.nombre), principal=f"{punto} {est.titular}",
+        detalle=lineas, pie=f"Se contó {est.ultimo_conteo.texto()}",
+    )
 
 
 # ------------------------------------------------------------------ /faltas
@@ -164,13 +178,22 @@ def faltas(session: Session, dias: int = DIAS_FALTAS, *, hoy: date | None = None
     filas = demanda_service.listar(session, desde, hasta)
     agrupadas = demanda_service.por_producto_talla(filas)
     if not agrupadas:
-        return f"Nadie pidió algo que no hubiera en los últimos {dias} días. ✅"
+        return fmt.mensaje(
+            "🔎", "Pidieron y no había", cuando=hasta_dia,
+            principal=f"✅ Nadie pidió algo que no hubiera en los últimos {dias} días.",
+        )
 
-    lineas = [f"Pidieron y no había ({dias} días):", ""]
+    lineas = []
     for f in agrupadas[:TOPE]:
         veces = "una vez" if f.veces == 1 else f"{f.veces} veces"
         urgente = " 🔴" if f.urgente else ""
         lineas.append(f"· {f.clave} — {veces}{urgente}")
     if len(agrupadas) > TOPE:
         lineas.append(f"… y {len(agrupadas) - TOPE} más")
-    return "\n".join(lineas)
+    return fmt.mensaje(
+        "🔎", "Pidieron y no había", cuando=hasta_dia,
+        principal=(
+            ("Una cosa" if len(agrupadas) == 1 else f"{len(agrupadas)} cosas")
+            + f" en los últimos {dias} días:"
+        ), detalle=lineas,
+    )

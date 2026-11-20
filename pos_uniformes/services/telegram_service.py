@@ -392,6 +392,18 @@ def es_respuesta_de_telegram(exc: BaseException) -> bool:
     return isinstance(exc, RuntimeError) and str(exc).startswith("Telegram respondió")
 
 
+def es_limite_de_velocidad(exc: BaseException) -> bool:
+    """¿Telegram contestó 429 («Too Many Requests: retry after N»)? No dice
+    nada del mensaje: se trata como sin red y se reintenta (2026-11-20)."""
+    texto = str(exc).lower()
+    return "too many requests" in texto or "retry after" in texto
+
+
+def _ya_no_existe(exc: BaseException) -> bool:
+    """«message to delete not found»: alguien ya lo borró (2026-11-20)."""
+    return es_respuesta_de_telegram(exc) and "message to delete not found" in str(exc).lower()
+
+
 def borrar_con_motivo(message_id: int, *, token: str | None = None, chat_id: str | None = None) -> str:
     """"ok" si se borró; "no" si Telegram dijo que no (ya no existe o ya no se
     puede); "red" si no se supo. La limpieza solo olvida un mensaje con "ok"
@@ -402,6 +414,12 @@ def borrar_con_motivo(message_id: int, *, token: str | None = None, chat_id: str
                 {"chat_id": chat_id, "message_id": str(int(message_id))})
         return "ok"
     except Exception as exc:  # noqa: BLE001
+        # 2026-11-20: un 429 no es «no» (posponía o se olvidaba sin borrar);
+        # y si ya no existe, para la lista es como borrado.
+        if es_limite_de_velocidad(exc):
+            return "red"
+        if _ya_no_existe(exc):
+            return "ok"
         return "no" if es_respuesta_de_telegram(exc) else "red"
 
 

@@ -30,12 +30,19 @@ telegram"):
 
 Este módulo es solo texto y botones; el aviso lo guarda `anuncio_service` y lo
 pinta el overlay del satélite.
+
+Formato común del bot (2026-11-20): cada mensaje abre con su encabezado
+(`telegram_formato`); los de un momento concreto (aviso puesto, acuse) llevan
+la hora.
 """
 
 from __future__ import annotations
 
 import re
 from datetime import datetime, timezone
+
+from pos_uniformes.services.telegram_formato import encabezado
+from pos_uniformes.services.telegram_formato import mensaje as _mensaje
 
 #: Prefijo de los botones de avisos (máx. 64 bytes por regla de Telegram).
 PREFIJO = "av:"
@@ -172,7 +179,8 @@ def falta_para(expira: datetime | None, ahora: datetime | None = None) -> str:
 
 
 AYUDA_CORTA = (
-    "¿Qué aviso? Se usa así:\n"
+    "📣 CÓMO MANDAR UN AVISO\n"
+    "¿Qué aviso? Se usa así:\n\n"
     "/aviso Junta a las 6\n"
     "/aviso 3h Hoy cerramos temprano — se quita en 3 horas\n"
     "/aviso @caja2 Ven un momento — solo en esa pantalla\n"
@@ -284,7 +292,7 @@ def mandar(
         asvc.notificar(session, "inmediato", anuncio.id)
     session.commit()
 
-    que = "📣 Aviso" if interrumpe else "🖼 Cartel"
+    emoji, que = ("📣", "Aviso puesto") if interrumpe else ("🖼", "Cartel puesto")
     if pantalla:
         donde = f"en {pantalla['nombre']}"
         if not pantalla["online"]:
@@ -296,9 +304,8 @@ def mandar(
             if cuantas is None
             else f"en {_plural(cuantas, 'pantalla', 'pantallas')}"
         )
-    lineas = [f"{que} puesto {donde}:", ""]
     cuerpo = (titulo or mensaje or "").strip()
-    lineas.append(f"«{cuerpo}»" if cuerpo else "(solo la imagen)")
+    lineas = [f"«{cuerpo}»" if cuerpo else "(solo la imagen)"]
     if imagen is not None and cuerpo:
         lineas.append("(con tu foto)")
     if sonido:
@@ -313,7 +320,11 @@ def mandar(
     if quejas:
         lineas.append("")
         lineas.extend(quejas)
-    return "\n".join(lineas)
+    # Encabezado con la hora en que se puso y, debajo, a dónde fue (2026-11-20).
+    return (
+        encabezado(emoji, que, datetime.now().astimezone(), hora=True)
+        + "\n" + donde[:1].upper() + donde[1:] + "\n\n" + "\n".join(lineas)
+    )
 
 
 def mandar_foto(
@@ -402,7 +413,8 @@ def resumen(session) -> str:
 
     activos = asvc.listar_activos(session)
     if not activos:
-        lineas = ["No hay ningún aviso puesto.", "", "Para poner uno: /aviso Junta a las 6"]
+        lineas = [encabezado("📣", "Avisos"), "No hay ningún aviso puesto.", "",
+                  "Para poner uno: /aviso Junta a las 6"]
         nombres = pantallas(session)
         if nombres:
             lineas.append("")
@@ -413,7 +425,8 @@ def resumen(session) -> str:
         return "\n".join(lineas)
 
     nombres = {p["identificador"]: p["nombre"] for p in pantallas(session)}
-    lineas = [f"📣 {_plural(len(activos), 'aviso puesto', 'avisos puestos')}:"]
+    lineas = [encabezado("📣", "Avisos"),
+              f"{_plural(len(activos), 'aviso puesto', 'avisos puestos')}:"]
     for a in activos:
         lineas.append("")
         lineas.extend(_renglones_de(session, a, nombres))
@@ -430,7 +443,7 @@ def detalle(session, anuncio_id: int) -> tuple[str, list[list[tuple[str, str]]]]
     if anuncio is None:
         return "Ese aviso ya no existe.", []
     nombres = {p["identificador"]: p["nombre"] for p in pantallas(session)}
-    texto = "\n".join(_renglones_de(session, anuncio, nombres))
+    texto = encabezado("📣", "Aviso") + "\n" + "\n".join(_renglones_de(session, anuncio, nombres))
     if not anuncio.activo:
         texto += "\n\n(ya no está en las pantallas)"
         return texto, [[("🔄 Ponerlo otra vez", f"{PREFIJO}otra:{anuncio.id}")]]
@@ -558,6 +571,7 @@ def aviso_de_acuse(
     pantalla: str | None,
     faltan: int | None = None,
     cerrado: bool = False,
+    ahora: datetime | None = None,
 ) -> str:
     """El mensaje que recibe Daniel cuando tocan «Enterada» en una pantalla.
 
@@ -568,15 +582,16 @@ def aviso_de_acuse(
     """
     quien = (empleada or "Alguien").strip()
     donde = (pantalla or "").strip()
-    linea = f"✅ {quien} vio el aviso"
+    linea = f"{quien} vio el aviso"
     if donde:
         linea += f" en {donde}"
-    partes = [linea, "", f"«{etiqueta}»", ""]
     if cerrado:
-        partes.append("Ya lo vieron todas. El aviso se quitó de las pantallas.")
+        pie = "Ya lo vieron todas. El aviso se quitó de las pantallas."
     elif faltan:
         verbo = "Falta" if faltan == 1 else "Faltan"
-        partes.append(f"{verbo} {_plural(faltan, 'pantalla', 'pantallas')} por verlo.")
+        pie = f"{verbo} {_plural(faltan, 'pantalla', 'pantallas')} por verlo."
     else:
-        partes.append("Sigue puesto. Para quitarlo: /avisos")
-    return "\n".join(partes)
+        pie = "Sigue puesto. Para quitarlo: /avisos"
+    # Encabezado con la hora en que llegó el acuse (2026-11-20).
+    return _mensaje("✅", "Aviso visto", cuando=ahora or datetime.now().astimezone(), hora=True,
+                    principal=linea, detalle=f"«{etiqueta}»", pie=pie)

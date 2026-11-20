@@ -120,8 +120,11 @@ class TextosTests(unittest.TestCase):
     def test_corte_encargado(self) -> None:
         pago = SimpleNamespace(employee_name="Ana López", employee_code="VEND-2", total=Decimal("1390.00"))
         t = al.texto_alerta_corte(self._corte(), Decimal("3230.00"), pagos=[pago])
-        self.assertIn("Corte hecho por ENC-1 a las 17:31", t)
-        self.assertIn("Venta efectivo $3,230.00 · pagos $1,390.00", t)
+        # Formato común (2026-11-20): encabezado con la hora y la venta arriba.
+        self.assertEqual(t.splitlines()[0], "🧾 CORTE DE CAJA · mié 9 sep · 17:31")
+        self.assertEqual(t.splitlines()[1], "💰 $3,230.00 de venta en efectivo")
+        self.assertIn("Hecho por ENC-1", t)
+        self.assertIn("Pagos $1,390.00", t)
         self.assertIn("💵 Ana: $1,390.00", t)
         self.assertIn("Se saca $1,840.00 · reactivo queda $11,160.00", t)
         self.assertNotIn("FALTARON", t)
@@ -145,7 +148,10 @@ class TextosTests(unittest.TestCase):
 
     def test_retiro(self) -> None:
         r = SimpleNamespace(monto=Decimal("500"), motivo="Proveedor", creado_por="enc-1", created_at=datetime(2026, 9, 9, 12, 5))
-        self.assertEqual(al.texto_alerta_retiro(r), "💸 Retiro del cajón: $500.00 — Proveedor (ENC-1, 12:05)")
+        self.assertEqual(
+            al.texto_alerta_retiro(r),
+            "💸 RETIRO DEL CAJÓN · mié 9 sep · 12:05\n💰 $500.00 — Proveedor\n\nLo sacó ENC-1",
+        )
 
 
 def _venta(s, momento: datetime, monto="300", nombre="Ana López"):
@@ -181,8 +187,11 @@ class VigilanteTests(unittest.TestCase):
             textos = v.revisar(s, datetime(2026, 9, 7, 18, 41))
             fuera = [t for t in textos if "fuera de horario" in t]
             self.assertEqual(len(fuera), 1)
-            self.assertIn("venta $450.00 por Ana a las 18:40 (horario 09:00–18:00)", fuera[0])
-            self.assertTrue(any("no se ha hecho corte" in t for t in textos))  # también avisa el cierre sin corte
+            # Formato común (2026-11-20): la cifra arriba, la hora y el horario abajo.
+            self.assertIn("💰 $450.00 venta por Ana", fuera[0])
+            self.assertIn("a las 18:40 (horario 09:00–18:00)", fuera[0])
+            # también avisa el cierre sin corte (ese llega con botón: (texto, botones))
+            self.assertTrue(any("no se ha hecho corte" in (t[0] if isinstance(t, tuple) else t) for t in textos))
             self.assertEqual(v.revisar(s, datetime(2026, 9, 7, 18, 42)), [])  # no repite
             _venta(s, datetime(2026, 9, 10, 17, 30), "80")  # jueves cierra 17:00
             self.assertIn("17:00)", v.revisar(s, datetime(2026, 9, 10, 17, 31))[0])
@@ -195,7 +204,11 @@ class VigilanteTests(unittest.TestCase):
             self.assertEqual(v.revisar(s, datetime(2026, 9, 7, 18, 5)), [])   # todavía no (cierre + 10 min)
             textos = v.revisar(s, datetime(2026, 9, 7, 18, 12))
             self.assertEqual(len(textos), 1)
-            self.assertIn("Ya cerró la tienda (18:00) y hoy no se ha hecho corte", textos[0])
+            # Llega con el botón de la propuesta en vez de «Manda /corte» (2026-11-20).
+            texto, botones = textos[0]
+            self.assertIn("Ya cerró la tienda (18:00) y hoy no se ha hecho corte", texto)
+            self.assertIn('"cc:volver"', botones)
+            self.assertNotIn("/corte", texto)
             self.assertEqual(v.revisar(s, datetime(2026, 9, 7, 19, 0)), [])   # ya avisó hoy
 
     def test_con_corte_o_sin_movimiento_no_avisa(self) -> None:
@@ -250,7 +263,7 @@ class EnganchesTests(unittest.TestCase):
             registrar_retiro(s, monto="500", motivo="Renta", creado_por="ENC-1")
             pend = al.pendientes(s)
             self.assertEqual(len(pend), 1)
-            self.assertIn("$500.00 — Renta (ENC-1", pend[0].texto)
+            self.assertIn("$500.00 — Renta\n\nLo sacó ENC-1", pend[0].texto)
 
     def test_retiro_sin_tabla_de_alertas_sigue_funcionando(self) -> None:
         from pos_uniformes.services.retiros_service import registrar_retiro
@@ -276,7 +289,9 @@ class EnganchesTests(unittest.TestCase):
             pend = al.pendientes(s)
             self.assertEqual(corte.monto_final, Decimal("13100.00"))
         self.assertEqual(len(pend), 1)
-        self.assertIn("Corte hecho por VEND-1 a las 17:30", pend[0].texto)
+        self.assertTrue(pend[0].texto.startswith("🧾 CORTE DE CAJA · "))
+        self.assertIn(" · 17:30\n", pend[0].texto)
+        self.assertIn("Hecho por VEND-1", pend[0].texto)
         self.assertNotIn("FALTARON", pend[0].texto)
         self.assertIn("Ajuste: real $13,160.00 → oficial $13,100.00 (−$60.00)", pend[0].texto)
         self.assertEqual(corte.monto_esperado, Decimal("13160.00"))  # el real se guarda; solo Daniel lo ve

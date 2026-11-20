@@ -15,6 +15,7 @@ from decimal import Decimal
 
 from pos_uniformes.services.nombres_empleadas_service import mostrar as _nombre_de
 from pos_uniformes.services.nombres_empleadas_service import nombres_por_codigo
+from pos_uniformes.services.telegram_formato import cifra, encabezado, es_encabezado, mensaje
 
 _CENT = Decimal("0.01")
 _DIAS = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
@@ -104,9 +105,14 @@ def _pesos(v: Decimal) -> str:
 
 
 def formatear(d: DatosResumen) -> str:
-    """Texto listo para Telegram (sin markdown, para que nada se rompa)."""
-    fecha = f"{_DIAS[d.fecha.weekday()]} {d.fecha:%d/%m/%Y}"
-    lineas = [f"📒 RESUMEN DEL DÍA · {fecha}", ""]
+    """Texto listo para Telegram (sin markdown, para que nada se rompa).
+
+    Formato común (2026-11-20): encabezado con la fecha y, si hubo
+    movimiento, lo que entró (efectivo + tarjeta) como cifra principal."""
+    lineas = [encabezado("📒", "Resumen del día", d.fecha)]
+    if d.hubo_movimiento:
+        lineas.append(cifra(entro_real(d), "entró", emoji="💵"))
+    lineas.append("")
 
     lineas.append("💰 VENTAS" + (f" ({d.periodo})" if d.inicio_corte is not None else ""))
     if d.hubo_movimiento:
@@ -230,9 +236,15 @@ def texto_hoy(d: DatosResumen, *, quien_esta: list[str] | None = None, ahora=Non
     from datetime import datetime
 
     momento = ahora or datetime.now()
-    lineas = [f"📅 Hoy · {_DIAS[d.fecha.weekday()]} {d.fecha:%d/%m}, {momento:%H:%M}"]
-    if d.inicio_corte is not None:
-        lineas.append(f"(dinero {d.periodo})")
+    # Formato común (2026-11-20): encabezado con fecha y hora, y lo que entró
+    # como cifra principal. Encabeza el menú fijado: se queda igual de corto.
+    lineas = [encabezado("📅", "Hoy", datetime.combine(d.fecha, momento.time()), hora=True)]
+    if d.hubo_movimiento:
+        # La misma línea que /pulso, con la misma etiqueta: «entró hoy» o
+        # «entró desde el corte…»; lo de antes del corte no es «hoy» (2026-11-20).
+        cuando = d.periodo if d.inicio_corte is not None else "hoy"
+        lineas.append(cifra(entro_real(d), f"entró {cuando}"))
+    # Sin movimiento, «Ninguna venta {periodo}» ya dice desde cuándo.
     lineas.append("")
 
     if not d.hubo_movimiento:
@@ -241,10 +253,9 @@ def texto_hoy(d: DatosResumen, *, quien_esta: list[str] | None = None, ahora=Non
             else "Todavía no se registra ninguna venta."
         )
     else:
-        lineas.append(f"💵 Entró: {_pesos(entro_real(d))}")
-        lineas.append(f"   efectivo {_pesos(d.efectivo)} · tarjeta {_pesos(d.tarjeta)}")
+        lineas.append(f"efectivo {_pesos(d.efectivo)} · tarjeta {_pesos(d.tarjeta)}")
         if d.abonos:
-            lineas.append(f"   (incluye {_pesos(d.abonos)} de abonos)")
+            lineas.append(f"(incluye {_pesos(d.abonos)} de abonos)")
         lineas.append(f"🛍 {d.operaciones} operaciones · {d.piezas} piezas")
         if d.apartados_n:
             lineas.append(f"📦 {_apartados(d.apartados_n)} (no es dinero cobrado)")
@@ -369,14 +380,20 @@ def _pendientes(session, d: DatosResumen, hoy: date) -> None:
 
 
 def texto_solo_pendientes(session, hoy: date | None = None) -> str:
-    """Recordatorio de mediodía: solo lo que falta por registrar."""
+    """Recordatorio de mediodía: solo lo que falta por registrar.
+
+    Formato común (2026-11-20): «📌 PENDIENTES · vie 20 nov» y la lista; el
+    título que trae el bloque («📌 PENDIENTES») no se repite."""
     from pos_uniformes.services.pendientes_service import pendientes_del_dia, texto_pendientes
 
     hoy = hoy or date.today()
     texto = texto_pendientes(pendientes_del_dia(session, hoy))
     if not texto:
         return ""
-    return f"{_DIAS[hoy.weekday()]} {hoy:%d/%m}\n{texto}"
+    renglones = texto.splitlines()
+    if renglones and (renglones[0].startswith("📌") or es_encabezado(renglones[0])):
+        renglones = renglones[1:]
+    return mensaje("📌", "Pendientes", cuando=hoy, detalle=renglones)
 
 
 def _bloque(session, fn) -> None:

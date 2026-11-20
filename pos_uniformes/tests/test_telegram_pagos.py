@@ -78,7 +78,7 @@ class PagarTest(unittest.TestCase):
 
     def test_con_la_confirmacion_si_paga(self):
         r = self._correr("Evelyn si")
-        self.assertIn("✅ Pagado", r)
+        self.assertTrue(r.startswith("✅ PAGADO · "))   # formato común (2026-11-20)
         self.assertIn("$1,412.00", r)
         self.assertEqual(len(self.registrados), 1)
 
@@ -121,7 +121,8 @@ class PagarTest(unittest.TestCase):
         self.assertIn("/pagar Evelyn si", r)
         r = self._correr("Evelyn si", det=det)
         self.assertEqual(len(self.registrados), 1)
-        self.assertIn("✅ Ciclo de Evelyn Ortiz cerrado: el préstamo se llevó todo el pago ($1,412.00)", r)
+        self.assertTrue(r.startswith("✅ CICLO CERRADO · "))   # formato común (2026-11-20)
+        self.assertIn("Ciclo de Evelyn Ortiz cerrado: el préstamo se llevó todo el pago ($1,412.00)", r)
 
     def test_a_quien_no_existe_lo_dice(self):
         r = self._correr("Menganita", code=None)
@@ -216,7 +217,7 @@ class ElBotLosConoceTest(unittest.TestCase):
     def test_estan_en_la_ayuda_y_en_el_despachador(self):
         from pathlib import Path
 
-        from pos_uniformes.services.telegram_bot_service import AYUDA
+        from pos_uniformes.services.telegram_bot_service import AYUDA_COMPLETA as AYUDA  # la de «/ayuda todo» (2026-11-20)
 
         for c in ("/pagos", "/pagar", "/retiro", "/deshacerpago"):
             self.assertIn(c, AYUDA, f"{c} no sale en /ayuda")

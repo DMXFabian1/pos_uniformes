@@ -55,7 +55,7 @@ class PrendaTest(_Base):
     def test_dice_precio_existencia_y_total(self):
         self._prod("Playera Justo Sierra", tallas={("10", "Rojo"): 3, ("12", "Rojo"): 0})
         r = inv.prenda(self.s, "playera justo")
-        self.assertIn("Playera Justo Sierra", r)
+        self.assertIn("PLAYERA JUSTO SIERRA", r)   # el título, en mayúsculas (2026-11-20)
         self.assertIn("$100.00", r)
         self.assertIn("10: 3", r)
         self.assertIn("12: —", r)       # cero se ve como raya, no como 0
@@ -100,7 +100,7 @@ class EscuelaTest(_Base):
     def test_trae_el_titular_y_las_cifras(self):
         self._prod("Playera Justo Sierra", tallas={("10", "Rojo"): 4})
         r = inv.escuela(self.s, "justo")
-        self.assertIn("Justo Sierra", r)
+        self.assertIn("JUSTO SIERRA", r)   # el título, en mayúsculas (2026-11-20)
         self.assertIn("nunca se ha contado", r)
         self.assertIn("En tienda: 4 piezas", r)
 
@@ -176,7 +176,7 @@ class ContarTest(_Base):
 
 class ElBotLosConoceTest(unittest.TestCase):
     def test_estan_en_la_ayuda_y_en_el_despachador(self):
-        from pos_uniformes.services.telegram_bot_service import AYUDA
+        from pos_uniformes.services.telegram_bot_service import AYUDA_COMPLETA as AYUDA  # la de «/ayuda todo» (2026-11-20)
         from pathlib import Path
 
         for c in ("/prenda", "/escuela", "/contar", "/faltas"):

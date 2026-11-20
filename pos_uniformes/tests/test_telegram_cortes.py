@@ -106,7 +106,7 @@ class ElBotLoConoceTest(unittest.TestCase):
     def test_esta_en_la_ayuda_el_despachador_y_el_menu(self):
         from pathlib import Path
 
-        from pos_uniformes.services.telegram_bot_service import AYUDA
+        from pos_uniformes.services.telegram_bot_service import AYUDA_COMPLETA as AYUDA  # la de «/ayuda todo» (2026-11-20)
 
         self.assertIn("/cortes", AYUDA)
         base = Path(__file__).resolve().parent.parent / "services"
@@ -609,7 +609,7 @@ class ElPluralDeLosDiasTests(unittest.TestCase):
             fecha=_date(2026, 10, 8), hora="17:40", quien="Daniel",
             contado=Decimal("100"), esperado=Decimal("100"), operaciones=1,
         )
-        self.assertIn("🧾 Cortes · 1 día\n", ct.texto([fila], dias=1))
+        self.assertIn("🧾 CORTES · 1 DÍA\n", ct.texto([fila], dias=1))   # encabezado (2026-11-20)
 
     def test_sin_cortes_tampoco_dice_1_dias(self) -> None:
         self.assertNotIn("1 días", ct.texto([], dias=1))

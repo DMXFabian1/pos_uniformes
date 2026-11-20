@@ -177,7 +177,8 @@ class TableroTest(unittest.TestCase):
 
     def test_sin_sesion_sigue_siendo_la_pregunta_de_siempre(self):
         texto, botones = menu.menu_raiz()
-        self.assertEqual(texto, "¿Qué quieres ver?")
+        self.assertTrue(texto.startswith("📋 TIENDA"))
+        self.assertTrue(texto.endswith("¿Qué quieres ver?"))
         self.assertTrue(_textos(botones))
 
     def test_con_sesion_encabeza_con_el_dia(self):
@@ -191,7 +192,8 @@ class TableroTest(unittest.TestCase):
 
         with patch.object(rd, "recolectar", side_effect=RuntimeError("sin base")):
             texto = menu.cabecera(object())
-        self.assertEqual(texto, "¿Qué quieres ver?")
+        self.assertTrue(texto.startswith("📋 TIENDA"))
+        self.assertTrue(texto.endswith("¿Qué quieres ver?"))
 
     def test_cortes_esta_en_el_tablero(self):
         self.assertIn("🧾 Cortes", _textos(menu.menu_raiz()[1]))

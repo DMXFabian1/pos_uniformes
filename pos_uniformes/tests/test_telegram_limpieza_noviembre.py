@@ -219,7 +219,8 @@ class BorrarConMotivoTests(unittest.TestCase):
 
     def test_telegram_dice_que_no(self) -> None:
         self.assertEqual(
-            self._motivo(RuntimeError("Telegram respondió: Bad Request: message to delete not found")), "no"
+            # «message to delete not found» ya cuenta como borrado (2026-11-20).
+            self._motivo(RuntimeError("Telegram respondió: Bad Request: message can't be deleted")), "no"
         )
 
     def test_sin_red(self) -> None:
@@ -270,8 +271,6 @@ class ElKioskoMandaPorLaColaTests(unittest.TestCase):
         llamar.assert_called_once()
 
 
-if __name__ == "__main__":
-    unittest.main()
 
 
 class UnaSolaPantallaTests(_ConArchivo):
@@ -362,3 +361,7 @@ class UnaSolaPantallaTests(_ConArchivo):
         limpieza.recordar_pantalla(90, "2026-11-20")
         telegram_service._anotar_para_barrer(respuesta={"result": {"message_id": 91}})
         self.assertTrue(limpieza.pantalla()[2])
+
+
+if __name__ == "__main__":
+    unittest.main()

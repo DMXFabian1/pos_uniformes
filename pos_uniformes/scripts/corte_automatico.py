@@ -26,6 +26,8 @@ import argparse
 import sys
 from datetime import datetime
 
+from pos_uniformes.services.telegram_formato import encabezado
+
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Corte de 30 min antes de cerrar")
@@ -102,12 +104,29 @@ def _mandar(mensaje: str, botones: str | None = None) -> bool:
         from pos_uniformes.services import telegram_service
 
         if not (telegram_service.token_configurado() and telegram_service.chat_id_configurado()):
-            return False
+            # La tarea no ve el token: a la cola, que el bot sí lo tiene. Un
+            # corte hecho no se queda sin aviso (2026-11-20).
+            print("(Telegram sin configurar aquí; lo dejo en la cola)")
+            return _encolar(mensaje, botones)
         telegram_service.enviar_mensaje(mensaje, botones=botones, conservar=True)
         return True
     except Exception as exc:  # noqa: BLE001
+        if _probablemente_salio(exc):
+            print(f"(Telegram tardó en contestar: {exc}; no lo repito)")
+            return True
         print(f"(Telegram no disponible: {exc}; lo dejo en la cola)")
     return _encolar(mensaje, botones)
+
+
+def _probablemente_salio(exc: BaseException) -> bool:
+    """Se acabó el tiempo esperando la respuesta: el mensaje ya salió. Encolarlo
+    lo mandaba dos veces (dos propuestas con botones; 2026-11-20)."""
+    try:
+        from pos_uniformes.services import telegram_service
+
+        return bool(telegram_service._ya_se_mando(exc))
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _mandar_y_dar_id(mensaje: str, botones: str | None = None) -> int:
@@ -117,12 +136,17 @@ def _mandar_y_dar_id(mensaje: str, botones: str | None = None) -> int:
         from pos_uniformes.services import telegram_service
 
         if not (telegram_service.token_configurado() and telegram_service.chat_id_configurado()):
+            print("(Telegram sin configurar aquí; lo dejo en la cola)")
+            _encolar(mensaje, botones)
             return 0
         if len(mensaje) <= telegram_service._MAX:
             return telegram_service.enviar_y_dar_id(mensaje, botones=botones, conservar=True)
         telegram_service.enviar_mensaje(mensaje, botones=botones, conservar=True)
         return 0
     except Exception as exc:  # noqa: BLE001
+        if _probablemente_salio(exc):
+            print(f"(Telegram tardó en contestar: {exc}; no lo repito)")
+            return 0
         print(f"(Telegram no disponible: {exc}; lo dejo en la cola)")
     _encolar(mensaje, botones)
     return 0
@@ -165,7 +189,11 @@ def _recordar() -> int:
         from pos_uniformes.services.corte_remoto_service import propuesta_de_corte
 
         texto_, botones = propuesta_de_corte(session, ahora)
-        mensaje = "⏰ Sigue pendiente el corte.\n\n" + texto_
+        # Un solo encabezado: el del recordatorio toma el lugar del de la
+        # propuesta (formato común del bot, 2026-11-20).
+        mensaje = _con_encabezado(
+            encabezado("⏰", "Sigue pendiente el corte", ahora, hora=True), texto_
+        )
     # El recordatorio REEMPLAZA a la propuesta: sale nuevo (para que suene)
     # y la de antes se quita. Antes quedaban las dos con sus botones.
     from pos_uniformes.services.corte_propuesta_service import retirar_mensaje
@@ -230,12 +258,14 @@ def _cerrar_si_nadie_contesto(*, simular: bool = False) -> int:
             # oculta y un día sin corte no lo sabía nadie (2026-10-10).
             raro = not (propuesta.hay and propuesta.fecha == ahora.date()) or not propuesta.recordado
             if raro and not hubo_corte_despues and not propuesta.cancelado and hubo_movimiento:
+                # Formato común del bot (2026-11-20); «/corte» pasó a botón.
                 _mandar(
-                    "⚠️ No cerré el día solo: "
-                    + (f"hoy no se propuso el corte (¿no corrió la tarea de las {hora_corte(ahora.date()):%H:%M}?)"
+                    encabezado("⚠️", "No cerré el día solo", ahora, hora=True) + "\n"
+                    + (f"Hoy no se propuso el corte (¿no corrió la tarea de las {hora_corte(ahora.date()):%H:%M}?)"
                        if not (propuesta.hay and propuesta.fecha == ahora.date())
-                       else "el recordatorio no corrió; lo intento en un rato")
-                    + ". Si quieres, manda /corte."
+                       else "El recordatorio no corrió; lo intento en un rato")
+                    + ".\n\nSi quieres, hazlo con el botón.",
+                    botones=_boton_corte(),
                 )
             return 0
         if simular:
@@ -248,35 +278,75 @@ def _cerrar_si_nadie_contesto(*, simular: bool = False) -> int:
             resultado = hacer_corte_y_avisar(session, creado_por=AUTO_CODE, ahora=ahora)
         except Exception as exc:  # noqa: BLE001 — antes el error se quedaba en una consola oculta
             print(f"El cierre automático falló: {exc}")
-            _mandar(_texto_cierre_fallido(str(exc)))
+            _mandar(_texto_cierre_fallido(str(exc)), botones=_boton_corte())
             return 1
 
     if not resultado.hecho:
         # No decir «Cerré el día» de un corte que no se hizo.
         print(resultado.mensaje)
-        _mandar(_texto_cierre_fallido(resultado.mensaje))
+        _mandar(_texto_cierre_fallido(resultado.mensaje), botones=_boton_corte())
         return 1
     from pos_uniformes.services.corte_propuesta_service import retirar_mensaje
 
-    retirar_mensaje(ahora.date())      # queda un solo mensaje del corte
+    # El encabezado del cierre toma el lugar del de «Corte hecho» y el porqué
+    # va al pie (formato común del bot, 2026-11-20).
     mensaje = (
-        "🌙 Cerré el día por ti: no contestaste la propuesta y en el kiosko "
-        "nadie más puede hacer el corte.\n\n"
-        + resultado.mensaje
-        + "\n\nEs la cifra real, sin ajustes. Si algo no cuadra, lo arreglas "
+        _con_encabezado(encabezado("🌙", "Cerré el día por ti", ahora, hora=True), resultado.mensaje)
+        + "\n\nNo contestaste la propuesta y en el kiosko nadie más puede hacer el corte. "
+        "Es la cifra real, sin ajustes. Si algo no cuadra, lo arreglas "
         "desde «Cortes anteriores» cuando puedas."
     )
     print(mensaje)
-    _mandar(mensaje)
+    # El recordatorio se quita solo cuando el aviso salió o quedó en la cola:
+    # si no, el día quedaba cerrado sin rastro en el chat (2026-11-20).
+    if _mandar(mensaje):
+        retirar_mensaje(ahora.date())  # queda un solo mensaje del corte
     return 0
 
 
-def _texto_cierre_fallido(motivo: str) -> str:
-    return (
-        "⚠️ Quise cerrar el día por ti y no pude:\n"
-        f"{motivo[:300]}\n\n"
-        "Lo vendido sigue esperando corte. Hazlo con /corte cuando puedas."
+def _texto_cierre_fallido(motivo: str, ahora: datetime | None = None) -> str:
+    """Formato común del bot (2026-11-20). El motivo suele ser un mensaje del
+    corte con su propio encabezado: se le quita para no dejar uno debajo de
+    otro. «Hazlo con /corte» pasó a botón (`_boton_corte`)."""
+    from pos_uniformes.services.telegram_formato import mensaje
+
+    motivo = _sin_encabezado(motivo)
+    return mensaje(
+        "⚠️", "No pude cerrar el día", cuando=ahora or datetime.now().astimezone(), hora=True,
+        principal="Quise cerrar el día por ti y no pude:",
+        detalle=motivo[:300],
+        pie="Lo vendido sigue esperando corte. Hazlo con el botón cuando puedas.",
     )
+
+
+def _boton_corte() -> str | None:
+    """«🧾 Hacer el corte…»: el mismo botón de 🧾 Cortes (`co:nuevo`), que
+    enseña la propuesta con sus botones. Antes estos avisos decían «manda
+    /corte» (2026-11-20). Sin él, el aviso sale igual."""
+    try:
+        from pos_uniformes.services import telegram_service
+
+        return telegram_service.teclado([[("🧾 Hacer el corte…", "co:nuevo")]])
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _sin_encabezado(texto: str) -> str:
+    """El texto sin su primera línea si esa es un encabezado del formato."""
+    from pos_uniformes.services.telegram_formato import es_encabezado
+
+    primera, _, resto = (texto or "").partition("\n")
+    return resto.lstrip("\n") if es_encabezado(primera) else (texto or "")
+
+
+def _con_encabezado(cabeza: str, texto: str) -> str:
+    """`cabeza` en lugar del encabezado de `texto` (o encima, si no trae)."""
+    from pos_uniformes.services.telegram_formato import es_encabezado
+
+    primera, _, resto = (texto or "").partition("\n")
+    if es_encabezado(primera):
+        return cabeza + ("\n" + resto if resto else "")
+    return cabeza + "\n\n" + (texto or "")
 
 
 def _local(momento):

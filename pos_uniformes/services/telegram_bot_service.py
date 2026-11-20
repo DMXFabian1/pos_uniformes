@@ -49,8 +49,13 @@ logger = logging.getLogger("telegram_bot")
 
 CODIGO_REMOTO = "VEND-1"  # Daniel: el que manda /corte
 
-AYUDA = (
-    "CAJA\n"
+#: Todos los comandos, con sus variantes: sale con «/ayuda todo». De aquí
+#: salen también los nombres que conoce `comando_desconocido`.
+# Tiene que caber en UN mensaje (telegram_service._MAX, con margen): si no,
+# sale partida y deja de ser pantalla (2026-11-20; prueba en test_telegram_revision_formato).
+AYUDA_COMPLETA = (
+    "❔ TODOS LOS COMANDOS\n"
+    "\n🧾 CAJA\n"
     "/corte — hacer el corte ahora e imprimir el ticket en la tienda\n"
     "/corte 5000 — el mismo corte, pero se retiran $5,000\n"
     "/corte sintarjeta — sin que se vean los cobros con tarjeta\n"
@@ -60,9 +65,9 @@ AYUDA = (
     "/corte segundo — otro corte si el anterior fue hace menos de una hora\n"
     "/nocorte — dejar pasar el corte propuesto hoy\n"
     "/estado — qué hay en caja ahora\n"
-    "/pulso — ¿está todo en pie? la tienda entera en una pantalla\n"
+    "/pulso — la tienda entera en una pantalla\n"
     "/hoy — cómo va el día ahora mismo\n"
-    "/resumen — resumen del día (el de la noche, completo) · /resumen ayer · /resumen 5/11\n"
+    "/resumen — el resumen del día completo · /resumen ayer · /resumen 5/11\n"
     "/pendientes — lo que falta por registrar\n"
     "/cortes — los últimos cortes; toca uno para ajustarlo o borrarlo\n"
     "/cortes 30 — los de los últimos 30 días (para rastrear el dinero)\n"
@@ -75,47 +80,75 @@ AYUDA = (
     "/deshacer — los retiros y entradas de hoy, para deshacer uno (antes del corte)\n"
     "/cajon — desmarca lo que NO salió del cajón (una transferencia,\n"
     "   algo ya contado). Antes del corte\n"
-    "\nPAGOS\n"
+    "\n💰 PAGOS\n"
     "/pagos — a quién le toca cobrar y cuánto\n"
     "/pagar Fanny — el desglose; con «si» al final se registra\n"
-    "/deshacerpago — enseña el último pago y cómo deshacerlo (solo de hoy y antes del corte)\n"    "/fechapago Stayce 18/10 — el último pago de alguien pasa a ese día (si se registró tarde)\n"
+    "/deshacerpago — enseña el último pago y cómo deshacerlo (solo de hoy y antes del corte)\n"
+    "/fechapago Stayce 18/10 — mueve su último pago a ese día (si se registró tarde)\n"
     "/prestamos — los préstamos que te pidieron, para aprobar o rechazar\n"
     "/descansos — los días que te pidieron, con cómo queda la semana\n"
     "/programas — clientes propuestos a Profesional o Mayorista\n"
     "/receso 2026-10-27 2026-11-04 — tus vacaciones: el calendario lo dice\n"
     "   y tu martes deja de ocupar el cupo · /receso quitar\n"
     "/sonidos — los sonidos que puede hacer un aviso\n"
-    "\nMI PAGO (lo que te paga tu papá; no sale del cajón)\n"
+    "\n💼 MI PAGO (lo que te paga tu papá; no sale del cajón)\n"
     "/mipago — cuál toca, cuánto, los 4 del mes y tus días de más · /mipago dic\n"
     "/mepagaron — registra el que toca (pregunta antes) · /mepagaron 2400 18/11\n"
     "   · /mepagaron 2 de 4 o /mepagaron pago 14/11 para elegir cuál\n"
-    "/deshacermipago — deshace el último que registraste (pregunta antes) · /deshacermipago 21/11\n"
+    "/deshacermipago — deshace el último (pregunta antes) · /deshacermipago 21/11\n"
     "/diasdemas — tus días de más: págamelo o guárdamelo\n"
     "/vino_yo · /falta_yo · /descanso_yo — tus días (o con espacio: /vino yo)\n"
-    "\nLA TIENDA\n"
+    "\n🏪 LA TIENDA\n"
     "/prenda playera justo sierra — precio y cuántas hay por talla\n"
     "/escuela conalep — cómo va esa escuela\n"
     "/contar — qué falta contar, lo más urgente primero\n"
     "/faltas — lo que pidieron y no había · /faltas 30 = los últimos 30 días\n"
-    "\nLAS PANTALLAS\n"
+    "\n📣 LAS PANTALLAS\n"
     "/aviso Junta a las 6 — sale a pantalla completa en la tienda\n"
     "/aviso 3h Hoy cerramos temprano — y se quita solo en 3 horas\n"
     "/aviso @caja2 Ven un momento — solo en esa pantalla\n"
     "/cartel Promoción de mochilas — rota sin interrumpir a nadie\n"
     "Mándame una foto y sale a pantalla completa (el pie de foto es el aviso)\n"
     "/avisos — los que están puestos, quién los vio, y quitarlos\n"
-    "\nEL SISTEMA\n"
+    "\n⚙️ EL SISTEMA\n"
     "/version — qué versión trae la PC principal y cuál corren los kioskos\n"
     "/actualizar — trae lo nuevo y actualiza la tienda (respaldo antes, y vuelta atrás si falla)\n"
     "/actualizar noche — que se actualice sola cada noche (/actualizar noche no lo quita)\n"
-    "/volver — los kioskos regresan a la versión anterior, si la nueva salió mala\n"
-    "/camaras — si el contador de personas está contando y si sus números tienen sentido\n"
-    "/latido — que alguien de fuera te avise si esta PC se apaga (healthchecks.io)\n"
-    "\nGENTE\n"
+    "/volver — los kioskos vuelven a la versión anterior\n"
+    "/camaras — si el contador de personas cuenta bien\n"
+    "/latido — aviso de fuera si esta PC se apaga (healthchecks.io)\n"
+    "\n👥 GENTE\n"
     "/asistencia — quién vino hoy, con un comando por empleada para marcar\n"
     "/falta_Fanny · /descanso_Fanny · /vino_Fanny — o con espacio: /falta Fanny\n"
     "\n/menu — los botones, para no acordarse de nada\n"
-    "/ayuda — esta lista"
+    "/ayuda — la ayuda corta · /ayuda todo — esta lista"
+)
+
+
+#: La ayuda de todos los días (Daniel, 2026-11-20: formato común). Corta, por
+#: secciones, y dice que casi todo está en /menu: `responder` la manda con los
+#: botones del tablero debajo. Lo completo, con «/ayuda todo».
+AYUDA = (
+    "❔ AYUDA\n"
+    "Casi todo está en /menu, con botones: toca y listo.\n"
+    "\n🧾 CAJA\n"
+    "/corte — el corte ahora · /corte 5000 retira eso\n"
+    "/nocorte — hoy no hay corte\n"
+    "/estado — qué hay en caja\n"
+    "/retiro 500 gasolina — sacar del cajón, con su motivo\n"
+    "/entrada 1750 papá — dinero que entró sin ser venta\n"
+    "\n💰 PAGOS\n"
+    "/pagos — a quién le toca cobrar y cuánto\n"
+    "/pagar Fanny — el desglose; con «si» al final se paga\n"
+    "/mipago — tu pago (no sale del cajón)\n"
+    "\n🏪 LA TIENDA\n"
+    "/hoy · /resumen · /pendientes — cómo va el día\n"
+    "/prenda playera — precio y existencias por talla\n"
+    "/escuela conalep — cómo va una escuela\n"
+    "\n📣 LAS PANTALLAS\n"
+    "/aviso Junta a las 6 — sale a pantalla completa\n"
+    "Una foto mandada aquí también sale a pantalla completa\n"
+    "\nTodos los comandos, con sus variantes: /ayuda todo"
 )
 
 
@@ -354,15 +387,24 @@ def dia_de_argumento(argumento: str, hoy: date) -> date:
     raise ValueError(f"No entendí «{argumento.strip()}» como día. Por ejemplo: /resumen ayer o /resumen 5/11")
 
 
-def _sin_argumento(cmd) -> str:
-    """Un aviso corto cuando se le pone algo a un comando que no lleva nada.
+def _sin_argumento(cmd, texto: str) -> str:
+    """`texto` con un aviso corto al final si al comando se le puso algo que
+    no lleva.
 
     Antes «/contar Playera» o «/pagos Fanny» tragaban el argumento en
     silencio y contestaban lo de siempre: parecía que sí lo habían tomado en
-    cuenta (2026-10-10)."""
+    cuenta (2026-10-10). El aviso iba ARRIBA; desde el formato común
+    (2026-11-20) la primera línea es el encabezado y el aviso va de pie."""
     if not (cmd.argumento or "").strip():
-        return ""
-    return f"(/{cmd.nombre} no lleva nada después; «{cmd.argumento.strip()}» no se usó)\n\n"
+        return texto
+    return f"{texto}\n\n(/{cmd.nombre} no lleva nada después; «{cmd.argumento.strip()}» no se usó)"
+
+
+def _sin_pendientes(hoy: date | None = None) -> str:
+    """«📝 PENDIENTES · vie 20 nov» + «✅ Sin pendientes.» (formato común, 2026-11-20)."""
+    from pos_uniformes.services.telegram_formato import encabezado
+
+    return encabezado("📝", "Pendientes", hoy or date.today()) + "\n✅ Sin pendientes."
 
 
 def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> str:
@@ -373,6 +415,8 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
         # ayuda completa cada vez (2026-10-10). Una línea basta.
         return "No entendí. Para ver qué puedo hacer: /menu (botones) o /ayuda."
     if cmd.nombre in ("ayuda", "help", "start"):
+        if (cmd.argumento or "").strip().lower() in ("todo", "todos", "completa", "toda"):
+            return AYUDA_COMPLETA
         return AYUDA
     if cmd.nombre == "corte":
         from pos_uniformes.services.corte_remoto_service import hacer_corte_y_avisar
@@ -388,11 +432,15 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
                 fondo=opciones.fondo, otros=opciones.otros, nota=opciones.nota,
             )
         mensaje = hecho.mensaje
-        if hecho.hecho:
-            _retirar_propuesta_del_corte()
         # El aviso va DESPUÉS y no cancela nada: el corte ya se hizo y hay que
         # decir lo que se guardó, no tragárselo.
-        return mensaje + ("\n\n⚠️ " + opciones.aviso if opciones.aviso else "")
+        mensaje += ("\n\n⚠️ " + opciones.aviso if opciones.aviso else "")
+        if hecho.hecho:
+            _retirar_propuesta_del_corte()
+            # Marca para el bucle: solo esto se conserva como registro del
+            # día; un error de /corte va a la pantalla (2026-11-20).
+            return CorteHecho(mensaje)
+        return mensaje
     if cmd.nombre in ("actualizar", "actualiza"):
         from pos_uniformes.services import telegram_actualizar_service as tact
 
@@ -419,15 +467,21 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
                     f"«{cmd.argumento.strip()}» no lo entiendo. No cancelé nada.\n"
                     "Si es el de hoy: /nocorte (solo).")
 
+        from pos_uniformes.services.telegram_formato import mensaje
+
+        # Formato común (2026-11-20). /corte se queda escrito: el corte lleva
+        # cantidad y motivo, y a propósito no tiene botón en el menú.
         if cancelar(hoy):
-            return "Ok, hoy no se hace el corte. Cuando quieras, /corte."
-        return ("Anotado: hoy no se hace el corte, ni te lo propongo ni lo cierro solo. "
-                "Cuando quieras, /corte.")
+            principal = "Ok, hoy no se hace el corte."
+        else:
+            principal = "Anotado: hoy no se hace el corte, ni te lo propongo ni lo cierro solo."
+        return mensaje("🧾", "Sin corte hoy", cuando=hoy or date.today(),
+                       principal=principal, pie="Cuando quieras, /corte.")
     if cmd.nombre == "estado":
         from pos_uniformes.services.corte_remoto_service import texto_estado_actual
 
         with session_factory() as session:
-            return _sin_argumento(cmd) + texto_estado_actual(session)
+            return _sin_argumento(cmd, texto_estado_actual(session))
     if cmd.nombre == "resumen":
         from pos_uniformes.services.resumen_diario_service import formatear, recolectar
 
@@ -463,20 +517,20 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
                 linea = comp.texto(comp.comparar(session, hoy))
             except Exception:  # noqa: BLE001 — el día sale igual sin comparación
                 linea = ""
-            return _sin_argumento(cmd) + texto + (f"\n\n{linea}" if linea else "")
+            return _sin_argumento(cmd, texto + (f"\n\n{linea}" if linea else ""))
     if cmd.nombre in ("pulso", "pulse", "todo"):
         from pos_uniformes.services.telegram_pulso_service import pulso
 
         with session_factory() as session:
-            return _sin_argumento(cmd) + pulso(session, hoy=hoy)
+            return _sin_argumento(cmd, pulso(session, hoy=hoy))
     if cmd.nombre == "pendientes":
         from pos_uniformes.services.resumen_diario_service import texto_solo_pendientes
 
         with session_factory() as session:
-            return _sin_argumento(cmd) + (texto_solo_pendientes(session, hoy) or "Sin pendientes. ✅")
+            return _sin_argumento(cmd, texto_solo_pendientes(session, hoy) or _sin_pendientes(hoy))
     if cmd.nombre == "asistencia":
         with session_factory() as session:
-            return _sin_argumento(cmd) + mensaje_asistencia(session, hoy)[0]
+            return _sin_argumento(cmd, mensaje_asistencia(session, hoy)[0])
     if cmd.nombre in ("menu", "menú"):
         from pos_uniformes.services import telegram_menu_service as menu
 
@@ -532,15 +586,20 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
     if cmd.nombre in ("sonidos", "sonido"):
         from pos_uniformes.services import sonidos_service as sn
 
+        from pos_uniformes.services.telegram_formato import mensaje
+
         nombres = sn.nombres()
         if not nombres:
-            return (
-                "No hay sonidos todavía.\n\n"
-                "Se ponen como archivos .wav en pos_uniformes\\assets\\sonidos "
-                "y entran a los kioskos con actualizar_pc_principal.bat."
+            return mensaje(
+                "🔊", "Sonidos", principal="No hay sonidos todavía.",
+                detalle="Se ponen como archivos .wav en pos_uniformes\\assets\\sonidos "
+                        "y entran a los kioskos con actualizar_pc_principal.bat.",
             )
-        lista = "\n".join(f"· sonido={n}" for n in nombres)
-        return f"🔊 Sonidos que puedo poner en un aviso:\n\n{lista}\n\nEjemplo:\n/aviso sonido={nombres[0]} 🤡 Te veo..."
+        return mensaje(
+            "🔊", "Sonidos", principal="Los que puedo poner en un aviso:",
+            detalle=[f"· sonido={n}" for n in nombres],
+            pie=f"Ejemplo:\n/aviso sonido={nombres[0]} 🤡 Te veo...",
+        )
     if cmd.nombre == "descansos":
         from pos_uniformes.services import telegram_descansos_service as dsc
 
@@ -577,7 +636,7 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
         from pos_uniformes.services import telegram_pagos_service as pg
 
         with session_factory() as session:
-            return _sin_argumento(cmd) + pg.pagos(session, hoy=hoy)
+            return _sin_argumento(cmd, pg.pagos(session, hoy=hoy))
     if cmd.nombre == "pagar":
         from pos_uniformes.services import telegram_pagos_service as pg
 
@@ -623,7 +682,7 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
         from pos_uniformes.services import telegram_inventario_service as inv
 
         with session_factory() as session:
-            return _sin_argumento(cmd) + inv.contar(session)
+            return _sin_argumento(cmd, inv.contar(session))
     if cmd.nombre == "escuela":
         from pos_uniformes.services import telegram_inventario_service as inv
 
@@ -672,7 +731,7 @@ def comandos_conocidos() -> list[str]:
     dos listas) más los que se atienden y no se anuncian."""
     import re
 
-    nombres = set(re.findall(r"/([a-záéíóúñ_]+)", AYUDA))
+    nombres = set(re.findall(r"/([a-záéíóúñ_]+)", AYUDA_COMPLETA))
     nombres |= {"ayuda", "menu", "asistencia", "vino", "falta", "descanso", "version", "volver", "camaras"}
     nombres |= {"mipago", "mepagaron", "deshacermipago", "diasdemas"}
     return sorted(nombres)
@@ -774,10 +833,13 @@ def _receso(session, argumento: str, *, hoy: date | None = None) -> str:
         return "No tienes receso apuntado. Así: /receso 2026-10-27 2026-11-04"
     hoy = hoy or date.today()
     estado = "ya pasó" if dias[-1] < hoy else ("va corriendo" if dias[0] <= hoy else f"empieza en {(dias[0] - hoy).days} días")
-    return (
-        f"🏖️ Tu receso: del {dias[0]:%d/%m/%Y} al {dias[-1]:%d/%m/%Y} ({len(dias)} días, {estado}).\n"
-        "Esos días tu martes no ocupa el cupo de las muchachas y el calendario lo dice.\n"
-        "/receso quitar lo borra."
+    from pos_uniformes.services.telegram_formato import mensaje
+
+    return mensaje(
+        "🏖️", "Tu receso",
+        principal=f"Del {dias[0]:%d/%m/%Y} al {dias[-1]:%d/%m/%Y} ({len(dias)} días, {estado}).",
+        detalle="Esos días tu martes no ocupa el cupo de las muchachas y el calendario lo dice.",
+        pie="/receso quitar lo borra.",
     )
 
 
@@ -813,6 +875,15 @@ def responder(texto: str, *, session_factory, hoy: date | None = None) -> tuple[
                 if mp.es_el_dueno(cmd.argumento, session=session):
                     # Con botones: si quedó día de más, Págamelo / Guárdamelo.
                     return mp.marcar_dueno(session, cmd.nombre, hoy=hoy)
+    if cmd is not None and cmd.nombre in ("ayuda", "help", "start"):
+        # La ayuda corta lleva debajo los botones del tablero: lo que dice
+        # «está en /menu» se toca ahí mismo (formato común, 2026-11-20).
+        texto_ayuda = atender_texto(texto, session_factory=session_factory, hoy=hoy)
+        if texto_ayuda == AYUDA:
+            from pos_uniformes.services import telegram_menu_service as menu
+
+            return texto_ayuda, menu.botones_raiz()
+        return texto_ayuda, ""
     destino = _CON_BOTONES.get(cmd.nombre) if cmd is not None else None
     if destino is not None and cmd.nombre in ("vacaciones", "primas") and _vacaciones_en_obra():
         destino = None
@@ -1030,36 +1101,22 @@ def _guardar_offset(offset: int | None) -> None:
 
 #: Lo que sale al teclear «/» en Telegram (setMyCommands). Lo más usado
 #: arriba. Sin esto había que saberse los nombres (auditoría 2026-11-07).
+#: Eran 29 y no se leían; quedan los 12 de diario (Daniel, 2026-11-20). Los
+#: demás siguen funcionando escritos, salen en «/ayuda todo» y casi todos
+#: están en /menu.
 COMANDOS_MENU: tuple[tuple[str, str], ...] = (
     ("menu", "Todo con botones"),
-    ("corte", "Hacer el corte ahora (/corte 5000 retira eso)"),
-    ("nocorte", "Dejar pasar el corte de hoy"),
     ("hoy", "Cómo va el día"),
     ("estado", "Qué hay en caja ahora"),
-    ("pulso", "¿Está todo en pie?"),
+    ("corte", "Hacer el corte ahora (/corte 5000 retira eso)"),
+    ("nocorte", "Dejar pasar el corte de hoy"),
     ("resumen", "Resumen del día (/resumen ayer)"),
-    ("pendientes", "Lo que falta por registrar"),
-    ("cortes", "Los últimos cortes (/cortes 30)"),
-    ("retiro", "Sacar del cajón: /retiro 500 gasolina"),
-    ("entrada", "Dinero que entró sin ser venta"),
-    ("deshacer", "Deshacer el último retiro o entrada de hoy"),
-    ("cajon", "Lo que no salió del cajón"),
     ("pagos", "A quién le toca cobrar"),
-    ("pagar", "Pagarle a alguien: /pagar Fanny"),
-    ("deshacerpago", "Deshacer el último pago de hoy"),
     ("mipago", "Tu pago: cuál toca y cuánto (no sale del cajón)"),
-    ("mepagaron", "Registrar que ya te pagaron"),
-    ("diasdemas", "Tus días de más: págamelo o guárdamelo"),
-    ("prestamos", "Préstamos por aprobar"),
-    ("descansos", "Días que te pidieron"),
-    ("programas", "Clientes propuestos a Profesional o Mayorista"),
+    ("retiro", "Sacar del cajón: /retiro 500 gasolina"),
     ("prenda", "Precio y existencias: /prenda playera"),
-    ("escuela", "Cómo va una escuela"),
-    ("contar", "Qué falta contar"),
-    ("faltas", "Lo que pidieron y no había"),
-    ("aviso", "Aviso a pantalla completa en la tienda"),
-    ("avisos", "Los avisos puestos"),
-    ("ayuda", "Todos los comandos"),
+    ("pendientes", "Lo que falta por registrar"),
+    ("ayuda", "Ayuda corta (/ayuda todo: todos los comandos)"),
 )
 
 
@@ -1101,6 +1158,14 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
     def _mandar(texto: str, botones: str = "") -> None:
         # Alertas, cortes y avisos del vigilante: se quedan en el chat. Lo que
         # se barre a las 24 h son las respuestas a comandos y el ruido.
+        if _es_propuesta_del_corte(texto, botones) and len(texto) <= telegram_service._MAX:
+            # La propuesta (o su recordatorio) que la tarea dejó en la cola
+            # sin token: su id se apunta para poder quitarla (revisión 2026-11-20).
+            mid = telegram_service.enviar_y_dar_id(
+                texto, token=token, chat_id=chat_id, botones=botones or None, conservar=True
+            )
+            _adoptar_propuesta(mid)
+            return
         telegram_service.enviar_mensaje(
             texto, token=token, chat_id=chat_id, botones=botones or None, conservar=True
         )
@@ -1268,12 +1333,13 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
                     telegram_service.enviar_mensaje(
                         respuesta, token=token, chat_id=chat_id, botones=botones or None
                     )
-                elif _es_comando_de_corte(texto):
+                elif _conservar_respuesta(texto, respuesta):
                     # El corte es el registro del día: se conserva hasta el
-                    # día siguiente y no lo pisa la siguiente consulta.
-                    telegram_service.enviar_mensaje(
-                        respuesta, token=token, chat_id=chat_id,
-                        botones=botones or None, conservar=True,
+                    # día siguiente y no lo pisa la siguiente consulta. Solo
+                    # si se hizo; los errores van a la pantalla (2026-11-20).
+                    _mandar_corte_hecho(
+                        respuesta, botones, token=token, chat_id=chat_id,
+                        session_factory=session_factory,
                     )
                     _quitar_comando(msg, token=token, chat_id=chat_id)
                 else:
@@ -1446,7 +1512,10 @@ class _Conflicto:
         if self.avisado or ahora - self.desde < self.SEGUNDOS:
             return ""
         self.avisado = True
-        return ("⚠️ Hay otro bot usando mi token (¿uno abierto en otra PC o en la Mac?).\n"
+        from pos_uniformes.services.telegram_formato import encabezado
+
+        return (encabezado("⚠️", "Otro bot con mi token", datetime.fromtimestamp(ahora), hora=True) + "\n"
+                "Hay otro bot usando mi token (¿uno abierto en otra PC o en la Mac?).\n"
                 "Mientras siga así, tus comandos y botones le llegan a él y no a mí. Ciérralo.")
 
     def listo(self) -> None:
@@ -1500,7 +1569,10 @@ def _atender_toque(toque: dict, *, session_factory, token: str, chat_id: str) ->
         # (auditoría 2026-11-07, #27). El mensaje tocado no se toca: sus
         # botones siguen ahí para intentarlo otra vez.
         try:
-            _mandar(f"⚠️ Ese botón no se pudo hacer.\n{resultado[0]}\n\nNo cambió nada; inténtalo otra vez en un rato.")
+            from pos_uniformes.services.telegram_formato import encabezado
+
+            _mandar(encabezado("⚠️", "Botón sin hacer", datetime.now(), hora=True)
+                    + f"\nEse botón no se pudo hacer.\n{resultado[0]}\n\nNo cambió nada; inténtalo otra vez en un rato.")
         except Exception as exc:  # noqa: BLE001
             logger.warning("No se pudo avisar del botón fallido: %s", exc)
     if resultado and resultado[1] and msg.get("message_id") is not None:
@@ -1508,7 +1580,10 @@ def _atender_toque(toque: dict, *, session_factory, token: str, chat_id: str) ->
         try:
             from pos_uniformes.services import telegram_limpieza_service as limpieza
 
-            es_el_menu = tocado == limpieza.menu_fijado()
+            # Sin poder leer la lista no se sabe: se trata como el menú, que
+            # así no se reescribe ni se borra (2026-11-20).
+            es_el_menu = (limpieza.estado_o_none() is None
+                          or tocado == limpieza.menu_fijado())
         except Exception:  # noqa: BLE001
             es_el_menu = False
         # «💵 Ya me pagaron» de un /mipago de ayer: la pregunta editada sobre
@@ -1542,9 +1617,73 @@ def _atender_toque(toque: dict, *, session_factory, token: str, chat_id: str) ->
             logger.warning("No se pudo actualizar la lista: %s", exc)
 
 
+#: Encabezados de la propuesta del corte y de su recordatorio.
+_ENCABEZADOS_DE_PROPUESTA = ("🧾 ¿HACEMOS EL CORTE?", "⏰ SIGUE PENDIENTE EL CORTE")
+
+
+def _es_propuesta_del_corte(texto: str, botones: str = "") -> bool:
+    return bool(botones) and "cc:" in str(botones) and str(texto or "").lstrip().startswith(
+        _ENCABEZADOS_DE_PROPUESTA
+    )
+
+
+def _adoptar_propuesta(mid: int) -> None:
+    try:
+        from pos_uniformes.services import corte_propuesta_service as cps
+
+        cps.adoptar_mensaje(mid)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("No se pudo apuntar la propuesta del corte: %s", exc)
+
+
 def _es_comando_de_corte(texto: str) -> bool:
     cmd = parsear(texto or "")
     return cmd is not None and cmd.nombre == "corte"
+
+
+class CorteHecho(str):
+    """La respuesta de un /corte que SÍ se hizo (2026-11-20). Es un texto
+    como cualquier otro; el bucle la reconoce para conservarla."""
+
+
+def _conservar_respuesta(texto: str, respuesta) -> bool:
+    """¿La respuesta es el registro de un corte hecho? Solo eso se conserva;
+    «No hay tanto en el cajón», «ya hay corte» o un error van a la pantalla."""
+    return _es_comando_de_corte(texto) and isinstance(respuesta, CorteHecho)
+
+
+def _mandar_corte_hecho(texto: str, botones: str = "", *, token: str, chat_id: str,
+                        session_factory=None) -> None:
+    """Manda el corte hecho y lo conserva. Si no sale, a la cola: un corte
+    hecho nunca se queda sin aviso en el chat (2026-11-20)."""
+    from pos_uniformes.services import telegram_service
+
+    try:
+        telegram_service.enviar_mensaje(
+            texto, token=token, chat_id=chat_id, botones=botones or None, conservar=True,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("No se pudo mandar el corte: %s", exc)
+        if not telegram_service._ya_se_mando(exc):
+            _encolar_aviso_del_corte(texto, session_factory=session_factory)
+
+
+def _encolar_aviso_del_corte(texto: str, *, session_factory=None) -> bool:
+    """Deja el aviso del corte en la cola de alertas; el bot lo manda cuando
+    vuelva la red y, al mandarlo, quita la propuesta (2026-11-20)."""
+    try:
+        from pos_uniformes.services import alertas_service
+
+        if session_factory is None:
+            from pos_uniformes.database.connection import get_session as session_factory
+        with session_factory() as session:
+            if alertas_service.encolar(session, str(texto)):
+                return True
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Corte hecho sin aviso en el chat (tampoco se encoló): %s", exc)
+        return False
+    logger.error("Corte hecho sin aviso en el chat (no se pudo encolar).")
+    return False
 
 
 def _retirar_propuesta_del_corte(*, salvo: int = 0) -> None:
@@ -1580,19 +1719,44 @@ def _corte_hecho_en_un_mensaje(tocado: int, texto: str, *, es_el_menu: bool,
             telegram_service.editar_mensaje(tocado, texto, token=token, chat_id=chat_id, botones="")
         except Exception as exc:  # noqa: BLE001
             logger.warning("No se pudo reescribir la propuesta del corte: %s", exc)
+            if not telegram_service._ya_se_mando(exc):
+                # Sin aviso en el chat: a la cola; al salir quita la propuesta.
+                _encolar_aviso_del_corte(texto)
+            return
+        # Ya es el registro del corte, no la propuesta: un segundo corte no
+        # debe borrarlo (2026-11-20).
+        _retirar_propuesta_del_corte(salvo=tocado)
         return
     try:
         telegram_service.enviar_mensaje(texto, token=token, chat_id=chat_id, conservar=True)
     except Exception as exc:  # noqa: BLE001
-        # Sin red: al menos el mensaje tocado dice el resultado.
         logger.warning("No se pudo mandar el corte: %s", exc)
-        if not es_el_menu:
+        if not telegram_service._ya_se_mando(exc):
+            # Sin red: al menos el mensaje tocado dice el resultado, y deja
+            # de ser la pantalla (la siguiente consulta lo pisaba) y se
+            # conserva. Si ni eso, a la cola (2026-11-20).
+            mostrado = False
+            if not es_el_menu:
+                try:
+                    telegram_service.editar_mensaje(tocado, texto, token=token, chat_id=chat_id, botones="")
+                    mostrado = True
+                except Exception:  # noqa: BLE001
+                    pass
+            if not mostrado:
+                _encolar_aviso_del_corte(texto)
+                return
             try:
-                telegram_service.editar_mensaje(tocado, texto, token=token, chat_id=chat_id, botones="")
+                if limpieza.pantalla()[0] == tocado:
+                    limpieza.recordar_pantalla(0, "")
+                limpieza.conservar(tocado)
             except Exception:  # noqa: BLE001
                 pass
-        return
-    _retirar_propuesta_del_corte()
+            # `salvo`: el tocado ya ES el registro del corte; si era una
+            # propuesta vieja no se debe borrar (revisión 2026-11-20).
+            _retirar_propuesta_del_corte(salvo=tocado)
+            return
+        # Tardó la respuesta pero el corte ya salió: se sigue como si nada.
+    _retirar_propuesta_del_corte(salvo=tocado)
     if es_el_menu:
         return
     motivo = telegram_service.borrar_con_motivo(tocado, token=token, chat_id=chat_id)
@@ -1627,7 +1791,15 @@ def asegurar_menu_fijado(*, session_factory, token: str, chat_id: str) -> int:
     except Exception:  # noqa: BLE001 — sin base, el menú sin el día puesto
         texto, botones = menu.menu_raiz()
 
-    fijado = limpieza.menu_fijado()
+    estado = limpieza.estado_o_none()
+    if estado is None:
+        # No se pudo leer la lista: con «0» se mandaba un menú nuevo en cada
+        # vuelta, fijado y sin apuntar (2026-11-20). Se espera a la próxima.
+        logger.info("Menú fijado: no se pudo leer la lista; no se toca")
+        return 0
+    # Del MISMO estado leído: otra lectura que fallara daría 0 y saldría un
+    # menú nuevo con el viejo fijado para siempre (revisión 2026-11-20).
+    fijado = int(estado.get("menu_id") or 0)
     huerfano = 0
     if fijado:
         # Si no cambió una letra, no se toca. Telegram contesta «message is
@@ -1637,7 +1809,7 @@ def asegurar_menu_fijado(*, session_factory, token: str, chat_id: str) -> int:
         import hashlib
 
         huella = hashlib.sha1(texto.encode("utf-8")).hexdigest()[:16]
-        if huella == limpieza.huella_del_menu():
+        if huella == str(estado.get("menu_huella") or ""):
             limpieza.anotar_menu_refrescado()
             return fijado
         try:
@@ -1648,6 +1820,10 @@ def asegurar_menu_fijado(*, session_factory, token: str, chat_id: str) -> int:
             limpieza.anotar_huella_del_menu(texto)
             return fijado
         except Exception as exc:  # noqa: BLE001
+            if telegram_service.es_limite_de_velocidad(exc):
+                # 429: el menú sigue bien; mandar otro borraba el bueno (2026-11-20).
+                logger.info("Menú fijado: Telegram pidió esperar (%s)", exc)
+                return fijado
             if not telegram_service.es_respuesta_de_telegram(exc):
                 # Sin red (o se tardó la respuesta): NO se manda otro. Antes
                 # se mandaba uno nuevo y el viejo se quedaba fijado para
@@ -1673,7 +1849,13 @@ def asegurar_menu_fijado(*, session_factory, token: str, chat_id: str) -> int:
         logger.warning("No se pudo mandar el menú: %s", exc)
         return 0
     if mid:
-        limpieza.recordar_menu(mid)
+        if not limpieza.recordar_menu(mid):
+            # No quedó apuntado: se quita antes de fijarlo, o se quedaría
+            # fijado para siempre sin que nadie lo retire (2026-11-20).
+            telegram_service.borrar_con_motivo(mid, token=token, chat_id=chat_id)
+            return 0
+        # Quedó abajo de la pantalla de trabajo: ya no se ve al editarla.
+        limpieza.tapar_pantalla(mid)
         limpieza.anotar_menu_refrescado()
         limpieza.anotar_huella_del_menu(texto)
         telegram_service.fijar_mensaje(mid, token=token, chat_id=chat_id)
@@ -1713,10 +1895,14 @@ def limpiar_si_toca(*, session_factory, token: str, chat_id: str, ahora=None) ->
         borrar=lambda mid: telegram_service.borrar_con_motivo(mid, token=token, chat_id=chat_id),
         ahora=ahora,
     )
-    if not limpieza.toca_limpiar(ahora):
+    # Sin poder leer la lista no se decide nada: con la lista vacía «tocaba»
+    # y el menú viejo salía 0 (nunca se retiraba; 2026-11-20).
+    estado = limpieza.estado_o_none()
+    if estado is None or not limpieza.toca_limpiar(ahora):
         return borrados
-    viejo = limpieza.menu_fijado()
-    limpieza.recordar_menu(0)                 # que asegurar_menu_fijado mande uno nuevo
+    viejo = int(estado.get("menu_id") or 0)
+    if not limpieza.recordar_menu(0):         # que asegurar_menu_fijado mande uno nuevo
+        return borrados
     nuevo = asegurar_menu_fijado(session_factory=session_factory, token=token, chat_id=chat_id)
     if not nuevo:
         limpieza.recordar_menu(viejo)         # sin red: se queda el de ayer

@@ -35,7 +35,10 @@ class ImpresionAtoradaTests(unittest.TestCase):
         self.assertIn("No está saliendo el papel", primero[0])
         self.assertIn("1 etiqueta, 1 ticket", primero[0])
         self.assertEqual(self._revisar(v, [_trabajo(5, 10), _trabajo(7, 30)]), [])     # mismo atorón
-        self.assertEqual(self._revisar(v, []), ["✅ Ya salió lo que estaba atorado en la cola de impresión."])
+        destapado = self._revisar(v, [])
+        self.assertEqual(len(destapado), 1)
+        self.assertTrue(destapado[0].startswith("✅ IMPRESIÓN · "))   # formato común (2026-11-20)
+        self.assertIn("Ya salió lo que estaba atorado en la cola de impresión.", destapado[0])
         self.assertEqual(self._revisar(v, []), [])
 
     def test_lo_avisado_sobrevive_al_reinicio(self):

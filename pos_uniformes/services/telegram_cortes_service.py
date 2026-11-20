@@ -17,6 +17,8 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from pos_uniformes.services.telegram_formato import cifra, encabezado
+
 _CENT = Decimal("0.01")
 
 #: Cuántos cortes caben en un mensaje de celular sin volverse un muro.
@@ -216,13 +218,16 @@ def _renglones_de_corte(c: "CorteFila", dias_abrev) -> list[str]:
 
 def texto(filas: list[CorteFila], *, dias: int = 14, salidas: SalidasPeriodo | None = None) -> str:
     """Los cortes como se leen en el celular."""
+    # Formato común del bot (2026-11-20): «🧾 CORTES · 14 DÍAS» de encabezado,
+    # también cuando no hay ninguno (la pantalla lleva botones igual).
+    cabeza = encabezado("🧾", f"Cortes · {dias_en_letra(dias)}")
     if not filas:
         if int(dias) == 1:
-            return "No hay cortes en el último día."
-        return f"No hay cortes en los últimos {dias_en_letra(dias)}."
+            return cabeza + "\n" + "No hay cortes en el último día."
+        return cabeza + "\n" + f"No hay cortes en los últimos {dias_en_letra(dias)}."
 
     _DIAS = ("lun", "mar", "mié", "jue", "vie", "sáb", "dom")
-    lineas = [f"🧾 Cortes · {dias_en_letra(dias)}", ""]
+    lineas = [cabeza, ""]
     for c in filas:
         lineas += _renglones_de_corte(c, _DIAS)
 
@@ -414,10 +419,11 @@ def texto_y_botones(session: Session, *, dias: int = 14, argumento: str = "") ->
     ]
     botones.append([("‹ Menú", "m:raiz")])
     cuerpo = texto(filas, dias=dias, salidas=salidas_del_periodo(session, dias=dias))
-    return (
-        (f"⚠️ {aviso}\n\n" + cuerpo) if aviso else cuerpo,
-        _teclado(botones),
-    )
+    if aviso:
+        # El aviso va DEBAJO del encabezado, no encima (formato común, 2026-11-20).
+        cabeza, _, resto = cuerpo.partition("\n")
+        cuerpo = f"{cabeza}\n⚠️ {aviso}\n" + resto
+    return cuerpo, _teclado(botones)
 
 
 def detalle(session: Session, corte_id: int) -> tuple[str, list]:
@@ -432,9 +438,11 @@ def detalle(session: Session, corte_id: int) -> tuple[str, list]:
 
     oficial = venta_oficial(corte)
     real = venta_real(corte)
+    # Formato común del bot (2026-11-20): encabezado con el número y el día
+    # del corte, y la cifra del ticket como principal.
     lineas = [
-        f"🧾 Corte del {corte.fecha:%d/%m/%Y}",
-        f"Lo que dice el ticket: ${oficial:,.2f}",
+        encabezado("🧾", f"Corte {corte.id}", corte.fecha),
+        cifra(oficial, "dice el ticket"),
     ]
     if real is not None and real != oficial:
         lineas.append(f"Lo que de verdad se vendió: ${real:,.2f}")
@@ -443,6 +451,8 @@ def detalle(session: Session, corte_id: int) -> tuple[str, list]:
     entro = Decimal(str(getattr(corte, "entradas_periodo", 0) or 0))
     if entro:
         lineas.append(f"Entró sin ser venta (fondo de papá…): ${entro:,.2f} — no cuenta como venta")
+    if len(lineas) > 2:
+        lineas.insert(2, "")       # el detalle va separado de la cifra
     lineas.append("")
     lineas.append(f"Para cambiar la cifra:\n/ajustar {corte.id} 12500 depósito al banco si")
 
@@ -581,9 +591,11 @@ def esconder_tarjetas(session: Session, argumento: str, *, quien: str) -> str:
             f"El corte {corte.id} ({corte.fecha:%d/%m}) no tiene cobros con tarjeta "
             "visibles: o no hubo, o ya estaban escondidos."
         )
+    # Formato común del bot (2026-11-20).
     return (
+        encabezado("🔒", f"Tarjetas escondidas · corte {corte.id}", corte.fecha) + "\n"
         f"✅ Escondí {cuantos} cobro(s) con tarjeta del corte {corte.id} "
-        f"({corte.fecha:%d/%m}).\n"
+        f"({corte.fecha:%d/%m}).\n\n"
         "El ticket que ya se imprimió no cambia; esto es para lo que se ve de aquí "
         "en adelante."
     )
@@ -616,7 +628,9 @@ def mostrar_tarjetas(session: Session, argumento: str, *, quien: str) -> str:
             f"El corte {corte.id} ({corte.fecha:%d/%m}) no tiene cobros con tarjeta "
             "escondidos: o no hubo, o ya estaban a la vista."
         )
+    # Formato común del bot (2026-11-20).
     return (
+        encabezado("💳", f"Tarjetas a la vista · corte {corte.id}", corte.fecha) + "\n"
         f"✅ Destapé {cuantos} cobro(s) con tarjeta del corte {corte.id} "
         f"({corte.fecha:%d/%m}). Ya se ven en /cortes y en la Libreta."
     )
@@ -665,13 +679,17 @@ def ajustar(session: Session, argumento: str, *, quien: str) -> str:
         antes = r.get("venta_antes")
         de = f" de ${antes:,.2f}" if antes is not None else ""
         cuando = f" (del {corte.fecha:%d/%m})" if corte is not None else ""
+        # Formato común del bot (2026-11-20). Ojo: aquí `cifra` es la cantidad
+        # pedida, no la función de telegram_formato.
         return (
+            encabezado("✏️", f"Ajustar el corte {corte_id}", corte.fecha if corte is not None else None)
+            + "\n"
             f"¿Cambio el corte {corte_id}{cuando}{de} a ${cifra:,.2f}?"
             + (f"\nPor qué: {nota}" if nota else "")
             + f"\n\nPara hacerlo, manda lo mismo con «si» al final:\n/ajustar {corte_id} {partes[1]}"
             + (f" {nota}" if nota else "") + " si"
         )
     session.commit()
-    return f"✅ El corte {corte_id} ahora dice ${cifra:,.2f}." + (
+    return encabezado("✅", f"Corte {corte_id} ajustado") + "\n" + f"El corte {corte_id} ahora dice ${cifra:,.2f}." + (
         f"\nPor qué: {nota}" if nota else ""
     )

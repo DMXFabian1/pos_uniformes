@@ -7,6 +7,10 @@ actualizador por Telegram (`scripts/actualizar.py`), salga bien o mal.
 
 Las dos que cambian algo piden «si»: un toque de más en el menú no debe
 actualizar la tienda a media venta.
+
+Formato común del bot (2026-11-20): cada respuesta abre con su encabezado
+(`telegram_formato`). Los «/actualizar si» y «/volver si» se quedan escritos:
+no hay botón con su manejador para eso, y el «si» escrito es justo el freno.
 """
 
 from __future__ import annotations
@@ -15,7 +19,10 @@ import logging
 import subprocess
 import sys
 import time
+from datetime import datetime
 from pathlib import Path
+
+from pos_uniformes.services.telegram_formato import encabezado, mensaje
 
 logger = logging.getLogger(__name__)
 
@@ -85,13 +92,17 @@ def atender_actualizar(argumento: str, *, es_windows: bool | None = None,
     if pedido.startswith("noche"):
         return atender_noche(pedido[len("noche"):].strip(), es_windows=es_windows)
     if pedido not in ("si", "sí"):
-        return (
-            f"{como_esta}\n\n"
-            "Para traer lo nuevo y actualizar la tienda: /actualizar si\n"
-            "Hace respaldo antes de tocar la base y, si algo falla, deja todo como estaba. "
-            "Tarda unos minutos; te aviso cómo terminó.\n\n"
-            "Para que se actualice sola cada noche a las 19:30: /actualizar noche "
-            "(y /actualizar noche no para quitarlo)."
+        return mensaje(
+            "🔄", "Actualizar la tienda", principal=como_esta,
+            detalle=[
+                "Para traer lo nuevo y actualizar la tienda: /actualizar si",
+                "Hace respaldo antes de tocar la base y, si algo falla, deja todo como estaba. "
+                "Tarda unos minutos; te aviso cómo terminó.",
+            ],
+            pie=(
+                "Para que se actualice sola cada noche a las 19:30: /actualizar noche "
+                "(y /actualizar noche no para quitarlo)."
+            ),
         )
     if not es_windows:
         return "Esto solo se puede hacer desde el bot de la PC principal de la tienda."
@@ -104,10 +115,12 @@ def atender_actualizar(argumento: str, *, es_windows: bool | None = None,
         quitar_candado()
         logger.exception("No se pudo arrancar la actualización")
         return f"🛑 No se pudo arrancar la actualización: {exc}"
-    return (
-        "🔄 Actualizando la tienda: trae lo nuevo, hace el build, respalda, migra y publica "
-        "a los kioskos.\n\nTarda unos minutos. Te aviso cómo terminó, salga bien o mal. "
-        "(Yo mismo me reinicio al final.)"
+    return mensaje(
+        "🔄", "Actualizando", cuando=datetime.now().astimezone(), hora=True,
+        principal="Actualizando la tienda: trae lo nuevo, hace el build, respalda, migra y "
+                  "publica a los kioskos.",
+        pie="Tarda unos minutos. Te aviso cómo terminó, salga bien o mal. "
+            "(Yo mismo me reinicio al final.)",
     )
 
 
@@ -127,21 +140,28 @@ def atender_noche(argumento: str, *, es_windows: bool | None = None,
         if not existe(tarea.nombre):
             return "La actualización de noche ya estaba apagada."
         if borrar(tarea.nombre):
-            return "Listo: la tienda ya no se actualiza sola. Sigue /actualizar si cuando quieras."
+            return mensaje(
+                "🌙", "Actualización de noche",
+                principal="Listo: la tienda ya no se actualiza sola.",
+                pie="Sigue /actualizar si cuando quieras.",
+            )
         return "🛑 No se pudo quitar la tarea «POS Actualizar». Revísalo en la tienda."
     if crear(tarea):
-        return (
-            "🌙 Listo: la tienda se actualiza sola todos los días a las 19:30, si hay algo nuevo. "
-            "Hace respaldo antes de tocar la base y, si algo falla, deja todo como estaba. "
-            "Te aviso cada vez que actualice o que falle; si no había nada nuevo, no molesto.\n\n"
-            "La PC principal tiene que estar encendida a esa hora. Para quitarlo: /actualizar noche no"
+        return mensaje(
+            "🌙", "Actualización de noche",
+            principal="Listo: la tienda se actualiza sola todos los días a las 19:30, si hay algo nuevo.",
+            detalle=(
+                "Hace respaldo antes de tocar la base y, si algo falla, deja todo como estaba. "
+                "Te aviso cada vez que actualice o que falle; si no había nada nuevo, no molesto."
+            ),
+            pie="La PC principal tiene que estar encendida a esa hora. Para quitarlo: /actualizar noche no",
         )
     return "🛑 No se pudo crear la tarea «POS Actualizar». Revísalo en la tienda."
 
 
 def atender_version(*, estado=None) -> str:
     try:
-        return (estado or _estado)()
+        return encabezado("🏷️", "Versión de la tienda") + "\n" + (estado or _estado)()
     except Exception as exc:  # noqa: BLE001
         return f"No pude leer la versión: {exc}"
 
@@ -149,10 +169,14 @@ def atender_version(*, estado=None) -> str:
 def atender_volver(argumento: str, *, volver=None) -> str:
     """`/volver si`: los kioskos regresan a la versión anterior."""
     if (argumento or "").strip().lower() not in ("si", "sí"):
-        return (
-            "Esto regresa los KIOSKOS a la versión anterior (la toman al abrir). La base no "
-            "se regresa y la PC principal se queda como está. Sirve para cuando la versión "
-            "nueva salió mala.\n\nPara hacerlo: /volver si"
+        return mensaje(
+            "⏪", "Volver a la versión anterior",
+            principal="Esto regresa los KIOSKOS a la versión anterior (la toman al abrir).",
+            detalle=(
+                "La base no se regresa y la PC principal se queda como está. Sirve para "
+                "cuando la versión nueva salió mala."
+            ),
+            pie="Para hacerlo: /volver si",
         )
     if volver is None:
         from pos_uniformes.scripts import actualizar as act
@@ -169,4 +193,5 @@ def atender_volver(argumento: str, *, volver=None) -> str:
     except Exception as exc:  # noqa: BLE001
         logger.exception("No se pudo volver a la versión anterior")
         return f"🛑 No se pudo volver a la versión anterior: {exc}"
-    return texto
+    return encabezado("⏪", "Volver a la versión anterior", datetime.now().astimezone(),
+                      hora=True) + "\n" + texto

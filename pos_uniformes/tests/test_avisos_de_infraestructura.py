@@ -30,7 +30,8 @@ class BaseCaidaTests(unittest.TestCase):
         self.assertEqual(len(mandados), 1)
         self.assertIn("Desde las 12:00 no puedo leer la base: connection to server at 192.168.0.10 failed", mandados[0])
         al._vuelta_con_base(mandados.append, t0 + timedelta(minutes=25))
-        self.assertIn("✅ La base volvió (12:25)", mandados[1])
+        self.assertTrue(mandados[1].startswith("✅ BASE · "))     # formato común (2026-11-20)
+        self.assertIn("La base volvió (12:25)", mandados[1])
         al._vuelta_con_base(mandados.append, t0 + timedelta(minutes=26))
         self.assertEqual(len(mandados), 2)
 

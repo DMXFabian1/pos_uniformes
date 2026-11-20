@@ -25,6 +25,20 @@ from pos_uniformes.services import telegram_service
 HOY = date(2026, 11, 20)
 
 
+class _Hoy(date):
+    """Reloj fijo: las pruebas no dependen de la hora real (revisión 2026-11-20)."""
+
+    @classmethod
+    def today(cls):
+        return HOY
+
+
+class _Ahora(datetime):
+    @classmethod
+    def now(cls, tz=None):
+        return datetime(2026, 11, 20, 18, 0, tzinfo=tz)
+
+
 class _ConPropuesta(unittest.TestCase):
     def setUp(self) -> None:
         d = tempfile.TemporaryDirectory()
@@ -32,6 +46,7 @@ class _ConPropuesta(unittest.TestCase):
         for p in (
             patch.object(prop, "ruta_estado", return_value=Path(d.name) / "corte_propuesto.json"),
             patch.object(limpieza, "ruta_estado", return_value=Path(d.name) / "bot_mensajes.json"),
+            patch.object(prop, "date", _Hoy),
         ):
             p.start()
             self.addCleanup(p.stop)
@@ -98,7 +113,7 @@ class RecordatorioReemplazaTests(_ConPropuesta):
         from pos_uniformes.scripts import corte_automatico as script
         from pos_uniformes.services import corte_caja_service, corte_remoto_service
 
-        prop.anotar_propuesta(datetime.now().replace(hour=17, minute=30), message_id=501)
+        prop.anotar_propuesta(datetime(2026, 11, 20, 17, 30), message_id=501)
 
         @contextmanager
         def _sesion():
@@ -108,10 +123,11 @@ class RecordatorioReemplazaTests(_ConPropuesta):
              patch.object(corte_caja_service, "ultimo_corte", return_value=None), \
              patch.object(prop, "toca_recordar", return_value=True), \
              patch.object(corte_remoto_service, "propuesta_de_corte", return_value=("¿Corte?", "{}")), \
+             patch.object(script, "datetime", _Ahora), \
              patch.object(script, "_mandar_y_dar_id", return_value=777) as mandar, \
              patch.object(telegram_service, "borrar_con_motivo", return_value="ok") as borrar:
             self.assertEqual(script._recordar(), 0)
-        self.assertIn("⏰ Sigue pendiente", mandar.call_args.args[0])
+        self.assertIn("⏰ SIGUE PENDIENTE", mandar.call_args.args[0])   # encabezado (2026-11-20)
         borrar.assert_called_once_with(501)
         self.assertEqual(prop.leer().message_id, 777)
         self.assertTrue(prop.leer().recordado)
@@ -147,7 +163,7 @@ class CorteHechoDesdeUnBotonTests(_ConPropuesta):
         return editar, enviar, borrar
 
     def test_en_la_propuesta_se_reescribe_ahi_mismo(self) -> None:
-        prop.anotar_propuesta(datetime.now().replace(hour=17, minute=30), message_id=501)
+        prop.anotar_propuesta(datetime(2026, 11, 20, 17, 30), message_id=501)
         editar, enviar, borrar = self._toque(501)
         editar.assert_called_once()
         self.assertEqual(editar.call_args.args[0], 501)
@@ -156,7 +172,7 @@ class CorteHechoDesdeUnBotonTests(_ConPropuesta):
         borrar.assert_not_called()
 
     def test_desde_la_pantalla_sale_uno_que_se_conserva(self) -> None:
-        prop.anotar_propuesta(datetime.now().replace(hour=17, minute=30), message_id=501)
+        prop.anotar_propuesta(datetime(2026, 11, 20, 17, 30), message_id=501)
         limpieza.recordar_pantalla(900, HOY.isoformat())
         editar, enviar, borrar = self._toque(900)
         enviar.assert_called_once()

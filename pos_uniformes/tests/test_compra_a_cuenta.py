@@ -246,7 +246,9 @@ class BotTests(unittest.TestCase):
         from pos_uniformes.services import telegram_prestamos_service as prs
 
         texto = prs.aviso_de_solicitud(self._compra())
-        self.assertTrue(texto.startswith("🛍️ COMPRA A CUENTA · Cristal compró a cuenta de su pago: $405.00"))
+        # Formato común (2026-11-20): encabezado con la hora y la cifra debajo.
+        self.assertTrue(texto.startswith("🛍️ COMPRA A CUENTA · "))
+        self.assertIn("$405.00 · Cristal compró a cuenta de su pago", texto.splitlines()[1])
         self.assertIn("Se le descuenta completo en su pago del sáb 14 nov.", texto)
         self.assertIn("no entró dinero", texto)
         self.assertIn("la paga en caja", texto)

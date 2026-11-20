@@ -719,3 +719,17 @@ def _temporada_sin_ajuste_de_esta_maquina(tmp_path):
          patch.object(temp, "_fechas_de_la_tienda", return_value=None):
         yield
     temp.olvidar_lo_leido()
+
+
+@pytest.fixture(autouse=True)
+def _formato_del_bot_en_2026():
+    """Los textos del bot omiten el año si es el actual (telegram_formato).
+    Las pruebas fijan fechas de 2026: el «hoy» del formato se queda en 2026
+    para que no fallen el 1 de enero de 2027 (revisión 2026-11-20)."""
+    from datetime import date
+    from unittest.mock import patch
+
+    from pos_uniformes.services import telegram_formato
+
+    with patch.object(telegram_formato, "_hoy", return_value=date(2026, 11, 20)):
+        yield

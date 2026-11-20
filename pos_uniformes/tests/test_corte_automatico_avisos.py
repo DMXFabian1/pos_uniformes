@@ -49,12 +49,12 @@ class CierreAutomaticoTests(unittest.TestCase):
     def test_un_corte_no_hecho_no_dice_cerre(self) -> None:
         codigo, mensajes = self._cerrar(resultado=ResultadoCorte(False, "Ya hay un corte de este periodo."))
         self.assertEqual(codigo, 1)
-        self.assertNotIn("🌙 Cerré el día", mensajes[0])
+        self.assertNotIn("🌙 CERRÉ EL DÍA", mensajes[0])
         self.assertIn("Ya hay un corte de este periodo.", mensajes[0])
 
     def test_hecho_si_lo_dice(self) -> None:
         _, mensajes = self._cerrar(resultado=ResultadoCorte(True, "🧾 Corte hecho"))
-        self.assertIn("🌙 Cerré el día por ti", mensajes[0])
+        self.assertIn("🌙 CERRÉ EL DÍA POR TI", mensajes[0])   # encabezado (2026-11-20)
 
     def test_el_jueves_dice_su_hora(self) -> None:
         """El texto decía «la tarea de las 17:30» también en jueves y domingo."""

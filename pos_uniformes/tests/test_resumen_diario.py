@@ -26,7 +26,8 @@ class FormatearTests(unittest.TestCase):
             pagos_proximos=[("Caro", "viernes", Decimal("1306.00"))],
         )
         t = formatear(d)
-        self.assertIn("RESUMEN DEL DÍA · martes 08/09/2026", t)
+        self.assertEqual(t.splitlines()[0], "📒 RESUMEN DEL DÍA · mar 8 sep")   # formato común (2026-11-20)
+        self.assertEqual(t.splitlines()[1], "💵 $11,000.00 entró")
         self.assertIn("14 operaciones · 31 piezas", t)
         self.assertIn("Efectivo: $8,400.00 · Tarjeta: $2,600.00", t)
         self.assertIn("Ana 9 ops/40 com.", t)

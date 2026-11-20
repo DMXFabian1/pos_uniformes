@@ -229,7 +229,7 @@ class ResumenDiarioTests(unittest.TestCase):
         self.assertEqual(d.operaciones, 0)
         self.assertTrue(d.hubo_movimiento)
         self.assertIn("Efectivo: $400.00", rd.formatear(d))
-        self.assertIn("Entró: $400.00", rd.texto_hoy(d, ahora=datetime.combine(HOY, time(12, 0))))
+        self.assertIn("💰 $400.00 entró hoy", rd.texto_hoy(d, ahora=datetime.combine(HOY, time(12, 0))))
 
     def test_sin_nada_sigue_diciendo_ninguna_venta(self) -> None:
         from pos_uniformes.services import resumen_diario_service as rd
@@ -359,7 +359,7 @@ class SoloAbonosTests(unittest.TestCase):
         self.assertIn("0 operaciones · 0 piezas", texto)
         hoy = rd.texto_hoy(d, ahora=datetime.combine(HOY, time(12, 0)))
         self.assertNotIn("ninguna venta", hoy.lower())
-        self.assertIn("Entró: $300.00", hoy)
+        self.assertIn("💰 $300.00 entró hoy", hoy)
 
     def test_textos_del_corte_nombran_los_abonos(self) -> None:
         """Revisión 2026-11-12: «Venta efectivo: $300.00 (0 ops)» confundía;
@@ -374,7 +374,7 @@ class SoloAbonosTests(unittest.TestCase):
             "pos_uniformes.services.corte_caja_service.pagos_que_tocan_hoy", return_value=[]
         ):
             self.assertIn("Venta efectivo: $300.00 (0 ops + 1 abono)", crs.texto_estado_actual(self.s, self.ahora))
-            self.assertIn("Venta en efectivo: $300.00 (0 ops + 1 abono)", crs.texto_propuesta_corte(self.s, self.ahora))
+            self.assertIn("$300.00 de venta en efectivo (0 ops + 1 abono)", crs.texto_propuesta_corte(self.s, self.ahora))
 
     def test_libreta_de_la_empleada_con_solo_abonos(self) -> None:
         t = ls.totales_libreta([tabla()[3]])

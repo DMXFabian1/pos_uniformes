@@ -128,7 +128,7 @@ class BotTests(unittest.TestCase):
     def test_el_bot_conoce_el_comando(self) -> None:
         from pos_uniformes.services import telegram_bot_service as bot
 
-        self.assertIn("/asistencia", bot.AYUDA)
+        self.assertIn("/asistencia", bot.AYUDA_COMPLETA)
         self.assertEqual(bot.parsear("/asistencia").nombre, "asistencia")
 
 

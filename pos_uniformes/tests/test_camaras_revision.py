@@ -131,7 +131,7 @@ class ComandoTests(_ConBase):
 
         texto = bot.atender_texto("/camaras", session_factory=fabrica, hoy=HOY)
         self.assertIn("Revisión del contador de personas", texto)
-        self.assertIn("/camaras", bot.AYUDA)
+        self.assertIn("/camaras", bot.AYUDA_COMPLETA)
 
 
 if __name__ == "__main__":

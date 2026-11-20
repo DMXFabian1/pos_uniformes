@@ -186,7 +186,7 @@ class EnganchadoAlBotTests(_Base):
         from pos_uniformes.services import telegram_bot_service as bot
         from pos_uniformes.services import telegram_menu_service as menu
 
-        self.assertIn("/cajon", bot.AYUDA)
+        self.assertIn("/cajon", bot.AYUDA_COMPLETA)
         self.assertIn("m:cajon", {d for fila in menu._RAIZ for _, d in fila})
 
 

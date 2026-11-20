@@ -249,7 +249,9 @@ class TareaPeriodicaTests(_ConBot):
         ahora = self._edad(self.m, 25)
         avisos = self._mios(ms.tarea_periodica(self.s, ahora=ahora))
         self.assertEqual(len(avisos), 1)
-        self.assertTrue(avisos[0][0].startswith("⏰ Sigue sin respuesta"))
+        # La nota va al pie; el encabezado del aviso, arriba (2026-11-20).
+        self.assertTrue(avisos[0][0].startswith("⭐ PROPUESTA DE PROGRAMA"))
+        self.assertTrue(avisos[0][0].endswith("⏰ Sigue sin respuesta."))
         self.assertIn(f"mb:ok:{self.m.id}", avisos[0][1])
         self.assertEqual(self._mios(ms.tarea_periodica(self.s, ahora=ahora + timedelta(hours=2))), [])
         self.assertEqual(len(self._mios(ms.tarea_periodica(self.s, ahora=ahora + timedelta(hours=25)))), 1)

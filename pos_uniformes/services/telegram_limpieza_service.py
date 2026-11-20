@@ -112,6 +112,16 @@ def _leer_o_vacio() -> dict:
         return _vacio()
 
 
+def estado_o_none() -> dict | None:
+    """Para DECIDIR (mandar o retirar el menú): None si no se pudo leer.
+    Con la lista vacía se mandaba un menú nuevo en cada vuelta y ninguno
+    quedaba apuntado (2026-11-20)."""
+    try:
+        return _leer()
+    except NoSeLeyo:
+        return None
+
+
 #: Cuánto se espera el candado de otro proceso, y a partir de cuándo un
 #: candado se da por abandonado (un proceso que murió con él puesto).
 _ESPERA_CANDADO_S = 5.0
@@ -125,30 +135,85 @@ class _CandadoEntreProcesos:
     (el bot, las tareas de la tarde, actualizar.py) que escriben la misma
     lista. Si no se consigue a tiempo se sigue sin él: es peor quedarse mudo."""
 
+    #: Ficha del candado que este proceso tiene puesto ahora (None si ninguno).
+    _ficha_vigente: str | None = None
+
     def __init__(self) -> None:
         self._ruta = None
         self._propio = False
+        self._ficha = ""
+
+    def _leer_ficha(self) -> str | None:
+        try:
+            return self._ruta.read_text(encoding="utf-8")
+        except OSError:
+            return None
+
+    def _quitar_abandonado(self) -> None:
+        """2026-11-20: antes era un unlink directo, y si dos procesos lo veían
+        abandonado a la vez, el segundo borraba el candado recién tomado por
+        el primero. Ahora se aparta con un rename (solo uno lo consigue) y, si
+        lo apartado resultó ser un candado vigente, se devuelve a su lugar."""
+        import os
+        import uuid
+
+        apartado = self._ruta.with_name(f"{self._ruta.name}.viejo.{uuid.uuid4().hex}")
+        try:
+            os.replace(str(self._ruta), str(apartado))
+        except OSError:
+            return                             # otro ya lo quitó
+        try:
+            if time.time() - apartado.stat().st_mtime <= _CANDADO_ABANDONADO_S:
+                try:                           # era de otro, vigente: se devuelve
+                    os.link(str(apartado), str(self._ruta))
+                except OSError:
+                    pass
+        except OSError:
+            pass
+        try:
+            apartado.unlink()
+        except OSError:
+            pass
 
     def __enter__(self):
         import os
+        import uuid
 
         _CANDADO.acquire()
+        if _CandadoEntreProcesos._ficha_vigente is not None:
+            return self                        # mismo hilo, ya lo tiene puesto
         self._ruta = ruta_estado().with_suffix(".lock")
         try:
             self._ruta.parent.mkdir(parents=True, exist_ok=True)
         except OSError:
             return self
+        self._ficha = f"{os.getpid()}:{uuid.uuid4().hex}"
         limite = time.monotonic() + _ESPERA_CANDADO_S
         while True:
             try:
                 fd = os.open(str(self._ruta), os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-                os.close(fd)
+                try:
+                    os.write(fd, self._ficha.encode("utf-8"))
+                finally:
+                    os.close(fd)
                 self._propio = True
+                _CandadoEntreProcesos._ficha_vigente = self._ficha
                 return self
             except FileExistsError:
+                ficha = self._leer_ficha()
+                if ficha and ficha.startswith(f"{os.getpid()}:"):
+                    # Es de este proceso y nadie aquí lo tiene: un __exit__
+                    # no pudo borrarlo (antivirus). Se toma, sin esperar.
+                    try:
+                        self._ruta.write_text(self._ficha, encoding="utf-8")
+                        self._propio = True
+                        _CandadoEntreProcesos._ficha_vigente = self._ficha
+                        return self
+                    except OSError:
+                        pass
                 try:
                     if time.time() - self._ruta.stat().st_mtime > _CANDADO_ABANDONADO_S:
-                        self._ruta.unlink()
+                        self._quitar_abandonado()
                         continue
                 except OSError:
                     pass
@@ -161,11 +226,14 @@ class _CandadoEntreProcesos:
 
     def __exit__(self, *exc) -> None:
         try:
-            if self._propio and self._ruta is not None:
+            # Solo se borra si sigue siendo nuestro (2026-11-20).
+            if self._propio and self._ruta is not None and self._leer_ficha() == self._ficha:
                 self._ruta.unlink()
         except OSError:
             pass
         finally:
+            if self._propio:
+                _CandadoEntreProcesos._ficha_vigente = None
             self._propio = False
             _CANDADO.release()
 
@@ -226,8 +294,8 @@ def menu_fijado() -> int:
     return int(_leer_o_vacio().get("menu_id") or 0)
 
 
-def recordar_menu(message_id: int) -> None:
-    """Guarda cuál es el menú para no barrerlo nunca."""
+def recordar_menu(message_id: int) -> bool:
+    """Guarda cuál es el menú para no barrerlo nunca. False si no se pudo."""
     nuevo = int(message_id or 0)
 
     def _cambio(datos: dict) -> None:
@@ -236,7 +304,7 @@ def recordar_menu(message_id: int) -> None:
         # la única forma de que el menú se borrara en la limpieza.
         datos["mensajes"] = [m for m in datos["mensajes"] if int(m.get("id") or 0) != nuevo]
 
-    _modificar(_cambio)
+    return _modificar(_cambio)
 
 
 #: Cada cuánto se reescribe la cabecera del menú fijado. Más seguido sería
@@ -290,7 +358,9 @@ def recordar_pantalla(message_id: int, dia: str) -> None:
     def _cambio(datos: dict) -> None:
         datos["pantalla_id"] = int(message_id or 0)
         datos["pantalla_dia"] = str(dia or "")
-        datos["pantalla_tapada"] = False
+        # Si otro proceso mandó algo entre el envío y este apunte, ya quedó
+        # tapada (los id de Telegram crecen; 2026-11-20).
+        datos["pantalla_tapada"] = int(datos.get("ultimo_id") or 0) > int(message_id or 0)
 
     _modificar(_cambio)
 
@@ -300,6 +370,7 @@ def tapar_pantalla(message_id: int = 0) -> None:
     mid = int(message_id or 0)
 
     def _cambio(datos: dict) -> None:
+        datos["ultimo_id"] = max(int(datos.get("ultimo_id") or 0), mid)
         pid = int(datos.get("pantalla_id") or 0)
         if pid and mid != pid and not datos.get("pantalla_tapada"):
             datos["pantalla_tapada"] = True
@@ -313,6 +384,23 @@ def olvidar(message_id: int) -> None:
     _modificar(lambda datos: datos.__setitem__(
         "mensajes", [m for m in datos.get("mensajes", []) if int(m.get("id") or 0) != mid]
     ))
+
+
+def conservar(message_id: int) -> None:
+    """Un mensaje ya apuntado pasa a conservarse, con su hora de siempre: se
+    reescribió con el resultado de un corte (2026-11-20)."""
+    mid = int(message_id or 0)
+    if mid <= 0:
+        return
+
+    def _cambio(datos: dict) -> None:
+        for m in datos.setdefault("mensajes", []):
+            if int(m.get("id") or 0) == mid:
+                m["conservar"] = True
+                return
+        datos["mensajes"].append({"id": mid, "ts": time.time(), "conservar": True})
+
+    _modificar(_cambio)
 
 
 # ── El barrido ───────────────────────────────────────────────────────────────

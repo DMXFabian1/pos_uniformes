@@ -655,7 +655,8 @@ def tarea_periodica(session: Session, *, ahora: datetime | None = None) -> list[
         s.recordatorios = int(s.recordatorios or 0) + 1
         session.flush()
         avisos.append((
-            "⏰ Sigue sin respuesta:\n" + dsc.aviso_de_solicitud(s, hoy=hoy),
+            # La nota al pie: el encabezado del aviso sigue arriba (y _fechada lo reconoce; 2026-11-20).
+            dsc.aviso_de_solicitud(s, hoy=hoy) + "\n\n⏰ Sigue sin respuesta.",
             dsc.botones_de(s),
         ))
     return avisos

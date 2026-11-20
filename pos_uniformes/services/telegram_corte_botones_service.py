@@ -24,6 +24,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from pos_uniformes.services.telegram_formato import cifra, encabezado
+
 #: Prefijo de los botones de esta pantalla.
 PREFIJO = "cc:"
 
@@ -109,8 +111,11 @@ def pantalla_bajar(retiro: Decimal, tarjeta: Decimal) -> tuple[str, str]:
         filas.append([(f"Bajar {_pesos(c)}", f"{PREFIJO}baja:{c}")])
     filas.append([("‹ Volver", f"{PREFIJO}volver")])
 
+    # Formato común del bot (2026-11-20): la pregunta va de encabezado y lo
+    # que sale tal cual, de cifra principal (es el tope de lo que se baja).
     texto = [
-        "¿Cuánto le bajo a la venta?",
+        encabezado("✂️", "¿Cuánto le bajo a la venta?"),
+        cifra(retiro, "saldrían tal cual"),
         "",
         "Lo que bajes no aparece en el ticket de la tienda.",
         "Cada botón hace el corte con esa cantidad ya restada.",
@@ -132,11 +137,11 @@ def pantalla_cantidades(que: str, sugerida: Decimal, tope: Decimal) -> tuple[str
     """
     accion = "ret" if que == "retirar" else "fnd"
     if que == "retirar":
-        titulo = "¿Cuánto sacas del cajón?"
+        emoji, titulo = "💵", "¿Cuánto sacas del cajón?"
         def etiqueta(monto: str) -> str:
             return f"Hacer el corte sacando {monto}"
     else:
-        titulo = "¿Cuánto se queda para mañana?"
+        emoji, titulo = "🪙", "¿Cuánto se queda para mañana?"
         def etiqueta(monto: str) -> str:
             return f"Hacer el corte dejando {monto}"
 
@@ -154,8 +159,9 @@ def pantalla_cantidades(que: str, sugerida: Decimal, tope: Decimal) -> tuple[str
         filas.append([(etiqueta(_pesos(c)), f"{PREFIJO}{accion}:{c}")])
     filas.append([("‹ Volver", f"{PREFIJO}volver")])
 
+    # Formato común del bot (2026-11-20): la pregunta como encabezado.
     texto = [
-        titulo,
+        encabezado(emoji, titulo),
         "",
         "Cada botón hace el corte con esa cantidad.",
         "",
@@ -249,7 +255,10 @@ def preguntar_por_la_nota(nota: str, retiro: Decimal) -> tuple[str, str]:
     (2026-10-10).
     """
     dato = nota if cabe_en_un_boton(nota) else guardar_nota_pendiente(nota)
+    # Formato común del bot (2026-11-20): encabezado, la pregunta con la nota
+    # justo debajo y el detalle aparte.
     return (
+        encabezado("🧾", "Corte con nota") + "\n"
         f"¿Hago el corte con la nota «{nota}»?\n\n"
         f"Saldrían {_pesos(retiro)} del cajón y se imprime el ticket en la tienda.\n"
         "Si era un dedazo, no toques nada.",
@@ -297,13 +306,23 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
         # justo lo que esta pantalla vino a evitar (2026-10-10).
         try:
             teclado = json.loads(botones) if botones else {"inline_keyboard": []}
-            teclado.setdefault("inline_keyboard", []).append(
+            filas = teclado.setdefault("inline_keyboard", [])
+            # Aquí el «Hacer el corte…» del cajón ES volver a la propuesta:
+            # va uno solo, el de regreso (2026-11-20).
+            filas[:] = [f for f in filas
+                        if not any(b.get("callback_data") == cj.BOTON_CORTE[1] for b in f)]
+            filas.append(
                 [{"text": "‹ Volver a la propuesta", "callback_data": f"{PREFIJO}volver"}]
             )
             botones = json.dumps(teclado, ensure_ascii=False)
         except Exception:  # noqa: BLE001 — sin botón de regreso, el texto lo dice
-            pass
-        return "", texto + "\n\nCuando termines, toca «Volver a la propuesta» o manda /corte.", botones
+            return "", texto + "\n\nCuando termines, manda /corte.", botones
+        volver = "Toca uno para cambiarlo. Cuando termines, «‹ Volver a la propuesta»."
+        if cj.PIE in texto:
+            texto = texto.replace(cj.PIE, volver)
+        else:
+            texto += "\n\nCuando termines, toca «‹ Volver a la propuesta»."
+        return "", texto, botones
 
     # «retirar» ya no se ofrece, pero se sigue atendiendo: los mensajes viejos
     # se quedan en el chat con sus botones, y tocar uno no debe contestar «no
@@ -338,8 +357,11 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
         with session_factory() as session:
             ahora_sale, fondo_ahora = crs.cifras_de_propuesta(session)
         if mostrado is not None and abs(Decimal(ahora_sale) - mostrado) >= Decimal("1"):
+            # Formato común del bot (2026-11-20): encabezado y la cifra nueva arriba.
             return (
                 "Cambió la cifra",
+                encabezado("⚠️", "Cambió la cifra") + "\n"
+                + cifra(ahora_sale, "saldrían ahora") + "\n\n"
                 f"Desde ese mensaje cambiaron los números: ahora saldrían {_pesos(ahora_sale)} "
                 f"(el botón decía {_pesos(mostrado)}). No hice el corte.\n\n¿Lo hago con la cifra de ahora?",
                 botones_de_propuesta(ahora_sale, fondo_ahora),

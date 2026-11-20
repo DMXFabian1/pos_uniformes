@@ -50,9 +50,14 @@ def pulso(session, *, hoy: date | None = None, ahora: datetime | None = None) ->
     ahora = ahora or datetime.now().astimezone()
     hoy = hoy or ahora.date()
 
-    lineas: list[str] = [f"🫀 La tienda ahora — {ahora:%d/%m %H:%M}", ""]
-    _bloque(session, lineas, lambda: _tienda(session, hoy, ahora))
+    # Formato común del bot (2026-11-20): encabezado con fecha y hora, y
+    # debajo la cifra que importa (lo que entró); luego el resto de renglones.
+    from pos_uniformes.services.telegram_formato import encabezado
+
+    lineas: list[str] = [encabezado("🫀", "La tienda ahora", ahora, hora=True)]
     _bloque(session, lineas, lambda: _venta(session, hoy, ahora))
+    lineas.append("")
+    _bloque(session, lineas, lambda: _tienda(session, hoy, ahora))
     _bloque(session, lineas, lambda: _corte(session, hoy))
     lineas.append("")
     _bloque(session, lineas, lambda: _pantallas(session))
@@ -94,10 +99,13 @@ def _venta(session, hoy: date, ahora: datetime) -> list[str]:
     del día, que es lo que se puede comparar semana contra semana."""
     from pos_uniformes.services import comparativa_service as comp
     from pos_uniformes.services.resumen_diario_service import entro_real, recolectar
+    from pos_uniformes.services.telegram_formato import cifra
 
     d = recolectar(session, hoy)
     entro = entro_real(d)
-    lineas = [f"{MUDO} Entró: ${entro:,.2f}" + (f" ({d.periodo})" if d.inicio_corte is not None else "")]
+    # Es la cifra principal del pulso: va con 💰 debajo del encabezado (2026-11-20).
+    cuando = d.periodo if d.inicio_corte is not None else "hoy"
+    lineas = [cifra(entro, f"entró {cuando}")]
     detalle = comp.texto(comp.comparar(session, hoy, ahora=ahora))
     if detalle:
         lineas.append(f"   ventas: {detalle}")

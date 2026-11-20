@@ -100,7 +100,7 @@ class BotTests(unittest.TestCase):
         a.assert_called_once_with("si")
         r.assert_called_once_with("")
         for comando in ("/version", "/actualizar", "/volver"):
-            self.assertIn(comando, bot.AYUDA)
+            self.assertIn(comando, bot.AYUDA_COMPLETA)
 
 
 class TareaDeNocheTests(unittest.TestCase):

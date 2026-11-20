@@ -124,7 +124,9 @@ class BotEntradaTests(unittest.TestCase):
         texto, reg = self._correr("1750 papá")
         self.assertEqual(reg.call_args.kwargs["monto"], Decimal("1750"))
         self.assertEqual(reg.call_args.kwargs["motivo"], "Fondo de papá")
-        self.assertIn("✅ Entró al cajón: $1,750.00 (Fondo de papá)", texto)
+        # Formato común (2026-11-20): encabezado y la cifra debajo.
+        self.assertTrue(texto.startswith("✅ ENTRÓ AL CAJÓN · "))
+        self.assertIn("$1,750.00 (Fondo de papá)", texto)
 
     def test_sin_motivo_es_el_fondo_de_papa_y_sin_monto_explica(self) -> None:
         _, reg = self._correr("1,750")

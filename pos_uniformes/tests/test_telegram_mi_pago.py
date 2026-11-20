@@ -261,7 +261,8 @@ class MePagaronTests(_ConBase):
         dato = _dato(botones, "mp:pagarok:")
         aviso, texto, _ = self._tocar(dato)
         self.assertEqual(aviso, "Anotado")
-        self.assertIn("✅ Anotado: te pagaron el 3 de 4 (sáb 21-nov) · $2,500, el 19-nov.", texto)
+        self.assertTrue(texto.startswith("✅ MI PAGO ANOTADO · "))   # formato común (2026-11-20)
+        self.assertIn("Anotado: te pagaron el 3 de 4 (sáb 21-nov) · $2,500, el 19-nov.", texto)
         self.assertIn("El que sigue: 4 de 4 · sáb 28-nov · $2,500", texto)
         self.assertIn("/deshacermipago 21/11", texto)
         self.assertEqual(self._registros()[D(2026, 11, 21)], (JUE_19, Decimal("2500.00")))
@@ -347,7 +348,8 @@ class DeshacerTests(_ConBase):
         dato = _dato(botones, "mp:deshacerok:")
         aviso, texto, _ = self._tocar(dato)
         self.assertEqual(aviso, "Deshecho")
-        self.assertIn("↩️ Deshecho: el 2 de 4 (sáb 14-nov) vuelve a estar atrasado.", texto)
+        self.assertTrue(texto.startswith("↩️ MI PAGO DESHECHO · "))   # formato común (2026-11-20)
+        self.assertIn("Deshecho: el 2 de 4 (sáb 14-nov) vuelve a estar atrasado.", texto)
         self.assertEqual(self._registros(), {})
         aviso, texto, _ = self._tocar(dato)
         self.assertEqual(aviso, "Ya no estaba")
@@ -496,11 +498,12 @@ class LasEmpleadasNoCambianTests(_ConBase):
 class AyudaYMenuTests(unittest.TestCase):
     def test_la_ayuda_los_lista(self) -> None:
         for c in ("/mipago", "/mepagaron", "/deshacermipago", "/diasdemas", "/vino_yo", "/falta_yo"):
-            self.assertIn(c, bot.AYUDA, f"{c} no sale en /ayuda")
+            self.assertIn(c, bot.AYUDA_COMPLETA, f"{c} no sale en /ayuda todo")
 
     def test_autocompletar(self) -> None:
+        # Al teclear «/» salen solo los 12 de diario (2026-11-20): de Mi pago, /mipago.
         nombres = {c for c, _ in bot.COMANDOS_MENU}
-        self.assertTrue({"mipago", "mepagaron", "diasdemas"} <= nombres)
+        self.assertIn("mipago", nombres)
 
     def test_quisiste_decir(self) -> None:
         self.assertIn("/mipago", bot.comando_desconocido("mipgo"))

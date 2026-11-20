@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from sqlalchemy.orm import Session
 
+from pos_uniformes.services import telegram_formato as fmt
+
 #: Prefijo de los botones de esta pantalla.
 PREFIJO = "dc:"
 
@@ -44,20 +46,25 @@ def _pila(solicitud) -> str:
 
 def encabezado(s, hoy) -> list[str]:
     """Quién pide qué. Un intercambio dice las dos mitades y si la compañera
-    ya aceptó: Daniel no aprueba algo que una de las dos no ha dicho."""
+    ya aceptó: Daniel no aprueba algo que una de las dos no ha dicho.
+
+    Formato común (2026-11-20): la primera línea es el encabezado con el día
+    pedido («🛌 PIDE DESCANSO · sáb 22 nov») y la frase de siempre debajo."""
     nombre = s.employee_name or s.employee_code
     if getattr(s, "tipo", "cambio") == "intercambio":
         otra = s.companera_name or s.companera_code
         acepto = "✔️ las dos aceptaron" if s.companera_acepto_at else f"⏳ falta que {otra.split()[0]} acepte"
         return [
-            f"🔄 {nombre} y {otra} se quieren cambiar el descanso "
+            fmt.encabezado("🔄", "Cambio de descanso", s.fecha),
+            f"{nombre} y {otra} se quieren cambiar el descanso "
             f"({_cuando_es(s.fecha, hoy)}):",
             f"· {nombre.split()[0]} descansaría el {contexto_dia(s)}",
             f"· {otra.split()[0]} descansaría el {_dia(s.fecha_companera)}",
             acepto,
         ]
     lineas = [
-        f"🛌 {nombre} pide descansar el {contexto_dia(s)} ({_cuando_es(s.fecha, hoy)})",
+        fmt.encabezado("🛌", "Pide descanso", s.fecha),
+        f"{nombre} pide descansar el {contexto_dia(s)} ({_cuando_es(s.fecha, hoy)})",
         f"Para: {s.motivo}",
     ]
     if getattr(s, "fecha_fijo", None):
@@ -90,7 +97,8 @@ def texto_y_botones(session: Session, *, hoy=None) -> tuple[str, str]:
     hoy = hoy or _date.today()
     pendientes = ds.pendientes(session, hoy=hoy)
     if not pendientes:
-        texto = "No hay días de descanso esperando respuesta. ✅"
+        texto = fmt.mensaje("🛌", "Días de descanso", cuando=hoy,
+                            principal="No hay días de descanso esperando respuesta. ✅")
         olvidadas = ds.sin_responder_que_ya_pasaron(session, hoy=hoy)
         if olvidadas:
             # Desde el lado de ella, no contestar se siente igual que un "no".
@@ -101,7 +109,7 @@ def texto_y_botones(session: Session, *, hoy=None) -> tuple[str, str]:
             )
         return texto, _teclado([[("‹ Menú", "m:raiz")]])
 
-    lineas = ["🛌 Días de descanso por responder:", ""]
+    lineas = []
     filas = []
     for s in pendientes:
         dia = f"{_ABREV[s.fecha.weekday()]} {s.fecha:%d/%m}"
@@ -109,7 +117,9 @@ def texto_y_botones(session: Session, *, hoy=None) -> tuple[str, str]:
         lineas.append(f"   {s.motivo}")
         filas.append([(f"👀 {_pila(s)} · {dia}", f"{PREFIJO}ver:{s.id}")])
     filas.append([("‹ Menú", "m:raiz")])
-    return "\n".join(lineas), _teclado(filas)
+    texto = fmt.mensaje("🛌", "Días de descanso", cuando=hoy,
+                        principal=f"{len(pendientes)} por responder", detalle=lineas)
+    return texto, _teclado(filas)
 
 
 # ── El panorama de UN día ────────────────────────────────────────────────────
@@ -221,17 +231,22 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
 
     with session_factory() as session:
         try:
+            # Formato común (2026-11-20): encabezado con el día decidido.
             if que == "ok":
                 s = ds.aprobar(session, solicitud_id, quien=quien)
                 aviso = "Aprobado"
-                hecho = (
-                    f"✅ {_pila(s)} descansa el {contexto_dia(s)}.\n"
-                    "Ya quedó en el calendario y se le avisa en la Libreta."
+                hecho = fmt.mensaje(
+                    "✅", "Descanso aprobado", cuando=s.fecha,
+                    principal=f"{_pila(s)} descansa el {contexto_dia(s)}.",
+                    detalle="Ya quedó en el calendario y se le avisa en la Libreta.",
                 )
             elif que == "no":
                 s = ds.rechazar(session, solicitud_id, quien=quien)
                 aviso = "Rechazado"
-                hecho = f"✖️ {_pila(s)} no descansa el {contexto_dia(s)}."
+                hecho = fmt.mensaje(
+                    "✖️", "Descanso no aprobado", cuando=s.fecha,
+                    principal=f"{_pila(s)} no descansa el {contexto_dia(s)}.",
+                )
             else:
                 return "No conozco ese botón", "", ""
             session.commit()
@@ -241,7 +256,8 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
             return str(exc), texto, botones
         texto, botones = texto_y_botones(session)
 
-    return aviso, hecho + "\n\n" + texto, botones
+    # Un solo encabezado: el de lo decidido; la lista va sin el suyo (2026-11-20).
+    return aviso, hecho + "\n\n" + fmt.quitar_encabezado(texto), botones
 
 
 def botones_de(solicitud) -> str:

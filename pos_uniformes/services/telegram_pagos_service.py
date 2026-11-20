@@ -13,13 +13,24 @@ resbalar que un clic en la caja.
 from __future__ import annotations
 
 import logging
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 from sqlalchemy.orm import Session
 
+from pos_uniformes.services import telegram_formato as fmt
+
 #: La segunda palabra que hace falta para que el dinero se mueva de verdad.
 CONFIRMAR = {"si", "sí", "ok", "confirmar", "dale", "va"}
+
+
+def _ahora(hoy: date | None = None) -> datetime:
+    """Para el encabezado de lo que acaba de pasar (2026-11-20): la hora de
+    ahora; si `hoy` es otro día (pruebas, botones), ese día a esta hora."""
+    ahora = datetime.now()
+    if hoy is None or hoy == ahora.date():
+        return ahora
+    return datetime.combine(hoy, ahora.time())
 
 
 def _nombre(session, code: str) -> str:
@@ -98,10 +109,12 @@ def pagos(session: Session, *, hoy: date | None = None) -> str:
     from pos_uniformes.services import nomina_service as nom
 
     avisos = nom.avisos_de_pago(session, hoy)
+    dia = hoy or date.today()
     if not avisos:
-        return "No hay pagos pendientes. ✅"
+        return fmt.mensaje("💰", "Pagos", cuando=dia, principal="No hay pagos pendientes. ✅")
 
-    lineas = ["Pagos pendientes:", ""]
+    # Formato común (2026-11-20): el total arriba, cada quien en el detalle.
+    lineas = []
     total = Decimal("0")
     for a in avisos:
         nombre = _nombre(session, a.employee_code)
@@ -109,11 +122,13 @@ def pagos(session: Session, *, hoy: date | None = None) -> str:
         total += det.total
         cuando = nom.cuando_pago(a)
         lineas.append(f"· {nombre} — ${det.total:,.2f}  ({cuando})")
-    lineas.append("")
-    lineas.append(f"En total: ${total:,.2f}")
-    lineas.append("")
-    lineas.append("Para pagarle a alguien: /pagar Fanny")
-    return "\n".join(lineas)
+    return fmt.mensaje(
+        "💰", "Pagos pendientes", cuando=dia,
+        principal=fmt.cifra(total, "en total"),
+        detalle=lineas,
+        # En 💰 Pagos del menú cada nombre ya es un botón; por texto, /pagar.
+        pie="Para pagarle a alguien: toca su nombre en /menu › 💰 Pagos, o escribe /pagar Fanny",
+    )
 
 
 def _hay_que_pagar(det) -> bool:
@@ -165,7 +180,13 @@ def desglose_por_code(session: Session, code: str, *, hoy: date | None = None) -
     det = nom.pago_pendiente(session, code, hoy)
     if not _hay_que_pagar(det):
         return f"{nombre} no tiene nada pendiente ahora mismo."
-    return "\n".join(_detalle_texto(det, nombre))
+    # El nombre va en el encabezado y lo que se le paga arriba (2026-11-20);
+    # el desglose (con su TOTAL al final) queda igual.
+    return fmt.mensaje(
+        "💵", f"Pago a {nombre}", cuando=hoy or date.today(),
+        principal=fmt.cifra(det.total, "a pagar"),
+        detalle="\n".join(_detalle_texto(det, nombre)[1:]),
+    )
 
 
 def pagar_por_code(session: Session, code: str, *, quien: str, hoy: date | None = None) -> str:
@@ -189,11 +210,21 @@ def pagar_por_code(session: Session, code: str, *, quien: str, hoy: date | None 
     # no de `det` (que se calculó antes y pudo quedar viejo si otro proceso
     # deshizo o movió un pago mientras tanto — auditoría 2026-11-08, M3).
     total = Decimal(str(getattr(pago, "total", 0) or 0))
+    # El menú lee el «✅» del principio para su globito «Pagado»: el
+    # encabezado lo conserva (2026-11-20).
     if total <= 0:
         cubierto = Decimal(str(getattr(pago, "descuento_prestamos", 0) or 0))
-        return (f"✅ Ciclo de {nombre} cerrado: el préstamo se llevó todo el pago "
-                f"(${cubierto:,.2f}). No se le entrega nada.\n\nSi fue un error, /deshacerpago")
-    return f"✅ Pagado a {nombre}: ${total:,.2f}\n\nSi fue un error, /deshacerpago"
+        return fmt.mensaje(
+            "✅", "Ciclo cerrado", cuando=_ahora(hoy), hora=True,
+            principal=(f"Ciclo de {nombre} cerrado: el préstamo se llevó todo el pago "
+                       f"(${cubierto:,.2f}). No se le entrega nada."),
+            pie="Si fue un error, /deshacerpago",
+        )
+    return fmt.mensaje(
+        "✅", "Pagado", cuando=_ahora(hoy), hora=True,
+        principal=fmt.cifra(total, f"a {nombre}"),
+        pie="Si fue un error, /deshacerpago",
+    )
 
 
 # ------------------------------------------------------------------- /pagar
@@ -276,7 +307,11 @@ def retiro(session: Session, argumento: str, *, quien: str) -> str:
         session.rollback()
         return f"No lo apunté: {exc}"
     session.commit()
-    return f"✅ Retirado del cajón: ${monto:,.2f} para {motivo}.\n\nEl corte de hoy ya lo toma en cuenta."
+    return fmt.mensaje(
+        "✅", "Retiro del cajón", cuando=_ahora(), hora=True,
+        principal=fmt.cifra(monto, f"para {motivo}", emoji="💸"),
+        pie="El corte de hoy ya lo toma en cuenta.",
+    )
 
 
 def _en_cajon(session) -> Decimal | None:
@@ -321,8 +356,11 @@ def entrada(session: Session, argumento: str, *, quien: str) -> str:
         session.rollback()
         return f"No lo apunté: {exc}"
     session.commit()
-    return (f"✅ Entró al cajón: ${monto:,.2f} ({motivo}).\n\n"
-            "Los pagos salen del cajón como siempre; el corte ya suma esto y lo que sobre se queda.")
+    return fmt.mensaje(
+        "✅", "Entró al cajón", cuando=_ahora(), hora=True,
+        principal=fmt.cifra(monto, f"({motivo})", emoji="📥"),
+        pie="Los pagos salen del cajón como siempre; el corte ya suma esto y lo que sobre se queda.",
+    )
 
 
 # ------------------------------------------------------------ /deshacer
@@ -369,7 +407,11 @@ def deshacer(session: Session, argumento: str = "", *, quien: str, hoy: date | N
         if not movimientos:
             return "Hoy no hay retiros ni entradas que deshacer."
         lineas = [_renglon_movimiento(c, f) for c, f in movimientos[:8]]
-        return "Retiros y entradas de hoy (toca el comando del que quieras deshacer):\n\n" + "\n".join(lineas)
+        return fmt.mensaje(
+            "↩️", "Deshacer retiro o entrada", cuando=hoy_,
+            principal="Toca el comando del que quieras deshacer:",
+            detalle=lineas,
+        )
     fila = dict(movimientos).get(clave)
     if fila is None:
         return (f"No encuentro «{clave}» entre los retiros y entradas de hoy. "
@@ -393,7 +435,11 @@ def deshacer(session: Session, argumento: str = "", *, quien: str, hoy: date | N
     if not ok:
         return "Ya no estaba; nada que deshacer."
     que = "el retiro" if clave.startswith("r") else "la entrada"
-    return f"↩️ Deshice {que} de ${monto:,.2f} ({fila.motivo or 'sin motivo'}). El cajón ya no lo cuenta."
+    return fmt.mensaje(
+        "↩️", "Deshecho", cuando=_ahora(hoy), hora=True,
+        principal=f"Deshice {que} de ${monto:,.2f} ({fila.motivo or 'sin motivo'}).",
+        detalle="El cajón ya no lo cuenta.",
+    )
 
 
 # ------------------------------------------------------------ /deshacerpago
@@ -454,20 +500,27 @@ def deshacer_pago(session: Session, argumento: str = "", *, quien: str, hoy: dat
             aviso = f"#{arg} ya no es el último pago. "
         else:
             aviso = ""
-        return (
-            f"{aviso}El último pago es a {nombre} de ${monto:,.2f} (hoy{hora}, #{ultimo.id}).\n"
-            f"Para deshacerlo manda: /deshacerpago {ultimo.id}"
+        # No hay botón que deshaga un pago de nómina: se queda el comando.
+        return fmt.mensaje(
+            "↩️", "Deshacer pago", cuando=hoy_,
+            principal=fmt.cifra(monto, f"a {nombre}"),
+            detalle=f"{aviso}El último pago es a {nombre} de ${monto:,.2f} (hoy{hora}, #{ultimo.id}).",
+            pie=f"Para deshacerlo manda: /deshacerpago {ultimo.id}",
         )
     try:
         r = nom.deshacer_pago(session, int(ultimo.id), creado_por=quien)
     except PermissionError as exc:
         return f"No se pudo: {exc}"
     session.commit()
-    texto = f"↩️ Deshecho el pago a {nombre} de ${monto:,.2f}."
+    texto = f"Deshecho el pago a {nombre} de ${monto:,.2f}."
     regresado = Decimal(str((r or {}).get("prestamo_regresado") or 0))
     if regresado:
         texto += f" Su préstamo de ${regresado:,.2f} vuelve a estar pendiente: se le descuenta en el siguiente pago."
-    return texto
+    return fmt.mensaje(
+        "↩️", "Pago deshecho", cuando=_ahora(hoy), hora=True,
+        principal=fmt.cifra(monto, f"a {nombre}"),
+        detalle=texto,
+    )
 
 
 def _ajuste_comisiones(r: dict) -> str:
@@ -527,6 +580,8 @@ def fecha_pago(session: Session, argumento: str, *, quien: str, hoy: date | None
     session.commit()
     extra = " Su siguiente pago también se recorrió." if r["ciclo_movido"] else ""
     extra += _ajuste_comisiones(r)
-    return (
-        f"📅 El pago a {nombre} de ${r['total']:,.2f} pasó del {r['de']:%d/%m} al {r['a']:%d/%m}.{extra}"
+    return fmt.mensaje(
+        "📅", "Fecha de pago movida", cuando=r["a"],
+        principal=fmt.cifra(r["total"], f"a {nombre}"),
+        detalle=f"El pago a {nombre} de ${r['total']:,.2f} pasó del {r['de']:%d/%m} al {r['a']:%d/%m}.{extra}",
     )

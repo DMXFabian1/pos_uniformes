@@ -22,6 +22,19 @@ from decimal import Decimal
 #: Prefijo de los botones de esta pantalla.
 PREFIJO = "cj:"
 
+#: Título de la pantalla: el mismo del botón del menú («💵 Lo que salió del
+#: cajón»), en el formato común del bot (2026-11-20).
+TITULO = "Lo que salió del cajón"
+
+#: Botón para seguir con el corte. Es el «Hacer el corte de hoy…» de 🧾
+#: Cortes, que ya tiene su manejador; antes el texto decía «Luego /corte» y
+#: había que escribirlo (2026-11-20).
+BOTON_CORTE = ("🧾 Hacer el corte…", "co:nuevo")
+
+#: El último renglón. La propuesta del corte lo cambia por el suyo cuando
+#: abre esta pantalla con «‹ Volver a la propuesta».
+PIE = "Toca uno para cambiarlo. Cuando termines, «🧾 Hacer el corte…»."
+
 
 @dataclass(frozen=True)
 class Fila:
@@ -89,18 +102,24 @@ def filas_del_periodo(session) -> list[Fila]:
 def texto_y_botones(session) -> tuple[str, str]:
     """(texto, botones) de la lista. Un botón por renglón: tocarlo lo cambia."""
     from pos_uniformes.services import telegram_service
+    from pos_uniformes.services.telegram_formato import encabezado, mensaje
 
     filas = filas_del_periodo(session)
     if not filas:
         return (
-            "No hay pagos ni retiros apuntados desde el último corte.\n\n"
-            "Cuando los haya, aquí se pueden desmarcar los que no salieron "
-            "del cajón (una transferencia, algo ya contado).",
+            mensaje(
+                "💵", TITULO,
+                principal="No hay pagos ni retiros apuntados desde el último corte.",
+                detalle="Cuando los haya, aquí se pueden desmarcar los que no salieron "
+                        "del cajón (una transferencia, algo ya contado).",
+            ),
             telegram_service.teclado([[("‹ Menú", "m:raiz")]]),
         )
 
     fuera = [f for f in filas if not f.en_cajon]
-    lineas = ["💵 Lo apuntado desde el último corte:", ""]
+    # Formato común del bot (2026-11-20): encabezado arriba; la lista se
+    # sigue editando en el mismo mensaje con cada toque.
+    lineas = [encabezado("💵", TITULO), "Lo apuntado desde el último corte:", ""]
     try:
         from datetime import datetime
 
@@ -120,12 +139,13 @@ def texto_y_botones(session) -> tuple[str, str]:
         total = sum(f.monto for f in fuera)
         lineas.append(f"Fuera del cajón: ${total:,.2f}")
     lineas.append("")
-    lineas.append("Toca uno para cambiarlo. Luego /corte.")
+    lineas.append(PIE)
 
     botones = [
         [(f"{'✅' if f.en_cajon else '⬜'} {f.quien} ${f.monto:,.0f}", f.dato)]
         for f in filas
     ]
+    botones.append([BOTON_CORTE])
     botones.append([("‹ Menú", "m:raiz")])
     return "\n".join(lineas), telegram_service.teclado(botones)
 

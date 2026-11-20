@@ -24,10 +24,11 @@ from __future__ import annotations
 
 import logging
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from pos_uniformes.services import pago_dueno_service as pd
+from pos_uniformes.services import telegram_formato as fmt
 
 logger = logging.getLogger(__name__)
 
@@ -102,6 +103,12 @@ def _teclado(filas):
 
 def es_de_mi_pago(dato: str) -> bool:
     return str(dato or "").startswith(PREFIJO)
+
+
+def _ahora(hoy: date) -> datetime:
+    """Para el encabezado de lo que acaba de pasar (2026-11-20): `hoy` a la
+    hora de ahora."""
+    return datetime.combine(hoy, datetime.now().time())
 
 
 def _iso(f: date) -> str:
@@ -298,7 +305,14 @@ def _pantalla(session, config, year: int, month: int, hoy: date) -> tuple[str, s
     rec = pd.calcular_recordatorio(config, datos, hoy)
     objetivo = pd.pago_objetivo(rec)
 
-    lineas = ["💼 MI PAGO (no sale del cajón)", ""]
+    # Formato común (2026-11-20): encabezado, lo que toca (o lo atrasado)
+    # arriba, y debajo el desglose de siempre.
+    if objetivo.estado(hoy) == pd.ATRASADO:
+        principal = fmt.cifra(objetivo.monto, f"atrasado desde el {fmt.fecha_corta(objetivo.fecha_programada)}",
+                              emoji="❗")
+    else:
+        principal = fmt.cifra(objetivo.monto, f"toca el {fmt.fecha_corta(objetivo.fecha_programada)}")
+    lineas = [fmt.encabezado("💼", "Mi pago", hoy), principal, "Es solo la cuenta: no sale del cajón.", ""]
     if objetivo.estado(hoy) == pd.ATRASADO:
         atraso = (hoy - objetivo.fecha_programada).days
         lineas.append(f"❗ PAGO ATRASADO: {objetivo.etiqueta} · {pd.fecha_corta(objetivo.fecha_programada, con_dia=True)}")
@@ -354,11 +368,14 @@ def _pantalla(session, config, year: int, month: int, hoy: date) -> tuple[str, s
         lineas.append(f"Págamelo suma {pd.dinero_texto(config.valor_dia)} a su pago; Guárdamelo lo deja a favor.")
 
     lineas.append("")
-    lineas.append("Con otro monto o fecha: /mepagaron 2400 18/11 · Días de más: /diasdemas")
+    # «Días de más: /diasdemas» ahora es el botón «📆 Días de más» (mp:dias,
+    # 2026-11-20). Otro monto o fecha se escribe: no cabe en un botón.
+    lineas.append("Con otro monto o fecha: /mepagaron 2400 18/11")
 
     filas = [[(_etiqueta_boton_pagar(objetivo), f"{PREFIJO}pagar:{_iso(objetivo.fecha_programada)}")]]
     for f in sin_decidir[-4:]:
         filas.append(_botones_dia(f))
+    filas.append([("📆 Días de más", f"{PREFIJO}dias")])
     (ya, ma), (ys, ms) = _mes_vecino(year, month, -1), _mes_vecino(year, month, +1)
     filas.append([
         (f"‹ {_MESES_CORTOS[ma - 1]}", f"{PREFIJO}mes:{ya}{ma:02d}"),
@@ -483,7 +500,13 @@ def _pregunta_pagar(config, datos, programada: date, fecha_pago: date, monto: De
         monto = None
     calculado = monto is None
     total = p.monto if calculado else monto
-    lineas = ([aviso, ""] if aviso else []) + [
+    # Formato común (2026-11-20): encabezado y el monto arriba; el aviso
+    # (cambió el monto, se tomó el atrasado) justo después.
+    lineas = [
+        fmt.encabezado("💼", "Registrar mi pago", hoy),
+        fmt.cifra(total, f"· {p.etiqueta} del {fmt.fecha_corta(programada)}"),
+        "",
+    ] + ([aviso, ""] if aviso else []) + [
         "¿Registro este pago?",
         "",
         f"💵 {p.etiqueta} · {pd.fecha_corta(programada, con_dia=True)} "
@@ -598,7 +621,9 @@ def _pagar_ok(session, crudo: str, *, quien: str, hoy: date) -> tuple[str, str, 
     except (ValueError, PermissionError) as exc:
         session.rollback()
         return "No se pudo", f"No se pudo: {exc}", _volver()
-    texto = (f"✅ Anotado: te pagaron el {p.etiqueta} ({pd.fecha_corta(programada, con_dia=True)}) · "
+    texto = (fmt.encabezado("✅", "Mi pago anotado", _ahora(hoy), hora=True) + "\n"
+             + fmt.cifra(visto, f"· {p.etiqueta} del {fmt.fecha_corta(programada)}") + "\n\n"
+             f"Anotado: te pagaron el {p.etiqueta} ({pd.fecha_corta(programada, con_dia=True)}) · "
              f"{pd.dinero_texto(visto)}, el {pd.fecha_corta(fecha_pago)}.")
     try:
         rec = pd.calcular_recordatorio(config, pd.cargar_datos(session, config), hoy)
@@ -652,10 +677,13 @@ def preparar_deshacer(session, argumento: str = "", *, hoy: date | None = None) 
                 return "No hay ningún pago tuyo registrado; nada que deshacer.", _volver()
         r = datos.registros.get(programada)
         if r is None:
+            # «‹ Mi pago» ya va en los botones (2026-11-20).
             return (f"No tengo registrado el pago del {pd.fecha_corta(programada)}; nada que deshacer.\n"
-                    "Mira /mipago para ver cuáles están pagados."), _volver()
+                    "Toca ‹ Mi pago para ver cuáles están pagados."), _volver()
         etiqueta = pd.desglose_de_pago(config, datos, programada).etiqueta
         texto = (
+            fmt.encabezado("↩️", "Deshacer mi pago", hoy) + "\n"
+            + fmt.cifra(r.monto, f"· {etiqueta} del {fmt.fecha_corta(programada)}") + "\n\n"
             "¿Deshago este pago?\n\n"
             f"↩️ {etiqueta} · {pd.fecha_corta(programada, con_dia=True)} · {pd.dinero_texto(r.monto)}, "
             f"pagado el {pd.fecha_corta(r.fecha_pago)}\n\n"
@@ -698,7 +726,11 @@ def _deshacer_ok(session, crudo: str, *, quien: str, hoy: date) -> tuple[str, st
     etiqueta = pd.desglose_de_pago(config, datos, programada).etiqueta
     estado = "atrasado" if programada < hoy else ("toca hoy" if programada == hoy else "pendiente")
     return ("Deshecho",
-            f"↩️ Deshecho: el {etiqueta} ({pd.fecha_corta(programada, con_dia=True)}) vuelve a estar {estado}.",
+            fmt.mensaje(
+                "↩️", "Mi pago deshecho", cuando=_ahora(hoy), hora=True,
+                principal=fmt.cifra(r.monto, f"· {etiqueta} del {fmt.fecha_corta(programada)}"),
+                detalle=f"Deshecho: el {etiqueta} ({pd.fecha_corta(programada, con_dia=True)}) vuelve a estar {estado}.",
+            ),
             _volver())
 
 
@@ -714,13 +746,15 @@ def _texto_dias(session, config, hoy: date) -> tuple[list[str], list]:
     extras = pd.dias_extra(config, datos, hoy)
     if not extras:
         lineas = [
+            fmt.encabezado("📆", "Tus días de más", hoy),
             f"No tienes días de más desde el inicio de tu cuenta ({pd.fecha_corta(config.fecha_inicio)}).",
             "Un día de más es trabajar en tu descanso sin moverlo: /vino yo ese día.",
         ]
         if not pd.tiene_descanso(datos.horario):
             lineas.append("⚠️ Tu descanso fijo no está guardado en el calendario: sin él no se cuentan.")
         return lineas, []
-    lineas = ["📆 Tus días de más:", ""]
+    # Formato común (2026-11-20): el encabezado y cuántos, arriba.
+    lineas = [fmt.encabezado("📆", "Tus días de más", hoy), _dias(len(extras)) + " de más", ""]
     filas = []
     for e in extras:
         pago = _pago_que_cubre(config, e.fecha)
@@ -753,8 +787,10 @@ def dias_texto_y_botones(session, argumento: str = "", *, hoy: date | None = Non
     def hacer():
         config = _cuenta(session)
         lineas, filas = _texto_dias(session, config, hoy)
-        aviso = f"(/diasdemas no lleva nada después; «{argumento.strip()}» no se usó)\n\n" if (argumento or "").strip() else ""
-        return aviso + "\n".join(lineas), _volver(filas)
+        if (argumento or "").strip():
+            # Debajo del encabezado, que siga siendo la primera línea (2026-11-20).
+            lineas[1:1] = [f"(/diasdemas no lleva nada después; «{argumento.strip()}» no se usó)", ""]
+        return "\n".join(lineas), _volver(filas)
 
     return _a_salvo(session, hacer, botones_si_falla=_volver(mi_pago=False))
 
@@ -771,18 +807,21 @@ def _decidir(session, crudo: str, *, hoy: date) -> tuple[str, str, str]:
     except ValueError:
         session.rollback()
         lineas, filas = _texto_dias(session, config, hoy)
-        return ("Ya no es día de más",
-                f"El {pd.fecha_corta(f, con_dia=True)} ya no es un día de más (se quitó la marca o se movió "
-                "tu descanso). No cambié nada.\n\n" + "\n".join(lineas),
-                _volver(filas))
+        # La nota debajo del encabezado de la lista, que siga arriba (2026-11-20).
+        lineas[1:1] = [f"El {pd.fecha_corta(f, con_dia=True)} ya no es un día de más (se quitó la marca "
+                       "o se movió tu descanso). No cambié nada.", ""]
+        return ("Ya no es día de más", "\n".join(lineas), _volver(filas))
     pago = _pago_que_cubre(config, f)
     datos = pd.cargar_datos(session, config)
+    # Formato común (2026-11-20): encabezado con el día decidido.
     if destino == pd.PAGAR:
-        hecho = (f"💵 Te lo pagamos: el {pd.fecha_corta(f)} suma {pd.dinero_texto(config.valor_dia)} "
+        hecho = (fmt.encabezado("💵", "Día de más", f) + "\n"
+                 f"💵 Te lo pagamos: el {pd.fecha_corta(f)} suma {pd.dinero_texto(config.valor_dia)} "
                  f"a tu pago del {pd.fecha_corta(pago)}.")
         aviso = "Te lo pagamos"
     else:
-        hecho = (f"📦 Te lo guardamos: el {pd.fecha_corta(f)} queda como día a favor "
+        hecho = (fmt.encabezado("📦", "Día de más", f) + "\n"
+                 f"📦 Te lo guardamos: el {pd.fecha_corta(f)} queda como día a favor "
                  f"(tienes {pd.dias_a_favor(config, datos, max(hoy, f))}).")
         aviso = "Te lo guardamos"
     reg = datos.registros.get(pago)
@@ -790,7 +829,8 @@ def _decidir(session, crudo: str, *, hoy: date) -> tuple[str, str, str]:
         hecho += (f"\nOjo: el pago del {pd.fecha_corta(pago)} ya se registró con {pd.dinero_texto(reg.monto)}; "
                   f"esto no lo cambia. Si hay que corregirlo: /deshacermipago {pago:%d/%m} y regístralo otra vez.")
     lineas, filas = _texto_dias(session, config, hoy)
-    return aviso, hecho + "\n\n" + "\n".join(lineas), _volver(filas)
+    # Un solo encabezado: el del día decidido; la lista va sin el suyo (2026-11-20).
+    return aviso, hecho + "\n\n" + fmt.quitar_encabezado("\n".join(lineas)), _volver(filas)
 
 
 # ─── /vino yo · /falta yo · /descanso yo ─────────────────────────────────
@@ -911,7 +951,8 @@ def marcar_dueno(session, accion: str, *, hoy: date | None = None, quien: str = 
             session.rollback()
         except Exception:  # noqa: BLE001
             pass
-    return "\n".join(lineas), botones
+    # Formato común (2026-11-20): «🗓️ TU DÍA · mar 24 nov» arriba.
+    return fmt.encabezado("🗓️", "Tu día", hoy) + "\n" + "\n".join(lineas), botones
 
 
 def _dias_de_mas_de_la_semana(session, hoy: date) -> set[date]:

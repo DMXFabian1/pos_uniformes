@@ -45,7 +45,8 @@ class _Base(unittest.TestCase):
 class SeLeeDeUnVistazoTests(_Base):
     def test_trae_todo_lo_que_importa(self) -> None:
         texto = self._pulso()
-        for pedazo in ("La tienda ahora", "Entró", "corte", "Pantallas", "Respaldo"):
+        # Formato común (2026-11-20): título en mayúsculas y «💰 $X entró».
+        for pedazo in ("LA TIENDA AHORA", "entró", "corte", "Pantallas", "Respaldo"):
             self.assertIn(pedazo, texto, pedazo)
 
     def test_cada_renglon_trae_su_marca(self) -> None:
@@ -68,7 +69,7 @@ class CuandoAlgoFallaTests(_Base):
             texto = self._pulso()
         self.assertIn("no se pudo leer este dato", texto)
         self.assertIn("Respaldo", texto)       # los de después salieron igual
-        self.assertIn("Entró", texto)          # los de antes también
+        self.assertIn("entró", texto)          # los de antes también
 
     def test_lo_que_no_se_sabe_no_se_asume_bien(self) -> None:
         with patch.object(pul, "_respaldo", side_effect=RuntimeError("disco")):
@@ -93,7 +94,7 @@ class CuandoAlgoFallaTests(_Base):
              patch.object(pul, "_respaldo", side_effect=RuntimeError()), \
              patch.object(pul, "_esperando", side_effect=RuntimeError()):
             texto = self._pulso()
-        self.assertIn("La tienda ahora", texto)
+        self.assertIn("LA TIENDA AHORA", texto)
 
 
 class LoQueDiceCadaBloqueTests(_Base):
@@ -133,13 +134,13 @@ class EnganchadoAlBotTests(_Base):
         factory = sessionmaker(self.engine)
         with patch.object(pul, "_respaldo", return_value=["✅ Respaldo: hoy"]):
             texto = bot.atender_texto("/pulso", session_factory=factory)
-        self.assertIn("La tienda ahora", texto)
+        self.assertIn("LA TIENDA AHORA", texto)
 
     def test_esta_en_la_ayuda_y_en_el_menu(self) -> None:
         from pos_uniformes.services import telegram_bot_service as bot
         from pos_uniformes.services import telegram_menu_service as menu
 
-        self.assertIn("/pulso", bot.AYUDA)
+        self.assertIn("/pulso", bot.AYUDA_COMPLETA)
         self.assertIn("m:pulso", {d for fila in menu._RAIZ for _, d in fila})
 
 
@@ -210,8 +211,12 @@ class LaMismaCifraQueHoyTests(_Base):
                                     created_at=momento))
         self.s.commit()
         hoy = texto_hoy(recolectar(self.s, self.hoy))
-        cifra = next(l for l in hoy.splitlines() if "Entró" in l).split("Entró: ")[1]
-        self.assertIn(f"Entró: {cifra}", self._pulso())
+        import re
+
+        # La cifra de /hoy, en el formato que tenga; en el pulso va «💰 $X entró» (2026-11-20).
+        linea = next(l for l in hoy.splitlines() if "ntró" in l)
+        cifra = re.search(r"\$[\d,]+\.\d\d", linea).group(0)
+        self.assertIn(f"💰 {cifra} entró", self._pulso())
 
     def test_los_abonos_no_se_cuentan_dos_veces(self) -> None:
         """Una venta de $450 y un abono de $200 en efectivo: entraron $650,
@@ -225,6 +230,6 @@ class LaMismaCifraQueHoyTests(_Base):
                                     created_at=momento))
         self.s.commit()
         hoy = texto_hoy(recolectar(self.s, self.hoy))
-        self.assertIn("Entró: $650.00", hoy)
+        self.assertIn("$650.00", hoy)   # /hoy cambió de formato (2026-11-20); la cifra es la misma
         self.assertIn("(incluye $200.00 de abonos)", hoy)
-        self.assertIn("Entró: $650.00", self._pulso())
+        self.assertIn("💰 $650.00 entró", self._pulso())

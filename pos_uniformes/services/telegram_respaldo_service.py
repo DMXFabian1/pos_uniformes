@@ -49,6 +49,17 @@ def botones_del_aviso() -> str:
     )
 
 
+def _con_encabezado(principal: str, detalle: str = "") -> str:
+    """El resultado con el formato común del bot (2026-11-20): encabezado con
+    la hora en que terminó, y lo que pasó justo debajo."""
+    from datetime import datetime
+
+    from pos_uniformes.services.telegram_formato import mensaje
+
+    return mensaje("💾", "Respaldo", cuando=datetime.now().astimezone(), hora=True,
+                   principal=principal, detalle=detalle)
+
+
 def _correr_respaldo() -> tuple[bool, str]:
     """Corre el respaldo y devuelve (salió bien, qué decir)."""
     import subprocess
@@ -69,29 +80,29 @@ def _correr_respaldo() -> tuple[bool, str]:
             cwd=str(raiz), capture_output=True, text=True, timeout=SEGUNDOS_TOPE,
         )
     except subprocess.TimeoutExpired:
-        return False, (
-            f"🛑 El respaldo lleva más de {int(SEGUNDOS_TOPE / 60)} minutos y lo corté.\n"
-            "Algo no está bien: revísalo en la tienda."
+        return False, _con_encabezado(
+            f"🛑 El respaldo lleva más de {int(SEGUNDOS_TOPE / 60)} minutos y lo corté.",
+            "Algo no está bien: revísalo en la tienda.",
         )
     except Exception as exc:  # noqa: BLE001
-        return False, f"🛑 No se pudo arrancar el respaldo: {exc}"
+        return False, _con_encabezado(f"🛑 No se pudo arrancar el respaldo: {exc}")
 
     # Se cree el ESTADO y no el código de salida: lo que importa es que haya
     # un archivo del tamaño correcto, no que el proceso haya terminado en 0.
     try:
         estado = est.leer_estado()
     except Exception as exc:  # noqa: BLE001
-        return False, f"🛑 El respaldo corrió pero no se pudo comprobar: {exc}"
+        return False, _con_encabezado(f"🛑 El respaldo corrió pero no se pudo comprobar: {exc}")
 
     # «Al día» no basta: si el de anoche estaba bien y el de ahora falló,
     # el estado sigue al día y el botón decía ✅ de un respaldo que no se
     # hizo. Tiene que haber uno NUEVO (auditoría 2026-11-07, #25).
     nuevo = estado.ultimo is not None and (antes is None or estado.ultimo > antes)
     if estado.al_dia and nuevo:
-        return True, "✅ " + est.texto_resumen(estado).lstrip("✅⚠️ ")
+        return True, _con_encabezado("✅ " + est.texto_resumen(estado).lstrip("✅⚠️ "))
     cola = (proc.stderr or proc.stdout or "").strip().splitlines()
     detalle = cola[-1] if cola else "sin detalle"
-    return False, f"🛑 El respaldo no quedó.\n{detalle}"
+    return False, _con_encabezado("🛑 El respaldo no quedó.", detalle)
 
 
 def atender(dato: str, *, enviar) -> tuple[str, str, str]:
@@ -106,7 +117,7 @@ def atender(dato: str, *, enviar) -> tuple[str, str, str]:
     if not _EN_CURSO.acquire(blocking=False):
         return (
             "Ya lo estoy haciendo",
-            "💾 Ya hay un respaldo en marcha. Te aviso en cuanto termine.",
+            _con_encabezado("⏳ Ya hay un respaldo en marcha.", "Te aviso en cuanto termine."),
             "",
         )
 
@@ -115,7 +126,7 @@ def atender(dato: str, *, enviar) -> tuple[str, str, str]:
             _, texto = _correr_respaldo()
         except Exception as exc:  # noqa: BLE001 — nunca dejar al usuario sin respuesta
             logger.exception("Respaldo desde el celular")
-            texto = f"🛑 El respaldo falló: {exc}"
+            texto = _con_encabezado(f"🛑 El respaldo falló: {exc}")
         finally:
             _EN_CURSO.release()
         try:
@@ -126,7 +137,7 @@ def atender(dato: str, *, enviar) -> tuple[str, str, str]:
     threading.Thread(target=_trabajo, name="respaldo-telegram", daemon=True).start()
     return (
         "Haciendo el respaldo…",
-        "💾 Haciendo el respaldo de la base.\n\n"
-        "Tarda un poco. Te aviso en cuanto termine, salga bien o mal.",
+        _con_encabezado("⏳ Haciendo el respaldo de la base.",
+                        "Tarda un poco. Te aviso en cuanto termine, salga bien o mal."),
         "",
     )

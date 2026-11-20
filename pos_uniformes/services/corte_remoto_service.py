@@ -10,6 +10,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from decimal import Decimal
 
+from pos_uniformes.services.telegram_formato import cifra, encabezado
+
 logger = logging.getLogger(__name__)
 
 
@@ -29,8 +31,13 @@ def texto_estado_actual(session, ahora: datetime | None = None) -> str:
     e = estado_caja(session, ahora)
     avisos = pagos_que_tocan_hoy(session, ahora.date())
     desde = f"desde {e.desde.astimezone():%d/%m %H:%M}" if e.desde else "sin corte previo"
+    # Formato común del bot (2026-11-20): encabezado con la hora, y la cifra
+    # que se viene a buscar —lo que debe haber en el cajón— justo debajo.
     lineas = [
-        f"💰 Caja ahora ({ahora:%d/%m %H:%M}, {desde})",
+        encabezado("💰", "Caja ahora", ahora, hora=True),
+        cifra(e.esperado, "debe haber en el cajón"),
+        "",
+        f"Cuenta {desde}:",
         f"• Venta efectivo: ${e.resumen.efectivo:,.2f} ({texto_operaciones(e.resumen.operaciones, getattr(e.resumen, 'num_abonos', 0), corto=True)})",
     ]
     if e.resumen.tarjeta:
@@ -92,9 +99,14 @@ def texto_propuesta_corte(session, ahora: datetime | None = None) -> str:
     e = estado_caja(session, ahora)
     avisos = pagos_que_tocan_hoy(session, ahora.date())
     de_la_venta = _de_la_venta(e, avisos)
+    # Formato común del bot (2026-11-20): encabezado con fecha y hora, y la
+    # venta en efectivo como cifra principal; el desglose y lo que pasaría
+    # quedan como detalle.
     lineas = [
-        f"🧾 ¿Hacemos el corte? ({ahora:%d/%m %H:%M})",
-        f"• Venta en efectivo: ${e.resumen.efectivo:,.2f} ({texto_operaciones(e.resumen.operaciones, getattr(e.resumen, 'num_abonos', 0), corto=True)})",
+        encabezado("🧾", "¿Hacemos el corte?", ahora, hora=True),
+        cifra(e.resumen.efectivo, "de venta en efectivo "
+              f"({texto_operaciones(e.resumen.operaciones, getattr(e.resumen, 'num_abonos', 0), corto=True)})"),
+        "",
     ]
     if e.resumen.tarjeta:
         lineas.append(f"• Con tarjeta: ${e.resumen.tarjeta:,.2f} (no entra al cajón)")
@@ -123,7 +135,9 @@ def texto_propuesta_corte(session, ahora: datetime | None = None) -> str:
                         f"  se toman ${-de_la_venta:,.2f} del fondo"
                         + (f" y se quedan ${queda:,.2f} para mañana" if queda >= 0
                            else f" y aun así faltan ${-queda:,.2f}")]
-    lineas += ["", "Si lo hago ahora:", *consecuencia, "  se imprime el ticket en la tienda"]
+    if lineas[-1]:
+        lineas.append("")
+    lineas += ["Si lo hago ahora:", *consecuencia, "  se imprime el ticket en la tienda"]
     return "\n".join(lineas)
 
 
@@ -336,7 +350,10 @@ def hacer_corte_y_avisar(
         session.rollback()
 
     retiro = (Decimal(auto.corte.monto_final) - Decimal(auto.corte.reactivo_final)).quantize(Decimal("0.01"))
-    lineas = [f"🧾 Corte hecho {ahora:%d/%m %H:%M}", f"Venta en efectivo: ${auto.estado.resumen.efectivo:,.2f}"]
+    # Formato común del bot (2026-11-20): encabezado con la hora del corte y
+    # la venta en efectivo arriba; lo de la impresora va al pie, aparte.
+    lineas = [encabezado("🧾", "Corte hecho", ahora, hora=True),
+              cifra(auto.estado.resumen.efectivo, "de venta en efectivo"), ""]
     if retirar is not None:
         # Solo para él: qué dice el papel y cuánto se quedó fuera.
         sobrante = (auto.estado.esperado - Decimal(auto.corte.monto_final)).quantize(Decimal("0.01"))
@@ -368,6 +385,7 @@ def hacer_corte_y_avisar(
         lineas.append(f"📝 Nota: «{nota}»")
     # «Encolado» y no «enviado»: lo imprime la PC que tenga la impresora
     # cuando lo tome; si está apagada, /pulso lo dice (2026-10-10).
+    lineas.append("")
     if not papel_completo:
         lineas.append(
             "⚠️ El corte quedó guardado, pero no se pudieron leer sus retiros o entradas: "

@@ -582,7 +582,8 @@ def tarea_periodica(session: Session, *, ahora: datetime | None = None) -> list[
         membresia.recordatorios = int(membresia.recordatorios or 0) + 1
         session.add(membresia)
         session.flush()
-        avisos.append(("⏰ Sigue sin respuesta:\n" + tm.aviso_de_propuesta(session, membresia, ahora=ahora),
+        # La nota al pie: el encabezado del aviso sigue arriba (y _fechada lo reconoce; 2026-11-20).
+        avisos.append((tm.aviso_de_propuesta(session, membresia, ahora=ahora) + "\n\n⏰ Sigue sin respuesta.",
                        tm.botones_de(membresia)))
     return avisos
 

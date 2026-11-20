@@ -294,8 +294,8 @@ class BotTests(unittest.TestCase):
     def test_la_ayuda_los_menciona(self) -> None:
         from pos_uniformes.services import telegram_bot_service as bot
 
-        self.assertIn("/aviso", bot.AYUDA)
-        self.assertIn("/avisos", bot.AYUDA)
+        self.assertIn("/aviso", bot.AYUDA_COMPLETA)
+        self.assertIn("/avisos", bot.AYUDA_COMPLETA)
 
     def test_el_menu_tiene_el_boton(self) -> None:
         from pos_uniformes.services import telegram_menu_service as menu
@@ -910,7 +910,8 @@ class ComandosConBotonesTests(unittest.TestCase):
     def test_un_comando_normal_no_lleva_botones(self) -> None:
         from pos_uniformes.services import telegram_bot_service as bot
 
-        texto, botones = bot.responder("/ayuda", session_factory=self.factory)
+        # «/ayuda» sola lleva el tablero debajo desde 2026-11-20; la completa no.
+        texto, botones = bot.responder("/ayuda todo", session_factory=self.factory)
         self.assertIn("/aviso", texto)
         self.assertEqual(botones, "")
 

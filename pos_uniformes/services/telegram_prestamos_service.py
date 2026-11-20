@@ -23,9 +23,12 @@ palabras de sistema («retiro», «ticket 9e9ad282») donde no hacen falta.
 
 from __future__ import annotations
 
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
+
+from pos_uniformes.services import telegram_formato as fmt
 
 #: Prefijo de los botones de esta pantalla.
 PREFIJO = "pr:"
@@ -62,6 +65,15 @@ def _monto(prestamo) -> Decimal:
     return Decimal(str(prestamo.monto))
 
 
+def _momento(prestamo) -> datetime:
+    """Cuándo lo pidió, en hora local, para el encabezado (2026-11-20). Sin
+    fecha guardada (o rara), ahora: el aviso sale en cuanto se pide."""
+    creado = getattr(prestamo, "created_at", None)
+    if isinstance(creado, datetime):
+        return creado.astimezone() if creado.tzinfo else creado
+    return datetime.now()
+
+
 # ─── La lista (/prestamos) ───────────────────────────────────────────────
 
 
@@ -71,7 +83,9 @@ def texto_y_botones(session: Session) -> tuple[str, str]:
 
     pendientes = pr.pendientes(session)
     if not pendientes:
-        return "No hay préstamos esperando respuesta. ✅", _teclado([[("‹ Menú", "m:raiz")]])
+        texto = fmt.mensaje("💵", "Préstamos", cuando=date.today(),
+                            principal="No hay préstamos esperando respuesta. ✅")
+        return texto, _teclado([[("‹ Menú", "m:raiz")]])
 
     prestamos = [p for p in pendientes if not _es_compra(p)]
     compras = [p for p in pendientes if _es_compra(p)]
@@ -99,7 +113,14 @@ def texto_y_botones(session: Session) -> tuple[str, str]:
                 ("✖️ Que lo pague", f"{PREFIJO}no:{p.id}"),
             ])
     filas.append([("‹ Menú", "m:raiz")])
-    return "\n".join(lineas), _teclado(filas)
+    # Formato común (2026-11-20). Sin una cifra sumada arriba: préstamos y
+    # compras no se suman (uno saca dinero del cajón y la otra no).
+    texto = fmt.mensaje(
+        "💵", "Préstamos y compras a cuenta", cuando=date.today(),
+        principal=f"{len(pendientes)} esperando respuesta",
+        detalle="\n".join(lineas),
+    )
+    return texto, _teclado(filas)
 
 
 # ─── Lo que pasa al tocar un botón ───────────────────────────────────────
@@ -108,25 +129,44 @@ def texto_y_botones(session: Session) -> tuple[str, str]:
 def texto_al_decidir(prestamo, aprobado: bool) -> str:
     """Lo que el bot contesta al decidir: qué pasó y qué pasa con el cajón."""
     nombre, monto = _nombre(prestamo), _monto(prestamo)
+    # Formato común (2026-11-20): qué se decidió en el encabezado, la cifra
+    # debajo y lo que pasa con el cajón en el detalle.
+    ahora = datetime.now()
     if _es_compra(prestamo):
         if aprobado:
-            return (
-                f"✅ Compra a cuenta autorizada: {nombre}, ${monto:,.2f}.\n"
-                f"• {_cuando_se_descuenta(prestamo)}\n"
-                "• El cajón no cambia: ese dinero nunca entró."
+            return fmt.mensaje(
+                "✅", "Compra a cuenta autorizada", cuando=ahora, hora=True,
+                principal=fmt.cifra(monto, f"a cuenta de {nombre}"),
+                detalle=[
+                    f"Compra a cuenta autorizada: {nombre}, ${monto:,.2f}.",
+                    f"• {_cuando_se_descuenta(prestamo)}",
+                    "• El cajón no cambia: ese dinero nunca entró.",
+                ],
             )
-        return (
-            f"✖️ Compra a cuenta NO autorizada: {nombre} paga ${monto:,.2f} en caja.\n"
-            f"• Ahora el corte sí espera esos ${monto:,.2f} en el cajón: cóbraselos.\n"
-            "• En su Libreta le sale el aviso."
+        return fmt.mensaje(
+            "✖️", "Compra a cuenta no autorizada", cuando=ahora, hora=True,
+            principal=fmt.cifra(monto, f"los paga {nombre} en caja"),
+            detalle=[
+                f"Compra a cuenta NO autorizada: {nombre} paga ${monto:,.2f} en caja.",
+                f"• Ahora el corte sí espera esos ${monto:,.2f} en el cajón: cóbraselos.",
+                "• En su Libreta le sale el aviso.",
+            ],
         )
     if aprobado:
-        return (
-            f"✅ Préstamo aprobado: ${monto:,.2f} para {nombre}.\n"
-            f"• Sale ${monto:,.2f} del cajón (ya quedó anotado como retiro del cajón).\n"
-            "• Se le descuenta completo en su siguiente pago."
+        return fmt.mensaje(
+            "✅", "Préstamo aprobado", cuando=ahora, hora=True,
+            principal=fmt.cifra(monto, f"para {nombre}"),
+            detalle=[
+                f"Préstamo aprobado: ${monto:,.2f} para {nombre}.",
+                f"• Sale ${monto:,.2f} del cajón (ya quedó anotado como retiro del cajón).",
+                "• Se le descuenta completo en su siguiente pago.",
+            ],
         )
-    return f"✖️ Préstamo no aprobado: {nombre} no recibe los ${monto:,.2f}. Del cajón no sale nada."
+    return fmt.mensaje(
+        "✖️", "Préstamo no aprobado", cuando=ahora, hora=True,
+        principal=fmt.cifra(monto, f"que pidió {nombre}"),
+        detalle=f"Préstamo no aprobado: {nombre} no recibe los ${monto:,.2f}. Del cajón no sale nada.",
+    )
 
 
 def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
@@ -161,7 +201,8 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
             return str(exc), texto, botones
         texto, botones = texto_y_botones(session)
 
-    return aviso, hecho + "\n\n" + texto, botones
+    # Un solo encabezado: el de lo decidido; la lista va sin el suyo (2026-11-20).
+    return aviso, hecho + "\n\n" + fmt.quitar_encabezado(texto), botones
 
 
 def _es_compra(prestamo) -> bool:
@@ -218,8 +259,15 @@ def aviso_de_solicitud(prestamo, *, session: Session | None = None) -> str:
     consulta falle.
     """
     nombre, monto = _nombre(prestamo), _monto(prestamo)
+    # Formato común (2026-11-20): «🛍️ COMPRA A CUENTA · vie 20 nov · 18:45»,
+    # la cifra debajo y luego lo de siempre.
+    cuando = _momento(prestamo)
     if _es_compra(prestamo):
-        lineas = [f"🛍️ COMPRA A CUENTA · {nombre} compró a cuenta de su pago: ${monto:,.2f}"]
+        lineas = [
+            fmt.encabezado("🛍️", "Compra a cuenta", cuando, hora=True),
+            fmt.cifra(monto, f"· {nombre} compró a cuenta de su pago"),
+            "",
+        ]
         llevo = _lo_que_se_llevo(prestamo, session)
         if llevo:
             lineas.append(f"Se llevó: {llevo}")
@@ -234,7 +282,9 @@ def aviso_de_solicitud(prestamo, *, session: Session | None = None) -> str:
             lineas.extend(detalle)
         return "\n".join(lineas)
     lineas = [
-        f"💵 PRÉSTAMO · {nombre} pide ${monto:,.2f} prestados",
+        fmt.encabezado("💵", "Préstamo", cuando, hora=True),
+        fmt.cifra(monto, f"· {nombre} pide prestado"),
+        "",
         f"Para: {prestamo.motivo}",
         "",
         f"💰 Si lo apruebas: sale del cajón hoy (${monto:,.2f}) y se le descuenta",

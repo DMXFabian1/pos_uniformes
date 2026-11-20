@@ -91,7 +91,7 @@ class AtenderTests(unittest.TestCase):
             self.assertEqual(bot.atender_texto("/resumen", session_factory=_sesion, hoy=date(2026, 9, 8)), "📒 R\n\n🩺 S")
             self.assertEqual(bot.atender_texto("/resumen ayer", session_factory=_sesion, hoy=date(2026, 9, 8)), "📒 R")
         with patch("pos_uniformes.services.resumen_diario_service.texto_solo_pendientes", return_value=""):
-            self.assertEqual(bot.atender_texto("/pendientes", session_factory=_sesion), "Sin pendientes. ✅")
+            self.assertIn("Sin pendientes.", bot.atender_texto("/pendientes", session_factory=_sesion))
         self.assertIn("/corte", bot.atender_texto("/ayuda", session_factory=_sesion))
         suelto = bot.atender_texto("hola", session_factory=_sesion)
         self.assertIn("No entendí", suelto)
@@ -188,8 +188,9 @@ class ArgumentosQueNoSeTragaTests(unittest.TestCase):
     def test_lo_que_no_lleva_argumento_lo_dice(self) -> None:
         with patch("pos_uniformes.services.telegram_inventario_service.contar", return_value="C"):
             r = bot.atender_texto("/contar Playera", session_factory=_sesion)
-        self.assertTrue(r.startswith("(/contar no lleva nada después"))
-        self.assertTrue(r.endswith("C"))
+        # Desde 2026-11-20 el aviso va al pie: arriba manda el encabezado.
+        self.assertTrue(r.startswith("C"))
+        self.assertIn("(/contar no lleva nada después", r)
         with patch("pos_uniformes.services.telegram_inventario_service.contar", return_value="C"):
             self.assertEqual(bot.atender_texto("/contar", session_factory=_sesion), "C")
 

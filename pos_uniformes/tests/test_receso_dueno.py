@@ -86,7 +86,7 @@ class ComandoRecesoTests(_Base):
             self.assertEqual(cal.receso_de(s, "VEND-1"), [])
 
     def test_esta_en_la_ayuda(self) -> None:
-        self.assertIn("/receso 2026-10-27 2026-11-04", bot.AYUDA)
+        self.assertIn("/receso 2026-10-27 2026-11-04", bot.AYUDA_COMPLETA)
 
 
 class VacacionesEnConstruccionTests(_Base):
@@ -100,8 +100,8 @@ class VacacionesEnConstruccionTests(_Base):
             with self.subTest(texto=texto):
                 self.assertEqual(bot.atender_texto(texto, session_factory=self.F), vs.EN_CONSTRUCCION_TEXTO)
         self.assertEqual(bot.responder("/vacaciones", session_factory=self.F), (vs.EN_CONSTRUCCION_TEXTO, ""))
-        self.assertNotIn("/vacaciones", bot.AYUDA)
-        self.assertNotIn("/primas", bot.AYUDA)
+        self.assertNotIn("/vacaciones", bot.AYUDA_COMPLETA)
+        self.assertNotIn("/primas", bot.AYUDA_COMPLETA)
 
     def test_los_botones_viejos_contestan_en_construccion(self) -> None:
         from pos_uniformes.services import telegram_vacaciones_service as tv

@@ -22,6 +22,8 @@ from decimal import Decimal
 
 from sqlalchemy import func, select
 
+from pos_uniformes.services.telegram_formato import cifra, dinero, encabezado, es_encabezado, mensaje
+
 logger = logging.getLogger("alertas")
 
 _CENT = Decimal("0.01")
@@ -117,7 +119,10 @@ def _es_falla_de_red(exc: BaseException) -> bool:
 
 
 def _fechada(alerta, ahora: datetime | None = None) -> str:
-    """El texto, con «(de ayer 18:10)» delante si lleva rato esperando."""
+    """El texto, con «(de ayer 18:10)» delante si lleva rato esperando.
+
+    Formato común (2026-11-20): si el texto ya trae encabezado, el encabezado
+    se queda arriba y lo de «llegó tarde» va al final como nota."""
     ahora = ahora or datetime.now().astimezone()
     creada = alerta.created_at
     if creada is None:
@@ -131,7 +136,10 @@ def _fechada(alerta, ahora: datetime | None = None) -> str:
     local = _local(creada)
     cuando = f"de las {local:%H:%M}" if local.date() == _local(ahora).date() else f"de ayer {local:%H:%M}" \
         if local.date() == _local(ahora).date() - timedelta(days=1) else f"del {local:%d/%m %H:%M}"
-    return f"🕒 ({cuando}) {alerta.texto}"
+    texto = alerta.texto or ""
+    if es_encabezado(texto.splitlines()[0] if texto else ""):
+        return f"{texto}\n\n🕒 Este aviso es {cuando}; llegó tarde."
+    return f"🕒 ({cuando}) {texto}"
 
 
 def enviar_pendientes(session, enviar, ahora: datetime | None = None) -> int:
@@ -165,24 +173,50 @@ def enviar_pendientes(session, enviar, ahora: datetime | None = None) -> int:
         alerta.enviado_at = datetime.now().astimezone()
         enviadas += 1
         session.commit()
+        _retirar_propuesta_si_es_corte(alerta)
     return enviadas
+
+
+#: Avisos de un corte ya hecho (kiosko, PWA, celular sin red, cierre solo).
+_ENCABEZADOS_DE_CORTE = ("🧾 CORTE DE CAJA", "🧾 CORTE HECHO", "🌙 CERRÉ EL DÍA POR TI")
+
+
+def _retirar_propuesta_si_es_corte(alerta) -> None:
+    """Salió el aviso de un corte hecho fuera del bot (kiosko, PWA): la
+    propuesta de la tarde, con sus botones, se quita del chat. Solo el bot
+    tiene el id de la propuesta; el kiosko no (2026-11-20)."""
+    if not str(alerta.texto or "").startswith(_ENCABEZADOS_DE_CORTE):
+        return
+    try:
+        from pos_uniformes.services import corte_propuesta_service as cps
+
+        cps.retirar_si_corte_despues(alerta.created_at or datetime.now().astimezone())
+    except Exception as exc:  # noqa: BLE001 — nunca detiene la cola
+        logger.warning("No se pudo quitar la propuesta del corte: %s", exc)
 
 
 # ----------------------------------------------------------------- textos
 def texto_alerta_corte(corte, venta_efectivo, *, pagos=None, retiros=None) -> str:
-    """Aviso al momento de cualquier corte: quién, venta, pagos, lo que se saca."""
+    """Aviso al momento de cualquier corte: quién, venta, pagos, lo que se saca.
+
+    Formato común (2026-11-20): encabezado con fecha y hora del corte y la
+    venta en efectivo como cifra principal; lo demás queda como detalle."""
     quien = str(corte.creado_por or "").upper() or "?"
-    hora = _local(getattr(corte, "hasta", None) or getattr(corte, "created_at", None)).strftime("%H:%M")
+    momento = _local(getattr(corte, "hasta", None) or getattr(corte, "created_at", None))
     se_saca = (_d(corte.monto_final) - _d(corte.reactivo_final)).quantize(_CENT)
-    lineas = [f"🧾 Corte hecho por {quien} a las {hora}"]
-    lineas.append(f"Venta efectivo ${_d(venta_efectivo):,.2f}")
+    lineas = [
+        encabezado("🧾", "Corte de caja", momento, hora=True),
+        cifra(venta_efectivo, "de venta en efectivo"),
+        "",
+        f"Hecho por {quien}",
+    ]
     detalle = []
     if _d(corte.retiros_pagos) > 0:
-        detalle.append(f"pagos ${_d(corte.retiros_pagos):,.2f}")
+        detalle.append(f"Pagos {dinero(corte.retiros_pagos)}")
     if _d(corte.otros_retiros) > 0:
-        detalle.append(f"retiros ${_d(corte.otros_retiros):,.2f}")
+        detalle.append(f"retiros {dinero(corte.otros_retiros)}")
     if detalle:
-        lineas[-1] += " · " + " · ".join(detalle)
+        lineas.append(" · ".join(detalle))
     for p in pagos or []:
         nombre = (getattr(p, "employee_name", "") or getattr(p, "employee_code", "")).split()[0]
         lineas.append(f"  💵 {nombre}: ${_d(p.total):,.2f}")
@@ -201,23 +235,47 @@ def texto_alerta_corte(corte, venta_efectivo, *, pagos=None, retiros=None) -> st
 
 
 def texto_alerta_retiro(retiro) -> str:
-    hora = _local(getattr(retiro, "created_at", None)).strftime("%H:%M")
-    return f"💸 Retiro del cajón: ${_d(retiro.monto):,.2f} — {retiro.motivo} ({str(retiro.creado_por).upper()}, {hora})"
+    """Formato común (2026-11-20): encabezado con la hora y el monto arriba."""
+    momento = _local(getattr(retiro, "created_at", None))
+    return mensaje(
+        "💸", "Retiro del cajón", cuando=momento, hora=True,
+        principal=f"{cifra(retiro.monto)} — {retiro.motivo}",
+        detalle=[f"Lo sacó {str(retiro.creado_por).upper()}"],
+    )
+
+
+def botones_ver_corte() -> str:
+    """El botón que lleva a la propuesta del corte (2026-11-20).
+
+    Reemplaza el «Manda /corte»: `cc:volver` ya existe y enseña la propuesta
+    con las cifras de ese momento y sus botones para hacerlo (o «Hoy no»).
+    Un toque de más que /corte, pero nada se hace sin ver la cifra."""
+    from pos_uniformes.services import telegram_corte_botones_service as cb
+    from pos_uniformes.services import telegram_service
+
+    return telegram_service.teclado([[("🧾 Ver el corte para hacerlo", f"{cb.PREFIJO}volver")]])
 
 
 def texto_sin_corte(dia: date, cierre) -> str:
-    return (
-        f"⏰ Ya cerró la tienda ({cierre.strftime('%H:%M')}) y hoy no se ha hecho corte.\n"
-        "Manda /corte para hacerlo ahora."
+    """Formato común (2026-11-20); la acción va en `botones_ver_corte()`."""
+    return mensaje(
+        "⏰", "Sin corte", cuando=dia,
+        principal=f"Ya cerró la tienda ({cierre.strftime('%H:%M')}) y hoy no se ha hecho corte.",
+        pie="Toca el botón para hacerlo ahora.",
     )
 
 
 def texto_fuera_de_horario(row, apertura, cierre) -> str:
+    """Formato común (2026-11-20): encabezado con la hora del movimiento."""
     momento = _local(row.created_at)
     nombre = (row.employee_name or row.employee_code or "?").split()[0]
-    return (
-        f"🚨 Movimiento fuera de horario: {row.tipo} ${_d(row.monto_total):,.2f} por {nombre} "
-        f"a las {momento.strftime('%H:%M')} (horario {apertura.strftime('%H:%M')}–{cierre.strftime('%H:%M')})"
+    return mensaje(
+        "🚨", "Fuera de horario", cuando=momento, hora=True,
+        principal=cifra(row.monto_total, f"{row.tipo} por {nombre}"),
+        detalle=[
+            f"Movimiento fuera de horario a las {momento.strftime('%H:%M')} "
+            f"(horario {apertura.strftime('%H:%M')}–{cierre.strftime('%H:%M')})"
+        ],
     )
 
 
@@ -390,7 +448,8 @@ class Vigilante:
                 return []
             self.impresion_avisada = None
             self._recordar()
-            return ["✅ Ya salió lo que estaba atorado en la cola de impresión."]
+            return [mensaje("✅", "Impresión", cuando=ahora, hora=True,
+                            principal="Ya salió lo que estaba atorado en la cola de impresión.")]
         if self.impresion_avisada is not None:
             return []      # mismo atorón (o uno que empezó mientras): ya se dijo
         self.impresion_avisada = int(atorados[0].id)
@@ -401,11 +460,12 @@ class Vigilante:
             cuantos[nombre] = cuantos.get(nombre, 0) + 1
         detalle = ", ".join(f"{n} {nombre}" for nombre, n in sorted(cuantos.items()))
         desde = _local(atorados[0].created_at) if atorados[0].created_at else ahora
-        return [
-            f"🖨 No está saliendo el papel: {detalle} esperando desde las {desde:%H:%M}.\n"
-            "Las empleadas creen que sí salió. Revisa que esté prendida la PC con las impresoras "
-            "(el Servidor de impresión); en cuanto prenda, sale solo y te aviso."
-        ]
+        return [mensaje(
+            "🖨", "Impresión atorada", cuando=ahora, hora=True,
+            principal=f"No está saliendo el papel: {detalle} esperando desde las {desde:%H:%M}.",
+            detalle=["Las empleadas creen que sí salió. Revisa que esté prendida la PC con las impresoras "
+                     "(el Servidor de impresión); en cuanto prenda, sale solo y te aviso."],
+        )]
 
     def _resumen_que_no_salio(self, session, ahora: datetime) -> list[str]:
         """Si a la hora del resumen + 100 min no salió (la tarea de Windows no
@@ -429,9 +489,13 @@ class Vigilante:
         texto = formatear(recolectar(session, hoy, todo_el_dia=True))
         salud = texto_salud(session, ahora=ahora)
         anotar_resumen_enviado(hoy)
+        # El encabezado del resumen se queda arriba (formato común,
+        # 2026-11-20); el «llegó tarde» va justo debajo.
+        arriba, _, resto = texto.partition("\n\n")
+        nota = (f"⏰ El resumen de las {hora_resumen(hoy):%H:%M} no salió (la tarea programada no corrió); "
+                "te lo mando yo.")
         return [
-            f"⏰ El resumen de las {hora_resumen(hoy):%H:%M} no salió (la tarea programada no corrió); "
-            "te lo mando yo.\n\n" + texto + (f"\n\n{salud}" if salud else "")
+            arriba + "\n\n" + nota + (f"\n\n{resto}" if resto else "") + (f"\n\n{salud}" if salud else "")
         ]
 
     def _revision_fallo(self, nombre: str, exc: BaseException, ahora: datetime) -> list[str]:
@@ -441,8 +505,11 @@ class Vigilante:
         if avisado or (ahora - desde) < timedelta(minutes=MINUTOS_REVISION_ROTA):
             return []
         self._fallando[nombre] = (desde, True)
-        return [f"⚠️ Desde las {desde:%H:%M} no puedo revisar {nombre}: {str(exc)[:150]}\n"
-                "Mientras tanto, de eso no te va a llegar ningún aviso."]
+        return [mensaje(
+            "⚠️", "Vigilante", cuando=ahora, hora=True,
+            principal=f"Desde las {desde:%H:%M} no puedo revisar {nombre}: {str(exc)[:150]}",
+            detalle=["Mientras tanto, de eso no te va a llegar ningún aviso."],
+        )]
 
     def _movimientos_fuera_de_horario(self, session, ahora: datetime) -> list[str]:
         from pos_uniformes.database.models import LibretaVenta
@@ -475,8 +542,12 @@ class Vigilante:
             return [texto_fuera_de_horario(*f) for f in fuera]
         # Varias en la misma vuelta (Daniel capturando de noche): un mensaje,
         # no una ráfaga.
-        _, apertura, cierre = fuera[0]
-        renglones = [f"🚨 {len(fuera)} movimientos fuera de horario (horario {apertura:%H:%M}–{cierre:%H:%M}):"]
+        primero, apertura, cierre = fuera[0]
+        renglones = [
+            encabezado("🚨", "Fuera de horario", _local(primero.created_at)),
+            f"{len(fuera)} movimientos fuera de horario (horario {apertura:%H:%M}–{cierre:%H:%M}):",
+            "",
+        ]
         for row, _a, _c in fuera[:10]:
             nombre = (row.employee_name or row.employee_code or "?").split()[0]
             renglones.append(f"• {_local(row.created_at):%H:%M} {row.tipo} ${_d(row.monto_total):,.2f} por {nombre}")
@@ -520,7 +591,8 @@ class Vigilante:
         )
         if not hubo_movimiento:
             return []
-        return [texto_sin_corte(hoy, cierre)]
+        # Con el botón de la propuesta en vez de «Manda /corte» (2026-11-20).
+        return [(texto_sin_corte(hoy, cierre), botones_ver_corte())]
 
 
     def _corte_que_no_se_hizo(self, session, ahora: datetime) -> list[str]:
@@ -551,10 +623,13 @@ class Vigilante:
         inicio = datetime.combine(hoy, datetime.min.time()).astimezone()
         if not session.scalar(select(func.count(LibretaVenta.id)).where(LibretaVenta.created_at >= inicio)):
             return []
-        return [
-            "⚠️ El corte de hoy no se hizo: ni con la propuesta ni con el cierre automático.\n"
-            "Lo vendido sigue esperando corte. Hazlo con /corte cuando puedas."
-        ]
+        # Formato común y botón en vez de «Hazlo con /corte» (2026-11-20).
+        return [(mensaje(
+            "⚠️", "Corte sin hacer", cuando=hoy,
+            principal="El corte de hoy no se hizo: ni con la propuesta ni con el cierre automático.",
+            detalle=["Lo vendido sigue esperando corte."],
+            pie="Toca el botón para hacerlo cuando puedas.",
+        ), botones_ver_corte())]
 
     def _respaldo_viejo(self, ahora: datetime) -> list[str]:
         """Avisa una vez al día si el último respaldo ya tiene días.
@@ -669,7 +744,8 @@ class Vigilante:
                     self.pantallas_avisadas.discard(ident)
                     self._avisadas_guardadas = (hoy, tuple(self.pantallas_avisadas))
                     self._recordar()
-                    textos.append(f"✅ {nombre} ya volvió.")
+                    textos.append(mensaje("✅", "Pantalla", cuando=ahora, hora=True,
+                                          principal=f"{nombre} ya volvió."))
                 continue
             if ident not in self.pantallas_vistas_hoy:
                 continue          # no es que se apagara: nunca estuvo hoy
@@ -688,10 +764,11 @@ class Vigilante:
             self.pantallas_avisadas.add(ident)
             self._avisadas_guardadas = (hoy, tuple(self.pantallas_avisadas))
             self._recordar()
-            textos.append(
-                f"⚠️ {nombre} lleva {int(minutos)} min sin responder, y la tienda "
-                "está abierta.\nSi está apagada, ahí no se puede cotizar ni vender."
-            )
+            textos.append(mensaje(
+                "⚠️", "Pantalla apagada", cuando=ahora, hora=True,
+                principal=f"{nombre} lleva {int(minutos)} min sin responder, y la tienda está abierta.",
+                detalle=["Si está apagada, ahí no se puede cotizar ni vender."],
+            ))
         return textos
 
 
@@ -761,11 +838,13 @@ def _vuelta_sin_base(exc: BaseException, enviar, ahora: datetime | None = None) 
     if _base_falla_avisada or ahora - _base_falla_desde < timedelta(minutes=MINUTOS_BASE_CAIDA):
         return
     try:
-        enviar(
-            f"⚠️ Desde las {_base_falla_desde:%H:%M} no puedo leer la base: {str(exc).splitlines()[0][:150] if str(exc) else type(exc).__name__}\n"
-            "Mientras siga así no te llegan avisos y los botones de dinero no funcionan. "
-            "¿Está prendida la PC servidor?"
-        )
+        causa = str(exc).splitlines()[0][:150] if str(exc) else type(exc).__name__
+        enviar(mensaje(
+            "⚠️", "Sin base", cuando=ahora, hora=True,
+            principal=f"Desde las {_base_falla_desde:%H:%M} no puedo leer la base: {causa}",
+            detalle=["Mientras siga así no te llegan avisos y los botones de dinero no funcionan. "
+                     "¿Está prendida la PC servidor?"],
+        ))
         _base_falla_avisada = True
     except Exception:  # noqa: BLE001 — sin internet tampoco: se intenta en la siguiente vuelta
         logger.debug("No se pudo avisar que la base está caída", exc_info=True)
@@ -776,7 +855,8 @@ def _vuelta_con_base(enviar, ahora: datetime | None = None) -> None:
     if _base_falla_avisada and _base_falla_desde is not None:
         ahora = ahora or datetime.now()
         try:
-            enviar(f"✅ La base volvió ({ahora:%H:%M}). Los avisos de mientras salen ahora.")
+            enviar(mensaje("✅", "Base", cuando=ahora, hora=True,
+                           principal=f"La base volvió ({ahora:%H:%M}). Los avisos de mientras salen ahora."))
         except Exception:  # noqa: BLE001
             logger.debug("No se pudo avisar que la base volvió", exc_info=True)
     _base_falla_desde = None
@@ -858,9 +938,10 @@ def _abonos_faltantes(session, enviar, ahora: datetime | None = None) -> int:
     if not repuestos:
         return 0
     logger.info("Monedero: se repusieron %s abonos que faltaban", repuestos)
-    texto = (
-        f"👛 Monedero: {repuestos} venta{'s' if repuestos != 1 else ''} con cliente "
-        f"se habían quedado sin su abono. Ya se repus{'ieron' if repuestos != 1 else 'o'}."
+    texto = mensaje(
+        "👛", "Monedero", cuando=ahora, hora=True,
+        principal=(f"{repuestos} venta{'s' if repuestos != 1 else ''} con cliente "
+                   f"se habían quedado sin su abono. Ya se repus{'ieron' if repuestos != 1 else 'o'}."),
     )
     if not encolar(session, texto, ""):
         return 0

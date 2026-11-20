@@ -61,6 +61,12 @@ def _teclado(filas):
     return telegram_service.teclado(filas)
 
 
+def botones_raiz() -> str:
+    """Los botones del tablero, para pegarlos debajo de otro mensaje (la
+    ayuda corta, 2026-11-20). Son los mismos callbacks `m:…` de siempre."""
+    return _teclado(_RAIZ)
+
+
 def menu_raiz(session=None, *, hoy: date | None = None) -> tuple[str, str]:
     """(texto, botones) del tablero.
 
@@ -68,8 +74,44 @@ def menu_raiz(session=None, *, hoy: date | None = None) -> tuple[str, str]:
     y saber cómo va la tienda tiene que ser el mismo gesto (Daniel, 2026-09-25:
     "que sea increíblemente completo y fácil de usar")."""
     if session is None:
-        return "¿Qué quieres ver?", _teclado(_RAIZ)
+        return _sin_dia(hoy), _teclado(_RAIZ)
     return cabecera(session, hoy=hoy), _teclado(_RAIZ)
+
+
+#: La pregunta con la que cierra el tablero.
+PREGUNTA = "¿Qué quieres ver?"
+
+
+def _titulo(hoy: date | None = None) -> str:
+    """«📋 TIENDA · vie 20 nov · 14:30»: el encabezado del menú fijado
+    (formato común del bot, 2026-11-20). La hora dice qué tan fresco está:
+    el tablero se reescribe solo cada tantos minutos."""
+    from datetime import datetime
+
+    from pos_uniformes.services.telegram_formato import encabezado
+
+    ahora = datetime.now()
+    if hoy is None or hoy == ahora.date():
+        return encabezado("📋", "Tienda", ahora, hora=True)
+    return encabezado("📋", "Tienda", hoy)
+
+
+def _sin_dia(hoy: date | None = None) -> str:
+    """El tablero cuando no se pudo leer el día: encabezado y la pregunta."""
+    return _titulo(hoy) + "\n" + PREGUNTA
+
+
+def _sin_su_encabezado(texto: str) -> str:
+    """`texto_hoy()` trae su propio encabezado («📅 Hoy · …»); en el tablero
+    manda el de la tienda, así que el suyo se quita (2026-11-20)."""
+    from pos_uniformes.services.telegram_formato import es_encabezado
+
+    lineas = texto.splitlines()
+    if lineas and (lineas[0].startswith("📅") or es_encabezado(lineas[0])):
+        lineas = lineas[1:]
+    while lineas and not lineas[0].strip():
+        lineas = lineas[1:]
+    return "\n".join(lineas)
 
 
 def cabecera(session, *, hoy: date | None = None) -> str:
@@ -88,7 +130,9 @@ def cabecera(session, *, hoy: date | None = None) -> str:
         ]
         texto = texto_hoy(datos, quien_esta=estan)
     except Exception:  # noqa: BLE001 — el tablero no puede quedarse sin botones
-        return "¿Qué quieres ver?"
+        return _sin_dia(hoy)
+    cuerpo = _sin_su_encabezado(texto)
+    texto = _titulo(hoy) + ("\n" + cuerpo if cuerpo else "")
     # El pago de Daniel, si hoy toca o va atrasado: el menú de la mañana es lo
     # primero que ve (2026-11-19). Sin cuenta, sin tablas o con error, nada.
     try:
@@ -99,7 +143,7 @@ def cabecera(session, *, hoy: date | None = None) -> str:
         linea = ""
     if linea:
         texto += "\n\n" + linea
-    return texto + "\n\n¿Qué quieres ver?"
+    return texto + "\n\n" + PREGUNTA
 
 
 def _con_volver(filas=None) -> str:
@@ -126,7 +170,9 @@ def atender(dato: str, *, session_factory, hoy: date | None = None) -> tuple[str
         return "", texto, botones
 
     if accion == "gente":
-        return "", "¿De las muchachas, qué?", _con_volver(_gente())
+        from pos_uniformes.services.telegram_formato import encabezado
+
+        return "", encabezado("👥", "Las muchachas") + "\n¿De las muchachas, qué?", _con_volver(_gente())
 
     # Pagar a alguien: el desglose primero, el dinero después.
     if accion.startswith("pagar:"):
@@ -150,11 +196,17 @@ def atender(dato: str, *, session_factory, hoy: date | None = None) -> tuple[str
                 ahora_es = pg.monto_pendiente(session, code, hoy=hoy)
                 visto = bot.leer_cifra(mostrado)
                 if visto is not None and ahora_es > 0 and abs(ahora_es - visto) >= Decimal("0.01"):
+                    from pos_uniformes.services.telegram_formato import SALTO
+
                     texto = pg.desglose_por_code(session, code, hoy=hoy)
+                    # Un solo encabezado y una sola cifra 💰: los del desglose
+                    # («💵 PAGO A … / 💰 $X a pagar»); el aviso va debajo (2026-11-20).
+                    arriba, _, resto = texto.partition(SALTO)
+                    aviso_monto = (f"⚠️ El monto cambió desde que lo viste: era ${visto:,.2f} y ahora es "
+                                   f"${ahora_es:,.2f}. No pagué nada.")
                     return (
                         "Cambió el monto",
-                        f"El monto cambió desde que lo viste: era ${visto:,.2f} y ahora es ${ahora_es:,.2f}. "
-                        "No pagué nada.\n\n" + texto,
+                        SALTO.join(p for p in (arriba, aviso_monto, resto) if p),
                         _con_volver([[("✅ Sí, pagar", f"{PREFIJO}pagarok:{code}:{ahora_es:.2f}")]]),
                     )
             texto = pg.pagar_por_code(session, code, quien=bot.CODIGO_REMOTO, hoy=hoy)

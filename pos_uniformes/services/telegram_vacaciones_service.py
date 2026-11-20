@@ -17,6 +17,8 @@ from datetime import date
 
 from sqlalchemy.orm import Session
 
+from pos_uniformes.services import telegram_formato as fmt
+
 PREFIJO = "vc:"
 _ABREV = ("lun", "mar", "mié", "jue", "vie", "sáb", "dom")
 
@@ -46,16 +48,19 @@ def texto_y_botones(session: Session, *, hoy=None) -> tuple[str, str]:
     pendientes = session.query(SolicitudVacaciones).filter(
         SolicitudVacaciones.estado == vs.PEDIDO).order_by(SolicitudVacaciones.desde).all()
     primas = vs.primas_pendientes(session)
-    if not pendientes:
-        texto = "No hay vacaciones esperando respuesta. ✅"
-    else:
-        lineas = ["🏖️ Vacaciones por responder:", ""]
-        for s in pendientes:
-            lineas.append(f"· #{s.id} {_pila(s)} — {_d(s.desde)} a {_d(s.hasta)} ({s.dias} días)")
-        texto = "\n".join(lineas)
+    # Formato común (2026-11-20). Las primas siguen con /primas: no hay un
+    # botón que las liste (solo el de «Ya pagué» dentro de /primas).
+    pie = ""
     if primas:
         total = sum(p.monto for p in primas)
-        texto += f"\n\n💵 Primas vacacionales sin pagar: {len(primas)} (${total:,.2f}) → /primas"
+        pie = f"💵 Primas vacacionales sin pagar: {len(primas)} (${total:,.2f}) → /primas"
+    if not pendientes:
+        texto = fmt.mensaje("🏖️", "Vacaciones", cuando=hoy or date.today(),
+                            principal="No hay vacaciones esperando respuesta. ✅", pie=pie)
+    else:
+        lineas = [f"· #{s.id} {_pila(s)} — {_d(s.desde)} a {_d(s.hasta)} ({s.dias} días)" for s in pendientes]
+        texto = fmt.mensaje("🏖️", "Vacaciones", cuando=hoy or date.today(),
+                            principal=f"{len(pendientes)} por responder", detalle=lineas, pie=pie)
     filas = [[(f"👀 {_pila(s)} · {_d(s.desde)}", f"{PREFIJO}ver:{s.id}")] for s in pendientes]
     filas.append([("‹ Menú", "m:raiz")])
     return texto, _teclado(filas)
@@ -71,8 +76,12 @@ def detalle(session: Session, sid: int, *, hoy=None) -> tuple[str, list]:
         return "Esa solicitud ya no existe.", []
     p = session.get(PeriodoVacaciones, s.periodo_id)
     sal = vs.saldo(session, s.employee_code, periodo_id=s.periodo_id)
+    # Formato común (2026-11-20): encabezado con el número (lo pide
+    # «/vacaciones no N») y el día en que empiezan.
     lineas = [
-        f"🏖️ #{s.id} {s.employee_name or s.employee_code} pide vacaciones",
+        fmt.encabezado("🏖️", f"Vacaciones #{s.id}", s.desde),
+        f"{s.employee_name or s.employee_code} pide vacaciones",
+        "",
         f"Del {_d(s.desde)} al {_d(s.hasta)}: {s.dias} días laborables",
     ]
     if s.motivo:
@@ -135,17 +144,25 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
         try:
             if que == "ok":
                 s = vs.aprobar(session, num, quien=quien)
-                aviso, hecho = "Aprobado", (
-                    f"✅ {_pila(s)} de vacaciones del {_d(s.desde)} al {_d(s.hasta)}. "
-                    "Ya está en el calendario; a ella se le avisa en la Libreta."
-                    + (f"\nPrima pendiente: ${s.prima_estimada:,.2f} → /primas" if s.prima_estimada else "")
+                aviso, hecho = "Aprobado", fmt.mensaje(
+                    "✅", "Vacaciones aprobadas", cuando=s.desde,
+                    principal=f"{_pila(s)} de vacaciones del {_d(s.desde)} al {_d(s.hasta)}.",
+                    detalle="Ya está en el calendario; a ella se le avisa en la Libreta.",
+                    pie=f"Prima pendiente: ${s.prima_estimada:,.2f} → /primas" if s.prima_estimada else "",
                 )
             elif que == "no":
                 s = vs.rechazar(session, num, quien=quien)
-                aviso, hecho = "Rechazado", f"✖️ No se aprobaron las vacaciones de {_pila(s)}."
+                aviso, hecho = "Rechazado", fmt.mensaje(
+                    "✖️", "Vacaciones no aprobadas", cuando=s.desde,
+                    principal=f"No se aprobaron las vacaciones de {_pila(s)}.",
+                )
             elif que == "pp":
                 p = vs.marcar_prima_pagada(session, num, quien=quien)
-                aviso, hecho = "Pagada", f"💵 Prima de {p.employee_code} (${p.monto:,.2f}) marcada pagada."
+                aviso, hecho = "Pagada", fmt.mensaje(
+                    "💵", "Prima pagada", cuando=date.today(),
+                    principal=fmt.cifra(p.monto, f"de {p.employee_code}"),
+                    detalle=f"Prima de {p.employee_code} (${p.monto:,.2f}) marcada pagada.",
+                )
             else:
                 return "No conozco ese botón", "", ""
             session.commit()
@@ -154,7 +171,8 @@ def atender(dato: str, *, session_factory, quien: str) -> tuple[str, str, str]:
             texto, botones = texto_y_botones(session)
             return str(exc), texto, botones
         texto, botones = texto_y_botones(session)
-    return aviso, hecho + "\n\n" + texto, botones
+    # Un solo encabezado: el de lo decidido; la lista va sin el suyo (2026-11-20).
+    return aviso, hecho + "\n\n" + fmt.quitar_encabezado(texto), botones
 
 
 def comando(session: Session, argumento: str, *, quien: str) -> str:
@@ -176,7 +194,10 @@ def comando(session: Session, argumento: str, *, quien: str) -> str:
         except vs.NoSePuede as exc:
             session.rollback()
             return str(exc)
-        return f"✖️ Rechazadas las vacaciones de {_pila(s)}" + (f": «{motivo}»" if motivo else ".")
+        return fmt.mensaje(
+            "✖️", "Vacaciones rechazadas", cuando=s.desde,
+            principal=f"Rechazadas las vacaciones de {_pila(s)}" + (f": «{motivo}»" if motivo else "."),
+        )
     return "Así: /vacaciones (lista) o /vacaciones no 12 motivo"
 
 
@@ -185,15 +206,23 @@ def primas(session: Session) -> tuple[str, str]:
 
     pendientes = vs.primas_pendientes(session)
     if not pendientes:
-        return "No hay primas vacacionales pendientes. ✅", _teclado([[("‹ Menú", "m:raiz")]])
-    lineas = ["💵 Primas vacacionales sin pagar (se pagan aparte de la nómina semanal):", ""]
+        texto = fmt.mensaje("💵", "Primas vacacionales", cuando=date.today(),
+                            principal="No hay primas vacacionales pendientes. ✅")
+        return texto, _teclado([[("‹ Menú", "m:raiz")]])
+    # Formato común (2026-11-20): lo que falta pagar, sumado, arriba.
+    lineas = ["Se pagan aparte de la nómina semanal:"]
     filas = []
     for p in pendientes:
         lineas.append(f"· {p.employee_code}: {p.dias} días × ${p.salario_diario:,.2f} × {p.porcentaje}% = ${p.monto:,.2f}")
         filas.append([(f"✅ Ya pagué {p.employee_code} ${p.monto:,.0f}", f"{PREFIJO}pp:{p.id}")])
-    lineas.append("\nBase: sueldo semanal / 7, sin comisiones (REVISAR con el contador).")
     filas.append([("‹ Menú", "m:raiz")])
-    return "\n".join(lineas), _teclado(filas)
+    texto = fmt.mensaje(
+        "💵", "Primas vacacionales", cuando=date.today(),
+        principal=fmt.cifra(sum(p.monto for p in pendientes), "sin pagar"),
+        detalle=lineas,
+        pie="Base: sueldo semanal / 7, sin comisiones (REVISAR con el contador).",
+    )
+    return texto, _teclado(filas)
 
 
 def ingreso(session: Session, argumento: str, *, quien: str) -> str:
@@ -222,8 +251,11 @@ def ingreso(session: Session, argumento: str, *, quien: str) -> str:
         session.rollback()
         return str(exc)
     e = vs.expediente(session, code)
-    return (f"📁 {code}: ingreso {fecha:%d/%m/%Y}, {e.anios_cumplidos} año(s) cumplidos. "
-            f"Periodos generados: {len(nuevos)} · disponibles {e.disponible} días.")
+    return fmt.mensaje(
+        "📁", "Fecha de ingreso",
+        principal=f"{code}: ingreso {fecha:%d/%m/%Y}, {e.anios_cumplidos} año(s) cumplidos.",
+        detalle=f"Periodos generados: {len(nuevos)} · disponibles {e.disponible} días.",
+    )
 
 
 def aviso_de_solicitud(s, *, session: Session | None = None) -> str:
@@ -232,8 +264,13 @@ def aviso_de_solicitud(s, *, session: Session | None = None) -> str:
             return detalle(session, s.id)[0]
         except Exception:  # noqa: BLE001 — el aviso sale aunque falte el panorama
             pass
-    return (f"🏖️ #{s.id} {s.employee_name or s.employee_code} pide vacaciones del "
-            f"{_d(s.desde)} al {_d(s.hasta)} ({s.dias} días). /vacaciones")
+    # Sin «/vacaciones» al final (2026-11-20): el aviso ya lleva el botón
+    # «🏖️ Ver todas» (botones_de).
+    return fmt.mensaje(
+        "🏖️", f"Vacaciones #{s.id}", cuando=s.desde,
+        principal=f"{s.employee_name or s.employee_code} pide vacaciones",
+        detalle=f"Del {_d(s.desde)} al {_d(s.hasta)} ({s.dias} días).",
+    )
 
 
 def botones_de(s) -> str:

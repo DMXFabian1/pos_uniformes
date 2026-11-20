@@ -345,7 +345,7 @@ class BajarleALaVentaTests(unittest.TestCase):
                 "cc:retirar", session_factory=self.factory, quien="VEND-1"
             )
         self.assertNotEqual(aviso, "No conozco ese botón")
-        self.assertIn("¿Cuánto le bajo a la venta?", texto)
+        self.assertIn("¿CUÁNTO LE BAJO A LA VENTA?", texto)   # encabezado (2026-11-20)
 
     def test_la_pantalla_avisa_que_no_sale_en_el_ticket(self) -> None:
         texto, _ = cb.pantalla_bajar(Decimal("7098"), Decimal("1368"))
