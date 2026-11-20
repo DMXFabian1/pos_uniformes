@@ -129,7 +129,9 @@ def _cuando_te_pagaron(f: date, hoy: date) -> str:
         return f"hoy, {pd.fecha_corta(f, con_dia=True)}"
     if f == hoy - timedelta(days=1):
         return f"ayer, {pd.fecha_corta(f, con_dia=True)}"
-    return pd.fecha_corta(f, con_dia=True)
+    texto = pd.fecha_corta(f, con_dia=True)
+    # De otro año se dice: «lun 28-dic» a secas parecería de este.
+    return texto if f.year == hoy.year else f"{texto} de {f.year}"
 
 
 def es_sin_tablas(exc: BaseException) -> bool:
@@ -365,11 +367,19 @@ def _pantalla(session, config, year: int, month: int, hoy: date) -> tuple[str, s
 # ─── /mepagaron ──────────────────────────────────────────────────────────
 
 
+#: Hasta cuántos días atrás un «dd/mm» sin año puede ser del año pasado
+#: (a inicios de enero, un día de diciembre).
+_DIAS_ATRAS_SIN_ANIO = 45
+
+
 def _leer_dia(texto: str, hoy: date, *, hacia_atras: bool) -> date | None:
     """«18/11», «18/11/2026», «hoy», «ayer», «antier» → fecha (None si no lo es).
 
-    `hacia_atras`: un «28/12» sin año que caería en el futuro es del año
-    pasado (la fecha en que te pagaron); si no, el más cercano a hoy."""
+    `hacia_atras` (la fecha en que te pagaron): sin año es de este año, y si
+    cae en el futuro se queda en el futuro para que se rechace. Solo a
+    inicios de año un «28/12» es del año pasado (hasta ~6 semanas atrás):
+    antes, «24/11» escrito el 19-nov se volvía 24-nov del año pasado y se
+    registraba sin aviso (revisión 2026-11-19). Si no, el más cercano a hoy."""
     t = texto.strip().lower()
     if t == "hoy":
         return hoy
@@ -386,7 +396,13 @@ def _leer_dia(texto: str, hoy: date, *, hacia_atras: bool) -> date | None:
         return date(anio, mes, d)
     if hacia_atras:
         f = date(hoy.year, mes, d)
-        return f if f <= hoy else date(hoy.year - 1, mes, d)
+        if f <= hoy:
+            return f
+        try:
+            antes = date(hoy.year - 1, mes, d)
+        except ValueError:        # un 29/02 que el año pasado no tuvo
+            return f
+        return antes if (hoy - antes).days <= _DIAS_ATRAS_SIN_ANIO else f
     return min((date(a, mes, d) for a in (hoy.year - 1, hoy.year, hoy.year + 1)),
                key=lambda f: abs((f - hoy).days))
 

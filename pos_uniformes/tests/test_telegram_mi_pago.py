@@ -573,3 +573,31 @@ class AvisoTests(_ConBase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+# ─── Hallazgos de la revisión (2026-11-19) ───────────────────────────────
+
+
+class FechaSinAnioTests(_ConBase):
+    def setUp(self) -> None:
+        super().setUp()
+        self._configurar(JUE_19)
+
+    def test_una_fecha_futura_sin_anio_se_rechaza(self) -> None:
+        """«24/11» con hoy 19-nov era el 24-nov-2025 y se registraba."""
+        for arg in ("24/11", "1/12"):
+            with self.subTest(arg=arg):
+                texto, botones = self._responder(f"/mepagaron {arg}")
+                self.assertIn("no puede ser futura", texto)
+                self.assertNotIn("mp:pagarok:", botones)
+        self.assertEqual(self._registros(), {})
+
+    def test_a_inicios_de_enero_un_dia_de_diciembre_es_del_anio_pasado(self) -> None:
+        dias = (7, 14, 21, 28)
+        self.assertEqual(mp.leer_pedido_pago("28/12", D(2027, 1, 3), dias)[1], D(2026, 12, 28))
+        self.assertEqual(mp.leer_pedido_pago("18/11", JUE_19, dias)[1], D(2026, 11, 18))
+        self.assertEqual(mp.leer_pedido_pago("24/11", JUE_19, dias)[1], D(2026, 11, 24))
+
+    def test_si_te_pagaron_otro_anio_se_ve_el_anio(self) -> None:
+        self.assertIn("2025", mp._cuando_te_pagaron(D(2025, 12, 28), D(2026, 1, 3)))
+        self.assertNotIn("2026", mp._cuando_te_pagaron(D(2026, 11, 17), JUE_19))
