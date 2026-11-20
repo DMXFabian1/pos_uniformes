@@ -38,6 +38,7 @@ cualquier otro lo ignora. `atender_texto` es la lógica (testeable); el
 
 from __future__ import annotations
 
+import json
 import logging
 import time
 from dataclasses import dataclass
@@ -1292,16 +1293,46 @@ def boton_vencido(dato: str, fecha_mensaje: int | float | None, ahora: datetime 
     el mensaje: el «Hoy no» de anoche, tocado antes de abrir, cancelaba el
     corte de HOY, y «Hacer el corte y sacar $3,200» de anteayer cortaba el
     periodo de hoy con otra cifra (auditoría 2026-11-07)."""
-    if not str(dato or "").startswith(_PREFIJOS_DE_DINERO) or not fecha_mensaje:
+    dato = str(dato or "")
+    if not dato.startswith(_PREFIJOS_DE_DINERO):
+        return None
+    del_mensaje = _dia_de_otro_dia(fecha_mensaje, ahora)
+    if del_mensaje is None:
+        return None
+    if dato.startswith("mp:deshacerok:"):
+        # Mi pago no es la nómina: /pagar le paga a una empleada del cajón.
+        para_hoy = "Para deshacer uno de tus pagos: /deshacermipago (o mira /mipago)."
+    elif dato.startswith("mp:"):
+        para_hoy = "Para registrar tu pago: /mepagaron (o mira /mipago)."
+    else:
+        para_hoy = "Para lo de hoy: /corte, /pagar o /menu."
+    return (
+        f"Ese botón es del {del_mensaje:%d/%m} y ya no hace nada: las cifras de ese día ya no son las de hoy.\n\n"
+        + para_hoy
+    )
+
+
+def _dia_de_otro_dia(fecha_mensaje: int | float | None, ahora: datetime | None = None) -> datetime | None:
+    """La fecha del mensaje si es de otro día; None si es de hoy o no trae.
+
+    Ojo: en Telegram `message.date` es la del envío; editarlo no la cambia."""
+    if not fecha_mensaje:
         return None
     ahora = ahora or datetime.now().astimezone()
     del_mensaje = datetime.fromtimestamp(float(fecha_mensaje), tz=ahora.tzinfo or None).astimezone(ahora.tzinfo)
-    if del_mensaje.date() == ahora.date():
-        return None
-    return (
-        f"Ese botón es del {del_mensaje:%d/%m} y ya no hace nada: las cifras de ese día ya no son las de hoy.\n\n"
-        "Para lo de hoy: /corte, /pagar o /menu."
-    )
+    return None if del_mensaje.date() == ahora.date() else del_mensaje
+
+
+def _lleva_boton_de_dinero(botones: str) -> bool:
+    """¿El teclado trae un botón de `_PREFIJOS_DE_DINERO`?"""
+    if not botones:
+        return False
+    try:
+        filas = json.loads(botones).get("inline_keyboard") or []
+    except (ValueError, AttributeError):
+        return False
+    return any(str(b.get("callback_data") or "").startswith(_PREFIJOS_DE_DINERO)
+               for fila in filas for b in fila if isinstance(b, dict))
 
 
 class _Conflicto:
@@ -1386,7 +1417,11 @@ def _atender_toque(toque: dict, *, session_factory, token: str, chat_id: str) ->
             es_el_menu = tocado == limpieza.menu_fijado()
         except Exception:  # noqa: BLE001
             es_el_menu = False
-        if es_el_menu:
+        # «💵 Ya me pagaron» de un /mipago de ayer: la pregunta editada sobre
+        # ese mensaje conservaba su fecha de ayer y su «Sí» nacía vencido
+        # (revisión 2026-11-19). Va en un mensaje nuevo, con la fecha de hoy.
+        nace_vencido = bool(_dia_de_otro_dia(msg.get("date"))) and _lleva_boton_de_dinero(resultado[2])
+        if es_el_menu or nace_vencido:
             # El menú fijado se queda siendo el menú. Si se reescribiera, al
             # primer toque el tablero de arriba se convertiría en una lista de
             # cortes y ya no habría de dónde salir (2026-10-08).

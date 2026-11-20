@@ -601,3 +601,48 @@ class FechaSinAnioTests(_ConBase):
     def test_si_te_pagaron_otro_anio_se_ve_el_anio(self) -> None:
         self.assertIn("2025", mp._cuando_te_pagaron(D(2025, 12, 28), D(2026, 1, 3)))
         self.assertNotIn("2026", mp._cuando_te_pagaron(D(2026, 11, 17), JUE_19))
+
+
+class BotonDeOtroDiaTests(_ConBase):
+    def setUp(self) -> None:
+        super().setUp()
+        self._configurar(JUE_19)
+
+    def _toque_de_ayer(self, dato, resultado):
+        from unittest.mock import patch
+
+        ayer = datetime.now().astimezone() - timedelta(days=1)
+        toque = {"id": "q1", "data": dato,
+                 "message": {"chat": {"id": "123"}, "message_id": 5, "date": int(ayer.timestamp())}}
+        with patch("pos_uniformes.services.telegram_service.responder_toque"), \
+             patch("pos_uniformes.services.telegram_service.editar_mensaje") as editar, \
+             patch("pos_uniformes.services.telegram_service.enviar_mensaje") as enviar, \
+             patch("pos_uniformes.services.telegram_limpieza_service.menu_fijado", return_value=0), \
+             patch.object(bot, "atender_toque", return_value=resultado):
+            bot._atender_toque(toque, session_factory=self.factory, token="t", chat_id="123")
+        return editar, enviar
+
+    def test_ya_me_pagaron_de_ayer_pregunta_en_un_mensaje_nuevo(self) -> None:
+        """Editado sobre el mensaje de ayer, su «Sí» nacía vencido."""
+        _, texto, botones = self._tocar("mp:pagar:20261121")
+        editar, enviar = self._toque_de_ayer("mp:pagar:20261121", ("", texto, botones))
+        editar.assert_not_called()
+        self.assertIn("¿Registro este pago?", enviar.call_args.args[0])
+        self.assertIn("mp:pagarok:", enviar.call_args.kwargs["botones"])
+
+    def test_ver_mi_pago_de_ayer_si_se_reescribe(self) -> None:
+        editar, enviar = self._toque_de_ayer("mp:ver", ("", "Mi pago", '{"inline_keyboard": []}'))
+        editar.assert_called_once()
+        enviar.assert_not_called()
+
+    def test_el_si_vencido_de_mi_pago_manda_a_mi_pago_no_a_pagar(self) -> None:
+        ayer = datetime(2026, 11, 18, 18, 0).astimezone()
+        ahora = datetime(2026, 11, 19, 10, 0).astimezone()
+        texto = bot.boton_vencido("mp:pagarok:20261121:20261118:c2500.00", ayer.timestamp(), ahora)
+        self.assertIn("/mipago", texto)
+        self.assertNotIn("/pagar", texto)
+        texto = bot.boton_vencido("mp:deshacerok:20261114:20261119:2500.00", ayer.timestamp(), ahora)
+        self.assertIn("/deshacermipago", texto)
+        self.assertNotIn("/pagar", texto)
+        # Los demás siguen igual.
+        self.assertIn("/corte, /pagar o /menu", bot.boton_vencido("cc:x", ayer.timestamp(), ahora))
