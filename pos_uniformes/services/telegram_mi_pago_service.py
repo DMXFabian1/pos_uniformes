@@ -50,7 +50,10 @@ COMANDOS = {
 
 #: Cómo se nombra Daniel a sí mismo en /vino, /falta y /descanso.
 _YO = {"yo", "mi", "mí", "dueño", "dueno", "vend-1", "vend1"}
-#: «daniel» también, salvo que haya una empleada que se llame así.
+#: «yo» y «mi» también son el principio de un nombre (Yolanda, Miriam): con
+#: una empleada así, no se adivina, se pregunta.
+_YO_AMBIGUO = {"yo", "mi", "mí"}
+#: «daniel» también, salvo que haya una empleada que empiece así.
 _DANIEL = {"daniel"}
 
 TEXTO_SIN_CUENTA = (
@@ -765,21 +768,61 @@ def _decidir(session, crudo: str, *, hoy: date) -> tuple[str, str, str]:
 # ─── /vino yo · /falta yo · /descanso yo ─────────────────────────────────
 
 
+def _plano(texto: str) -> str:
+    import unicodedata
+
+    sin = unicodedata.normalize("NFKD", texto or "").encode("ascii", "ignore").decode()
+    return "".join(ch for ch in sin if ch.isalnum()).lower()
+
+
+def empleadas_que_empiezan(session, argumento: str) -> list[str]:
+    """Los nombres de las empleadas activas que «/vino <argumento>» podría
+    marcar (mismo criterio que `asistencia_service.buscar_code`: gafete o
+    principio del nombre). Sin el dueño, el encargado ni el automático."""
+    from sqlalchemy import select
+
+    from pos_uniformes.database.models import Empleada
+    from pos_uniformes.services.nomina_service import QUIEN_PUEDE_PAGAR
+
+    pista = _plano(argumento)
+    if not pista:
+        return []
+    return [
+        e.nombre_completo
+        for e in session.scalars(select(Empleada).where(Empleada.activo.is_(True))).all()
+        if e.codigo.upper() not in QUIEN_PUEDE_PAGAR
+        and (_plano(e.codigo) == pista or _plano(e.nombre_completo).startswith(pista))
+    ]
+
+
 def es_el_dueno(argumento: str, *, session=None) -> bool:
     """¿«/vino yo», «/falta_yo», «/vino Daniel» hablan de Daniel?
 
-    «daniel» solo si ninguna empleada se llama así: con una Daniela o un
-    Daniel en el equipo, las empleadas siguen exactamente igual."""
+    «yo», «mi» y «daniel» solo si ninguna empleada activa empieza así: con
+    una Yolanda, una Miriam o una (o dos) Danielas, las empleadas siguen
+    exactamente igual. Sin `session` es la primera criba, sin base."""
     t = (argumento or "").strip().lower()
-    if t in _YO:
+    if t not in _YO and t not in _DANIEL:
+        return False
+    if session is None or t not in (_YO_AMBIGUO | _DANIEL):
         return True
-    if t in _DANIEL:
-        if session is None:
-            return True
-        from pos_uniformes.services import asistencia_service as asis
+    return not empleadas_que_empiezan(session, t)
 
-        return asis.buscar_code(session, t) is None
-    return False
+
+def duda_del_dueno(argumento: str, accion: str, *, session) -> str:
+    """«/vino yo» con una Yolanda en el equipo: el texto que pregunta a quién
+    se refiere ('' si no hay duda). Antes marcaba a Daniel sin decir nada."""
+    t = (argumento or "").strip().lower()
+    if t not in _YO_AMBIGUO:
+        return ""
+    nombres = empleadas_que_empiezan(session, t)
+    if not nombres:
+        return ""
+    ellas = " o ".join(nombres[:3])
+    primera = nombres[0].split()[0]
+    return (f"¿Tú o {ellas}? «{argumento.strip()}» también es el principio de su nombre; "
+            "no marqué a nadie.\n\n"
+            f"Para ti: /{accion} dueño · Para ella: /{accion} {primera}")
 
 
 def _tipo(accion: str) -> str:

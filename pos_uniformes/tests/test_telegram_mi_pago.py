@@ -646,3 +646,44 @@ class BotonDeOtroDiaTests(_ConBase):
         self.assertNotIn("/pagar", texto)
         # Los demás siguen igual.
         self.assertIn("/corte, /pagar o /menu", bot.boton_vencido("cc:x", ayer.timestamp(), ahora))
+
+
+class YoConEmpleadasParecidasTests(_ConBase):
+    def setUp(self) -> None:
+        super().setUp()
+        self._configurar(JUE_19)
+
+    def _agregar(self, *empleadas) -> None:
+        from pos_uniformes.database.models import Empleada
+
+        with self.factory() as s:
+            s.add_all([Empleada(codigo=c, nombre_completo=n, activo=True) for c, n in empleadas])
+            s.commit()
+
+    def test_vino_yo_con_una_yolanda_no_marca_a_nadie_y_pregunta(self) -> None:
+        self._agregar(("VEND-7", "Yolanda Pérez"))
+        for texto in ("/vino yo", "/vino_yo"):
+            with self.subTest(texto=texto):
+                respuesta, _ = self._responder(texto)
+                self.assertIn("Yolanda", respuesta)
+                self.assertIn("/vino dueño", respuesta)
+                self.assertNotIn("Tú: viniste", respuesta)
+        self.assertEqual(self._eventos("VEND-1"), {})
+        self.assertEqual(self._eventos("VEND-7"), {})
+        # «dueño» sí es él.
+        self.assertIn("Tú: viniste ✅", self._responder("/vino dueño")[0])
+
+    def test_vino_mi_con_una_miriam_tampoco(self) -> None:
+        self._agregar(("VEND-8", "Miriam Soto"))
+        respuesta = bot.atender_texto("/falta mi", session_factory=self.factory, hoy=JUE_19)
+        self.assertIn("Miriam", respuesta)
+        self.assertEqual(self._eventos("VEND-1"), {})
+        self.assertEqual(self._eventos("VEND-8"), {})
+
+    def test_vino_daniel_con_dos_danielas_pregunta_quien(self) -> None:
+        self._agregar(("VEND-7", "Daniela López"), ("VEND-8", "Daniela Ruiz"))
+        respuesta, _ = self._responder("/vino daniel")
+        self.assertIn("¿Quién?", respuesta)
+        self.assertEqual(self._eventos("VEND-1"), {})
+        with self.factory() as s:
+            self.assertFalse(mp.es_el_dueno("daniel", session=s))

@@ -652,6 +652,10 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
             if mp.es_el_dueno(cmd.argumento, session=session):
                 # «/vino yo»: Daniel marca SU día; las empleadas, igual que siempre.
                 return mp.marcar_dueno(session, cmd.nombre, hoy=hoy)[0]
+            duda = mp.duda_del_dueno(cmd.argumento, cmd.nombre, session=session)
+            if duda:
+                # «/vino yo» con una Yolanda: ni él ni ella sin preguntar.
+                return duda
             code = asis.buscar_code(session, cmd.argumento)
             if code is None:
                 return f"¿Quién? Escribe el nombre como aparece en la lista: /{cmd.nombre} Fanny"
