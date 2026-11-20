@@ -687,3 +687,22 @@ class YoConEmpleadasParecidasTests(_ConBase):
         self.assertEqual(self._eventos("VEND-1"), {})
         with self.factory() as s:
             self.assertFalse(mp.es_el_dueno("daniel", session=s))
+
+
+class NDeMAtrasadoTests(_ConBase):
+    def test_a_inicios_de_mes_n_de_m_toma_el_atrasado(self) -> None:
+        self._configurar(D(2026, 11, 1))
+        for f in (D(2026, 11, 7), D(2026, 11, 14), D(2026, 11, 21)):
+            self._registrar(f, f)
+        texto, botones = self._responder("/mepagaron 4 de 4", hoy=D(2026, 12, 2))
+        self.assertIn("4 de 4 · sáb 28-nov", texto)
+        self.assertIn("atrasado", texto)
+        self.assertIn("/mepagaron pago 28/12", texto)
+        self.assertEqual(_dato(botones, "mp:pagarok:"), "mp:pagarok:20261128:20261202:c2500.00")
+
+    def test_sin_atrasado_n_de_m_es_el_de_este_mes(self) -> None:
+        self._configurar(D(2026, 11, 1))
+        for f in (D(2026, 11, 7), D(2026, 11, 14), D(2026, 11, 21), D(2026, 11, 28)):
+            self._registrar(f, f)
+        _, botones = self._responder("/mepagaron 4 de 4", hoy=D(2026, 12, 2))
+        self.assertEqual(_dato(botones, "mp:pagarok:"), "mp:pagarok:20261228:20261202:c2500.00")

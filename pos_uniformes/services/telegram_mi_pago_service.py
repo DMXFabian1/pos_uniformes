@@ -509,11 +509,35 @@ def preparar_pago(session, argumento: str = "", *, hoy: date | None = None) -> t
         except ValueError as exc:
             return str(exc), _volver()
         datos = pd.cargar_datos(session, config)
+        aviso = ""
         if programada is None:
             programada = pd.pago_objetivo(pd.calcular_recordatorio(config, datos, hoy)).fecha_programada
-        return _validar_y_preguntar(config, datos, programada, fecha_pago, monto, hoy)
+        elif programada > hoy and _numero_elegido(argumento):
+            programada, aviso = _el_atrasado_con_ese_numero(config, datos, programada, hoy)
+        return _validar_y_preguntar(config, datos, programada, fecha_pago, monto, hoy, aviso=aviso)
 
     return _a_salvo(session, hacer, botones_si_falla=_volver(mi_pago=False))
+
+
+def _numero_elegido(argumento: str) -> bool:
+    """¿El pago se eligió con «N de M»?"""
+    return re.search(r"\b(\d)\s*de\s*(\d)\b", " ".join((argumento or "").lower().split())) is not None
+
+
+def _el_atrasado_con_ese_numero(config, datos, programada: date, hoy: date) -> tuple[date, str]:
+    """«/mepagaron 4 de 4» el 2-dic con el del 28-nov sin pagar: es el
+    atrasado que el bot acaba de enseñar, no el 28-dic que aún no llega
+    (revisión 2026-11-19). Sin atrasado con ese número, el de este mes."""
+    rec = pd.calcular_recordatorio(config, datos, hoy)
+    numero, _ = pd.numero_de_pago(config, programada)
+    mismos = [a for a in (rec.atrasados if rec is not None else []) if a.numero == numero]
+    if not mismos:
+        return programada, ""
+    atrasado = max(mismos, key=lambda a: a.fecha_programada).fecha_programada
+    aviso = (f"Tomé el {numero} de {len(config.dias_de_pago)} de {_MESES[atrasado.month - 1]} "
+             f"({pd.fecha_corta(atrasado)}), que está atrasado. Si era el de "
+             f"{_MESES[programada.month - 1]}: /mepagaron pago {programada:%d/%m}")
+    return atrasado, aviso
 
 
 def _validar_y_preguntar(config, datos, programada, fecha_pago, monto, hoy, *, aviso: str = ""):
