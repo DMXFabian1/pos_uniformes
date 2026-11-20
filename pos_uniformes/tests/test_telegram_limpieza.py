@@ -64,10 +64,11 @@ class LaLimpiezaDeLaMananaTests(unittest.TestCase):
         self.assertEqual(self._limpiar(), [1])
         self.assertEqual([m["id"] for m in limpieza._leer()["mensajes"]], [2])
 
-    def test_pasadas_48_horas_se_olvida_en_vez_de_insistir(self) -> None:
-        """Telegram ya no deja borrarlo: se olvida, no se reintenta cada día."""
+    def test_pasadas_48_horas_se_intenta_una_vez_y_se_olvida(self) -> None:
+        """Se prueba una vez (a veces Telegram sí deja) y, sea como sea, se
+        olvida: no se reintenta cada día."""
         self._anotar(10, datetime(2026, 10, 13, 8, 0))     # 49 h antes
-        self.assertEqual(self._limpiar(), [])
+        self.assertEqual(self._limpiar(borrar=lambda m: False), [])
         self.assertEqual(limpieza._leer()["mensajes"], [])
 
     def test_si_el_borrado_falla_se_reintenta_luego(self) -> None:
@@ -113,7 +114,7 @@ class LaLimpiezaDeLaMananaTests(unittest.TestCase):
     def test_una_vez_al_dia_y_desde_la_apertura(self) -> None:
         self.assertFalse(limpieza.toca_limpiar(datetime(2026, 10, 15, 8, 59)))   # aún no abre
         self.assertTrue(limpieza.toca_limpiar(self.HOY))
-        self._limpiar()
+        limpieza.marcar_limpieza_de_hoy(self.HOY)
         self.assertFalse(limpieza.toca_limpiar(datetime(2026, 10, 15, 17, 0)))   # ya se hizo hoy
         self.assertTrue(limpieza.toca_limpiar(datetime(2026, 10, 16, 9, 0)))     # mañana sí
 
@@ -146,7 +147,7 @@ class ElMenuSeRenuevaCadaMananaTests(unittest.TestCase):
         from pos_uniformes.services import telegram_service as ts
 
         with patch.object(bot, "asegurar_menu_fijado", return_value=nuevo) as asegurar, \
-                patch.object(ts, "borrar_mensaje", return_value=borra_viejo) as borrar, \
+                patch.object(ts, "borrar_con_motivo", return_value="ok" if borra_viejo else "no") as borrar, \
                 patch.object(ts, "desfijar_mensaje") as desfijar:
             bot.limpiar_si_toca(session_factory=None, token="t", chat_id="c", ahora=self.HOY)
         return asegurar, borrar, desfijar
@@ -225,15 +226,45 @@ class ElMenuSeFijaUnaSolaVezTests(unittest.TestCase):
         from pos_uniformes.services import telegram_service
 
         limpieza.recordar_menu(42)
-        with patch.object(telegram_service, "editar_mensaje", side_effect=OSError("no existe")), \
+        no_existe = RuntimeError("Telegram respondió: Bad Request: message to edit not found")
+        with patch.object(telegram_service, "editar_mensaje", side_effect=no_existe), \
              patch.object(telegram_service, "_llamar",
                           return_value={"result": {"message_id": 99}}), \
-             patch.object(telegram_service, "fijar_mensaje", return_value=True):
+             patch.object(telegram_service, "fijar_mensaje", return_value=True), \
+             patch.object(telegram_service, "borrar_con_motivo", return_value="ok") as borrar:
             mid = bot.asegurar_menu_fijado(
                 session_factory=self.factory, token="t", chat_id="c"
             )
         self.assertEqual(mid, 99)
         self.assertEqual(limpieza.menu_fijado(), 99)
+        # El viejo ya no se queda huérfano y fijado (2026-11-20).
+        borrar.assert_called_once_with(42, token="t", chat_id="c")
+
+    def test_sin_red_no_manda_otro_menu(self) -> None:
+        """Antes un timeout al reescribir mandaba un menú nuevo y dejaba el
+        viejo fijado para siempre."""
+        from pos_uniformes.services import telegram_bot_service as bot
+        from pos_uniformes.services import telegram_service
+
+        limpieza.recordar_menu(42)
+        with patch.object(telegram_service, "editar_mensaje", side_effect=OSError("timeout")), \
+             patch.object(telegram_service, "_llamar") as llamar:
+            mid = bot.asegurar_menu_fijado(session_factory=self.factory, token="t", chat_id="c")
+        self.assertEqual(mid, 42)
+        llamar.assert_not_called()
+        self.assertEqual(limpieza.menu_fijado(), 42)
+
+    def test_si_no_cambio_nada_no_manda_otro(self) -> None:
+        from pos_uniformes.services import telegram_bot_service as bot
+        from pos_uniformes.services import telegram_service
+
+        limpieza.recordar_menu(42)
+        igual = RuntimeError("Telegram respondió: Bad Request: message is not modified")
+        with patch.object(telegram_service, "editar_mensaje", side_effect=igual), \
+             patch.object(telegram_service, "_llamar") as llamar:
+            mid = bot.asegurar_menu_fijado(session_factory=self.factory, token="t", chat_id="c")
+        self.assertEqual(mid, 42)
+        llamar.assert_not_called()
 
 
 class TocarElMenuNoLoDeshaceTests(unittest.TestCase):

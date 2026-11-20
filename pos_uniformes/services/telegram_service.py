@@ -305,6 +305,8 @@ def enviar_mensaje(
     `conservar`: no barrerlo a las 24 h. Para alertas, cortes y resúmenes:
     Daniel de viaje dos días abría el chat y las alertas de anteayer ya no
     existían, solo la notificación sin cuerpo (2026-10-10)."""
+    if _es_kiosko() and token is None and chat_id is None:
+        return _mandar_por_la_cola(texto, botones)
     token, chat_id = _credenciales(token, chat_id)
     enviados = 0
     partes = partir_mensaje(texto)
@@ -319,6 +321,31 @@ def enviar_mensaje(
         _anotar_para_barrer(conservar=conservar, respuesta=respuesta)
         enviados += 1
     return enviados
+
+
+def _es_kiosko() -> bool:
+    """¿Corre como el programa del kiosko (.exe)?
+
+    Lo que un kiosko mandaba directo quedaba apuntado en la lista de mensajes
+    de ESA PC, y el bot de la PC principal, que es el único que barre, nunca
+    se enteraba: préstamos, acuses y avisos se quedaban en el chat para
+    siempre (2026-11-20). Ahora el kiosko deja el mensaje en la cola de la
+    base y el bot lo manda en segundos y lo apunta."""
+    import sys
+
+    return bool(getattr(sys, "frozen", False))
+
+
+def _mandar_por_la_cola(texto: str, botones: str | None) -> int:
+    """Deja el mensaje en la cola de alertas. Lanza si no se pudo, para que
+    quien llama siga su propio plan B (igual que si no hubiera red)."""
+    from pos_uniformes.database.connection import get_session
+    from pos_uniformes.services.alertas_service import encolar
+
+    with get_session() as session:
+        if not encolar(session, texto, botones or ""):
+            raise RuntimeError("No se pudo dejar el aviso en la cola de la PC principal.")
+    return 1
 
 
 def _anotar_para_barrer(respuesta: dict, *, conservar: bool = False) -> None:
@@ -338,13 +365,28 @@ def _anotar_para_barrer(respuesta: dict, *, conservar: bool = False) -> None:
 
 def borrar_mensaje(message_id: int, *, token: str | None = None, chat_id: str | None = None) -> bool:
     """Borra un mensaje del bot. False si Telegram no deja (pasó de 48 h)."""
+    return borrar_con_motivo(message_id, token=token, chat_id=chat_id) == "ok"
+
+
+def es_respuesta_de_telegram(exc: BaseException) -> bool:
+    """¿El error lo dio Telegram (contestó «no»), o fue la red (no se supo)?
+
+    `_llamar` convierte toda respuesta con ok=false en RuntimeError con este
+    prefijo; cualquier otra excepción es de conexión, tiempo o certificado."""
+    return isinstance(exc, RuntimeError) and str(exc).startswith("Telegram respondió")
+
+
+def borrar_con_motivo(message_id: int, *, token: str | None = None, chat_id: str | None = None) -> str:
+    """"ok" si se borró; "no" si Telegram dijo que no (ya no existe o ya no se
+    puede); "red" si no se supo. La limpieza solo olvida un mensaje con "ok"
+    o "no": con "red" lo reintenta (2026-11-20)."""
     token, chat_id = _credenciales(token, chat_id)
     try:
         _llamar(token, "deleteMessage",
                 {"chat_id": chat_id, "message_id": str(int(message_id))})
-        return True
-    except Exception:  # noqa: BLE001 — ya borrado, o muy viejo
-        return False
+        return "ok"
+    except Exception as exc:  # noqa: BLE001
+        return "no" if es_respuesta_de_telegram(exc) else "red"
 
 
 def fijar_mensaje(message_id: int, *, token: str | None = None, chat_id: str | None = None) -> bool:
