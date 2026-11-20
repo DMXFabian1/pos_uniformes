@@ -2,12 +2,15 @@
 
 Libreta del dueño → menú «💼 Caja ▾» → «💼 Mi pago». Solo VEND-1.
 
-- Los pagos del mes (7, 14, 21 y 28) con su estado: pagado (fecha y monto),
-  toca hoy, pendiente o atrasado, y el desglose de cada uno.
-- «Ya me pagaron» (fecha y monto editables; el calculado por omisión) y
-  «Deshacer pago».
+- Arriba, la tarjeta del PRÓXIMO pago (vino, como la cifra fuerte de «Hacer
+  corte»): «3 de 4», la fecha, el monto grande, cuándo toca y «Ya me pagaron».
+  Debajo, tres fichas: último pago, días a favor y atrasados.
+- Los pagos del mes (7, 14, 21 y 28): una tira con los cuatro por color y la
+  navegación de mes como píldora; luego una tarjeta por pago con su estado y,
+  solo si hay algo que desglosar, el desglose.
 - Los días de más con su destino, para cambiarlo.
-- La configuración: monto, valor del día, fechas de pago e inicio.
+- La configuración (monto, valor del día, fechas de pago e inicio), plegada:
+  casi no se usa. Se abre sola si la cuenta no está configurada.
 
 Es solo la cuenta: nada de esto sale del cajón ni toca el corte. La lógica
 vive en `services/pago_dueno_service.py`; aquí solo se pinta y se pregunta.
@@ -15,16 +18,22 @@ vive en `services/pago_dueno_service.py`; aquí solo se pinta y se pregunta.
 También vive aquí `despues_de_marcar_dueno`, lo que el calendario del dueño
 llama tras marcar un día suyo: si quedó un día de más, pregunta «¿Te lo
 pagamos o te lo guardamos?».
+
+Estética (Daniel, 2026-11-19: «mejoremos la estética»): los mismos colores
+que «Hacer corte», el calendario y los avisos (vino #6b1f3a, crema, verde de
+pagado, ámbar de pronto, rojo de atrasado).
 """
 
 from __future__ import annotations
 
 import logging
+from dataclasses import dataclass
 from datetime import date, timedelta
 from decimal import Decimal
 
 from PyQt6.QtCore import QDate, Qt
 from PyQt6.QtWidgets import (
+    QAbstractSpinBox,
     QCheckBox,
     QDateEdit,
     QDialog,
@@ -32,12 +41,14 @@ from PyQt6.QtWidgets import (
     QDoubleSpinBox,
     QFormLayout,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
     QPushButton,
     QScrollArea,
+    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -49,30 +60,123 @@ logger = logging.getLogger(__name__)
 _MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto",
           "septiembre", "octubre", "noviembre", "diciembre")
 
+#: Un pago del mes que cae antes del inicio de la cuenta (y no se registró).
+ANTES = "antes"
+
+# Solo colores y formas, como `_ESTILO_CORTE`. Paleta: crema #f4ede2, tarjeta
+# #fbf7f0, vino #6b1f3a; verde/ámbar/rojo de los avisos (avisos_bonitos).
 _ESTILO = """
 QDialog#miPago { background: #f4ede2; }
 QDialog#miPago QLabel { color: #2c2a27; background: transparent; }
 QDialog#miPago QScrollArea { background: transparent; border: none; }
 QDialog#miPago QScrollArea > QWidget > QWidget { background: transparent; }
-QFrame#miPagoCard { background: #fbf7f0; border: 1px solid #e6dccb; border-radius: 12px; }
-QDialog#miPago QLabel#miPagoSeccion { color: #7b2d14; font-size: 12px; font-weight: 800; letter-spacing: 1px; }
-QDialog#miPago QLabel#miPagoResumen { font-size: 15px; font-weight: 700; }
+
+QDialog#miPago QLabel#miPagoEncabezado { font-size: 22px; font-weight: 800; color: #2c2a27; }
+QFrame#miPagoPie { background: #efe6d8; border: none; border-top: 1px solid #e6dccb; }
 QDialog#miPago QLabel#miPagoNota { color: #8a8177; font-size: 12px; }
-QDialog#miPago QLabel#miPagoTitulo { font-size: 16px; font-weight: 800; }
+QDialog#miPago QLabel#miPagoMesResumen { color: #8a8177; font-size: 12px; font-weight: 700; }
+QDialog#miPago QLabel#miPagoMesResumen[completo="true"] { color: #2f7d4f; }
+QDialog#miPago QLabel#miPagoSeccion { color: #7b2d14; font-size: 12px; font-weight: 800; letter-spacing: 1px; }
+QDialog#miPago QLabel#miPagoAviso { background: #fbefd5; color: #8a5600; border-radius: 10px;
+                                    padding: 8px 12px; font-size: 13px; font-weight: 600; }
+
+QFrame#miPagoHeroe { background: #6b1f3a; border: none; border-radius: 16px; }
+QDialog#miPago QFrame#miPagoHeroe QLabel { color: #ffffff; }
+QDialog#miPago QFrame#miPagoHeroe QLabel#miPagoHeroeKicker { color: #e9cfd6; font-size: 11px; font-weight: 800; letter-spacing: 1px; }
+QDialog#miPago QFrame#miPagoHeroe QLabel#miPagoHeroeTitulo { font-size: 17px; font-weight: 800; }
+QDialog#miPago QFrame#miPagoHeroe QLabel#miPagoHeroeMonto { font-size: 36px; font-weight: 800; }
+QDialog#miPago QFrame#miPagoHeroe QLabel#miPagoHeroePie { color: #ecd7dd; font-size: 13px; }
+QDialog#miPago QLabel#miPagoCuando { border-radius: 11px; padding: 4px 12px; font-size: 12px; font-weight: 800; }
+QDialog#miPago QLabel#miPagoCuando[tono="hoy"] { background: #e3f1e6; color: #2f7d4f; }
+QDialog#miPago QLabel#miPagoCuando[tono="pronto"] { background: #fbefd5; color: #a86a00; }
+QDialog#miPago QLabel#miPagoCuando[tono="luego"] { background: #84405a; color: #ffffff; }
+QDialog#miPago QFrame#miPagoHeroe QPushButton#miPagoHeroeBoton { background: #ffffff; color: #6b1f3a; border: none;
+    border-radius: 12px; min-height: 44px; padding: 0 18px; font-size: 15px; font-weight: 800; }
+QDialog#miPago QFrame#miPagoHeroe QPushButton#miPagoHeroeBoton:pressed { background: #f1e3e8; }
+
+QFrame#miPagoVacio { background: #fbf7f0; border: 1.5px dashed #d9cdb8; border-radius: 16px; }
+QDialog#miPago QLabel#miPagoVacioTitulo { font-size: 17px; font-weight: 800; color: #6b1f3a; }
+
+QFrame#miPagoFicha { background: #fbf7f0; border: 1px solid #e6dccb; border-radius: 12px; }
+QDialog#miPago QLabel#miPagoFichaTitulo { color: #8a8177; font-size: 11px; font-weight: 800; letter-spacing: 1px; }
+QDialog#miPago QLabel#miPagoFichaValor { font-size: 18px; font-weight: 800; }
+QDialog#miPago QLabel#miPagoFichaValor[alerta="true"] { color: #b3261e; }
+QDialog#miPago QLabel#miPagoFichaPie { color: #8a8177; font-size: 11px; }
+
+QFrame#miPagoMesNav { background: #ffffff; border: 1px solid #ddd0c0; border-radius: 18px; }
+QDialog#miPago QFrame#miPagoMesNav QPushButton { background: transparent; color: #6b1f3a; border: none;
+    border-radius: 15px; min-height: 30px; max-height: 30px; min-width: 30px; max-width: 30px;
+    padding: 0; font-size: 13px; font-weight: 800; }
+QDialog#miPago QFrame#miPagoMesNav QPushButton:pressed { background: #f1e3e8; }
+QDialog#miPago QLabel#miPagoMes { font-size: 14px; font-weight: 800; color: #2c2a27; }
+
+QFrame#miPagoPaso { border-radius: 12px; border: 1px solid transparent; }
+QFrame#miPagoPaso[estado="pagado"] { background: #e3f1e6; border-color: #c4e0cb; }
+QFrame#miPagoPaso[estado="toca_hoy"] { background: #6b1f3a; }
+QFrame#miPagoPaso[estado="pendiente"] { background: #ffffff; border-color: #ddd0c0; }
+QFrame#miPagoPaso[estado="atrasado"] { background: #f8e1df; border-color: #efc2bd; }
+QFrame#miPagoPaso[estado="antes"] { background: #efe8dd; border: 1px dashed #d9cdb8; }
+QFrame#miPagoPaso[proximo="true"] { border: 2px solid #6b1f3a; }
+QDialog#miPago QLabel#miPagoPasoNumero { font-size: 20px; font-weight: 800; }
+QDialog#miPago QLabel#miPagoPasoFecha { font-size: 12px; font-weight: 700; }
+QDialog#miPago QLabel#miPagoPasoEstado { font-size: 11px; font-weight: 800; }
+QDialog#miPago QFrame#miPagoPaso[estado="pagado"] QLabel { color: #2f7d4f; }
+QDialog#miPago QFrame#miPagoPaso[estado="toca_hoy"] QLabel { color: #ffffff; }
+QDialog#miPago QFrame#miPagoPaso[estado="pendiente"] QLabel { color: #5f564c; }
+QDialog#miPago QFrame#miPagoPaso[estado="atrasado"] QLabel { color: #b3261e; }
+QDialog#miPago QFrame#miPagoPaso[estado="antes"] QLabel { color: #b5aa9c; }
+
+QFrame#miPagoCard { background: #fbf7f0; border: 1px solid #e6dccb; border-radius: 12px; }
+QFrame#miPagoCard[estado="atrasado"] { background: #fdf4f2; border-color: #efc2bd; }
+QFrame#miPagoCard[proximo="true"] { border: 1.5px solid #6b1f3a; }
+QDialog#miPago QLabel#miPagoTitulo { font-size: 15px; font-weight: 800; }
 QDialog#miPago QLabel#miPagoMonto { font-size: 18px; font-weight: 800; }
-QDialog#miPago QLabel#miPagoDesglose { color: #5f564c; font-size: 13px; }
-QDialog#miPago QLabel#miPagoEstado { border-radius: 9px; padding: 3px 10px; font-size: 12px; font-weight: 800; }
-QDialog#miPago QLabel#miPagoEstado[estado="pagado"] { background: #d9ecd0; color: #3d6b2f; }
-QDialog#miPago QLabel#miPagoEstado[estado="toca_hoy"] { background: #f7e3d8; color: #a84f2d; }
+QDialog#miPago QLabel#miPagoCubre { color: #8a8177; font-size: 13px; }
+QFrame#miPagoRecibo { background: #f4ede2; border: none; border-radius: 10px; }
+QDialog#miPago QLabel#miPagoRenglon { color: #5f564c; font-size: 13px; }
+QDialog#miPago QLabel#miPagoRenglonMonto { color: #2c2a27; font-size: 13px; font-weight: 700; }
+QDialog#miPago QLabel#miPagoRenglonMonto[clase="suma"] { color: #2f7d4f; }
+QDialog#miPago QLabel#miPagoRenglonMonto[clase="resta"] { color: #b3261e; }
+QDialog#miPago QLabel#miPagoRenglonMonto[clase="nota"] { color: #8a8177; font-weight: 600; }
+
+QDialog#miPago QLabel#miPagoEstado { border-radius: 10px; padding: 3px 10px; font-size: 12px; font-weight: 800; }
+QDialog#miPago QLabel#miPagoEstado[estado="pagado"] { background: #e3f1e6; color: #2f7d4f; }
+QDialog#miPago QLabel#miPagoEstado[estado="toca_hoy"] { background: #6b1f3a; color: #ffffff; }
 QDialog#miPago QLabel#miPagoEstado[estado="pendiente"] { background: #ece6dc; color: #5f564c; }
-QDialog#miPago QLabel#miPagoEstado[estado="atrasado"] { background: #f6d3cb; color: #a33b25; }
-QDialog#miPago QPushButton { background: #ffffff; color: #2c2a27; border: 1.5px solid #ddd0c0; border-radius: 10px;
-                             min-height: 38px; padding: 0 12px; font-size: 13px; font-weight: 700; }
+QDialog#miPago QLabel#miPagoEstado[estado="atrasado"] { background: #f8e1df; color: #b3261e; }
+QDialog#miPago QLabel#miPagoEstado[estado="sin_decidir"] { background: #fbefd5; color: #a86a00; }
+QDialog#miPago QLabel#miPagoEstado[estado="pagar"] { background: #e3f1e6; color: #2f7d4f; }
+QDialog#miPago QLabel#miPagoEstado[estado="acumular"] { background: #f1e3e8; color: #6b1f3a; }
+
+QDialog#miPago QPushButton { background: #ffffff; color: #6b1f3a; border: 1.5px solid #d9cdb8; border-radius: 10px;
+                             min-height: 34px; padding: 0 14px; font-size: 13px; font-weight: 700; }
+QDialog#miPago QPushButton:pressed { background: #f1e6d6; border-color: #6b1f3a; }
 QDialog#miPago QPushButton:disabled { color: #b5aa9c; background: #f4eee4; border-color: #e6dccd; }
-QDialog#miPago QPushButton#miPagoPrimario { background: #3d6b2f; color: #ffffff; border: none; }
-QDialog#miPago QPushButton#miPagoPrimario:disabled { background: #c9d6c2; color: #f4f7f2; }
-QDialog#miPago QDoubleSpinBox, QDialog#miPago QDateEdit, QDialog#miPago QLineEdit {
-    background: #ffffff; color: #2c2a27; border: 1px solid #d9cdb8; border-radius: 8px; padding: 4px 8px; min-height: 30px; }
+QDialog#miPago QPushButton#miPagoPrimario { background: #6b1f3a; color: #ffffff; border: none; }
+QDialog#miPago QPushButton#miPagoPrimario:pressed { background: #561730; }
+QDialog#miPago QPushButton#miPagoPrimario:disabled { background: #d8c3ca; color: #f8f2f4; }
+QDialog#miPago QPushButton#miPagoChico, QDialog#miPago QPushButton#miPagoSegmento {
+    min-height: 30px; padding: 0 12px; font-size: 12px; border-radius: 9px; }
+QDialog#miPago QPushButton#miPagoSegmento:disabled { background: #6b1f3a; color: #ffffff; border-color: #6b1f3a; }
+QDialog#miPago QPushButton#miPagoPlegable { background: transparent; color: #6b1f3a; border: none; text-align: left;
+                                            padding: 6px 2px; font-size: 14px; font-weight: 800; }
+QDialog#miPago QLabel#miPagoExtraFecha { font-size: 14px; font-weight: 800; }
+
+QDialog#miPago QDoubleSpinBox, QDialog#miPago QDateEdit, QDialog#miPago QLineEdit#miPagoCampo {
+    background: #ffffff; color: #2c2a27; border: 1px solid #d9cdb8; border-radius: 10px;
+    padding: 4px 10px; min-height: 32px; font-size: 14px; }
+QDialog#miPago QDoubleSpinBox:focus, QDialog#miPago QDateEdit:focus, QDialog#miPago QLineEdit#miPagoCampo:focus {
+    border: 2px solid #6b1f3a; }
+QDialog#miPago QDateEdit::drop-down { border: none; width: 28px; }
+/* Sin flechitas: con borde por hoja de estilos y sin esto, Qt deja el campo
+   de texto del spinbox de 1 px de ancho y no se ve la cifra. */
+QDialog#miPago QDoubleSpinBox::up-button { subcontrol-origin: border; width: 0px; border: none; }
+QDialog#miPago QDoubleSpinBox::down-button { width: 0px; border: none; }
+QDialog#miPago QCheckBox { color: #2c2a27; font-size: 13px; }
+QDialog#miPago QScrollBar:vertical { background: transparent; width: 10px; margin: 4px 2px; }
+QDialog#miPago QScrollBar::handle:vertical { background: #d9cdb8; border-radius: 3px; min-height: 40px; }
+QDialog#miPago QScrollBar::add-line:vertical, QDialog#miPago QScrollBar::sub-line:vertical { height: 0px; }
+QDialog#miPago QScrollBar::add-page:vertical, QDialog#miPago QScrollBar::sub-page:vertical { background: none; }
 """
 
 ESTADOS_TEXTO = {
@@ -82,17 +186,30 @@ ESTADOS_TEXTO = {
     pd.ATRASADO: "Atrasado",
 }
 
+#: Lo que dice cada cuadro de la tira del mes.
+PASO_TEXTO = {
+    pd.PAGADO: "✓ Pagado",
+    pd.TOCA_HOY: "Toca hoy",
+    pd.PENDIENTE: "Pendiente",
+    pd.ATRASADO: "Atrasado",
+    ANTES: "Antes de la cuenta",
+}
+
 DESTINO_TEXTO = {
     pd.PAGAR: "Se paga en su pago",
-    pd.ACUMULAR: "Guardado como día a favor",
+    pd.ACUMULAR: "Guardado a favor",
 }
 
 
-# ─── Textos (puros, probados) ────────────────────────────────────────────
+# ─── Textos y cuentas de pantalla (puros, probados) ──────────────────────
 
 
 def _dias(n: int) -> str:
     return f"{n} día" if n == 1 else f"{n} días"
+
+
+def _faltas(n: int) -> str:
+    return f"{n} falta" if n == 1 else f"{n} faltas"
 
 
 def _fechas(fechas: list[date]) -> str:
@@ -111,47 +228,24 @@ def titulo_pago(p: pd.DesglosePago) -> str:
 
 
 def texto_estado(p: pd.DesglosePago, hoy: date) -> str:
-    """'Pagado el 19-nov · $2,500', 'Toca hoy', 'Pendiente' o 'Atrasado'."""
+    """El chip: 'Pagado el 19-nov', 'Toca hoy', 'Pendiente' o 'Atrasado'.
+    (El monto ya va en grande en la tarjeta.)"""
     estado = p.estado(hoy)
     if estado == pd.PAGADO and p.registro is not None:
-        return f"Pagado el {pd.fecha_corta(p.registro.fecha_pago)} · {pd.dinero_texto(p.registro.monto)}"
+        return f"Pagado el {pd.fecha_corta(p.registro.fecha_pago)}"
     return ESTADOS_TEXTO[estado]
 
 
-def lineas_desglose(p: pd.DesglosePago) -> list[str]:
-    """El desglose de un pago, en palabras de la tienda."""
-    lineas = [
-        f"Cubre del {pd.fecha_corta(p.desde)} al {pd.fecha_corta(p.hasta)}",
-        f"Base: {pd.dinero_texto(p.base)}",
-    ]
-    if p.dias_extra_pagados:
-        lineas.append(
-            f"+ {_dias(len(p.dias_extra_pagados))} de más: {pd.dinero_texto(p.monto_extra)}"
-            f" ({_fechas(p.dias_extra_pagados)})"
-        )
-    if p.faltas_descontadas:
-        lineas.append(
-            f"− {len(p.faltas_descontadas)} falta(s): {pd.dinero_texto(p.descuento_faltas)}"
-            f" ({_fechas(p.faltas_descontadas)})"
-        )
-    if p.faltas_cubiertas:
-        lineas.append(
-            f"Falta(s) cubierta(s) con días a favor: {_fechas(p.faltas_cubiertas)} (no se descuentan)"
-        )
-    guardados = [f for f in p.dias_extra_acumulados if f not in p.dias_extra_sin_decidir]
-    if guardados:
-        lineas.append(f"Días de más guardados: {_fechas(guardados)}")
-    if p.dias_extra_sin_decidir:
-        lineas.append(f"Días de más sin decidir (se guardan): {_fechas(p.dias_extra_sin_decidir)}")
-    pagado = monto_de_la_tarjeta(p)
-    if pagado != p.monto:
-        # Lo que de verdad se pagó no es lo calculado (monto editado, o algo
-        # cambió después de registrarlo): se ven las dos cifras.
-        lineas.append(f"Calculado: {pd.dinero_texto(p.monto)}")
-        lineas.append(f"Pagado: {pd.dinero_texto(pagado)}")
-    else:
-        lineas.append(f"Total: {pd.dinero_texto(p.monto)}")
-    return lineas
+def rango_corto(desde: date, hasta: date) -> str:
+    """'del 15 al 21-nov' (mismo mes) o 'del 29-oct al 07-nov'."""
+    if (desde.year, desde.month) == (hasta.year, hasta.month):
+        return f"del {desde.day:02d} al {pd.fecha_corta(hasta)}"
+    return f"del {pd.fecha_corta(desde)} al {pd.fecha_corta(hasta)}"
+
+
+def texto_cubre(p: pd.DesglosePago) -> str:
+    """'Cubre del 15 al 21-nov'."""
+    return f"Cubre {rango_corto(p.desde, p.hasta)}"
 
 
 def monto_de_la_tarjeta(p: pd.DesglosePago) -> Decimal:
@@ -162,26 +256,122 @@ def monto_de_la_tarjeta(p: pd.DesglosePago) -> Decimal:
     return p.monto
 
 
-def texto_resumen(rec: pd.Recordatorio | None) -> str:
-    """El renglón de arriba: próximo pago, último pago y días a favor."""
-    if rec is None:
-        return "La cuenta de tu pago todavía no está configurada."
-    p = rec.proximo
-    ultimo = pd.fecha_corta(rec.ultimo_pago) if rec.ultimo_pago else "ninguno"
-    partes = [
-        f"Próximo: {titulo_pago(p)} · {pd.dinero_texto(p.monto)} ({pd.cuando_toca(rec.dias_faltan).lower()})",
-        f"Último pago: {ultimo} · Días a favor: {rec.dias_a_favor}",
-    ]
-    if rec.atrasados:
-        partes.append("Atrasados: " + ", ".join(
-            f"{a.etiqueta} ({pd.fecha_corta(a.fecha_programada)})" for a in rec.atrasados
-        ))
-    return "\n".join(partes)
+@dataclass(frozen=True)
+class Renglon:
+    """Un renglón del desglose: texto a la izquierda, cifra a la derecha.
+    `clase`: 'base', 'suma', 'resta' o 'nota' (gris, no cambia el total)."""
+
+    texto: str
+    cifra: str
+    clase: str
+
+
+def renglones_desglose(p: pd.DesglosePago) -> list[Renglon]:
+    """El desglose de un pago, en palabras de la tienda. Vacío si no hay nada
+    que desglosar (base sola, pagado lo calculado): entonces basta «Cubre…»."""
+    r: list[Renglon] = []
+    if p.dias_extra_pagados:
+        n = len(p.dias_extra_pagados)
+        r.append(Renglon(f"+ {_dias(n)} de más ({_fechas(p.dias_extra_pagados)})",
+                         f"+{pd.dinero_texto(p.monto_extra)}", "suma"))
+    if p.faltas_descontadas:
+        n = len(p.faltas_descontadas)
+        r.append(Renglon(f"− {_faltas(n)} ({_fechas(p.faltas_descontadas)})",
+                         f"−{pd.dinero_texto(p.descuento_faltas)}", "resta"))
+    if p.faltas_cubiertas:
+        r.append(Renglon(f"Falta cubierta con día a favor ({_fechas(p.faltas_cubiertas)})",
+                         "no se descuenta", "nota"))
+    guardados = [f for f in p.dias_extra_acumulados if f not in p.dias_extra_sin_decidir]
+    if guardados:
+        r.append(Renglon(f"Día de más guardado ({_fechas(guardados)})", "a favor", "nota"))
+    if p.dias_extra_sin_decidir:
+        r.append(Renglon(f"Día de más sin decidir ({_fechas(p.dias_extra_sin_decidir)})",
+                         "se guarda", "nota"))
+    pagado = monto_de_la_tarjeta(p)
+    if pagado != p.monto:
+        # Lo que de verdad se pagó no es lo calculado (monto editado, o algo
+        # cambió después de registrarlo): se ven las dos cifras.
+        r.append(Renglon("Calculado", pd.dinero_texto(p.monto), "nota"))
+        r.append(Renglon("Pagado", pd.dinero_texto(pagado), "base"))
+    if r:
+        r.insert(0, Renglon("Base", pd.dinero_texto(p.base), "base"))
+    return r
+
+
+def resumen_ajustes(p: pd.DesglosePago) -> str:
+    """Lo que mueve el monto, en una línea: '+1 día de más · −1 falta'."""
+    partes = []
+    if p.dias_extra_pagados:
+        partes.append(f"+{_dias(len(p.dias_extra_pagados))} de más")
+    if p.faltas_descontadas:
+        partes.append(f"−{_faltas(len(p.faltas_descontadas))}")
+    if p.faltas_cubiertas:
+        n = len(p.faltas_cubiertas)
+        partes.append(f"{_faltas(n)} cubierta" + ("s" if n != 1 else ""))
+    return " · ".join(partes)
+
+
+def tono_cuando_toca(dias_faltan: int) -> str:
+    """El color del chip «cuándo toca»: 'hoy' (verde), 'pronto' (ámbar, en 1
+    a 3 días) o 'luego'."""
+    if dias_faltan <= 0:
+        return "hoy"
+    if dias_faltan <= 3:
+        return "pronto"
+    return "luego"
+
+
+@dataclass(frozen=True)
+class Paso:
+    """Un cuadro de la tira del mes."""
+
+    numero: int
+    fecha: date
+    estado: str   # pagado / toca_hoy / pendiente / atrasado / antes
+
+
+def pasos_del_mes(
+    dias_de_pago: tuple[int, ...], year: int, month: int, pagos: list[pd.DesglosePago],
+    registradas: set[date], hoy: date,
+) -> list[Paso]:
+    """Los pagos del mes (los 4) con su estado. Uno antes del inicio de la
+    cuenta sale «antes», salvo que se haya registrado (el 14-nov pagado el
+    19-nov con la cuenta arrancando el 19)."""
+    por_fecha = {p.fecha_programada: p for p in pagos}
+    pasos = []
+    for i, dia in enumerate(sorted(dias_de_pago), start=1):
+        f = date(year, month, dia)
+        p = por_fecha.get(f)
+        if p is not None:
+            estado = p.estado(hoy)
+        elif f in registradas:
+            estado = pd.PAGADO
+        else:
+            estado = ANTES
+        pasos.append(Paso(i, f, estado))
+    return pasos
+
+
+def resumen_del_mes(pasos: list[Paso]) -> tuple[str, bool]:
+    """Junto al título: ('2 de 4 pagados', False) o ('✓ Todos pagados', True).
+    No cuenta los de antes del inicio de la cuenta."""
+    cuentan = [p for p in pasos if p.estado != ANTES]
+    if not cuentan:
+        return "", False
+    pagados = sum(1 for p in cuentan if p.estado == pd.PAGADO)
+    if pagados == len(cuentan):
+        return "✓ Todos pagados", True
+    return f"{pagados} de {len(cuentan)} pagados", False
+
+
+def estado_dia_extra(e: pd.DiaExtra) -> str:
+    """'sin_decidir', 'pagar' o 'acumular' (para el chip)."""
+    return "sin_decidir" if e.sin_decidir else e.destino
 
 
 def texto_dia_extra(e: pd.DiaExtra) -> str:
-    destino = "Sin decidir (se guarda)" if e.sin_decidir else DESTINO_TEXTO[e.destino]
-    return f"{pd.fecha_corta(e.fecha, con_dia=True)} · {destino}"
+    """El chip del destino."""
+    return "Sin decidir · se guarda" if e.sin_decidir else DESTINO_TEXTO[e.destino]
 
 
 def leer_dias_de_pago(texto: str) -> tuple[int, ...]:
@@ -211,6 +401,33 @@ def _sesion():
     from pos_uniformes.database.connection import get_session
 
     return get_session()
+
+
+def _label(texto: str, nombre: str, *, wrap: bool = False) -> QLabel:
+    lbl = QLabel(texto)
+    lbl.setObjectName(nombre)
+    lbl.setWordWrap(wrap)
+    return lbl
+
+
+def _repulir(w: QWidget) -> None:
+    """Vuelve a aplicar la hoja de estilos tras cambiar una propiedad."""
+    w.style().unpolish(w)
+    w.style().polish(w)
+
+
+def _dinero_spin(valor: Decimal, maximo: float) -> QDoubleSpinBox:
+    """Sin flechitas, como en «Hacer corte»: se escribe."""
+    s = QDoubleSpinBox()
+    s.setRange(0, maximo)
+    s.setDecimals(2)
+    s.setPrefix("$ ")
+    s.setGroupSeparatorShown(True)
+    s.setButtonSymbols(QAbstractSpinBox.ButtonSymbols.NoButtons)
+    s.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+    s.setValue(float(valor))
+    s.lineEdit().setTextMargins(6, 0, 6, 0)
+    return s
 
 
 # ─── Pregunta del calendario ─────────────────────────────────────────────
@@ -286,30 +503,31 @@ class _YaMePagaronDialog(QDialog):
 
     def __init__(self, parent: QWidget | None, p: pd.DesglosePago, hoy: date):
         super().__init__(parent)
+        self.setObjectName("miPago")
+        self.setStyleSheet(_ESTILO)
         self.setWindowTitle("Ya me pagaron")
         ly = QVBoxLayout(self)
-        titulo = QLabel(f"Pago {titulo_pago(p)}")
-        titulo.setStyleSheet("font-size: 16px; font-weight: 800;")
-        ly.addWidget(titulo)
+        ly.setContentsMargins(22, 18, 22, 16)
+        ly.setSpacing(12)
+        ly.addWidget(_label(f"Pago {titulo_pago(p)}", "miPagoEncabezado"))
         form = QFormLayout()
+        form.setVerticalSpacing(10)
         self.fecha = QDateEdit(_qdate(hoy))
         self.fecha.setCalendarPopup(True)
         self.fecha.setDisplayFormat("dd/MM/yyyy")
         self.fecha.setMaximumDate(_qdate(hoy))      # no se apunta un pago que no ha pasado
         form.addRow("¿Qué día te pagaron?", self.fecha)
-        self.monto = QDoubleSpinBox()
-        self.monto.setRange(0, 1_000_000)
-        self.monto.setDecimals(2)
-        self.monto.setPrefix("$ ")
-        self.monto.setValue(float(p.monto))
+        self.monto = _dinero_spin(p.monto, 1_000_000)
         form.addRow("¿Cuánto?", self.monto)
         ly.addLayout(form)
-        nota = QLabel(f"Lo calculado es {pd.dinero_texto(p.monto)}. Es solo la cuenta: no sale del cajón.")
-        nota.setWordWrap(True)
-        nota.setStyleSheet("color: #8a8177; font-size: 12px;")
-        ly.addWidget(nota)
+        ly.addWidget(_label(
+            f"Lo calculado es {pd.dinero_texto(p.monto)}. Es solo la cuenta: no sale del cajón.",
+            "miPagoNota", wrap=True,
+        ))
         botones = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        botones.button(QDialogButtonBox.StandardButton.Ok).setText("Guardar")
+        ok = botones.button(QDialogButtonBox.StandardButton.Ok)
+        ok.setText("Guardar")
+        ok.setObjectName("miPagoPrimario")
         botones.button(QDialogButtonBox.StandardButton.Cancel).setText("Cancelar")
         botones.accepted.connect(self.accept)
         botones.rejected.connect(self.reject)
@@ -326,139 +544,274 @@ class MiPagoDialog(QDialog):
         self.setObjectName("miPago")
         self.setWindowTitle("💼 Mi pago")
         self.setStyleSheet(_ESTILO)
-        self.resize(760, 760)
+        self.resize(780, 820)
         self._quien = str(quien or "").strip().upper()
         self._sf = session_factory or _sesion
         self._hoy = hoy or date.today()
         self._year, self._month = self._hoy.year, self._hoy.month
         self._config: pd.ConfigPagoDueno | None = None
+        self._rec: pd.Recordatorio | None = None
         self.pagos: list[pd.DesglosePago] = []
         self.extras: list[pd.DiaExtra] = []
+        self._registradas: set[date] = set()
         self._config_pintada = False   # la configuración guardada ya está en los campos
 
         raiz = QVBoxLayout(self)
         raiz.setContentsMargins(0, 0, 0, 0)
-        cuerpo = QWidget()
-        self._ly = QVBoxLayout(cuerpo)
-        self._ly.setContentsMargins(20, 16, 20, 10)
-        self._ly.setSpacing(10)
+        raiz.setSpacing(0)
+        self._cuerpo = QWidget()
+        self._ly = QVBoxLayout(self._cuerpo)
+        self._ly.setContentsMargins(22, 18, 22, 12)
+        self._ly.setSpacing(12)
         area = QScrollArea()
         area.setWidgetResizable(True)
-        area.setWidget(cuerpo)
+        area.setWidget(self._cuerpo)
         area.setFrameShape(QScrollArea.Shape.NoFrame)
+        area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         raiz.addWidget(area, 1)
 
-        aviso = QLabel("Es solo la cuenta de tu pago: no sale del cajón ni cambia el corte.")
-        aviso.setObjectName("miPagoNota")
-        aviso.setWordWrap(True)
-        self._ly.addWidget(aviso)
-        self.resumen = QLabel("")
-        self.resumen.setObjectName("miPagoResumen")
-        self.resumen.setWordWrap(True)
-        self._ly.addWidget(self.resumen)
-        self.aviso_descanso = QLabel(TEXTO_SIN_DESCANSO)
-        self.aviso_descanso.setObjectName("miPagoNota")
-        self.aviso_descanso.setWordWrap(True)
+        # Encabezado.
+        self._ly.addWidget(_label("💼 Mi pago", "miPagoEncabezado"))
+        self._ly.addWidget(_label(
+            "Es solo la cuenta de tu pago: no sale del cajón ni cambia el corte.", "miPagoNota", wrap=True,
+        ))
+        self.aviso_descanso = _label(TEXTO_SIN_DESCANSO, "miPagoAviso", wrap=True)
         self.aviso_descanso.setVisible(False)
         self._ly.addWidget(self.aviso_descanso)
 
-        # Pagos del mes, con flechas.
-        nav = QHBoxLayout()
-        self.btn_mes_prev = QPushButton("◀")
-        self.btn_mes_next = QPushButton("▶")
-        for b in (self.btn_mes_prev, self.btn_mes_next):
-            b.setFixedWidth(48)
-            b.setAutoDefault(False)
-        self.btn_mes_prev.clicked.connect(lambda: self._mover_mes(-1))
-        self.btn_mes_next.clicked.connect(lambda: self._mover_mes(1))
-        self.mes_label = QLabel("")
-        self.mes_label.setObjectName("miPagoSeccion")
-        self.mes_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        nav.addWidget(self.btn_mes_prev)
-        nav.addWidget(self.mes_label, 1)
-        nav.addWidget(self.btn_mes_next)
-        self._ly.addLayout(nav)
+        # El próximo pago (o «sin configurar») y las tres fichas.
+        self._ly.addWidget(self._armar_heroe())
+        self.vacio_config = self._armar_vacio()
+        self._ly.addWidget(self.vacio_config)
+        self.fichas = QWidget()
+        fichas = QHBoxLayout(self.fichas)
+        fichas.setContentsMargins(0, 0, 0, 0)
+        fichas.setSpacing(10)
+        self.stat_ultimo = self._ficha(fichas, "ÚLTIMO PAGO")
+        self.stat_favor = self._ficha(fichas, "DÍAS A FAVOR")
+        self.stat_atrasados = self._ficha(fichas, "ATRASADOS")
+        self._ly.addWidget(self.fichas)
+
+        # Pagos del mes: título, píldora de mes, tira y tarjetas.
+        self.seccion_pagos = QWidget()
+        sp = QVBoxLayout(self.seccion_pagos)
+        sp.setContentsMargins(0, 8, 0, 0)
+        sp.setSpacing(10)
+        cabeza = QHBoxLayout()
+        cabeza.setSpacing(10)
+        cabeza.addWidget(_label("PAGOS DEL MES", "miPagoSeccion"))
+        self.mes_resumen = _label("", "miPagoMesResumen")
+        cabeza.addWidget(self.mes_resumen)
+        cabeza.addStretch(1)
+        cabeza.addWidget(self._armar_nav_mes())
+        sp.addLayout(cabeza)
+        self._tira_box = QHBoxLayout()
+        self._tira_box.setSpacing(8)
+        sp.addLayout(self._tira_box)
         self._pagos_box = QVBoxLayout()
         self._pagos_box.setSpacing(8)
-        self._ly.addLayout(self._pagos_box)
+        sp.addLayout(self._pagos_box)
+        self._ly.addWidget(self.seccion_pagos)
 
         # Días de más.
-        seccion = QLabel("DÍAS DE MÁS")
-        seccion.setObjectName("miPagoSeccion")
-        self._ly.addWidget(seccion)
-        self._extras_box = QVBoxLayout()
-        self._extras_box.setSpacing(6)
-        self._ly.addLayout(self._extras_box)
+        self.seccion_extras = QWidget()
+        se = QVBoxLayout(self.seccion_extras)
+        se.setContentsMargins(0, 8, 0, 0)
+        se.setSpacing(8)
+        cab = QHBoxLayout()
+        cab.addWidget(_label("DÍAS DE MÁS", "miPagoSeccion"))
+        cab.addStretch(1)
+        self.extras_nota = _label("", "miPagoNota")
+        cab.addWidget(self.extras_nota)
+        se.addLayout(cab)
+        extras_card = QFrame()
+        extras_card.setObjectName("miPagoCard")
+        self._extras_box = QVBoxLayout(extras_card)
+        self._extras_box.setContentsMargins(14, 6, 14, 6)
+        self._extras_box.setSpacing(0)
+        se.addWidget(extras_card)
+        self._ly.addWidget(self.seccion_extras)
 
-        # Configuración.
-        self._ly.addWidget(self._seccion_config())
+        # Configuración, plegada.
+        self.btn_config = QPushButton("")
+        self.btn_config.setObjectName("miPagoPlegable")
+        self.btn_config.setAutoDefault(False)
+        self.btn_config.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_config.clicked.connect(lambda: self._mostrar_config(self.config_box.isHidden()))
+        self._ly.addWidget(self.btn_config)
+        self.config_box = self._seccion_config()
+        self._ly.addWidget(self.config_box)
         self._ly.addStretch(1)
 
-        pie = QHBoxLayout()
-        pie.setContentsMargins(20, 6, 20, 14)
-        self.status = QLabel("")
-        self.status.setObjectName("miPagoNota")
-        self.status.setWordWrap(True)
+        pie_w = QFrame()
+        pie_w.setObjectName("miPagoPie")
+        pie = QHBoxLayout(pie_w)
+        pie.setContentsMargins(22, 10, 22, 12)
+        self.status = _label("", "miPagoNota", wrap=True)
         pie.addWidget(self.status, 1)
         cerrar = QPushButton("Cerrar")
         cerrar.setAutoDefault(False)
+        cerrar.setMinimumWidth(110)
         cerrar.clicked.connect(self.accept)
         pie.addWidget(cerrar)
-        raiz.addLayout(pie)
+        raiz.addWidget(pie_w)
         self.recargar(pintar_config=True)
+        # Plegada: casi no se usa. Abierta si no hay cuenta que llevar.
+        self._mostrar_config(self._config is None or not self._config.vigente)
 
     # ── armado ──
+    def _armar_heroe(self) -> QFrame:
+        self.heroe = QFrame()
+        self.heroe.setObjectName("miPagoHeroe")
+        ly = QHBoxLayout(self.heroe)
+        ly.setContentsMargins(22, 18, 22, 18)
+        ly.setSpacing(16)
+        izq = QVBoxLayout()
+        izq.setSpacing(3)
+        izq.addWidget(_label("PRÓXIMO PAGO", "miPagoHeroeKicker"))
+        self.heroe_titulo = _label("", "miPagoHeroeTitulo")
+        izq.addWidget(self.heroe_titulo)
+        self.heroe_monto = _label("", "miPagoHeroeMonto")
+        izq.addWidget(self.heroe_monto)
+        self.heroe_pie = _label("", "miPagoHeroePie", wrap=True)
+        izq.addWidget(self.heroe_pie)
+        ly.addLayout(izq, 1)
+        der = QVBoxLayout()
+        der.setSpacing(10)
+        self.heroe_cuando = _label("", "miPagoCuando")
+        der.addWidget(self.heroe_cuando, 0, Qt.AlignmentFlag.AlignRight)
+        der.addStretch(1)
+        self.btn_heroe = QPushButton("💵 Ya me pagaron")
+        self.btn_heroe.setObjectName("miPagoHeroeBoton")
+        self.btn_heroe.setAutoDefault(False)
+        self.btn_heroe.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_heroe.clicked.connect(lambda: self._rec and self._ya_me_pagaron(self._rec.proximo))
+        der.addWidget(self.btn_heroe, 0, Qt.AlignmentFlag.AlignRight)
+        ly.addLayout(der)
+        return self.heroe
+
+    def _armar_vacio(self) -> QFrame:
+        caja = QFrame()
+        caja.setObjectName("miPagoVacio")
+        ly = QVBoxLayout(caja)
+        ly.setContentsMargins(22, 18, 22, 18)
+        ly.setSpacing(4)
+        ly.addWidget(_label("Tu cuenta todavía no está configurada", "miPagoVacioTitulo", wrap=True))
+        self.vacio_texto = _label(
+            "Pon abajo el monto de cada pago y el día en que empieza la cuenta, y guarda.",
+            "miPagoNota", wrap=True,
+        )
+        ly.addWidget(self.vacio_texto)
+        return caja
+
+    @staticmethod
+    def _ficha(fila: QHBoxLayout, titulo: str) -> QLabel:
+        caja = QFrame()
+        caja.setObjectName("miPagoFicha")
+        ly = QVBoxLayout(caja)
+        ly.setContentsMargins(14, 10, 14, 10)
+        ly.setSpacing(2)
+        ly.addWidget(_label(titulo, "miPagoFichaTitulo"))
+        valor = _label("", "miPagoFichaValor")
+        ly.addWidget(valor)
+        pie = _label("", "miPagoFichaPie", wrap=True)
+        ly.addWidget(pie)
+        valor.pie = pie
+        fila.addWidget(caja, 1)
+        return valor
+
+    def _armar_nav_mes(self) -> QFrame:
+        nav = QFrame()
+        nav.setObjectName("miPagoMesNav")
+        ly = QHBoxLayout(nav)
+        ly.setContentsMargins(3, 2, 3, 2)
+        ly.setSpacing(4)
+        self.btn_mes_prev = QPushButton("◀")
+        self.btn_mes_next = QPushButton("▶")
+        self.mes_label = _label("", "miPagoMes")
+        self.mes_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.mes_label.setMinimumWidth(130)
+        for b in (self.btn_mes_prev, self.btn_mes_next):
+            b.setAutoDefault(False)
+            b.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.btn_mes_prev.setToolTip("Mes anterior")
+        self.btn_mes_next.setToolTip("Mes siguiente")
+        self.btn_mes_prev.clicked.connect(lambda: self._mover_mes(-1))
+        self.btn_mes_next.clicked.connect(lambda: self._mover_mes(1))
+        ly.addWidget(self.btn_mes_prev)
+        ly.addWidget(self.mes_label)
+        ly.addWidget(self.btn_mes_next)
+        return nav
+
     def _seccion_config(self) -> QFrame:
         card = QFrame()
         card.setObjectName("miPagoCard")
         ly = QVBoxLayout(card)
-        ly.setContentsMargins(14, 10, 14, 12)
-        t = QLabel("CONFIGURACIÓN")
-        t.setObjectName("miPagoSeccion")
-        ly.addWidget(t)
-        form = QFormLayout()
-        self.cfg_monto = QDoubleSpinBox()
-        self.cfg_monto.setRange(0, 1_000_000)
-        self.cfg_monto.setPrefix("$ ")
-        self.cfg_monto.setValue(float(pd.MONTO_DEFAULT))
-        form.addRow("Monto de cada pago:", self.cfg_monto)
-        self.cfg_valor_dia = QDoubleSpinBox()
-        self.cfg_valor_dia.setRange(0, 100_000)
-        self.cfg_valor_dia.setPrefix("$ ")
-        self.cfg_valor_dia.setValue(float(pd.VALOR_DIA_DEFAULT))
-        form.addRow("Valor de un día:", self.cfg_valor_dia)
+        ly.setContentsMargins(18, 14, 18, 16)
+        ly.setSpacing(12)
+        grid = QGridLayout()
+        grid.setHorizontalSpacing(14)
+        grid.setVerticalSpacing(4)
+        self.cfg_monto = _dinero_spin(pd.MONTO_DEFAULT, 1_000_000)
+        self.cfg_valor_dia = _dinero_spin(pd.VALOR_DIA_DEFAULT, 100_000)
         self.cfg_dias = QLineEdit(", ".join(str(d) for d in pd.DIAS_DE_PAGO_DEFAULT))
+        self.cfg_dias.setObjectName("miPagoCampo")
         self.cfg_dias.setPlaceholderText("7, 14, 21, 28")
-        form.addRow("Días de pago (1 al 28):", self.cfg_dias)
         self.cfg_inicio = QDateEdit(_qdate(self._hoy))
         self.cfg_inicio.setCalendarPopup(True)
         self.cfg_inicio.setDisplayFormat("dd/MM/yyyy")
-        form.addRow("La cuenta empieza el:", self.cfg_inicio)
+        campos = (
+            ("MONTO DE CADA PAGO", self.cfg_monto, "Lo de una semana."),
+            ("VALOR DE UN DÍA", self.cfg_valor_dia, "Lo que suma o resta un día."),
+            ("DÍAS DE PAGO", self.cfg_dias, "Del 1 al 28, separados por comas."),
+            ("LA CUENTA EMPIEZA EL", self.cfg_inicio, "Antes de esa fecha no se cuenta nada."),
+        )
+        for i, (titulo, campo, ayuda) in enumerate(campos):
+            fila, col = (i // 2) * 3, i % 2
+            grid.addWidget(_label(titulo, "miPagoFichaTitulo"), fila, col)
+            campo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            if isinstance(campo, QDoubleSpinBox):
+                campo.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+            campo.setMinimumWidth(120)
+            grid.addWidget(campo, fila + 1, col)
+            grid.addWidget(_label(ayuda, "miPagoNota", wrap=True), fila + 2, col)
+            grid.setRowMinimumHeight(fila + 2, 26)
+        grid.setColumnStretch(0, 1)
+        grid.setColumnStretch(1, 1)
+        ly.addLayout(grid)
+        fila = QHBoxLayout()
         self.cfg_activo = QCheckBox("Llevar la cuenta (y recordarla en el corte)")
         self.cfg_activo.setChecked(True)
-        form.addRow("", self.cfg_activo)
-        ly.addLayout(form)
+        fila.addWidget(self.cfg_activo, 1)
         self.btn_guardar_config = QPushButton("Guardar configuración")
         self.btn_guardar_config.setObjectName("miPagoPrimario")
         self.btn_guardar_config.setAutoDefault(False)
         self.btn_guardar_config.clicked.connect(self._guardar_config)
-        ly.addWidget(self.btn_guardar_config)
+        fila.addWidget(self.btn_guardar_config)
+        ly.addLayout(fila)
         return card
 
+    def _mostrar_config(self, abierta: bool) -> None:
+        self.config_box.setVisible(abierta)
+        self.btn_config.setText(("▾" if abierta else "▸") + "  ⚙ Configuración")
+
     @staticmethod
-    def _limpiar(box: QVBoxLayout) -> None:
+    def _limpiar(box) -> None:
         while box.count():
             item = box.takeAt(0)
             w = item.widget()
             if w is not None:
                 w.setParent(None)
                 w.deleteLater()
+            elif item.layout() is not None:
+                MiPagoDialog._limpiar(item.layout())
 
     def recargar(self, *, pintar_config: bool = False) -> None:
         """Vuelve a leer y pinta. La configuración solo se repinta al abrir y
         al guardarla (`pintar_config`), para no borrar lo que se está editando."""
         rec = None
         sin_descanso = False
+        self._registradas = set()
         try:
             with self._sf() as session:
                 pd.limpiar_decisiones_huerfanas(session)
@@ -468,14 +821,17 @@ class MiPagoDialog(QDialog):
                 self.extras = pd.lista_dias_extra(session, max(self._hoy, self._fin_de_mes())) if vigente else []
                 rec = pd.recordatorio(session, self._hoy) if vigente else None
                 sin_descanso = pd.falta_descanso(session) if vigente else False
+                if vigente:
+                    self._registradas = set(pd.cargar_datos(session, self._config).registros)
         except Exception:  # noqa: BLE001
             logger.exception("Mi pago: no se pudo cargar")
             self.status.setText("Sin conexión con la PC principal.")
             self.pagos, self.extras = [], []
-        self.resumen.setText(texto_resumen(rec))
+        self._rec = rec
         self.aviso_descanso.setVisible(sin_descanso)
         if pintar_config or not self._config_pintada:
             self._pintar_config()
+        self._pintar_heroe()
         self._pintar_pagos()
         self._pintar_extras()
 
@@ -495,80 +851,196 @@ class MiPagoDialog(QDialog):
             self.cfg_inicio.setDate(_qdate(c.fecha_inicio))
         self.cfg_activo.setChecked(bool(c.activo))
 
+    def _pintar_heroe(self) -> None:
+        rec = self._rec
+        hay = rec is not None
+        self.heroe.setVisible(hay)
+        self.fichas.setVisible(hay)
+        self.seccion_pagos.setVisible(hay)
+        self.seccion_extras.setVisible(hay)
+        self.vacio_config.setVisible(not hay)
+        if self._config is not None and not self._config.vigente:
+            self.vacio_texto.setText("La cuenta está apagada. Prende «Llevar la cuenta» en la configuración.")
+        if not hay:
+            self.heroe_titulo.setText("")
+            return
+        p = rec.proximo
+        self.heroe_titulo.setText(titulo_pago(p))
+        self.heroe_monto.setText(pd.dinero_texto(p.monto))
+        ajustes = resumen_ajustes(p)
+        self.heroe_pie.setText(texto_cubre(p) + (f" · {ajustes}" if ajustes else ""))
+        self.heroe_cuando.setText(pd.cuando_toca(rec.dias_faltan))
+        self.heroe_cuando.setProperty("tono", tono_cuando_toca(rec.dias_faltan))
+        _repulir(self.heroe_cuando)
+
+        self.stat_ultimo.setText(pd.fecha_corta(rec.ultimo_pago) if rec.ultimo_pago else "Ninguno")
+        self.stat_ultimo.pie.setText("la última vez que te pagaron")
+        self.stat_favor.setText(str(rec.dias_a_favor))
+        self.stat_favor.pie.setText("cubren una falta cada uno")
+        n = len(rec.atrasados)
+        self.stat_atrasados.setText(str(n) if n else "Ninguno")
+        self.stat_atrasados.setProperty("alerta", "true" if n else "false")
+        _repulir(self.stat_atrasados)
+        self.stat_atrasados.pie.setText(
+            ", ".join(f"{a.etiqueta} ({pd.fecha_corta(a.fecha_programada)})" for a in rec.atrasados)
+            if n else "vas al día"
+        )
+
     def _pintar_pagos(self) -> None:
+        self._limpiar(self._tira_box)
         self._limpiar(self._pagos_box)
-        self.mes_label.setText(f"PAGOS DE {_MESES[self._month - 1].upper()} {self._year}")
+        self.mes_label.setText(f"{_MESES[self._month - 1].capitalize()} {self._year}")
+        self.tira: list[QFrame] = []
+        c = self._config
+        pasos: list[Paso] = []
+        if c is not None and c.vigente:
+            pasos = pasos_del_mes(c.dias_de_pago, self._year, self._month, self.pagos, self._registradas, self._hoy)
+        texto, completo = resumen_del_mes(pasos)
+        self.mes_resumen.setText(texto)
+        self.mes_resumen.setProperty("completo", "true" if completo else "false")
+        _repulir(self.mes_resumen)
+        if pasos:
+            for paso in pasos:
+                cuadro = self._cuadro_paso(paso)
+                self.tira.append(cuadro)
+                self._tira_box.addWidget(cuadro, 1)
         if not self.pagos:
-            vacio = QLabel(
-                "Configura la cuenta abajo para ver tus pagos." if not (self._config and self._config.vigente)
-                else "Ningún pago de este mes cae desde el inicio de la cuenta."
-            )
-            vacio.setObjectName("miPagoNota")
-            vacio.setWordWrap(True)
+            vacio = _label("Ningún pago de este mes cae desde el inicio de la cuenta.", "miPagoNota", wrap=True)
             self._pagos_box.addWidget(vacio)
             return
         for p in self.pagos:
             self._pagos_box.addWidget(self._tarjeta_pago(p))
 
+    def _cuadro_paso(self, paso: Paso) -> QFrame:
+        cuadro = QFrame()
+        cuadro.setObjectName("miPagoPaso")
+        cuadro.setProperty("estado", paso.estado)
+        cuadro.setProperty("proximo", "true" if self._es_proximo(paso.fecha) else "false")
+        ly = QVBoxLayout(cuadro)
+        ly.setContentsMargins(10, 8, 10, 8)
+        ly.setSpacing(0)
+        fila = QHBoxLayout()
+        fila.addWidget(_label(str(paso.numero), "miPagoPasoNumero"))
+        fila.addStretch(1)
+        fila.addWidget(_label(pd.fecha_corta(paso.fecha), "miPagoPasoFecha"))
+        ly.addLayout(fila)
+        estado = _label(PASO_TEXTO[paso.estado], "miPagoPasoEstado")
+        ly.addWidget(estado)
+        cuadro.paso = paso
+        cuadro.setToolTip(f"{paso.numero} de {len(self._config.dias_de_pago)} · "
+                          f"{pd.fecha_corta(paso.fecha, con_dia=True)} · {PASO_TEXTO[paso.estado]}")
+        return cuadro
+
+    def _es_proximo(self, fecha: date) -> bool:
+        return self._rec is not None and self._rec.proximo.fecha_programada == fecha
+
     def _tarjeta_pago(self, p: pd.DesglosePago) -> QFrame:
+        estado_pago = p.estado(self._hoy)
         card = QFrame()
         card.setObjectName("miPagoCard")
+        card.setProperty("estado", estado_pago)
+        card.setProperty("proximo", "true" if self._es_proximo(p.fecha_programada) else "false")
         ly = QVBoxLayout(card)
-        ly.setContentsMargins(14, 10, 14, 10)
+        ly.setContentsMargins(16, 12, 16, 12)
+        ly.setSpacing(6)
         fila = QHBoxLayout()
-        titulo = QLabel(titulo_pago(p))
-        titulo.setObjectName("miPagoTitulo")
+        fila.setSpacing(10)
+        titulo = _label(titulo_pago(p), "miPagoTitulo")
         fila.addWidget(titulo)
-        estado = QLabel(texto_estado(p, self._hoy))
-        estado.setObjectName("miPagoEstado")
-        estado.setProperty("estado", p.estado(self._hoy))
+        estado = _label(texto_estado(p, self._hoy), "miPagoEstado")
+        estado.setProperty("estado", estado_pago)
         fila.addWidget(estado)
         fila.addStretch(1)
-        monto = QLabel(pd.dinero_texto(monto_de_la_tarjeta(p)))
-        monto.setObjectName("miPagoMonto")
+        monto = _label(pd.dinero_texto(monto_de_la_tarjeta(p)), "miPagoMonto")
         fila.addWidget(monto)
         ly.addLayout(fila)
-        desglose = QLabel("\n".join(lineas_desglose(p)))
-        desglose.setObjectName("miPagoDesglose")
-        desglose.setWordWrap(True)
-        ly.addWidget(desglose)
-        botones = QHBoxLayout()
-        botones.addStretch(1)
+
+        fila2 = QHBoxLayout()
+        fila2.addWidget(_label(texto_cubre(p), "miPagoCubre"), 1)
         if p.pagado:
             b = QPushButton("Deshacer pago")
+            b.setObjectName("miPagoChico")
             b.clicked.connect(lambda _c=False, pago=p: self._deshacer(pago))
         else:
             b = QPushButton("💵 Ya me pagaron")
-            b.setObjectName("miPagoPrimario")
+            # El botón lleno solo en los atrasados (y en la tarjeta de arriba);
+            # en los demás, de contorno.
+            b.setObjectName("miPagoPrimario" if estado_pago == pd.ATRASADO else "miPagoChico")
             b.clicked.connect(lambda _c=False, pago=p: self._ya_me_pagaron(pago))
         b.setAutoDefault(False)
-        botones.addWidget(b)
-        ly.addLayout(botones)
+        b.setCursor(Qt.CursorShape.PointingHandCursor)
+        renglones = renglones_desglose(p)
+        if not renglones:
+            fila2.addWidget(b)
+            ly.addLayout(fila2)
+        else:
+            ly.addLayout(fila2)
+            ly.addWidget(self._recibo(renglones))
+            fila3 = QHBoxLayout()
+            fila3.addStretch(1)
+            fila3.addWidget(b)
+            ly.addLayout(fila3)
         card.boton = b          # para las pruebas
         card.monto = monto
+        card.renglones = renglones
         return card
+
+    @staticmethod
+    def _recibo(renglones: list[Renglon]) -> QFrame:
+        recibo = QFrame()
+        recibo.setObjectName("miPagoRecibo")
+        grid = QGridLayout(recibo)
+        grid.setContentsMargins(12, 8, 12, 8)
+        grid.setHorizontalSpacing(12)
+        grid.setVerticalSpacing(3)
+        for i, r in enumerate(renglones):
+            grid.addWidget(_label(r.texto, "miPagoRenglon", wrap=True), i, 0)
+            cifra = _label(r.cifra, "miPagoRenglonMonto")
+            cifra.setProperty("clase", r.clase)
+            cifra.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+            grid.addWidget(cifra, i, 1)
+        grid.setColumnStretch(0, 1)
+        return recibo
 
     def _pintar_extras(self) -> None:
         self._limpiar(self._extras_box)
+        valor = self._config.valor_dia if self._config is not None else pd.VALOR_DIA_DEFAULT
+        self.extras_nota.setText(f"Cada uno vale {pd.dinero_texto(valor)}")
         if not self.extras:
-            vacio = QLabel("No hay días de más. Se apuntan en el calendario con «Sí trabajó» en tu descanso.")
-            vacio.setObjectName("miPagoNota")
-            vacio.setWordWrap(True)
+            vacio = _label(
+                "Ninguno por ahora. Se apuntan en el calendario con «Sí trabajó» en tu descanso.",
+                "miPagoNota", wrap=True,
+            )
+            vacio.setContentsMargins(0, 8, 0, 8)
             self._extras_box.addWidget(vacio)
             return
-        for e in self.extras:
+        for i, e in enumerate(self.extras):
+            if i:
+                raya = QFrame()
+                raya.setFixedHeight(1)
+                raya.setStyleSheet("background: #ece2d4; border: none;")
+                self._extras_box.addWidget(raya)
             fila_w = QWidget()
             fila = QHBoxLayout(fila_w)
-            fila.setContentsMargins(0, 0, 0, 0)
-            lbl = QLabel(texto_dia_extra(e))
-            fila.addWidget(lbl, 1)
+            fila.setContentsMargins(0, 8, 0, 8)
+            fila.setSpacing(10)
+            fecha = _label(pd.fecha_corta(e.fecha, con_dia=True), "miPagoExtraFecha")
+            fecha.setMinimumWidth(92)
+            fila.addWidget(fecha)
+            chip = _label(texto_dia_extra(e), "miPagoEstado")
+            chip.setProperty("estado", estado_dia_extra(e))
+            fila.addWidget(chip)
+            fila.addStretch(1)
             pagar = QPushButton("💵 Págamelo")
             guardar = QPushButton("📦 Guárdamelo")
             for b, destino in ((pagar, pd.PAGAR), (guardar, pd.ACUMULAR)):
+                b.setObjectName("miPagoSegmento")
                 b.setAutoDefault(False)
+                # El destino elegido queda «encendido» (deshabilitado: ya está).
                 b.setEnabled(e.sin_decidir or e.destino != destino)
                 b.clicked.connect(lambda _c=False, f=e.fecha, d=destino: self._decidir(f, d))
                 fila.addWidget(b)
+            fila_w.extra = e
             self._extras_box.addWidget(fila_w)
 
     # ── acciones ──

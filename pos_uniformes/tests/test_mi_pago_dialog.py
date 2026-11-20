@@ -68,7 +68,8 @@ class TextosTests(unittest.TestCase):
         self.assertEqual(mp.texto_estado(p, D(2026, 11, 21)), "Toca hoy")
         self.assertEqual(mp.texto_estado(p, D(2026, 11, 22)), "Atrasado")
         p.registro = pd.RegistroPago(D(2026, 11, 21), D(2026, 11, 20), Decimal("2500.00"))
-        self.assertEqual(mp.texto_estado(p, D(2026, 11, 22)), "Pagado el 20-nov · $2,500")
+        # El monto ya va en grande en la tarjeta: el chip solo dice cuándo.
+        self.assertEqual(mp.texto_estado(p, D(2026, 11, 22)), "Pagado el 20-nov")
 
     def test_desglose_con_dias_de_mas_y_faltas(self) -> None:
         p = _desglose(
@@ -76,21 +77,62 @@ class TextosTests(unittest.TestCase):
             dias_extra_acumulados=[D(2026, 11, 18)], dias_extra_sin_decidir=[D(2026, 11, 18)],
             faltas_descontadas=[D(2026, 11, 20)], faltas_cubiertas=[D(2026, 11, 19)],
         )
-        texto = "\n".join(mp.lineas_desglose(p))
-        self.assertIn("Cubre del 15-nov al 21-nov", texto)
-        self.assertIn("Base: $2,500", texto)
-        self.assertIn("+ 1 día de más: $385 (17-nov)", texto)
-        self.assertIn("− 1 falta(s): $385 (20-nov)", texto)
-        self.assertIn("cubierta(s) con días a favor: 19-nov", texto)
-        self.assertIn("sin decidir (se guardan): 18-nov", texto)
-        self.assertTrue(texto.endswith("Total: $2,500"))
+        self.assertEqual(mp.texto_cubre(p), "Cubre del 15 al 21-nov")
+        R = mp.Renglon
+        self.assertEqual(mp.renglones_desglose(p), [
+            R("Base", "$2,500", "base"),
+            R("+ 1 día de más (17-nov)", "+$385", "suma"),
+            R("− 1 falta (20-nov)", "−$385", "resta"),
+            R("Falta cubierta con día a favor (19-nov)", "no se descuenta", "nota"),
+            R("Día de más sin decidir (18-nov)", "se guarda", "nota"),
+        ])
+        self.assertEqual(mp.resumen_ajustes(p), "+1 día de más · −1 falta · 1 falta cubierta")
 
-    def test_desglose_simple(self) -> None:
-        self.assertEqual(mp.lineas_desglose(_desglose()),
-                         ["Cubre del 15-nov al 21-nov", "Base: $2,500", "Total: $2,500"])
+    def test_desglose_simple_es_una_sola_linea(self) -> None:
+        # Sin días de más ni faltas no hay nada que desglosar: basta «Cubre…».
+        self.assertEqual(mp.renglones_desglose(_desglose()), [])
+        self.assertEqual(mp.resumen_ajustes(_desglose()), "")
 
-    def test_resumen_sin_cuenta(self) -> None:
-        self.assertIn("no está configurada", mp.texto_resumen(None))
+    def test_desglose_de_un_pago_con_monto_editado(self) -> None:
+        p = _desglose(registro=pd.RegistroPago(D(2026, 11, 21), D(2026, 11, 21), Decimal("2400.00")))
+        self.assertEqual([(r.texto, r.cifra) for r in mp.renglones_desglose(p)],
+                         [("Base", "$2,500"), ("Calculado", "$2,500"), ("Pagado", "$2,400")])
+
+    def test_rango_corto(self) -> None:
+        self.assertEqual(mp.rango_corto(D(2026, 11, 15), D(2026, 11, 21)), "del 15 al 21-nov")
+        self.assertEqual(mp.rango_corto(D(2026, 11, 29), D(2026, 12, 7)), "del 29-nov al 07-dic")
+
+    def test_tono_cuando_toca(self) -> None:
+        self.assertEqual([mp.tono_cuando_toca(n) for n in (0, 1, 3, 4, 9)],
+                         ["hoy", "pronto", "pronto", "luego", "luego"])
+
+    def test_pasos_del_mes(self) -> None:
+        # Cuenta desde el 19-nov; el 14 se registró aunque es de antes; hoy 21.
+        p21 = _desglose()
+        p28 = _desglose(fecha_programada=D(2026, 11, 28), numero=4, desde=D(2026, 11, 22), hasta=D(2026, 11, 28))
+        pasos = mp.pasos_del_mes((7, 14, 21, 28), 2026, 11, [p21, p28], {D(2026, 11, 14)}, D(2026, 11, 21))
+        self.assertEqual([(x.numero, x.fecha.day, x.estado) for x in pasos], [
+            (1, 7, mp.ANTES), (2, 14, pd.PAGADO), (3, 21, pd.TOCA_HOY), (4, 28, pd.PENDIENTE),
+        ])
+        self.assertEqual(mp.resumen_del_mes(pasos), ("1 de 3 pagados", False))
+        atrasado = mp.pasos_del_mes((7, 14, 21, 28), 2026, 11, [p21], set(), D(2026, 11, 23))
+        self.assertEqual(atrasado[2].estado, pd.ATRASADO)
+
+    def test_resumen_del_mes(self) -> None:
+        P = mp.Paso
+        todos = [P(i, D(2026, 12, 7 * i), pd.PAGADO) for i in range(1, 5)]
+        self.assertEqual(mp.resumen_del_mes(todos), ("✓ Todos pagados", True))
+        self.assertEqual(mp.resumen_del_mes([P(1, D(2026, 10, 7), mp.ANTES)]), ("", False))
+        self.assertEqual(mp.resumen_del_mes([]), ("", False))
+
+    def test_chip_del_dia_de_mas(self) -> None:
+        sin = pd.DiaExtra(D(2026, 11, 17), pd.ACUMULAR, False)
+        pagar = pd.DiaExtra(D(2026, 11, 10), pd.PAGAR, True)
+        guardado = pd.DiaExtra(D(2026, 11, 3), pd.ACUMULAR, True)
+        self.assertEqual([mp.estado_dia_extra(e) for e in (sin, pagar, guardado)],
+                         ["sin_decidir", pd.PAGAR, pd.ACUMULAR])
+        self.assertEqual([mp.texto_dia_extra(e) for e in (sin, pagar, guardado)],
+                         ["Sin decidir · se guarda", "Se paga en su pago", "Guardado a favor"])
 
     def test_dias_de_pago(self) -> None:
         self.assertEqual(mp.leer_dias_de_pago("7, 14, 21, 28"), (7, 14, 21, 28))
@@ -116,11 +158,17 @@ class MiPagoDialogTests(unittest.TestCase):
 
     def test_sin_configuracion_lo_dice_y_se_puede_configurar(self) -> None:
         d = self._dialogo()
-        self.assertIn("no está configurada", d.resumen.text())
+        # Sin cuenta: el aviso en lugar de la tarjeta grande, y la configuración abierta.
+        self.assertFalse(d.vacio_config.isHidden())
+        self.assertTrue(d.heroe.isHidden())
+        self.assertFalse(d.config_box.isHidden())
         self.assertEqual(d.pagos, [])
         d.cfg_inicio.setDate(QDate(2026, 11, 19))
         d._guardar_config()
-        self.assertIn("3 de 4", d.resumen.text())
+        self.assertTrue(d.vacio_config.isHidden())
+        self.assertFalse(d.heroe.isHidden())
+        self.assertEqual(d.heroe_titulo.text(), "3 de 4 · sáb 21-nov")
+        self.assertEqual(d.heroe_monto.text(), "$2,500")
         self.assertEqual([p.fecha_programada for p in d.pagos], [D(2026, 11, 21), D(2026, 11, 28)])
 
     def test_fechas_de_pago_invalidas_no_se_guardan(self) -> None:
@@ -137,7 +185,9 @@ class MiPagoDialogTests(unittest.TestCase):
             pd.guardar_config(s, fecha_inicio=D(2026, 11, 19))
         d = self._dialogo()
         self.assertTrue(d.registrar(D(2026, 11, 14), D(2026, 11, 19), None))
-        self.assertIn("Último pago: 19-nov", d.resumen.text())
+        self.assertEqual(d.stat_ultimo.text(), "19-nov")
+        # El 14 es de antes del inicio, pero se pagó: la tira lo marca pagado.
+        self.assertEqual([c.paso.estado for c in d.tira], [mp.ANTES, pd.PAGADO, pd.PENDIENTE, pd.PENDIENTE])
         self.assertIn("Pago 2 de 4 guardado: $2,500", d.status.text())
         # Un monto editado
         self.assertTrue(d.registrar(D(2026, 11, 21), D(2026, 11, 19), Decimal("2400")))
@@ -153,10 +203,8 @@ class MiPagoDialogTests(unittest.TestCase):
         self.assertTrue(d.registrar(D(2026, 11, 21), D(2026, 11, 19), Decimal("2400")))
         tarjeta = d._pagos_box.itemAt(0).widget()
         self.assertEqual(tarjeta.monto.text(), "$2,400")
-        texto = "\n".join(mp.lineas_desglose(d.pagos[0]))
-        self.assertIn("Calculado: $2,500", texto)
-        self.assertIn("Pagado: $2,400", texto)
-        self.assertNotIn("Total:", texto)
+        self.assertIn(mp.Renglon("Calculado", "$2,500", "nota"), tarjeta.renglones)
+        self.assertIn(mp.Renglon("Pagado", "$2,400", "base"), tarjeta.renglones)
         # Sin pagar: la cifra grande es la calculada.
         self.assertEqual(d._pagos_box.itemAt(1).widget().monto.text(), "$2,500")
 
@@ -175,6 +223,34 @@ class MiPagoDialogTests(unittest.TestCase):
         d = self._dialogo()
         tarjetas = [d._pagos_box.itemAt(i).widget() for i in range(d._pagos_box.count())]
         self.assertEqual([t.boton.text() for t in tarjetas], ["Deshacer pago", "💵 Ya me pagaron"])
+
+    def test_la_configuracion_se_pliega_si_ya_hay_cuenta(self) -> None:
+        with self.sesion() as s:
+            pd.guardar_config(s, fecha_inicio=D(2026, 11, 19))
+        d = self._dialogo()
+        self.assertTrue(d.config_box.isHidden())
+        d.btn_config.click()
+        self.assertFalse(d.config_box.isHidden())
+
+    def test_la_tarjeta_grande_y_las_fichas(self) -> None:
+        with self.sesion() as s:
+            pd.guardar_config(s, fecha_inicio=D(2026, 11, 1))
+        d = self._dialogo(hoy=D(2026, 11, 19))
+        self.assertEqual(d.heroe_titulo.text(), "3 de 4 · sáb 21-nov")
+        self.assertEqual(d.heroe_cuando.text(), "Toca en 2 días")
+        self.assertEqual(d.heroe_cuando.property("tono"), "pronto")
+        self.assertEqual(d.stat_ultimo.text(), "Ninguno")
+        self.assertEqual(d.stat_atrasados.text(), "2")
+        self.assertEqual(d.stat_atrasados.property("alerta"), "true")
+        # Botón lleno en los atrasados; de contorno en los demás.
+        nombres = [d._pagos_box.itemAt(i).widget().boton.objectName() for i in range(d._pagos_box.count())]
+        self.assertEqual(nombres, ["miPagoPrimario", "miPagoPrimario", "miPagoChico", "miPagoChico"])
+        with patch.object(mp.MiPagoDialog, "_ya_me_pagaron") as pagar:
+            d.btn_heroe.click()
+        pagar.assert_called_once_with(d._rec.proximo)
+        d._mover_mes(-1)
+        self.assertEqual(d.mes_label.text(), "Octubre 2026")
+        self.assertEqual([c.paso.estado for c in d.tira], [mp.ANTES] * 4)
 
     def test_cambiar_el_destino_de_un_dia_de_mas(self) -> None:
         with self.sesion() as s:
