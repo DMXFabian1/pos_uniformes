@@ -630,7 +630,7 @@ def encargado_hacer_corte(
         cerrar_corte_automatico,
         datos_ticket_encargado,
     )
-    from pos_uniformes.ui.dialogs.corte_caja_dialog import texto_ticket_corte_encargado
+    from pos_uniformes.ui.dialogs.corte_caja_dialog import lineas_pago_dueno, texto_ticket_corte_encargado
 
     empleada, _p = current
     _solo_gestor(empleada)
@@ -644,6 +644,7 @@ def encargado_hacer_corte(
         texto = texto_ticket_corte_encargado(
             auto.corte, auto.estado.resumen.efectivo, auto.pagos, datos.por_empleada,
             retiros=datos.retiros, tarjeta=datos.tarjeta, tarjeta_ops=datos.tarjeta_ops,
+            pago_dueno=lineas_pago_dueno(db, auto.estado.hasta),
         )
         trabajos_service.enviar_ticket(db, texto, origen="pwa", creado_por=quien)
         ticket_encolado = True
@@ -871,7 +872,7 @@ def dueno_hacer_corte(
         pagos_registrados_del_periodo,
     )
     from pos_uniformes.services.libreta_service import resumir_por_empleada
-    from pos_uniformes.ui.dialogs.corte_caja_dialog import contar_tarjeta, texto_ticket_corte_encargado
+    from pos_uniformes.ui.dialogs.corte_caja_dialog import contar_tarjeta, lineas_pago_dueno, texto_ticket_corte_encargado
 
     empleada, _p = current
     _solo_dueno(empleada)
@@ -963,6 +964,7 @@ def dueno_hacer_corte(
             tarjeta_neto=None if body.ocultar_tarjeta else estado.resumen.tarjeta_neto,
             ya_pagados=pagos_registrados_del_periodo(db, estado.desde, estado.hasta),
             entradas=entradas,
+            pago_dueno=lineas_pago_dueno(db, estado.hasta),
         )
         trabajos_service.enviar_ticket(db, texto, origen="pwa", creado_por=quien)
         ticket_encolado = True

@@ -1268,7 +1268,7 @@ class CalendarioEncargadoDialog(QDialog):
 
     def _ir_a_corte_hoy(self) -> None:
         """Muestra la previa (venta, pagos de hoy, retiro) antes de imprimir."""
-        from pos_uniformes.ui.dialogs.corte_caja_dialog import texto_previa_corte_encargado
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import lineas_pago_dueno, texto_previa_corte_encargado
 
         try:
             from pos_uniformes.database.connection import get_session
@@ -1277,6 +1277,7 @@ class CalendarioEncargadoDialog(QDialog):
             with get_session() as session:
                 estado = estado_caja(session)
                 avisos = pagos_que_tocan_hoy(session)
+                pago_dueno = lineas_pago_dueno(session, estado.hasta)
         except Exception:  # noqa: BLE001
             logger.exception("Encargado: no se pudo calcular el corte")
             QMessageBox.warning(self, "Sin conexión", "Inténtalo otra vez.")
@@ -1284,7 +1285,7 @@ class CalendarioEncargadoDialog(QDialog):
         if not estado.resumen.hubo_movimiento and not avisos:
             self._mostrar_listo("Todavía no hay ventas desde el último corte.", con_deshacer=False)
             return
-        self._corte_texto.setText(texto_previa_corte_encargado(estado, avisos))
+        self._corte_texto.setText(texto_previa_corte_encargado(estado, avisos, pago_dueno))
         self._pila.setCurrentWidget(self._pg_corte)
 
     def _hacer_corte(self) -> None:

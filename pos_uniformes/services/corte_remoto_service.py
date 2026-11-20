@@ -203,7 +203,12 @@ def hacer_corte_y_avisar(
         pagos_que_tocan_hoy,
     )
     from pos_uniformes.services.libreta_service import resumir_por_empleada
-    from pos_uniformes.ui.dialogs.corte_caja_dialog import contar_tarjeta, pagos_previos_del_periodo, texto_ticket_corte_encargado
+    from pos_uniformes.ui.dialogs.corte_caja_dialog import (
+        contar_tarjeta,
+        lineas_pago_dueno,
+        pagos_previos_del_periodo,
+        texto_ticket_corte_encargado,
+    )
 
     ahora = ahora or datetime.now().astimezone()
     if sin_tarjeta is None:
@@ -296,6 +301,8 @@ def hacer_corte_y_avisar(
         logger.exception("Corte remoto: no se leyeron retiros o entradas; el ticket no se imprime")
         session.rollback()
         retiros, entradas, datos, papel_completo = [], [], None, False
+    # El pago del dueño: solo recordatorio (no sale del cajón ni cambia cifras).
+    pago_dueno = lineas_pago_dueno(session, ahora)
     # Con `retirar`, el papel habla de la venta que cuadra con esa cifra:
     # venta − pagos − lo que ya salió = lo que se retira.
     venta_papel = auto.estado.resumen.efectivo
@@ -316,6 +323,7 @@ def hacer_corte_y_avisar(
             # El fondo de papá no salía en el ticket del corte del celular, sí en
             # el del kiosko (auditoría 2026-11-07, #6).
             entradas=entradas,
+            pago_dueno=pago_dueno,
         )
         # Como CORTE y no como TICKET: así cada PC decide si los imprime, y el
         # de la venta del día no sale en la que queda a la mano de cualquiera
@@ -348,6 +356,9 @@ def hacer_corte_y_avisar(
     lineas.append(f"Reactivo que queda: ${Decimal(auto.corte.reactivo_final):,.2f}")
     if sin_tarjeta:
         lineas.append("🔒 Los cobros con tarjeta no salieron en el ticket.")
+    if pago_dueno:
+        lineas.append("💼 " + pago_dueno[0])
+        lineas.extend(pago_dueno[1:])
     if nota:
         # Se repite lo que se entendió como nota, a propósito: desde que el
         # texto suelto vale como motivo, una palabra mal escrita («sintarjets»)

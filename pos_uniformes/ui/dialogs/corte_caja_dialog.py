@@ -295,7 +295,73 @@ def _bloque_pagos(lines, pagos: list, ya_pagados: list, *, total: bool, titulo: 
     lines.append(tk_bot())
 
 
-def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list | None = None, venta_efectivo=None, retiros: list | None = None, reimpresion: bool = False, tarjeta=None, tarjeta_ops: int | None = None, tarjeta_neto=None, entradas: list | None = None) -> str:
+def _hoy_del_corte(momento):
+    """La fecha local del corte (para el recordatorio del pago del dueño)."""
+    from datetime import date
+
+    if momento is None:
+        return date.today()
+    try:
+        return (momento.astimezone() if getattr(momento, "tzinfo", None) else momento).date()
+    except Exception:  # noqa: BLE001
+        return date.today()
+
+
+def lineas_pago_dueno(session, momento=None) -> list[str]:
+    """El recordatorio del pago del dueño para el corte, o [] (sin cuenta
+    activa, base sin migrar o cualquier error). Solo se lee: no toca el
+    esperado ni ninguna cifra del corte."""
+    try:
+        from pos_uniformes.services.pago_dueno_service import lineas_recordatorio_corte
+
+        lineas = lineas_recordatorio_corte(session, _hoy_del_corte(momento))
+    except Exception:  # noqa: BLE001 — el corte nunca se cae por el recordatorio
+        logger.warning("Corte: sin recordatorio del pago del dueño", exc_info=True)
+        return []
+    if not isinstance(lineas, list) or not all(isinstance(t, str) for t in lineas):
+        return []
+    return lineas
+
+
+def _partir_renglon(texto: str, ancho: int) -> list[str]:
+    """Parte un renglón por sus « · » para que quepa; si aun así no cabe, por palabras."""
+    import textwrap
+
+    if len(texto) <= ancho:
+        return [texto]
+    renglones: list[str] = []
+    actual = ""
+    for parte in texto.split(" · "):
+        junto = f"{actual} · {parte}" if actual else parte
+        if len(junto) <= ancho:
+            actual = junto
+            continue
+        if actual:
+            renglones.append(actual)
+        actual = parte
+    if actual:
+        renglones.append(actual)
+    salida: list[str] = []
+    for r in renglones:
+        salida.extend(textwrap.wrap(r, width=ancho) or [""])
+    return salida
+
+
+def _bloque_pago_dueno(lines: list[str], pago_dueno: list[str] | None) -> None:
+    """PAGO DE DANIEL (no sale del cajón): un recordatorio, no una resta."""
+    if not pago_dueno:
+        return
+    _TW, tk_top, _tk_mid, _tk_dbl, tk_bot, _tk_row, tk_line, _tk_field = _tk()
+    lines.append("")
+    lines.append(pago_dueno[0].strip().center(_TW))
+    lines.append(tk_top())
+    for renglon in pago_dueno[1:]:
+        for parte in _partir_renglon(renglon.strip(), _TW - 4):
+            lines.append(tk_line(parte))
+    lines.append(tk_bot())
+
+
+def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list | None = None, venta_efectivo=None, retiros: list | None = None, reimpresion: bool = False, tarjeta=None, tarjeta_ops: int | None = None, tarjeta_neto=None, entradas: list | None = None, pago_dueno: list[str] | None = None) -> str:
     """Ticket del dueño (CORTE DE CAJA): misma cuenta simple que el del
     encargado + POR EMPLEADA con operaciones. Sin esperado ni diferencia.
 
@@ -353,6 +419,7 @@ def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list |
             lines.append(tk_line(_nombre_de(r.employee_name or r.employee_code)[: _TW - 4]))
             lines.append(tk_row(f"{r.operaciones} ops:", f"{r.comisiones} com."))
         lines.append(tk_bot())
+    _bloque_pago_dueno(lines, pago_dueno)
     lines.append("")
     lines.append("Corte generado por la Libreta.".center(_TW))
     return "\n".join(lines)
@@ -523,6 +590,8 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
             except Exception:  # noqa: BLE001
                 session.rollback()
                 avisos_hoy = []
+            # El pago del dueño: solo se recuerda, no entra en la cuenta.
+            pago_dueno = lineas_pago_dueno(session, estado.hasta)
     except Exception:  # noqa: BLE001
         logger.exception("Corte: no se pudo calcular el estado de caja")
         QMessageBox.warning(parent, "Sin conexión", "No se alcanzó la base. Inténtalo otra vez.")
@@ -624,6 +693,18 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
             cly.addWidget(cb)
             casillas_pago.append((cb, aviso))
         ly.addWidget(card)
+
+    # Recordatorio del pago del dueño (2026-11-19): no sale del cajón, así que
+    # no se marca ni se resta; solo se ve.
+    dlg.pago_dueno = None              # para las pruebas
+    if pago_dueno:
+        card, cly = _card(pago_dueno[0])
+        recordatorio = QLabel("\n".join(t.strip() for t in pago_dueno[1:]))
+        recordatorio.setWordWrap(True)
+        recordatorio.setStyleSheet(tam_etiqueta)
+        cly.addWidget(recordatorio)
+        ly.addWidget(card)
+        dlg.pago_dueno = recordatorio
 
     # La pregunta: se pregunta por la VENTA (Daniel 2026-09-10), es la cifra
     # con la que se razona el corte. Lo que debe haber en el cajón se calcula.
@@ -905,6 +986,7 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
                 tarjeta_neto=None if sin_tarjeta.isChecked() else estado.resumen.tarjeta_neto,
                 ya_pagados=pagos_periodo,              # los del periodo ya salieron del cajón
                 entradas=entradas_periodo,
+                pago_dueno=pago_dueno,                 # solo recordatorio
             )
     except ValueError as exc:
         QMessageBox.warning(parent, "Corte", str(exc))
@@ -1123,7 +1205,7 @@ def confirmar_pago(parent: QWidget | None, *, employee_code: str, employee_name:
     return pago
 
 
-def texto_previa_corte_encargado(estado: EstadoCaja, avisos: list) -> str:
+def texto_previa_corte_encargado(estado: EstadoCaja, avisos: list, pago_dueno: list[str] | None = None) -> str:
     """Lo que ve el encargado antes de imprimir: venta, a quién pagar, retiro."""
     total_pagos = sum((a.total_estimado for a in avisos), Decimal("0.00"))
     entradas = Decimal(getattr(estado, "entradas", 0) or 0)
@@ -1145,6 +1227,9 @@ def texto_previa_corte_encargado(estado: EstadoCaja, avisos: list) -> str:
     lineas.append("")
     lineas.append(f"SE RETIRA: ${retiro:,.2f}")
     lineas.append(f"Se queda de fondo: ${estado.reactivo:,.2f}")
+    if pago_dueno:
+        lineas.append("")
+        lineas.extend(t.strip() for t in pago_dueno)
     return "\n".join(lineas)
 
 
@@ -1168,6 +1253,7 @@ def hacer_corte_automatico(parent: QWidget | None, *, creado_por: str):
                 tarjeta_ops=datos.tarjeta_ops,
                 tarjeta_neto=getattr(datos, "tarjeta_neto", None),
                 ya_pagados=pagos_previos_del_periodo(session, resultado),
+                pago_dueno=lineas_pago_dueno(session, resultado.estado.hasta),
             )
     except Exception:  # noqa: BLE001
         logger.exception("Corte automático: no se pudo guardar")
@@ -1187,7 +1273,7 @@ def hacer_corte_automatico(parent: QWidget | None, *, creado_por: str):
 def texto_ticket_corte_encargado(
     corte, venta_efectivo, pagos: list, por_empleada: list | None = None, retiros: list | None = None,
     reimpresion: bool = False, tarjeta=None, tarjeta_ops: int | None = None, ya_pagados: list | None = None, tarjeta_neto=None,
-    entradas: list | None = None,
+    entradas: list | None = None, pago_dueno: list[str] | None = None,
 ) -> str:
     """Ticket simple para el encargado: la cuenta (reactivo · venta · restas ·
     SACAR), a quién pagar con desglose y las comisiones.
@@ -1233,6 +1319,8 @@ def texto_ticket_corte_encargado(
             first = False
             lines.append(tk_row(f"{_nombre_pila(r)}:", f"{r.comisiones} com."))
         lines.append(tk_bot())
+    # Recordatorio del pago del dueño: va al final y no entra en ninguna cuenta.
+    _bloque_pago_dueno(lines, pago_dueno)
     return "\n".join(lines)
 
 
