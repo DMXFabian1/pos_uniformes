@@ -4,7 +4,7 @@ Reproduce los canales RTSP del DVR con QtMultimedia (ffmpeg viene dentro de
 PyQt6, no hay dependencias nuevas). Reglas:
 
   - Abre en modo *empleada*: solo las cámaras marcadas como entrada.
-  - "Ver todas" pide el PIN de administrador y muestra todos los canales.
+  - "Ver todas" pide el PIN del dueño y muestra todos los canales.
   - Al cerrar la ventana vuelve a modo empleada (el PIN no queda "pegado").
   - Doble clic en una cámara la amplía sola con el stream principal; Esc regresa.
   - Si un stream falla, muestra "Sin señal" y reintenta cada pocos segundos.
@@ -24,7 +24,6 @@ from PyQt6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
     QLabel,
-    QMessageBox,
     QPushButton,
     QSizePolicy,
     QVBoxLayout,
@@ -95,7 +94,7 @@ def _default_video_widget_factory() -> QWidget:
 def _default_pin_prompt(parent: QWidget) -> bool:
     from pos_uniformes.ui.dialogs.satellite_admin_dialog import _prompt_pin
 
-    return _prompt_pin(parent)
+    return _prompt_pin(parent, motivo="Ver todas las cámaras.")
 
 
 class CameraTile(QFrame):
@@ -349,10 +348,8 @@ class CameraWallDialog(QDialog):
         if self._admin:
             self.set_admin(False)
             return
-        if self._pin_prompt(self):
+        if self._pin_prompt(self):     # el diálogo del PIN ya avisa si falló
             self.set_admin(True)
-        else:
-            QMessageBox.warning(self, "PIN incorrecto", "PIN incorrecto.")
 
     def _ampliar(self, canal: int) -> None:
         self._ampliado = canal

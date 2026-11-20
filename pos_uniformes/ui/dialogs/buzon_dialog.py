@@ -422,7 +422,7 @@ class _ItemChat(QWidget):
 
 
 class _ConfirmarEjecucion(QDialog):
-    """Antes de correr: el comando completo a la vista y el PIN de admin."""
+    """Antes de correr: el comando completo a la vista. Luego se pide el PIN del dueño."""
 
     def __init__(self, parent: QWidget, texto: str, de: str) -> None:
         super().__init__(parent)
@@ -440,12 +440,6 @@ class _ConfirmarEjecucion(QDialog):
         vista.setFont(_mono())
         vista.setMinimumHeight(160)
         ly.addWidget(vista)
-        self.pin = QLineEdit()
-        self.pin.setEchoMode(QLineEdit.EchoMode.Password)
-        self.pin.setPlaceholderText("PIN de administrador")
-        self.pin.returnPressed.connect(self.accept)
-        ly.addWidget(self.pin)
-        self.pin.setFocus()
         botones = QDialogButtonBox()
         botones.addButton("Cancelar", QDialogButtonBox.ButtonRole.RejectRole)
         botones.addButton("▶ Ejecutar en esta PC", QDialogButtonBox.ButtonRole.AcceptRole)
@@ -454,18 +448,22 @@ class _ConfirmarEjecucion(QDialog):
         ly.addWidget(botones)
 
 
-def _pin_correcto(pin: str) -> bool:
-    from pos_uniformes.ui.dialogs.satellite_admin_dialog import _ADMIN_PIN
-
-    return (pin or "").strip() == _ADMIN_PIN
-
-
 def _confirmar_con_pin(parent: QWidget, texto: str, de: str) -> bool | None:
-    """True = adelante; False = PIN equivocado; None = se arrepintió."""
+    """True = adelante; None = se arrepintió o no dio el PIN del dueño.
+
+    El diálogo del PIN ya dice si fue incorrecto, sin red o sin PIN definido,
+    así que aquí no hay False."""
+    from pos_uniformes.ui.helpers import pin_dueno_dialog
+
     dlg = _ConfirmarEjecucion(parent, texto, de)
     if dlg.exec() != QDialog.DialogCode.Accepted:
         return None
-    return _pin_correcto(dlg.pin.text())
+    if pin_dueno_dialog.pedir_pin_dueno(
+        parent, en_linea=pin_dueno_dialog.en_linea_de(parent),
+        motivo=f"Ejecutar en esta PC lo que pide {de}.",
+    ):
+        return True
+    return None
 
 
 class BuzonDialog(QDialog):

@@ -6,7 +6,7 @@ que salió, copiar, volver, pegar, enviar— y en uno se mandó el script en vez
 resultado. Aquí es un botón, con tres candados:
 
 - Solo se ofrece en mensajes de remitentes de confianza (Claude, la PC principal).
-- Antes de correr se enseña el comando completo y se pide el PIN de admin.
+- Antes de correr se enseña el comando completo y se pide el PIN del dueño.
 - Tiene tiempo límite: un comando trabado no congela el kiosko.
 
 Lo que sale se manda de regreso al chat de quien lo pidió. Nada corre solo.

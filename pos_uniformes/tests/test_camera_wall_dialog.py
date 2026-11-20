@@ -97,13 +97,10 @@ class CameraWallDialogTests(unittest.TestCase):
         d.close()
 
     def test_pin_incorrecto_sigue_en_entradas(self) -> None:
-        from unittest.mock import patch
-
         d = self._dialog()
         d.show()
         self.pin_respuestas = [False]
-        with patch("pos_uniformes.ui.dialogs.camera_wall_dialog.QMessageBox.warning"):
-            d.admin_button.click()
+        d.admin_button.click()          # el diálogo del PIN ya avisó
         self.assertFalse(d.es_admin())
         self.assertEqual([c for c, _ in d.tiles_activos()], [4, 6])
         d.close()

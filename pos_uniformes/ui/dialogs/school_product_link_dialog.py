@@ -7,7 +7,6 @@ from PyQt6.QtWidgets import (
     QDialog,
     QFrame,
     QHBoxLayout,
-    QInputDialog,
     QLabel,
     QLineEdit,
     QListWidget,
@@ -28,21 +27,16 @@ from pos_uniformes.services.catalog_school_link_service import (
     remove_school_product_link,
 )
 
-_ADMIN_PIN = "12345"
-
 
 def prompt_school_product_link_admin(parent=None, *, on_links_changed=None) -> None:
-    """Pide PIN y abre el diálogo de administración si es correcto."""
-    pin, ok = QInputDialog.getText(
+    """Pide el PIN del dueño y abre el diálogo si es correcto."""
+    from pos_uniformes.ui.helpers import pin_dueno_dialog
+
+    if not pin_dueno_dialog.pedir_pin_dueno(
         parent,
-        "Acceso restringido",
-        "Introduce la contraseña de administrador:",
-        QLineEdit.EchoMode.Password,
-    )
-    if not ok:
-        return
-    if pin.strip() != _ADMIN_PIN:
-        QMessageBox.warning(parent, "Acceso denegado", "Contraseña incorrecta.")
+        en_linea=pin_dueno_dialog.en_linea_de(parent),
+        motivo="Ligar productos generales a escuelas.",
+    ):
         return
     dialog = SchoolProductLinkDialog(parent, on_links_changed=on_links_changed)
     dialog.exec()

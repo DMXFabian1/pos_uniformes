@@ -155,7 +155,6 @@ def _fecha_iso(valor) -> datetime | None:
 _COLOR_SEMAFORO = {"rojo": "#b91c1c", "ambar": "#b45309", "verde": "#8a8177"}
 
 SATELLITE_SEARCH_DEBOUNCE_MS = 300
-_LABEL_PRINT_PINS = {"634700", "12345"}
 SATELLITE_CATALOG_PAGE_SIZE = 25
 SATELLITE_QUOTE_VALIDITY_DAYS = 7
 
@@ -8580,34 +8579,9 @@ class QuoteSatelliteWindow(QMainWindow):
         self._render_guided_product_page()
 
     def _confirm_favorites_password(self, action: str) -> bool:
-        """Pide contraseña para agregar o quitar un favorito. Retorna True si es correcta."""
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Favoritos")
-        dialog.setModal(True)
-        dialog.setMinimumWidth(300)
-        layout = QVBoxLayout()
-        layout.setSpacing(12)
-        lbl = QLabel(f"Ingresa la contraseña para {action}.")
-        lbl.setWordWrap(True)
-        layout.addWidget(lbl)
-        pwd_input = QLineEdit()
-        pwd_input.setEchoMode(QLineEdit.EchoMode.Password)
-        pwd_input.setPlaceholderText("Contraseña")
-        layout.addWidget(pwd_input)
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        pwd_input.returnPressed.connect(dialog.accept)
-        layout.addWidget(buttons)
-        dialog.setLayout(layout)
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            return False
-        if pwd_input.text().strip() != "12345":
-            QMessageBox.warning(self, "Contraseña incorrecta", "La contraseña ingresada no es válida.")
-            return False
-        return True
+        """Agregar o quitar un favorito pide el PIN del dueño (Daniel, 2026-11-19:
+        «un solo PIN»; antes era una contraseña fija en el código)."""
+        return self._pedir_pin_dueno(f"Para {action}.")
 
     def _authorize_with_employee_qr(self) -> str | None:
         """Muestra diálogo de escaneo QR. Retorna nombre del empleado si autorizado, None si no."""
@@ -11600,38 +11574,6 @@ QLabel#favDialogPriceLabel {
             layout.addWidget(helper)
         dialog.setLayout(layout)
         return dialog, layout
-
-    def _show_pin_dialog(self) -> bool:
-        """Pide un PIN antes de abrir el diálogo de etiquetas. Retorna True si es válido."""
-        dialog = QDialog(self)
-        dialog.setWindowTitle("PIN requerido")
-        dialog.setModal(True)
-        dialog.setMinimumWidth(320)
-        layout = QVBoxLayout()
-        layout.setSpacing(12)
-        hint = QLabel("Ingresa el PIN para imprimir etiquetas.")
-        hint.setWordWrap(True)
-        layout.addWidget(hint)
-        pin_input = QLineEdit()
-        pin_input.setEchoMode(QLineEdit.EchoMode.Password)
-        pin_input.setPlaceholderText("PIN")
-        pin_input.setMaxLength(10)
-        layout.addWidget(pin_input)
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addWidget(buttons)
-        dialog.setLayout(layout)
-        pin_input.returnPressed.connect(dialog.accept)
-        if dialog.exec() != QDialog.DialogCode.Accepted:
-            return False
-        entered = pin_input.text().strip()
-        if entered not in _LABEL_PRINT_PINS:
-            QMessageBox.warning(self, "PIN incorrecto", "El PIN ingresado no es válido.")
-            return False
-        return True
 
     def _print_satellite_label(
         self,

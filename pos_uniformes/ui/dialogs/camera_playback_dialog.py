@@ -20,7 +20,6 @@ from PyQt6.QtWidgets import (
     QDialog,
     QHBoxLayout,
     QLabel,
-    QMessageBox,
     QPushButton,
     QSizePolicy,
     QSlider,
@@ -207,11 +206,9 @@ class CameraPlaybackDialog(QDialog):
             self._admin = False
             self._rebuild_cameras()
             return
-        if self._pin_prompt(self):
+        if self._pin_prompt(self):     # el diálogo del PIN ya avisa si falló
             self._admin = True
             self._rebuild_cameras()
-        else:
-            QMessageBox.warning(self, "PIN incorrecto", "PIN incorrecto.")
 
     # -- reproducción --------------------------------------------------------
     def _cargar(self) -> None:

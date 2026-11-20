@@ -44,7 +44,9 @@ from pos_uniformes.services.ticket_print_settings_cache_service import (
 )
 from pos_uniformes.utils.config import settings, _appdata_config_dir, runtime_base_dir
 
-_ADMIN_PIN = "634700"
+#: Ya no hay un PIN fijo en el código: Administración, «Ver todas»
+#: las cámaras, ejecutar desde el buzón y ligar productos piden el PIN del
+#: dueño (`services/pin_dueno_service.py`). Daniel, 2026-11-19: «un solo PIN».
 
 #: Lo propio de la ventana de Administración: cabecera, menú lateral y estado.
 _ESTILO_ADMIN = """
@@ -111,27 +113,16 @@ def _restart_app() -> None:
     os.execv(sys.executable, sys.argv)
 
 
-def _prompt_pin(parent: QWidget) -> bool:
-    dialog = QDialog(parent)
-    dialog.setWindowTitle("Acceso administrador")
-    dialog.setMinimumWidth(320)
-    layout = QVBoxLayout()
-    label = QLabel("Ingresa el PIN de administrador:")
-    label.setWordWrap(True)
-    pin_input = QLineEdit()
-    pin_input.setEchoMode(QLineEdit.EchoMode.Password)
-    pin_input.setPlaceholderText("PIN")
-    buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-    buttons.accepted.connect(dialog.accept)
-    buttons.rejected.connect(dialog.reject)
-    layout.addWidget(label)
-    layout.addWidget(pin_input)
-    layout.addWidget(buttons)
-    dialog.setLayout(layout)
-    pin_input.returnPressed.connect(dialog.accept)
-    if dialog.exec() != QDialog.DialogCode.Accepted:
-        return False
-    return pin_input.text().strip() == _ADMIN_PIN
+def _prompt_pin(parent: QWidget, motivo: str = "Abrir Administración.") -> bool:
+    """True solo con el PIN del dueño correcto (el de Configuración › Empleadas).
+
+    Sin red se valida contra la copia local del kiosko; los intentos fallidos
+    bloquean 60 s. El diálogo ya dice qué pasó: quien llama no avisa nada."""
+    from pos_uniformes.ui.helpers import pin_dueno_dialog
+
+    return pin_dueno_dialog.pedir_pin_dueno(
+        parent, en_linea=pin_dueno_dialog.en_linea_de(parent), motivo=motivo
+    )
 
 
 def _build_anuncios_boxes(dialog: QWidget) -> list[QGroupBox]:
@@ -868,7 +859,7 @@ def _repintar_adornos(dialog: QWidget) -> None:
 def _build_precios_box(dialog: QWidget) -> QGroupBox:
     """Pestaña Precios: cambiar el precio de una prenda sin salir del kiosko.
 
-    Es la puerta que ya existe (Ctrl+Shift+A pide PIN de administrador), no una
+    Es la puerta que ya existe (Ctrl+Shift+A pide el PIN del dueño), no una
     trasera: las empleadas no la ven. Daniel, 2026-09-24: "un comando en venta
     rápida para hacer ajustes".
 
@@ -1041,7 +1032,7 @@ def _build_camaras_box(dialog: QWidget) -> QGroupBox:
     hint = QLabel(
         "El kiosko reproduce las cámaras del DVR por la red local (Ctrl+Shift+C o botón "
         "Cámaras). Marca las cámaras de ENTRADA: son las únicas que ven las empleadas; "
-        "el resto solo con PIN de administrador."
+        "el resto solo con el PIN del dueño."
     )
     hint.setWordWrap(True)
     layout.addWidget(hint)
@@ -1172,15 +1163,8 @@ def _build_camaras_box(dialog: QWidget) -> QGroupBox:
     return box
 
 
-def open_satellite_admin_dialog(parent: QWidget) -> None:
-    if not _prompt_pin(parent):
-        QMessageBox.warning(parent, "PIN incorrecto", "PIN incorrecto.")
-        return
-
-    dialog = QDialog(parent)
-    dialog.setWindowTitle("Administración")
-    dialog.setMinimumWidth(860)
-
+def _build_conexion_box(dialog: QDialog, parent: QWidget) -> QGroupBox:
+    """La tarjeta «Conexión con la PC principal» (IP, contraseña, probar, guardar)."""
     # — Conexion —
     # Una sola tarjeta: antes «Estado de conexión» repetía arriba la misma IP
     # que se editaba abajo, y la ruta del .env salía cortada (Daniel,
@@ -1262,6 +1246,57 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     config_layout.addLayout(conn_btn_row)
     config_layout.addWidget(env_path_label)
     config_box.setLayout(config_layout)
+    return config_box
+
+
+def _sin_red_ni_copia_del_pin(parent: QWidget) -> bool:
+    """¿El kiosko no tiene base ni la copia local del PIN del dueño?
+
+    Entonces ningún PIN se puede validar, y la conexión (lo único que lo
+    arreglaría) vive en Administración: sin esta salida quedaría encerrado."""
+    from pos_uniformes.services import pin_dueno_service
+    from pos_uniformes.ui.helpers import pin_dueno_dialog
+
+    if pin_dueno_dialog.en_linea_de(parent):
+        return False
+    try:
+        return pin_dueno_service.leer_copia_local() is None
+    except Exception:  # noqa: BLE001 — sin poder leerla, es como no tenerla
+        return True
+
+
+def _abrir_solo_conexion(parent: QWidget) -> None:
+    """Rescate: solo la tarjeta de conexión, sin el resto de Administración."""
+    dialog = QDialog(parent)
+    dialog.setWindowTitle("Conexión con la PC principal")
+    dialog.setMinimumWidth(560)
+    layout = QVBoxLayout(dialog)
+    aviso = QLabel(
+        "Este kiosko no encuentra la PC principal y todavía no guarda la copia "
+        "del PIN del dueño, así que aquí solo se puede arreglar la conexión. "
+        "En cuanto conecte, Administración vuelve a pedir el PIN del dueño."
+    )
+    aviso.setWordWrap(True)
+    layout.addWidget(aviso)
+    layout.addWidget(_build_conexion_box(dialog, parent))
+    cerrar = QPushButton("Cerrar")
+    cerrar.clicked.connect(dialog.reject)
+    layout.addWidget(cerrar)
+    dialog.exec()
+
+
+def open_satellite_admin_dialog(parent: QWidget) -> None:
+    if _sin_red_ni_copia_del_pin(parent):
+        _abrir_solo_conexion(parent)
+        return
+    if not _prompt_pin(parent):
+        return
+
+    dialog = QDialog(parent)
+    dialog.setWindowTitle("Administración")
+    dialog.setMinimumWidth(860)
+
+    config_box = _build_conexion_box(dialog, parent)
 
     # — Impresora de tickets —
     printer_box = QGroupBox("Impresora de tickets")
