@@ -22,6 +22,8 @@ Comandos:
     /retiro N X   saca del cajón dejando dicho para qué
     /entrada N X  dinero que entró al cajón sin ser venta (fondo de papá)
     /cajon        corrige lo que NO salió del cajón, antes del corte
+    /mipago       el pago de Daniel: cuál toca, cuánto, días de más
+    /mepagaron    registra que ya le pagaron (pregunta antes)
     /prestamos    aprobar o rechazar lo que pidieron
     /aviso X      pone X a pantalla completa en las pantallas de la tienda
     /avisos       los avisos puestos, quién los vio, y quitarlos
@@ -82,6 +84,13 @@ AYUDA = (
     "/receso 2026-10-27 2026-11-04 — tus vacaciones: el calendario lo dice\n"
     "   y tu martes deja de ocupar el cupo · /receso quitar\n"
     "/sonidos — los sonidos que puede hacer un aviso\n"
+    "\nMI PAGO (lo que te paga tu papá; no sale del cajón)\n"
+    "/mipago — cuál toca, cuánto, los 4 del mes y tus días de más · /mipago dic\n"
+    "/mepagaron — registra el que toca (pregunta antes) · /mepagaron 2400 18/11\n"
+    "   · /mepagaron 2 de 4 o /mepagaron pago 14/11 para elegir cuál\n"
+    "/deshacermipago — deshace el último que registraste (pregunta antes) · /deshacermipago 21/11\n"
+    "/diasdemas — tus días de más: págamelo o guárdamelo\n"
+    "/vino_yo · /falta_yo · /descanso_yo — tus días (o con espacio: /vino yo)\n"
     "\nLA TIENDA\n"
     "/prenda playera justo sierra — precio y cuántas hay por talla\n"
     "/escuela conalep — cómo va esa escuela\n"
@@ -627,11 +636,21 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
                 return f"No entendí «{cmd.argumento}» como días. Por ejemplo: /faltas 30"
         with session_factory() as session:
             return inv.faltas(session, dias, hoy=hoy)
+    if cmd.nombre in ("mipago", "mi_pago", "mispagos", "mepagaron", "me_pagaron", "yamepagaron",
+                      "deshacermipago", "diasdemas", "dias_de_mas", "díasdemás"):
+        # «💼 Mi pago» (los mismos de `_MI_PAGO`; aquí escritos para que se vean).
+        from pos_uniformes.services import telegram_mi_pago_service as mp
+
+        return mp.comando(cmd.nombre, cmd.argumento, session_factory=session_factory, hoy=hoy)[0]
     if cmd.nombre in ("vino", "falta", "descanso"):
         from pos_uniformes.services import asistencia_service as asis
+        from pos_uniformes.services import telegram_mi_pago_service as mp
 
         accion = {"vino": asis.VINO, "falta": asis.NO_VINO, "descanso": asis.DESCANSA}[cmd.nombre]
         with session_factory() as session:
+            if mp.es_el_dueno(cmd.argumento, session=session):
+                # «/vino yo»: Daniel marca SU día; las empleadas, igual que siempre.
+                return mp.marcar_dueno(session, cmd.nombre, hoy=hoy)[0]
             code = asis.buscar_code(session, cmd.argumento)
             if code is None:
                 return f"¿Quién? Escribe el nombre como aparece en la lista: /{cmd.nombre} Fanny"
@@ -647,6 +666,7 @@ def comandos_conocidos() -> list[str]:
 
     nombres = set(re.findall(r"/([a-záéíóúñ_]+)", AYUDA))
     nombres |= {"ayuda", "menu", "asistencia", "vino", "falta", "descanso", "version", "volver", "camaras"}
+    nombres |= {"mipago", "mepagaron", "deshacermipago", "diasdemas"}
     return sorted(nombres)
 
 
@@ -660,6 +680,13 @@ def comando_desconocido(nombre: str) -> str:
     if parecidos:
         texto += " ¿Quisiste decir " + " o ".join(f"/{p}" for p in parecidos) + "?"
     return texto + "\nPara ver todo: /ayuda (o /menu con botones)."
+
+
+#: Los de «💼 Mi pago» (telegram_mi_pago_service). Llevan botones y `hoy`.
+_MI_PAGO = frozenset({
+    "mipago", "mi_pago", "mispagos", "mepagaron", "me_pagaron", "yamepagaron",
+    "deshacermipago", "diasdemas", "dias_de_mas", "díasdemás",
+})
 
 
 #: Comandos cuya respuesta lleva botones. Sin esto, `/avisos` decía «toca uno
@@ -766,6 +793,18 @@ def responder(texto: str, *, session_factory, hoy: date | None = None) -> tuple[
             with session_factory() as session:
                 retiro, _ = crs.cifras_de_propuesta(session)
             return cb.preguntar_por_la_nota(nota, retiro)
+    if cmd is not None and cmd.nombre in _MI_PAGO:
+        from pos_uniformes.services import telegram_mi_pago_service as mp
+
+        return mp.comando(cmd.nombre, cmd.argumento, session_factory=session_factory, hoy=hoy)
+    if cmd is not None and cmd.nombre in ("vino", "falta", "descanso"):
+        from pos_uniformes.services import telegram_mi_pago_service as mp
+
+        if mp.es_el_dueno(cmd.argumento):
+            with session_factory() as session:
+                if mp.es_el_dueno(cmd.argumento, session=session):
+                    # Con botones: si quedó día de más, Págamelo / Guárdamelo.
+                    return mp.marcar_dueno(session, cmd.nombre, hoy=hoy)
     destino = _CON_BOTONES.get(cmd.nombre) if cmd is not None else None
     if destino is not None and cmd.nombre in ("vacaciones", "primas") and _vacaciones_en_obra():
         destino = None
@@ -909,6 +948,11 @@ def atender_toque(
             return vs.EN_CONSTRUCCION_TEXTO, "", ""
         return vac.atender(dato, session_factory=session_factory, quien=CODIGO_REMOTO)
 
+    from pos_uniformes.services import telegram_mi_pago_service as mp
+
+    if mp.es_de_mi_pago(dato):
+        return mp.atender(dato, session_factory=session_factory, hoy=hoy, quien=CODIGO_REMOTO)
+
     toque = asis.interpretar_toque(dato)
     if toque is None:
         return None
@@ -995,6 +1039,9 @@ COMANDOS_MENU: tuple[tuple[str, str], ...] = (
     ("pagos", "A quién le toca cobrar"),
     ("pagar", "Pagarle a alguien: /pagar Fanny"),
     ("deshacerpago", "Deshacer el último pago de hoy"),
+    ("mipago", "Tu pago: cuál toca y cuánto (no sale del cajón)"),
+    ("mepagaron", "Registrar que ya te pagaron"),
+    ("diasdemas", "Tus días de más: págamelo o guárdamelo"),
     ("prestamos", "Préstamos por aprobar"),
     ("descansos", "Días que te pidieron"),
     ("programas", "Clientes propuestos a Profesional o Mayorista"),
@@ -1232,8 +1279,9 @@ def _es_de_servicio(msg: dict) -> bool:
 
 
 #: Botones que mueven dinero: el corte, el cajón, los cortes (ajustar), los
-#: préstamos y «✅ Sí, pagar» del menú.
-_PREFIJOS_DE_DINERO = ("cc:", "cj:", "co:", "pr:", "m:pagarok:")
+#: préstamos, «✅ Sí, pagar» del menú y los Sí de «💼 Mi pago» (registrar o
+#: deshacer un pago de Daniel: el de ayer llevaba la fecha de ayer).
+_PREFIJOS_DE_DINERO = ("cc:", "cj:", "co:", "pr:", "m:pagarok:", "mp:pagarok:", "mp:deshacerok:")
 
 
 def boton_vencido(dato: str, fecha_mensaje: int | float | None, ahora: datetime | None = None) -> str | None:

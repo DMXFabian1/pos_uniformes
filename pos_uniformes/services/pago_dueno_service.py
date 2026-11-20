@@ -456,6 +456,14 @@ def calcular_recordatorio(config: ConfigPagoDueno, datos: DatosPagoDueno, hoy: d
     )
 
 
+def pago_objetivo(rec: Recordatorio) -> DesglosePago:
+    """El pago que toca registrar ahora: el atrasado más viejo si hay; si no,
+    el próximo. Es el de «Ya me pagaron» (Mi pago y el bot de Telegram)."""
+    if rec.atrasados:
+        return min(rec.atrasados, key=lambda p: p.fecha_programada)
+    return rec.proximo
+
+
 # ─── Texto ───────────────────────────────────────────────────────────────
 
 

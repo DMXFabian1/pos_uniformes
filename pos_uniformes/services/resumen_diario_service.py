@@ -90,6 +90,8 @@ class DatosResumen:
     descansan_manana: list[str] = field(default_factory=list)
     pagos_proximos: list[tuple[str, str, Decimal]] = field(default_factory=list)  # (nombre, cuándo, total)
     pendientes: str = ""  # bloque de pendientes_service.texto_pendientes (ya formateado)
+    #: «💼 Tu pago: toca hoy el 3 de 4 · $2,500 → /mipago» ('' = nada que decir).
+    pago_dueno: str = ""
     retiros: list[tuple[str, Decimal, str]] = field(default_factory=list)  # (motivo, monto, quién)
 
 
@@ -195,6 +197,10 @@ def formatear(d: DatosResumen) -> str:
 
     if d.pendientes:
         lineas.append(d.pendientes)
+        lineas.append("")
+
+    if d.pago_dueno:
+        lineas.append(d.pago_dueno)
         lineas.append("")
 
     lineas.append("📅 MAÑANA")
@@ -326,7 +332,16 @@ def recolectar(session, hoy: date | None = None, *, todo_el_dia: bool = False) -
     _bloque(session, lambda: _manana(session, d, hoy))
     _bloque(session, lambda: _pendientes(session, d, hoy))
     _bloque(session, lambda: _retiros(session, d, desde, hasta))
+    _bloque(session, lambda: _pago_dueno(session, d, hoy))
     return d
+
+
+def _pago_dueno(session, d: DatosResumen, hoy: date) -> None:
+    """La línea del pago de Daniel si hoy toca, mañana toca o va atrasado.
+    Sin cuenta configurada (o sin tablas), nada: el resumen sale igual."""
+    from pos_uniformes.services.telegram_mi_pago_service import aviso
+
+    d.pago_dueno = aviso(session, hoy, incluir_manana=True)
 
 
 def _inicio_del_primer_corte_de_hoy(session, hoy: date):

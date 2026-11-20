@@ -331,6 +331,16 @@ class RecordatorioTests(unittest.TestCase):
         self.assertEqual(pagos[21].estado(hoy), TOCA_HOY)
         self.assertEqual(pagos[28].estado(hoy), PENDIENTE)
 
+    def test_pago_objetivo_es_el_atrasado_mas_viejo_o_el_proximo(self) -> None:
+        c = _config(D(2026, 11, 1))
+        # Sin registrar nada: el 7 y el 14 están atrasados el 21 → el del 7.
+        rec = pd.calcular_recordatorio(c, _datos(), D(2026, 11, 21))
+        self.assertEqual(pd.pago_objetivo(rec).fecha_programada, D(2026, 11, 7))
+        # Al día: el próximo (hoy, el 21).
+        datos = _datos(registros=[_reg(D(2026, 11, 7)), _reg(D(2026, 11, 14))])
+        rec = pd.calcular_recordatorio(c, datos, D(2026, 11, 21))
+        self.assertEqual(pd.pago_objetivo(rec).fecha_programada, D(2026, 11, 21))
+
     def test_caso_real_de_daniel(self) -> None:
         # Arranca el 19-nov; ese día le pagaron el 2 de 4 (14-nov).
         c = _config(D(2026, 11, 19))

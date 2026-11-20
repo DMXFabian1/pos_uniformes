@@ -30,7 +30,7 @@ PREFIJO = "m:"
 _RAIZ = [
     [("🫀 ¿Todo en pie?", "m:pulso")],
     [("💵 Caja", "m:estado"), ("📋 Resumen", "m:resumen")],
-    [("🧾 Cortes", "m:cortes"), ("💰 Pagos", "m:pagos")],
+    [("🧾 Cortes", "m:cortes"), ("💰 Pagos", "m:pagos"), ("💼 Mi pago", "mp:ver")],
     [("💵 Lo que salió del cajón", "m:cajon")],
     [("👥 Las muchachas…", "m:gente"), ("🏪 Qué contar", "m:contar")],
     [("🔎 Sin surtir", "m:faltas"), ("📣 Avisos", "m:avisos")],
@@ -86,9 +86,20 @@ def cabecera(session, *, hoy: date | None = None) -> str:
             a.nombre for a in asis.asistencia_del_dia(session, hoy)
             if a.estado == asis.PRESENTE
         ]
-        return texto_hoy(datos, quien_esta=estan) + "\n\n¿Qué quieres ver?"
+        texto = texto_hoy(datos, quien_esta=estan)
     except Exception:  # noqa: BLE001 — el tablero no puede quedarse sin botones
         return "¿Qué quieres ver?"
+    # El pago de Daniel, si hoy toca o va atrasado: el menú de la mañana es lo
+    # primero que ve (2026-11-19). Sin cuenta, sin tablas o con error, nada.
+    try:
+        from pos_uniformes.services import telegram_mi_pago_service as mp
+
+        linea = mp.aviso(session, hoy)
+    except Exception:  # noqa: BLE001
+        linea = ""
+    if linea:
+        texto += "\n\n" + linea
+    return texto + "\n\n¿Qué quieres ver?"
 
 
 def _con_volver(filas=None) -> str:
