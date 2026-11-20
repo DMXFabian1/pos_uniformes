@@ -4,10 +4,15 @@ Libreta del dueño → menú «💼 Caja ▾» → «💼 Mi pago». Solo VEND-1
 
 - Arriba, la tarjeta del PRÓXIMO pago (vino, como la cifra fuerte de «Hacer
   corte»): «3 de 4», la fecha, el monto grande, cuándo toca y «Ya me pagaron».
+  Si hay atrasados, en su lugar va el atrasado más viejo («PAGO ATRASADO»).
   Debajo, tres fichas: último pago, días a favor y atrasados.
 - Los pagos del mes (7, 14, 21 y 28): una tira con los cuatro por color y la
-  navegación de mes como píldora; luego una tarjeta por pago con su estado y,
-  solo si hay algo que desglosar, el desglose.
+  navegación de mes como píldora (tocar un cuadro baja a su tarjeta); luego
+  una tarjeta por pago con su estado y, solo si hay algo que desglosar, el
+  desglose. También lleva tarjeta un pago de antes del inicio que sí se
+  registró, para poder deshacerlo.
+- Si no se pudo leer la base, lo dice y no abre la configuración (no se
+  invita a sobrescribir la cuenta real con los valores por omisión).
 - Los días de más con su destino, para cambiarlo.
 - La configuración (monto, valor del día, fechas de pago e inicio), plegada:
   casi no se usa. Se abre sola si la cuenta no está configurada.
@@ -73,8 +78,8 @@ QDialog#miPago QScrollArea > QWidget > QWidget { background: transparent; }
 
 QDialog#miPago QLabel#miPagoEncabezado { font-size: 22px; font-weight: 800; color: #2c2a27; }
 QFrame#miPagoPie { background: #efe6d8; border: none; border-top: 1px solid #e6dccb; }
-QDialog#miPago QLabel#miPagoNota { color: #8a8177; font-size: 12px; }
-QDialog#miPago QLabel#miPagoMesResumen { color: #8a8177; font-size: 12px; font-weight: 700; }
+QDialog#miPago QLabel#miPagoNota { color: #6f665c; font-size: 12px; }
+QDialog#miPago QLabel#miPagoMesResumen { color: #6f665c; font-size: 12px; font-weight: 700; }
 QDialog#miPago QLabel#miPagoMesResumen[completo="true"] { color: #2f7d4f; }
 QDialog#miPago QLabel#miPagoSeccion { color: #7b2d14; font-size: 12px; font-weight: 800; letter-spacing: 1px; }
 QDialog#miPago QLabel#miPagoAviso { background: #fbefd5; color: #8a5600; border-radius: 10px;
@@ -86,27 +91,30 @@ QDialog#miPago QFrame#miPagoHeroe QLabel#miPagoHeroeKicker { color: #e9cfd6; fon
 QDialog#miPago QFrame#miPagoHeroe QLabel#miPagoHeroeTitulo { font-size: 17px; font-weight: 800; }
 QDialog#miPago QFrame#miPagoHeroe QLabel#miPagoHeroeMonto { font-size: 36px; font-weight: 800; }
 QDialog#miPago QFrame#miPagoHeroe QLabel#miPagoHeroePie { color: #ecd7dd; font-size: 13px; }
-QDialog#miPago QLabel#miPagoCuando { border-radius: 11px; padding: 4px 12px; font-size: 12px; font-weight: 800; }
-QDialog#miPago QLabel#miPagoCuando[tono="hoy"] { background: #e3f1e6; color: #2f7d4f; }
-QDialog#miPago QLabel#miPagoCuando[tono="pronto"] { background: #fbefd5; color: #a86a00; }
-QDialog#miPago QLabel#miPagoCuando[tono="luego"] { background: #84405a; color: #ffffff; }
+/* «Cuándo toca»: los mismos colores que la tira (toca hoy = vino, aquí al
+   revés porque el fondo ya es vino; nunca verde, que es «pagado»). */
+QDialog#miPago QFrame#miPagoHeroe QLabel#miPagoCuando { border-radius: 11px; padding: 4px 12px; font-size: 12px; font-weight: 800; }
+QDialog#miPago QFrame#miPagoHeroe QLabel#miPagoCuando[tono="hoy"] { background: #ffffff; color: #6b1f3a; }
+QDialog#miPago QFrame#miPagoHeroe QLabel#miPagoCuando[tono="pronto"] { background: #fbefd5; color: #8a5600; }
+QDialog#miPago QFrame#miPagoHeroe QLabel#miPagoCuando[tono="luego"] { background: #84405a; color: #ffffff; }
+QDialog#miPago QFrame#miPagoHeroe QLabel#miPagoCuando[tono="atrasado"] { background: #f8e1df; color: #b3261e; }
 QDialog#miPago QFrame#miPagoHeroe QPushButton#miPagoHeroeBoton { background: #ffffff; color: #6b1f3a; border: none;
-    border-radius: 12px; min-height: 44px; padding: 0 18px; font-size: 15px; font-weight: 800; }
+    border-radius: 12px; min-height: 48px; padding: 0 20px; font-size: 15px; font-weight: 800; }
 QDialog#miPago QFrame#miPagoHeroe QPushButton#miPagoHeroeBoton:pressed { background: #f1e3e8; }
 
 QFrame#miPagoVacio { background: #fbf7f0; border: 1.5px dashed #d9cdb8; border-radius: 16px; }
 QDialog#miPago QLabel#miPagoVacioTitulo { font-size: 17px; font-weight: 800; color: #6b1f3a; }
 
 QFrame#miPagoFicha { background: #fbf7f0; border: 1px solid #e6dccb; border-radius: 12px; }
-QDialog#miPago QLabel#miPagoFichaTitulo { color: #8a8177; font-size: 11px; font-weight: 800; letter-spacing: 1px; }
+QDialog#miPago QLabel#miPagoFichaTitulo { color: #6f665c; font-size: 11px; font-weight: 800; letter-spacing: 1px; }
 QDialog#miPago QLabel#miPagoFichaValor { font-size: 18px; font-weight: 800; }
 QDialog#miPago QLabel#miPagoFichaValor[alerta="true"] { color: #b3261e; }
-QDialog#miPago QLabel#miPagoFichaPie { color: #8a8177; font-size: 11px; }
+QDialog#miPago QLabel#miPagoFichaPie { color: #6f665c; font-size: 12px; }
 
-QFrame#miPagoMesNav { background: #ffffff; border: 1px solid #ddd0c0; border-radius: 18px; }
+QFrame#miPagoMesNav { background: #ffffff; border: 1px solid #ddd0c0; border-radius: 22px; }
 QDialog#miPago QFrame#miPagoMesNav QPushButton { background: transparent; color: #6b1f3a; border: none;
-    border-radius: 15px; min-height: 30px; max-height: 30px; min-width: 30px; max-width: 30px;
-    padding: 0; font-size: 13px; font-weight: 800; }
+    border-radius: 18px; min-height: 36px; max-height: 36px; min-width: 36px; max-width: 36px;
+    padding: 0; font-size: 16px; font-weight: 800; }
 QDialog#miPago QFrame#miPagoMesNav QPushButton:pressed { background: #f1e3e8; }
 QDialog#miPago QLabel#miPagoMes { font-size: 14px; font-weight: 800; color: #2c2a27; }
 
@@ -116,7 +124,7 @@ QFrame#miPagoPaso[estado="toca_hoy"] { background: #6b1f3a; }
 QFrame#miPagoPaso[estado="pendiente"] { background: #ffffff; border-color: #ddd0c0; }
 QFrame#miPagoPaso[estado="atrasado"] { background: #f8e1df; border-color: #efc2bd; }
 QFrame#miPagoPaso[estado="antes"] { background: #efe8dd; border: 1px dashed #d9cdb8; }
-QFrame#miPagoPaso[proximo="true"] { border: 2px solid #6b1f3a; }
+QFrame#miPagoPaso[destacado="true"] { border: 2px solid #6b1f3a; }
 QDialog#miPago QLabel#miPagoPasoNumero { font-size: 20px; font-weight: 800; }
 QDialog#miPago QLabel#miPagoPasoFecha { font-size: 12px; font-weight: 700; }
 QDialog#miPago QLabel#miPagoPasoEstado { font-size: 11px; font-weight: 800; }
@@ -124,47 +132,51 @@ QDialog#miPago QFrame#miPagoPaso[estado="pagado"] QLabel { color: #2f7d4f; }
 QDialog#miPago QFrame#miPagoPaso[estado="toca_hoy"] QLabel { color: #ffffff; }
 QDialog#miPago QFrame#miPagoPaso[estado="pendiente"] QLabel { color: #5f564c; }
 QDialog#miPago QFrame#miPagoPaso[estado="atrasado"] QLabel { color: #b3261e; }
-QDialog#miPago QFrame#miPagoPaso[estado="antes"] QLabel { color: #b5aa9c; }
+QDialog#miPago QFrame#miPagoPaso[estado="antes"] QLabel { color: #8a8177; }
+QDialog#miPago QFrame#miPagoPaso[estado="antes"] QLabel#miPagoPasoNumero { color: #a59a8c; }
 
 QFrame#miPagoCard { background: #fbf7f0; border: 1px solid #e6dccb; border-radius: 12px; }
 QFrame#miPagoCard[estado="atrasado"] { background: #fdf4f2; border-color: #efc2bd; }
-QFrame#miPagoCard[proximo="true"] { border: 1.5px solid #6b1f3a; }
 QDialog#miPago QLabel#miPagoTitulo { font-size: 15px; font-weight: 800; }
 QDialog#miPago QLabel#miPagoMonto { font-size: 18px; font-weight: 800; }
-QDialog#miPago QLabel#miPagoCubre { color: #8a8177; font-size: 13px; }
+QDialog#miPago QLabel#miPagoCubre { color: #6f665c; font-size: 13px; }
 QFrame#miPagoRecibo { background: #f4ede2; border: none; border-radius: 10px; }
 QDialog#miPago QLabel#miPagoRenglon { color: #5f564c; font-size: 13px; }
 QDialog#miPago QLabel#miPagoRenglonMonto { color: #2c2a27; font-size: 13px; font-weight: 700; }
 QDialog#miPago QLabel#miPagoRenglonMonto[clase="suma"] { color: #2f7d4f; }
 QDialog#miPago QLabel#miPagoRenglonMonto[clase="resta"] { color: #b3261e; }
-QDialog#miPago QLabel#miPagoRenglonMonto[clase="nota"] { color: #8a8177; font-weight: 600; }
+QDialog#miPago QLabel#miPagoRenglonMonto[clase="nota"] { color: #6f665c; font-weight: 600; }
 
 QDialog#miPago QLabel#miPagoEstado { border-radius: 10px; padding: 3px 10px; font-size: 12px; font-weight: 800; }
 QDialog#miPago QLabel#miPagoEstado[estado="pagado"] { background: #e3f1e6; color: #2f7d4f; }
 QDialog#miPago QLabel#miPagoEstado[estado="toca_hoy"] { background: #6b1f3a; color: #ffffff; }
 QDialog#miPago QLabel#miPagoEstado[estado="pendiente"] { background: #ece6dc; color: #5f564c; }
 QDialog#miPago QLabel#miPagoEstado[estado="atrasado"] { background: #f8e1df; color: #b3261e; }
-QDialog#miPago QLabel#miPagoEstado[estado="sin_decidir"] { background: #fbefd5; color: #a86a00; }
+QDialog#miPago QLabel#miPagoEstado[estado="sin_decidir"] { background: #fbefd5; color: #8a5600; }
 QDialog#miPago QLabel#miPagoEstado[estado="pagar"] { background: #e3f1e6; color: #2f7d4f; }
 QDialog#miPago QLabel#miPagoEstado[estado="acumular"] { background: #f1e3e8; color: #6b1f3a; }
 
 QDialog#miPago QPushButton { background: #ffffff; color: #6b1f3a; border: 1.5px solid #d9cdb8; border-radius: 10px;
-                             min-height: 34px; padding: 0 14px; font-size: 13px; font-weight: 700; }
+                             min-height: 40px; padding: 0 16px; font-size: 13px; font-weight: 700; }
 QDialog#miPago QPushButton:pressed { background: #f1e6d6; border-color: #6b1f3a; }
 QDialog#miPago QPushButton:disabled { color: #b5aa9c; background: #f4eee4; border-color: #e6dccd; }
 QDialog#miPago QPushButton#miPagoPrimario { background: #6b1f3a; color: #ffffff; border: none; }
 QDialog#miPago QPushButton#miPagoPrimario:pressed { background: #561730; }
 QDialog#miPago QPushButton#miPagoPrimario:disabled { background: #d8c3ca; color: #f8f2f4; }
-QDialog#miPago QPushButton#miPagoChico, QDialog#miPago QPushButton#miPagoSegmento {
-    min-height: 30px; padding: 0 12px; font-size: 12px; border-radius: 9px; }
+QDialog#miPago QPushButton#miPagoChico { min-height: 40px; padding: 0 14px; font-size: 13px; border-radius: 10px; }
+QDialog#miPago QPushButton#miPagoSegmento { min-height: 40px; padding: 0 10px; font-size: 12px; border-radius: 10px; }
 QDialog#miPago QPushButton#miPagoSegmento:disabled { background: #6b1f3a; color: #ffffff; border-color: #6b1f3a; }
+/* Deshacer: una acción que borra no se parece a «Ya me pagaron». */
+QDialog#miPago QPushButton#miPagoDeshacer { background: transparent; border: none; color: #6f665c;
+    text-decoration: underline; font-size: 12px; font-weight: 600; padding: 0 6px; }
+QDialog#miPago QPushButton#miPagoDeshacer:pressed { color: #b3261e; background: transparent; }
 QDialog#miPago QPushButton#miPagoPlegable { background: transparent; color: #6b1f3a; border: none; text-align: left;
-                                            padding: 6px 2px; font-size: 14px; font-weight: 800; }
+                                            padding: 6px 2px; font-size: 15px; font-weight: 800; }
 QDialog#miPago QLabel#miPagoExtraFecha { font-size: 14px; font-weight: 800; }
 
 QDialog#miPago QDoubleSpinBox, QDialog#miPago QDateEdit, QDialog#miPago QLineEdit#miPagoCampo {
     background: #ffffff; color: #2c2a27; border: 1px solid #d9cdb8; border-radius: 10px;
-    padding: 4px 10px; min-height: 32px; font-size: 14px; }
+    padding: 4px 10px; min-height: 34px; font-size: 14px; }
 QDialog#miPago QDoubleSpinBox:focus, QDialog#miPago QDateEdit:focus, QDialog#miPago QLineEdit#miPagoCampo:focus {
     border: 2px solid #6b1f3a; }
 QDialog#miPago QDateEdit::drop-down { border: none; width: 28px; }
@@ -172,7 +184,10 @@ QDialog#miPago QDateEdit::drop-down { border: none; width: 28px; }
    de texto del spinbox de 1 px de ancho y no se ve la cifra. */
 QDialog#miPago QDoubleSpinBox::up-button { subcontrol-origin: border; width: 0px; border: none; }
 QDialog#miPago QDoubleSpinBox::down-button { width: 0px; border: none; }
-QDialog#miPago QCheckBox { color: #2c2a27; font-size: 13px; }
+QDialog#miPago QCheckBox { color: #2c2a27; font-size: 13px; spacing: 10px; }
+QDialog#miPago QCheckBox::indicator { width: 18px; height: 18px; border: 1.5px solid #d9cdb8;
+                                      border-radius: 5px; background: #ffffff; }
+QDialog#miPago QCheckBox::indicator:checked { background: #6b1f3a; border-color: #6b1f3a; }
 QDialog#miPago QScrollBar:vertical { background: transparent; width: 10px; margin: 4px 2px; }
 QDialog#miPago QScrollBar::handle:vertical { background: #d9cdb8; border-radius: 3px; min-height: 40px; }
 QDialog#miPago QScrollBar::add-line:vertical, QDialog#miPago QScrollBar::sub-line:vertical { height: 0px; }
@@ -199,6 +214,8 @@ DESTINO_TEXTO = {
     pd.PAGAR: "Se paga en su pago",
     pd.ACUMULAR: "Guardado a favor",
 }
+
+_MESES_CORTOS = ("ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic")
 
 
 # ─── Textos y cuentas de pantalla (puros, probados) ──────────────────────
@@ -236,11 +253,16 @@ def texto_estado(p: pd.DesglosePago, hoy: date) -> str:
     return ESTADOS_TEXTO[estado]
 
 
+def _dia_mes(f: date) -> str:
+    """'7-nov' (sin cero a la izquierda, como se dice en la tienda)."""
+    return f"{f.day}-{_MESES_CORTOS[f.month - 1]}"
+
+
 def rango_corto(desde: date, hasta: date) -> str:
-    """'del 15 al 21-nov' (mismo mes) o 'del 29-oct al 07-nov'."""
+    """'del 1 al 7-nov' (mismo mes) o 'del 29-oct al 7-nov'."""
     if (desde.year, desde.month) == (hasta.year, hasta.month):
-        return f"del {desde.day:02d} al {pd.fecha_corta(hasta)}"
-    return f"del {pd.fecha_corta(desde)} al {pd.fecha_corta(hasta)}"
+        return f"del {desde.day} al {_dia_mes(hasta)}"
+    return f"del {_dia_mes(desde)} al {_dia_mes(hasta)}"
 
 
 def texto_cubre(p: pd.DesglosePago) -> str:
@@ -299,12 +321,12 @@ def renglones_desglose(p: pd.DesglosePago) -> list[Renglon]:
 
 
 def resumen_ajustes(p: pd.DesglosePago) -> str:
-    """Lo que mueve el monto, en una línea: '+1 día de más · −1 falta'."""
+    """Lo que mueve el monto, en una línea: '+1 día de más · 1 falta (−$385)'."""
     partes = []
     if p.dias_extra_pagados:
         partes.append(f"+{_dias(len(p.dias_extra_pagados))} de más")
     if p.faltas_descontadas:
-        partes.append(f"−{_faltas(len(p.faltas_descontadas))}")
+        partes.append(f"{_faltas(len(p.faltas_descontadas))} (−{pd.dinero_texto(p.descuento_faltas)})")
     if p.faltas_cubiertas:
         n = len(p.faltas_cubiertas)
         partes.append(f"{_faltas(n)} cubierta" + ("s" if n != 1 else ""))
@@ -312,8 +334,8 @@ def resumen_ajustes(p: pd.DesglosePago) -> str:
 
 
 def tono_cuando_toca(dias_faltan: int) -> str:
-    """El color del chip «cuándo toca»: 'hoy' (verde), 'pronto' (ámbar, en 1
-    a 3 días) o 'luego'."""
+    """El color del chip «cuándo toca»: 'hoy' (blanco con letra vino, como el
+    cuadro vino de la tira), 'pronto' (ámbar, en 1 a 3 días) o 'luego'."""
     if dias_faltan <= 0:
         return "hoy"
     if dias_faltan <= 3:
@@ -369,9 +391,37 @@ def estado_dia_extra(e: pd.DiaExtra) -> str:
     return "sin_decidir" if e.sin_decidir else e.destino
 
 
-def texto_dia_extra(e: pd.DiaExtra) -> str:
-    """El chip del destino."""
-    return "Sin decidir · se guarda" if e.sin_decidir else DESTINO_TEXTO[e.destino]
+def texto_dia_extra(e: pd.DiaExtra, pago: date | None = None) -> str:
+    """El chip del destino. Con `pago` (la fecha del pago que lo cubre), el de
+    «págamelo» dice cuándo: «Se paga el 14-nov»."""
+    if e.sin_decidir:
+        return "Sin decidir · se guarda"
+    if e.destino == pd.PAGAR and pago is not None:
+        return f"Se paga el {_dia_mes(pago)}"
+    return DESTINO_TEXTO[e.destino]
+
+
+def texto_ultimo_pago(registros: dict[date, pd.RegistroPago]) -> tuple[str, str]:
+    """La ficha «Último pago»: ('19-nov', 'fue el pago del 14-nov') si se
+    pagó otro día que el programado; si no, el pie de siempre."""
+    if not registros:
+        return "Ninguno", "todavía no se registra ninguno"
+    r = max(registros.values(), key=lambda x: (x.fecha_pago, x.fecha_programada))
+    if r.fecha_pago != r.fecha_programada:
+        return pd.fecha_corta(r.fecha_pago), f"fue el pago del {_dia_mes(r.fecha_programada)}"
+    return pd.fecha_corta(r.fecha_pago), "la última vez que te pagaron"
+
+
+def pago_de_la_tarjeta_grande(rec: pd.Recordatorio) -> pd.DesglosePago:
+    """El pago que va arriba: el atrasado más viejo si hay; si no, el próximo."""
+    if rec.atrasados:
+        return min(rec.atrasados, key=lambda p: p.fecha_programada)
+    return rec.proximo
+
+
+def texto_atraso(dias: int) -> str:
+    """'Atrasado 1 día' / 'Atrasado 5 días'."""
+    return f"Atrasado {_dias(max(1, dias))}"
 
 
 def leer_dias_de_pago(texto: str) -> tuple[int, ...]:
@@ -498,6 +548,20 @@ def despues_de_marcar_dueno(
 # ─── El diálogo ──────────────────────────────────────────────────────────
 
 
+class _CuadroPaso(QFrame):
+    """Un cuadro de la tira: al tocarlo, baja a la tarjeta de su pago."""
+
+    def __init__(self, al_tocar):
+        super().__init__()
+        self._al_tocar = al_tocar
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+
+    def mouseReleaseEvent(self, event) -> None:  # noqa: N802 — nombre de Qt
+        if event.button() == Qt.MouseButton.LeftButton and self.rect().contains(event.position().toPoint()):
+            self._al_tocar()
+        super().mouseReleaseEvent(event)
+
+
 class _YaMePagaronDialog(QDialog):
     """Fecha real y monto (el calculado por omisión)."""
 
@@ -554,7 +618,10 @@ class MiPagoDialog(QDialog):
         self.pagos: list[pd.DesglosePago] = []
         self.extras: list[pd.DiaExtra] = []
         self._registradas: set[date] = set()
+        self._datos: pd.DatosPagoDueno | None = None
         self._config_pintada = False   # la configuración guardada ya está en los campos
+        self._carga_ok = False         # la última lectura de la base salió bien
+        self._cargo_alguna_vez = False
 
         raiz = QVBoxLayout(self)
         raiz.setContentsMargins(0, 0, 0, 0)
@@ -568,6 +635,7 @@ class MiPagoDialog(QDialog):
         area.setWidget(self._cuerpo)
         area.setFrameShape(QScrollArea.Shape.NoFrame)
         area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._area = area
         raiz.addWidget(area, 1)
 
         # Encabezado.
@@ -656,8 +724,9 @@ class MiPagoDialog(QDialog):
         pie.addWidget(cerrar)
         raiz.addWidget(pie_w)
         self.recargar(pintar_config=True)
-        # Plegada: casi no se usa. Abierta si no hay cuenta que llevar.
-        self._mostrar_config(self._config is None or not self._config.vigente)
+        # Plegada: casi no se usa. Abierta si no hay cuenta que llevar (y solo
+        # si se pudo leer: sin conexión no se invita a sobrescribirla).
+        self._mostrar_config(self._carga_ok and (self._config is None or not self._config.vigente))
 
     # ── armado ──
     def _armar_heroe(self) -> QFrame:
@@ -668,7 +737,8 @@ class MiPagoDialog(QDialog):
         ly.setSpacing(16)
         izq = QVBoxLayout()
         izq.setSpacing(3)
-        izq.addWidget(_label("PRÓXIMO PAGO", "miPagoHeroeKicker"))
+        self.heroe_kicker = _label("PRÓXIMO PAGO", "miPagoHeroeKicker")
+        izq.addWidget(self.heroe_kicker)
         self.heroe_titulo = _label("", "miPagoHeroeTitulo")
         izq.addWidget(self.heroe_titulo)
         self.heroe_monto = _label("", "miPagoHeroeMonto")
@@ -685,7 +755,7 @@ class MiPagoDialog(QDialog):
         self.btn_heroe.setObjectName("miPagoHeroeBoton")
         self.btn_heroe.setAutoDefault(False)
         self.btn_heroe.setCursor(Qt.CursorShape.PointingHandCursor)
-        self.btn_heroe.clicked.connect(lambda: self._rec and self._ya_me_pagaron(self._rec.proximo))
+        self.btn_heroe.clicked.connect(lambda: self._rec and self._ya_me_pagaron(self.pago_heroe()))
         der.addWidget(self.btn_heroe, 0, Qt.AlignmentFlag.AlignRight)
         ly.addLayout(der)
         return self.heroe
@@ -696,7 +766,8 @@ class MiPagoDialog(QDialog):
         ly = QVBoxLayout(caja)
         ly.setContentsMargins(22, 18, 22, 18)
         ly.setSpacing(4)
-        ly.addWidget(_label("Tu cuenta todavía no está configurada", "miPagoVacioTitulo", wrap=True))
+        self.vacio_titulo = _label("Tu cuenta todavía no está configurada", "miPagoVacioTitulo", wrap=True)
+        ly.addWidget(self.vacio_titulo)
         self.vacio_texto = _label(
             "Pon abajo el monto de cada pago y el día en que empieza la cuenta, y guarda.",
             "miPagoNota", wrap=True,
@@ -716,6 +787,7 @@ class MiPagoDialog(QDialog):
         ly.addWidget(valor)
         pie = _label("", "miPagoFichaPie", wrap=True)
         ly.addWidget(pie)
+        ly.addStretch(1)
         valor.pie = pie
         fila.addWidget(caja, 1)
         return valor
@@ -724,7 +796,7 @@ class MiPagoDialog(QDialog):
         nav = QFrame()
         nav.setObjectName("miPagoMesNav")
         ly = QHBoxLayout(nav)
-        ly.setContentsMargins(3, 2, 3, 2)
+        ly.setContentsMargins(4, 3, 4, 3)
         ly.setSpacing(4)
         self.btn_mes_prev = QPushButton("◀")
         self.btn_mes_next = QPushButton("▶")
@@ -751,7 +823,7 @@ class MiPagoDialog(QDialog):
         ly.setSpacing(12)
         grid = QGridLayout()
         grid.setHorizontalSpacing(14)
-        grid.setVerticalSpacing(4)
+        grid.setVerticalSpacing(16)
         self.cfg_monto = _dinero_spin(pd.MONTO_DEFAULT, 1_000_000)
         self.cfg_valor_dia = _dinero_spin(pd.VALOR_DIA_DEFAULT, 100_000)
         self.cfg_dias = QLineEdit(", ".join(str(d) for d in pd.DIAS_DE_PAGO_DEFAULT))
@@ -767,15 +839,17 @@ class MiPagoDialog(QDialog):
             ("LA CUENTA EMPIEZA EL", self.cfg_inicio, "Antes de esa fecha no se cuenta nada."),
         )
         for i, (titulo, campo, ayuda) in enumerate(campos):
-            fila, col = (i // 2) * 3, i % 2
-            grid.addWidget(_label(titulo, "miPagoFichaTitulo"), fila, col)
+            grupo = QVBoxLayout()
+            grupo.setSpacing(4)
+            grupo.addWidget(_label(titulo, "miPagoFichaTitulo"))
             campo.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
             if isinstance(campo, QDoubleSpinBox):
                 campo.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
             campo.setMinimumWidth(120)
-            grid.addWidget(campo, fila + 1, col)
-            grid.addWidget(_label(ayuda, "miPagoNota", wrap=True), fila + 2, col)
-            grid.setRowMinimumHeight(fila + 2, 26)
+            grupo.addWidget(campo)
+            grupo.addWidget(_label(ayuda, "miPagoNota", wrap=True))
+            grupo.addStretch(1)
+            grid.addLayout(grupo, i // 2, i % 2)
         grid.setColumnStretch(0, 1)
         grid.setColumnStretch(1, 1)
         ly.addLayout(grid)
@@ -793,7 +867,9 @@ class MiPagoDialog(QDialog):
 
     def _mostrar_config(self, abierta: bool) -> None:
         self.config_box.setVisible(abierta)
-        self.btn_config.setText(("▾" if abierta else "▸") + "  ⚙ Configuración")
+        self.btn_config.setText(("▾" if abierta else "▸") + "  Configuración")
+        # Sin cuenta guardada no hay nada que plegar: la configuración es lo único.
+        self.btn_config.setVisible(self._carga_ok and self._config is not None)
 
     @staticmethod
     def _limpiar(box) -> None:
@@ -811,22 +887,39 @@ class MiPagoDialog(QDialog):
         al guardarla (`pintar_config`), para no borrar lo que se está editando."""
         rec = None
         sin_descanso = False
-        self._registradas = set()
+        datos = None
         try:
             with self._sf() as session:
                 pd.limpiar_decisiones_huerfanas(session)
-                self._config = pd.cargar_config(session)
-                vigente = self._config is not None and self._config.vigente
-                self.pagos = pd.pagos_del_mes_db(session, self._year, self._month) if vigente else []
-                self.extras = pd.lista_dias_extra(session, max(self._hoy, self._fin_de_mes())) if vigente else []
+                config = pd.cargar_config(session)
+                vigente = config is not None and config.vigente
+                pagos = pd.pagos_del_mes_db(session, self._year, self._month) if vigente else []
+                extras = pd.lista_dias_extra(session, max(self._hoy, self._fin_de_mes())) if vigente else []
                 rec = pd.recordatorio(session, self._hoy) if vigente else None
                 sin_descanso = pd.falta_descanso(session) if vigente else False
                 if vigente:
-                    self._registradas = set(pd.cargar_datos(session, self._config).registros)
+                    datos = pd.cargar_datos(session, config)
         except Exception:  # noqa: BLE001
             logger.exception("Mi pago: no se pudo cargar")
             self.status.setText("Sin conexión con la PC principal.")
-            self.pagos, self.extras = [], []
+            self._carga_ok = False
+            self.btn_guardar_config.setEnabled(False)
+            if self._cargo_alguna_vez:
+                return      # se queda lo que ya se veía; solo cambia el pie
+            self.vacio_titulo.setText("Sin conexión con la PC principal")
+            self.vacio_texto.setText("No se pudo leer tu cuenta. Cierra y vuelve a abrir Mi pago.")
+            self.pagos, self.extras, self._rec, self._datos = [], [], None, None
+            self._registradas = set()
+            self._pintar_heroe()
+            self._mostrar_config(False)
+            return
+        self._carga_ok = self._cargo_alguna_vez = True
+        self.btn_guardar_config.setEnabled(True)
+        self._config, self.pagos, self.extras, self._datos = config, pagos, extras, datos
+        self._registradas = set(datos.registros) if datos is not None else set()
+        self.vacio_titulo.setText("Tu cuenta todavía no está configurada")
+        self.vacio_texto.setText("Pon abajo el monto de cada pago y el día en que empieza la cuenta, y guarda.")
+        self.btn_config.setVisible(self._config is not None)
         self._rec = rec
         self.aviso_descanso.setVisible(sin_descanso)
         if pintar_config or not self._config_pintada:
@@ -864,17 +957,26 @@ class MiPagoDialog(QDialog):
         if not hay:
             self.heroe_titulo.setText("")
             return
-        p = rec.proximo
+        # Si hay atrasados, arriba va el más viejo: el botón más visible de la
+        # pantalla registra lo que urge, no el pago que todavía no toca.
+        p = pago_de_la_tarjeta_grande(rec)
+        atrasado = p is not rec.proximo
+        self.heroe_kicker.setText("PAGO ATRASADO" if atrasado else "PRÓXIMO PAGO")
         self.heroe_titulo.setText(titulo_pago(p))
         self.heroe_monto.setText(pd.dinero_texto(p.monto))
         ajustes = resumen_ajustes(p)
         self.heroe_pie.setText(texto_cubre(p) + (f" · {ajustes}" if ajustes else ""))
-        self.heroe_cuando.setText(pd.cuando_toca(rec.dias_faltan))
-        self.heroe_cuando.setProperty("tono", tono_cuando_toca(rec.dias_faltan))
+        if atrasado:
+            self.heroe_cuando.setText(texto_atraso((self._hoy - p.fecha_programada).days))
+            self.heroe_cuando.setProperty("tono", "atrasado")
+        else:
+            self.heroe_cuando.setText(pd.cuando_toca(rec.dias_faltan))
+            self.heroe_cuando.setProperty("tono", tono_cuando_toca(rec.dias_faltan))
         _repulir(self.heroe_cuando)
 
-        self.stat_ultimo.setText(pd.fecha_corta(rec.ultimo_pago) if rec.ultimo_pago else "Ninguno")
-        self.stat_ultimo.pie.setText("la última vez que te pagaron")
+        valor, pie = texto_ultimo_pago(self._datos.registros if self._datos is not None else {})
+        self.stat_ultimo.setText(valor)
+        self.stat_ultimo.pie.setText(pie)
         self.stat_favor.setText(str(rec.dias_a_favor))
         self.stat_favor.pie.setText("cubren una falta cada uno")
         n = len(rec.atrasados)
@@ -904,18 +1006,30 @@ class MiPagoDialog(QDialog):
                 cuadro = self._cuadro_paso(paso)
                 self.tira.append(cuadro)
                 self._tira_box.addWidget(cuadro, 1)
-        if not self.pagos:
+        tarjetas = list(self.pagos)
+        if c is not None and self._datos is not None:
+            # Un pago de antes del inicio que sí se registró (el 14-nov pagado
+            # el 19) también lleva tarjeta: se ve su monto y se puede deshacer.
+            ya = {p.fecha_programada for p in tarjetas}
+            for paso in pasos:
+                if paso.fecha in self._registradas and paso.fecha not in ya:
+                    tarjetas.append(pd.desglose_de_pago(c, self._datos, paso.fecha))
+            tarjetas.sort(key=lambda p: p.fecha_programada)
+        self.tarjetas: dict[date, QFrame] = {}
+        if not tarjetas:
             vacio = _label("Ningún pago de este mes cae desde el inicio de la cuenta.", "miPagoNota", wrap=True)
             self._pagos_box.addWidget(vacio)
             return
-        for p in self.pagos:
-            self._pagos_box.addWidget(self._tarjeta_pago(p))
+        for p in tarjetas:
+            tarjeta = self._tarjeta_pago(p)
+            self.tarjetas[p.fecha_programada] = tarjeta
+            self._pagos_box.addWidget(tarjeta)
 
     def _cuadro_paso(self, paso: Paso) -> QFrame:
-        cuadro = QFrame()
+        cuadro = _CuadroPaso(lambda f=paso.fecha: self.ir_a_tarjeta(f))
         cuadro.setObjectName("miPagoPaso")
         cuadro.setProperty("estado", paso.estado)
-        cuadro.setProperty("proximo", "true" if self._es_proximo(paso.fecha) else "false")
+        cuadro.setProperty("destacado", "true" if self._es_destacado(paso.fecha) else "false")
         ly = QVBoxLayout(cuadro)
         ly.setContentsMargins(10, 8, 10, 8)
         ly.setSpacing(0)
@@ -931,15 +1045,25 @@ class MiPagoDialog(QDialog):
                           f"{pd.fecha_corta(paso.fecha, con_dia=True)} · {PASO_TEXTO[paso.estado]}")
         return cuadro
 
-    def _es_proximo(self, fecha: date) -> bool:
-        return self._rec is not None and self._rec.proximo.fecha_programada == fecha
+    def pago_heroe(self) -> pd.DesglosePago | None:
+        """El pago de la tarjeta grande (el atrasado más viejo, o el próximo)."""
+        return pago_de_la_tarjeta_grande(self._rec) if self._rec is not None else None
+
+    def _es_destacado(self, fecha: date) -> bool:
+        p = self.pago_heroe()
+        return p is not None and p.fecha_programada == fecha
+
+    def ir_a_tarjeta(self, fecha: date) -> None:
+        """Tocar un cuadro de la tira baja a la tarjeta de ese pago."""
+        tarjeta = getattr(self, "tarjetas", {}).get(fecha)
+        if tarjeta is not None:
+            self._area.ensureWidgetVisible(tarjeta, 0, 12)
 
     def _tarjeta_pago(self, p: pd.DesglosePago) -> QFrame:
         estado_pago = p.estado(self._hoy)
         card = QFrame()
         card.setObjectName("miPagoCard")
         card.setProperty("estado", estado_pago)
-        card.setProperty("proximo", "true" if self._es_proximo(p.fecha_programada) else "false")
         ly = QVBoxLayout(card)
         ly.setContentsMargins(16, 12, 16, 12)
         ly.setSpacing(6)
@@ -959,7 +1083,7 @@ class MiPagoDialog(QDialog):
         fila2.addWidget(_label(texto_cubre(p), "miPagoCubre"), 1)
         if p.pagado:
             b = QPushButton("Deshacer pago")
-            b.setObjectName("miPagoChico")
+            b.setObjectName("miPagoDeshacer")
             b.clicked.connect(lambda _c=False, pago=p: self._deshacer(pago))
         else:
             b = QPushButton("💵 Ya me pagaron")
@@ -1023,11 +1147,11 @@ class MiPagoDialog(QDialog):
             fila_w = QWidget()
             fila = QHBoxLayout(fila_w)
             fila.setContentsMargins(0, 8, 0, 8)
-            fila.setSpacing(10)
+            fila.setSpacing(8)
             fecha = _label(pd.fecha_corta(e.fecha, con_dia=True), "miPagoExtraFecha")
-            fecha.setMinimumWidth(92)
+            fecha.setMinimumWidth(84)
             fila.addWidget(fecha)
-            chip = _label(texto_dia_extra(e), "miPagoEstado")
+            chip = _label(texto_dia_extra(e, self._pago_que_cubre(e.fecha)), "miPagoEstado")
             chip.setProperty("estado", estado_dia_extra(e))
             fila.addWidget(chip)
             fila.addStretch(1)
@@ -1042,6 +1166,11 @@ class MiPagoDialog(QDialog):
                 fila.addWidget(b)
             fila_w.extra = e
             self._extras_box.addWidget(fila_w)
+
+    def _pago_que_cubre(self, fecha: date) -> date | None:
+        if self._config is None or not self._config.dias_de_pago:
+            return None
+        return pd.siguiente_pago(self._config, fecha)
 
     # ── acciones ──
     def _mover_mes(self, delta: int) -> None:
@@ -1108,9 +1237,12 @@ class MiPagoDialog(QDialog):
             logger.exception("Mi pago: no se guardó el destino")
             QMessageBox.warning(self, "No se guardó", "Inténtalo otra vez.")
             return
-        self.status.setText(
-            f"{pd.fecha_corta(fecha)}: " + ("se paga en su pago." if destino == pd.PAGAR else "queda como día a favor.")
-        )
+        pago = self._pago_que_cubre(fecha)
+        if destino == pd.PAGAR:
+            cuando = f"va en el pago del {_dia_mes(pago)}." if pago is not None else "se paga en su pago."
+        else:
+            cuando = "queda como día a favor."
+        self.status.setText(f"{pd.fecha_corta(fecha)}: {cuando}")
         self.recargar()
 
     def _guardar_config(self) -> None:

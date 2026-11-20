@@ -86,7 +86,7 @@ class TextosTests(unittest.TestCase):
             R("Falta cubierta con día a favor (19-nov)", "no se descuenta", "nota"),
             R("Día de más sin decidir (18-nov)", "se guarda", "nota"),
         ])
-        self.assertEqual(mp.resumen_ajustes(p), "+1 día de más · −1 falta · 1 falta cubierta")
+        self.assertEqual(mp.resumen_ajustes(p), "+1 día de más · 1 falta (−$385) · 1 falta cubierta")
 
     def test_desglose_simple_es_una_sola_linea(self) -> None:
         # Sin días de más ni faltas no hay nada que desglosar: basta «Cubre…».
@@ -100,7 +100,9 @@ class TextosTests(unittest.TestCase):
 
     def test_rango_corto(self) -> None:
         self.assertEqual(mp.rango_corto(D(2026, 11, 15), D(2026, 11, 21)), "del 15 al 21-nov")
-        self.assertEqual(mp.rango_corto(D(2026, 11, 29), D(2026, 12, 7)), "del 29-nov al 07-dic")
+        self.assertEqual(mp.rango_corto(D(2026, 11, 29), D(2026, 12, 7)), "del 29-nov al 7-dic")
+        # Sin cero a la izquierda: «del 1 al 7-nov», como se dice en la tienda.
+        self.assertEqual(mp.rango_corto(D(2026, 11, 1), D(2026, 11, 7)), "del 1 al 7-nov")
 
     def test_tono_cuando_toca(self) -> None:
         self.assertEqual([mp.tono_cuando_toca(n) for n in (0, 1, 3, 4, 9)],
@@ -133,6 +135,21 @@ class TextosTests(unittest.TestCase):
                          ["sin_decidir", pd.PAGAR, pd.ACUMULAR])
         self.assertEqual([mp.texto_dia_extra(e) for e in (sin, pagar, guardado)],
                          ["Sin decidir · se guarda", "Se paga en su pago", "Guardado a favor"])
+        # Con la fecha del pago que lo cubre, dice en cuál.
+        self.assertEqual(mp.texto_dia_extra(pagar, D(2026, 11, 14)), "Se paga el 14-nov")
+        self.assertEqual(mp.texto_dia_extra(guardado, D(2026, 11, 7)), "Guardado a favor")
+
+    def test_ficha_del_ultimo_pago(self) -> None:
+        self.assertEqual(mp.texto_ultimo_pago({}), ("Ninguno", "todavía no se registra ninguno"))
+        tarde = pd.RegistroPago(D(2026, 11, 14), D(2026, 11, 19), Decimal("2500"))
+        self.assertEqual(mp.texto_ultimo_pago({tarde.fecha_programada: tarde}),
+                         ("19-nov", "fue el pago del 14-nov"))
+        a_tiempo = pd.RegistroPago(D(2026, 11, 21), D(2026, 11, 21), Decimal("2500"))
+        self.assertEqual(mp.texto_ultimo_pago({tarde.fecha_programada: tarde, a_tiempo.fecha_programada: a_tiempo}),
+                         ("21-nov", "la última vez que te pagaron"))
+
+    def test_texto_atraso(self) -> None:
+        self.assertEqual([mp.texto_atraso(n) for n in (1, 5)], ["Atrasado 1 día", "Atrasado 5 días"])
 
     def test_dias_de_pago(self) -> None:
         self.assertEqual(mp.leer_dias_de_pago("7, 14, 21, 28"), (7, 14, 21, 28))
@@ -186,8 +203,13 @@ class MiPagoDialogTests(unittest.TestCase):
         d = self._dialogo()
         self.assertTrue(d.registrar(D(2026, 11, 14), D(2026, 11, 19), None))
         self.assertEqual(d.stat_ultimo.text(), "19-nov")
-        # El 14 es de antes del inicio, pero se pagó: la tira lo marca pagado.
+        self.assertEqual(d.stat_ultimo.pie.text(), "fue el pago del 14-nov")
+        # El 14 es de antes del inicio, pero se pagó: la tira lo marca pagado
+        # y tiene su tarjeta, con «Deshacer pago».
         self.assertEqual([c.paso.estado for c in d.tira], [mp.ANTES, pd.PAGADO, pd.PENDIENTE, pd.PENDIENTE])
+        self.assertEqual(sorted(d.tarjetas), [D(2026, 11, 14), D(2026, 11, 21), D(2026, 11, 28)])
+        self.assertEqual(d.tarjetas[D(2026, 11, 14)].boton.text(), "Deshacer pago")
+        self.assertEqual(d.tarjetas[D(2026, 11, 14)].boton.objectName(), "miPagoDeshacer")
         self.assertIn("Pago 2 de 4 guardado: $2,500", d.status.text())
         # Un monto editado
         self.assertTrue(d.registrar(D(2026, 11, 21), D(2026, 11, 19), Decimal("2400")))
@@ -232,13 +254,26 @@ class MiPagoDialogTests(unittest.TestCase):
         d.btn_config.click()
         self.assertFalse(d.config_box.isHidden())
 
+    def test_la_tarjeta_grande_va_al_proximo_si_no_hay_atrasados(self) -> None:
+        with self.sesion() as s:
+            pd.guardar_config(s, fecha_inicio=D(2026, 11, 19))
+        d = self._dialogo(hoy=D(2026, 11, 21))
+        self.assertEqual(d.heroe_kicker.text(), "PRÓXIMO PAGO")
+        self.assertEqual(d.heroe_titulo.text(), "3 de 4 · sáb 21-nov")
+        self.assertEqual(d.heroe_cuando.text(), "Toca hoy")
+        self.assertEqual(d.heroe_cuando.property("tono"), "hoy")
+        self.assertEqual([c.property("destacado") for c in d.tira], ["false", "false", "true", "false"])
+
     def test_la_tarjeta_grande_y_las_fichas(self) -> None:
         with self.sesion() as s:
             pd.guardar_config(s, fecha_inicio=D(2026, 11, 1))
         d = self._dialogo(hoy=D(2026, 11, 19))
-        self.assertEqual(d.heroe_titulo.text(), "3 de 4 · sáb 21-nov")
-        self.assertEqual(d.heroe_cuando.text(), "Toca en 2 días")
-        self.assertEqual(d.heroe_cuando.property("tono"), "pronto")
+        # Con atrasados, arriba va el más viejo (y su botón lo registra).
+        self.assertEqual(d.heroe_kicker.text(), "PAGO ATRASADO")
+        self.assertEqual(d.heroe_titulo.text(), "1 de 4 · sáb 07-nov")
+        self.assertEqual(d.heroe_cuando.text(), "Atrasado 12 días")
+        self.assertEqual(d.heroe_cuando.property("tono"), "atrasado")
+        self.assertEqual([c.property("destacado") for c in d.tira], ["true", "false", "false", "false"])
         self.assertEqual(d.stat_ultimo.text(), "Ninguno")
         self.assertEqual(d.stat_atrasados.text(), "2")
         self.assertEqual(d.stat_atrasados.property("alerta"), "true")
@@ -247,7 +282,10 @@ class MiPagoDialogTests(unittest.TestCase):
         self.assertEqual(nombres, ["miPagoPrimario", "miPagoPrimario", "miPagoChico", "miPagoChico"])
         with patch.object(mp.MiPagoDialog, "_ya_me_pagaron") as pagar:
             d.btn_heroe.click()
-        pagar.assert_called_once_with(d._rec.proximo)
+        pagar.assert_called_once_with(d.pago_heroe())
+        self.assertEqual(d.pago_heroe().fecha_programada, D(2026, 11, 7))
+        # Tocar un cuadro de la tira no truena (baja a su tarjeta).
+        d.ir_a_tarjeta(D(2026, 11, 28))
         d._mover_mes(-1)
         self.assertEqual(d.mes_label.text(), "Octubre 2026")
         self.assertEqual([c.paso.estado for c in d.tira], [mp.ANTES] * 4)
@@ -292,6 +330,34 @@ class MiPagoDialogTests(unittest.TestCase):
         with self.sesion() as s:
             self.assertEqual(pd.cargar_config(s).monto_por_pago, Decimal("3000.00"))
         self.assertEqual(d.cfg_monto.value(), 3000)
+
+    def test_sin_conexion_no_invita_a_configurar(self) -> None:
+        def falla():
+            raise OSError("sin red")
+
+        d = mp.MiPagoDialog(None, quien="VEND-1", session_factory=falla, hoy=D(2026, 11, 19))
+        self.addCleanup(d.deleteLater)
+        self.assertTrue(d.config_box.isHidden())
+        self.assertTrue(d.btn_config.isHidden())
+        self.assertFalse(d.btn_guardar_config.isEnabled())
+        self.assertIn("Sin conexión", d.vacio_titulo.text())
+        self.assertIn("Sin conexión", d.status.text())
+
+    def test_si_se_cae_la_conexion_despues_se_queda_lo_que_se_veia(self) -> None:
+        with self.sesion() as s:
+            pd.guardar_config(s, fecha_inicio=D(2026, 11, 19))
+        d = self._dialogo()
+        self.assertFalse(d.heroe.isHidden())
+
+        def falla():
+            raise OSError("sin red")
+
+        d._sf = falla
+        d.recargar()
+        self.assertFalse(d.heroe.isHidden())
+        self.assertTrue(d.vacio_config.isHidden())
+        self.assertFalse(d.btn_guardar_config.isEnabled())
+        self.assertIn("Sin conexión", d.status.text())
 
     def test_solo_el_dueno(self) -> None:
         with patch.object(QMessageBox, "information") as aviso, patch.object(mp.MiPagoDialog, "exec") as exe:
