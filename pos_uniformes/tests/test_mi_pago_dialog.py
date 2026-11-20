@@ -200,6 +200,23 @@ class MiPagoDialogTests(unittest.TestCase):
         self.assertFalse(d.aviso_descanso.isHidden())
         self.assertIn("descanso fijo no está guardado", d.aviso_descanso.text())
 
+    def test_las_acciones_no_borran_la_configuracion_sin_guardar(self) -> None:
+        with self.sesion() as s:
+            pd.guardar_config(s, fecha_inicio=D(2026, 11, 19))
+            s.add(EmpleadaEvento(employee_code="VEND-1", fecha=D(2026, 11, 24), tipo=TRABAJO))
+            s.commit()
+        d = self._dialogo(hoy=D(2026, 11, 25))
+        self.assertEqual(d.cfg_monto.value(), 2500)
+        d.cfg_monto.setValue(3000)
+        d._decidir(D(2026, 11, 24), pd.PAGAR)
+        d.registrar(D(2026, 11, 21), D(2026, 11, 25), None)
+        d._mover_mes(1)
+        self.assertEqual(d.cfg_monto.value(), 3000)
+        d._guardar_config()
+        with self.sesion() as s:
+            self.assertEqual(pd.cargar_config(s).monto_por_pago, Decimal("3000.00"))
+        self.assertEqual(d.cfg_monto.value(), 3000)
+
     def test_solo_el_dueno(self) -> None:
         with patch.object(QMessageBox, "information") as aviso, patch.object(mp.MiPagoDialog, "exec") as exe:
             self.assertFalse(mp.abrir_mi_pago(None, "VEND-4"))

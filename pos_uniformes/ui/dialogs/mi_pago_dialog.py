@@ -334,6 +334,7 @@ class MiPagoDialog(QDialog):
         self._config: pd.ConfigPagoDueno | None = None
         self.pagos: list[pd.DesglosePago] = []
         self.extras: list[pd.DiaExtra] = []
+        self._config_pintada = False   # la configuración guardada ya está en los campos
 
         raiz = QVBoxLayout(self)
         raiz.setContentsMargins(0, 0, 0, 0)
@@ -404,7 +405,7 @@ class MiPagoDialog(QDialog):
         cerrar.clicked.connect(self.accept)
         pie.addWidget(cerrar)
         raiz.addLayout(pie)
-        self.recargar()
+        self.recargar(pintar_config=True)
 
     # ── armado ──
     def _seccion_config(self) -> QFrame:
@@ -453,7 +454,9 @@ class MiPagoDialog(QDialog):
                 w.setParent(None)
                 w.deleteLater()
 
-    def recargar(self) -> None:
+    def recargar(self, *, pintar_config: bool = False) -> None:
+        """Vuelve a leer y pinta. La configuración solo se repinta al abrir y
+        al guardarla (`pintar_config`), para no borrar lo que se está editando."""
         rec = None
         sin_descanso = False
         try:
@@ -471,7 +474,8 @@ class MiPagoDialog(QDialog):
             self.pagos, self.extras = [], []
         self.resumen.setText(texto_resumen(rec))
         self.aviso_descanso.setVisible(sin_descanso)
-        self._pintar_config()
+        if pintar_config or not self._config_pintada:
+            self._pintar_config()
         self._pintar_pagos()
         self._pintar_extras()
 
@@ -483,6 +487,7 @@ class MiPagoDialog(QDialog):
         c = self._config
         if c is None:
             return
+        self._config_pintada = True
         self.cfg_monto.setValue(float(c.monto_por_pago))
         self.cfg_valor_dia.setValue(float(c.valor_dia))
         self.cfg_dias.setText(", ".join(str(d) for d in c.dias_de_pago))
@@ -660,7 +665,7 @@ class MiPagoDialog(QDialog):
             QMessageBox.warning(self, "No se guardó", "Inténtalo otra vez.")
             return
         self.status.setText("Configuración guardada.")
-        self.recargar()
+        self.recargar(pintar_config=True)
 
 
 def abrir_mi_pago(parent: QWidget | None, quien: str | None) -> bool:
