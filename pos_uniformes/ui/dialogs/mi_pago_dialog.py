@@ -99,6 +99,12 @@ def _fechas(fechas: list[date]) -> str:
     return ", ".join(pd.fecha_corta(f) for f in fechas)
 
 
+TEXTO_SIN_DESCANSO = (
+    "⚠ Tu descanso fijo no está guardado en el calendario, así que no se cuentan "
+    "días de más. Guárdalo (martes) en tu horario del calendario."
+)
+
+
 def titulo_pago(p: pd.DesglosePago) -> str:
     """'3 de 4 · sáb 21-nov'."""
     return f"{p.etiqueta} · {pd.fecha_corta(p.fecha_programada, con_dia=True)}"
@@ -334,6 +340,11 @@ class MiPagoDialog(QDialog):
         self.resumen.setObjectName("miPagoResumen")
         self.resumen.setWordWrap(True)
         self._ly.addWidget(self.resumen)
+        self.aviso_descanso = QLabel(TEXTO_SIN_DESCANSO)
+        self.aviso_descanso.setObjectName("miPagoNota")
+        self.aviso_descanso.setWordWrap(True)
+        self.aviso_descanso.setVisible(False)
+        self._ly.addWidget(self.aviso_descanso)
 
         # Pagos del mes, con flechas.
         nav = QHBoxLayout()
@@ -429,6 +440,7 @@ class MiPagoDialog(QDialog):
 
     def recargar(self) -> None:
         rec = None
+        sin_descanso = False
         try:
             with self._sf() as session:
                 pd.limpiar_decisiones_huerfanas(session)
@@ -437,11 +449,13 @@ class MiPagoDialog(QDialog):
                 self.pagos = pd.pagos_del_mes_db(session, self._year, self._month) if vigente else []
                 self.extras = pd.lista_dias_extra(session, max(self._hoy, self._fin_de_mes())) if vigente else []
                 rec = pd.recordatorio(session, self._hoy) if vigente else None
+                sin_descanso = pd.falta_descanso(session) if vigente else False
         except Exception:  # noqa: BLE001
             logger.exception("Mi pago: no se pudo cargar")
             self.status.setText("Sin conexión con la PC principal.")
             self.pagos, self.extras = [], []
         self.resumen.setText(texto_resumen(rec))
+        self.aviso_descanso.setVisible(sin_descanso)
         self._pintar_config()
         self._pintar_pagos()
         self._pintar_extras()

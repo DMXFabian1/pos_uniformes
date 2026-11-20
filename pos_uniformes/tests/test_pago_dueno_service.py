@@ -223,9 +223,13 @@ class MontoTests(unittest.TestCase):
         fechas = [e.fecha for e in pd.dias_extra(_config(), datos, D(2026, 11, 30))]
         self.assertEqual(fechas, [D(2026, 11, 14), D(2026, 11, 17)])
 
-    def test_sin_descanso_configurado_es_martes(self) -> None:
-        datos = _datos({D(2026, 11, 10): TRABAJO}, descanso=None)
-        self.assertEqual([e.fecha for e in pd.dias_extra(_config(), datos, D(2026, 11, 30))], [D(2026, 11, 10)])
+    def test_sin_descanso_guardado_no_supone_el_martes(self) -> None:
+        # Sin descanso en su horario, el calendario ve el martes como día de
+        # trabajo: la cuenta tampoco lo trata como descanso.
+        datos = _datos({D(2026, 11, 10): TRABAJO, D(2026, 11, 11): DESCANSO}, descanso=None)
+        self.assertEqual(pd.dias_extra(_config(), datos, D(2026, 11, 30)), [])
+        self.assertFalse(pd.tiene_descanso(datos.horario))
+        self.assertTrue(pd.tiene_descanso(_datos().horario))
 
     def test_falta_sin_dias_a_favor_se_descuenta(self) -> None:
         datos = _datos({D(2026, 11, 12): FALTA})
@@ -563,6 +567,29 @@ class DiasExtraDbTests(_ConBase):
         self.assertFalse(pd.es_dia_extra(self.s, D(2026, 11, 24)))                 # el martes quedó "trabajo"
         with self.assertRaises(ValueError):
             pd.decidir_dia_extra(self.s, D(2026, 11, 24), PAGAR)
+
+    def test_sin_descanso_guardado_la_cuenta_y_el_calendario_coinciden(self) -> None:
+        from pos_uniformes.database.models import EmpleadaHorario
+        from pos_uniformes.services.calendario_empleadas_service import (
+            cargar_horario, estado_del_dia, marcar_dia,
+        )
+
+        self.s.get(EmpleadaHorario, "VEND-1").descanso_weekday = None
+        self.s.commit()
+        self._configurar(inicio=D(2026, 11, 17))
+        self.assertTrue(pd.falta_descanso(self.s))
+        marcar_dia(self.s, "VEND-1", D(2026, 11, 24), TRABAJO, actor="VEND-1")
+        self.assertEqual(estado_del_dia(cargar_horario(self.s, "VEND-1"), D(2026, 11, 24)), TRABAJO)
+        self.assertFalse(pd.es_dia_extra(self.s, D(2026, 11, 24)))
+        self.assertEqual(pd.lista_dias_extra(self.s, D(2026, 11, 30)), [])
+        # Con el descanso guardado, el aviso se va y el martes trabajado sí es de más.
+        self.s.get(EmpleadaHorario, "VEND-1").descanso_weekday = 1
+        self.s.commit()
+        self.assertFalse(pd.falta_descanso(self.s))
+        self.assertTrue(pd.es_dia_extra(self.s, D(2026, 11, 24)))
+
+    def test_falta_descanso_sin_cuenta_es_false(self) -> None:
+        self.assertFalse(pd.falta_descanso(self.s))
 
     def test_destino_invalido(self) -> None:
         self._configurar()

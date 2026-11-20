@@ -174,6 +174,18 @@ class MiPagoDialogTests(unittest.TestCase):
         self.assertEqual(d.extras[0].destino, pd.PAGAR)
         self.assertEqual(d.pagos[-1].monto, Decimal("2885.00"))
 
+    def test_avisa_si_no_tiene_descanso_guardado(self) -> None:
+        with self.sesion() as s:
+            pd.guardar_config(s, fecha_inicio=D(2026, 11, 19))
+        d = self._dialogo()
+        self.assertTrue(d.aviso_descanso.isHidden())
+        with self.sesion() as s:
+            s.get(EmpleadaHorario, "VEND-1").descanso_weekday = None
+            s.commit()
+        d.recargar()
+        self.assertFalse(d.aviso_descanso.isHidden())
+        self.assertIn("descanso fijo no está guardado", d.aviso_descanso.text())
+
     def test_solo_el_dueno(self) -> None:
         with patch.object(QMessageBox, "information") as aviso, patch.object(mp.MiPagoDialog, "exec") as exe:
             self.assertFalse(mp.abrir_mi_pago(None, "VEND-4"))

@@ -46,8 +46,10 @@ EMPLOYEE_CODE = "VEND-1"
 DIAS_DE_PAGO_DEFAULT = (7, 14, 21, 28)
 MONTO_DEFAULT = Decimal("2500.00")
 VALOR_DIA_DEFAULT = Decimal("385.00")
-#: Martes. Si VEND-1 no tiene descanso en su horario, es este.
-DESCANSO_DEFAULT = 1
+#: El descanso del dueño (martes). Vive en su horario del calendario
+#: (`empleada_horario`); este servicio NO lo supone si falta, para no
+#: contradecir al calendario: Mi pago avisa que hay que guardarlo.
+DESCANSO_SUGERIDO = 1
 
 PAGAR = "pagar"
 ACUMULAR = "acumular"
@@ -285,21 +287,10 @@ def calendario_pagos(config: ConfigPagoDueno, hasta: date, desde: date | None = 
     return fechas
 
 
-def _con_descanso(horario: HorarioEmpleada) -> HorarioEmpleada:
-    """Sin descanso configurado, el del dueño es el martes."""
-    if horario.descanso_weekday is None and not horario.descansos_anteriores:
-        return HorarioEmpleada(
-            employee_code=horario.employee_code,
-            descanso_weekday=DESCANSO_DEFAULT,
-            ciclo_dias_pago=horario.ciclo_dias_pago,
-            fecha_ultimo_pago=horario.fecha_ultimo_pago,
-            eventos=horario.eventos,
-            modo_pago=horario.modo_pago,
-            dias_trabajo=horario.dias_trabajo,
-            pagos=horario.pagos,
-            descansos_anteriores=horario.descansos_anteriores,
-        )
-    return horario
+def tiene_descanso(horario: HorarioEmpleada) -> bool:
+    """¿El horario del dueño tiene descanso fijo guardado? Sin él no hay días
+    de más (el calendario tampoco ve ningún día como su descanso)."""
+    return horario.descanso_weekday is not None or bool(horario.descansos_anteriores)
 
 
 def _dias_extra_de_la_semana(
@@ -346,7 +337,7 @@ def _libro(config: ConfigPagoDueno, datos: DatosPagoDueno, hasta: date) -> _Libr
     inicio = config.fecha_inicio
     if inicio is None:
         return _Libro([], set(), set(), [])
-    horario = _con_descanso(datos.horario)
+    horario = datos.horario
     _, fin = _semana_de(max(hasta, inicio))
     extras: list[DiaExtra] = []
     lunes = _semana_de(inicio)[0]
@@ -686,6 +677,17 @@ def deshacer_pago(session, fecha_programada: date, creado_por: str) -> bool:
     session.delete(fila)
     session.commit()
     return True
+
+
+def falta_descanso(session) -> bool:
+    """True si la cuenta está vigente y el dueño no tiene descanso fijo en su
+    horario del calendario: Mi pago lo avisa (sin él no hay días de más)."""
+    from pos_uniformes.services.calendario_empleadas_service import cargar_horario
+
+    config = cargar_config(session)
+    if config is None or not config.vigente:
+        return False
+    return not tiene_descanso(cargar_horario(session, config.employee_code))
 
 
 def es_dia_extra(session, fecha: date) -> bool:
