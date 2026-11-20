@@ -477,6 +477,10 @@ def _pregunta_pagar(config, datos, programada: date, fecha_pago: date, monto: De
                     hoy: date, *, aviso: str = "") -> tuple[str, str]:
     """El segundo paso: qué se va a registrar, con los botones Sí / No."""
     p = pd.desglose_de_pago(config, datos, programada)
+    if monto is not None and monto == p.monto:
+        # «/mepagaron $2,500» con $2,500 calculados es el calculado: así su
+        # «Sí» revisa que no haya cambiado (una falta marcada en medio).
+        monto = None
     calculado = monto is None
     total = p.monto if calculado else monto
     lineas = ([aviso, ""] if aviso else []) + [

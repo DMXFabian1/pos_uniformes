@@ -706,3 +706,20 @@ class NDeMAtrasadoTests(_ConBase):
             self._registrar(f, f)
         _, botones = self._responder("/mepagaron 4 de 4", hoy=D(2026, 12, 2))
         self.assertEqual(_dato(botones, "mp:pagarok:"), "mp:pagarok:20261228:20261202:c2500.00")
+
+
+class MontoIgualAlCalculadoTests(_ConBase):
+    def setUp(self) -> None:
+        super().setUp()
+        self._configurar(JUE_19)
+
+    def test_escribir_el_mismo_monto_es_el_calculado(self) -> None:
+        texto, botones = self._responder("/mepagaron $2,500")
+        self.assertIn("Monto: $2,500 (el calculado)", texto)
+        self.assertNotIn("(el calculado es", texto)
+        dato = _dato(botones, "mp:pagarok:")
+        self.assertEqual(dato, "mp:pagarok:20261121:20261119:c2500.00")
+        self._marcar(D(2026, 11, 20), "falta")
+        aviso, _, _ = self._tocar(dato)
+        self.assertEqual(aviso, "Cambió el monto")
+        self.assertNotIn(D(2026, 11, 21), self._registros())
