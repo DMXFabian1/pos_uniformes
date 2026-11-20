@@ -143,8 +143,23 @@ def lineas_desglose(p: pd.DesglosePago) -> list[str]:
         lineas.append(f"Días de más guardados: {_fechas(guardados)}")
     if p.dias_extra_sin_decidir:
         lineas.append(f"Días de más sin decidir (se guardan): {_fechas(p.dias_extra_sin_decidir)}")
-    lineas.append(f"Total: {pd.dinero_texto(p.monto)}")
+    pagado = monto_de_la_tarjeta(p)
+    if pagado != p.monto:
+        # Lo que de verdad se pagó no es lo calculado (monto editado, o algo
+        # cambió después de registrarlo): se ven las dos cifras.
+        lineas.append(f"Calculado: {pd.dinero_texto(p.monto)}")
+        lineas.append(f"Pagado: {pd.dinero_texto(pagado)}")
+    else:
+        lineas.append(f"Total: {pd.dinero_texto(p.monto)}")
     return lineas
+
+
+def monto_de_la_tarjeta(p: pd.DesglosePago) -> Decimal:
+    """La cifra grande: lo que de verdad se pagó si ya está registrado; si no,
+    lo calculado."""
+    if p.pagado and p.registro is not None:
+        return p.registro.monto
+    return p.monto
 
 
 def texto_resumen(rec: pd.Recordatorio | None) -> str:
@@ -504,7 +519,7 @@ class MiPagoDialog(QDialog):
         estado.setProperty("estado", p.estado(self._hoy))
         fila.addWidget(estado)
         fila.addStretch(1)
-        monto = QLabel(pd.dinero_texto(p.monto))
+        monto = QLabel(pd.dinero_texto(monto_de_la_tarjeta(p)))
         monto.setObjectName("miPagoMonto")
         fila.addWidget(monto)
         ly.addLayout(fila)
@@ -525,6 +540,7 @@ class MiPagoDialog(QDialog):
         botones.addWidget(b)
         ly.addLayout(botones)
         card.boton = b          # para las pruebas
+        card.monto = monto
         return card
 
     def _pintar_extras(self) -> None:

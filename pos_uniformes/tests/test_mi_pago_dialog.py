@@ -146,6 +146,20 @@ class MiPagoDialogTests(unittest.TestCase):
         self.assertTrue(d.deshacer(D(2026, 11, 21)))
         self.assertFalse(d.pagos[0].pagado)
 
+    def test_la_tarjeta_pagada_muestra_lo_que_de_verdad_se_pago(self) -> None:
+        with self.sesion() as s:
+            pd.guardar_config(s, fecha_inicio=D(2026, 11, 19))
+        d = self._dialogo()
+        self.assertTrue(d.registrar(D(2026, 11, 21), D(2026, 11, 19), Decimal("2400")))
+        tarjeta = d._pagos_box.itemAt(0).widget()
+        self.assertEqual(tarjeta.monto.text(), "$2,400")
+        texto = "\n".join(mp.lineas_desglose(d.pagos[0]))
+        self.assertIn("Calculado: $2,500", texto)
+        self.assertIn("Pagado: $2,400", texto)
+        self.assertNotIn("Total:", texto)
+        # Sin pagar: la cifra grande es la calculada.
+        self.assertEqual(d._pagos_box.itemAt(1).widget().monto.text(), "$2,500")
+
     def test_un_pago_futuro_avisa_y_no_se_guarda(self) -> None:
         with self.sesion() as s:
             pd.guardar_config(s, fecha_inicio=D(2026, 11, 19))
