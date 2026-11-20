@@ -526,6 +526,17 @@ class HojaEnElCelularTests(unittest.TestCase):
     """guardar_tallas: se llena como una hoja, se puede corregir, no duplica."""
 
     def setUp(self) -> None:
+        # El caché de nombres por código es del proceso: si otra prueba lo
+        # (o su copia local en disco) dejó «VEND-3», «Ana López (VEND-3)» salía recortado según el
+        # orden en que xdist repartía las pruebas (2026-11-20).
+        from unittest.mock import patch
+
+        from pos_uniformes.services import nombres_empleadas_service as nombres
+
+        for parche in (patch.object(nombres, "_cache", {}),
+                       patch.object(nombres, "_leer_local", return_value={})):
+            parche.start()
+            self.addCleanup(parche.stop)
         self.engine = create_engine("sqlite:///:memory:")
         Base.metadata.create_all(self.engine)
         self.s = Session(self.engine)
