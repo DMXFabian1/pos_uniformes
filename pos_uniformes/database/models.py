@@ -2808,6 +2808,71 @@ class EmpleadaPago(Base):
     )
 
 
+class PagoDuenoConfig(Base):
+    """Cómo se le paga al dueño (VEND-1): una sola fila (2026-11-19).
+
+    Su papá le da `monto_por_pago` en las fechas `dias_de_pago` de cada mes
+    ([7, 14, 21, 28] = «1 de 4» … «4 de 4»). `valor_dia` es lo que vale un día
+    de más o una falta. Es solo la cuenta: no sale del cajón ni toca el corte.
+    Sin fila, o con `activo` en False, no aparece nada en ningún lado.
+    """
+
+    __tablename__ = "pago_dueno_config"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_code: Mapped[str] = mapped_column(String(40), nullable=False, default="VEND-1", server_default="VEND-1")
+    monto_por_pago: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("2500.00"), server_default="2500")
+    valor_dia: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("385.00"), server_default="385")
+    dias_de_pago: Mapped[list] = mapped_column(JSON().with_variant(JSONB(), "postgresql"), nullable=False)
+    # Desde qué día cuenta: los pagos y las marcas de antes no existen.
+    fecha_inicio: Mapped[date | None] = mapped_column(Date)
+    activo: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class PagoDuenoRegistro(Base):
+    """Un pago del dueño que ya le hicieron (lo marca él: fecha real y monto).
+
+    `fecha_programada` es la fecha fija del calendario (p.ej. el 14) y
+    `fecha_pago` el día en que de verdad le pagaron. `desglose` guarda cómo
+    se calculó en ese momento, para que un pago viejo se siga entendiendo.
+    """
+
+    __tablename__ = "pago_dueno_registro"
+    __table_args__ = (
+        UniqueConstraint("fecha_programada", name="uq_pago_dueno_registro_fecha_programada"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    fecha_programada: Mapped[date] = mapped_column(Date, nullable=False)
+    fecha_pago: Mapped[date] = mapped_column(Date, nullable=False)
+    monto: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    desglose: Mapped[dict | None] = mapped_column(JSON().with_variant(JSONB(), "postgresql"))
+    creado_por: Mapped[str] = mapped_column(String(40), nullable=False, default="", server_default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class PagoDuenoDiaExtra(Base):
+    """Qué se hace con un día de más del dueño: «pagar» (suma un día al pago
+    de ese periodo) o «acumular» (un día a favor para cubrir una falta).
+    Un día de más sin fila cuenta como acumulado y se muestra «sin decidir»."""
+
+    __tablename__ = "pago_dueno_dia_extra"
+    __table_args__ = (
+        CheckConstraint("destino IN ('pagar', 'acumular')", name="pago_dueno_dia_extra_destino_valido"),
+    )
+
+    fecha: Mapped[date] = mapped_column(Date, primary_key=True)
+    destino: Mapped[str] = mapped_column(String(20), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class AfluenciaHora(Base):
     """Personas que entran (y pasan por fuera) por cámara y hora.
 
