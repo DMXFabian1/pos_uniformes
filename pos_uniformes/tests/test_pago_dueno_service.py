@@ -184,6 +184,27 @@ class MontoTests(unittest.TestCase):
         self.assertEqual(p.monto, Decimal("2500.00"))
         self.assertEqual(pd.dias_extra(_config(), datos, D(2026, 11, 30)), [])
 
+    def test_descanso_movido_antes_del_inicio_compensa_el_martes(self) -> None:
+        # La cuenta arranca el martes 17; el lunes 16 (antes del inicio) movió
+        # su descanso y el martes 17 quedó "trabajo (descanso movido)". La
+        # semana se cuenta completa, de lunes a domingo: no es día de más.
+        config = _config(D(2026, 11, 17))
+        datos = _datos(
+            {D(2026, 11, 16): DESCANSO, D(2026, 11, 17): TRABAJO},
+            notas={D(2026, 11, 17): "descanso movido al 16/11"},
+            decisiones={D(2026, 11, 17): PAGAR},
+        )
+        self.assertEqual(pd.dias_extra(config, datos, D(2026, 11, 30)), [])
+        self.assertEqual(pd.desglose_de_pago(config, datos, D(2026, 11, 21)).monto, Decimal("2500.00"))
+        self.assertEqual(pd.dias_a_favor(config, datos, D(2026, 11, 30)), 0)
+
+    def test_martes_trabajado_antes_del_inicio_no_cuenta(self) -> None:
+        # Inicio el miércoles 18: el martes 17 trabajado queda fuera aunque la
+        # semana se cuente completa.
+        config = _config(D(2026, 11, 18))
+        datos = _datos({D(2026, 11, 17): TRABAJO}, decisiones={D(2026, 11, 17): PAGAR})
+        self.assertEqual(pd.dias_extra(config, datos, D(2026, 11, 30)), [])
+
     def test_trabajo_en_dia_normal_no_es_dia_de_mas(self) -> None:
         datos = _datos({D(2026, 11, 11): TRABAJO})
         self.assertEqual(pd.dias_extra(_config(), datos, D(2026, 11, 30)), [])

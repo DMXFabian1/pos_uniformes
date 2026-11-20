@@ -307,14 +307,17 @@ def _dias_extra_de_la_semana(
 ) -> list[date]:
     """Las fechas de los días de más de una semana (lunes a domingo).
 
-    Cuántos: `dias_extra_en_rango` (trabajos en el descanso fijo menos
-    descansos tomados en otro día). Cuáles: primero los trabajos en el fijo
-    que NO son «descanso movido» (esos los compensa el descanso que se movió)."""
+    Cuántos: `dias_extra_en_rango` de la semana COMPLETA (trabajos en el
+    descanso fijo menos descansos tomados en otro día), aunque el inicio de la
+    cuenta caiga a media semana: un descanso movido a un día anterior al
+    inicio sigue compensando el fijo de esa semana. Solo cuentan los que caen
+    desde el inicio. Cuáles: primero los trabajos en el fijo que NO son
+    «descanso movido» (esos los compensa el descanso que se movió)."""
     desde = max(lunes, inicio)
     domingo = lunes + timedelta(days=6)
     if desde > domingo:
         return []
-    cuantos = dias_extra_en_rango(horario, desde, domingo)
+    cuantos = dias_extra_en_rango(horario, lunes, domingo)
     if cuantos <= 0:
         return []
     candidatos = sorted(
