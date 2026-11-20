@@ -711,6 +711,38 @@ def decidir_dia_extra(session, fecha: date, destino: str) -> None:
     session.commit()
 
 
+def limpiar_decisiones_huerfanas(session) -> int:
+    """Borra la decisión de los días que ya NO son de más (se quitó la marca,
+    se volvió falta o se movió el descanso esa semana). Sin esto, si el día se
+    volvía a marcar desde otra pantalla, revivía un «págamelo» viejo y movía
+    el monto sin que nadie lo decidiera. Devuelve cuántas borró. Hace commit
+    solo si borró algo. Sin cuenta vigente no toca nada."""
+    from pos_uniformes.database.models import PagoDuenoDiaExtra
+
+    config = cargar_config(session)
+    if config is None or not config.vigente:
+        return 0
+    filas = session.query(PagoDuenoDiaExtra).all()
+    if not filas:
+        return 0
+    hasta = max(f.fecha for f in filas)
+    vigentes = {e.fecha for e in dias_extra(config, cargar_datos(session, config), hasta)}
+    huerfanas = [f for f in filas if f.fecha not in vigentes]
+    for fila in huerfanas:
+        session.delete(fila)
+    if huerfanas:
+        session.commit()
+    return len(huerfanas)
+
+
+def decision_dia_extra(session, fecha: date) -> str | None:
+    """'pagar' / 'acumular' si ya se decidió ese día, None si no."""
+    from pos_uniformes.database.models import PagoDuenoDiaExtra
+
+    fila = session.get(PagoDuenoDiaExtra, fecha)
+    return fila.destino if fila is not None and fila.destino in DESTINOS else None
+
+
 def lista_dias_extra(session, hasta: date | None = None) -> list[DiaExtra]:
     """Los días de más desde el inicio de la cuenta hasta `hasta` (hoy)."""
     config = cargar_config(session)

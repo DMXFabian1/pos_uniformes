@@ -557,6 +557,44 @@ class DiasExtraDbTests(_ConBase):
         self.assertEqual(p.faltas_cubiertas, [D(2026, 11, 27)])
         self.assertEqual(p.monto, Decimal("2500.00"))
 
+    def test_quitar_la_marca_no_deja_basura(self) -> None:
+        """Se quita «Sí trabajó» y luego se vuelve a marcar desde otra pantalla:
+        el «págamelo» viejo no revive (no mueve el monto sin que nadie lo decida)."""
+        self._configurar()
+        from pos_uniformes.services.calendario_empleadas_service import marcar_dia, quitar_marca
+
+        marcar_dia(self.s, "VEND-1", D(2026, 11, 24), TRABAJO, actor="VEND-1")
+        pd.decidir_dia_extra(self.s, D(2026, 11, 24), PAGAR)
+        self.assertEqual(pd.decision_dia_extra(self.s, D(2026, 11, 24)), PAGAR)
+        quitar_marca(self.s, "VEND-1", D(2026, 11, 24), actor="VEND-1")
+        self.assertEqual(pd.limpiar_decisiones_huerfanas(self.s), 1)
+        self.assertIsNone(pd.decision_dia_extra(self.s, D(2026, 11, 24)))
+        self.assertEqual(pd.pagos_del_mes_db(self.s, 2026, 11)[-1].monto, Decimal("2500.00"))
+        marcar_dia(self.s, "VEND-1", D(2026, 11, 24), TRABAJO, actor="ENC-1")
+        p = pd.pagos_del_mes_db(self.s, 2026, 11)[-1]
+        self.assertEqual(p.monto, Decimal("2500.00"))
+        self.assertEqual(p.dias_extra_sin_decidir, [D(2026, 11, 24)])
+
+    def test_limpiar_respeta_las_decisiones_vigentes(self) -> None:
+        self._configurar()
+        self._marcar(D(2026, 11, 24), TRABAJO)
+        pd.decidir_dia_extra(self.s, D(2026, 11, 24), ACUMULAR)
+        self.assertEqual(pd.limpiar_decisiones_huerfanas(self.s), 0)
+        self.assertEqual(pd.decision_dia_extra(self.s, D(2026, 11, 24)), ACUMULAR)
+
+    def test_descanso_movido_despues_borra_la_decision(self) -> None:
+        self._configurar()
+        from pos_uniformes.services.calendario_empleadas_service import marcar_dia
+
+        marcar_dia(self.s, "VEND-1", D(2026, 11, 24), TRABAJO, actor="VEND-1")
+        pd.decidir_dia_extra(self.s, D(2026, 11, 24), PAGAR)
+        marcar_dia(self.s, "VEND-1", D(2026, 11, 26), DESCANSO, actor="VEND-1")   # descansó el jueves
+        self.assertEqual(pd.limpiar_decisiones_huerfanas(self.s), 1)
+        self.assertEqual(pd.pagos_del_mes_db(self.s, 2026, 11)[-1].monto, Decimal("2500.00"))
+
+    def test_limpiar_sin_cuenta_no_toca_nada(self) -> None:
+        self.assertEqual(pd.limpiar_decisiones_huerfanas(self.s), 0)
+
     def test_las_empleadas_no_cambian(self) -> None:
         self._configurar()
         from pos_uniformes.database.models import EmpleadaPago
