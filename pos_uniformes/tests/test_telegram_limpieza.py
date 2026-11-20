@@ -292,15 +292,26 @@ class TocarElMenuNoLoDeshaceTests(unittest.TestCase):
         with patch.object(bot, "atender_toque", return_value=("", "Cortes", "{}")), \
              patch.object(telegram_service, "responder_toque"), \
              patch.object(telegram_service, "editar_mensaje") as editar, \
-             patch.object(telegram_service, "enviar_mensaje") as enviar:
+             patch.object(telegram_service, "enviar_y_dar_id", return_value=self.siguiente) as enviar, \
+             patch.object(telegram_service, "borrar_con_motivo", return_value="ok"):
             bot._atender_toque(toque, session_factory=None, token="t", chat_id="c")
         return editar, enviar
+
+    siguiente = 90
 
     def test_el_menu_fijado_contesta_en_un_mensaje_nuevo(self) -> None:
         limpieza.recordar_menu(42)
         editar, enviar = self._tocar(42)
         editar.assert_not_called()
         enviar.assert_called_once()
+
+    def test_el_segundo_toque_reescribe_la_misma_pantalla(self) -> None:
+        """Una sola pantalla (2026-11-20): antes cada toque dejaba un mensaje."""
+        limpieza.recordar_menu(42)
+        self._tocar(42)
+        editar, enviar = self._tocar(42)
+        enviar.assert_not_called()
+        self.assertEqual(editar.call_args.args[0], 90)
 
     def test_cualquier_otro_mensaje_se_sigue_reescribiendo(self) -> None:
         """La lista de cortes se actualiza en su lugar, como siempre."""

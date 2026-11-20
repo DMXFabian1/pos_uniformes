@@ -267,6 +267,54 @@ def anotar_huella_del_menu(texto: str) -> None:
     _modificar(lambda datos: datos.__setitem__("menu_huella", huella))
 
 
+# ── La pantalla de trabajo ───────────────────────────────────────────────────
+#
+# Daniel (2026-11-20): «una sola pantalla». Las consultas (/hoy, Caja, Pagos…)
+# ya no dejan cada una su mensaje: se reescribe siempre el mismo, abajo del
+# chat, y el comando de Daniel se borra al contestar. Si después salió otro
+# mensaje (una alerta, un corte), la pantalla quedó «tapada»: editarla no se
+# vería, así que la siguiente consulta manda una nueva y quita la vieja.
+
+
+def pantalla() -> tuple[int, str, bool]:
+    """(id, día ISO, tapada) de la pantalla de trabajo; id 0 si no hay."""
+    datos = _leer_o_vacio()
+    return (
+        int(datos.get("pantalla_id") or 0),
+        str(datos.get("pantalla_dia") or ""),
+        bool(datos.get("pantalla_tapada")),
+    )
+
+
+def recordar_pantalla(message_id: int, dia: str) -> None:
+    def _cambio(datos: dict) -> None:
+        datos["pantalla_id"] = int(message_id or 0)
+        datos["pantalla_dia"] = str(dia or "")
+        datos["pantalla_tapada"] = False
+
+    _modificar(_cambio)
+
+
+def tapar_pantalla(message_id: int = 0) -> None:
+    """Salió otro mensaje abajo de la pantalla: ya no se ve al editarla."""
+    mid = int(message_id or 0)
+
+    def _cambio(datos: dict) -> None:
+        pid = int(datos.get("pantalla_id") or 0)
+        if pid and mid != pid and not datos.get("pantalla_tapada"):
+            datos["pantalla_tapada"] = True
+
+    _modificar(_cambio)
+
+
+def olvidar(message_id: int) -> None:
+    """Ya se borró a mano (el comando de Daniel al contestarle): fuera de la lista."""
+    mid = int(message_id or 0)
+    _modificar(lambda datos: datos.__setitem__(
+        "mensajes", [m for m in datos.get("mensajes", []) if int(m.get("id") or 0) != mid]
+    ))
+
+
 # ── El barrido ───────────────────────────────────────────────────────────────
 
 #: Lo conservado (alertas, cortes, resúmenes) vive esto, contado desde que

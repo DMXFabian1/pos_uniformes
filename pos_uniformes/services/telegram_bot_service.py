@@ -1261,15 +1261,74 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
                 if not respuesta:
                     continue
             try:
-                telegram_service.enviar_mensaje(
-                    respuesta, token=token, chat_id=chat_id, botones=botones or None
-                )
+                if es_rezago or trae_foto:
+                    telegram_service.enviar_mensaje(
+                        respuesta, token=token, chat_id=chat_id, botones=botones or None
+                    )
+                else:
+                    # Una sola pantalla (Daniel, 2026-11-20): la respuesta
+                    # reescribe la pantalla de trabajo y el comando se quita.
+                    mostrar_en_pantalla(respuesta, botones, token=token, chat_id=chat_id)
+                    _quitar_comando(msg, token=token, chat_id=chat_id)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("No se pudo responder: %s", exc)
             finally:
                 _guardar_offset(offset)
         if una_vez:
             return
+
+
+def mostrar_en_pantalla(texto: str, botones: str = "", *, token: str, chat_id: str,
+                       nueva: bool = False) -> int:
+    """Pone `texto` en la pantalla de trabajo: la reescribe si es de hoy y sigue
+    hasta abajo; si no, manda una nueva y quita la anterior. Devuelve su id.
+
+    Lo que no cabe en un mensaje sale como siempre, partido (no se puede
+    editar en dos). `nueva=True` obliga a mandar otra (un botón de dinero
+    tiene que nacer con la fecha de hoy)."""
+    from datetime import date
+
+    from pos_uniformes.services import telegram_limpieza_service as limpieza
+    from pos_uniformes.services import telegram_service
+
+    if len(texto or "") > telegram_service._MAX:
+        telegram_service.enviar_mensaje(texto, token=token, chat_id=chat_id, botones=botones or None)
+        return 0
+    hoy = date.today().isoformat()
+    pid, dia, tapada = limpieza.pantalla()
+    if pid and dia == hoy and not tapada and not nueva:
+        try:
+            telegram_service.editar_mensaje(pid, texto, token=token, chat_id=chat_id, botones=botones or None)
+            return pid
+        except Exception as exc:  # noqa: BLE001
+            if not telegram_service.es_respuesta_de_telegram(exc):
+                raise                      # sin red: tampoco saldría una nueva
+            if "not modified" in str(exc):
+                return pid
+            # La borró a mano o ya no se puede editar: se manda otra.
+    mid = telegram_service.enviar_y_dar_id(texto, token=token, chat_id=chat_id, botones=botones or None)
+    if mid:
+        limpieza.recordar_pantalla(mid, hoy)
+        if pid and pid != mid and pid != limpieza.menu_fijado():
+            if telegram_service.borrar_con_motivo(pid, token=token, chat_id=chat_id) == "ok":
+                limpieza.olvidar(pid)
+    return mid
+
+
+def _quitar_comando(msg: dict, *, token: str, chat_id: str) -> None:
+    """Borra el comando que escribió Daniel, ya contestado. Si no se pudo, se
+    queda apuntado y se va con el barrido."""
+    from pos_uniformes.services import telegram_limpieza_service as limpieza
+    from pos_uniformes.services import telegram_service
+
+    mid = int(msg.get("message_id") or 0)
+    if mid <= 0:
+        return
+    try:
+        if telegram_service.borrar_con_motivo(mid, token=token, chat_id=chat_id) == "ok":
+            limpieza.olvidar(mid)
+    except Exception:  # noqa: BLE001 — se queda para el barrido
+        logger.debug("No se pudo quitar el comando", exc_info=True)
 
 
 _LLAVES_DE_SERVICIO = (
@@ -1448,10 +1507,13 @@ def _atender_toque(toque: dict, *, session_factory, token: str, chat_id: str) ->
         if es_el_menu or nace_vencido:
             # El menú fijado se queda siendo el menú. Si se reescribiera, al
             # primer toque el tablero de arriba se convertiría en una lista de
-            # cortes y ya no habría de dónde salir (2026-10-08).
+            # cortes y ya no habría de dónde salir (2026-10-08). Lo que se
+            # abre desde él va a la pantalla de trabajo (2026-11-20): antes
+            # cada toque dejaba un mensaje nuevo.
             try:
-                telegram_service.enviar_mensaje(
-                    resultado[1], token=token, chat_id=chat_id, botones=resultado[2] or None
+                mostrar_en_pantalla(
+                    resultado[1], resultado[2] or "", token=token, chat_id=chat_id,
+                    nueva=nace_vencido,
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.warning("No se pudo responder al menú: %s", exc)

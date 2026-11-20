@@ -272,3 +272,93 @@ class ElKioskoMandaPorLaColaTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UnaSolaPantallaTests(_ConArchivo):
+    """Daniel (2026-11-20): «una sola pantalla». Las consultas reescriben la
+    misma pantalla de trabajo y el comando se borra al contestar."""
+
+    def _mostrar(self, texto="Caja", *, nuevo_id=90, editar=None, nueva=False):
+        from pos_uniformes.services import telegram_bot_service as bot
+        from pos_uniformes.services import telegram_service
+
+        with patch.object(telegram_service, "editar_mensaje", side_effect=editar) as ed, \
+                patch.object(telegram_service, "enviar_y_dar_id", return_value=nuevo_id) as env, \
+                patch.object(telegram_service, "enviar_mensaje") as largo, \
+                patch.object(telegram_service, "borrar_con_motivo", return_value="ok") as borrar:
+            mid = bot.mostrar_en_pantalla(texto, "", token="t", chat_id="c", nueva=nueva)
+        return mid, ed, env, largo, borrar
+
+    def test_la_primera_consulta_manda_y_la_segunda_reescribe(self) -> None:
+        mid, _, env, _, _ = self._mostrar("Caja")
+        self.assertEqual(mid, 90)
+        env.assert_called_once()
+        mid, ed, env, _, _ = self._mostrar("Pagos")
+        self.assertEqual(mid, 90)
+        env.assert_not_called()
+        self.assertEqual(ed.call_args.args[:2], (90, "Pagos"))
+
+    def test_si_salio_otro_mensaje_abajo_manda_una_nueva_y_quita_la_vieja(self) -> None:
+        self._mostrar("Caja")
+        limpieza.tapar_pantalla(95)                # llegó una alerta
+        mid, ed, env, _, borrar = self._mostrar("Pagos", nuevo_id=96)
+        self.assertEqual(mid, 96)
+        ed.assert_not_called()
+        borrar.assert_called_once_with(90, token="t", chat_id="c")
+        self.assertEqual(limpieza.pantalla(), (96, limpieza.pantalla()[1], False))
+
+    def test_la_pantalla_de_ayer_no_se_reescribe(self) -> None:
+        limpieza.recordar_pantalla(80, "2026-01-01")
+        mid, ed, env, _, _ = self._mostrar("Caja")
+        ed.assert_not_called()
+        self.assertEqual(mid, 90)
+
+    def test_si_la_borraron_a_mano_manda_otra(self) -> None:
+        self._mostrar("Caja")
+        no_existe = RuntimeError("Telegram respondió: Bad Request: message to edit not found")
+        mid, _, env, _, _ = self._mostrar("Pagos", nuevo_id=91, editar=no_existe)
+        self.assertEqual(mid, 91)
+
+    def test_sin_red_no_manda_otra(self) -> None:
+        self._mostrar("Caja")
+        with self.assertRaises(OSError):
+            self._mostrar("Pagos", editar=OSError("timeout"))
+        self.assertEqual(limpieza.pantalla()[0], 90)
+
+    def test_lo_que_no_cabe_sale_partido_como_siempre(self) -> None:
+        mid, ed, env, largo, _ = self._mostrar("x" * 5000)
+        largo.assert_called_once()
+        env.assert_not_called()
+        self.assertEqual(mid, 0)
+
+    def test_un_boton_de_dinero_de_ayer_nace_en_un_mensaje_nuevo(self) -> None:
+        self._mostrar("Caja")
+        mid, ed, env, _, _ = self._mostrar("¿Registro este pago?", nuevo_id=92, nueva=True)
+        ed.assert_not_called()
+        self.assertEqual(mid, 92)
+
+    def test_el_comando_de_daniel_se_borra_y_sale_de_la_lista(self) -> None:
+        from pos_uniformes.services import telegram_bot_service as bot
+        from pos_uniformes.services import telegram_service
+
+        limpieza.anotar(55)
+        with patch.object(telegram_service, "borrar_con_motivo", return_value="ok") as borrar:
+            bot._quitar_comando({"message_id": 55}, token="t", chat_id="c")
+        borrar.assert_called_once_with(55, token="t", chat_id="c")
+        self.assertEqual(self._ids(), [])
+
+    def test_si_no_se_pudo_borrar_el_comando_se_queda_para_el_barrido(self) -> None:
+        from pos_uniformes.services import telegram_bot_service as bot
+        from pos_uniformes.services import telegram_service
+
+        limpieza.anotar(55)
+        with patch.object(telegram_service, "borrar_con_motivo", return_value="red"):
+            bot._quitar_comando({"message_id": 55}, token="t", chat_id="c")
+        self.assertEqual(self._ids(), [55])
+
+    def test_mandar_cualquier_aviso_tapa_la_pantalla(self) -> None:
+        from pos_uniformes.services import telegram_service
+
+        limpieza.recordar_pantalla(90, "2026-11-20")
+        telegram_service._anotar_para_barrer(respuesta={"result": {"message_id": 91}})
+        self.assertTrue(limpieza.pantalla()[2])

@@ -616,7 +616,7 @@ class BotonDeOtroDiaTests(_ConBase):
                  "message": {"chat": {"id": "123"}, "message_id": 5, "date": int(ayer.timestamp())}}
         with patch("pos_uniformes.services.telegram_service.responder_toque"), \
              patch("pos_uniformes.services.telegram_service.editar_mensaje") as editar, \
-             patch("pos_uniformes.services.telegram_service.enviar_mensaje") as enviar, \
+             patch("pos_uniformes.services.telegram_service.enviar_y_dar_id", return_value=7) as enviar, \
              patch("pos_uniformes.services.telegram_limpieza_service.menu_fijado", return_value=0), \
              patch.object(bot, "atender_toque", return_value=resultado):
             bot._atender_toque(toque, session_factory=self.factory, token="t", chat_id="123")

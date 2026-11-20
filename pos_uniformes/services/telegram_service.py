@@ -323,6 +323,19 @@ def enviar_mensaje(
     return enviados
 
 
+def enviar_y_dar_id(
+    texto: str, *, token: str | None = None, chat_id: str | None = None, botones: str | None = None,
+) -> int:
+    """Manda UN mensaje (cabe en uno) y devuelve su id, apuntado para el barrido."""
+    token, chat_id = _credenciales(token, chat_id)
+    datos = {"chat_id": chat_id, "text": recortar_para_editar(texto), "disable_web_page_preview": "true"}
+    if botones:
+        datos["reply_markup"] = botones
+    respuesta = _llamar(token, "sendMessage", datos)
+    _anotar_para_barrer(respuesta=respuesta)
+    return int(((respuesta or {}).get("result") or {}).get("message_id") or 0)
+
+
 def _es_kiosko() -> bool:
     """¿Corre como el programa del kiosko (.exe)?
 
@@ -359,6 +372,8 @@ def _anotar_para_barrer(respuesta: dict, *, conservar: bool = False) -> None:
             from pos_uniformes.services import telegram_limpieza_service as limpieza
 
             limpieza.anotar(mid, conservar=conservar)
+            # Cualquier mensaje nuevo queda abajo de la pantalla de trabajo.
+            limpieza.tapar_pantalla(mid)
     except Exception:  # noqa: BLE001 — no poder apuntarlo no impide mandarlo
         pass
 
