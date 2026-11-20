@@ -1744,6 +1744,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self.libreta_caja_menu.addAction(texto_menu).triggered.connect(
                 lambda _c=False, b=boton_viejo: b.click()
             )
+        self.libreta_caja_menu.addAction("💼  Mi pago").triggered.connect(lambda _c=False: self._abrir_mi_pago())
         self.libreta_caja_menu.addSeparator()
         self.libreta_caja_menu.addAction("🎯  Meta semanal…").triggered.connect(
             lambda _c=False: self._libreta_pedir_meta()
@@ -4471,6 +4472,13 @@ class QuoteSatelliteWindow(QMainWindow):
 
         EquipoDialog(self).exec()
         self._refresh_libreta_view()
+
+    def _abrir_mi_pago(self) -> None:
+        """La cuenta del pago del dueño (solo VEND-1; no toca el cajón)."""
+        from pos_uniformes.ui.dialogs.mi_pago_dialog import abrir_mi_pago
+
+        if self._libreta_is_owner:
+            abrir_mi_pago(self, self._libreta_code)
 
     def _abrir_historial_pagos(self) -> None:
         """Historial de pagos a empleadas con desglose y totales (solo dueño)."""

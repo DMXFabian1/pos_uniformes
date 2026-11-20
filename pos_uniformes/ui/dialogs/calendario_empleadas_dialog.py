@@ -729,6 +729,7 @@ class CalendarioEmpleadasDialog(QDialog):
                 s, self._codigo_activo(), fecha, tipo, actor=self._code, origen="calendario"
             )
         ):
+            self._cuenta_del_dueno(fecha, tipo)
             self._recargar()
 
     def _quitar(self) -> None:
@@ -736,7 +737,15 @@ class CalendarioEmpleadasDialog(QDialog):
         if self._con_sesion(lambda s: quitar_marca(
             s, self._codigo_activo(), fecha, actor=self._code, origen="calendario"
         )):
+            self._cuenta_del_dueno(fecha, None)
             self._recargar()
+
+    def _cuenta_del_dueno(self, fecha: date, tipo: str | None) -> None:
+        """Si el día es del dueño: «¿Te lo pagamos o te lo guardamos?» (💼 Mi pago)."""
+        if self._is_owner and self._codigo_activo().upper() == "VEND-1":
+            from pos_uniformes.ui.dialogs.mi_pago_dialog import despues_de_marcar_dueno
+
+            despues_de_marcar_dueno(self, fecha, tipo or "")
 
     def _pagar(self) -> None:
         """Pago con monto calculado (1300 + 2/comisión − faltas) y desglose."""

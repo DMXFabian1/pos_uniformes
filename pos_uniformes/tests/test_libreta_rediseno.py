@@ -120,8 +120,8 @@ class LibretaDelDuenoTests(unittest.TestCase):
     def test_lo_de_caja_va_en_un_menu_y_dispara_lo_de_siempre(self) -> None:
         win = self._ventana()
         textos = [a.text() for a in win.libreta_caja_menu.actions() if a.text()]
-        self.assertEqual(len(textos), 7)
-        for palabra in ("retiro", "Cortes", "Pagos", "Equipo", "Caja y nómina", "Meta semanal", "Descuento de empleadas"):
+        self.assertEqual(len(textos), 8)
+        for palabra in ("retiro", "Cortes", "Pagos", "Equipo", "Caja y nómina", "Mi pago", "Meta semanal", "Descuento de empleadas"):
             self.assertTrue(any(palabra in t for t in textos), palabra)
         self.assertFalse(win.libreta_caja_menu_button.isHidden())
         self.assertFalse(win.libreta_print_button.isHidden())
@@ -132,6 +132,13 @@ class LibretaDelDuenoTests(unittest.TestCase):
                 accion.trigger()
             clic.assert_called_once()
         del abrir
+
+    def test_mi_pago_se_abre_desde_el_menu(self) -> None:
+        win = self._ventana()
+        accion = next(a for a in win.libreta_caja_menu.actions() if "Mi pago" in a.text())
+        with patch("pos_uniformes.ui.dialogs.mi_pago_dialog.abrir_mi_pago") as abrir:
+            accion.trigger()
+        abrir.assert_called_once_with(win, win._libreta_code)
 
     def test_la_meta_se_cambia_desde_el_menu(self) -> None:
         win = self._ventana()
