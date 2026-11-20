@@ -382,11 +382,14 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
         except ValueError as exc:
             return str(exc)
         with session_factory() as session:
-            mensaje = hacer_corte_y_avisar(
+            hecho = hacer_corte_y_avisar(
                 session, creado_por=CODIGO_REMOTO,
                 retirar=opciones.retirar, sin_tarjeta=opciones.sin_tarjeta,
                 fondo=opciones.fondo, otros=opciones.otros, nota=opciones.nota,
-            ).mensaje
+            )
+        mensaje = hecho.mensaje
+        if hecho.hecho:
+            _retirar_propuesta_del_corte()
         # El aviso va DESPUÉS y no cancela nada: el corte ya se hizo y hay que
         # decir lo que se guardó, no tragárselo.
         return mensaje + ("\n\n⚠️ " + opciones.aviso if opciones.aviso else "")
@@ -1265,6 +1268,14 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
                     telegram_service.enviar_mensaje(
                         respuesta, token=token, chat_id=chat_id, botones=botones or None
                     )
+                elif _es_comando_de_corte(texto):
+                    # El corte es el registro del día: se conserva hasta el
+                    # día siguiente y no lo pisa la siguiente consulta.
+                    telegram_service.enviar_mensaje(
+                        respuesta, token=token, chat_id=chat_id,
+                        botones=botones or None, conservar=True,
+                    )
+                    _quitar_comando(msg, token=token, chat_id=chat_id)
                 else:
                     # Una sola pantalla (Daniel, 2026-11-20): la respuesta
                     # reescribe la pantalla de trabajo y el comando se quita.
@@ -1504,6 +1515,11 @@ def _atender_toque(toque: dict, *, session_factory, token: str, chat_id: str) ->
         # ese mensaje conservaba su fecha de ayer y su «Sí» nacía vencido
         # (revisión 2026-11-19). Va en un mensaje nuevo, con la fecha de hoy.
         nace_vencido = bool(_dia_de_otro_dia(msg.get("date"))) and _lleva_boton_de_dinero(resultado[2])
+        if dato.startswith("cc:") and resultado[0] == "Corte hecho":
+            _corte_hecho_en_un_mensaje(
+                tocado, resultado[1], es_el_menu=es_el_menu, token=token, chat_id=chat_id
+            )
+            return
         if es_el_menu or nace_vencido:
             # El menú fijado se queda siendo el menú. Si se reescribiera, al
             # primer toque el tablero de arriba se convertiría en una lista de
@@ -1524,6 +1540,74 @@ def _atender_toque(toque: dict, *, session_factory, token: str, chat_id: str) ->
             )
         except Exception as exc:  # noqa: BLE001
             logger.warning("No se pudo actualizar la lista: %s", exc)
+
+
+def _es_comando_de_corte(texto: str) -> bool:
+    cmd = parsear(texto or "")
+    return cmd is not None and cmd.nombre == "corte"
+
+
+def _retirar_propuesta_del_corte(*, salvo: int = 0) -> None:
+    """El corte ya se hizo: la propuesta de la tarde (con sus botones) sale
+    del chat. Sin red se queda y la quita el barrido."""
+    try:
+        from pos_uniformes.services import corte_propuesta_service as cps
+
+        cps.retirar_mensaje(salvo=salvo)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("No se pudo quitar la propuesta del corte: %s", exc)
+
+
+def _corte_hecho_en_un_mensaje(tocado: int, texto: str, *, es_el_menu: bool,
+                               token: str, chat_id: str) -> None:
+    """Un solo mensaje del corte (Daniel, 2026-11-20).
+
+    - Se tocó la propuesta: ella misma se reescribe con «✅ corte hecho».
+    - Se tocó otro mensaje (la pantalla, el menú): el corte sale en un
+      mensaje nuevo que se conserva, el de los botones se quita (salvo el
+      menú) y la propuesta, si estaba, también.
+    """
+    from pos_uniformes.services import corte_propuesta_service as cps
+    from pos_uniformes.services import telegram_limpieza_service as limpieza
+    from pos_uniformes.services import telegram_service
+
+    try:
+        propuesta = cps.mensaje_de_hoy()
+    except Exception:  # noqa: BLE001
+        propuesta = 0
+    if propuesta and tocado == propuesta:
+        try:
+            telegram_service.editar_mensaje(tocado, texto, token=token, chat_id=chat_id, botones="")
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("No se pudo reescribir la propuesta del corte: %s", exc)
+        return
+    try:
+        telegram_service.enviar_mensaje(texto, token=token, chat_id=chat_id, conservar=True)
+    except Exception as exc:  # noqa: BLE001
+        # Sin red: al menos el mensaje tocado dice el resultado.
+        logger.warning("No se pudo mandar el corte: %s", exc)
+        if not es_el_menu:
+            try:
+                telegram_service.editar_mensaje(tocado, texto, token=token, chat_id=chat_id, botones="")
+            except Exception:  # noqa: BLE001
+                pass
+        return
+    _retirar_propuesta_del_corte()
+    if es_el_menu:
+        return
+    motivo = telegram_service.borrar_con_motivo(tocado, token=token, chat_id=chat_id)
+    if motivo == "ok":
+        limpieza.olvidar(tocado)
+        if limpieza.pantalla()[0] == tocado:
+            limpieza.recordar_pantalla(0, "")
+    else:
+        # No se pudo borrar: que al menos ya no tenga los botones del corte.
+        try:
+            telegram_service.editar_mensaje(
+                tocado, "✅ Corte hecho (el detalle está abajo).", token=token, chat_id=chat_id, botones=""
+            )
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def asegurar_menu_fijado(*, session_factory, token: str, chat_id: str) -> int:

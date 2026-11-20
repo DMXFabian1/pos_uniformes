@@ -267,6 +267,7 @@ def hacer_corte_y_avisar(
         session, creado_por=creado_por, ahora=ahora, retirar=retirar,
         fondo_final=fondo, otros_retiros=otros or Decimal("0.00"),
         nota=nota or None,
+        avisar=False,      # el mensaje de este corte ya es el aviso (2026-11-20)
     )
     if sin_tarjeta:
         from pos_uniformes.services.libreta_service import marcar_privadas_del_periodo

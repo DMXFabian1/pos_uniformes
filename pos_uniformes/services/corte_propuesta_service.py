@@ -38,6 +38,9 @@ class Propuesta:
     momento: datetime | None = None
     recordado: bool = False
     cancelado: bool = False
+    #: El mensaje de Telegram de la propuesta (o del recordatorio, que la
+    #: reemplaza): el corte de la tarde vive en UN mensaje (2026-11-20).
+    message_id: int = 0
 
     @property
     def hay(self) -> bool:
@@ -55,6 +58,7 @@ def leer() -> Propuesta:
             momento=datetime.fromisoformat(datos["momento"]) if datos.get("momento") else None,
             recordado=bool(datos.get("recordado")),
             cancelado=bool(datos.get("cancelado")),
+            message_id=int(datos.get("message_id") or 0),
         )
     except Exception:  # noqa: BLE001
         return Propuesta()
@@ -69,6 +73,7 @@ def _guardar(p: Propuesta) -> None:
             "momento": p.momento.isoformat() if p.momento else None,
             "recordado": p.recordado,
             "cancelado": p.cancelado,
+            "message_id": int(p.message_id or 0),
         }),
         encoding="utf-8",
     )
@@ -80,19 +85,46 @@ def cancelada_hoy(hoy: date | None = None) -> bool:
     return p.hay and p.fecha == (hoy or date.today()) and p.cancelado
 
 
-def anotar_propuesta(momento: datetime) -> Propuesta:
+def anotar_propuesta(momento: datetime, message_id: int = 0) -> Propuesta:
     """Hoy se propuso el corte. Si Daniel ya había dicho /nocorte para hoy,
     el «no» se respeta: queda anotada pero cancelada."""
     p = Propuesta(fecha=momento.date(), momento=momento, recordado=False,
-                  cancelado=cancelada_hoy(momento.date()))
+                  cancelado=cancelada_hoy(momento.date()), message_id=int(message_id or 0))
     _guardar(p)
     return p
 
 
-def anotar_recordatorio() -> None:
+def anotar_recordatorio(message_id: int = 0) -> None:
+    """Ya se recordó. `message_id`: el recordatorio reemplaza a la propuesta."""
     p = leer()
     if p.hay:
-        _guardar(Propuesta(p.fecha, p.momento, True, p.cancelado))
+        _guardar(Propuesta(p.fecha, p.momento, True, p.cancelado,
+                           int(message_id or 0) or p.message_id))
+
+
+def mensaje_de_hoy(hoy: date | None = None) -> int:
+    """El id del mensaje de la propuesta de hoy (0 si no hay)."""
+    p = leer()
+    return p.message_id if p.hay and p.fecha == (hoy or date.today()) else 0
+
+
+def retirar_mensaje(hoy: date | None = None, *, salvo: int = 0) -> bool:
+    """El corte ya se hizo por otro lado: la propuesta (con sus botones) se
+    quita del chat para que quede un solo mensaje del corte. `salvo`: el
+    mensaje que se está reescribiendo con el resultado no se borra."""
+    mid = mensaje_de_hoy(hoy)
+    if not mid or mid == int(salvo or 0):
+        return False
+    try:
+        from pos_uniformes.services import telegram_service
+
+        motivo = telegram_service.borrar_con_motivo(mid)
+    except Exception:  # noqa: BLE001 — sin credenciales o sin red: se queda para el barrido
+        return False
+    if motivo != "red":
+        p = leer()
+        _guardar(Propuesta(p.fecha, p.momento, p.recordado, p.cancelado, 0))
+    return motivo == "ok"
 
 
 def cancelar(hoy: date | None = None) -> bool:
@@ -103,7 +135,7 @@ def cancelar(hoy: date | None = None) -> bool:
     hoy = hoy or date.today()
     p = leer()
     if p.hay and p.fecha == hoy:
-        _guardar(Propuesta(p.fecha, p.momento, p.recordado, True))
+        _guardar(Propuesta(p.fecha, p.momento, p.recordado, True, p.message_id))
         return True
     _guardar(Propuesta(fecha=hoy, momento=None, recordado=False, cancelado=True))
     return False

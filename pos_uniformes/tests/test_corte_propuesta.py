@@ -132,7 +132,9 @@ class ScriptTests(unittest.TestCase):
             corte_remoto_service, "texto_propuesta_corte", return_value="¿Hacemos el corte?"
         ), patch.object(
             corte_remoto_service, "hacer_corte_y_avisar"
-        ) as hacer, patch.object(script, "_mandar") as mandar:
+        ) as hacer, patch.object(script, "_mandar") as _viejo, patch.object(
+            script, "_mandar_y_dar_id", return_value=0
+        ) as mandar:
             codigo = script.main(argv)
         return codigo, hacer, mandar
 

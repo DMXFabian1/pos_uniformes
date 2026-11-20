@@ -588,6 +588,8 @@ _RUTAS_DE_LA_MAQUINA = (
     ("pos_uniformes.services.temporada_service", "ruta_bitacora"),
     # intentos equivocados del QR de descuento (2026-11-16)
     ("pos_uniformes.services.descuento_qr_service", "ruta_intentos"),
+    # la propuesta del corte de la tarde (y su mensaje) (2026-11-20)
+    ("pos_uniformes.services.corte_propuesta_service", "ruta_estado"),
 )
 
 

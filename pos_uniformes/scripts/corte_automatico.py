@@ -81,8 +81,8 @@ def main(argv: list[str] | None = None) -> int:
             from pos_uniformes.services.corte_remoto_service import propuesta_de_corte
 
             mensaje, botones = propuesta_de_corte(session, ahora)
-            anotar_propuesta(ahora)
-            _mandar(mensaje, botones)
+            mid = _mandar_y_dar_id(mensaje, botones)
+            anotar_propuesta(ahora, message_id=mid)
             print(mensaje)
             return 0
 
@@ -108,6 +108,24 @@ def _mandar(mensaje: str, botones: str | None = None) -> bool:
     except Exception as exc:  # noqa: BLE001
         print(f"(Telegram no disponible: {exc}; lo dejo en la cola)")
     return _encolar(mensaje, botones)
+
+
+def _mandar_y_dar_id(mensaje: str, botones: str | None = None) -> int:
+    """Como `_mandar`, pero devuelve el id del mensaje para poder reemplazarlo
+    después (el recordatorio y el corte hecho). 0 si se fue a la cola."""
+    try:
+        from pos_uniformes.services import telegram_service
+
+        if not (telegram_service.token_configurado() and telegram_service.chat_id_configurado()):
+            return 0
+        if len(mensaje) <= telegram_service._MAX:
+            return telegram_service.enviar_y_dar_id(mensaje, botones=botones, conservar=True)
+        telegram_service.enviar_mensaje(mensaje, botones=botones, conservar=True)
+        return 0
+    except Exception as exc:  # noqa: BLE001
+        print(f"(Telegram no disponible: {exc}; lo dejo en la cola)")
+    _encolar(mensaje, botones)
+    return 0
 
 
 def _encolar(mensaje: str, botones: str | None = None) -> bool:
@@ -148,8 +166,14 @@ def _recordar() -> int:
 
         texto_, botones = propuesta_de_corte(session, ahora)
         mensaje = "⏰ Sigue pendiente el corte.\n\n" + texto_
-    anotar_recordatorio()
-    _mandar(mensaje, botones)
+    # El recordatorio REEMPLAZA a la propuesta: sale nuevo (para que suene)
+    # y la de antes se quita. Antes quedaban las dos con sus botones.
+    from pos_uniformes.services.corte_propuesta_service import retirar_mensaje
+
+    mid = _mandar_y_dar_id(mensaje, botones)
+    if mid:
+        retirar_mensaje(ahora.date(), salvo=mid)
+    anotar_recordatorio(mid)
     print(mensaje)
     return 0
 
@@ -232,6 +256,9 @@ def _cerrar_si_nadie_contesto(*, simular: bool = False) -> int:
         print(resultado.mensaje)
         _mandar(_texto_cierre_fallido(resultado.mensaje))
         return 1
+    from pos_uniformes.services.corte_propuesta_service import retirar_mensaje
+
+    retirar_mensaje(ahora.date())      # queda un solo mensaje del corte
     mensaje = (
         "🌙 Cerré el día por ti: no contestaste la propuesta y en el kiosko "
         "nadie más puede hacer el corte.\n\n"

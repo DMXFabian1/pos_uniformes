@@ -342,9 +342,13 @@ def cerrar_corte(
     otros_retiros=Decimal("0.00"),
     nota: str | None = None,
     ahora: datetime | None = None,
+    avisar: bool = True,
 ):
     """Cierra el periodo: guarda el corte y deja `reactivo_final` como fondo
-    del siguiente. `contado` es el efectivo real en el cajón."""
+    del siguiente. `contado` es el efectivo real en el cajón.
+
+    `avisar=False`: quien lo hizo ya le dice a Daniel (el bot o la tarea del
+    corte). Antes el corte del celular llegaba dos veces (2026-11-20)."""
     from pos_uniformes.database.models import LibretaCorte
 
     ahora = ahora or datetime.now().astimezone()
@@ -378,7 +382,8 @@ def cerrar_corte(
     )
     session.add(corte)
     guardar_parametros(session, reactivo_actual=reactivo_final)  # hace commit
-    _avisar_corte(session, corte, estado)
+    if avisar:
+        _avisar_corte(session, corte, estado)
     return corte
 
 
@@ -534,7 +539,7 @@ def datos_ticket_encargado(session, desde: datetime | None, hasta: datetime) -> 
 def cerrar_corte_automatico(
     session, *, creado_por: str, ahora: datetime | None = None, nota: str | None = None,
     retirar: Decimal | None = None, fondo_final: Decimal | None = None,
-    otros_retiros: Decimal = Decimal("0.00"),
+    otros_retiros: Decimal = Decimal("0.00"), avisar: bool = True,
 ) -> CorteAutomatico:
     """Corte de un botón (encargado): registra los pagos que tocan hoy, cierra
     con el esperado como cifra final y deja el mismo fondo. Nadie cuenta ni
@@ -580,5 +585,6 @@ def cerrar_corte_automatico(
         otros_retiros=otros_retiros,
         nota=nota,
         ahora=ahora,
+        avisar=avisar,
     )
     return CorteAutomatico(corte=corte, estado=estado, pagos=pagos)
