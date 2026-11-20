@@ -879,6 +879,7 @@ def marcar_dueno(session, accion: str, *, hoy: date | None = None, quien: str = 
     tipo = _tipo(accion)
     dia = pd.fecha_corta(hoy, con_dia=True)
     antes = _dias_de_mas_de_la_semana(session, hoy)
+    cubiertas = _faltas_cubiertas_cerca(session, hoy)
     if cargar_horario(session, code).eventos.get(hoy) == tipo:
         quitar_marca(session, code, hoy, actor=quien, origen="telegram")
         lineas = [f"Tú: marca quitada ↩ ({dia})"]
@@ -902,7 +903,7 @@ def marcar_dueno(session, accion: str, *, hoy: date | None = None, quien: str = 
                               "(se movió; no es día de más).")
     botones = ""
     try:
-        extra, botones = _cuenta_tras_marcar(session, tipo, hoy, antes=antes)
+        extra, botones = _cuenta_tras_marcar(session, tipo, hoy, antes=antes, cubiertas=cubiertas)
         lineas.extend(extra)
     except Exception:  # noqa: BLE001 — la marca ya quedó; la cuenta es aparte
         logger.warning("Mi pago: no se pudo revisar la cuenta tras marcar", exc_info=True)
@@ -926,7 +927,24 @@ def _dias_de_mas_de_la_semana(session, hoy: date) -> set[date]:
         return set()
 
 
-def _cuenta_tras_marcar(session, tipo: str, hoy: date, *, antes: set[date] = frozenset()) -> tuple[list[str], str]:
+def _faltas_cubiertas_cerca(session, hoy: date) -> set[date]:
+    """Las faltas que hoy se cubren con un día a favor en los pagos de esta
+    semana y la que sigue (vacío sin cuenta o sin tablas; en un savepoint,
+    como `_dias_de_mas_de_la_semana`). Un día de más que se pierde solo
+    afecta a las faltas de su semana en adelante."""
+    lunes = hoy - timedelta(days=hoy.weekday())
+    try:
+        with session.begin_nested():
+            config = _cuenta(session)
+            datos = pd.cargar_datos(session, config)
+            pagos = {_pago_que_cubre(config, lunes + timedelta(days=i)) for i in range(14)}
+            return {f for pago in pagos for f in pd.desglose_de_pago(config, datos, pago).faltas_cubiertas}
+    except Exception:  # noqa: BLE001
+        return set()
+
+
+def _cuenta_tras_marcar(session, tipo: str, hoy: date, *, antes: set[date] = frozenset(),
+                        cubiertas: set[date] = frozenset()) -> tuple[list[str], str]:
     from pos_uniformes.services.calendario_empleadas_service import FALTA, TRABAJO
 
     try:
@@ -937,6 +955,17 @@ def _cuenta_tras_marcar(session, tipo: str, hoy: date, *, antes: set[date] = fro
     perdidos = sorted(set(antes) - _dias_de_mas_de_la_semana(session, hoy) - {hoy})
     aviso = [f"El {pd.fecha_corta(f, con_dia=True)} ya no es día de más: esa semana ya quedó pareja con tu descanso."
              for f in perdidos]
+    if cubiertas:
+        # La falta que el bot dijo «se cubre» y, al perder el día a favor,
+        # ya se descuenta: se dice ahora y no hasta ver /mipago (revisión
+        # 2026-11-19).
+        datos = pd.cargar_datos(session, config)
+        for f in sorted(cubiertas):
+            p = pd.desglose_de_pago(config, datos, _pago_que_cubre(config, f))
+            if f in p.faltas_descontadas:
+                aviso.append(f"Tu falta del {pd.fecha_corta(f)} ya no se cubre: se descuenta "
+                             f"{pd.dinero_texto(config.valor_dia)} de tu pago del "
+                             f"{pd.fecha_corta(p.fecha_programada)} (queda en {pd.dinero_texto(p.monto)}).")
     if aviso:
         aviso.insert(0, "")
     if tipo == TRABAJO and pd.es_dia_extra(session, hoy):

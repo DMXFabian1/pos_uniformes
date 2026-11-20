@@ -723,3 +723,15 @@ class MontoIgualAlCalculadoTests(_ConBase):
         aviso, _, _ = self._tocar(dato)
         self.assertEqual(aviso, "Cambió el monto")
         self.assertNotIn(D(2026, 11, 21), self._registros())
+
+
+class DescansoQueDescubreUnaFaltaTests(_ConBase):
+    def test_avisa_que_la_falta_ya_se_descuenta(self) -> None:
+        self._configurar(JUE_19)
+        self._responder("/vino yo", hoy=MAR_24)
+        texto, _ = self._responder("/falta yo", hoy=D(2026, 11, 25))
+        self.assertIn("Se cubre con un día a favor", texto)
+        texto, _ = self._responder("/descanso yo", hoy=D(2026, 11, 26))
+        self.assertIn("El mar 24-nov ya no es día de más", texto)
+        self.assertIn("Tu falta del 25-nov ya no se cubre: se descuenta $385 de tu pago del 28-nov "
+                      "(queda en $2,115).", texto)
