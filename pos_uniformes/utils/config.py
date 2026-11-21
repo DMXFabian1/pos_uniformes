@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import lru_cache
 import os
 from pathlib import Path
 import sys
@@ -82,6 +83,15 @@ def _to_timeout_ms(value: str, default: int = 30_000) -> int:
     return parsed if parsed >= 0 else default
 
 
+def _to_horas(value: str, default: int = 8) -> int:
+    """Horas positivas; valores inválidos caen al default."""
+    try:
+        parsed = int(str(value).strip())
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed > 0 else default
+
+
 def server_db_host(default: str | None = None) -> str | None:
     """IP del servidor (PC principal) leida del .env — nunca se codifica en el codigo.
 
@@ -117,7 +127,10 @@ class Settings:
     db_echo: bool
     auto_create_schema: bool
     backup_external_dir: str | None
-    api_secret_key: str = "dev-secret-key-cambiar-en-produccion"
+    # Llave de las sesiones de la API (POS_API_SECRET_KEY). Vacía = la resuelve
+    # utils/llave_api.py: la guardada en data/api_secret.key o una nueva.
+    # Nunca usar este campo directo para firmar: ver llave_api.llave_sesiones().
+    api_secret_key: str = ""
     api_token_expire_hours: int = 8
     # Techo por query en el servidor (ms). Sin esto, una query colgada congela
     # la UI hasta que los TCP keepalives maten la conexión (~60s). 30s deja
@@ -169,10 +182,22 @@ class Settings:
             db_statement_timeout_ms=_to_timeout_ms(
                 env_value("POS_UNIFORMES_DB_STATEMENT_TIMEOUT_MS", "30000")
             ),
+            api_secret_key=(env_value("POS_API_SECRET_KEY", "") or "").strip(),
+            api_token_expire_hours=_to_horas(env_value("POS_API_TOKEN_EXPIRE_HOURS", "8")),
         )
 
 
 settings = Settings.from_env()
+
+
+@lru_cache(maxsize=1)
+def modo_pwa() -> str | None:
+    """POS_PWA_MODO=casa|tienda (entorno o pos_uniformes.env). None si no está
+    o no es válido: entonces el modo se deduce como siempre (SQLite = casa).
+    Se lee una vez por proceso (las pruebas limpian con modo_pwa.cache_clear())."""
+    raw = os.getenv("POS_PWA_MODO", load_runtime_env_overrides().get("POS_PWA_MODO", ""))
+    valor = (raw or "").strip().lower()
+    return valor if valor in {"casa", "tienda"} else None
 
 
 def python_sin_consola() -> str:

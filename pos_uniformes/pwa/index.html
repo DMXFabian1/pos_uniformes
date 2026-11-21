@@ -120,6 +120,9 @@ table.tallas input{margin:0; min-height:46px; font-size:20px; font-weight:800; t
 .topbar .tb-titulo{flex:1; text-align:center; font-weight:800; font-size:15px; color:var(--tinta);
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
 .topbar button.girando{animation:ptr-spin .7s linear infinite}
+.datos-de-btn{background:none; border:0; padding:4px 8px; margin:-4px 0 -4px 0; font-size:15px; line-height:1;
+  color:var(--tenue); cursor:pointer; display:inline-block; width:auto; min-height:0; box-shadow:none}
+.datos-de-btn.girando{animation:ptr-spin .7s linear infinite}
 body.con-topbar .app{padding-top:calc(58px + env(safe-area-inset-top))}
 .hoja-menu{position:fixed; inset:0; z-index:70; background:rgba(0,0,0,.35); display:flex; align-items:flex-end}
 .hoja-menu .panel{background:var(--carta); width:100%; max-width:520px; margin:0 auto; border-radius:18px 18px 0 0;
@@ -199,10 +202,13 @@ body.con-topbar .app{padding-top:calc(58px + env(safe-area-inset-top))}
 <div class="topbar oculto" id="topbar">
   <button class="tb-atras" id="tb-atras" onclick="navAtras()"><span>‹</span>Atrás</button>
   <span class="tb-titulo" id="tb-titulo"></span>
-  <button id="tb-refresh" onclick="navActualizar()" title="Actualizar">↻</button>
+  <button id="tb-refresh" onclick="recargar()" title="Actualizar">↻</button>
   <button id="tb-menu" onclick="navMenu()" title="Menú">⋯</button>
 </div>
 <div class="app">
+  <p class="sub oculto" id="datos-de" style="text-align:center;margin:0 0 8px"><span id="datos-de-texto"></span><button
+    class="datos-de-btn" id="datos-de-btn" onclick="traerLoMasNuevo()" title="Traer lo más nuevo de la tienda"
+    aria-label="Traer lo más nuevo de la tienda">↻</button></p>
 
   <!-- LOGIN -->
   <div id="vista-login">
@@ -356,7 +362,7 @@ body.con-topbar .app{padding-top:calc(58px + env(safe-area-inset-top))}
 const $ = id => document.getElementById(id);
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const DIAS = ["lun","mar","mié","jue","vie","sáb","dom"];
-const PWA_VERSION = "v30";
+const PWA_VERSION = "v35";
 let token = localStorage.getItem("pos_token") || "";
 let calY = 0, calM = 0;
 let rolActual = "", vistaInicio = "", modoServidor = "casa";
@@ -419,23 +425,112 @@ async function entrar() {
       body: JSON.stringify({employee_id: Number($("login-quien").value),
                             pin: $("login-pin").value, device_id: "pwa"}),
     });
+    if (r.status === 429) { const e = new Error(); e.aviso = "Demasiados PIN equivocados. Espera unos minutos."; throw e; }
     if (!r.ok) throw new Error();
     const data = await r.json();
     token = data.access_token || data.token;
     localStorage.setItem("pos_token", token);
     $("login-pin").value = "";
     await cargarInicio();
+    traerLoMasNuevo();
   } catch (e) {
-    $("login-error").textContent = "PIN incorrecto o sin conexión.";
+    $("login-error").textContent = e.aviso || "PIN incorrecto o sin conexión.";
     $("login-error").classList.remove("oculto");
   }
 }
 
-function salir() { token = ""; localStorage.removeItem("pos_token"); cargarLogin(); }
+function salir() { token = ""; localStorage.removeItem("pos_token"); datosDeActual = null; avisoDatos = ""; $("datos-de").classList.add("oculto"); cargarLogin(); }
+
+// Copia de la casa: de qué hora son los datos (solo en modo casa)
+let datosDeActual = null;   // "AAAA-MM-DDTHH:MM" de lo que se está viendo
+let avisoDatos = "";        // "" | "trayendo" | "cerrada"
+function horaDeDatos(d) {
+  const [fecha, hora] = d.split("T");
+  const ayer = new Date(); ayer.setDate(ayer.getDate() - 1);
+  const ayerISO = `${ayer.getFullYear()}-${String(ayer.getMonth()+1).padStart(2,"0")}-${String(ayer.getDate()).padStart(2,"0")}`;
+  return fecha === hoyISO() ? "de las " + hora : fecha === ayerISO ? "de ayer " + hora : "del " + fechaLarga(fecha) + " " + hora;
+}
+function pintarFrescura() {
+  const casa = modoServidor === "casa" && Boolean(token), d = datosDeActual;
+  $("datos-de").classList.toggle("oculto", !casa || (!d && avisoDatos !== "trayendo"));
+  $("datos-de-texto").textContent = avisoDatos === "trayendo" ? "Trayendo lo más nuevo de la tienda…"
+    : !d ? "" : avisoDatos === "cerrada" ? "La tienda está cerrada: datos " + horaDeDatos(d)
+    : "Datos de la tienda " + horaDeDatos(d);
+  $("datos-de-btn").classList.toggle("girando", avisoDatos === "trayendo");
+}
+function pintarDatosDe(data) {
+  datosDeActual = data.modo === "casa" ? (data.datos_de || null) : null;
+  pintarFrescura();
+}
+
+// Casa: al abrir, al recargar (↻ de arriba, jalar hacia abajo), al volver a la app después de
+// un rato y con el ↻ de junto a la hora, se le pide al servidor de casa una copia nueva de la
+// tienda (/movil/actualizar, que contesta {estado, datos_de}). Mientras la saca («pidiendo» /
+// «en_curso») se le vuelve a preguntar cada 8 s: así se sabe también si falló («espera»), si la
+// tienda resultó cerrada o si llegó la nueva. Cada vez que la copia de la base es otra que la de
+// pantalla se repinta todo (la hora de arriba y la pantalla abierta), aunque se siga esperando.
+// Máx. 2½ min (una copia tarda ~1 min); si el teléfono se durmió en medio, al pasar el plazo se
+// insiste hasta tener una respuesta buena (o 2 fallas) y, si volvió a la app, se pide otra vez.
+// Cualquier error: se queda lo que hay. En la tienda no hace nada.
+const COPIA_CADA_MS = 8000, COPIA_MAX_MS = 150000;
+let trayendo = false, traerOtraVez = false;
+const esperar = ms => new Promise(ok => setTimeout(ok, ms));
+async function pedirActualizar() {
+  try {
+    const r = await fetch("/api/v1/movil/actualizar", {method: "POST", headers: {"Authorization": "Bearer " + token}});
+    return r.ok ? await r.json() : null;
+  } catch (e) { return null; }
+}
+async function traerLoMasNuevo() {
+  if (!token || modoServidor !== "casa") return;
+  if (trayendo) { traerOtraVez = true; return; }     // p. ej. volvió a la app a media espera
+  trayendo = true; traerOtraVez = false;
+  try {
+    let d = await pedirActualizar();
+    if (!d) return;
+    const base = d.datos_de || null;                  // la copia que había al pedir
+    const hasta = Date.now() + COPIA_MAX_MS;
+    let fallos = 0;
+    for (;;) {
+      if (!token) return;
+      if (d) {
+        fallos = 0;
+        const sigue = d.estado === "pidiendo" || d.estado === "en_curso";
+        avisoDatos = sigue ? "trayendo"
+          : d.estado === "tienda_apagada" || d.estado === "fuera_de_horario" ? "cerrada" : "";
+        const llego = Boolean(d.datos_de) && d.datos_de !== base;    // la que se estaba esperando
+        if (d.datos_de && d.datos_de !== datosDeActual) {
+          if (llego && avisoDatos === "trayendo") avisoDatos = "";
+          await datosNuevos(d.datos_de);
+        } else pintarFrescura();
+        if (!sigue || llego || Date.now() >= hasta) break;
+      } else if (Date.now() >= hasta && ++fallos >= 2) break;
+      await esperar(COPIA_CADA_MS);
+      d = await pedirActualizar();
+    }
+  } catch (e) {
+  } finally {
+    trayendo = false;
+    if (avisoDatos === "trayendo") { avisoDatos = ""; pintarFrescura(); }
+    if (traerOtraVez) { traerOtraVez = false; setTimeout(traerLoMasNuevo, 0); }
+  }
+}
+// La copia de la base es otra que la de pantalla: la hora de arriba y la pantalla que esté abierta
+async function datosNuevos(datosDe) {
+  datosDeActual = datosDe; pintarFrescura();
+  try { await navActualizar(); } catch (e) {}
+}
+let ocultaDesde = 0;
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) { ocultaDesde = Date.now(); return; }
+  if (ocultaDesde && Date.now() - ocultaDesde > 60000) traerLoMasNuevo();
+  ocultaDesde = 0;
+});
 
 async function cargarInicio() {
   const data = await api("/api/v1/movil/inicio");
   rolActual = data.rol; modoServidor = data.modo || "casa"; window._yo = {nombre: data.nombre || ""};
+  pintarDatosDe(data);
   if (data.rol === "empleada") pintarEmpleada(data);
   else if (data.rol === "encargado") pintarEncargado(data);
   else pintarDueno(data);
@@ -1828,9 +1923,13 @@ window.addEventListener("popstate", e => {
   navMostrar(navPila[i]);
   setTimeout(navPintar, 60);
 });
+// Recargar (lo pide quien usa la app): la pantalla de ahora y, en casa, lo más nuevo de la tienda
+function recargar() { traerLoMasNuevo(); return navActualizar(); }
+let navOtraVez = false;
 async function navActualizar() {
-  if (navRefrescando) return;
-  navRefrescando = true;
+  // Si ya se está refrescando (p. ej. el de recargar() y llega la copia nueva), se repite al acabar
+  if (navRefrescando) { navOtraVez = true; return; }
+  navRefrescando = true; navOtraVez = false;
   $("tb-refresh").classList.add("girando");
   try {
     const top = navPila[navPila.length - 1];
@@ -1841,13 +1940,14 @@ async function navActualizar() {
   $("tb-refresh").classList.remove("girando");
   navRefrescando = false;
   navPintar();
+  if (navOtraVez) { navOtraVez = false; return navActualizar(); }
 }
 function navMenu() {
   const quien = (window._yo && window._yo.nombre) || "";
   const modo = modoServidor === "tienda" ? "en la tienda" : "modo consulta";
   const m = document.createElement("div"); m.className = "hoja-menu"; m.id = "hoja-menu";
   m.innerHTML = `<div class="panel"><p class="info">${quien ? quien + " · " : ""}${modo} · app ${PWA_VERSION}</p>` +
-    `<button class="btn-suave" onclick="navActualizar(); navCerrarMenu()">↻  Actualizar esta pantalla</button>` +
+    `<button class="btn-suave" onclick="recargar(); navCerrarMenu()">↻  Actualizar esta pantalla</button>` +
     `<button class="btn-suave" onclick="navReinstalar()">⬇️  Traer la última versión de la app</button>` +
     `<button class="btn-suave" onclick="navCerrarMenu(); salir()">🚪  Cerrar sesión</button>` +
     `<button class="btn-suave" onclick="navCerrarMenu()">Cancelar</button></div>`;
@@ -1919,7 +2019,7 @@ document.addEventListener("touchend", async () => {
   if (suelto >= PTR_UMBRAL) {
     ptrOcupado = true;
     ptr.style.top = "16px"; ptr.textContent = "↻"; ptr.classList.add("girando");
-    try { await navActualizar(); } catch (e) {}
+    try { await recargar(); } catch (e) {}
     ptr.classList.remove("girando");
     ptrOcupado = false;
   }
@@ -1927,7 +2027,7 @@ document.addEventListener("touchend", async () => {
 });
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
-(token ? cargarInicio().catch(cargarLogin) : cargarLogin());
+(token ? cargarInicio().then(() => { traerLoMasNuevo(); }, cargarLogin) : cargarLogin());
 </script>
 </body>
 </html>

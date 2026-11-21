@@ -30,7 +30,15 @@ _ENCARGADO_CODE = "ENC-1"
 
 def _modo_servidor() -> str:
     """"tienda" = PC principal con la base viva (puede encolar impresiones);
-    "casa" = snapshot SQLite de solo lectura (consulta 24/7)."""
+    "casa" = copia de solo lectura (consulta 24/7).
+
+    Manda POS_PWA_MODO=casa|tienda si está; sin ella, como siempre: un
+    snapshot SQLite es la casa y todo lo demás la tienda."""
+    from pos_uniformes.utils.config import modo_pwa
+
+    forzado = modo_pwa()
+    if forzado:
+        return forzado
     from pos_uniformes.database.connection import engine
 
     return "casa" if engine.url.get_backend_name() == "sqlite" else "tienda"
@@ -274,7 +282,32 @@ def inicio(
         base["cortes"] = _payload_cortes(db)
     else:
         base["empleada"] = _payload_empleada(db, str(empleada.codigo))
+    if base["modo"] == "casa":
+        # Hora de la tienda de la copia que se está leyendo (al final: si la
+        # consulta fallara, no estorba a lo de arriba).
+        from pos_uniformes.services.frescura_copia_service import datos_de
+
+        base["datos_de"] = datos_de(db)
     return base
+
+
+@router.post("/actualizar")
+def actualizar(
+    current: tuple = Depends(get_current_employee),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Solo en casa: pide al servidor una copia nueva de la tienda (no espera
+    a que llegue) y dice de qué hora son los datos que hay ahora. La PWA lo
+    llama al abrir y al recargar; con "pidiendo"/"en_curso" vuelve a mirar
+    /inicio hasta que "datos_de" cambie. No escribe en la base: es la única
+    escritura que deja pasar el candado de solo lectura de casa (api/main.py)
+    aparte de entrar y salir. En la tienda no existe (404)."""
+    if _modo_servidor() != "casa":
+        raise HTTPException(status_code=404, detail="Not Found")
+    from pos_uniformes.services.frescura_copia_service import datos_de
+    from pos_uniformes.services.pedir_copia_service import pedir_copia
+
+    return {"estado": pedir_copia(), "datos_de": datos_de(db)}
 
 
 @router.get("/calendario")
@@ -379,11 +412,14 @@ def _solo_gestor(empleada) -> None:
             "code": "solo_gestor", "message": "Solo el dueño o el encargado."}})
 
 
+SOLO_EN_TIENDA = {"error": {
+    "code": "solo_en_tienda",
+    "message": "Esta acción solo funciona conectado a la tienda."}}
+
+
 def _solo_tienda() -> None:
     if _modo_servidor() != "tienda":
-        raise HTTPException(status_code=409, detail={"error": {
-            "code": "solo_en_tienda",
-            "message": "Esta acción solo funciona conectado a la tienda."}})
+        raise HTTPException(status_code=409, detail=SOLO_EN_TIENDA)
 
 
 def _equipo(db: Session) -> list[dict]:

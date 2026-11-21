@@ -13,6 +13,7 @@ from pos_uniformes.api.schemas.auth import (
     LoginResponse,
     MeResponse,
 )
+from pos_uniformes.api.services.limite_login import limite_login
 from pos_uniformes.api.services.token_service import TokenService
 from pos_uniformes.database.models import Empleada
 from pos_uniformes.services.auth_service import AuthService
@@ -67,11 +68,31 @@ def login(body: LoginRequest, db: Session = Depends(get_db)) -> LoginResponse:
             detail={"error": {"code": "sin_pin", "message": "Esta empleada no tiene PIN configurado. Contacta al administrador."}},
         )
 
+    # En la copia de casa (alcanzable por Tailscale) se frena a quien adivina
+    # PIN; en la tienda, igual que siempre.
+    from pos_uniformes.api.routers.movil import _modo_servidor
+
+    en_casa = _modo_servidor() == "casa"
+    if en_casa:
+        espera = limite_login.intento(empleada.id)
+        if espera:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail={"error": {
+                    "code": "demasiados_intentos",
+                    "message": f"Demasiados PIN equivocados. Espera {max(1, round(espera / 60))} min.",
+                }},
+                headers={"Retry-After": str(espera)},
+            )
+
     if not AuthService.verify_password(body.pin, empleada.pin_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"error": {"code": "credenciales_invalidas", "message": "PIN incorrecto."}},
         )
+
+    if en_casa:
+        limite_login.exito(empleada.id)
 
     token, device_id = TokenService.create_token(
         employee_id=empleada.id,

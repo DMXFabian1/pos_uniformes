@@ -7,7 +7,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy import create_engine
 
-from pos_uniformes.utils.config import settings
+from pos_uniformes.utils.config import modo_pwa, settings
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -22,7 +22,7 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
-def build_connect_args(statement_timeout_ms: int) -> dict:
+def build_connect_args(statement_timeout_ms: int, solo_lectura: bool = False) -> dict:
     connect_args = {
         # 2s: en LAN el connect es <100ms; solo importa cuando el host está
         # apagado, y ahí acota cuánto puede bloquear un intento de conexión.
@@ -34,11 +34,18 @@ def build_connect_args(statement_timeout_ms: int) -> dict:
         "keepalives_interval": 10,
         "keepalives_count": 3,
     }
+    opciones = []
     if statement_timeout_ms > 0:
         # connect_timeout solo acota la fase TCP/auth; una query ya en vuelo
         # no tenía límite y podía congelar la UI hasta que los keepalives
         # mataran la conexión (~60s). Esto la acota del lado del servidor.
-        connect_args["options"] = f"-c statement_timeout={statement_timeout_ms}"
+        opciones.append(f"-c statement_timeout={statement_timeout_ms}")
+    if solo_lectura:
+        # PWA de la casa (POS_PWA_MODO=casa): toda transacción nace de solo
+        # lectura; un INSERT/UPDATE que se escape lo rechaza el propio Postgres.
+        opciones.append("-c default_transaction_read_only=on")
+    if opciones:
+        connect_args["options"] = " ".join(opciones)
     return connect_args
 
 
@@ -59,7 +66,9 @@ else:
         # (crítico en el satélite, que va por Wi-Fi a la PC principal).
         pool_pre_ping=True,
         pool_recycle=1800,  # recicla conexiones > 30 min (NAT/firewall las cortan)
-        connect_args=build_connect_args(settings.db_statement_timeout_ms),
+        connect_args=build_connect_args(
+            settings.db_statement_timeout_ms, solo_lectura=modo_pwa() == "casa"
+        ),
     )
 
 SessionLocal = sessionmaker(

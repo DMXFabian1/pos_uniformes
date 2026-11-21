@@ -21,6 +21,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 def _try_meilisearch_warmup() -> None:
+    from pos_uniformes.api.routers.movil import _modo_servidor
+
+    if _modo_servidor() == "casa":
+        return  # la casa solo consulta: no reindexa nada
     try:
         from pos_uniformes.services import meilisearch_service
         from pos_uniformes.database.connection import get_session
@@ -44,6 +48,26 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+# Modo casa (POS_PWA_MODO=casa): la copia de la casa SOLO consulta. Todo lo
+# que no sea leer se rechaza aquí, antes de llegar a cualquier router, con el
+# mismo 409 «solo_en_tienda» que la PWA ya sabe mostrar. Entrar y salir sí
+# (no escriben nada: el JWT no se guarda en la base), y pedir una copia nueva
+# de la tienda (/movil/actualizar: se la pide al servidor de casa, no toca la base).
+_METODOS_DE_LECTURA = {"GET", "HEAD", "OPTIONS"}
+_PERMITIDOS_EN_CASA = {"/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/movil/actualizar"}
+
+
+@app.middleware("http")
+async def solo_lectura_en_casa(request: Request, call_next):
+    if request.method not in _METODOS_DE_LECTURA:
+        from pos_uniformes.api.routers.movil import SOLO_EN_TIENDA, _modo_servidor
+
+        ruta = request.url.path.rstrip("/") or "/"
+        if _modo_servidor() == "casa" and ruta not in _PERMITIDOS_EN_CASA:
+            return JSONResponse(status_code=409, content={"detail": SOLO_EN_TIENDA})
+    return await call_next(request)
+
 
 # CORS — red local. Configurable via POS_CORS_ORIGINS (comas).
 _DEFAULT_ORIGINS = [

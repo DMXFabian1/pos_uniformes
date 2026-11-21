@@ -9,6 +9,7 @@ from typing import Any
 import jwt
 
 from pos_uniformes.utils.config import settings
+from pos_uniformes.utils.llave_api import llave_sesiones
 
 ALGORITHM = "HS256"
 
@@ -25,7 +26,8 @@ class TokenService:
 
     @classmethod
     def _secret(cls) -> str:
-        return settings.api_secret_key
+        # Nunca la llave pública vieja: ver utils/llave_api.py.
+        return llave_sesiones()
 
     @classmethod
     def create_token(cls, employee_id: int, employee_name: str, device_id: str | None = None) -> tuple[str, str]:

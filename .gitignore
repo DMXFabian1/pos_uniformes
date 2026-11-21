@@ -11,6 +11,9 @@ C:\\Meilisearch/
 pwa/.certs/
 Gestor_de_Inventarios/tarifarios_cache_*.json
 pos_uniformes/data/satellite_identity.json
+# Llave de las sesiones de la API: se genera sola (repo público: jamás subirla)
+pos_uniformes/data/api_secret.key
+pos_uniformes/data/api_secret.key.*.tmp
 
 # Dependencias y caches
 node_modules/

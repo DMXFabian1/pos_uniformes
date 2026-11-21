@@ -60,6 +60,12 @@ if not _USA_BASE_REAL:
 # Mac de desarrollo los satélites de prueba dejaban de latir (2026-10-11).
 os.environ["POS_UNIFORMES_SATELITE_DESARROLLO"] = "0"
 
+# Las pruebas firman tokens con una llave propia: así no generan ni leen la
+# llave real de sesiones (data/api_secret.key) de la máquina. Y el modo de la
+# PWA se deduce como siempre, aunque el entorno de la máquina diga otra cosa.
+os.environ["POS_API_SECRET_KEY"] = "llave-solo-para-pruebas-" + "x" * 40
+os.environ["POS_PWA_MODO"] = ""  # vacío también tapa el del pos_uniformes.env
+
 # Señales de que un archivo de test necesita cada dependencia.
 # `pos_uniformes.ui` importa PyQt6 en cadena: un test que lo toca es un test Qt
 # aunque nunca escriba "PyQt6".

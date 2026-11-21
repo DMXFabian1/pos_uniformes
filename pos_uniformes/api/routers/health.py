@@ -28,9 +28,18 @@ def health_check(db: Session = Depends(get_db)) -> dict:
     except Exception:
         db_ok = False
 
-    return {
+    respuesta = {
         "status": "ok" if db_ok else "degradado",
         "api_version": API_VERSION,
         "database": "conectada" if db_ok else "sin_conexion",
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+    # Copia de casa: ¿este código va en la misma versión de base que la tienda?
+    # (la vigila el latido de nucleo). En la tienda, /health igual que siempre.
+    from pos_uniformes.utils.config import modo_pwa
+
+    if db_ok and modo_pwa() == "casa":
+        from pos_uniformes.services.version_base_service import estado_version
+
+        respuesta["version_base"] = estado_version(db)
+    return respuesta

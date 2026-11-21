@@ -122,4 +122,5 @@ python scripts/receive_updates.py --branch codex/etiquetas-windows
 - `.venv` no se copia entre sistemas operativos; cada maquina crea la suya.
 - `pos_uniformes.env` tampoco se comparte; cada maquina usa su propia configuracion.
 - Si la app marca que la base esta desactualizada, corre `python -m alembic upgrade head`.
+- La API móvil firma las sesiones con una llave propia de cada máquina (`data/api_secret.key`, se genera sola). Al actualizar desde una versión anterior, cada quien vuelve a entrar con su PIN una vez. La copia de solo consulta de la casa (`POS_PWA_MODO=casa`) y `requirements-api.txt`: ver [docs/pwa_casa.md](./docs/pwa_casa.md).
 - Si quieres empaquetar para Windows, usa la guia detallada de [WINDOWS_SETUP.md](./WINDOWS_SETUP.md).

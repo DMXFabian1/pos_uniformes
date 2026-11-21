@@ -1,0 +1,18 @@
+# Solo lo que la API móvil + la Libreta (PWA en /app) necesitan para SERVIR en
+# Linux (la copia de la casa en Docker). Nada de PyQt, pywin32, brother_ql ni
+# alembic: la API no los importa al arrancar, y lo que sí los usa (imprimir el
+# corte, subir fotos) es de la tienda y en modo casa está bloqueado.
+#
+#     pip install -r pos_uniformes/requirements-api.txt
+#     uvicorn pos_uniformes.api.main:app --host 0.0.0.0 --port 8000
+#
+# (api_server.py no sirve para esto: arrancar siempre con uvicorn.)
+fastapi>=0.111
+uvicorn[standard]>=0.29
+PyJWT>=2.8
+SQLAlchemy>=2.0
+psycopg[binary]>=3.1
+# Zonas horarias (America/Mexico_City) aunque la imagen no traiga las del sistema
+tzdata>=2024.1
+# Opcional: búsqueda rápida si hay un Meilisearch; sin él se busca en la base.
+# meilisearch>=0.31
