@@ -778,7 +778,11 @@ class MonederoVentaMixin:
         else:
             from pos_uniformes.ui.helpers.ticket_routing_helper import route_tickets
 
-            route_tickets(self, "Ticket de venta", tickets)
+            # Ya anotada: sale directo, sin vista previa (2026-11-24).
+            route_tickets(
+                self, "Ticket de venta", tickets, directo=True,
+                destino=getattr(self, "_destino_ticket", None),
+            )
         self._scan_input.setFocus()
 
 

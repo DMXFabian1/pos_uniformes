@@ -27,12 +27,25 @@ def route_tickets(
     on_printed=None,
     on_back=None,
     tipo=None,
+    directo: bool = False,
+    destino: dict | None = None,
 ) -> None:
     """`tipo`: TICKET (lo normal) o CORTE. El corte es su propio tipo desde
     2026-10-07 para decidir en qué PC sale; hasta el 2026-11-06 este camino lo
     trataba como ticket, así que las fichas de «¿dónde se imprime?» ofrecían
     las PCs de tickets y no las de cortes (Daniel: «¿también puedo elegir la
-    impresora a donde enviar el corte?»)."""
+    impresora a donde enviar el corte?»).
+
+    `directo=True` (cobro en un paso, 2026-11-24): si esta PC imprime esto,
+    sale en su impresora SIN la ventana de vista previa y `on_printed` se
+    llama igual que al tocar «Imprimir». Queda abierta la ventana «✓ Cobrado»
+    (cobro_listo_dialog) con «Imprimir otra vez» —sin volver a anotar— por si
+    se atora el papel o no salió, y «Listo». Las empleadas pedían
+    menos toques: antes eran Cobrar → Solo ticket → Imprimir → Cerrar.
+
+    `destino` ({identificador, nombre}, de `destinos_para_cobro`): con
+    `directo`, el ticket se manda a la cola de esa PC en vez de imprimirse
+    aquí (Daniel: «la opción de enviar a la PC principal o imprimir aquí»)."""
     tickets = [t for t in tickets if t and t.strip()]
     if not tickets:
         return
@@ -81,6 +94,10 @@ def route_tickets(
                 on_printed()
             except Exception:  # noqa: BLE001
                 pass
+    elif directo and destino:
+        mandar_directo(parent, title, tickets, destino, on_printed=on_printed, tipo=tipo, origen=origen)
+    elif directo:
+        imprimir_directo(parent, title, tickets, on_printed=on_printed, tipo=tipo, origen=origen)
     else:
         from pos_uniformes.ui.dialogs.printable_text_dialog import open_tickets_print_dialog
 
@@ -98,6 +115,188 @@ def route_tickets(
             destinos=otras,
             enviar_a=_enviar_y_vigilar(parent, otras, origen, tipo),
         )
+
+
+def _imprimir_en_cola(textos: list[str], print_fn, al_terminar, title: str):
+    """Imprime `textos` aquí, uno tras otro (cada uno con su corte), y al
+    acabar llama `al_terminar(no_salieron)`. Devuelve la cola."""
+    from PyQt6.QtCore import QTimer
+
+    from pos_uniformes.ui.helpers.ticket_print_queue import TicketPrintQueue
+
+    no_salieron: list[str] = []
+
+    def _uno(texto: str) -> bool:
+        try:
+            ok = bool(print_fn(texto))
+        except Exception:  # noqa: BLE001 — se ofrece reimprimir, no se truena
+            logger.exception("Impresión directa: falló un ticket de %s", title)
+            ok = False
+        if not ok:
+            no_salieron.append(texto)
+        return ok
+
+    cola = TicketPrintQueue(
+        textos, print_fn=_uno, schedule=QTimer.singleShot,
+        on_done=lambda _ok, _err: al_terminar(list(no_salieron)),
+    )
+    cola.start()
+    return cola
+
+
+def _anotar(on_printed, title: str) -> None:
+    if on_printed is None:
+        return
+    try:
+        on_printed()
+    except Exception:  # noqa: BLE001 — igual que en la ventana: no rompe la impresión
+        logger.exception("Cobro: on_printed falló en %s", title)
+
+
+def ventana_cobrado(
+    parent: QWidget,
+    title: str,
+    tickets: list[str],
+    *,
+    tipo,
+    origen: str,
+    print_fn,
+):
+    """La ventana «✓ Cobrado» que se queda abierta después de cobrar, para
+    reimprimir (aquí o en otra PC) sin volver a anotar. Ver cobro_listo_dialog."""
+    from pos_uniformes.ui.dialogs.cobro_listo_dialog import VentanaCobrado
+    from pos_uniformes.ui.dialogs.printable_text_dialog import total_del_ticket
+
+    otras = otras_impresoras_de_tickets(tipo)
+
+    def _mandar(destino: dict, textos: list[str]) -> bool:
+        try:
+            ids = encolar_para_ids(str(destino["identificador"]), textos, origen, tipo=tipo)
+        except Exception:  # noqa: BLE001 — la ventana lo dice
+            logger.exception("Cobro: no se pudo reenviar %s", title)
+            return False
+        vigilar_envio(parent, ids, str(destino.get("nombre") or ""), imprimir_aqui=_imprimir_aqui_si_se_puede(parent))
+        return True
+
+    return VentanaCobrado(
+        parent,
+        tickets,
+        total_txt=total_del_ticket(tickets[0]) if tickets else None,
+        destinos=otras,
+        reimprimir=lambda textos, fin: _imprimir_en_cola(textos, print_fn, fin, title),
+        mandar=_mandar,
+        al_cerrar_con_fallas=lambda fallidos: ofrecer_reimprimir(parent, title, fallidos, tipo=tipo, origen=origen),
+    )
+
+
+def imprimir_directo(
+    parent: QWidget,
+    title: str,
+    tickets: list[str],
+    *,
+    on_printed=None,
+    tipo=None,
+    origen: str = "",
+    print_fn=None,
+):
+    """Imprime aquí sin vista previa, anota y deja abierta la ventana
+    «✓ Cobrado» (Imprimir otra vez / Listo). Devuelve esa ventana (pruebas).
+
+    Mismo orden que el botón «Imprimir» de la ventana de siempre: arranca la
+    impresión (el primer ticket sale en ese momento) y luego `on_printed`."""
+    from pos_uniformes.database.models import TipoTrabajo
+
+    tipo = tipo or TipoTrabajo.TICKET
+    if print_fn is None:
+        from pos_uniformes.ui.dialogs.printable_text_dialog import _print_ticket_job as print_fn
+
+    ventana = ventana_cobrado(parent, title, tickets, tipo=tipo, origen=origen, print_fn=print_fn)
+    ventana.imprimiendo()
+    _imprimir_en_cola(tickets, print_fn, ventana.termino, title)
+    _anotar(on_printed, title)
+    ventana.exec()
+    return ventana
+
+
+def destinos_para_cobro() -> list[dict]:
+    """Las otras PCs que imprimen tickets, para ofrecerlas en la ventana de
+    cobro junto a «Imprimir aquí». Vacío si esta PC no imprime tickets (ahí
+    se encolan solos, como siempre) o si no hay conexión."""
+    try:
+        from pos_uniformes.database.models import TipoTrabajo
+        from pos_uniformes.services.print_routing_cache_service import puede_imprimir
+
+        if not puede_imprimir(TipoTrabajo.TICKET):
+            return []
+    except Exception:  # noqa: BLE001 — sin saberlo, solo «aquí»
+        return []
+    return otras_impresoras_de_tickets()
+
+
+def mandar_directo(
+    parent: QWidget,
+    title: str,
+    tickets: list[str],
+    destino: dict,
+    *,
+    on_printed=None,
+    tipo=None,
+    origen: str = "",
+    print_fn=None,
+) -> bool:
+    """Manda los tickets a la cola de `destino`, anota y deja la ventana
+    «✓ Cobrado» para reimprimir.
+
+    Igual que la ficha de otra PC en la ventana de imprimir, pero sin el
+    aviso «Enviado»: si no sale allá, `vigilar_envio` avisa.
+    Si no se pudo encolar, NO anota: abre la ventana de siempre con
+    `on_printed`, para imprimirlo aquí o elegir otra PC. Devuelve si se mandó."""
+    from pos_uniformes.database.models import TipoTrabajo
+
+    tipo = tipo or TipoTrabajo.TICKET
+    nombre = str(destino.get("nombre") or "la otra PC")
+    try:
+        ids = encolar_para_ids(str(destino["identificador"]), tickets, origen, tipo=tipo)
+    except Exception:  # noqa: BLE001
+        logger.exception("Cobro: no se pudo mandar %s a %s", title, nombre)
+        from pos_uniformes.ui.dialogs.printable_text_dialog import open_tickets_print_dialog
+
+        otras = otras_impresoras_de_tickets(tipo)
+        open_tickets_print_dialog(
+            parent,
+            f"No se pudo mandar a {nombre}: imprímelo aquí",
+            tickets,
+            on_printed=on_printed,
+            destinos=otras,
+            enviar_a=_enviar_y_vigilar(parent, otras, origen, tipo),
+        )
+        return False
+    vigilar_envio(parent, ids, nombre, imprimir_aqui=_imprimir_aqui_si_se_puede(parent))
+    _anotar(on_printed, title)
+    # Igual que al imprimir aquí: la ventana se queda para reimprimir.
+    if print_fn is None:
+        from pos_uniformes.ui.dialogs.printable_text_dialog import _print_ticket_job as print_fn
+    ventana = ventana_cobrado(parent, title, tickets, tipo=tipo, origen=origen, print_fn=print_fn)
+    ventana.mandado(nombre)
+    ventana.exec()
+    return True
+
+
+def ofrecer_reimprimir(parent: QWidget, title: str, tickets: list[str], *, tipo=None, origen: str = "") -> None:
+    """La ventana de siempre con lo que no salió: reintentar aquí o mandarlo a
+    otra PC. Sin `on_printed`: la operación ya quedó anotada y no se duplica."""
+    from pos_uniformes.database.models import TipoTrabajo
+    from pos_uniformes.ui.dialogs.printable_text_dialog import open_tickets_print_dialog
+
+    tipo = tipo or TipoTrabajo.TICKET
+    otras = otras_impresoras_de_tickets(tipo)
+    open_tickets_print_dialog(
+        parent,
+        f"No salió: {title} (ya quedó anotado)",
+        tickets,
+        destinos=otras,
+        enviar_a=_enviar_y_vigilar(parent, otras, origen, tipo),
+    )
 
 
 def otras_impresoras_de_tickets(tipo=None) -> list[dict]:

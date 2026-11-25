@@ -22,6 +22,7 @@ from pos_uniformes.ui.helpers.ticket_print_layout_helper import tk_dbl_row, tk_r
 from pos_uniformes.ui.views.quick_sale_view import QuickSaleWidget
 
 _MOD = "pos_uniformes.ui.views.quick_sale_view"
+_TRH = "pos_uniformes.ui.helpers.ticket_routing_helper"
 
 
 def _items() -> list[dict]:
@@ -189,6 +190,12 @@ class AskStoreCopyScanTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
 
+    def setUp(self) -> None:
+        # Sin otras PCs: la ventana no consulta la base en las pruebas.
+        p = patch(f"{_TRH}.destinos_para_cobro", return_value=[])
+        self.destinos = p.start()
+        self.addCleanup(p.stop)
+
     def _make_widget(self) -> QuickSaleWidget:
         satellite = SimpleNamespace(offline_mode=True, _kiosk_lookup_from_cache=None)
         widget = QuickSaleWidget(satellite)
@@ -238,10 +245,178 @@ class AskStoreCopyScanTests(unittest.TestCase):
             self.assertEqual(widget._ask_venta_options(), (False, False, True))
 
     def test_foreign_scan_does_not_answer(self) -> None:
+        # El gafete ajeno no contesta: la ventana sigue abierta y, si luego
+        # se cierra, no se cobra nada (None).
         widget = self._make_widget()
         with patch.object(QDialog, "exec", self._fake_exec_scanning("EMP:VEND-2")):
-            wants_copy, _card, _sin = widget._ask_venta_options()
-        self.assertFalse(wants_copy)
+            self.assertIsNone(widget._ask_venta_options())
+
+    # ── Cobro en un paso (2026-11-24) ────────────────────────────────────
+
+    def _exec_clic(self, nombre: str, *, tarjeta: bool = False):
+        def _exec(dlg):
+            from PyQt6.QtWidgets import QPushButton
+
+            botones = dlg.findChildren(QPushButton)
+            if tarjeta:
+                [b for b in botones if "Tarjeta" in b.text()][0].click()
+            [b for b in botones if b.objectName() == nombre][0].click()
+            return 0
+
+        return _exec
+
+    def test_solo_ticket_contesta_sin_copia(self) -> None:
+        widget = self._make_widget()
+        with patch.object(QDialog, "exec", self._exec_clic("soloTicketButton")):
+            self.assertEqual(widget._ask_venta_options(), (False, False, False))
+
+    def test_solo_ticket_con_tarjeta(self) -> None:
+        widget = self._make_widget()
+        with patch.object(QDialog, "exec", self._exec_clic("soloTicketButton", tarjeta=True)):
+            self.assertEqual(widget._ask_venta_options(), (False, True, False))
+
+    def test_ya_no_hay_boton_con_copia(self) -> None:
+        # Daniel, 2026-11-24: se quitó; la copia sale escaneando el gafete.
+        widget = self._make_widget()
+        nombres = []
+
+        def _exec(dlg):
+            from PyQt6.QtWidgets import QPushButton
+
+            nombres.extend(b.text() for b in dlg.findChildren(QPushButton))
+            return 0
+
+        with patch.object(QDialog, "exec", _exec):
+            widget._ask_venta_options()
+        self.assertFalse([n for n in nombres if "copia" in n.lower()])
+
+    def test_imprimir_aqui_no_elige_otra_pc(self) -> None:
+        widget = self._make_widget()
+        widget._destino_ticket = {"identificador": "viejo", "nombre": "Vieja"}
+        with patch.object(QDialog, "exec", self._exec_clic("soloTicketButton")):
+            self.assertEqual(widget._ask_venta_options(), (False, False, False))
+        self.assertIsNone(widget._destino_ticket)
+
+    def test_mandar_a_la_pc_principal(self) -> None:
+        self.destinos.return_value = [
+            {"identificador": "PC-1", "nombre": "PC principal", "online": True},
+        ]
+        widget = self._make_widget()
+        with patch.object(QDialog, "exec", self._exec_clic("mandarAButton", tarjeta=True)):
+            self.assertEqual(widget._ask_venta_options(), (False, True, False))
+        self.assertEqual(widget._destino_ticket, {"identificador": "PC-1", "nombre": "PC principal"})
+
+    def test_pc_apagada_no_se_puede_elegir(self) -> None:
+        self.destinos.return_value = [
+            {"identificador": "PC-1", "nombre": "PC principal", "online": False},
+        ]
+        widget = self._make_widget()
+        estado = []
+
+        def _exec(dlg):
+            from PyQt6.QtWidgets import QPushButton
+
+            estado.extend(b.isEnabled() for b in dlg.findChildren(QPushButton) if b.objectName() == "mandarAButton")
+            return 0
+
+        with patch.object(QDialog, "exec", _exec):
+            widget._ask_venta_options()
+        self.assertEqual(estado, [False])
+
+    def test_enter_con_el_campo_vacio_es_solo_ticket(self) -> None:
+        widget = self._make_widget()
+        with patch.object(QDialog, "exec", self._fake_exec_scanning("")):
+            self.assertEqual(widget._ask_venta_options(), (False, False, False))
+
+    def test_regresar_o_cerrar_no_cobra(self) -> None:
+        widget = self._make_widget()
+        with patch.object(QDialog, "exec", self._exec_clic("regresarVentaButton")):
+            self.assertIsNone(widget._ask_venta_options())
+        with patch.object(QDialog, "exec", lambda dlg: 0):   # ✕ o Esc
+            self.assertIsNone(widget._ask_venta_options())
+
+    def test_la_ventana_muestra_el_total(self) -> None:
+        widget = self._make_widget()
+        widget._items = _items()
+        vistos = []
+
+        def _exec(dlg):
+            from PyQt6.QtWidgets import QLabel
+
+            vistos.extend(l.text() for l in dlg.findChildren(QLabel) if l.objectName() == "cobroTotal")
+            return 0
+
+        with patch.object(QDialog, "exec", _exec):
+            widget._ask_venta_options()
+        self.assertEqual(len(vistos), 1)
+        self.assertIn("$515.00", vistos[0])
+
+
+class CobroEnUnPasoTests(unittest.TestCase):
+    """Cobrar → «Solo ticket» imprime directo, sin la ventana de vista previa."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _make_widget(self) -> QuickSaleWidget:
+        satellite = SimpleNamespace(offline_mode=True, _kiosk_lookup_from_cache=None)
+        widget = QuickSaleWidget(satellite)
+        widget._employee_code = "VEND-1"
+        widget._employee_name = "Daniel Fabian"
+        widget._items = _items()
+        widget._discount_active = False
+        return widget
+
+    def test_la_venta_pide_impresion_directa(self) -> None:
+        widget = self._make_widget()
+        with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")), \
+                patch.object(widget, "_ask_venta_options", return_value=(False, False, False)), \
+                patch(f"{_MOD}.route_tickets") as opd:
+            widget._on_ticket_venta()
+        self.assertTrue(opd.call_args.kwargs.get("directo"))
+        self.assertNotIn("on_back", opd.call_args.kwargs)
+        self.assertIsNone(opd.call_args.kwargs.get("destino"))
+
+    def test_la_pc_elegida_llega_a_la_impresion(self) -> None:
+        widget = self._make_widget()
+        pc = {"identificador": "PC-1", "nombre": "PC principal"}
+
+        def _elige(*_a, **_k):
+            widget._destino_ticket = pc
+            return (False, False, False)
+
+        with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")), \
+                patch.object(widget, "_ask_venta_options", side_effect=_elige), \
+                patch(f"{_MOD}.route_tickets") as opd:
+            widget._on_ticket_venta()
+        self.assertEqual(opd.call_args.kwargs["destino"], pc)
+
+    def test_regresar_no_imprime_ni_anota(self) -> None:
+        widget = self._make_widget()
+        with patch.object(widget, "_ask_venta_options", return_value=None), \
+                patch.object(widget, "_registrar_y_vaciar") as registrar, \
+                patch(f"{_MOD}.route_tickets") as opd:
+            widget._on_ticket_venta()
+        opd.assert_not_called()
+        registrar.assert_not_called()
+        self.assertEqual(len(widget._items), 1)
+
+    def test_empleada_que_cierra_forma_de_pago_no_cobra(self) -> None:
+        widget = self._make_widget()
+        widget._discount_active = True
+        with patch.object(widget, "_ask_card_payment", return_value=None), \
+                patch.object(widget, "_opciones_a_cuenta", return_value=([], None)), \
+                patch.object(widget, "_registrar_y_vaciar") as registrar, \
+                patch(f"{_MOD}.route_tickets") as opd:
+            widget._on_ticket_venta()
+        opd.assert_not_called()
+        registrar.assert_not_called()
+
+    def test_cerrar_forma_de_pago_es_none(self) -> None:
+        widget = self._make_widget()
+        with patch.object(QDialog, "exec", lambda dlg: 0):
+            self.assertIsNone(widget._ask_card_payment())
 
 
 class QuickSaleBusinessInfoTests(unittest.TestCase):

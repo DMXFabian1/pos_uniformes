@@ -2154,10 +2154,11 @@ class QuickSaleWidget(
         code = self._clean_scanned_code(raw)
         return bool(code) and code == str(self._employee_code or "").upper()
 
-    def _ask_card_payment(self) -> bool:
+    def _ask_card_payment(self) -> bool | None:
         """Pregunta si el pago fue con tarjeta (ventas con descuento de
         empleada, donde no aparece el diálogo de copia). Táctil: dos
-        botones grandes, un toque responde."""
+        botones grandes, un toque responde. None si se cierra sin elegir:
+        el ticket sale directo al contestar, así que cerrar no cobra."""
         dlg = QDialog(self)
         dlg.setWindowTitle("Forma de pago")
         dlg.setMinimumWidth(420)
@@ -2172,7 +2173,7 @@ class QuickSaleWidget(
         title.setStyleSheet("font-size: 19px; font-weight: 800; color: #73341c;")
         ly.addWidget(title)
 
-        respuesta = {"tarjeta": False}
+        respuesta: dict = {"tarjeta": None}
         fila = QHBoxLayout()
         fila.setSpacing(10)
         _BTN = (
@@ -2201,22 +2202,25 @@ class QuickSaleWidget(
         dlg.exec()
         return respuesta["tarjeta"]
 
-    def _ask_venta_options(self) -> tuple[bool, bool, bool]:
-        """Pregunta copia interna y forma de pago en un solo diálogo.
+    def _ask_venta_options(self) -> tuple[bool, bool, bool] | None:
+        """La ventana de cobro: forma de pago, copia y «sin ticket» en una.
 
-        Devuelve (con_copia, pago_tarjeta, sin_ticket). Default: sin copia,
-        efectivo, con ticket. "Sin ticket" (2026-09-09, pedido de Daniel):
-        la venta se registra en la Libreta igual que siempre pero no sale
-        papel; el ticket se reconstruye y reimprime después desde la Libreta.
+        Devuelve (con_copia, pago_tarjeta, sin_ticket), o None si regresa a
+        la venta (botón, Esc o ✕): desde 2026-11-24 el ticket sale directo al
+        contestar, ya no hay vista previa donde arrepentirse, así que cerrar
+        esta ventana NO cobra. Default: sin copia, efectivo, con ticket.
+        "Sin ticket" (2026-09-09, pedido de Daniel): la venta se registra en
+        la Libreta igual que siempre pero no sale papel; el ticket se
+        reconstruye y reimprime después desde la Libreta.
         Escanear el gafete de la empleada en sesión equivale a "sí, con
         copia"; cualquier otro código se rechaza. Aquí NO va el
         ScannerEnterGuard: el escaneo es entrada legítima y el Enter del
-        escáner cae en el input (los botones no son default, así que un
-        Enter suelto no contesta nada)."""
+        escáner cae en el input. Un Enter con el input VACÍO (el escáner
+        siempre manda caracteres antes) es «Solo ticket del cliente»."""
         # Rediseño táctil (2026-09-05): botones grandes en vez de checkbox
         # chiquito — pensado para el dedo, no para el mouse.
         dlg = QDialog(self)
-        dlg.setWindowTitle("Copia tienda")
+        dlg.setWindowTitle("Cobrar")
         dlg.setMinimumWidth(480)
         dlg.setStyleSheet(
             "QDialog { background: #f4ede2; }"
@@ -2229,14 +2233,24 @@ class QuickSaleWidget(
         ly.setContentsMargins(22, 20, 22, 18)
         ly.setSpacing(12)
 
-        title = QLabel("¿Imprimir copia para la tienda?")
+        # Arriba: ¿Cómo pagó? y el total en grande (antes salía en la ventana
+        # de imprimir, que ya no aparece).
+        encabezado = QHBoxLayout()
+        title = QLabel("¿Cómo pagó?")
         title.setStyleSheet("font-size: 19px; font-weight: 800; color: #73341c;")
-        ly.addWidget(title)
-
-        # ¿Cómo pagó? — dos toggles grandes y exclusivos (default: efectivo)
-        pago_label = QLabel("¿Cómo pagó?")
-        pago_label.setStyleSheet(f"font-size: 13px; color: {_MUTED}; font-weight: 700;")
-        ly.addWidget(pago_label)
+        encabezado.addWidget(title, 1)
+        total_txt = self._total_para_cobrar_txt()
+        if total_txt:
+            total_box = QLabel(total_txt)
+            total_box.setObjectName("cobroTotal")
+            total_box.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            total_box.setStyleSheet(
+                "QLabel#cobroTotal { background: #a84f2d; color: #ffffff;"
+                "  border-radius: 14px; padding: 6px 18px;"
+                "  font-size: 22px; font-weight: 900; }"
+            )
+            encabezado.addWidget(total_box, 0, Qt.AlignmentFlag.AlignTop)
+        ly.addLayout(encabezado)
         # Seleccionado = tinte claro con borde grueso (distinto del botón de
         # acción sólido, para que no se confundan a golpe de vista).
         _TOGGLE = (
@@ -2268,7 +2282,7 @@ class QuickSaleWidget(
         btn_tarjeta.clicked.connect(lambda: _set_pago(True))
         ly.addLayout(pago_row)
 
-        hint = QLabel("O escanea tu gafete: eso responde \"Sí, con copia\".")
+        hint = QLabel("¿Copia para la tienda? Escanea tu gafete.  Enter = imprimir aquí.")
         hint.setStyleSheet(f"font-size: 12px; color: {_MUTED};")
 
         scan_input = QLineEdit()
@@ -2280,6 +2294,20 @@ class QuickSaleWidget(
 
         wants_copy = False
         sin_ticket = False
+        # A dónde sale el ticket: None = aquí; si no, {identificador, nombre}
+        # de otra PC. Va en un atributo para no cambiar la tupla que
+        # devuelve esta ventana (la leen _on_ticket_venta y el monedero).
+        self._destino_ticket = None
+
+        def _accept_solo_ticket() -> None:
+            dlg.accept()
+
+        def _accept_mandar_a(destino: dict) -> None:
+            self._destino_ticket = {
+                "identificador": destino["identificador"],
+                "nombre": destino.get("nombre", ""),
+            }
+            dlg.accept()
 
         def _accept_with_copy() -> None:
             nonlocal wants_copy
@@ -2295,6 +2323,8 @@ class QuickSaleWidget(
             raw = scan_input.text()
             scan_input.clear()
             if not raw.strip():
+                # Enter a mano (el escáner nunca lo manda solo): lo de diario.
+                _accept_solo_ticket()
                 return
             if self._scan_confirms_copy(raw):
                 _accept_with_copy()
@@ -2309,28 +2339,45 @@ class QuickSaleWidget(
         btn_row.setSpacing(10)
         # "Solo ticket" es la respuesta de todos los días: ese lleva el
         # terracota protagonista (pedido de Daniel).
-        no_button = QPushButton("🧾  Solo ticket\ndel cliente")
+        no_button = QPushButton("🖨  Imprimir\naquí")
+        no_button.setObjectName("soloTicketButton")
         no_button.setStyleSheet(
             "QPushButton { background: #a84f2d; color: #ffffff; border: none;"
             "  border-radius: 14px; min-height: 60px;"
             "  font-size: 17px; font-weight: 800; }"
             "QPushButton:pressed { background: #8a4326; }"
         )
-        yes_button = QPushButton("🖨  Sí, con copia")
-        yes_button.setStyleSheet(
+        # En el lugar de «Con copia» (Daniel, 2026-11-24: «quita el con copia
+        # para la tienda, y ahí podemos poner la opción de enviar a la PC
+        # principal o imprimir aquí»). Un botón por cada otra PC que imprime
+        # tickets; una apagada se ve pero no se puede tocar. La copia sigue
+        # saliendo escaneando el gafete.
+        _OTRA = (
             "QPushButton { background: #f8f2e9; color: #73341c;"
             "  border: 1px solid #ddd0c0; border-radius: 14px;"
             "  min-height: 60px; font-size: 16px; font-weight: 700; }"
             "QPushButton:pressed { background: #e8dbc7; }"
+            "QPushButton:disabled { background: #f1ece4; color: #a89f93; border-color: #e6ddd0; }"
         )
-        for button in (no_button, yes_button):
-            # Sin botón default: un Enter suelto no debe contestar el diálogo.
+        from pos_uniformes.ui.helpers.ticket_routing_helper import destinos_para_cobro
+
+        botones = [no_button]
+        for destino in destinos_para_cobro()[:2]:
+            nombre = destino.get("nombre") or "otra PC"
+            encendida = bool(destino.get("online"))
+            b = QPushButton(f"📡  Mandar a\n{nombre}" if encendida else f"📡  {nombre}\napagada")
+            b.setObjectName("mandarAButton")
+            b.setStyleSheet(_OTRA)
+            b.setEnabled(encendida)
+            b.clicked.connect(lambda _=False, d=destino: _accept_mandar_a(d))
+            botones.append(b)
+        for button in botones:
+            # Sin botón default: el Enter lo atiende el input (vacío = aquí).
             button.setAutoDefault(False)
             button.setDefault(False)
-        no_button.clicked.connect(dlg.reject)
-        yes_button.clicked.connect(_accept_with_copy)
-        btn_row.addWidget(no_button, 1)
-        btn_row.addWidget(yes_button, 1)
+        no_button.clicked.connect(_accept_solo_ticket)
+        for button in botones:
+            btn_row.addWidget(button, 1)
         ly.addLayout(btn_row)
 
         # Sin papel: se registra igual, se reimprime después si hace falta.
@@ -2352,11 +2399,38 @@ class QuickSaleWidget(
         ly.addWidget(scan_input)
         ly.addWidget(error_label)
 
+        # Sin vista previa ya no hay «Regresar» después: aquí se arrepiente.
+        regresar_button = QPushButton("←  Regresar a la venta")
+        regresar_button.setObjectName("regresarVentaButton")
+        regresar_button.setStyleSheet(
+            "QPushButton { background: transparent; color: #5f594f; border: none;"
+            "  min-height: 40px; font-size: 14px; font-weight: 700; }"
+        )
+        regresar_button.setAutoDefault(False)
+        regresar_button.setDefault(False)
+        regresar_button.clicked.connect(dlg.reject)
+        ly.addWidget(regresar_button)
+
         dlg.setLayout(ly)
         QTimer.singleShot(0, scan_input.setFocus)
         dlg.exec()
+        if dlg.result() != QDialog.DialogCode.Accepted:
+            return None
         # La forma de pago vale aunque conteste "solo ticket del cliente".
         return wants_copy, btn_tarjeta.isChecked(), sin_ticket
+
+    def _total_para_cobrar_txt(self) -> str:
+        """«Total $850.00» para la ventana de cobro; con saldo de monedero,
+        lo que queda por cobrar. Vacío si no se puede calcular."""
+        try:
+            _s, _d, total = self._compute_totals()
+            canje = self._canje_actual(total)
+            if canje > 0:
+                resto = max(Decimal(str(total)) - Decimal(str(canje)), Decimal("0"))
+                return f"Por cobrar\n${resto:,.2f}"
+            return f"Total\n${Decimal(str(total)):,.2f}"
+        except Exception:  # noqa: BLE001 — el recuadro es ayuda, no bloquea el cobro
+            return ""
 
     def build_reprint_ticket(
         self,
@@ -2901,6 +2975,8 @@ class QuickSaleWidget(
 
     def _on_ticket_venta(self) -> None:
         self._folio_venta = None
+        # Aquí, salvo que en la ventana de cobro elija otra PC.
+        self._destino_ticket = None
         if not self._items:
             QMessageBox.information(self, "Sin piezas", "Agrega piezas antes de generar ticket.")
             return
@@ -2925,7 +3001,11 @@ class QuickSaleWidget(
             if not self._revisar_con_servidor():
                 return
         else:
-            wants_copy, card, sin_ticket = self._ask_venta_options()
+            respuesta = self._ask_venta_options()
+            if respuesta is None:
+                # «Regresar a la venta» / Esc / ✕: no se cobra nada.
+                return
+            wants_copy, card, sin_ticket = respuesta
             if not self._revisar_con_servidor():
                 return
             _s, _d, _t = self._compute_totals()
@@ -2966,16 +3046,17 @@ class QuickSaleWidget(
                 return
             self._registrar_y_vaciar("venta", pago_tarjeta=card)
 
-        # La Libreta registra HASTA que la impresión realmente arranca:
-        # cerrar el diálogo sin imprimir no anota nada.
+        # La Libreta registra cuando la impresión arranca. Desde 2026-11-24
+        # (las empleadas pedían menos toques) el ticket sale directo, sin la
+        # ventana de vista previa: «Cobrar» → «Solo ticket» y listo. Si no
+        # sale, se abre esa ventana para reintentar o mandarlo a otra PC.
         route_tickets(
             self,
             "Ticket de venta",
             tickets,
             on_printed=_al_imprimir,
-            # "← Regresar": vuelve a la pregunta (copia / pago / sin ticket)
-            # con el carrito intacto; nada se registró todavía.
-            on_back=self._on_ticket_venta,
+            directo=True,
+            destino=getattr(self, "_destino_ticket", None),
         )
         self._scan_input.setFocus()
 

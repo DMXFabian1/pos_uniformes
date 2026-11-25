@@ -161,11 +161,18 @@ class CompradoraEmpleadaMixin:
         """«¿Cómo paga?»: "efectivo", "tarjeta" o la opción a cuenta elegida.
         None si se cerró sin elegir."""
         _s, _d, total = self._compute_totals()
+        def _efectivo_o_tarjeta():
+            # Cerrar sin elegir no cobra: el ticket sale directo (2026-11-24).
+            tarjeta = self._ask_card_payment()
+            if tarjeta is None:
+                return None
+            return "tarjeta" if tarjeta else "efectivo"
+
         if self._canje_actual(total) > 0:
-            return "tarjeta" if self._ask_card_payment() else "efectivo"
+            return _efectivo_o_tarjeta()
         opciones, razon = self._opciones_a_cuenta(total)
         if not opciones and razon is None:
-            return "tarjeta" if self._ask_card_payment() else "efectivo"
+            return _efectivo_o_tarjeta()
 
         dlg = QDialog(self)
         dlg.setWindowTitle("Forma de pago")
