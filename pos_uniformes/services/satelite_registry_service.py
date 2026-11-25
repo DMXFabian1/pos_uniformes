@@ -32,18 +32,27 @@ def es_de_desarrollo() -> bool:
     como un kiosko más, y cada vez que la cerraba el bot de la tienda avisaba
     que se había apagado, y al abrirla que «ya volvió» (2026-10-11). Sin
     latido, para el vigilante nunca estuvo prendida hoy y no hay noticia.
+
+    2026-11-25: la variable vivía en un .env por carpeta, y un kiosko abierto
+    desde otra carpeta de trabajo volvió a latir como «MacBook-Air-de-Daniel»
+    y el bot le recordaba encenderla. Las pantallas de la tienda son Windows:
+    en una Mac, si nadie dijo lo contrario, es de desarrollo. Un «0» explícito
+    la vuelve pantalla (las pruebas lo usan).
     """
     import os
+    import sys
 
     valor = os.getenv("POS_UNIFORMES_SATELITE_DESARROLLO")
     if valor is None:
         try:
             from pos_uniformes.utils.config import load_runtime_env_overrides
 
-            valor = load_runtime_env_overrides().get("POS_UNIFORMES_SATELITE_DESARROLLO", "")
-        except Exception:  # noqa: BLE001 — sin config, es una pantalla normal
-            valor = ""
-    return (valor or "").strip().lower() in {"1", "si", "sí", "true"}
+            valor = load_runtime_env_overrides().get("POS_UNIFORMES_SATELITE_DESARROLLO")
+        except Exception:  # noqa: BLE001 — sin config, decide el sistema
+            valor = None
+    if valor is None or not valor.strip():
+        return sys.platform == "darwin"
+    return valor.strip().lower() in {"1", "si", "sí", "true"}
 
 
 def registrar(

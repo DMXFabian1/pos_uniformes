@@ -38,6 +38,38 @@ class SateliteDeDesarrolloTests(unittest.TestCase):
         session.add.assert_called_once()
         self.assertIsNotNone(sat.ultimo_visto)
 
+    def _sin_variable(self):
+        """Ni en el entorno ni en el .env de la carpeta."""
+        limpio = {k: v for k, v in os.environ.items() if k != "POS_UNIFORMES_SATELITE_DESARROLLO"}
+        return (
+            patch.dict(os.environ, limpio, clear=True),
+            patch("pos_uniformes.utils.config.load_runtime_env_overrides", return_value={}),
+        )
+
+    def test_una_mac_sin_variable_es_de_desarrollo(self) -> None:
+        # 2026-11-25: un kiosko abierto desde otra carpeta, sin el .env con la
+        # variable, latía como pantalla y el bot pedía encender la Mac.
+        entorno, env_file = self._sin_variable()
+        with entorno, env_file, patch("sys.platform", "darwin"):
+            self.assertTrue(rsvc.es_de_desarrollo())
+
+    def test_windows_sin_variable_es_pantalla(self) -> None:
+        entorno, env_file = self._sin_variable()
+        with entorno, env_file, patch("sys.platform", "win32"):
+            self.assertFalse(rsvc.es_de_desarrollo())
+
+    def test_una_mac_con_cero_explicito_si_late(self) -> None:
+        with patch.dict(os.environ, {"POS_UNIFORMES_SATELITE_DESARROLLO": "0"}), patch("sys.platform", "darwin"):
+            self.assertFalse(rsvc.es_de_desarrollo())
+
+    def test_la_variable_del_env_de_la_carpeta_cuenta(self) -> None:
+        entorno, _ = self._sin_variable()
+        with entorno, patch("sys.platform", "darwin"), patch(
+            "pos_uniformes.utils.config.load_runtime_env_overrides",
+            return_value={"POS_UNIFORMES_SATELITE_DESARROLLO": "0"},
+        ):
+            self.assertFalse(rsvc.es_de_desarrollo())
+
 
 if __name__ == "__main__":
     unittest.main()
