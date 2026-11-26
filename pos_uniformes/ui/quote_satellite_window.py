@@ -374,6 +374,10 @@ class QuoteSatelliteWindow(QMainWindow):
     # no sirve: Qt solo arma timers en hilos suyos, así que la otra pantalla
     # nunca se enteraba del cambio (2026-10-10).
     _temporada_leida = pyqtSignal(str)
+    # El latido (cada minuto, en su hilo) sabe antes que el watchdog (cada 5
+    # min) si la PC principal se apagó o volvió (2026-11-25).
+    _latido_sin_base = pyqtSignal()
+    _latido_con_base = pyqtSignal()
     _conteo_banner_ready = pyqtSignal(object)   # lista de escuelas vencidas, o None si no se pudo
     # Lo de la sección Conteos, ya leído en un hilo (dict) — ver _refresh_conteos_vista.
     _conteos_datos_listos = pyqtSignal(object)
@@ -514,6 +518,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self._anuncio_inmediato_pendiente = None
         self._anuncios_ready.connect(self._on_anuncios_ready)
         self._temporada_leida.connect(self._repintar_si_cambio_la_temporada)
+        self._latido_sin_base.connect(self.marcar_sin_conexion)
+        self._latido_con_base.connect(self._volvio_la_base)
         QTimer.singleShot(2_500, self._setup_anuncio_cartelera)
 
     def _start_trabajo_dispatcher(self) -> None:
@@ -716,6 +722,12 @@ class QuoteSatelliteWindow(QMainWindow):
             self._set_db_connectivity_banner(online=False)
         except Exception:  # noqa: BLE001 — avisar nunca puede tumbar la venta
             pass
+
+    def _volvio_la_base(self) -> None:
+        """El latido volvió a ver la PC principal: el watchdog confirma, trae el
+        catálogo y regresa al modo en línea (sin esperar sus cinco minutos)."""
+        if not self.db_en_linea:
+            self._start_background_db_refresh()
 
     def _start_background_db_refresh(self) -> None:
         """Lanza un hilo que revisa la DB y trae catálogo fresco si se puede."""
@@ -8871,7 +8883,13 @@ class QuoteSatelliteWindow(QMainWindow):
                 from pos_uniformes.services.satellite_startup_service import probe_database_host
 
                 if not probe_database_host():
-                    return  # DB caída: no bloquear ni fallar ruidosamente
+                    # Se apagó la PC principal: al modo local YA, no a los
+                    # cinco minutos del watchdog. Mientras tanto cada toque
+                    # volvía a buscarla y a esperar (2026-11-25).
+                    self._latido_sin_base.emit()
+                    return
+                if not self.db_en_linea:
+                    self._latido_con_base.emit()
                 from pos_uniformes.services.satellite_identity_service import (
                     get_satellite_id,
                     get_satellite_name,

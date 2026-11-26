@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from sqlalchemy import MetaData, text
+import socket
+import threading
+import time
+
+from sqlalchemy import MetaData, event, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 from sqlalchemy import create_engine
@@ -49,15 +53,109 @@ def build_connect_args(statement_timeout_ms: int, solo_lectura: bool = False) ->
     return connect_args
 
 
-_DB_URL = settings.database_url
+class CorteDeBase:
+    """¿La PC principal sigue ahí? Contestarlo rápido, sin esperar a Postgres.
 
-if _DB_URL.startswith("sqlite"):
-    # Modo snapshot (servidor PWA de la casa): SQLite no entiende los
-    # keepalives/timeouts de psycopg — engine simple.
-    engine: Engine = create_engine(_DB_URL, echo=settings.db_echo, future=True)
-else:
-    engine = create_engine(
-        _DB_URL,
+    Daniel, 2026-11-25: «apago la PC principal antes y el kiosko
+    inmediatamente se pone lento; me ha obligado a encenderla de nuevo o a
+    cerrar el programa». Dos esperas se sumaban en cada toque:
+
+    - Las conexiones que el pool ya tenía abiertas: el pre-ping (SELECT 1)
+      se manda a un host apagado y nadie contesta. Windows tarda ~20 s en
+      darse por vencido, una vez por cada conexión guardada. La simulación
+      con un proxy mudo (2026-11-25) se quedó esperando las tres.
+    - Cada conexión nueva: hasta `connect_timeout` (2 s), una y otra vez.
+
+    Con esto, antes de reusar una conexión se toca el puerto con un connect
+    TCP de medio segundo (en la LAN tarda milisegundos; no se recuerda el
+    «sí»: la simulación apagó a los pocos segundos de una consulta buena y
+    con el «sí» guardado el pre-ping volvía a esperar para siempre). Si
+    no contesta, el pool se tira y por `ESPERA_TRAS_CAIDA_SEG` todo intento
+    de conectar falla al instante, como si no hubiera red. Lo que ya sabía
+    trabajar sin la PC principal (catálogo local, cola de la Libreta) lo
+    hace sin que la empleada espere.
+    """
+
+    TIEMPO_SONDEO_SEG = 0.5
+    ESPERA_TRAS_CAIDA_SEG = 15.0
+
+    def __init__(self, host: str, port: int, *, reloj=time.monotonic, sondear=None) -> None:
+        self.host = host
+        self.port = int(port)
+        self._reloj = reloj
+        self._sondear = sondear or self._sondeo_tcp
+        self._lock = threading.Lock()
+        self._caida_en: float | None = None
+
+    def _sondeo_tcp(self) -> bool:
+        try:
+            with socket.create_connection((self.host, self.port), timeout=self.TIEMPO_SONDEO_SEG):
+                return True
+        except OSError:
+            return False
+
+    def anotar_caida(self) -> None:
+        with self._lock:
+            self._caida_en = self._reloj()
+
+    def recien_caida(self) -> bool:
+        """Falló hace poco: ni intentarlo (falla al instante)."""
+        with self._lock:
+            return self._caida_en is not None and self._reloj() - self._caida_en < self.ESPERA_TRAS_CAIDA_SEG
+
+    def host_contesta(self) -> bool:
+        """Sondeo TCP corto. Si contesta, se olvida la caída."""
+        if self._sondear():
+            with self._lock:
+                self._caida_en = None
+            return True
+        self.anotar_caida()
+        return False
+
+
+def _base_no_contesta(corte: CorteDeBase) -> Exception:
+    import psycopg
+
+    return psycopg.OperationalError(
+        f"La PC principal ({corte.host}:{corte.port}) no contesta; se reintenta en unos segundos."
+    )
+
+
+def instalar_corte(engine_pg: Engine, corte: CorteDeBase) -> CorteDeBase:
+    """Engancha el corte al engine: el pre-ping y cada conexión nueva."""
+    dialecto = engine_pg.dialect
+    ping_original = dialecto.do_ping
+
+    def do_ping(dbapi_connection) -> bool:
+        # False = conexión muerta: SQLAlchemy tira TODO el pool y reconecta,
+        # y la reconexión cae en el corte de abajo (al instante).
+        if not corte.host_contesta():
+            return False
+        return ping_original(dbapi_connection)
+
+    dialecto.do_ping = do_ping  # type: ignore[method-assign]
+
+    @event.listens_for(engine_pg, "do_connect")
+    def _conectar(_dialect, _conn_rec, cargs, cparams):
+        if corte.recien_caida() or not corte.host_contesta():
+            raise _base_no_contesta(corte)
+        try:
+            return dialecto.connect(*cargs, **cparams)
+        except dialecto.loaded_dbapi.OperationalError:
+            corte.anotar_caida()
+            raise
+
+    engine_pg.corte_de_base = corte  # type: ignore[attr-defined]
+    return corte
+
+
+def crear_engine(url: str) -> Engine:
+    if url.startswith("sqlite"):
+        # Modo snapshot (servidor PWA de la casa): SQLite no entiende los
+        # keepalives/timeouts de psycopg — engine simple.
+        return create_engine(url, echo=settings.db_echo, future=True)
+    nuevo = create_engine(
+        url,
         echo=settings.db_echo,
         future=True,
         # pool_pre_ping: prueba la conexión (SELECT 1) antes de reutilizarla y
@@ -70,6 +168,15 @@ else:
             settings.db_statement_timeout_ms, solo_lectura=modo_pwa() == "casa"
         ),
     )
+    from sqlalchemy.engine import make_url
+
+    destino = make_url(url)
+    instalar_corte(nuevo, CorteDeBase(destino.host or "localhost", destino.port or 5432))
+    return nuevo
+
+
+_DB_URL = settings.database_url
+engine: Engine = crear_engine(_DB_URL)
 
 SessionLocal = sessionmaker(
     bind=engine,
