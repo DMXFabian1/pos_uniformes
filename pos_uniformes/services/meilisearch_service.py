@@ -17,12 +17,29 @@ MEILI_KEY = None
 INDEX_NAME = "variantes"
 
 _client = None
+_buscador = None
 _client_checked_at: float = 0
 _CLIENT_RETRY_INTERVAL = 30
 
+# Segundos que se espera a Meilisearch. El cliente traía `timeout=None`: si
+# el proceso quedaba prendido pero sin contestar, cada letra que se tecleaba
+# en la búsqueda esperaba para siempre en el hilo de la pantalla. El 25-nov
+# el kiosko se trabó así armando un presupuesto y Windows lo cerró (evento
+# 1002 a las 16:02; /health no contestaba ni en 5 s). La búsqueda y el
+# /health van en la pantalla: espera corta. Indexar va en un hilo aparte y
+# sube miles de documentos: espera larga.
+TIEMPO_BUSQUEDA_SEG = 1
+TIEMPO_INDEXAR_SEG = 60
+
+
+def _nuevo_cliente(timeout: int):
+    import meilisearch
+
+    return meilisearch.Client(MEILI_URL, MEILI_KEY, timeout=timeout)
+
 
 def _get_client():
-    global _client, _client_checked_at
+    global _client, _buscador, _client_checked_at
     now = time.monotonic()
     if _client is not None:
         return _client
@@ -30,15 +47,36 @@ def _get_client():
         return None
     _client_checked_at = now
     try:
-        import meilisearch
-        c = meilisearch.Client(MEILI_URL, MEILI_KEY)
-        c.health()
-        _client = c
+        buscador = _nuevo_cliente(TIEMPO_BUSQUEDA_SEG)
+        buscador.health()
+        _client = _nuevo_cliente(TIEMPO_INDEXAR_SEG)
+        _buscador = buscador
         logger.info("Meilisearch conectado en %s", MEILI_URL)
         return _client
     except Exception as exc:
         logger.debug("Meilisearch no disponible: %s", exc)
         _client = None
+        _buscador = None
+        return None
+
+
+def _dar_por_caido(motivo: object) -> None:
+    """No contestó a tiempo: las próximas búsquedas van al catálogo local, sin
+    esperar, y se vuelve a probar a los `_CLIENT_RETRY_INTERVAL` segundos."""
+    global _client, _buscador, _client_checked_at
+    logger.warning("Meilisearch no contestó; se busca en el catálogo local: %s", motivo)
+    _client = None
+    _buscador = None
+    _client_checked_at = time.monotonic()
+
+
+def _indice_de_busqueda():
+    """El índice con el cliente de espera corta (el de la pantalla)."""
+    if _get_client() is None or _buscador is None:
+        return None
+    try:
+        return _buscador.index(INDEX_NAME)
+    except Exception:
         return None
 
 
@@ -335,7 +373,7 @@ def index_from_db(session: Session) -> int:
 
 
 def search(query: str, *, limit: int = 40, mode: str | None = None) -> list[dict[str, Any]]:
-    index = _get_index()
+    index = _indice_de_busqueda()
     if index is None:
         return []
 
@@ -364,7 +402,7 @@ def search(query: str, *, limit: int = 40, mode: str | None = None) -> list[dict
         result = index.search(query, opts)
         return result.get("hits", [])
     except Exception as exc:
-        logger.warning("Error buscando en Meilisearch: %s", exc)
+        _dar_por_caido(exc)
         return []
 
 

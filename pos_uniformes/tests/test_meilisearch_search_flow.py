@@ -139,11 +139,74 @@ class SearchUsesMatchingStrategyAllTests(unittest.TestCase):
 
         fake_index = Mock()
         fake_index.search.return_value = {"hits": [{"sku": "SKU-1"}]}
-        with patch.object(meilisearch_service, "_get_index", return_value=fake_index):
+        with patch.object(meilisearch_service, "_indice_de_busqueda", return_value=fake_index):
             hits = meilisearch_service.search("camisa blanca")
         self.assertEqual(hits, [{"sku": "SKU-1"}])
         _query, opts = fake_index.search.call_args.args
         self.assertEqual(opts.get("matchingStrategy"), "all")
+
+
+class BuscadorQueNoContestaTests(unittest.TestCase):
+    """25-nov: Meilisearch prendido pero sin contestar trabó el kiosko armando
+    un presupuesto (Windows lo cerró). Nunca se espera sin límite."""
+
+    def setUp(self) -> None:
+        from pos_uniformes.services import meilisearch_service as ms
+
+        self.ms = ms
+        self._antes = (ms._client, ms._buscador, ms._client_checked_at)
+        ms._client, ms._buscador, ms._client_checked_at = None, None, 0
+
+    def tearDown(self) -> None:
+        self.ms._client, self.ms._buscador, self.ms._client_checked_at = self._antes
+
+    def test_la_busqueda_y_el_health_esperan_poco_e_indexar_mas(self) -> None:
+        creados = []
+
+        def _cliente(url, key, timeout=None):
+            c = Mock()
+            creados.append(timeout)
+            return c
+
+        with patch("meilisearch.Client", side_effect=_cliente):
+            self.assertTrue(self.ms.is_available())
+        self.assertNotIn(None, creados)
+        self.assertEqual(creados[0], self.ms.TIEMPO_BUSQUEDA_SEG)
+        self.assertLessEqual(self.ms.TIEMPO_BUSQUEDA_SEG, 2)
+        self.assertIn(self.ms.TIEMPO_INDEXAR_SEG, creados)
+
+    def test_si_no_contesta_las_siguientes_van_al_catalogo_local_sin_esperar(self) -> None:
+        lento = Mock()
+        lento.index.return_value.search.side_effect = TimeoutError("read timed out")
+        with patch("meilisearch.Client", return_value=lento):
+            self.assertTrue(self.ms.is_available())
+            self.assertEqual(self.ms.search("pantalon cqa"), [])
+            # Ya no se vuelve a preguntar en cada letra: se da por caído.
+            self.assertFalse(self.ms.is_available())
+            self.assertEqual(self.ms.search("pantalon cq"), [])
+        self.assertEqual(lento.index.return_value.search.call_count, 1)
+
+    def test_se_vuelve_a_probar_pasado_el_intervalo(self) -> None:
+        lento = Mock()
+        lento.index.return_value.search.side_effect = TimeoutError("read timed out")
+        with patch("meilisearch.Client", return_value=lento):
+            self.ms.search("pantalon")
+            self.ms._client_checked_at -= self.ms._CLIENT_RETRY_INTERVAL + 1
+            self.assertTrue(self.ms.is_available())
+
+    def test_el_dialogo_busca_local_si_meili_no_contesta(self) -> None:
+        from PyQt6.QtWidgets import QApplication
+
+        self.app = QApplication.instance() or QApplication([])   # que viva toda la prueba
+        from pos_uniformes.ui.dialogs.quick_product_search_dialog import QuickProductSearchDialog
+
+        lento = Mock()
+        lento.index.return_value.search.side_effect = TimeoutError("read timed out")
+        with patch("meilisearch.Client", return_value=lento):
+            dlg = QuickProductSearchDialog(catalog_rows=[_catalog_row("SKU-1", "Pantalon Gabardina")])
+            dlg._search_input.setText("pantalon")
+            dlg._run_search()
+        self.assertEqual([r["sku"] for r in dlg._result_rows], ["SKU-1"])
 
 
 def _catalog_row(sku: str, nombre: str, color: str = "Blanco") -> dict:
