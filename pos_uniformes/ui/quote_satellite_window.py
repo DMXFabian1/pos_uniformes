@@ -8883,11 +8883,16 @@ class QuoteSatelliteWindow(QMainWindow):
                 from pos_uniformes.services.satellite_startup_service import probe_database_host
 
                 if not probe_database_host():
-                    # Se apagó la PC principal: al modo local YA, no a los
-                    # cinco minutos del watchdog. Mientras tanto cada toque
-                    # volvía a buscarla y a esperar (2026-11-25).
-                    self._latido_sin_base.emit()
+                    # Se apagó la PC principal: al modo local sin esperar los
+                    # cinco minutos del watchdog (2026-11-25). Con DOS latidos
+                    # fallidos seguidos, no con uno: un latido que no alcanza
+                    # a contestar con la red bien no debe sacar al kiosko de
+                    # línea (2026-11-26, «pierde la conexión seguido»).
+                    self._latidos_sin_base = int(getattr(self, "_latidos_sin_base", 0) or 0) + 1
+                    if self._latidos_sin_base >= 2:
+                        self._latido_sin_base.emit()
                     return
+                self._latidos_sin_base = 0
                 if not self.db_en_linea:
                     self._latido_con_base.emit()
                 from pos_uniformes.services.satellite_identity_service import (

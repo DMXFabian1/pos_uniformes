@@ -4,6 +4,11 @@ Daniel: «apago la PC principal antes y el kiosko inmediatamente se pone lento;
 me ha obligado a encenderla de nuevo o a cerrar el programa». El pre-ping de
 cada conexión guardada esperaba a un host que ya no contesta, y cada conexión
 nueva esperaba su connect_timeout. `CorteDeBase` lo vuelve un «no» al instante.
+
+2026-11-26: la primera versión sondeaba el puerto con medio segundo y, dentro
+del programa, daba «no contesta» con la red bien («el kiosko pierde la conexión
+seguido»). Ahora solo cuentan dos conexiones de verdad fallidas seguidas, y el
+latido pide dos latidos fallidos seguidos.
 """
 
 from __future__ import annotations
@@ -29,65 +34,93 @@ class _Reloj:
 
 
 class CorteDeBaseTests(unittest.TestCase):
-    def test_si_no_contesta_queda_caida_un_rato_y_luego_se_reintenta(self) -> None:
+    def test_una_sola_falla_no_la_da_por_caida(self) -> None:
+        # 2026-11-26: un tropiezo suelto no debe sacar al kiosko de línea.
+        corte = cx.CorteDeBase("10.0.0.9", 5432, reloj=_Reloj())
+        corte.anotar_falla("timeout")
+        self.assertFalse(corte.recien_caida())
+
+    def test_dos_fallas_seguidas_la_dan_por_caida_un_rato(self) -> None:
         reloj = _Reloj()
-        corte = cx.CorteDeBase("10.0.0.9", 5432, reloj=reloj, sondear=lambda: False)
-        self.assertFalse(corte.host_contesta())
+        corte = cx.CorteDeBase("10.0.0.9", 5432, reloj=reloj)
+        corte.anotar_falla()
+        with self.assertLogs("pos_uniformes.database.connection", level="WARNING") as log:
+            corte.anotar_falla("timeout expired")
+        self.assertIn("timeout expired", log.output[0])
         self.assertTrue(corte.recien_caida())
         reloj.t += corte.ESPERA_TRAS_CAIDA_SEG + 1
         self.assertFalse(corte.recien_caida())
 
-    def test_si_vuelve_a_contestar_se_olvida_la_caida(self) -> None:
-        contesta = {"si": False}
-        corte = cx.CorteDeBase("10.0.0.9", 5432, reloj=_Reloj(), sondear=lambda: contesta["si"])
-        corte.host_contesta()
-        contesta["si"] = True
-        self.assertTrue(corte.host_contesta())
+    def test_un_exito_en_medio_reinicia_la_cuenta(self) -> None:
+        corte = cx.CorteDeBase("10.0.0.9", 5432, reloj=_Reloj())
+        corte.anotar_falla()
+        corte.anotar_exito()
+        corte.anotar_falla()
         self.assertFalse(corte.recien_caida())
 
-    def test_el_sondeo_real_falla_rapido_con_un_puerto_cerrado(self) -> None:
-        corte = cx.CorteDeBase("127.0.0.1", 1, reloj=_Reloj())
-        self.assertFalse(corte.host_contesta())
+    def test_si_vuelve_se_olvida_la_caida(self) -> None:
+        corte = cx.CorteDeBase("10.0.0.9", 5432, reloj=_Reloj())
+        corte.anotar_falla()
+        corte.anotar_falla()
+        corte.anotar_exito()
+        self.assertFalse(corte.recien_caida())
+
+    def test_ya_no_se_sondea_el_puerto(self) -> None:
+        # El sondeo de medio segundo daba «no contesta» con la red bien.
+        self.assertFalse(hasattr(cx.CorteDeBase, "host_contesta"))
+        self.assertNotIn("socket", vars(cx))
 
 
 class EngineConCorteTests(unittest.TestCase):
-    def _engine(self, sondear):
+    def _engine(self):
         engine = create_engine("postgresql+psycopg://u:p@10.0.0.9:5432/x", pool_pre_ping=True)
-        corte = cx.instalar_corte(engine, cx.CorteDeBase("10.0.0.9", 5432, reloj=_Reloj(), sondear=sondear))
+        corte = cx.instalar_corte(engine, cx.CorteDeBase("10.0.0.9", 5432, reloj=_Reloj()))
         return engine, corte
 
-    def test_apagada_no_intenta_conectar_y_falla_al_instante(self) -> None:
-        engine, _ = self._engine(lambda: False)
+    def _caer(self, corte) -> None:
+        corte.anotar_falla()
+        corte.anotar_falla()
+
+    def test_con_la_base_bien_conecta_de_verdad_sin_sondear(self) -> None:
+        engine, corte = self._engine()
+        with patch.object(engine.dialect, "connect", return_value=MagicMock()) as conectar:
+            try:
+                engine.connect()
+            except Exception:  # noqa: BLE001 — el MagicMock no es una conexión de verdad
+                pass
+        conectar.assert_called_once()
+        self.assertFalse(corte.recien_caida())
+
+    def test_recien_caida_no_intenta_conectar_y_falla_al_instante(self) -> None:
+        engine, corte = self._engine()
+        self._caer(corte)
         with patch.object(engine.dialect, "connect") as conectar:
             with self.assertRaises(OperationalError):
                 engine.connect()
         conectar.assert_not_called()
 
-    def test_recien_caida_ni_siquiera_sondea(self) -> None:
-        sondeos = []
-        engine, corte = self._engine(lambda: sondeos.append(1) or False)
-        corte.anotar_caida()
-        with self.assertRaises(OperationalError):
-            engine.connect()
-        self.assertEqual(sondeos, [])
-
-    def test_si_falla_el_connect_de_postgres_se_anota_la_caida(self) -> None:
-        engine, corte = self._engine(lambda: True)
+    def test_dos_connect_fallidos_la_dan_por_caida(self) -> None:
+        engine, corte = self._engine()
         dbapi = engine.dialect.loaded_dbapi
-        with patch.object(engine.dialect, "connect", side_effect=dbapi.OperationalError("timeout")):
+        with patch.object(engine.dialect, "connect", side_effect=dbapi.OperationalError("timeout")) as conectar:
+            for _ in range(2):
+                with self.assertRaises(OperationalError):
+                    engine.connect()
+            self.assertTrue(corte.recien_caida())
             with self.assertRaises(OperationalError):
                 engine.connect()
-        self.assertTrue(corte.recien_caida())
+        self.assertEqual(conectar.call_count, 2)   # el tercero ni lo intentó
 
-    def test_el_pre_ping_no_toca_una_conexion_si_el_host_no_contesta(self) -> None:
+    def test_recien_caida_el_pre_ping_no_toca_la_conexion_guardada(self) -> None:
         # Mandarle SELECT 1 a un host apagado es lo que esperaba ~20 s.
-        engine, _ = self._engine(lambda: False)
+        engine, corte = self._engine()
+        self._caer(corte)
         conexion_guardada = MagicMock()
         self.assertFalse(engine.dialect.do_ping(conexion_guardada))
         conexion_guardada.cursor.assert_not_called()
 
-    def test_con_host_vivo_el_pre_ping_es_el_de_siempre(self) -> None:
-        engine, _ = self._engine(lambda: True)
+    def test_con_la_base_bien_el_pre_ping_es_el_de_siempre(self) -> None:
+        engine, _ = self._engine()
         conexion = MagicMock()
         self.assertTrue(engine.dialect.do_ping(conexion))
         conexion.cursor.assert_called()
@@ -104,10 +137,12 @@ class EngineConCorteTests(unittest.TestCase):
 class LatidoAvisaTests(unittest.TestCase):
     """El latido (cada minuto) avisa antes que el watchdog (cada 5 min)."""
 
-    def _latir(self, *, contesta: bool, en_linea: bool) -> MagicMock:
+    def _latir(self, *, contesta: bool, en_linea: bool, ventana: MagicMock | None = None) -> MagicMock:
         from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
 
-        ventana = MagicMock()
+        if ventana is None:
+            ventana = MagicMock()
+            ventana._latidos_sin_base = 0
         ventana.db_en_linea = en_linea
 
         class _Inline:
@@ -123,10 +158,22 @@ class LatidoAvisaTests(unittest.TestCase):
             QuoteSatelliteWindow._enviar_heartbeat(ventana)
         return ventana
 
-    def test_si_no_contesta_pasa_a_modo_local_ya(self) -> None:
+    def test_un_latido_fallido_suelto_no_saca_de_linea(self) -> None:
+        # 2026-11-26: «el kiosko pierde la conexión seguido» con la red bien.
         ventana = self._latir(contesta=False, en_linea=True)
+        ventana._latido_sin_base.emit.assert_not_called()
+
+    def test_dos_latidos_fallidos_seguidos_pasan_a_modo_local(self) -> None:
+        ventana = self._latir(contesta=False, en_linea=True)
+        self._latir(contesta=False, en_linea=True, ventana=ventana)
         ventana._latido_sin_base.emit.assert_called_once()
         ventana._latido_con_base.emit.assert_not_called()
+
+    def test_un_latido_bueno_en_medio_reinicia_la_cuenta(self) -> None:
+        ventana = self._latir(contesta=False, en_linea=True)
+        self._latir(contesta=True, en_linea=True, ventana=ventana)
+        self._latir(contesta=False, en_linea=True, ventana=ventana)
+        ventana._latido_sin_base.emit.assert_not_called()
 
     def test_si_vuelve_estando_sin_conexion_lo_avisa(self) -> None:
         ventana = self._latir(contesta=True, en_linea=False)

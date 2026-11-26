@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import socket
 import threading
 import time
 
@@ -54,63 +53,62 @@ def build_connect_args(statement_timeout_ms: int, solo_lectura: bool = False) ->
 
 
 class CorteDeBase:
-    """¿La PC principal sigue ahí? Contestarlo rápido, sin esperar a Postgres.
+    """¿La PC principal sigue ahí? Si no, fallar al instante en vez de esperar.
 
     Daniel, 2026-11-25: «apago la PC principal antes y el kiosko
-    inmediatamente se pone lento; me ha obligado a encenderla de nuevo o a
-    cerrar el programa». Dos esperas se sumaban en cada toque:
+    inmediatamente se pone lento». Cada intento de conectar a un host
+    apagado esperaba `connect_timeout` (2 s), una y otra vez, en el hilo de
+    la pantalla, hasta que el watchdog (cada 5 min) pasaba a modo local.
 
-    - Las conexiones que el pool ya tenía abiertas: el pre-ping (SELECT 1)
-      se manda a un host apagado y nadie contesta. Windows tarda ~20 s en
-      darse por vencido, una vez por cada conexión guardada. La simulación
-      con un proxy mudo (2026-11-25) se quedó esperando las tres.
-    - Cada conexión nueva: hasta `connect_timeout` (2 s), una y otra vez.
+    Primera versión (a6ea7b42): antes de cada uso se tocaba el puerto con un
+    connect TCP de medio segundo. Al día siguiente el kiosko «perdía la
+    conexión seguido»: su bitácora decía «no contesta» cada 30–60 s mientras
+    una medición desde PowerShell, en el mismo kiosko y el mismo minuto,
+    tenía 60 de 60 respuestas en 4 ms (2026-11-26). Dentro del programa el
+    sondeo fallaba solo: el hilo no recuperaba el GIL a tiempo y su
+    medio segundo vencía con la respuesta ya ahí. Ya no se sondea nada.
 
-    Con esto, antes de reusar una conexión se toca el puerto con un connect
-    TCP de medio segundo (en la LAN tarda milisegundos; no se recuerda el
-    «sí»: la simulación apagó a los pocos segundos de una consulta buena y
-    con el «sí» guardado el pre-ping volvía a esperar para siempre). Si
-    no contesta, el pool se tira y por `ESPERA_TRAS_CAIDA_SEG` todo intento
-    de conectar falla al instante, como si no hubiera red. Lo que ya sabía
-    trabajar sin la PC principal (catálogo local, cola de la Libreta) lo
-    hace sin que la empleada espere.
+    Ahora solo cuentan los intentos de conexión DE VERDAD: con
+    `FALLAS_PARA_CORTAR` seguidos fallidos se da por caída y, por
+    `ESPERA_TRAS_CAIDA_SEG`, todo intento falla al instante (y el pre-ping no
+    toca las conexiones guardadas). El primer intento que entra la levanta.
     """
 
-    TIEMPO_SONDEO_SEG = 0.5
-    ESPERA_TRAS_CAIDA_SEG = 15.0
+    FALLAS_PARA_CORTAR = 2
+    ESPERA_TRAS_CAIDA_SEG = 10.0
 
-    def __init__(self, host: str, port: int, *, reloj=time.monotonic, sondear=None) -> None:
+    def __init__(self, host: str, port: int, *, reloj=time.monotonic) -> None:
         self.host = host
         self.port = int(port)
         self._reloj = reloj
-        self._sondear = sondear or self._sondeo_tcp
         self._lock = threading.Lock()
         self._caida_en: float | None = None
+        self._fallas = 0
 
-    def _sondeo_tcp(self) -> bool:
-        try:
-            with socket.create_connection((self.host, self.port), timeout=self.TIEMPO_SONDEO_SEG):
-                return True
-        except OSError:
-            return False
-
-    def anotar_caida(self) -> None:
+    def anotar_falla(self, motivo: object = None) -> None:
         with self._lock:
-            self._caida_en = self._reloj()
+            self._fallas += 1
+            corta = self._fallas >= self.FALLAS_PARA_CORTAR
+            nueva = corta and self._caida_en is None
+            if corta:
+                self._caida_en = self._reloj()
+        if nueva:
+            import logging
+
+            logging.getLogger(__name__).warning(
+                "La PC principal (%s:%s) no contestó %d veces seguidas; %d s sin intentar. Último error: %s",
+                self.host, self.port, self.FALLAS_PARA_CORTAR, int(self.ESPERA_TRAS_CAIDA_SEG), motivo,
+            )
+
+    def anotar_exito(self) -> None:
+        with self._lock:
+            self._fallas = 0
+            self._caida_en = None
 
     def recien_caida(self) -> bool:
-        """Falló hace poco: ni intentarlo (falla al instante)."""
+        """Se dio por caída hace poco: ni intentarlo (falla al instante)."""
         with self._lock:
             return self._caida_en is not None and self._reloj() - self._caida_en < self.ESPERA_TRAS_CAIDA_SEG
-
-    def host_contesta(self) -> bool:
-        """Sondeo TCP corto. Si contesta, se olvida la caída."""
-        if self._sondear():
-            with self._lock:
-                self._caida_en = None
-            return True
-        self.anotar_caida()
-        return False
 
 
 def _base_no_contesta(corte: CorteDeBase) -> Exception:
@@ -127,9 +125,10 @@ def instalar_corte(engine_pg: Engine, corte: CorteDeBase) -> CorteDeBase:
     ping_original = dialecto.do_ping
 
     def do_ping(dbapi_connection) -> bool:
-        # False = conexión muerta: SQLAlchemy tira TODO el pool y reconecta,
+        # Ya se sabe que no contesta: no esperar a que el SELECT 1 de una
+        # conexión guardada se dé por vencido. False = SQLAlchemy tira el pool
         # y la reconexión cae en el corte de abajo (al instante).
-        if not corte.host_contesta():
+        if corte.recien_caida():
             return False
         return ping_original(dbapi_connection)
 
@@ -137,13 +136,15 @@ def instalar_corte(engine_pg: Engine, corte: CorteDeBase) -> CorteDeBase:
 
     @event.listens_for(engine_pg, "do_connect")
     def _conectar(_dialect, _conn_rec, cargs, cparams):
-        if corte.recien_caida() or not corte.host_contesta():
+        if corte.recien_caida():
             raise _base_no_contesta(corte)
         try:
-            return dialecto.connect(*cargs, **cparams)
-        except dialecto.loaded_dbapi.OperationalError:
-            corte.anotar_caida()
+            conexion = dialecto.connect(*cargs, **cparams)
+        except dialecto.loaded_dbapi.OperationalError as exc:
+            corte.anotar_falla(exc)
             raise
+        corte.anotar_exito()
+        return conexion
 
     engine_pg.corte_de_base = corte  # type: ignore[attr-defined]
     return corte
